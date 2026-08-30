@@ -2943,6 +2943,30 @@
     "mine_none": {
       "text": "nothing shown yet",
       "doc": "Summary when neither allow is on."
+    },
+    "reach_share": {
+      "text": "Share how to reach me",
+      "doc": "Rung 4: the action in a nearby thread that shares my {transport→address} map (all-or-nothing; the NKN address only if the publication lock allows)."
+    },
+    "reach_shared_you": {
+      "text": "You shared how to reach you.",
+      "doc": "Thread line after sharing."
+    },
+    "reach_received": {
+      "text": "{{name}} shared how to reach them — you can now reach them from home.",
+      "doc": "Thread line when their reach arrived (stored on this device like a business card)."
+    },
+    "reach_ask_back": {
+      "text": "{{name}} shared how to reach them — share back?",
+      "doc": "The bar when their reach asked for one back; declining discloses nothing."
+    },
+    "reach_back_yes": {
+      "text": "Share back",
+      "doc": "Accept: share mine back."
+    },
+    "reach_back_no": {
+      "text": "Not now",
+      "doc": "Decline the ask-back; the bar goes away, their card stays."
     }
   },
   "viewAsSplit": {

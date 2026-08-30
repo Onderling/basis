@@ -320,3 +320,48 @@ describe('the invite door — announcing a circle invite into the room', () => {
     expect(await a.announceInvite({ uri: INVITE_URI, circleId: 'c1' })).toMatchObject({ ok: false, reason: 'nobody-nearby', peers: 0 });
   });
 });
+
+describe('rung 4 — the deliberate reach exchange', () => {
+  function reachPair() {
+    const nodes = {};
+    const make = (addr, other, mine) => createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload) => { nodes[to]?.onPeerMessage(addr, JSON.parse(JSON.stringify(payload))); return { delivered: true }; },
+      listPeers: () => [{ pubKey: other }], myAddress: () => addr, now,
+      myAddresses: () => mine,
+    });
+    nodes.a = make('a', 'b', { relay: { url: 'wss://relay.a' }, nkn: { address: 'nkn-a' } });
+    nodes.b = make('b', 'a', { relay: { url: 'wss://relay.b' } });
+    return nodes;
+  }
+
+  it('one tap shares mine and asks back; the other side sees the ask and can answer with theirs', async () => {
+    const { a, b } = reachPair();
+    const atB = []; b.subscribeToReach((r) => atB.push(r));
+    const atA = []; a.subscribeToReach((r) => atA.push(r));
+    const r = await a.shareReach('b');
+    expect(r.ok).toBe(true);
+    expect(atB).toHaveLength(1);
+    expect(atB[0]).toMatchObject({ from: 'a', wantBack: true, transports: { relay: { url: 'wss://relay.a' }, nkn: { address: 'nkn-a' } } });
+    expect(b.pendingReachFrom('a')).toBeTruthy();
+    const back = await b.shareReach('a', { wantBack: false });
+    expect(back.ok).toBe(true);
+    expect(b.pendingReachFrom('a')).toBeNull();               // answering settles the ask
+    expect(atA[0]).toMatchObject({ from: 'b', wantBack: false, transports: { relay: { url: 'wss://relay.b' } } });
+  });
+
+  it('the answer still lands after the sender left the room (the rung is not proximity-gated)', async () => {
+    const b = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [], now });
+    const seen = []; b.subscribeToReach((r) => seen.push(r));
+    expect(b.onPeerMessage('a', { subtype: 'nearby-reach', reach: { transports: { relay: { url: 'wss://x' } }, wantBack: false } })).toBe(true);
+    expect(seen).toHaveLength(1);
+    expect(b.pendingReachFrom('a')).toBeNull();               // a gift needs no settling — no ask-back bar
+  });
+
+  it('a reach with nothing usable in it is refused; sharing with nothing to share says so', async () => {
+    const { b } = reachPair();
+    expect(b.onPeerMessage('a', { subtype: 'nearby-reach', reach: { transports: {} } })).toBe(true);
+    expect(b.pendingReachFrom('a')).toBeNull();
+    const none = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [{ pubKey: 'x' }], now });
+    expect(await none.shareReach('x')).toMatchObject({ ok: false, reason: 'nothing-to-share' });
+  });
+});

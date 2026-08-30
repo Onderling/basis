@@ -19,7 +19,7 @@ describe('the Nearby room reaches both shells', () => {
   it('the binding claims every room subtype', () => {
     const b = createNearbyRoomBinding({ sendPeerMessage: async () => {} });
     for (const s of NEARBY_ROOM_SUBTYPES) expect(typeof b.handlers[s]).toBe('function');
-    expect(NEARBY_ROOM_SUBTYPES).toEqual(['nearby-ask', 'nearby-answer', 'nearby-card', 'nearby-chat', 'nearby-invite', 'nearby-presence']);
+    expect(NEARBY_ROOM_SUBTYPES).toEqual(['nearby-ask', 'nearby-answer', 'nearby-card', 'nearby-chat', 'nearby-invite', 'nearby-presence', 'nearby-reach']);
   });
 
   it('web: the screen gets screenDeps() and the peer router spreads handlers', () => {

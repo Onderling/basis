@@ -1404,6 +1404,18 @@ function ensureNearbyRoom(agent = _peerAgent) {
     listPeers: () => [],
     myAddress: () => agent.identity?.pubKey ?? agent.peer?.address ?? null,
     deliveryMap: deliveryStateMap,   // the SAME map chat's receipts advance
+    // Rung 4 — what "share how to reach me" shares (all-or-nothing; the NKN address only if the
+    // publication lock allows).
+    myAddresses: async () => {
+      const out = {};
+      if (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL) out.relay = { url: CIRCLE_RELAY_URL };
+      try {
+        const allow = agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY);
+        const addr = agent?.peer?.address ?? null;
+        if (allow === true && typeof addr === 'string' && addr) out.nkn = { address: addr };
+      } catch { /* the lock stays closed on a broken read */ }
+      return out;
+    },
     myFace: async () => {
       try {
         const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
@@ -1416,6 +1428,18 @@ function ensureNearbyRoom(agent = _peerAgent) {
   });
   // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
   // answerer's side does.
+  // Rung 4, receive side: store what they chose to give, and say so in the thread.
+  _nearbyRoom.subscribeToReach((r) => {
+    if (!r?.from) return;
+    try {
+      circlePeerGraph?.upsert?.({ type: 'native', pubKey: r.from, transports: r.transports, reachable: true, nearby: true })
+        ?.catch?.(() => {});
+    } catch { /* the line below still tells the person */ }
+    const face = _nearbyRoom.presenceOf?.(r.from)?.label ?? String(r.from).slice(0, 8);
+    const th = contactThreads.get(r.from);
+    if (th) { th.messages.push({ origin: 'bot', text: t('circle.nearbyScreen.reach_received', { name: face }) }); }
+    if (_activeContactThread?.contactId === r.from) _activeContactThread.rerender();
+  });
   _nearbyRoom.subscribeToAnswers((answer) => {
     if (!answer?.from) return;
     const face = _nearbyRoom.presenceOf?.(answer.from)?.label ?? null;
@@ -3049,9 +3073,37 @@ async function showContactThread(contactId) {
   }
 
   const rerender = () => renderContactThread(rootEl, {
-    name, messages: thread.messages, skills, busy, error, t,
+    // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
+    // renderer already knows buttons; the host decides what they do (onButtonTap below).
+    name,
+    messages: (() => {
+      const room = ensureNearbyRoom();
+      const pending = room?.pendingReachFrom?.(thread.peerAddr);
+      const extra = [];
+      if (pending) extra.push({ origin: 'bot', text: t('circle.nearbyScreen.reach_ask_back', { name }), buttons: [
+        { id: 'reach-back-yes', label: t('circle.nearbyScreen.reach_back_yes') },
+        { id: 'reach-back-no', label: t('circle.nearbyScreen.reach_back_no') },
+      ] });
+      else if (thread.transient) extra.push({ origin: 'bot', text: '', buttons: [
+        { id: 'reach-share', label: t('circle.nearbyScreen.reach_share') },
+      ] });
+      return [...thread.messages, ...extra];
+    })(),
+    skills, busy, error, t,
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
+    onButtonTap: async (b) => {
+      const room = ensureNearbyRoom();
+      if (b?.id === 'reach-back-no') { room?.settleReach?.(thread.peerAddr); rerender(); return; }
+      if (b?.id === 'reach-back-yes' || b?.id === 'reach-share') {
+        const r = await room?.shareReach?.(thread.peerAddr, { wantBack: b.id === 'reach-share' });
+        if (r?.ok) {
+          room?.settleReach?.(thread.peerAddr);
+          thread.messages.push({ origin: 'user', text: t('circle.nearbyScreen.reach_shared_you') });
+        }
+        rerender();
+      }
+    },
     onSend: async (text) => {
       // `/skill args` → dispatch as a skill; otherwise a conversational turn.
       if (text.startsWith('/')) {

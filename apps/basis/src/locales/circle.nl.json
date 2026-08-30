@@ -2943,6 +2943,30 @@
     "mine_none": {
       "text": "nog niets getoond",
       "doc": "Summary when neither allow is on."
+    },
+    "reach_share": {
+      "text": "Deel hoe ik bereikbaar ben",
+      "doc": "Rung 4: the action in a nearby thread that shares my {transport→address} map (all-or-nothing; the NKN address only if the publication lock allows)."
+    },
+    "reach_shared_you": {
+      "text": "Je hebt gedeeld hoe je bereikbaar bent.",
+      "doc": "Thread line after sharing."
+    },
+    "reach_received": {
+      "text": "{{name}} deelde hoe die bereikbaar is — je kunt {{name}} nu ook van huis uit bereiken.",
+      "doc": "Thread line when their reach arrived (stored on this device like a business card)."
+    },
+    "reach_ask_back": {
+      "text": "{{name}} deelde hoe die bereikbaar is — ook delen?",
+      "doc": "The bar when their reach asked for one back; declining discloses nothing."
+    },
+    "reach_back_yes": {
+      "text": "Ook delen",
+      "doc": "Accept: share mine back."
+    },
+    "reach_back_no": {
+      "text": "Nu niet",
+      "doc": "Decline the ask-back; the bar goes away, their card stays."
     }
   },
   "viewAsSplit": {

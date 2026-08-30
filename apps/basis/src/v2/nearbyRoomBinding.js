@@ -57,11 +57,35 @@ import { receiveReceipt, deliveryAfterSend } from './deliveryState.js';
 
 export const PRESENCE_MESSAGE = 'nearby-presence';
 export const PRESENCE_MAX_LABEL = 40;
+export const REACH_MESSAGE = 'nearby-reach';
+const REACH_MAX_URL = 200;
+const REACH_MAX_ADDR = 120;
 
 /** Every subtype the room speaks — the shells' routers must carry all of them (a fitness test pins it). */
 export const NEARBY_ROOM_SUBTYPES = Object.freeze([
-  ASK_MESSAGE, ANSWER_MESSAGE, CARD_MESSAGE, CHAT_MESSAGE, INVITE_MESSAGE, PRESENCE_MESSAGE,
+  ASK_MESSAGE, ANSWER_MESSAGE, CARD_MESSAGE, CHAT_MESSAGE, INVITE_MESSAGE, PRESENCE_MESSAGE, REACH_MESSAGE,
 ]);
+
+/**
+ * Rung 4 of the ladder (PLAN-nearby §4): the deliberate `{transport → address}` exchange that turns a café
+ * encounter into a peer you can reach from home. Decided by Frits 2026-08-30: one tap shares MINE and asks
+ * the other side to share back (they may decline); all-or-nothing (the NKN address rides only if the
+ * publication lock allows — the shells decide that inside `myAddresses`); the contact row's change of
+ * state is the confirmation, no extra dialog. A reach payload is rebuilt field by field and capped;
+ * `from` is the wire's.
+ */
+export function receiveReach(payload, fromAddress, now = () => Date.now()) {
+  if (payload?.subtype !== REACH_MESSAGE) return null;
+  const raw = payload.reach;
+  if (!raw || typeof raw !== 'object') return null;
+  const transports = {};
+  const url = typeof raw.transports?.relay?.url === 'string' ? raw.transports.relay.url.trim().slice(0, REACH_MAX_URL) : '';
+  if (url) transports.relay = { url };
+  const nkn = typeof raw.transports?.nkn?.address === 'string' ? raw.transports.nkn.address.trim().slice(0, REACH_MAX_ADDR) : '';
+  if (nkn) transports.nkn = { address: nkn };
+  if (Object.keys(transports).length === 0) return null;
+  return Object.freeze({ from: fromAddress ?? null, transports, wantBack: raw.wantBack === true, at: now() });
+}
 
 /** A presence payload, rebuilt field by field; `from` from the wire. */
 export function receivePresence(payload, fromAddress, now = () => Date.now()) {
@@ -84,7 +108,7 @@ export function receivePresence(payload, fromAddress, now = () => Date.now()) {
  */
 export function createNearbyRoomBinding({
   sendPeerMessage, listPeers = () => [], subscribeToPeers = null, myAddress = () => null, myFace = null,
-  now = () => Date.now(), onError = null, deliveryMap: deliveryMapInput = null,
+  now = () => Date.now(), onError = null, deliveryMap: deliveryMapInput = null, myAddresses = null,
 } = {}) {
   let deliveryMap = deliveryMapInput;
   if (typeof sendPeerMessage !== 'function') throw new TypeError('nearbyRoomBinding: sendPeerMessage required');
@@ -100,6 +124,7 @@ export function createNearbyRoomBinding({
   const heldChat    = [];          // recent lines
   const heldInvites = new Map();   // circleId → invite
   const presence    = new Map();   // from → { label }
+  const pendingReach = new Map();  // from → the reach they sent (held until the shell shows/acts on it)
   const mine = { asks: new Map(), card: null, invites: new Map() };   // what I said, for newcomers
 
   const sweep = () => {
@@ -159,9 +184,10 @@ export function createNearbyRoomBinding({
   };
 
   // ── Subscribers ───────────────────────────────────────────────────────────────────────────────────────
-  const subs = { ask: new Set(), answer: new Set(), card: new Set(), chat: new Set(), invite: new Set(), presence: new Set() };
+  const subs = { ask: new Set(), answer: new Set(), card: new Set(), chat: new Set(), invite: new Set(), presence: new Set(), reach: new Set() };
   const replay = { ask: () => [...heldAsks.values()], card: () => [...heldCards.values()], chat: () => [...heldChat],
-    invite: () => [...heldInvites.values()], presence: () => [...presence.values()], answer: () => [] };
+    invite: () => [...heldInvites.values()], presence: () => [...presence.values()], answer: () => [],
+    reach: () => [...pendingReach.values()] };
   const subscribe = (kind) => (fn) => {
     if (typeof fn !== 'function') return () => {};
     subs[kind].add(fn);
@@ -205,6 +231,15 @@ export function createNearbyRoomBinding({
     [CHAT_MESSAGE]:     gated((from, payload) => land('chat',     receiveChatMessage(payload, from, now), from, payload)),
     [INVITE_MESSAGE]:   gated((from, payload) => land('invite',   receiveInvite(payload, from, now), from, payload)),
     [PRESENCE_MESSAGE]: gated((from, payload) => land('presence', receivePresence(payload, from, now))),
+    // Deliberately NOT gated on the room: the exchange is begun nearby, but the answer ("share back")
+    // may come after one side left the café — refusing it then would break the very act the rung is for.
+    [REACH_MESSAGE]: (from, payload) => {
+      const r = receiveReach(payload, from, now);
+      if (!r) return;
+      if (r.wantBack) pendingReach.set(from, r);   // only an ask-back needs settling; a plain share is a gift
+      deliver('reach', r);
+      confirm(from, payload);
+    },
   };
 
   // ── Newcomers ─────────────────────────────────────────────────────────────────────────────────────────
@@ -284,6 +319,28 @@ export function createNearbyRoomBinding({
         return { ok: false, reason: err?.message ?? 'broadcast-failed' };
       }
     },
+    /**
+     * Rung 4, outbound: share how to reach me with ONE peer (all-or-nothing; the shell's `myAddresses`
+     * decides what "all" is, the publication lock included). `wantBack: true` asks them to share back.
+     */
+    async shareReach(toAddress, { wantBack = true } = {}) {
+      let mine = null;
+      try { mine = await (typeof myAddresses === 'function' ? myAddresses() : null); } catch { mine = null; }
+      const transports = mine && typeof mine === 'object' ? mine : {};
+      if (Object.keys(transports).length === 0) return { ok: false, reason: 'nothing-to-share' };
+      try {
+        await sendPeerMessage(toAddress, { subtype: REACH_MESSAGE, msgId: `reach:${now()}`, reach: { transports, wantBack } });
+        pendingReach.delete(toAddress);   // answering their ask-back settles it
+        return { ok: true, transports };
+      } catch (err) {
+        report(err, 'shareReach');
+        return { ok: false, reason: err?.message ?? 'send-failed' };
+      }
+    },
+    /** A reach this peer sent that the shell has not settled yet (show "share back?" while this is set). */
+    pendingReachFrom: (from) => pendingReach.get(from) ?? null,
+    settleReach: (from) => { pendingReach.delete(from); },
+    subscribeToReach(fn) { return subscribe('reach')(fn); },
     /** The shell's receipt sender goes here — the SAME one chat uses. */
     setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; },
     /** The shell's delivery map — the SAME one chat uses; attachable after creation. */
@@ -314,7 +371,7 @@ export function createNearbyRoomBinding({
       try { unsubscribePeers?.(); } catch { /* best-effort */ }
       for (const s of Object.values(subs)) s.clear();
       heldAsks.clear(); heldCards.clear(); heldChat.length = 0; heldInvites.clear(); presence.clear(); known.clear();
-      heard.clear(); heardSubs.clear();
+      heard.clear(); heardSubs.clear(); pendingReach.clear();
     },
   };
 }

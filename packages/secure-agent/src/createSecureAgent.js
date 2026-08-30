@@ -982,6 +982,9 @@ export async function createSecureAgent(opts = {}) {
     const n = (deliveryFailures.get(addr)?.n ?? 0) + 1;
     deliveryFailures.set(addr, { n, at: Date.now() });
     const writtenOff = holdMaxDeliveryFailures > 0 && n >= holdMaxDeliveryFailures;
+    if (typeof console !== 'undefined') {
+      console.info(`[secure-agent] delivery failure ${n}/${holdMaxDeliveryFailures} for ${String(addr).slice(0, 16)}…${writtenOff ? ' — written off until presence' : ''}`);
+    }
     if (writtenOff) persistHolds();          // the verdict is worth keeping across a restart
     return writtenOff;
   }

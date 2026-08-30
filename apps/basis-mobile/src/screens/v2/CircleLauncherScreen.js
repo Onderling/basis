@@ -1400,6 +1400,7 @@ export default function CircleLauncherScreen({
   const onTab = (id) => {
     if (id === 'screens') setView('screens');
     else if (id === 'circles') { setActiveCircle(null); setSelected(null); setView('list'); }
+    else if (id === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
     else if (id === 'contacten') { setContactThread(null); setView('contacten'); }
     else if (id === 'mij') setView('profile');   // S2 — Mij is now the profile
   };
@@ -1710,13 +1711,15 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <NearbyScreenHost
-        bundle={bundle}
-        onBack={() => setView('list')}
-        onAction={handleNearbyAction}
-        onOpenThread={openNearbyThread}
-        onJoinInvite={(uri) => setJoinArgs({ invite: uri })}
-      />
+      <WithTabBar active="nearby" onSelect={onTab}>
+        <NearbyScreenHost
+          bundle={bundle}
+          onBack={() => setView('list')}
+          onAction={handleNearbyAction}
+          onOpenThread={openNearbyThread}
+          onJoinInvite={(uri) => setJoinArgs({ invite: uri })}
+        />
+      </WithTabBar>
     );
   }
   if (view === 'mythings') {
@@ -1961,11 +1964,11 @@ export default function CircleLauncherScreen({
             keyboardShouldPersistTaps="handled"
           >
             {bundle?.mdns ? (
-              <View style={styles.nearbyRow} testID="circle-nearby">
+              <Pressable style={styles.nearbyRow} testID="circle-nearby" accessibilityRole="button" onPress={() => setView('nearby')}>
                 <Text style={styles.nearbyText}>
                   {formatNearbyLabel(nearbyCount, t)}
                 </Text>
-              </View>
+              </Pressable>
             ) : null}
 
             {/* β.1 — Nearby + Mijn dingen launcher shortcuts removed.

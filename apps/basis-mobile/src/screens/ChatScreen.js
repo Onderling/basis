@@ -474,7 +474,7 @@ export default function ChatScreen({
   // received nothing while looking perfectly healthy. Taking it as an argument is what keeps the empty dep
   // array honest.
   const buildPeerWiring = useCallback(({ bundle, agent, callSkill, contactChannel, pendingPeerRedeems, pendingPersonaProps, sharedWithMeStore }) => {
-    const sendPeer = (addr, payload) => agent.sendPeerMessage(addr, payload);
+    const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
     // A noticeboard post from another member LANDS in the circle store through the task lane (one carry,
     // web parity); the shell bridges it into stoop's index + the notification through the same handler.
     agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
@@ -709,7 +709,7 @@ export default function ChatScreen({
         };
         const govCatchUp = govRail ? makeGovernanceCatchUp({
           rail: govRail,
-          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          sendToPeer: (addr, payload, opts) => bundle?.agent?.sendPeerMessage?.(addr, payload, opts),
           onChange: govChanged,
           // The durable-head serve (same wiring as the web shell): the preserved rules-update
           // statement still reaches a member offline past the lane's audit window.
@@ -722,7 +722,7 @@ export default function ChatScreen({
         const memRail = bundle?.agent?.membershipRail ?? null;
         const memCatchUp = memRail ? makeGovernanceCatchUp({
           rail: memRail,
-          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          sendToPeer: (addr, payload, opts) => bundle?.agent?.sendPeerMessage?.(addr, payload, opts),
           subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
         }) : null;
         if (memCatchUp && !globalThis.__onderlingMemCatchUpKicked) {
@@ -769,7 +769,7 @@ export default function ChatScreen({
         const taskRail = bundle?.agent?.taskRail ?? null;
         const taskCatchUp = taskRail ? makeFrontierReplay({
           rail: taskRail,
-          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          sendToPeer: (addr, payload, opts) => bundle?.agent?.sendPeerMessage?.(addr, payload, opts),
           subtypes: TASK_CATCHUP_SUBTYPES,
           statementsFor: (cid) => taskRail.catchUpStatements(cid),
         }) : null;
@@ -816,7 +816,7 @@ export default function ChatScreen({
         }
         const chatCatchUp = chatLaneRail ? makeFrontierReplay({
           rail: chatLaneRail,
-          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          sendToPeer: (addr, payload, opts) => bundle?.agent?.sendPeerMessage?.(addr, payload, opts),
           subtypes: CHAT_CATCHUP_SUBTYPES,
           onOffer: ({ circleId: cid, count, approxBytes, allow }) => {
             const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
@@ -845,7 +845,7 @@ export default function ChatScreen({
         }) : null;
         const keyCatchUp = keyLaneRail ? makeGovernanceCatchUp({
           rail: keyLaneRail,
-          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          sendToPeer: (addr, payload, opts) => bundle?.agent?.sendPeerMessage?.(addr, payload, opts),
           subtypes: KEY_CATCHUP_SUBTYPES,
           onChange: (cid) => refreshCircleKeyEventsFromLane(keyLaneRail, cid).catch(() => {}),
         }) : null;
@@ -1023,7 +1023,7 @@ export default function ChatScreen({
         const agentRef = bootState.bundle.agent;
         const calendarHook = makeCalendarOutboundHook({
           callSkill:       bootState.bundle.callSkill,
-          sendPeer:        (addr, payload) => agentRef.sendPeerMessage(addr, payload),
+          sendPeer:        (addr, payload, opts) => agentRef.sendPeerMessage(addr, payload, opts),
           isPeerConnected: () => agentRef?.peer?.status === 'connected',
           publishEvent:    (e) => {
             if (!e || typeof e !== 'object') return;

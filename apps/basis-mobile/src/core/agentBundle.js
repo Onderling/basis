@@ -120,6 +120,8 @@ async function loadCreateRealHouseholdAgent() {
 // native module guard inside MdnsTransport.isAvailable() short-circuits
 // to false when MdnsModule isn't compiled in (e.g. iOS, Expo Go) — so
 // failure is silent and the "Nearby" UI row simply doesn't render.
+import { DISCOVERABILITY } from '@onderling/core';
+
 async function loadMdnsTransport() {   // (batch 7) unused — kept one release for the stoop-mobile mirror; builder owns construction now
   try {
     const mod = await import('../../../../packages/react-native/src/transport/MdnsTransport.js');
@@ -447,6 +449,11 @@ export async function bootAgentBundle(opts = {}) {
       const built = await buildMeshTransports({
         identity: chatIdentity,
         enable: { ble: false, relay: false },
+        // Rest in BROWSE: see the room, announce nothing. The builder's default is PUBLISH and the native
+        // start() announces, so without this the phone advertised `_onderling._tcp` with its pubKey at all
+        // times — the presence beacon the companion's L61 decision refused. Opening the Nearby screen
+        // raises to PUBLISH for as long as it is open (nearbyDiscoverability.js); closing it drops back.
+        discoverability: DISCOVERABILITY.BROWSE,
         hostnamePrefix: 'cc',
         permissions: { ble: false },
       });
@@ -466,6 +473,12 @@ export async function bootAgentBundle(opts = {}) {
       } catch (err) {
         console.warn('[cc/boot] mDNS router-inject failed (Nearby still works):', err?.message ?? err);
       }
+      // The control above was built over an empty thunk; anything the UI asked meanwhile (Nearby opened
+      // during the seconds this build takes) got "nothing can discover" as its answer. Settle now that the
+      // transport is here, so the screen's banner tells the truth without a reopen.
+      try { await discoverability.settle(); } catch (err) { console.warn('[cc/boot] discoverability settle:', err?.message ?? err); }
+      // Same for the peer list: a screen that subscribed before this point bound to no transport at all.
+      try { nearbyPeers.rebind(); } catch (err) { console.warn('[cc/boot] nearby peers rebind:', err?.message ?? err); }
     } catch (err) {
       console.warn('[cc/boot] mDNS init failed (best-effort):', err?.message ?? err);
     }
@@ -720,7 +733,7 @@ export async function bootAgentBundle(opts = {}) {
   // the same sender, so a v2 join correlates with the already-wired response handler. No double-wiring.
   const pendingPeerRedeems = new Map();
   const sendPeerRedeem = makeSendGroupRedeemRequest({
-    sendPeer:        (addr, payload) => agent.sendPeerMessage(addr, payload),
+    sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // Identity 5B/C — present this device's per-circle address on the peer redeem path (parity with web).
@@ -735,7 +748,7 @@ export async function bootAgentBundle(opts = {}) {
   // this sender via shareDisclosureToCircle.
   const pendingPersonaProps = new Map();
   const sendPersonaUpdate = makeSendPersonaPropsUpdate({
-    sendPeer:        (addr, payload) => agent.sendPeerMessage(addr, payload),
+    sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPersonaProps,
     circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,

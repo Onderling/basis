@@ -20,11 +20,11 @@ import { basisManifest } from '../../basis/src/index.js';
 import { t } from '../src/core/localisation.js';
 
 describe('D / Surface 1 — mobile CircleTabBar roster from the manifest projection', () => {
-  it('renderMobile projects the four tabs in order with their locale keys', () => {
+  it('renderMobile projects the five tabs in order with their locale keys', () => {
     const tabs = circleTabsMobile(basisManifest);
-    expect(tabs.map((tab) => tab.id)).toEqual(['screens', 'circles', 'contacten', 'mij']);
+    expect(tabs.map((tab) => tab.id)).toEqual(['screens', 'circles', 'nearby', 'contacten', 'mij']);
     expect(tabs.map((tab) => tab.labelKey)).toEqual([
-      'circle.tab.screens', 'circle.tab.circles', 'circle.tab.contacten', 'circle.tab.mij',
+      'circle.tab.screens', 'circle.tab.circles', 'circle.tab.nearby', 'circle.tab.contacten', 'circle.tab.mij',
     ]);
   });
 

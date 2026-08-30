@@ -4716,7 +4716,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
     screen.open();
     return () => { off(); screen.close(); };
   }, [screen]);
-  // J-N5 — backgrounding stops advertising. The screen stays mounted when the app goes to the background,
+  // Backgrounding stops advertising. The screen stays mounted when the app goes to the background,
   // so nothing closed the session and the phone kept announcing for as long as it was in a pocket (wire
   // check, 2026-08-30). The room is "while this screen is open" — a screen you cannot see is not open.
   useEffect(() => {

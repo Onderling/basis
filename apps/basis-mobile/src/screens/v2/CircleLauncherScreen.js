@@ -4791,6 +4791,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
       onCompose={() => { setNotice(null); setComposing(true); }}
       composing={composing}
       answering={!!answering}
+      answeringAsk={answering ? (model?.asks?.find?.((e) => e?.ask?.id === answering)?.ask ?? null) : null}
       notice={notice}
       onSubmitAsk={submitAsk}
       onSubmitAnswer={submitAnswer}
@@ -4812,7 +4813,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
   model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, onSubmitAnswer, onCancel, onToggleAllow, onSubmitCard, onSay, onInviteAction,
+  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -4871,11 +4872,6 @@ function NearbyScreen({
               {row.card?.tags?.length ? <Text style={styles.rowMeta}>{row.card.tags.join(', ')}</Text> : null}
               {/* Rule (b): a stranger you can see is still a stranger — say it, rather than letting the
                   absence of an "open" button be the only hint. */}
-              {row.note === 'nearby-not-member' ? (
-                <Text style={styles.rowMeta} testID={`nearby-note-${row.id || row.pseudonym}`}>
-                  {t('circle.nearbyScreen.not_member_note')}
-                </Text>
-              ) : null}
               {Array.isArray(row.actions) && row.actions.some((a) => NEARBY_ACTION_LABELS[a]) ? (
                 <View style={styles.nearbyActions}>
                   {row.actions.filter((a) => NEARBY_ACTION_LABELS[a]).map((action) => (
@@ -4897,18 +4893,26 @@ function NearbyScreen({
       )}
       {/* Asks (step F). Every live ask shows, matching or not — filtering the room to what resonates
           would make it a recommender, and would leak my own drivers into what I am able to see. */}
+      {rows.some((row) => row.note === 'nearby-not-member') ? (
+        // Rule (b), said ONCE for the room rather than under every stranger: a person you can see is
+        // still a stranger.
+        <Text style={styles.muted} testID="nearby-note">{t('circle.nearbyScreen.not_member_note')}</Text>
+      ) : null}
       <View style={styles.nearbyAsks} testID="nearby-asks">
         <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.asks_title')}</Text>
         {composing || answering ? (
           // Inline, not a modal: the room stays visible while you type. You are about to say something out
           // loud in a place where you can see who is standing there.
           <View style={styles.nearbyComposer} testID="nearby-ask-composer">
+            {answering && answeringAsk?.text ? (
+              <Text style={styles.rowMeta} testID="nearby-answering-to">{t('circle.nearbyScreen.answering_to', { text: answeringAsk.text })}</Text>
+            ) : null}
             <TextInput
               style={styles.nearbyInput}
               value={draft}
               onChangeText={setDraft}
               maxLength={280}
-              placeholder={t('circle.nearbyScreen.ask_placeholder')}
+              placeholder={t(answering ? 'circle.nearbyScreen.answer_placeholder' : 'circle.nearbyScreen.ask_placeholder')}
               testID="nearby-ask-input"
               autoFocus
             />
@@ -4922,7 +4926,7 @@ function NearbyScreen({
               testID="nearby-ask-send"
               style={styles.nearbyAction}
             >
-              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.ask_send')}</Text>
+              <Text style={styles.nearbyActionText}>{t(answering ? 'circle.nearbyScreen.answer_send' : 'circle.nearbyScreen.ask_send')}</Text>
             </Pressable>
             <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
               <Text style={styles.nearbyActionText}>{t('circle.back')}</Text>
@@ -4949,6 +4953,11 @@ function NearbyScreen({
             ) : null}
             {/* Shown to me, sent nowhere — the reminder that replying is what reveals me. */}
             <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_disclosure')}</Text>
+            {typeof entry.ask?.expiresAt === 'number' ? (
+              <Text style={styles.rowMeta} testID={`nearby-ask-clock-${entry.ask?.id}`}>
+                {t('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) })}
+              </Text>
+            ) : null}
             {Array.isArray(entry.actions) && entry.actions.some((a) => NEARBY_ASK_LABELS[a]) ? (
               <View style={styles.nearbyActions}>
                 {entry.actions.filter((a) => NEARBY_ASK_LABELS[a]).map((action) => (

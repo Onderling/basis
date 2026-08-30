@@ -2102,6 +2102,28 @@ export default function CircleLauncherScreen({
                       {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
                     </Text>
                   ) : null}
+                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
+                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="invite-announce-nearby"
+                    onPress={async () => {
+                      const res = await bundle?.nearbyRoom?.announceInvite?.({
+                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
+                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
+                      }) ?? { ok: false, reason: 'nobody-nearby' };
+                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
+                    }}
+                  >
+                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
+                  </Pressable>
+                  {inviteFor.announced ? (
+                    <Text style={styles.inviteHint} testID="invite-announce-result">
+                      {inviteFor.announced.ok
+                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
+                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
+                    </Text>
+                  ) : null}
                 </>
               ) : (
                 <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>

@@ -13,6 +13,7 @@
  * Flagged for device verification.
  */
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
+import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle } from 'react-native';
 import { useTheme } from './themeContext.js';
@@ -4660,6 +4661,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
   const [notice, setNotice] = useState(null);
 
   const screen = useMemo(() => createNearbyScreen({
+    ...(bundle?.nearbyRoom?.screenDeps?.() ?? {}),
     control:            bundle?.discoverability ?? null,
     subscribeToPeers:   bundle?.nearbyPeers ? (fn) => bundle.nearbyPeers.subscribe(fn) : null,
     subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
@@ -4676,6 +4678,13 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
     screen.open();
     return () => { off(); screen.close(); };
   }, [screen]);
+  // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
+  // answerer's side does.
+  useEffect(() => {
+    const sub = bundle?.nearbyRoom?.subscribeToAnswers;
+    if (typeof sub !== 'function') return undefined;
+    return sub((answer) => { if (answer?.from) onOpenThread?.(nearbyThreadDescriptor(answer.from)); });
+  }, [bundle, onOpenThread]);
 
   const submitAsk = useCallback(async (text) => {
     const r = await screen.askRoom({ text });

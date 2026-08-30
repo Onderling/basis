@@ -49,6 +49,7 @@ import { sendA2ATask } from '@onderling/core';
 // the signal the surface is missing an affordance, and the Nearby screen doing exactly that is why it was
 // mDNS-only and blind to BLE.
 import { createDiscoverabilityControl, createNearbyPeerSource } from '@onderling/core';
+import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -430,6 +431,15 @@ export async function bootAgentBundle(opts = {}) {
     ),
   });
   const nearbyPeers = createNearbyPeerSource({ transports: meshTransports });
+  // The Nearby room's wire binding (nearbyRoomBinding.js): outbound over the agent's peer send to the
+  // room's current peers, inbound through the shell's peer router (`...nearbyRoom.handlers`). Lazy on the
+  // agent, like everything else here built before the agent lands.
+  const nearbyRoom = createNearbyRoomBinding({
+    sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
+    listPeers: () => nearbyPeers.list(),
+    myAddress: () => agent?.sa?.agent?.identity?.pubKey ?? null,
+    onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
+  });
 
   (async () => {
     try {
@@ -831,6 +841,7 @@ export async function bootAgentBundle(opts = {}) {
     // The surface. Prefer these over `mdns` in app code — see the import comment above.
     discoverability,
     nearbyPeers,
+    nearbyRoom,
     attachPeerWiring,
     dispose: async () => {
       try { contactSkills.dispose(); } catch { /* defensive */ }

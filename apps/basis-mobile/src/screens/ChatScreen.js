@@ -874,6 +874,8 @@ export default function ChatScreen({
           ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),
           ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail, onChange: (circleId) => bundle?.agent?.rosterReads?.invalidate(circleId) }) } : {}),
           ...(memCatchUp ? { [memCatchUp.subtypes.request]: memCatchUp.onRequest, [memCatchUp.subtypes.batch]: memCatchUp.onBatch } : {}),
+          // The Nearby room's inbound side — asks, answers, cards, room chat, broadcast invites (nearbyRoomBinding.js).
+          ...(bundle?.nearbyRoom?.handlers ?? {}),
           // The grants lane: a sibling device's grant/revoke lands through the agent's ready-made
           // receiver and refolds the door's grant set live (same wiring as the web shell).
           ...(bundle?.agent?.grantsPeerHandler ? { [GRANTS_BROADCAST]: bundle.agent.grantsPeerHandler } : {}),

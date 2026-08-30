@@ -245,22 +245,27 @@ export class MdnsTransport extends Transport {
   }
 
   /**
-   * Freshness threshold for canReach().  mDNS connections can go silent
-   * without closing (Wi-Fi drop, peer moved subnet), leaving a live
-   * socket that no longer delivers data.  A peer whose last observed
-   * activity is beyond this window is treated as unreachable so
-   * RoutingStrategy falls through to BLE / relay instead.
+   * How long a connection may sit silent before `lastActivityAt` counts as stale — a DIAGNOSTIC, no
+   * longer the routing rule. It used to gate `canReach()`: a peer quiet for 30 s was "unreachable" so the
+   * router would fall through to BLE / relay after a Wi-Fi drop left a half-open socket. On a LAN that made
+   * every idle peer unroutable — the Nearby room's whole population sits idle between asks — and the
+   * phone's first ask to a peer it had listed for a minute went out over NKN and timed out (2026-08-30).
    */
   static FRESHNESS_MS = 30_000;
 
   /**
-   * Routing hint (Group EE).  Reachable iff we have a live TCP connection
-   * AND we've seen activity on it within the freshness window.
+   * Routing hint (Group EE). Reachable iff we hold a live TCP connection to the peer — the socket is the
+   * truth. A half-open socket after a Wi-Fi drop is caught where it shows: the send fails, the native side
+   * closes and reports the connection, the maps clear, and the router's failure path picks another route.
    */
   canReach(pubKey) {
-    if (!this.#pubKeyToConn.has(pubKey)) return false;
-    const last = this.#lastActivity.get(pubKey) ?? 0;
-    return (Date.now() - last) < MdnsTransport.FRESHNESS_MS;
+    return this.#pubKeyToConn.has(pubKey);
+  }
+
+  /** Has this peer's connection been silent for longer than the freshness window? Diagnostics only. */
+  isStale(pubKey) {
+    if (!this.#pubKeyToConn.has(pubKey)) return true;
+    return (Date.now() - (this.#lastActivity.get(pubKey) ?? 0)) >= MdnsTransport.FRESHNESS_MS;
   }
 
   /**

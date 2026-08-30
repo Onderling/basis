@@ -117,3 +117,17 @@ describe('sendMessage reports what actually happened (G8/G9/G10)', () => {
   });
 });
 
+
+describe('the message event carries the raw payload too', () => {
+  it('a one-way `{ subtype, … }` payload (no parts) reaches the listener as `payload`', async () => {
+    const { alice, bob } = await makePair();
+    const got = new Promise((res) => bob.on('message', res));
+    const t = await alice.transportFor(bob.address);
+    await t.sendOneWay(bob.address, { subtype: 'nearby-ask', ask: { id: 'a1', text: 'ladder?' } });
+    const msg = await got;
+    expect(msg.from).toBe(alice.address);
+    expect(msg.parts).toEqual([]);
+    expect(msg.payload).toEqual({ subtype: 'nearby-ask', ask: { id: 'a1', text: 'ladder?' } });
+    await alice.stop(); await bob.stop();
+  });
+});

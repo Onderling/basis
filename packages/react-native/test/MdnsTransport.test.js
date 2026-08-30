@@ -157,6 +157,24 @@ describe('MdnsTransport', () => {
     expect(transport.connectedPeers()).toEqual([remoteHigher]);
   });
 
+  it('an idle connection stays reachable — the socket is the truth, silence is only "stale"', async () => {
+    // The 30 s freshness window used to gate canReach(): a Nearby peer listed for a minute without a word
+    // was "unreachable", the router chose NKN for the first ask, and the ask timed out on the wrong network.
+    vi.useFakeTimers();
+    try {
+      await transport.connect();
+      const discovered = new Promise((res) => transport.once('peer-discovered', res));
+      fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
+      await discovered;
+      vi.advanceTimersByTime(5 * 60_000);
+      expect(transport.canReach(remoteHigher)).toBe(true);
+      expect(transport.isStale(remoteHigher)).toBe(true);
+      fireMdns('MdnsClientDisconnected', { connectionId: 'conn-1' });
+      await Promise.resolve();
+      expect(transport.canReach(remoteHigher)).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('inbound connection identified by a hello frame → peer-discovered', async () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));

@@ -738,6 +738,8 @@ import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
+import { createNearbyRoomBinding } from '../../src/v2/nearbyRoomBinding.js';
+import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
@@ -1388,6 +1390,26 @@ let   CIRCLE_RELAY_URL      = bootRelayUrl({
   })(),
 });
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
+/**
+ * The Nearby room's wire binding (asks, answers, cards, chat, invites over `sendPeerMessage`), built once
+ * the agent exists and shared by the screen (outbound + its subscriptions) and the peer router (inbound).
+ * Web has no local-network transport yet, so the room's peer list is empty here — but an answer or ask
+ * that reaches this address still lands, and the day a browser transport lands nothing here changes.
+ */
+let   _nearbyRoom          = null;
+function ensureNearbyRoom(agent = _peerAgent) {
+  if (_nearbyRoom || !agent || typeof agent.sendPeerMessage !== 'function') return _nearbyRoom;
+  _nearbyRoom = createNearbyRoomBinding({
+    sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
+    listPeers: () => [],
+    myAddress: () => agent.identity?.pubKey ?? agent.peer?.address ?? null,
+    onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
+  });
+  // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
+  // answerer's side does.
+  _nearbyRoom.subscribeToAnswers((answer) => { if (answer?.from) openNearbyThread(nearbyThreadDescriptor(answer.from)); });
+  return _nearbyRoom;
+}
 let   _peerRouter          = null;
 // Phase 4 §9 — device transport-mode preference (nkn|relay|both). One home since the
 // device-params consolidation: the parameter register (realAgent applies it at boot + on a
@@ -3522,6 +3544,7 @@ function showNearby() {
   // lands, it is these two lines that change and nothing else.
   const mesh = null;
   nearbyScreen = createNearbyScreen({
+    ...(ensureNearbyRoom()?.screenDeps() ?? {}),
     control:            mesh?.discoverability ?? null,
     subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
     subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
@@ -8121,6 +8144,8 @@ async function boot() {
           // record it as a SILENT stream entry (never a chat bubble, never a wake) and re-read
           // those rows from the roster. The values are never on this wire.
           'roster-updated':          makeRosterUpdatedPeerHandler({ eventLog, onPull: pullRosterForCircle }),
+          // The Nearby room's inbound side — asks, answers, cards, room chat, broadcast invites (nearbyRoomBinding.js).
+          ...(ensureNearbyRoom(agent)?.handlers ?? {}),
           // a contact-bot's reply in its 1:1 DM thread (guarded: the channel
           // is null if buildCircleBot threw, and must not break the peer router).
           // S1 #3 — also handle an inbound PEER DM (contact-msg): a person's message

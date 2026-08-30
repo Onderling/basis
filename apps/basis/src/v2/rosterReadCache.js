@@ -20,7 +20,7 @@
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
- * How long one roster answer serves every caller. Measured on the A33: the boot kicks (one per lane, 2–3.5 s
+ * How long one roster answer serves every caller. Measured on the phone: the boot kicks (one per lane, 2–3.5 s
  * apart on paper) land 10–20 s apart because each read costs the saturated JS thread ~0.5 s, so a 5 s
  * window never overlapped two lanes. 30 s covers the whole boot sequence; a membership change inside the
  * window clears it (writes through the waist, landed statements, the store's own change event).

@@ -53,8 +53,12 @@ export async function sendMessage(agent, peerId, partsOrValue, opts = {}) {
  */
 export function handleMessage(agent, envelope) {
   const parts = envelope.payload?.parts ?? [];
+  // `payload` rides along for app-level protocols that are not Parts — a one-way `{ subtype, … }` the way
+  // the shells' peer send puts it on the wire (the Nearby room, for one). A core agent that only saw
+  // `parts` could never take part in them; it received the envelope and heard nothing.
   agent.emit('message', {
-    from:  envelope._from,
+    from:    envelope._from,
     parts,
+    payload: envelope.payload ?? null,
   });
 }

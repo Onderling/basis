@@ -10,7 +10,8 @@
  *
  * Mocks mirror the real canReach contracts:
  *   • BleTransport.canReach(pk) = _hasPeer(pk) OR pk looks like a BLE MAC
- *   • MdnsTransport.canReach(pk) = _hasPeer(pk) AND activity is fresh
+ *   • MdnsTransport.canReach(pk) = _hasPeer(pk) (the socket is the truth; `fresh` here models a
+ *     transport that additionally demotes itself, which the real one no longer does)
  *   • RelayTransport.canReach(_) = this.connected (WS open)
  *   • OfflineTransport.canReach(_) = false (fallback only)
  *

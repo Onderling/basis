@@ -20,6 +20,7 @@
   "exports": {
     ".": "./src/index.js",
     "./mdns": "./src/MdnsTransport.js",
+    "./mdns-node": "./src/mdnsNodeBackend.js",
     "./utils/base64": "./src/utils/base64.js"
   },
   "scripts": {

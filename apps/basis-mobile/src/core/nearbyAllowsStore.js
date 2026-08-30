@@ -18,7 +18,7 @@ AsyncStorage.getItem(KEY)
 export function readNearbyAllows() { return cached; }
 
 /**
- * "You here" opens on the FIRST-ever open of Nearby only (L66a): true once, then never again.
+ * "You here" opens on the FIRST-ever open of Nearby only: true once, then never again.
  * Synchronous like the allows cache; before the prime lands the answer is false (folded), which only
  * costs the very first open on a cold cache — honest enough.
  */
@@ -30,6 +30,20 @@ export function firstNearbyMineOpen() {
   seen = true;
   AsyncStorage.setItem(SEEN_KEY, '1').catch(() => {});
   return true;
+}
+
+/**
+ * The room face: which of the existing circle-style faces this device presents in Nearby —
+ * 'name' (displayName, the default) · 'handle' · 'none'. Per device, like the allows.
+ */
+const FACE_KEY = 'cc.nearbyFace';
+let face = 'name';
+AsyncStorage.getItem(FACE_KEY).then((raw) => { if (raw === 'handle' || raw === 'none' || raw === 'name') face = raw; }).catch(() => {});
+export function readNearbyFace() { return face; }
+export function writeNearbyFace(next) {
+  if (next !== 'name' && next !== 'handle' && next !== 'none') return;
+  face = next;
+  AsyncStorage.setItem(FACE_KEY, next).catch(() => {});
 }
 
 export function writeNearbyAllows(next) {

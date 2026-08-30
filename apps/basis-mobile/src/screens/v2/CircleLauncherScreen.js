@@ -14,7 +14,7 @@
  */
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
-import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen } from '../../core/nearbyAllowsStore.js';
+import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace } from '../../core/nearbyAllowsStore.js';
 import { pushContactReply } from '../../core/contactReplyInbox.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState } from 'react-native';
@@ -4808,6 +4808,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
       onSubmitCard={submitCard}
       onSay={say}
       onInviteAction={inviteAction}
+      onFaceChange={() => bundle?.nearbyRoom?.announceFace?.()}
       onCompose={() => { setNotice(null); setComposing(true); }}
       composing={composing}
       answering={!!answering}
@@ -4833,7 +4834,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
   model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onSubmitCard, onSay, onInviteAction,
+  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onFaceChange, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -4854,7 +4855,8 @@ function NearbyScreen({
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
   useEffect(() => { setDraft(''); }, [composing, answering]);
   const [bannerOpen, setBannerOpen] = useState(false);
-  // "You here" opens on the FIRST-ever open only (L66a), so the card/chat toggles are discovered once.
+  const [faceChoice, setFaceChoice] = useState(() => readNearbyFace());
+  // "You here" opens on the FIRST-ever open only. so the card/chat toggles are discovered once.
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   return (
     <View style={styles.page} testID="circle-nearby-screen">
@@ -5046,6 +5048,24 @@ function NearbyScreen({
         </Text>
       </Pressable>
       {mineOpen ? (<>
+      {/* The room face: the SAME faces a circle offers — name, handle, or nobody. */}
+      <View style={styles.nearbyAsks} testID="nearby-face">
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.face_row')}</Text>
+        <View style={styles.nearbyActions}>
+          {['name', 'handle', 'none'].map((v) => (
+            <Pressable
+              key={v}
+              accessibilityRole="button"
+              testID={`nearby-face-${v}`}
+              style={styles.nearbyAction}
+              onPress={() => { writeNearbyFace(v); setFaceChoice(v); onFaceChange?.(v); }}
+            >
+              <Text style={styles.nearbyActionText}>{(faceChoice === v ? '● ' : '○ ') + t(`circle.nearbyScreen.face_${v}`)}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.muted}>{t('circle.nearbyScreen.face_caveat')}</Text>
+      </View>
       {/* Cards + chat, each behind its own per-device allow (step G). */}
       <View style={styles.nearbyAsks} testID="nearby-allows">
         {['card', 'chat'].map((key) => (

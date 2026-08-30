@@ -51,6 +51,7 @@ import { sendA2ATask } from '@onderling/core';
 import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
+import { readNearbyFace } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -454,12 +455,15 @@ export async function bootAgentBundle(opts = {}) {
       } catch { /* the lock stays closed on a broken read */ }
       return out;
     },
-    // The face this device presents in the room: the person's display name or handle, a label only.
+    // The face this device presents in the room: the SAME faces a circle offers — displayName,
+    // handle, or nobody — chosen per device in "You here" (nearbyAllowsStore), a label only.
     myFace: async () => {
       try {
+        const choice = readNearbyFace();
+        if (choice === 'none') return null;
         const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
         const e = r?.entry ?? {};
-        const label = e.displayName ?? e.handle ?? null;
+        const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
         return label ? { label: String(label) } : null;
       } catch { return null; }
     },

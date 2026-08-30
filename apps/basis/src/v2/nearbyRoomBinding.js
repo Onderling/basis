@@ -34,6 +34,7 @@
  * `from`. The ephemeral room address is rung-4 work (address exchange), recorded, not faked here.
  */
 import { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE } from './nearbyAskChannel.js';
+import { isAskLive, ASKS_MAX_KEPT } from './nearbyAsks.js';
 import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE } from './nearbyRoom.js';
 import { receiveInvite, INVITE_MESSAGE } from './nearbyInvites.js';
 
@@ -65,12 +66,28 @@ export function createNearbyRoomBinding({
 
   // One subscriber set per kind. A throwing subscriber must not stop its siblings or the router.
   const subs = { ask: new Set(), answer: new Set(), card: new Set(), chat: new Set(), invite: new Set() };
+  // Asks outlive the moment they arrive. The Nearby screen subscribes only while it is open, and a peer
+  // asks whoever it lists — including a phone whose person is in a thread or on another tab right now.
+  // Walked 2026-08-30: an ask from the other phone arrived while this one was answering the companion,
+  // nobody was subscribed, and it was gone; the asker had been told "asked 2 of 2". So live asks are kept
+  // here, bounded by their own expiry and the room's cap, and handed to the next subscriber.
+  const heldAsks = new Map();   // ask.id → ask
+  const sweepAsks = () => { for (const [id, ask] of heldAsks) if (!isAskLive(ask, now)) heldAsks.delete(id); };
   const subscribe = (kind) => (fn) => {
     if (typeof fn !== 'function') return () => {};
     subs[kind].add(fn);
+    if (kind === 'ask') {
+      sweepAsks();
+      for (const ask of heldAsks.values()) { try { fn(ask); } catch (err) { report(err, 'deliver:ask'); } }
+    }
     return () => { subs[kind].delete(fn); };
   };
   const deliver = (kind, value) => {
+    if (kind === 'ask' && value?.id) {
+      sweepAsks();
+      heldAsks.set(value.id, value);
+      while (heldAsks.size > ASKS_MAX_KEPT) heldAsks.delete(heldAsks.keys().next().value);
+    }
     for (const fn of subs[kind]) { try { fn(value); } catch (err) { report(err, `deliver:${kind}`); } }
   };
 
@@ -133,6 +150,8 @@ export function createNearbyRoomBinding({
         myRoomAddress:      this.myRoomAddress,
       };
     },
-    close() { for (const s of Object.values(subs)) s.clear(); },
+    /** Live asks held for the next subscriber (diagnostics / tests). */
+    heldAsks: () => { sweepAsks(); return [...heldAsks.values()]; },
+    close() { for (const s of Object.values(subs)) s.clear(); heldAsks.clear(); },
   };
 }

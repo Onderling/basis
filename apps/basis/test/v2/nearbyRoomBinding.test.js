@@ -107,6 +107,34 @@ describe('who may speak — the room is who the surface lists', () => {
   });
 });
 
+describe('an ask that arrives while nobody is listening', () => {
+  it('is held (while live) and handed to the next subscriber — the screen was closed, the room was not', async () => {
+    const { a, b } = pair();
+    const ask = createAsk({ text: 'anyone?', from: 'a', now }).ask;
+    await a.askChannel.broadcast(ask);                     // b has no subscriber yet
+    expect(b.heldAsks().map((x) => x.id)).toEqual([ask.id]);
+    const seen = [];
+    b.subscribeToAsks((x) => seen.push(x));                // the screen opens
+    expect(seen.map((x) => x.id)).toEqual([ask.id]);
+  });
+
+  it('an expired ask is not replayed', async () => {
+    let t = T0;
+    const nodes = {};
+    const make = (addr, other) => createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload) => { nodes[to]?.onPeerMessage(addr, payload); },
+      listPeers: () => [{ pubKey: other }], myAddress: () => addr, now: () => t,
+    });
+    nodes.a = make('a', 'b'); nodes.b = make('b', 'a');
+    await nodes.a.askChannel.broadcast(createAsk({ text: 'soon gone', from: 'a', now: () => t, ttlMs: 60_000 }).ask);
+    t += 61_000;
+    const seen = [];
+    nodes.b.subscribeToAsks((x) => seen.push(x));
+    expect(seen).toHaveLength(0);
+    expect(nodes.b.heldAsks()).toHaveLength(0);
+  });
+});
+
 describe('the router', () => {
   it('claims exactly the room\'s subtypes and leaves the rest to other handlers', () => {
     const { b } = pair();
@@ -132,9 +160,12 @@ describe('the router', () => {
     off();
     await a.askChannel.broadcast(createAsk({ text: 'two', from: 'a', now }).ask);
     expect(fn).toHaveBeenCalledTimes(1);
-    b.subscribeToAsks(fn); b.close();
+    b.subscribeToAsks(fn);                                 // re-opening replays the live asks (one, two)
+    expect(fn).toHaveBeenCalledTimes(3);
+    b.close();
     await a.askChannel.broadcast(createAsk({ text: 'three', from: 'a', now }).ask);
-    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenCalledTimes(3);
+    expect(b.heldAsks()).toHaveLength(1);                 // held for whoever opens the room next
   });
 });
 

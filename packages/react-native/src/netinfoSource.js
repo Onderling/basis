@@ -62,14 +62,22 @@ export function subscribeToNetInfo(onEvent, { netInfo = NetInfo } = {}) {
   // subscribe" exists to prevent, arriving one layer lower.
   let last;
   let primed = false;
-
-  const unsubscribe = netInfo.addEventListener((state) => {
-    const next = fingerprint(state);
-    if (!primed) { primed = true; last = next; return; }
-    if (next === last) return;      // an update that changes nothing we route on
-    last = next;
-    onEvent();
-  });
+  let unsubscribe = null;
+  try {
+    unsubscribe = netInfo.addEventListener((state) => {
+      const next = fingerprint(state);
+      if (!primed) { primed = true; last = next; return; }
+      if (next === last) return;      // an update that changes nothing we route on
+      last = next;
+      onEvent();
+    });
+  } catch (err) {
+    // The JS module loads on a binary that predates the native one; it throws HERE, at first use
+    // ("NativeModule.RNCNetInfo is null"). A missing signal must cost the Wi-Fi-switch re-announce,
+    // never the screen (seen as a redbox over Nearby on a phone with an older APK, 2026-08-30).
+    if (typeof console !== 'undefined') console.warn('[netinfo] unavailable — no network-change signal:', err?.message ?? err);
+    return () => {};
+  }
 
   return () => { try { unsubscribe?.(); } catch { /* best-effort teardown */ } };
 }

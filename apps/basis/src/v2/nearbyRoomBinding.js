@@ -50,8 +50,8 @@
  * key. The per-session ephemeral address of PLAN-nearby §3 is rung-4 work, recorded, not faked here.
  */
 import { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE } from './nearbyAskChannel.js';
-import { isAskLive, ASKS_MAX_KEPT } from './nearbyAsks.js';
-import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE, CHAT_MAX_KEPT } from './nearbyRoom.js';
+import { isAskLive } from './nearbyAsks.js';
+import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE, CHAT_MAX_KEPT, ASKS_MAX_KEPT } from './nearbyRoom.js';
 import { receiveInvite, isInviteLive, INVITE_MESSAGE } from './nearbyInvites.js';
 import { receiveReceipt, deliveryAfterSend } from './deliveryState.js';
 

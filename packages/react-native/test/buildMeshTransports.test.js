@@ -157,3 +157,16 @@ describe('BLE defaults TIGHTER than the rest (Nearby step J, R1+R2)', () => {
   });
 });
 
+
+describe('adopting the app\'s surface', () => {
+  it('fills in the surface the app hands over instead of making a second control + peer source', async () => {
+    const { createMeshSurface } = await import('@onderling/core');
+    const surface = createMeshSurface();
+    const asked = await surface.discoverability.set('browse+publish');   // a screen opened before the build
+    expect(asked.effective).toBe('off');
+    const r = await buildMeshTransports({ identity, enable: { ble: false, relay: false }, surface });
+    expect(r.discoverability).toBe(surface.discoverability);
+    expect(r.nearbyPeers).toBe(surface.nearbyPeers);
+    expect(surface.transports().mdns).toBe(r.mdns);
+  });
+});

@@ -152,6 +152,7 @@ export {
 // halves live with their adapters (nkn in `@onderling/transports`, the socket set in `@onderling/relay`).
 export { senderVerdict, createSenderBinding } from './transport/senderBinding.js';
 export { createNearbyPeerSource }         from './transport/nearbyPeers.js';
+export { createMeshSurface }              from './transport/meshSurface.js';
 export { InternalBus, InternalTransport } from './transport/InternalTransport.js';
 export { LocalTransport }                 from './transport/LocalTransport.js';
 export { OfflineTransport }               from './transport/OfflineTransport.js';

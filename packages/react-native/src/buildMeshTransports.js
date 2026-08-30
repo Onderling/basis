@@ -30,6 +30,8 @@
  * @param {string}  [opts.discoverability='browse+publish'] — the initial discovery state (Nearby step A).
  *   Both consumers get a `discoverability` CONTROL back, which is the one surface an app may use to change
  *   it later — never the transports directly (`CLAUDE.md`).
+ * @param {object}  [opts.surface]              — a `createMeshSurface()` the app already holds (built at
+ *   boot, before any transport); the builder fills it in rather than making a second pair. Preferred.
  * @returns {Promise<{ mdns, ble, relay, perms, discoverability, nearbyPeers }>}
  */
 import { RelayTransport }                             from '@onderling/transports';
@@ -55,6 +57,7 @@ export async function buildMeshTransports({
   hostnamePrefix = 'dw',
   permissions,
   discoverability = DISCOVERABILITY.PUBLISH,
+  surface = null,
   bleDiscoverability = DISCOVERABILITY.BROWSE,
 } = {}) {
   if (!identity?.pubKey) {
@@ -136,7 +139,9 @@ export async function buildMeshTransports({
   // Built here rather than in either consumer, because both need it and neither should be the one that
   // knows how to fan a state across transports. It re-reads `mdns`/`ble` on every call, so a transport that
   // was dropped above (Wi-Fi off) simply is not part of the answer.
-  const control = createDiscoverabilityControl({
+  // With a surface handed in, the app already holds the control + peer source (from boot); the builder
+  // fills them in at the end (`setTransports`) instead of making a second pair.
+  const control = surface?.discoverability ?? createDiscoverabilityControl({
     transports: () => ({ mdns, ble }),
     onDegraded: (r) => _warn(
       `discoverability: asked for '${r.requested}', actually '${r.effective}' — ` +
@@ -154,12 +159,13 @@ export async function buildMeshTransports({
   // such method, and must not break boot for it.
   try { await mdns?.setDiscoverability?.(discoverability); } catch (e) { _warn('mDNS discoverability:', e); }
   try { await ble?.setDiscoverability?.(bleState); }         catch (e) { _warn('BLE discoverability:', e); }
-  control.refresh();
+  if (surface) await surface.setTransports({ mdns, ble });   // settles what was asked meanwhile + seeds peers
+  else control.refresh();
 
   // Who is around, merged across every discovering transport. Built here for the same reason the
   // discoverability control is: an app must not reach into one adapter to answer a question the surface
   // owns — that is how the Nearby screen ended up mDNS-only and blind to BLE.
-  const nearbyPeers = createNearbyPeerSource({ transports: () => ({ mdns, ble }) });
+  const nearbyPeers = surface?.nearbyPeers ?? createNearbyPeerSource({ transports: () => ({ mdns, ble }) });
 
   return { mdns, ble, relay, perms, discoverability: control, nearbyPeers };
 }

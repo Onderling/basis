@@ -48,7 +48,7 @@ import { sendA2ATask } from '@onderling/core';
 // must go through these rather than reaching into `bundle.mdns` (`CLAUDE.md`): reaching for a transport is
 // the signal the surface is missing an affordance, and the Nearby screen doing exactly that is why it was
 // mDNS-only and blind to BLE.
-import { createDiscoverabilityControl, createNearbyPeerSource } from '@onderling/core';
+import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
@@ -420,17 +420,16 @@ export async function bootAgentBundle(opts = {}) {
   // unset and the UI row hides itself.
   let mdns = null;
 
-  // Built BEFORE the transport exists, deliberately: both take a lazy thunk, so they simply start empty and
-  // pick mDNS up when the fire-and-forget block below lands it (or never, on iOS / Expo Go / Wi-Fi off).
-  // That keeps the surface a stable object the UI can hold from boot.
-  const meshTransports = () => ({ mdns });
-  const discoverability = createDiscoverabilityControl({
-    transports: meshTransports,
+  // The mesh SURFACE — built BEFORE the transport exists, deliberately, so the UI holds one stable object
+  // from boot; the builder below fills it in when mDNS lands (or never, on iOS / Expo Go / Wi-Fi off), which
+  // settles anything a screen asked meanwhile and seeds the peer list. One surface, the same one the
+  // builder returns — not a second pair over a second thunk (that duplicate is how "unavailable" stuck).
+  const meshSurface = createMeshSurface({
     onDegraded: (r) => console.warn(
       `[cc/boot] discoverability: asked for '${r.requested}', actually '${r.effective}'`,
     ),
   });
-  const nearbyPeers = createNearbyPeerSource({ transports: meshTransports });
+  const { discoverability, nearbyPeers } = meshSurface;
   // The Nearby room's wire binding (nearbyRoomBinding.js): outbound over the agent's peer send to the
   // room's current peers, inbound through the shell's peer router (`...nearbyRoom.handlers`). Lazy on the
   // agent, like everything else here built before the agent lands.
@@ -476,6 +475,7 @@ export async function bootAgentBundle(opts = {}) {
         discoverability: DISCOVERABILITY.BROWSE,
         hostnamePrefix: 'cc',
         permissions: { ble: false },
+        surface: meshSurface,
       });
       if (!built?.mdns) return;   // no radio / Wi-Fi off / native module absent — Nearby row hides
       const inst = built.mdns;
@@ -493,12 +493,6 @@ export async function bootAgentBundle(opts = {}) {
       } catch (err) {
         console.warn('[cc/boot] mDNS router-inject failed (Nearby still works):', err?.message ?? err);
       }
-      // The control above was built over an empty thunk; anything the UI asked meanwhile (Nearby opened
-      // during the seconds this build takes) got "nothing can discover" as its answer. Settle now that the
-      // transport is here, so the screen's banner tells the truth without a reopen.
-      try { await discoverability.settle(); } catch (err) { console.warn('[cc/boot] discoverability settle:', err?.message ?? err); }
-      // Same for the peer list: a screen that subscribed before this point bound to no transport at all.
-      try { nearbyPeers.rebind(); } catch (err) { console.warn('[cc/boot] nearby peers rebind:', err?.message ?? err); }
     } catch (err) {
       console.warn('[cc/boot] mDNS init failed (best-effort):', err?.message ?? err);
     }

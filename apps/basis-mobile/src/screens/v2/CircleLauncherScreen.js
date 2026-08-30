@@ -14,7 +14,7 @@
  */
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
-import { readNearbyAllows, writeNearbyAllows } from '../../core/nearbyAllowsStore.js';
+import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen } from '../../core/nearbyAllowsStore.js';
 import { pushContactReply } from '../../core/contactReplyInbox.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState } from 'react-native';
@@ -4854,7 +4854,8 @@ function NearbyScreen({
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
   useEffect(() => { setDraft(''); }, [composing, answering]);
   const [bannerOpen, setBannerOpen] = useState(false);
-  const [mineOpen, setMineOpen] = useState(false);
+  // "You here" opens on the FIRST-ever open only (L66a), so the card/chat toggles are discovered once.
+  const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   return (
     <View style={styles.page} testID="circle-nearby-screen">
       <View style={styles.bar}>
@@ -4969,6 +4970,11 @@ function NearbyScreen({
             {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
           </Text>
         ) : null}
+        {(model?.myAsks ?? []).map((e) => (
+          <Text key={`mine-${e.ask?.id}`} style={styles.rowMeta} testID={`nearby-my-ask-${e.ask?.id}`}>
+            {t('circle.nearbyScreen.my_ask_row', { heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)) })}
+          </Text>
+        ))}
         {asks.length === 0 ? (
           <Text style={styles.muted}>{t('circle.nearbyScreen.asks_empty')}</Text>
         ) : asks.map((entry) => (

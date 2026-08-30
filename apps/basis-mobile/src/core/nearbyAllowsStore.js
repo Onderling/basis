@@ -17,6 +17,21 @@ AsyncStorage.getItem(KEY)
 /** @returns {{card?: boolean, chat?: boolean}|null} the stored allows, or null before the prime / when unset */
 export function readNearbyAllows() { return cached; }
 
+/**
+ * "You here" opens on the FIRST-ever open of Nearby only (L66a): true once, then never again.
+ * Synchronous like the allows cache; before the prime lands the answer is false (folded), which only
+ * costs the very first open on a cold cache — honest enough.
+ */
+const SEEN_KEY = 'cc.nearbyMineSeen';
+let seen = true;
+AsyncStorage.getItem(SEEN_KEY).then((raw) => { seen = raw === '1'; }).catch(() => {});
+export function firstNearbyMineOpen() {
+  if (seen) return false;
+  seen = true;
+  AsyncStorage.setItem(SEEN_KEY, '1').catch(() => {});
+  return true;
+}
+
 export function writeNearbyAllows(next) {
   if (!next || typeof next !== 'object') return;
   cached = { card: next.card === true, chat: next.chat === true };

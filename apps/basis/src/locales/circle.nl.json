@@ -2800,6 +2800,10 @@
       "text": "Aan {{sent}} van {{peers}} in de buurt gevraagd",
       "doc": "Broadcast result. Names the real reach rather than claiming everyone heard it."
     },
+    "ask_heard": {
+      "text": "Door {{heard}} van {{peers}} in de buurt gehoord",
+      "doc": "Receipt count for a room ask: peers whose shell confirmed it landed (the same delivery receipt chat uses)."
+    },
     "ask_expired": {
       "text": "Deze vraag is verlopen.",
       "doc": "Shown if an ask lapses while it is on screen."

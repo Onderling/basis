@@ -32,6 +32,14 @@
  * `{ label }` — the face this device chose for the room (`myFace`), a handle at minimum — and the screen
  * puts it on the row. It is a label, never an identifier (PLAN-nearby §3: two Annas are shown as two).
  *
+ * HEARD, NOT SENT. Every room payload carries a `msgId` (the object's own id), which is what the app's
+ * delivery honesty already keys on: the receiving shell answers a landed ask/card/chat/invite with the
+ * SAME `delivery-receipt` it answers chat with (`makeReceiptSender`, the person's "confirm receipt"
+ * setting included), and the sender's shell applies it to the SAME delivery map. The binding adds only
+ * the count — which peers confirmed which msgId — because a room ask goes to many and "heard by 2" is
+ * the number the asker wants. No second receipt path: `setLandedHook` is the receipt sender, `onReceipt`
+ * is fed from the shell's existing receipt handler, `deliveryMap` is the shell's map.
+ *
  * WHO MAY SPEAK. No roster vouches for a stranger, and the circle sender authorisation lets anything
  * correctly signed through to the canonical address by design (that door is how a stranger ever becomes a
  * contact). The room's own rule is proximity, decided on THIS device from THIS device's peer list: a
@@ -45,6 +53,7 @@ import { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE } from './nearbyAskChanne
 import { isAskLive, ASKS_MAX_KEPT } from './nearbyAsks.js';
 import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE, CHAT_MAX_KEPT } from './nearbyRoom.js';
 import { receiveInvite, isInviteLive, INVITE_MESSAGE } from './nearbyInvites.js';
+import { receiveReceipt, deliveryAfterSend } from './deliveryState.js';
 
 export const PRESENCE_MESSAGE = 'nearby-presence';
 export const PRESENCE_MAX_LABEL = 40;
@@ -75,8 +84,9 @@ export function receivePresence(payload, fromAddress, now = () => Date.now()) {
  */
 export function createNearbyRoomBinding({
   sendPeerMessage, listPeers = () => [], subscribeToPeers = null, myAddress = () => null, myFace = null,
-  now = () => Date.now(), onError = null,
+  now = () => Date.now(), onError = null, deliveryMap: deliveryMapInput = null,
 } = {}) {
+  let deliveryMap = deliveryMapInput;
   if (typeof sendPeerMessage !== 'function') throw new TypeError('nearbyRoomBinding: sendPeerMessage required');
 
   const report = (err, phase) => { try { onError?.(err, phase); } catch { /* diagnostics only */ } };
@@ -104,9 +114,25 @@ export function createNearbyRoomBinding({
   };
 
   // ── Outbound ──────────────────────────────────────────────────────────────────────────────────────────
+  const msgIdOf = (payload) => payload?.ask?.id ?? payload?.card?.id ?? payload?.message?.id ?? payload?.answer?.id
+    ?? (payload?.invite ? `inv:${payload.invite.circleId}:${payload.invite.expiresAt}` : null) ?? null;
+  const heard = new Map();        // msgId → Set<from>
+  const heardSubs = new Set();
+  const notifyHeard = (msgId) => {
+    const n = heard.get(msgId)?.size ?? 0;
+    for (const fn of heardSubs) { try { fn({ msgId, heard: n }); } catch (err) { report(err, 'deliver:heard'); } }
+  };
   const askChannel = createAskChannel({
     listPeers,
-    sendTo: (address, payload) => sendPeerMessage(address, payload),
+    sendTo: (address, payload) => {
+      const msgId = msgIdOf(payload);
+      const stamped = msgId ? { msgId, ...payload } : payload;
+      if (msgId) {
+        if (!heard.has(msgId)) heard.set(msgId, new Set());
+        try { if (deliveryMap?.get?.(msgId) == null) deliveryMap?.set?.(msgId, deliveryAfterSend()); } catch { /* the map is a mirror */ }
+      }
+      return sendPeerMessage(address, stamped);
+    },
     now,
     onError,
   });
@@ -155,17 +181,29 @@ export function createNearbyRoomBinding({
   };
 
   // ── Inbound ───────────────────────────────────────────────────────────────────────────────────────────
-  const land = (kind, value) => { if (!value) return; hold[kind]?.(value); deliver(kind, value); };
+  let landedHook = null;   // the shell's receipt sender: ({ msgId, fromPeerAddr, source }) => Promise
+  const confirm = (from, payload) => {
+    const msgId = typeof payload?.msgId === 'string' ? payload.msgId : null;
+    if (!msgId || typeof landedHook !== 'function') return;
+    try { Promise.resolve(landedHook({ msgId, fromPeerAddr: from, source: 'receiver' })).catch((err) => report(err, 'receipt')); }
+    catch (err) { report(err, 'receipt'); }
+  };
+  const land = (kind, value, from, payload) => {
+    if (!value) return;
+    hold[kind]?.(value);
+    deliver(kind, value);
+    confirm(from, payload);
+  };
   const gated = (fn) => (from, payload) => {
     if (inRoom(from)) fn(from, payload);
     else report(new Error(`not in the room: ${String(from).slice(0, 12)}`), `refuse:${payload?.subtype}`);
   };
   const handlers = {
-    [ASK_MESSAGE]:      gated((from, payload) => land('ask',      askChannel.receiveAsk(payload, from))),
-    [ANSWER_MESSAGE]:   gated((from, payload) => { const a = askChannel.receiveAnswer(payload, from); if (a) deliver('answer', a); }),
-    [CARD_MESSAGE]:     gated((from, payload) => land('card',     receiveCard(payload, from, now))),
-    [CHAT_MESSAGE]:     gated((from, payload) => land('chat',     receiveChatMessage(payload, from, now))),
-    [INVITE_MESSAGE]:   gated((from, payload) => land('invite',   receiveInvite(payload, from, now))),
+    [ASK_MESSAGE]:      gated((from, payload) => land('ask',      askChannel.receiveAsk(payload, from), from, payload)),
+    [ANSWER_MESSAGE]:   gated((from, payload) => { const a = askChannel.receiveAnswer(payload, from); if (a) { deliver('answer', a); confirm(from, payload); } }),
+    [CARD_MESSAGE]:     gated((from, payload) => land('card',     receiveCard(payload, from, now), from, payload)),
+    [CHAT_MESSAGE]:     gated((from, payload) => land('chat',     receiveChatMessage(payload, from, now), from, payload)),
+    [INVITE_MESSAGE]:   gated((from, payload) => land('invite',   receiveInvite(payload, from, now), from, payload)),
     [PRESENCE_MESSAGE]: gated((from, payload) => land('presence', receivePresence(payload, from, now))),
   };
 
@@ -225,6 +263,25 @@ export function createNearbyRoomBinding({
         myRoomAddress:       this.myRoomAddress,
       };
     },
+    /** The shell's receipt sender goes here — the SAME one chat uses. */
+    setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; },
+    /** The shell's delivery map — the SAME one chat uses; attachable after creation. */
+    setDeliveryMap(map) { deliveryMap = map ?? null; },
+    /**
+     * Fed from the shell's existing `delivery-receipt` handler (which also advances the shell's map):
+     * counts which peers confirmed which room msgId. Returns true when the receipt was for something we
+     * sent into the room.
+     */
+    onReceipt(from, payload) {
+      const r = receiveReceipt(payload, from);
+      if (!r?.messageId || !heard.has(r.messageId)) return false;
+      const set = heard.get(r.messageId);
+      if (typeof from === 'string' && !set.has(from)) { set.add(from); notifyHeard(r.messageId); }
+      return true;
+    },
+    /** How many peers confirmed a room msgId so far. */
+    heardBy: (msgId) => heard.get(msgId)?.size ?? 0,
+    subscribeToHeard(fn) { if (typeof fn !== 'function') return () => {}; heardSubs.add(fn); return () => { heardSubs.delete(fn); }; },
     /** Diagnostics / tests. */
     heldAsks:  () => { sweep(); return [...heldAsks.values()]; },
     heldCards: () => { sweep(); return [...heldCards.values()]; },
@@ -236,6 +293,7 @@ export function createNearbyRoomBinding({
       try { unsubscribePeers?.(); } catch { /* best-effort */ }
       for (const s of Object.values(subs)) s.clear();
       heldAsks.clear(); heldCards.clear(); heldChat.length = 0; heldInvites.clear(); presence.clear(); known.clear();
+      heard.clear(); heardSubs.clear();
     },
   };
 }

@@ -264,3 +264,43 @@ describe('the room outlives the screen, and re-tells itself to a newcomer', () =
     expect(r).toMatchObject({ sent: 3, failed: 0, reached: 2, peers: 3 });
   });
 });
+
+describe('heard, not sent — the room rides the app\'s delivery receipts', () => {
+  it('a room payload carries its msgId, the receiver confirms through the shell\'s receipt sender, the sender counts', async () => {
+    const wire = [];
+    const receipts = [];
+    const map = new Map();
+    const deliveryMap = { get: (k) => (map.has(k) ? map.get(k) : null), set: (k, v) => map.set(k, v) };
+    const nodes = {};
+    const make = (addr, other) => createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload) => { wire.push({ from: addr, to, payload }); nodes[to]?.onPeerMessage(addr, payload); return { delivered: true }; },
+      listPeers: () => [{ pubKey: other }], myAddress: () => addr, now, deliveryMap: addr === 'a' ? deliveryMap : null,
+    });
+    nodes.a = make('a', 'b'); nodes.b = make('b', 'a');
+    nodes.b.setLandedHook(async (info) => { receipts.push(info); });
+    const heardAtA = []; nodes.a.subscribeToHeard((h) => heardAtA.push(h));
+
+    const ask = createAsk({ text: 'ladder?', from: 'a', now }).ask;
+    await nodes.a.askChannel.broadcast(ask);
+    expect(wire[0].payload.msgId).toBe(ask.id);                       // stamped with the object's own id
+    expect(map.get(ask.id)).toBe('maybe-received');                   // the shell's map knows the send
+    expect(receipts).toEqual([{ msgId: ask.id, fromPeerAddr: 'a', source: 'receiver' }]);   // b's shell would now send the receipt
+
+    // …and when that receipt reaches a's shell, its handler feeds the binding:
+    expect(nodes.a.onReceipt('b', { subtype: 'delivery-receipt', messageId: ask.id })).toBe(true);
+    expect(nodes.a.heardBy(ask.id)).toBe(1);
+    expect(heardAtA).toEqual([{ msgId: ask.id, heard: 1 }]);
+    nodes.a.onReceipt('b', { subtype: 'delivery-receipt', messageId: ask.id });   // a repeat is not a second peer
+    expect(nodes.a.heardBy(ask.id)).toBe(1);
+    expect(nodes.a.onReceipt('b', { subtype: 'delivery-receipt', messageId: 'not-ours' })).toBe(false);
+  });
+
+  it('a refused payload is not confirmed', async () => {
+    const receipts = [];
+    const b = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [{ pubKey: 'a' }], now });
+    b.setLandedHook(async (info) => { receipts.push(info); });
+    b.onPeerMessage('a', { subtype: 'nearby-card', msgId: 'c1', card: { id: 'c1', label: 'L'.repeat(5000), line: '', tags: [] } });
+    b.onPeerMessage('z', { subtype: 'nearby-ask', msgId: 'x', ask: createAsk({ text: 'hi', from: 'z', now }).ask });
+    expect(receipts).toEqual([]);
+  });
+});

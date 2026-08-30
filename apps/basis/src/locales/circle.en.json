@@ -2800,6 +2800,10 @@
       "text": "Asked {{sent}} of {{peers}} nearby",
       "doc": "Broadcast result. Names the real reach rather than claiming everyone heard it."
     },
+    "ask_heard": {
+      "text": "Heard by {{heard}} of {{peers}} nearby",
+      "doc": "Receipt count for a room ask: peers whose shell confirmed it landed (the same delivery receipt chat uses)."
+    },
     "ask_expired": {
       "text": "This ask has expired.",
       "doc": "Shown if an ask lapses while it is on screen."

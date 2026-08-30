@@ -1403,6 +1403,7 @@ function ensureNearbyRoom(agent = _peerAgent) {
     sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
     listPeers: () => [],
     myAddress: () => agent.identity?.pubKey ?? agent.peer?.address ?? null,
+    deliveryMap: deliveryStateMap,   // the SAME map chat's receipts advance
     myFace: async () => {
       try {
         const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
@@ -3571,6 +3572,10 @@ function showNearby() {
   // about whether this browser currently has a text box open.
   let composing = false;
   let notice = null;
+  let lastAsk = null;
+  _unsubscribeNearbyHeard = _nearbyRoom?.subscribeToHeard?.(({ msgId, heard }) => {
+    if (lastAsk && msgId === lastAsk.id && nearbyScreen) { notice = { key: 'ask_heard', vars: { heard, peers: lastAsk.peers } }; draw(nearbyScreen.model()); }
+  }) ?? null;
 
   const draw = (model) => renderCircleNearby(rootEl, {
     model, t, composing, notice,
@@ -3580,7 +3585,9 @@ function showNearby() {
     onSubmitAsk: async (text) => {
       const r = await nearbyScreen.askRoom({ text });
       composing = false;
-      // Name the REAL reach. "Asked 3 of 5 nearby" is true; "sent" implies the whole room heard it.
+      // Name the REAL reach. "Asked 3 of 5 nearby" is true; "sent" implies the whole room heard it. The
+      // line then follows the receipts ("heard by 2 of 5").
+      lastAsk = r.ok ? { id: r.ask?.id ?? null, peers: r.peers } : null;
       notice = r.ok
         ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } }
         : { key: 'ask_expired' };
@@ -3667,10 +3674,13 @@ function writeNearbyAllows(next) {
   if (!next || typeof next !== 'object') return;
   try { localStorage.setItem('basis.nearbyAllows', JSON.stringify({ card: next.card === true, chat: next.chat === true })); } catch { /* best-effort */ }
 }
+let _unsubscribeNearbyHeard = null;
 function closeNearby() {
   if (!nearbyScreen) return;
   nearbyScreen.close();
   nearbyScreen = null;
+  try { _unsubscribeNearbyHeard?.(); } catch { /* best-effort */ }
+  _unsubscribeNearbyHeard = null;
 }
 
 // Row actions. Only the two `supportedActions` admits reach here; an unknown id is logged rather than
@@ -7929,6 +7939,8 @@ async function boot() {
             ? _peerAgent.sendPeerMessage(to, payload, opts)
             : Promise.reject(new Error('no peer agent'))),
         }));
+      // The Nearby room confirms what lands with the SAME receipt (nearbyRoomBinding.js).
+      try { ensureNearbyRoom(agent)?.setLandedHook(onCircleStored); } catch { /* the room works without receipts */ }
       const circleChatInbox = createChatMessageInbox({
         eventLog,
         ingest: ingestCircleMessage,
@@ -8045,7 +8057,7 @@ async function boot() {
           // The shared receiver validates (rebuilt, `from` off the wire), checks the sender against the
           // circle's roster, and the map's monotonic rule orders it. Fire-and-forget: the roster read is a
           // skill call and the router does not await handlers, so it delays the bubble, not the receive loop.
-          'delivery-receipt':        (from, payload) => { applyIncomingReceipt(payload, from); },
+          'delivery-receipt':        (from, payload) => { ensureNearbyRoom(agent)?.onReceipt(from, payload); applyIncomingReceipt(payload, from); },
           'circle-recipe-broadcast':  circleRecipeHandler,
           'circle-rules-broadcast':   circleRulesHandler,
           'circle-policy-broadcast':  circlePolicyHandler,

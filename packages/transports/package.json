@@ -18,7 +18,9 @@
   ],
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./mdns": "./src/MdnsTransport.js",
+    "./utils/base64": "./src/utils/base64.js"
   },
   "scripts": {
     "test": "vitest run",

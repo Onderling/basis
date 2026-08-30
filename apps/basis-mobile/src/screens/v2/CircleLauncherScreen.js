@@ -15,6 +15,7 @@
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { readNearbyAllows, writeNearbyAllows } from '../../core/nearbyAllowsStore.js';
+import { pushContactReply } from '../../core/contactReplyInbox.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState } from 'react-native';
 import { useTheme } from './themeContext.js';
@@ -1231,6 +1232,23 @@ export default function CircleLauncherScreen({
    * "I can reach you from home", and that is a deliberate exchange of the transport→address map the user
    * has not made. Persisting a café encounter into the contact list climbs a rung nobody chose.
    */
+  // Rung 4, receive side: their reach is stored like a handed-over business card (only what they chose
+  // to give), the contact row becomes reachable-from-home, and the thread says so. The ask-back bar
+  // itself lives in the thread screen (ContactThreadScreen), which reads pendingReachFrom.
+  useEffect(() => {
+    const sub = bundle?.nearbyRoom?.subscribeToReach;
+    if (typeof sub !== 'function') return undefined;
+    return sub((r) => {
+      if (!r?.from) return;
+      try {
+        bundle?.peerGraph?.upsert?.({ type: 'native', pubKey: r.from, transports: r.transports, reachable: true, nearby: true })
+          ?.catch?.(() => {});
+      } catch { /* the line below still tells the person */ }
+      const face = bundle?.nearbyRoom?.presenceOf?.(r.from)?.label ?? r.from.slice(0, 8);
+      pushContactReply({ fromAddr: r.from, text: t('circle.nearbyScreen.reach_received', { name: face }) });
+    });
+  }, [bundle]);
+
   const openNearbyThread = useCallback((thread, seed = []) => {
     if (!thread?.peerAddress) return;
     // Frits, 2026-08-30 (after the two-phone walk): a person you start talking to from the room DOES

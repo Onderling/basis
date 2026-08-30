@@ -27,6 +27,21 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
 
   // A thread may open WITH its first lines — the ask that was answered and the answer (Nearby).
   const [messages, setMessages] = useState(() => (Array.isArray(contact?.seed) ? contact.seed : []));
+  // Rung 4 (nearby threads): "share how to reach me" + the other side's ask-back bar.
+  const room = bundle?.nearbyRoom ?? null;
+  const [pendingReach, setPendingReach] = useState(() => room?.pendingReachFrom?.(peerAddr) ?? null);
+  useEffect(() => {
+    if (typeof room?.subscribeToReach !== 'function') return undefined;
+    return room.subscribeToReach((r) => { if (r?.from === peerAddr) setPendingReach(r); });
+  }, [room, peerAddr]);
+  const shareReach = async (wantBack) => {
+    const r = await room?.shareReach?.(peerAddr, { wantBack });
+    if (r?.ok) {
+      room?.settleReach?.(peerAddr);
+      setPendingReach(null);
+      setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: t('circle.nearbyScreen.reach_shared_you') }]);
+    }
+  };
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -127,6 +142,24 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
         </View>
       )}
 
+      {pendingReach ? (
+        <View style={styles.composer} testID="reach-ask-back">
+          <Text style={{ flex: 1, color: theme.color.ink, fontSize: 13 }}>
+            {t('circle.nearbyScreen.reach_ask_back', { name })}
+          </Text>
+          <Pressable style={styles.send} onPress={() => shareReach(false)} accessibilityRole="button" testID="reach-back-yes">
+            <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_back_yes')}</Text>
+          </Pressable>
+          <Pressable style={styles.send} onPress={() => { room?.settleReach?.(peerAddr); setPendingReach(null); }} accessibilityRole="button" testID="reach-back-no">
+            <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_back_no')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {contact?.transient && !pendingReach ? (
+        <Pressable onPress={() => shareReach(true)} accessibilityRole="button" testID="reach-share" style={styles.skillChip ?? styles.send}>
+          <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_share')}</Text>
+        </Pressable>
+      ) : null}
       <View style={styles.composer}>
         <TextInput
           style={styles.input}

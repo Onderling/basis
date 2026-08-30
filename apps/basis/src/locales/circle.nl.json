@@ -2971,6 +2971,26 @@
     "my_ask_row": {
       "text": "Jouw vraag · door {{heard}} gehoord · nog {{min}} min",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
+    },
+    "face_row": {
+      "text": "Toon hier als",
+      "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
+    },
+    "face_name": {
+      "text": "Je naam",
+      "doc": "displayName (the default)."
+    },
+    "face_handle": {
+      "text": "Je handle",
+      "doc": "the handle."
+    },
+    "face_none": {
+      "text": "Niemand",
+      "doc": "withhold the label; rows show the key fragment."
+    },
+    "face_caveat": {
+      "text": "Een vast gezicht maakt je herkenbaar op verschillende plekken, ook al wisselt je adres.",
+      "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."
     }
   },
   "viewAsSplit": {

@@ -1416,11 +1416,14 @@ function ensureNearbyRoom(agent = _peerAgent) {
       } catch { /* the lock stays closed on a broken read */ }
       return out;
     },
+    // The SAME faces a circle offers — displayName, handle, or nobody — chosen per device.
     myFace: async () => {
       try {
+        const choice = readNearbyFace();
+        if (choice === 'none') return null;
         const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
         const e = r?.entry ?? {};
-        const label = e.displayName ?? e.handle ?? null;
+        const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
         return label ? { label: String(label) } : null;
       } catch { return null; }
     },
@@ -3646,6 +3649,8 @@ function showNearby() {
       draw(nearbyScreen.model());
     },
     onAskAction: handleNearbyAskAction,
+    face: readNearbyFace(),
+    onFaceChange: (v) => { writeNearbyFace(v); ensureNearbyRoom()?.announceFace?.(); draw(nearbyScreen.model()); },
     onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); notice = null; draw(nearbyScreen.model()); },
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);
@@ -3720,6 +3725,9 @@ function openNearbyThread(thread, seed = []) {
   showContactThread(thread.peerAddress);
 }
 
+// The room face: 'name' (default) · 'handle' · 'none' — per device, like the allows.
+function readNearbyFace() { try { const v = localStorage.getItem('basis.nearbyFace'); return (v === 'handle' || v === 'none') ? v : 'name'; } catch { return 'name'; } }
+function writeNearbyFace(v) { try { if (v === 'name' || v === 'handle' || v === 'none') localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.
 function readNearbyAllows() { try { const raw = localStorage.getItem('basis.nearbyAllows'); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeNearbyAllows(next) {

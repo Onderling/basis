@@ -39,6 +39,8 @@ export function renderCircleNearby(container, {
   composing = false,
   onSubmitAsk = null,
   notice = null,
+  face = 'name',
+  onFaceChange = null,
   onToggleAllow = null,
   onSubmitCard = null,
   onSay = null,
@@ -404,13 +406,37 @@ export function renderCircleNearby(container, {
   // ── Your side, folded (sketch §2): the allows, the card, what others see — one row that opens ──────
   const mine = document.createElement('details');
   mine.className = 'circle-nearby__mine';
-  // "You here" opens on the FIRST-ever open only (L66a).
+  // "You here" opens on the FIRST-ever open only.
   try { if (!localStorage.getItem('basis.nearbyMineSeen')) { mine.open = true; localStorage.setItem('basis.nearbyMineSeen', '1'); } } catch { /* folded */ }
   const mineSummary = document.createElement('summary');
   mineSummary.className = 'circle-nearby__mine-summary';
   const mineChips = [allows.card ? tr('circle.nearbyScreen.mine_card_on') : null, allows.chat ? tr('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean);
   mineSummary.textContent = `${tr('circle.nearbyScreen.mine_title')} · ${mineChips.length ? mineChips.join(' · ') : tr('circle.nearbyScreen.mine_none')}`;
   mine.appendChild(mineSummary);
+  // The room face: the SAME faces a circle offers — name, handle, or nobody.
+  if (typeof onFaceChange === 'function') {
+    const faceBlock = document.createElement('div');
+    faceBlock.className = 'circle-nearby__face';
+    const faceTitle = document.createElement('div');
+    faceTitle.className = 'circle-nearby__face-title';
+    faceTitle.textContent = tr('circle.nearbyScreen.face_row');
+    faceBlock.appendChild(faceTitle);
+    for (const v of ['name', 'handle', 'none']) {
+      const lbl = document.createElement('label');
+      lbl.className = `circle-nearby__face-option circle-nearby__face-option--${v}`;
+      const radio = document.createElement('input');
+      radio.type = 'radio'; radio.name = 'nearby-face'; radio.value = v; radio.checked = face === v;
+      radio.addEventListener('change', () => onFaceChange(v));
+      lbl.appendChild(radio);
+      lbl.appendChild(document.createTextNode(tr(`circle.nearbyScreen.face_${v}`)));
+      faceBlock.appendChild(lbl);
+    }
+    const caveat = document.createElement('div');
+    caveat.className = 'circle-nearby__face-caveat';
+    caveat.textContent = tr('circle.nearbyScreen.face_caveat');
+    faceBlock.appendChild(caveat);
+    mine.appendChild(faceBlock);
+  }
   mine.appendChild(allowsBlock);
 
   if (allows.card) {

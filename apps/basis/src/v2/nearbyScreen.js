@@ -332,7 +332,7 @@ export function createNearbyScreen({
     // Live asks only, newest first. An expired one is not "greyed out" — it is gone, because the room has
     // moved on and an answer to it would arrive to nobody.
     // My own asks do not echo into the room list, but they DO get a row of their own: the question I
-    // put out, how long it still stands, and how many rooms confirmed it (L66c).
+    // put out, how long it still stands, and how many rooms confirmed it.
     const myAskRows = safeCall(myAsks, []).filter((e) => isAskLive(e?.ask, now));
     const askRows = [...asks.values()]
       .filter((entry) => isAskLive(entry.ask, now))

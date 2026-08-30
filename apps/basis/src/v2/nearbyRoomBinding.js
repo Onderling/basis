@@ -183,7 +183,7 @@ export function createNearbyRoomBinding({
 
   // ── Subscribers ───────────────────────────────────────────────────────────────────────────────────────
   const subs = { ask: new Set(), answer: new Set(), card: new Set(), chat: new Set(), invite: new Set(), presence: new Set(), reach: new Set() };
-  // Chat is LIVE-ONLY by Frits' call (L65, 2026-08-31): "don't record anything, they just miss out."
+  // Chat is LIVE-ONLY by Frits' call (2026-08-31): "don't record anything, they just miss out."
   const replay = { ask: () => [...heldAsks.values()], card: () => [...heldCards.values()], chat: () => [],
     invite: () => [...heldInvites.values()], presence: () => [...presence.values()], answer: () => [],
     reach: () => [...pendingReach.values()] };
@@ -338,6 +338,18 @@ export function createNearbyRoomBinding({
         return { ok: false, reason: err?.message ?? 'send-failed' };
       }
     },
+    /** The face changed (the picker in "You here"): tell everyone listed, now — not only newcomers. */
+    async announceFace() {
+      let face = null;
+      try { face = await (typeof myFace === 'function' ? myFace() : null); } catch { face = null; }
+      if (!face?.label) return { announced: 0 };
+      let announced = 0;
+      for (const p of peersNow()) {
+        const id = peerId(p);
+        if (id) { await sendTo(id, { subtype: PRESENCE_MESSAGE, presence: { label: String(face.label) } }, 'announceFace'); announced += 1; }
+      }
+      return { announced };
+    },
     /** A reach this peer sent that the shell has not settled yet (show "share back?" while this is set). */
     pendingReachFrom: (from) => pendingReach.get(from) ?? null,
     settleReach: (from) => { pendingReach.delete(from); },
@@ -360,7 +372,7 @@ export function createNearbyRoomBinding({
     },
     /** How many peers confirmed a room msgId so far. */
     heardBy: (msgId) => heard.get(msgId)?.size ?? 0,
-    /** My live asks with their heard counts — what the ask row renders (L66c). */
+    /** My live asks with their heard counts — what the ask row renders. */
     myAsks() {
       sweep();
       return [...mine.asks.values()].map((ask) => ({ ask, heard: heard.get(ask.id)?.size ?? 0 }));

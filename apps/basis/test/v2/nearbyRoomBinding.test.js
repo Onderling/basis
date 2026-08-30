@@ -375,3 +375,22 @@ describe('my asks carry their heard counts (the ask row)', () => {
     expect(a.myAsks()[0].heard).toBe(1);
   });
 });
+
+describe('the face picker (L63)', () => {
+  it('announceFace tells everyone listed the current face, now', async () => {
+    const sent = [];
+    let label = 'Frits';
+    const b = createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload) => { sent.push({ to, payload }); },
+      listPeers: () => [{ pubKey: 'x' }, { pubKey: 'y' }],
+      myFace: () => (label ? { label } : null), now,
+    });
+    expect(await b.announceFace()).toEqual({ announced: 2 });
+    expect(sent.map((s) => s.payload)).toMatchObject([
+      { subtype: 'nearby-presence', presence: { label: 'Frits' } },
+      { subtype: 'nearby-presence', presence: { label: 'Frits' } },
+    ]);
+    label = null;                                            // "nobody": nothing to announce
+    expect(await b.announceFace()).toEqual({ announced: 0 });
+  });
+});

@@ -2971,6 +2971,26 @@
     "my_ask_row": {
       "text": "Your ask · heard by {{heard}} · {{min}} min left",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
+    },
+    "face_row": {
+      "text": "Show here as",
+      "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
+    },
+    "face_name": {
+      "text": "Your name",
+      "doc": "displayName (the default)."
+    },
+    "face_handle": {
+      "text": "Your handle",
+      "doc": "the handle."
+    },
+    "face_none": {
+      "text": "Nobody",
+      "doc": "withhold the label; rows show the key fragment."
+    },
+    "face_caveat": {
+      "text": "A stable face re-identifies you across places, even though your address rotates.",
+      "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."
     }
   },
   "viewAsSplit": {

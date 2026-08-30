@@ -2919,6 +2919,14 @@
     "ask_expires_in": {
       "text": "nog {{min}} min",
       "doc": "The clock on an ask: minutes until it lapses."
+    },
+    "becoming_visible_title": {
+      "text": "Je wordt zichtbaar…",
+      "doc": "The banner between opening Nearby and the transport confirming the announce (a few seconds). Neither \"hidden\" nor \"visible\" is true then."
+    },
+    "becoming_visible_body": {
+      "text": "De radio krijgt net de opdracht je aan te kondigen; een ogenblik.",
+      "doc": "Second line of that banner."
     }
   },
   "viewAsSplit": {

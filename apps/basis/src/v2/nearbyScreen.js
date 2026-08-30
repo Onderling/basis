@@ -74,6 +74,7 @@ export function nearbyVisibilityKey(visibility) {
   if (!visibility) return null;
   if (visibility.degraded)    return 'still_visible';
   if (visibility.unavailable) return 'unavailable';
+  if (visibility.pending)     return 'becoming_visible';
   return visibility.publishing ? 'visible' : 'hidden';
 }
 
@@ -278,6 +279,11 @@ export function createNearbyScreen({
       degraded:   report?.degraded === true,
       // The device simply cannot discover (no radio, no permission). Not a warning — an explanation.
       unavailable: report?.shortfall === true && effective === 'off',
+      // Asked to be seen, not yet confirmed by the radio: the seconds between opening the screen and the
+      // transport's answer. Saying "hidden" there was true of the last second and misleading about the
+      // next; "becoming visible" is what is happening (seen on the phone: ~3–5 s per open).
+      pending: session.isOpen() && (report?.requested ?? 'off') === 'browse+publish' && effective !== 'browse+publish'
+        && report?.degraded !== true && !(report?.shortfall === true && effective === 'off'),
       perTransport: report?.perTransport ?? [],
     };
   }

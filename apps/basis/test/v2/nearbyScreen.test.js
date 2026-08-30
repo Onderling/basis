@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { DISCOVERABILITY, createDiscoverabilityControl, Transport } from '@onderling/core';
-import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
+import { createNearbyScreen, nearbyVisibilityKey } from '../../src/v2/nearbyScreen.js';
 
 class Discovering extends Transport {
   get supportsDiscoverability() { return true; }
@@ -819,5 +819,23 @@ describe('the visibility banner follows the control (a transport landing after o
     const n = seen.length;
     await control.set('browse');
     expect(seen).toHaveLength(n);
+  });
+});
+
+describe('the seconds between opening and the radio answering', () => {
+  it('reads "becoming visible", not "hidden", while the announce is still in flight', async () => {
+    let resolveSet;
+    const control = {
+      report: () => ({ requested: 'browse+publish', effective: 'browse', degraded: false, shortfall: false, perTransport: [] }),
+      set: () => new Promise((r) => { resolveSet = r; }),
+      subscribe: () => () => {},
+    };
+    const screen = createNearbyScreen({ control, t: (k) => k });
+    screen.open();
+    expect(screen.model().visibility.pending).toBe(true);
+    expect(nearbyVisibilityKey(screen.model().visibility)).toBe('becoming_visible');
+    screen.close();
+    expect(screen.model().visibility.pending).toBe(false);
+    resolveSet?.({ requested: 'browse', effective: 'browse', degraded: false, shortfall: false });
   });
 });

@@ -135,6 +135,10 @@ export const stoopManifest = {
     // ── Post + browse ───────────────────────────────────────────────
     {
       id:   'postRequest',
+      // `circleScoped` — the op acts on the ACTIVE circle's items: a write gets the circle injected (and
+      // its `text` sealed for a sealed circle), a list is filtered to it. Declared here, derived
+      // everywhere (`circleStoopScope.js`); an op that acts on an item without saying so fails a guard.
+      circleScoped: true,
       verb: 'add',
       // No `appliesTo.type` — postRequest dispatches across ask/offer/
       // lend based on the `intent` arg, so it spans three types.
@@ -192,6 +196,7 @@ export const stoopManifest = {
     },
     {
       id:   'listOpen',
+      circleScoped: true,
       verb: 'list',
       // listOpen spans the three noticeboard types — no appliesTo.type
       // narrowing (same as postRequest).
@@ -228,6 +233,7 @@ export const stoopManifest = {
     },
     {
       id:   'listMyRequests',
+      circleScoped: true,
       verb: 'list',
       params: [],
       surfaces: {
@@ -244,6 +250,7 @@ export const stoopManifest = {
     // ── Negotiate / chat ────────────────────────────────────────────
     {
       id:        'respondToItem',
+      circleScoped: true,
       verb:      'claim',  // canonical — `respondToItem` soft-claims the post.
       // Part G dissolve (2026-06-17) — the former mock declared this op
       // WITHOUT a slash command but WITH a richer surface: an `appliesTo`
@@ -282,6 +289,7 @@ export const stoopManifest = {
     },
     {
       id:        'cancelRequest',
+      circleScoped: true,
       verb:      'remove',  // canonical — cancelRequest removes the item.
       // (2026-05-21, narrowed 2026-07-02 for) — cancelRequest spans the
       // user's own POST types (ask/offer/lend + the generic request/post the `mine`
@@ -324,6 +332,7 @@ export const stoopManifest = {
     // ── Lend lifecycle ──────────────────────────────────────────────
     {
       id:        'assignLend',
+      circleScoped: true,
       verb:      'reassign',  // canonical — assigns the borrower.
       appliesTo: { type: 'offer', kind: 'lend' },
       params: [
@@ -348,6 +357,7 @@ export const stoopManifest = {
     },
     {
       id:        'markReturned',
+      circleScoped: true,
       verb:      'complete',  // canonical — marks the lend complete.
       appliesTo: { type: 'offer', kind: 'lend' },
       params: [
@@ -382,6 +392,7 @@ export const stoopManifest = {
     // ── Moderation ──────────────────────────────────────────────────
     {
       id:   'reportPost',
+      circleScoped: true,
       verb: 'report',  // F-SP1-e: non-canonical.  Resolved 2026-05-21
                        // (owner): kept `report` (truer to intent).
                        // Squeezing into canonical `add` would obscure
@@ -498,6 +509,7 @@ export const stoopManifest = {
     // ── Groups ──────────────────────────────────────────────────────
     {
       id:   'leaveGroup',
+      circleScoped: false,
       verb: 'remove',  // canonical — leaving is a removal of self.
       appliesTo: { type: 'group-leave' },
       params: [
@@ -523,6 +535,7 @@ export const stoopManifest = {
     // ── Read-only graph walk ────────────────────────────────────────
     {
       id:   'getItemTree',
+      circleScoped: false,
       verb: 'tree',  // F-SP1-e: non-canonical.  `list` doesn't fit
                      // (this returns a tree, not a flat list);
                      // `tree` is a domain-natural read-only verb.
@@ -602,7 +615,8 @@ export const stoopManifest = {
      * id is load-bearing and stays as a thin alias of listOpen.
      */
     {
-      id:   'listFeed', verb: 'list',
+      id:   'listFeed',
+      circleScoped: true, verb: 'list',
       appliesTo: { type: 'post' },
       params: [],
       surfaces: {
@@ -739,7 +753,8 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'conflictDisputeWizard', verb: 'add',
+      id:   'conflictDisputeWizard',
+      circleScoped: false, verb: 'add',
       // per-bubble action on stoop posts. Slash kept for
       // general-dispute (no postId) + LLM tool-call surface.
       appliesTo: { type: 'post', state: ['open'] },
@@ -754,7 +769,8 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'postAudienceWizard', verb: 'add',
+      id:   'postAudienceWizard',
+      circleScoped: false, verb: 'add',
       params: [
         { name: 'text', kind: 'string', required: false },
       ],
@@ -831,7 +847,8 @@ export const stoopManifest = {
       // Re-accept the circle's current rules version after a rules change (the member's own signed
       // `rules-accept` on the membership spine). Voluntary: an older acceptance stays valid, visibly
       // stale — the shells offer this from the stale-rules banner, so no slash surface is invented.
-      id:   'acceptGroupRules', verb: 'add',
+      id:   'acceptGroupRules',
+      circleScoped: false, verb: 'add',
       // A member's acceptance is SELF-ONLY (the fold ignores anyone else's statement about them) and
       // versions are monotonic, so two of their own devices converge on the causally-later acceptance —
       // content, not a claim: nobody races for exclusive ownership of someone's own consent.
@@ -959,7 +976,8 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'recordMemberPersonaProperties', verb: 'set',
+      id:   'recordMemberPersonaProperties',
+      circleScoped: false, verb: 'set',
       // ADMIN side: the circle admin owns the roster, so a member sends their released properties and the
       // admin records them. `memberWebid` comes from the AUTHENTICATED peer address at the call site,
       // never from the payload — a member speaks only for their own row.
@@ -1027,7 +1045,8 @@ export const stoopManifest = {
     // These ops say where a circle's bytes rest and let a person carry them off; none of them can
     // read anything, because the medium never holds plaintext.
     {
-      id:   'getCircleStoragePolicy', verb: 'list',
+      id:   'getCircleStoragePolicy',
+      circleScoped: false, verb: 'list',
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: "Where this circle's data rests, and under which storage policy." },
@@ -1035,7 +1054,8 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'setCircleStoragePolicy', verb: 'set',
+      id:   'setCircleStoragePolicy',
+      circleScoped: false, verb: 'set',
       params: [
         { name: 'groupId',       kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'storagePolicy', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -1396,7 +1416,8 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'postAnnouncement', verb: 'add',
+      id:   'postAnnouncement',
+      circleScoped: true, verb: 'add',
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'text',    kind: 'string', required: true, ...STR_NONEMPTY },
@@ -1442,7 +1463,8 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'acceptResponder', verb: 'confirm',
+      id:   'acceptResponder',
+      circleScoped: false, verb: 'confirm',
       params: [
         { name: 'requestId',       kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'responderWebid',  kind: 'string', required: true, ...ID_NONEMPTY },

@@ -24,24 +24,36 @@
 import { openThumbnail } from '@onderling/blob-gateway';
 import { itemCircleId } from './circleScope.js';
 import { createMediaEmbed } from '../core/handlers/mediaEmbed.js';
+import { stoopManifest } from '@onderling-app/stoop/manifest';
+import { STOOP_OP_ALIAS } from './stoopOpAliases.js';
 
 /**
- * stoop ops whose created/mutated item belongs to / routes to the active circle.
+ * Which stoop ops act on the ACTIVE circle's items — DERIVED from the manifest's `circleScoped`
+ * declaration, never listed here. A write verb gets the circle injected into its args (and its `text`
+ * sealed for a sealed circle); a `list` gets its items filtered to the circle. An alias of a scoped op
+ * (`getBulletin` → `listOpen`) is scoped through the one alias table the dispatcher reads.
  *
- * Still a hand-written list, on purpose for now: its job is to inject the active circle into an op's ARGS
- * (and seal the text) BEFORE the op runs, and nothing in the stoop manifest yet declares which item type
- * an op writes — `postRequest` deliberately carries no `appliesTo.type` (it spans three), and `add` is
- * also the verb of contact/offering ops that must NOT be circle-scoped. Deriving this needs the op to
- * declare what it writes; until it does, the list is the declaration. What no longer depends on a list:
- * the FAN of a written item (`noticeboardFan.js` reads the stored item) and the task lane's catch-up
- * (every row the circle store holds).
+ * This used to be two hand-written sets. They drifted (`getBulletin` was in one, `postAnnouncement` in
+ * neither), and an op added without a list edit silently wrote to the wrong store. Now adding an op that
+ * acts on an item means declaring `circleScoped` on it — and a guard fails when it does not.
  */
-export const SCOPED_WRITE_OPS = new Set([
-  'postRequest', 'respondToItem', 'cancelRequest', 'markReturned', 'assignLend', 'reportPost',
-]);
-
-/** stoop list ops whose `{ items }` are filtered to the active circle. */
-export const SCOPED_LIST_OPS = new Set(['listOpen', 'listFeed', 'listMyRequests', 'getBulletin']);
+export function circleScopedOps(manifest, aliases = STOOP_OP_ALIAS) {
+  const writes = new Set(); const lists = new Set();
+  for (const op of manifest?.operations ?? []) {
+    if (op?.circleScoped !== true) continue;
+    (op.verb === 'list' ? lists : writes).add(op.id);
+  }
+  for (const [alias, real] of Object.entries(aliases ?? {})) {
+    if (writes.has(real)) writes.add(alias);
+    if (lists.has(real)) lists.add(alias);
+  }
+  return { writes, lists };
+}
+const DERIVED = circleScopedOps(stoopManifest);
+/** stoop ops whose created/mutated item belongs to / routes to the active circle (derived, see above). */
+export const SCOPED_WRITE_OPS = DERIVED.writes;
+/** stoop list ops whose `{ items }` are filtered to the active circle (derived, see above). */
+export const SCOPED_LIST_OPS = DERIVED.lists;
 
 // The "what is a noticeboard post" gate lives in `@onderling/item-types` now (its type-taxonomy
 // home) — stoop needed it too (`/brief` counted chat lines as circle requests for a month because
@@ -178,10 +190,12 @@ export function scopeStoopCallSkill(callSkill, circleId, getSealStrategy, getMed
     if (SCOPED_WRITE_OPS.has(opId)) {
       const scoped = { ...args };
       if (scoped.groupId == null) scoped.groupId = circleId;   // don't clobber an explicit scope
-      if (strategy && opId === 'postRequest' && typeof scoped.text === 'string' && scoped.text) {
-        scoped.text = strategy.seal(scoped.text);             // seal the body at rest
+      // Any scoped write's body is sealed at rest for a sealed circle — a post, an announcement, the next
+      // kind — keyed on the ARG, not on the op's name (an announcement used to slip through unsealed).
+      if (strategy && typeof scoped.text === 'string' && scoped.text) {
+        scoped.text = strategy.seal(scoped.text);
       }
-      if (opId === 'postRequest' && Array.isArray(scoped.attachments) && scoped.attachments.length) {
+      if (Array.isArray(scoped.attachments) && scoped.attachments.length) {
         // Sealed-only: an image attachment must ride the sealed circle-media pointer.
         const media = (typeof getMedia === 'function') ? await getMedia().catch(() => null) : null;
         if (!media || !media.mediaGateway) throw new Error('media-gateway-unavailable');

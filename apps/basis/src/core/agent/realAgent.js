@@ -91,6 +91,7 @@ import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
 import { createBrowserStoopAgent } from '@onderling-app/stoop/browser';
+import { STOOP_OP_ALIAS } from '../../v2/stoopOpAliases.js';
 import { shouldFanNoticeboardItem, noticeboardFanPayload, noticeboardItemCircle } from '../../v2/noticeboardFan.js';
 import { createBrowserFolioAgent } from '@onderling-app/folio/browser';
 // agents — the read-only "your agents" surface (2026-07-09). buildAgentSkills
@@ -2552,14 +2553,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * twice).  Same alias pattern tasks-v0 uses for
    * `getMyTasks → listOpen` above.
    */
-  const STOOP_OP_ALIAS = {
-    listFeed:        'listOpen',
-    getStoopProfile: 'getMyProfile',
-    // `getBulletin` is NOT a manifest op — it's a circleContent source
-    // op (circleContent.DEFAULT_SOURCES); aliasing it to listOpen lands
-    // per-circle reads on the real reader.  KEPT (used by circleContent).
-    getBulletin:     'listOpen',
-  };
+  // The alias table lives in `stoopOpAliases.js` — the circle scope reads the same one.
 
   // 2026-05-24 — retry-on-HI-race now lives in secure-agent's
   // sendToPeer (task). sa.peer.sendTo handles it transparently.

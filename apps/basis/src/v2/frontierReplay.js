@@ -45,7 +45,7 @@ const REPLAY_AUTO_ALLOW = param({ key: 'replay.autoAllow', scope: PARAM_SCOPE.DE
 /**
  * @param {object} deps
  * @param {{ storedStatements: Function, ingest: Function }} deps.rail  the lane's rail
- * @param {(peerAddr: string, payload: object) => Promise<*>|*} deps.sendToPeer
+ * @param {(peerAddr: string, payload: object, opts?: object) => Promise<*>|*} deps.sendToPeer  opts carries `holdKey`
  * @param {{ request: string, batch: string }} deps.subtypes  the lane's wire pair
  * @param {(circleId: string) => Promise<object[]>|object[]} [deps.statementsFor]  serve-set override
  * @param {(circleId: string) => void} [deps.onChange]
@@ -189,10 +189,12 @@ export function makeFrontierReplay({
   /** Ask one peer for one circle's missing statements (this device's frontier + window + any allowance). */
   const requestFrom = (peerAddr, circleId) => {
     const allowance = granted.get(`${peerAddr}|${circleId}`) ?? 0;
+    // One slot per lane per circle: a request held for an offline peer is superseded by the next boot's,
+    // never stacked — the frontier in the newest is the only one worth answering.
     return sendToPeer(peerAddr, {
       subtype: REQ, circleId, frontier: localFrontier(circleId), limit,
       ...(allowance > 0 ? { allowance } : {}),
-    });
+    }, { holdKey: `${REQ}:${circleId}` });
   };
 
   /** The reconnect kick — same roster walk as the pull-all catch-up (any ONE complete peer suffices). */

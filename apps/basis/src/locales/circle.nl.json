@@ -85,6 +85,10 @@
     "contacten": {
       "text": "Contacten",
       "doc": "P5 — bottom-nav tab → the contacts/bots roster + their 1:1 DM threads."
+    },
+    "nearby": {
+      "text": "In de buurt",
+      "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
   "new": {

@@ -21,7 +21,7 @@
  * @param {object} deps
  * @param {() => Record<string, object|null>} deps.transports  named transports; re-read on subscribe
  * @param {() => number} [deps.now]
- * @returns {{subscribe, list, forget, close}}
+ * @returns {{subscribe, list, rebind, forget, close}}
  */
 export function createNearbyPeerSource({ transports, now = () => Date.now() } = {}) {
   if (typeof transports !== 'function') {
@@ -89,6 +89,11 @@ export function createNearbyPeerSource({ transports, now = () => Date.now() } = 
       t.on('peer-discovered', onFound);
       t.on('peer-disconnected', onLost);
       bound.push({ transport: t, onFound, onLost });
+      // Seed with whoever the transport already holds: `peer-discovered` fired before we listened (the
+      // screen opened after the handshake), and an event nobody heard must not mean an empty room.
+      let already = [];
+      try { already = t.connectedPeers?.() ?? []; } catch { /* a transport that cannot say is just empty */ }
+      for (const address of already) seen(address, name);
     }
   }
 
@@ -113,6 +118,15 @@ export function createNearbyPeerSource({ transports, now = () => Date.now() } = 
 
     /** The merged list, right now. */
     list: snapshot,
+    /**
+     * The set of transports changed (one landed after the first subscriber bound — a phone's mDNS is built
+     * seconds into boot). Re-read them and seed; a no-op with nobody watching, since `subscribe` binds.
+     */
+    rebind() {
+      if (watchers.size === 0) return;
+      bind();
+      emit();
+    },
 
     /** Drop a peer entirely (a host that knows they are gone — a failed send, a block). */
     forget(address) {

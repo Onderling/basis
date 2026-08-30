@@ -2561,6 +2561,7 @@ function showTabBar(active) {
     active, t,
     onScreens: showScreens,
     onCircles: showLauncher,
+    onNearby: showNearby,
     onContacts: showContacts,
     onMij: showMij,
   });
@@ -3513,7 +3514,7 @@ function showConnectionPoints() {
 }
 
 function showNearby() {
-  hideCircleTabBar(tabBarEl);
+  showTabBar('nearby');
   closeNearby();
 
   // Web has no mesh agent today, so both are null and the controller reports `unavailable` — which is the
@@ -7710,7 +7711,7 @@ async function boot() {
     circleSyncFolioNoteEmbedder();
     // OBJ-2 — joiner-side peer-redeem sender (shared factory), correlated by circlePendingRedeems.
     circleSendPeerRedeem = makeSendGroupRedeemRequest({
-      sendPeer:        (addr, payload) => agent.sendPeerMessage(addr, payload),
+      sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingRedeems,
       // Identity 5B/C — present this device's per-circle address on the peer redeem path.
@@ -7721,7 +7722,7 @@ async function boot() {
     });
     // personas#2 — the post-join "share to this circle" sender (same shape as the redeem sender).
     circleSendPersonaUpdate = makeSendPersonaPropsUpdate({
-      sendPeer:        (addr, payload) => agent.sendPeerMessage(addr, payload),
+      sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingPersonaProps,
       circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
@@ -7744,7 +7745,7 @@ async function boot() {
       // transport being connected; a no-op otherwise.
       if (pendingRestoreFlow) { pendingRestoreFlow = false; setTimeout(() => showRestoreSettingsFlow(), 0); }
       rawCallSkill = withCalendarOutbound(agent.callSkill, {
-        sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         // transport-NEUTRAL: true if NKN OR relay is up (sendPeerMessage routes
         // over whichever; keying on peer.status alone wrongly skips on relay).
         isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
@@ -7772,7 +7773,7 @@ async function boot() {
       };
       govCatchUpShell = govShellRail ? makeGovernanceCatchUp({
         rail: govShellRail,
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         onChange: govChanged,
         // The durable-head serve: a member offline past the lane's audit window still receives the
         // preserved (original, signed) rules-update statement — the final setting never deletes.
@@ -7781,14 +7782,14 @@ async function boot() {
       // The membership lane's catch-up: the same lane-parametrized mechanism over the agent's rail.
       memCatchUpShell = agent.membershipRail ? makeGovernanceCatchUp({
         rail: agent.membershipRail,
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
       }) : null;
       // The KEY lane's catch-up (pull-all — one small statement per version): a long-offline or freshly
       // enrolled device converges on the circle's group-key chain; the store refreshes as the projection.
       keyCatchUpShell = agent.keyRail ? makeGovernanceCatchUp({
         rail: agent.keyRail,
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         subtypes: KEY_CATCHUP_SUBTYPES,
         onChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
       }) : null;
@@ -7798,7 +7799,7 @@ async function boot() {
       // a long-offline device still converges on every open task, paging as needed.
       taskCatchUpShell = agent.taskRail ? makeFrontierReplay({
         rail: agent.taskRail,
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         subtypes: TASK_CATCHUP_SUBTYPES,
         statementsFor: (cid) => agent.taskRail.catchUpStatements(cid),
       }) : null;
@@ -7917,7 +7918,7 @@ async function boot() {
       // ceiling the user gets the real question as a circle bubble with a download button.
       chatCatchUpShell = agent.chatRail ? makeFrontierReplay({
         rail: agent.chatRail,
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         subtypes: CHAT_CATCHUP_SUBTYPES,
         onChange: (cid) => { if (cid === _circleRender?.circleId) { try { _circleRender?.rerender?.(); } catch { /* */ } } },
         onOffer: ({ circleId: cid, count, approxBytes, allow }) => {
@@ -8073,7 +8074,7 @@ async function boot() {
           // admin verifies an incoming redeem + replies; joiner resolves the pending request on response.
           'group-redeem-request':    makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
-            sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+            sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
             publishEvent: publishEventToLog,
             // …and return OUR per-circle address for the circle being joined, proven the same way the
             // joiner proves theirs, so per-circle addressing works in both directions from the join on.
@@ -8113,7 +8114,7 @@ async function boot() {
           } : {}),
           // personas#2 — post-join persona-property push: admin records the member's disclosure onto
           // the roster + acks; the member resolves the pending push on the ack.
-          'persona-props-update':    makeHandlePersonaPropsUpdate({ callSkill: rawCallSkill, sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload), announceRosterUpdate }),
+          'persona-props-update':    makeHandlePersonaPropsUpdate({ callSkill: rawCallSkill, sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts), announceRosterUpdate }),
           'persona-props-ack':       makeHandlePersonaPropsAck({ pendingMap: circlePendingPersonaProps }),
           // profile-update propagation — the roster owner says "row X changed, keys [a,b]"; we
           // record it as a SILENT stream entry (never a chat bubble, never a wake) and re-read

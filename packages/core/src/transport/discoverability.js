@@ -97,7 +97,7 @@ export function maxExposure(a, b) {
  *   transport built later (or dropped) is picked up without re-creating the control
  * @param {(report: object) => void} [deps.onChange]    every applied change, degraded or not
  * @param {(report: object) => void} [deps.onDegraded]  only when the result is more exposed than requested
- * @returns {{set, state, requested, isPublishing, isBrowsing, report}}
+ * @returns {{set, reannounce, refresh, settle, subscribe, state, requested, isPublishing, isBrowsing, report}}
  */
 export function createDiscoverabilityControl({ transports, onChange = null, onDegraded = null } = {}) {
   if (typeof transports !== 'function') {
@@ -107,8 +107,16 @@ export function createDiscoverabilityControl({ transports, onChange = null, onDe
   let requested = DISCOVERABILITY.OFF;
   let effective = DISCOVERABILITY.OFF;
   let perTransport = [];
+  // Has anyone asked for a state yet? `requested` alone cannot say: OFF is both "never asked" and "asked to
+  // be hidden", and `settle()` must re-apply the latter while merely reading the former.
+  let asked = false;
+  const subscribers = new Set();
 
   const notify = (fn, report) => { try { fn?.(report); } catch { /* diagnostics must never break the surface */ } };
+  const publish = (report) => {
+    notify(onChange, report);
+    for (const fn of subscribers) notify(fn, report);
+  };
 
   // `degraded` means MORE exposed than asked — the dangerous direction, and the only one worth alarming
   // about. Being LESS exposed (a device with no radio, Wi-Fi off) is a `shortfall`: worth showing in a UI
@@ -132,6 +140,7 @@ export function createDiscoverabilityControl({ transports, onChange = null, onDe
     async set(state) {
       const norm = normalizeDiscoverability(state);
       requested = norm.value;
+      asked = true;
 
       const named = Object.entries(transports() ?? {}).filter(([, t]) => t && t.supportsDiscoverability);
       const results = [];
@@ -155,7 +164,7 @@ export function createDiscoverabilityControl({ transports, onChange = null, onDe
       effective = results.reduce((acc, r) => maxExposure(acc, r.effective), DISCOVERABILITY.OFF);
 
       const report = buildReport();
-      notify(onChange, report);
+      publish(report);
       if (report.degraded) notify(onDegraded, report);
       return report;
     },
@@ -190,7 +199,7 @@ export function createDiscoverabilityControl({ transports, onChange = null, onDe
         effective = results.reduce((acc, r) => maxExposure(acc, r.effective), DISCOVERABILITY.OFF);
       }
       const report = buildReport();
-      notify(onChange, report);
+      publish(report);
       if (report.degraded) notify(onDegraded, report);
       return report;
     },
@@ -209,10 +218,29 @@ export function createDiscoverabilityControl({ transports, onChange = null, onDe
       }));
       effective = perTransport.reduce((acc, r) => maxExposure(acc, r.effective), DISCOVERABILITY.OFF);
       const report = buildReport();
-      notify(onChange, report);
+      publish(report);
       return report;
     },
 
+    /**
+     * A transport arrived (or dropped) AFTER the last request — a phone whose mDNS lands seconds into boot
+     * while the Nearby screen already asked to be announced. Re-apply what was asked if anything was;
+     * otherwise just read what the transports are doing. Without this the first answer ("nothing can
+     * discover") would stand for as long as the screen is open, however wrong it became.
+     */
+    async settle() {
+      return asked ? this.set(requested) : this.refresh();
+    },
+    /**
+     * Observe every report the control produces (`set`, `reannounce`, `refresh`, `settle`). A surface that
+     * holds the control from boot needs this to redraw when the answer changes underneath it.
+     * @returns {() => void} unsubscribe
+     */
+    subscribe(fn) {
+      if (typeof fn !== 'function') return () => {};
+      subscribers.add(fn);
+      return () => { subscribers.delete(fn); };
+    },
     /** What the device is ACTUALLY doing, across all transports. */
     get state() { return effective; },
 

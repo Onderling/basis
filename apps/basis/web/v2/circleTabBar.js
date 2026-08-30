@@ -15,12 +15,12 @@
 import { circleTabs } from '../../src/v2/tabProjection.js';
 import { basisManifest } from '../../src/index.js';
 
-export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onContacts, onMij } = {}) {
+export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onNearby, onContacts, onMij } = {}) {
   if (!container) return container;
   const tr = typeof t === 'function' ? t : (k) => k;
   // id → the host-wired handler.  Keyed by the projected tab id, so the
   // callback contract (onScreens/onCircles/onContacts/onMij) is unchanged.
-  const handlers = { screens: onScreens, circles: onCircles, contacten: onContacts, mij: onMij };
+  const handlers = { screens: onScreens, circles: onCircles, nearby: onNearby, contacten: onContacts, mij: onMij };
   container.innerHTML = '';
   container.className = 'circle-tabbar';
   for (const tab of circleTabs(basisManifest)) {

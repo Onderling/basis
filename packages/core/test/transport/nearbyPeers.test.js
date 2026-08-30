@@ -189,3 +189,52 @@ describe('subscription lifecycle', () => {
     expect(() => createNearbyPeerSource({ transports: {} })).toThrow(TypeError);
   });
 });
+
+describe('a subscriber that arrives late (seed + rebind)', () => {
+  class Connected extends FakeTransport {
+    constructor(peers) { super(); this.peers = peers; }
+    connectedPeers() { return this.peers; }
+  }
+
+  it('seeds from what the transport already holds — the handshake happened before anyone listened', () => {
+    const transports = { mdns: new Connected(['ada']) };
+    const src = createNearbyPeerSource({ transports: () => transports });
+    const seen = vi.fn();
+    src.subscribe(seen);
+    expect(src.list().map((p) => p.pubKey)).toEqual(['ada']);
+    expect(seen.mock.calls[0][0].map((p) => p.pubKey)).toEqual(['ada']);   // the first delivery already has her
+  });
+
+  it('rebind() picks up a transport that landed after the first subscriber bound', () => {
+    const transports = {};
+    const src = createNearbyPeerSource({ transports: () => transports });
+    const seen = vi.fn();
+    src.subscribe(seen);
+    expect(src.list()).toEqual([]);
+
+    const mdns = new Connected(['ada']);
+    transports.mdns = mdns;
+    src.rebind();
+    expect(src.list().map((p) => p.pubKey)).toEqual(['ada']);
+    mdns.found('bea');                                   // and it follows the late transport's events too
+    expect(src.list().map((p) => p.pubKey).sort()).toEqual(['ada', 'bea']);
+    mdns.lost('ada');
+    expect(src.list().map((p) => p.pubKey)).toEqual(['bea']);
+  });
+
+  it('rebind() with nobody watching binds nothing (subscribe is what binds)', () => {
+    const transports = { mdns: new Connected(['ada']) };
+    const src = createNearbyPeerSource({ transports: () => transports });
+    src.rebind();
+    expect(src.list()).toEqual([]);
+  });
+
+  it('a transport whose connectedPeers() throws is treated as empty, not fatal', () => {
+    const bad = new FakeTransport();
+    bad.connectedPeers = () => { throw new Error('nope'); };
+    const src = createNearbyPeerSource({ transports: () => ({ bad }) });
+    expect(() => src.subscribe(() => {})).not.toThrow();
+    bad.found('ada');
+    expect(src.list().map((p) => p.pubKey)).toEqual(['ada']);
+  });
+});

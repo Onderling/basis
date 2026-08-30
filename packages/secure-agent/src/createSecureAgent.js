@@ -696,6 +696,8 @@ export async function createSecureAgent(opts = {}) {
   // hold the per-circle key we are about to sign with, and treating it as if it did leaves them unable
   // to verify a single circle envelope. One entry per (peer, identity-we-speak-as) is the honest key.
   const helloedPeers = new Set();
+  /** helloKey → the handshake currently running for that peer; later sends await it instead of starting another. */
+  const hiInFlight = new Map();
   const helloKey = (addr, sendAs = null) => `${addr}|${sendAs ?? ''}`;
   // Reciprocal HIs are tracked SEPARATELY from `helloedPeers`, and the difference matters.
   //
@@ -720,6 +722,8 @@ export async function createSecureAgent(opts = {}) {
   // Purely event-driven; there is no timer/poll here.
   //
   //   pendingHold : peerAddr → Map<holdKey, { payload, opts, ts }>
+  //   holdKey     : `id:<msgId>` (a message: a repeat is deduped) · `key:<opts.holdKey>` (a slot: the
+  //                 newest send supersedes the held one) · `seq:n` (neither: every send is its own)
   //
   // De-dup is at TWO layers: the sender collapses a repeat `msgId` here (so a
   // retry while offline doesn't double-queue), and the receiver stays the
@@ -869,7 +873,12 @@ export async function createSecureAgent(opts = {}) {
 
   /** The de-dup key for a payload: its message id when it carries one, else a
    *  per-send sequence (an id-less payload is never treated as a duplicate). */
-  function holdKeyFor(payload) {
+  function holdKeyFor(payload, sendOpts = null) {
+    // A caller-declared key names a SLOT, not a message: the newest send under it supersedes what was
+    // held. Boot-time catch-up requests are the case — one per lane per circle per boot, each making the
+    // previous one pointless, and without this a peer back after a week met fifty of them at once.
+    const slot = sendOpts?.holdKey;
+    if (typeof slot === 'string' && slot) return `key:${slot}`;
     const id = payload?.msgId ?? payload?.id ?? payload?._id;
     return (id != null) ? `id:${id}` : `seq:${++holdSeq}`;
   }
@@ -918,9 +927,12 @@ export async function createSecureAgent(opts = {}) {
     sweepExpiredHolds();
     let q = pendingHold.get(addr);
     if (!q) { q = new Map(); pendingHold.set(addr, q); }
-    const key = holdKeyFor(payload);
+    const key = holdKeyFor(payload, sendOpts);
     if (q.has(key)) {
-      return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
+      if (!key.startsWith('key:')) {
+        return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
+      }
+      q.delete(key);   // a slot: the newest supersedes (re-set below keeps it at the young end)
     }
     q.set(key, { payload, opts: sendOpts, ts: Date.now() });
     // Per-peer cap — a Map iterates in insertion order, so the first key IS the oldest.
@@ -2006,51 +2018,67 @@ export async function createSecureAgent(opts = {}) {
       if (typeof console !== 'undefined') {
         console.log('[secure-agent] sending outbound HI to ' + String(addr).slice(0, 16) + '…');
       }
-      await announceHi();
-      // Wait for the peer's reciprocal HI to register their pubKey at our
-      // SecurityLayer — otherwise the OW encrypt below throws 'No pubKey
-      // registered for recipient'.  A freshly-connected peer on a mesh
-      // transport takes several seconds to become reachable (its presence must
-      // propagate into the mesh), and the FIRST HI sent into that cold-start
-      // window is simply lost.  So instead of one send + a passive wait, we
-      // RE-ANNOUNCE our HI on a coarse cadence across a longer window and
-      // succeed the instant the peer's key arrives.  On an always-reachable
-      // transport (relay / InternalTransport) the reciprocal HI lands in well
-      // under a second, so the loop breaks on an early poll tick, the
-      // re-announce never fires, and that path stays fast — the extra patience
-      // is gated on the mesh transport.
-      const meshTransport = sel.name === 'nkn';
-      const defaultWaitMs = meshTransport ? 15_000 : 5_000;
-      const waitMs = typeof opts.firstSendTimeoutMs === 'number'
-        ? opts.firstSendTimeoutMs : defaultWaitMs;
-      const resendEveryMs = 2_500;
-      if (waitMs > 0 && !peerKeyKnown()) {
-        const start = Date.now();
-        let lastResend = start;
-        while (Date.now() - start < waitMs) {
-          if (peerKeyKnown()) break;
-          await new Promise((r) => setTimeout(r, 100));
-          if (!peerKeyKnown() && Date.now() - lastResend >= resendEveryMs) {
-            lastResend = Date.now();
-            if (typeof console !== 'undefined') {
-              console.log('[secure-agent] re-announcing HI to ' + String(addr).slice(0, 16) + '… (peer still propagating)');
+      // ONE handshake per peer at a time. Boot fans several sends at one peer (a catch-up request per
+      // lane, a statement per circle); each used to open its own HI budget — three sends to one dead peer
+      // cost three 15 s waits with re-announces, in parallel. A handshake is per peer, not per message, so
+      // later sends join the in-flight one and share its outcome (their delivery-failure counts still tick
+      // individually, which is what retires a dead address after the FIRST shared timeout, not the third).
+      const hiKey = helloKey(addr, speakAs);
+      const handshake = async () => {
+        await announceHi();
+        // Wait for the peer's reciprocal HI to register their pubKey at our
+        // SecurityLayer — otherwise the OW encrypt below throws 'No pubKey
+        // registered for recipient'.  A freshly-connected peer on a mesh
+        // transport takes several seconds to become reachable (its presence must
+        // propagate into the mesh), and the FIRST HI sent into that cold-start
+        // window is simply lost.  So instead of one send + a passive wait, we
+        // RE-ANNOUNCE our HI on a coarse cadence across a longer window and
+        // succeed the instant the peer's key arrives.  On an always-reachable
+        // transport (relay / InternalTransport) the reciprocal HI lands in well
+        // under a second, so the loop breaks on an early poll tick, the
+        // re-announce never fires, and that path stays fast — the extra patience
+        // is gated on the mesh transport.
+        const meshTransport = sel.name === 'nkn';
+        const defaultWaitMs = meshTransport ? 15_000 : 5_000;
+        const waitMs = typeof opts.firstSendTimeoutMs === 'number'
+          ? opts.firstSendTimeoutMs : defaultWaitMs;
+        const resendEveryMs = 2_500;
+        if (waitMs > 0 && !peerKeyKnown()) {
+          const start = Date.now();
+          let lastResend = start;
+          while (Date.now() - start < waitMs) {
+            if (peerKeyKnown()) break;
+            await new Promise((r) => setTimeout(r, 100));
+            if (!peerKeyKnown() && Date.now() - lastResend >= resendEveryMs) {
+              lastResend = Date.now();
+              if (typeof console !== 'undefined') {
+                console.log('[secure-agent] re-announcing HI to ' + String(addr).slice(0, 16) + '… (peer still propagating)');
+              }
+              await announceHi();
             }
-            await announceHi();
+          }
+          if (!peerKeyKnown()) {
+            // 2026-05-24 — DON'T add to helloedPeers when the wait times out.
+            // Previously this happened right after the single tx.sendHello, so
+            // subsequent retries skipped the HI re-send entirely and threw
+            // "No pubKey registered" forever.  Leaving helloedPeers unset lets
+            // the next call retry the full handshake (which may succeed once the
+            // peer finishes propagating or a lost HI is re-sent).
+            throw new Error(
+              `secure-agent: peer "${addr}" did not respond with HI within ${waitMs}ms; ` +
+              `they may be offline.  Try again after they reconnect.`,
+            );
           }
         }
-        if (!peerKeyKnown()) {
-          // 2026-05-24 — DON'T add to helloedPeers when the wait times out.
-          // Previously this happened right after the single tx.sendHello, so
-          // subsequent retries skipped the HI re-send entirely and threw
-          // "No pubKey registered" forever.  Leaving helloedPeers unset lets
-          // the next call retry the full handshake (which may succeed once the
-          // peer finishes propagating or a lost HI is re-sent).
-          throw new Error(
-            `secure-agent: peer "${addr}" did not respond with HI within ${waitMs}ms; ` +
-            `they may be offline.  Try again after they reconnect.`,
-          );
-        }
+      };
+      let inflight = hiInFlight.get(hiKey);
+      if (!inflight) {
+        inflight = handshake().finally(() => { if (hiInFlight.get(hiKey) === inflight) hiInFlight.delete(hiKey); });
+        hiInFlight.set(hiKey, inflight);
+      } else if (typeof console !== 'undefined') {
+        console.log('[secure-agent] joining the in-flight HI to ' + String(addr).slice(0, 16) + '…');
       }
+      await inflight;
       // Only mark as helloed after the bidirectional handshake fully
       // completed (or wasn't needed because we already had their key).
       helloedPeers.add(helloKey(addr, speakAs));

@@ -224,6 +224,12 @@ export class MdnsTransport extends Transport {
    * peer-disconnected events fire on this transport.  v2 circle 5.9c.
    */
   get connectionCount() { return this.#pubKeyToConn.size; }
+  /**
+   * Who is connected RIGHT NOW. `peer-discovered` is an event — a listener that binds after the handshake
+   * never hears it — so a surface that starts late reads this once and then follows the events.
+   * @returns {string[]} peer pubKeys
+   */
+  connectedPeers() { return [...this.#pubKeyToConn.keys()]; }
 
   _hasPeer(pubKey) {
     return this.#pubKeyToConn.has(pubKey);
@@ -282,6 +288,9 @@ export class MdnsTransport extends Transport {
   // ── Private ────────────────────────────────────────────────────────────────
 
   #setupEvents() {
+    // Idempotent: `connect()` and `_applyDiscoverability()` both call this, and a JS reload calls it
+    // again — without this guard one inbound connection was handled (and logged) up to six times.
+    if (this.#eventSubs.length) return;
     this.#eventSubs.push(
       // Peer discovered via mDNS — apply tiebreaker before connecting
       this.#emitter.addListener('MdnsServiceDiscovered', async ({ host, port, pubKey }) => {

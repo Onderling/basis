@@ -81,7 +81,13 @@ export function makeNearbySessionAdapter({
     stopAdvertising() { apply(restingState, 'stop'); },
 
     /** What the transports last reported — the truthful answer to "am I visible?". */
-    lastReport() { return last ? { ...last } : (control?.report?.() ?? null); },
+    // The control's own report is the live truth (it moves when a transport lands after our request —
+    // `settle()`); the memo of our last answer only stands in for a control that cannot report.
+    lastReport() {
+      const live = control?.report?.();
+      if (live) return live;
+      return last ? { ...last } : null;
+    },
 
     restingState,
 

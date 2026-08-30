@@ -799,3 +799,25 @@ describe('an ask flood is bounded, and the expensive half is what gets protected
     expect(screen.model().asksIgnored).toBe(0);
   });
 });
+
+describe('the visibility banner follows the control (a transport landing after open)', () => {
+  it('redraws with the corrected report while open, and stops listening once closed', async () => {
+    const transports = {};
+    const { screen, control } = build({ transports });
+    const seen = [];
+    screen.subscribe((m) => seen.push(m.visibility));
+    screen.open();
+    await settle();
+    expect(seen.at(-1)).toMatchObject({ unavailable: true, publishing: false });
+
+    transports.mdns = mk(Discovering);
+    await control.settle();
+    expect(seen.at(-1)).toMatchObject({ unavailable: false, publishing: true });
+
+    screen.close();
+    await settle();
+    const n = seen.length;
+    await control.set('browse');
+    expect(seen).toHaveLength(n);
+  });
+});

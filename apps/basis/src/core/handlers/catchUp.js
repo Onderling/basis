@@ -86,7 +86,7 @@ export function makeRequestCatchUpForGroup({ callSkill, sendPeer, logger = conso
           groupId,
           sinceMs,
           sentAt:  Date.now(),
-        });
+        }, { holdKey: `catch-up-request:${groupId}` });   // one held request per group, the newest wins
         sent += 1;
       } catch (err) {
         errors.push({ addr: m.addr, reason: String(err?.message ?? err) });

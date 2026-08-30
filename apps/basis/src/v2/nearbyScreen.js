@@ -151,6 +151,10 @@ export function createNearbyScreen({
 
   session.subscribeToPeers(() => emit());
 
+  // The visibility banner reads the control's report; when that changes underneath us (a transport landing
+  // after open, a re-announce), the surface must redraw or it keeps showing the answer that was true once.
+  let unsubscribeControl = null;
+
   // ── Asks (step F) ──────────────────────────────────────────────────────────
   // Held here rather than in the session because an ask outlives a peer row: someone can ask and walk out
   // of range, and the question is still worth answering until it expires.
@@ -350,6 +354,10 @@ export function createNearbyScreen({
     /** Enter the screen: announce, listen for peers and asks, watch for network changes. */
     open() {
       session.open();      // advertising + peer subscription
+      if (!unsubscribeControl && typeof control?.subscribe === 'function') {
+        try { unsubscribeControl = control.subscribe(() => emit()) ?? null; }
+        catch (err) { unsubscribeControl = null; try { onError?.(err, 'subscribeToControl'); } catch { /* */ } }
+      }
       watcher.start();     // only while the screen is up: a closed screen has nothing to re-announce for
       if (typeof subscribeToAsks === 'function' && !unsubscribeAsks) {
         try { unsubscribeAsks = subscribeToAsks((ask) => { ingestAsk(ask); }) ?? null; }
@@ -389,6 +397,10 @@ export function createNearbyScreen({
      */
     close() {
       watcher.stop();
+      if (unsubscribeControl) {
+        try { unsubscribeControl(); } catch (err) { try { onError?.(err, 'unsubscribeControl'); } catch { /* */ } }
+        unsubscribeControl = null;
+      }
       if (unsubscribeAsks) {
         try { unsubscribeAsks(); } catch (err) { try { onError?.(err, 'unsubscribeAsks'); } catch { /* */ } }
         unsubscribeAsks = null;

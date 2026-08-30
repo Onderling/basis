@@ -326,3 +326,68 @@ describe('reannounce (Nearby step C)', () => {
   });
 });
 
+
+describe('a transport that lands late (settle + subscribe)', () => {
+  it('settle() re-applies what was asked once a transport exists', async () => {
+    // The phone's mDNS is built seconds into boot; the Nearby screen already asked to be announced and was
+    // told "nothing can discover". That answer must not outlive the transport's arrival.
+    const named = {};
+    const c = createDiscoverabilityControl({ transports: () => named });
+    expect(await c.set(DISCOVERABILITY.PUBLISH)).toMatchObject({ effective: 'off', shortfall: true });
+
+    const mdns = mk(Discovering);
+    named.mdns = mdns;
+    const r = await c.settle();
+    expect(r).toMatchObject({ requested: 'browse+publish', effective: 'browse+publish', shortfall: false });
+    expect(mdns.applied).toEqual(['browse+publish']);
+    expect(c.isPublishing).toBe(true);
+  });
+
+  it('settle() with nothing ever asked only READS — it does not invent a request', async () => {
+    const named = {};
+    const c = createDiscoverabilityControl({ transports: () => named });
+    const mdns = mk(Discovering);
+    await mdns.setDiscoverability(DISCOVERABILITY.BROWSE);   // the builder's resting state
+    named.mdns = mdns;
+    const r = await c.settle();
+    expect(mdns.applied).toEqual(['browse']);                 // nothing re-applied by the control
+    expect(r).toMatchObject({ requested: 'off', effective: 'browse' });
+  });
+
+  it('settle() re-applies an explicit OFF too — "asked to hide" is not "never asked"', async () => {
+    const named = {};
+    const c = createDiscoverabilityControl({ transports: () => named });
+    await c.set(DISCOVERABILITY.OFF);
+    const mdns = mk(Discovering);
+    await mdns.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    named.mdns = mdns;
+    await c.settle();
+    expect(mdns.applied).toEqual(['browse+publish', 'off']);
+    expect(c.isPublishing).toBe(false);
+  });
+
+  it('subscribe() hears every report and stops on unsubscribe', async () => {
+    const named = { mdns: mk(Discovering) };
+    const c = createDiscoverabilityControl({ transports: () => named });
+    const seen = [];
+    const off = c.subscribe((r) => seen.push(r.effective));
+    await c.set(DISCOVERABILITY.PUBLISH);
+    c.refresh();
+    await c.reannounce();
+    await c.settle();
+    expect(seen).toEqual(['browse+publish', 'browse+publish', 'browse+publish', 'browse+publish']);
+    off();
+    await c.set(DISCOVERABILITY.OFF);
+    expect(seen).toHaveLength(4);
+    expect(c.subscribe(null)).toBeTypeOf('function');   // a non-function subscriber is a no-op, not a throw
+  });
+
+  it('a throwing subscriber never breaks the surface or its siblings', async () => {
+    const c = createDiscoverabilityControl({ transports: () => ({ mdns: mk(Discovering) }) });
+    const good = vi.fn();
+    c.subscribe(() => { throw new Error('bad listener'); });
+    c.subscribe(good);
+    await expect(c.set(DISCOVERABILITY.BROWSE)).resolves.toMatchObject({ effective: 'browse' });
+    expect(good).toHaveBeenCalledTimes(1);
+  });
+});

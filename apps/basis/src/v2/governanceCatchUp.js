@@ -25,7 +25,7 @@ const RETRY_REFUSED_MS = 2000;
 /**
  * @param {object} deps
  * @param {{ storedStatements: Function, ingest: Function }} deps.rail  the governance rail (makeGovernanceRail)
- * @param {(peerAddr: string, payload: object) => Promise<*>|*} deps.sendToPeer
+ * @param {(peerAddr: string, payload: object, opts?: object) => Promise<*>|*} deps.sendToPeer  opts carries `holdKey`
  * @param {(circleId: string) => void} [deps.onChange]   re-render an open panel after a batch lands
  * @param {(fromPeerAddr: string, circleId: string) => Promise<boolean>|boolean} [deps.mayServe]
  *   whether to answer this peer's request. Default: serve (the V1 catch-up posture — every circle member is a
@@ -108,7 +108,8 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
   }
 
   /** Ask one peer for one circle's governance statements. */
-  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: REQ, circleId });
+  // One held request per lane per circle (see frontierReplay): the newest supersedes, never stacks.
+  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: REQ, circleId }, { holdKey: `${REQ}:${circleId}` });
 
   /**
    * The reconnect kick: request every circle's governance statements from that circle's reachable members

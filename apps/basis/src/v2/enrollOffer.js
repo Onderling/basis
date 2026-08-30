@@ -269,9 +269,10 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // 4 — pull the circle's truth from the sibling: membership, governance, and the KEY lane
       // (the group-key chain travels as signed statements like everything else — a sealed circle
       // opens on this device once the chain folds; no side-channel replay).
-      await sendPeerMessage(c.address, { subtype: MEMBERSHIP_CATCHUP_SUBTYPES.request, circleId: c.id }, SEND);
-      await sendPeerMessage(c.address, { subtype: GOV_CATCHUP_REQUEST, circleId: c.id }, SEND);
-      await sendPeerMessage(c.address, { subtype: KEY_CATCHUP_SUBTYPES.request, circleId: c.id }, SEND);
+      for (const subtype of [MEMBERSHIP_CATCHUP_SUBTYPES.request, GOV_CATCHUP_REQUEST, KEY_CATCHUP_SUBTYPES.request]) {
+        // held per lane per circle — a sibling that is offline meets one request, not one per attempt
+        await sendPeerMessage(c.address, { subtype, circleId: c.id }, { ...SEND, holdKey: `${subtype}:${c.id}` });
+      }
       row.steps.push('catch-up');
       // 5 — the CONTENT pulls (tasks + chat), targeted at the sibling — see the header. Best-effort:
       // the statements bind against the freshly seeded roster; the reconnect requestAll retries.

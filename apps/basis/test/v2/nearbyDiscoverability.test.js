@@ -216,3 +216,25 @@ describe('a network change (Nearby step C)', () => {
   });
 });
 
+
+describe('the report is the control\'s, live — not the adapter\'s memo of its last answer', () => {
+  it('a transport that lands after open corrects lastReport() without a reopen', async () => {
+    const named = {};
+    const { control, adapter, session } = wire({ transports: named });
+    session.open();
+    await settle();
+    expect(adapter.lastReport()).toMatchObject({ effective: 'off', shortfall: true });
+
+    named.mdns = mk(FakeMdns);
+    await control.settle();
+    expect(adapter.lastReport()).toMatchObject({ requested: 'browse+publish', effective: 'browse+publish', shortfall: false });
+  });
+
+  it('a control that cannot report still gets the memo', async () => {
+    const control = { set: async (state) => ({ requested: state, effective: state, degraded: false, shortfall: false }) };
+    const adapter = makeNearbySessionAdapter({ control });
+    adapter.startAdvertising();
+    await settle();
+    expect(adapter.lastReport()).toMatchObject({ effective: 'browse+publish' });
+  });
+});

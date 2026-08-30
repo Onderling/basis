@@ -866,6 +866,9 @@ export const basisManifest = {
   tabs: [
     { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },
     { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
+    // Nearby — the room this device is in (mDNS / BLE). The screen existed on both shells with no door
+    // (found 2026-08-30, story 8); a tab for now, declared here so both shells get it from one line.
+    { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },
     { id: 'contacten', labelKey: 'circle.tab.contacten', target: { kind: 'nav', to: 'contacten' } },
     { id: 'mij',       labelKey: 'circle.tab.mij',       target: { kind: 'op',  opId: 'me' } },
   ],

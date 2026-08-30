@@ -724,6 +724,7 @@ export default function ChatScreen({
           rail: memRail,
           sendToPeer: (addr, payload, opts) => bundle?.agent?.sendPeerMessage?.(addr, payload, opts),
           subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
+          onChange: (circleId) => bundle?.agent?.rosterReads?.invalidate(circleId),   // a landed batch changes the roster
         }) : null;
         if (memCatchUp && !globalThis.__onderlingMemCatchUpKicked) {
           globalThis.__onderlingMemCatchUpKicked = true;
@@ -871,7 +872,7 @@ export default function ChatScreen({
         }
         return {
           ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),
-          ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail }) } : {}),
+          ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail, onChange: (circleId) => bundle?.agent?.rosterReads?.invalidate(circleId) }) } : {}),
           ...(memCatchUp ? { [memCatchUp.subtypes.request]: memCatchUp.onRequest, [memCatchUp.subtypes.batch]: memCatchUp.onBatch } : {}),
           // The grants lane: a sibling device's grant/revoke lands through the agent's ready-made
           // receiver and refolds the door's grant set live (same wiring as the web shell).

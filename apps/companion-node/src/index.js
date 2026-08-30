@@ -172,6 +172,14 @@ export function resolveConfigDir(explicit) {
  *                                         in the 100 MiB `ws` frame ceiling. Match the device's
  *                                         `registerPodProxy({ maxBodyBytes })`.
  * @param {object}  [opts.registryPseudoPod]  inject the registry pod — else in-memory (R1)
+ * @param {boolean|object} [opts.nearby=false]  the local-network radio (mDNS), OFF by default. `true` or
+ *                                         `{mdns:true, label?, publish?, publishFor?}` composes the mDNS
+ *                                         transport so this node takes part in a nearby group on the LAN.
+ *                                         Absent ⇒ the module is never imported and `bonjour-service` is
+ *                                         never loaded. Defaults to BROWSE-ONLY: a companion that
+ *                                         announces itself permanently is a presence beacon with a stable
+ *                                         identifier, so publishing is an explicit act (`publish:true`),
+ *                                         and `publishFor` bounds it in time.
  * @param {string}  [opts.label='companion-folio']
  * @returns {Promise<{
  *   agent: import('@onderling/core').Agent,
@@ -551,6 +559,7 @@ export async function startCompanionNode(opts = {}) {
 
   let manageServer = null;   // 6d surface ② — the /manage HTTP tenant (assigned below when manageHttp is ON)
   async function stop() {
+    if (nearbyMdns) { try { await nearbyMdns.stop(); } catch { /* best-effort */ } }
     if (manageServer) { try { await manageServer.stop(); } catch { /* best-effort */ } }
     try { await agent.stop?.(); } catch { /* best-effort */ }
     if (relay) { try { await relay.stop(); } catch { /* best-effort */ } }
@@ -680,6 +689,27 @@ export async function startCompanionNode(opts = {}) {
     }
   }
 
+  // ── Nearby (opt-in): the local-network radio ──────────────────────────────
+  // Imported ONLY when asked for, so a node that does not want multicast never loads the DNS-SD library.
+  // Composed after the agent so the transport can be added to a running host rather than gating boot: a
+  // Wi-Fi that is not there must cost latency, never a companion that refuses to start.
+  let nearbyMdns = null;
+  const nearbyOpt = opts.nearby;
+  if (nearbyOpt) {
+    try {
+      const { startNearbyMdns, normaliseNearbyOption } = await import('./nearbyMdns.js');
+      const normalised = normaliseNearbyOption(nearbyOpt);
+      if (normalised) {
+        nearbyMdns = await startNearbyMdns({ identity, opts: normalised });
+        agent.addTransport?.('mdns', nearbyMdns.transport);
+      }
+    } catch (err) {
+      // Say so rather than boot a node that silently has no radio — the failure a person would otherwise
+      // read as "nobody is nearby".
+      console.warn('[companion] nearby (mdns) not started:', err?.message ?? err);
+    }
+  }
+
   return {
     agent,
     identity,
@@ -709,6 +739,9 @@ export async function startCompanionNode(opts = {}) {
     management,
     managementOwnerPubKey: management ? mgmtOwner : null,
     // 6d surface ② — the online /manage interface (null when OFF).
+    // The local-network radio (null when `nearby` is OFF): `{transport, nearbyPeers, state, stop}`.
+    // `nearbyPeers` is the same peer source the phone's mesh builder hands the nearby surface.
+    nearby: nearbyMdns,
     manageUrl: manageServer?.url ?? null,
     managePort: manageServer?.port ?? null,
     stop,

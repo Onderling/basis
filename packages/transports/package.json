@@ -21,6 +21,7 @@
     ".": "./src/index.js",
     "./mdns": "./src/MdnsTransport.js",
     "./mdns-node": "./src/mdnsNodeBackend.js",
+    "./mdns-dnssd": "./src/mdnsDnsSdDiscovery.js",
     "./utils/base64": "./src/utils/base64.js"
   },
   "scripts": {
@@ -30,6 +31,7 @@
   "dependencies": {
     "@onderling/core": "workspace:^",
     "@onderling/logger": "workspace:^",
+    "bonjour-service": "^1.4.4",
     "ws": "^8.20.0",
     "tweetnacl": "^1.0.3"
   },

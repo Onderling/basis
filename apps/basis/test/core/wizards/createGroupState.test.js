@@ -33,7 +33,7 @@ describe('setKind — fills policy axes from the template', () => {
     expect(s1.kind).toBe('household');
     expect(s1.features).toEqual(CIRCLE_TEMPLATES.household.features);
     expect(s1.revealPolicy).toBe('open');
-    expect(s1.pod).toBe('shared');
+    expect(s1.pod, 'the pod axis follows the storage radio (default: no pod), never the template').toBe(s1.storagePolicy);
     expect(s1.llmTool).toBe('local');
     expect(s1.agents).toBe('admin-approval');
     expect(s1.consensusRequired).toBe(false);
@@ -48,7 +48,7 @@ describe('setKind — fills policy axes from the template', () => {
     expect(s.features.noticeboard).toBe(true);
     expect(s.features.calendar).toBe(false);
     expect(s.revealPolicy).toBe('pairwise');
-    expect(s.pod).toBe('personal');
+    expect(s.pod, 'the pod axis follows the storage radio (default: no pod), never the template').toBe(s.storagePolicy);
     expect(s.consensusRequired).toBe(true);
   });
 

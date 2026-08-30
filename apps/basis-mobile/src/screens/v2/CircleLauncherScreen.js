@@ -4835,6 +4835,8 @@ function NearbyScreen({
   const invites    = Array.isArray(model?.invites) ? model.invites : [];
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
   useEffect(() => { setDraft(''); }, [composing, answering]);
+  const [bannerOpen, setBannerOpen] = useState(false);
+  const [mineOpen, setMineOpen] = useState(false);
   return (
     <View style={styles.page} testID="circle-nearby-screen">
       <View style={styles.bar}>
@@ -4844,14 +4846,19 @@ function NearbyScreen({
       </View>
       <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
       {visKey ? (
-        <View
+        // One line for the state; the sentence behind it one tap away (sketch §2). A degraded state keeps
+        // its sentence in view — that one is a warning, not an explanation.
+        <Pressable
           style={[styles.nearbyBanner, visKey === 'still_visible' ? styles.nearbyBannerAlert : null]}
           testID={`nearby-visibility-${visKey}`}
-          accessibilityRole={visKey === 'still_visible' ? 'alert' : undefined}
+          accessibilityRole={visKey === 'still_visible' ? 'alert' : 'button'}
+          onPress={() => setBannerOpen((v) => !v)}
         >
           <Text style={styles.nearbyBannerTitle}>{t(`circle.nearbyScreen.${visKey}_title`)}</Text>
-          <Text style={styles.muted}>{t(`circle.nearbyScreen.${visKey}_body`)}</Text>
-        </View>
+          {(bannerOpen || visKey === 'still_visible') ? (
+            <Text style={styles.muted}>{t(`circle.nearbyScreen.${visKey}_body`)}</Text>
+          ) : null}
+        </Pressable>
       ) : null}
       <Text style={styles.muted}>{headerText}</Text>
       {rows.length === 0 ? (
@@ -5006,6 +5013,15 @@ function NearbyScreen({
         ))}
       </View>
 
+      {/* Your side, folded (sketch §2): the allows, the card, what others see — one row that opens. */}
+      <Pressable onPress={() => setMineOpen((v) => !v)} accessibilityRole="button" testID="nearby-mine" style={styles.nearbyAsks}>
+        <Text style={styles.ownProfileTitle}>
+          {t('circle.nearbyScreen.mine_title')}
+          {' · '}
+          {[allows.card ? t('circle.nearbyScreen.mine_card_on') : null, allows.chat ? t('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean).join(' · ') || t('circle.nearbyScreen.mine_none')}
+        </Text>
+      </Pressable>
+      {mineOpen ? (<>
       {/* Cards + chat, each behind its own per-device allow (step G). */}
       <View style={styles.nearbyAsks} testID="nearby-allows">
         {['card', 'chat'].map((key) => (
@@ -5067,6 +5083,17 @@ function NearbyScreen({
         </View>
       ) : null}
 
+      <View style={styles.ownProfile}>
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.own_profile')}</Text>
+        <Text style={styles.muted}>
+          {Array.isArray(own.publishedSkills) && own.publishedSkills.length
+            ? own.publishedSkills.join(', ')
+            : t('circle.nearbyScreen.own_profile_empty')}
+        </Text>
+      </View>
+      </>) : null}
+
+      {/* The room chat is its own pane (sketch §2). */}
       {chat ? (
         <View style={styles.nearbyAsks} testID="nearby-chat">
           <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.chat_title')}</Text>
@@ -5103,14 +5130,6 @@ function NearbyScreen({
         </View>
       ) : null}
 
-      <View style={styles.ownProfile}>
-        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.own_profile')}</Text>
-        <Text style={styles.muted}>
-          {Array.isArray(own.publishedSkills) && own.publishedSkills.length
-            ? own.publishedSkills.join(', ')
-            : t('circle.nearbyScreen.own_profile_empty')}
-        </Text>
-      </View>
     </View>
   );
 }

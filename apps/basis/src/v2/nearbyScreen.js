@@ -475,6 +475,7 @@ export function createNearbyScreen({
       try {
         const result = await askChannel.broadcast(built.ask);
         // Reports the REAL reach. "Asked 3 of 5 nearby" is honest; "sent" implies everyone heard it.
+        emit();   // my ask does not echo into the room list, but its OWN row (heard + clock) must appear now
         return { ok: true, ask: built.ask, ...result };
       } catch (err) {
         try { onError?.(err, 'askRoom'); } catch { /* diagnostics only */ }

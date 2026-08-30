@@ -286,6 +286,8 @@ export async function bootAgentBundle(opts = {}) {
       tasksPersistDb,
       householdPersistDb,
       settingsPersistDb,
+      // Held messages + the dead-address verdict survive a launch (AsyncStorage, like the settings cache).
+      outboxPersistDb: opts.asyncStorage ? { dbName: 'cc-outbox-cache', asyncStorage: opts.asyncStorage } : undefined,
       stoopControlAgent: opts.stoopControlAgent,   // S4 — multi-member sealing router (redeem/leave)
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side, keyed by circleId), RN
       // parity with web circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod +

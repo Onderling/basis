@@ -7784,6 +7784,7 @@ async function boot() {
         rail: agent.membershipRail,
         sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
+        onChange: (circleId) => agent.rosterReads?.invalidate(circleId),   // a landed batch changes the roster
       }) : null;
       // The KEY lane's catch-up (pull-all — one small statement per version): a long-offline or freshly
       // enrolled device converges on the circle's group-key chain; the store refreshes as the projection.
@@ -8007,7 +8008,7 @@ async function boot() {
           // member-side pull and no-ops when the circle is not open.
           ...(agent.membershipRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({
             rail: agent.membershipRail,
-            onChange: (circleId) => { pullRosterForCircle({ circleId }).catch(() => { /* best-effort */ }); },
+            onChange: (circleId) => { agent.rosterReads?.invalidate(circleId); pullRosterForCircle({ circleId }).catch(() => { /* best-effort */ }); },
           }) } : {}),
           ...(memCatchUpShell ? { [memCatchUpShell.subtypes.request]: memCatchUpShell.onRequest, [memCatchUpShell.subtypes.batch]: memCatchUpShell.onBatch } : {}),
           // The grants lane (connections belong to the person): a sibling device's grant/revoke

@@ -1,5 +1,5 @@
 /**
- * The companion is an ordinary routed agent (story 8, N2 — Frits: "no special routes").
+ * The companion is an ordinary routed agent (Frits, after the phone + laptop walk: "no special routes").
  *
  * With a nearby mDNS transport registered, the host's own `RoutingStrategy` must CHOOSE it for a peer it
  * can reach on the local network — mdns outranks relay. Before, the companion built a bare `Agent` with

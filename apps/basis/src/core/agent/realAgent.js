@@ -33,6 +33,7 @@ import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
+import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
@@ -2202,6 +2203,19 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: chatId.pubKey,
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     });
+    // A membership statement that LANDS (fan or catch-up) changes the roster without a write through the
+    // waist — clear that circle's roster-read window so the next read sees it (rosterReadCache.js).
+    // …and one this device APPENDS (a join, a revoke) is a roster change too, before any fan.
+    for (const fn of ['ingest', 'append', 'appendOne']) {
+      if (!membershipRail || typeof membershipRail[fn] !== 'function') continue;
+      const raw = membershipRail[fn].bind(membershipRail);
+      membershipRail[fn] = async (...a) => {
+        const r = await raw(...a);
+        const cid = typeof a[0] === 'string' ? a[0] : (a[0]?.circleId ?? null);   // (circleId, …) on all three
+        if (cid) rosterReads.invalidate(cid); else rosterReads.invalidateAll();
+        return r;
+      };
+    }
     membershipEmit = makeMembershipEmitter({
       rail: membershipRail,
       myRef: chatId.pubKey,
@@ -2677,6 +2691,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     return /^[a-z0-9]/.test(slug) ? slug : `c-${slug}`;
   }
 
+  const rosterReads = createRosterReadCache();
   const callSkill = async (appOrigin, opId, args) => {
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and
@@ -3144,15 +3159,22 @@ export async function createRealHouseholdAgent(opts = {}) {
           note:        'Multi-circle support requires multi-agent topology — separate slice.',
         };
       }
-      const parts = [DataPart(realArgs)];
-      const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts);
-      const first  = Array.isArray(result) ? result[0] : null;
-      const reply  = first?.data ?? null;
-
-      // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the stoop
-      // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
-
-      return adaptStoopReply(opId, reply, realArgs);
+      const runStoop = async () => {
+        const parts = [DataPart(realArgs)];
+        const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts);
+        const first  = Array.isArray(result) ? result[0] : null;
+        const reply  = first?.data ?? null;
+        // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the stoop
+        // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
+        return adaptStoopReply(opId, reply, realArgs);
+      };
+      // The three roster reads share one answer per circle for a short window (every lane asks at boot,
+      // the verifier per statement — see rosterReadCache.js); any other stoop op may have changed a
+      // roster and clears it.
+      if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runStoop);
+      const out = await runStoop();
+      rosterReads.afterWrite(realOpId);
+      return out;
     }
     if (appOrigin === 'folio') {
       // Folio's web-only skills already return chat-shell-shaped
@@ -4313,6 +4335,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // calls enableSecureRendezvous for the common case; these stay exposed for
     // the Nearby/mDNS path + diagnostics.
     addSecureTransport:     sa.addSecureTransport,
+    /** The roster-read window at the stoop waist; a shell that lands a membership statement outside the waist clears it here. */
+    rosterReads,
     removeSecureTransport:  sa.removeSecureTransport,
     enableSecureRendezvous: sa.enableSecureRendezvous,
     upgradeToRendezvous:    sa.upgradeToRendezvous,

@@ -662,7 +662,7 @@ export default function ChatScreen({
       // circle's ROSTER knows advance it; the map's monotonic rule then orders it. Absent map ⇒ the
       // handler is a no-op, as before. Fire-and-forget: reading the roster is a skill call and the peer
       // router does not await its handlers, so a slow read delays the bubble, never the receive loop.
-      'delivery-receipt': (from, payload) => { applyIncomingReceipt?.(payload, from); },
+      'delivery-receipt': (from, payload) => { bundle?.nearbyRoom?.onReceipt?.(from, payload); applyIncomingReceipt?.(payload, from); },
       // γ-next.recipe — circle screen recipe broadcast.  Caches the
       // inbound recipe per-circle; the editor pulls on next open and
       // passes via γ.3's `incomingRecipe` opt.  No bubble UI.

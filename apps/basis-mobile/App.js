@@ -553,6 +553,12 @@ export default function App() {
         // closure built above.  Must happen BEFORE the rehydrator
         // fires (next block) so the first ingest call sees callSkill.
         bundleRef.current = b;
+        // The Nearby room confirms landed asks/cards/chat/invites with the SAME receipt chat uses, and
+        // counts receipts on the SAME delivery map — no second receipt path (nearbyRoomBinding.js).
+        try {
+          b.nearbyRoom?.setLandedHook?.((info) => chatReceiptSenderRef.current?.(info));
+          b.nearbyRoom?.setDeliveryMap?.(deliveryStateMapRef.current);
+        } catch { /* the room works without receipts */ }
         // Register-backed surface preference (the device-params consolidation): bind the booted
         // agent into the module store, which hydrates the cached value from the register.
         attachSurfacePrefAgent(b.agent);

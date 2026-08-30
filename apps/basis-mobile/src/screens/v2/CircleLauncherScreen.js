@@ -4701,12 +4701,22 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
     });
   }, [bundle, onOpenThread]);
 
+  const lastAsk = useRef(null);
   const submitAsk = useCallback(async (text) => {
     const r = await screen.askRoom({ text });
     setComposing(false);
-    // Names the REAL reach — "asked 3 of 5 nearby" — rather than implying the whole room heard it.
+    // Names the REAL reach — "asked 3 of 5 nearby" — rather than implying the whole room heard it; the
+    // line then follows the receipts ("heard by 2 of 5") as they come in.
+    lastAsk.current = r.ok ? { id: r.ask?.id ?? null, peers: r.peers } : null;
     setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
   }, [screen]);
+  useEffect(() => {
+    const sub = bundle?.nearbyRoom?.subscribeToHeard;
+    if (typeof sub !== 'function') return undefined;
+    return sub(({ msgId, heard }) => {
+      if (lastAsk.current && msgId === lastAsk.current.id) setNotice({ key: 'ask_heard', vars: { heard, peers: lastAsk.current.peers } });
+    });
+  }, [bundle]);
 
   const submitAnswer = useCallback(async (text) => {
     const askId = answering;

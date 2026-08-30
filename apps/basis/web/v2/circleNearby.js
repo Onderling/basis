@@ -81,10 +81,21 @@ export function renderCircleNearby(container, {
     bTitle.textContent = tr(`circle.nearbyScreen.${key}_title`);
     banner.appendChild(bTitle);
 
+    // The sentence behind the state, one tap away rather than three lines on every open (sketch §2). A
+    // degraded state keeps its sentence in view: that one is a warning, not an explanation.
     const bBody = document.createElement('div');
     bBody.className = 'circle-nearby__visibility-body';
     bBody.textContent = tr(`circle.nearbyScreen.${key}_body`);
-    banner.appendChild(bBody);
+    if (visibility.degraded) banner.appendChild(bBody);
+    else {
+      const more = document.createElement('details');
+      more.className = 'circle-nearby__visibility-more';
+      const sum = document.createElement('summary');
+      sum.textContent = '…';
+      more.appendChild(sum);
+      more.appendChild(bBody);
+      banner.appendChild(more);
+    }
 
     container.appendChild(banner);
   }
@@ -382,7 +393,15 @@ export function renderCircleNearby(container, {
       allowsBlock.appendChild(off);
     }
   }
-  container.appendChild(allowsBlock);
+  // ── Your side, folded (sketch §2): the allows, the card, what others see — one row that opens ──────
+  const mine = document.createElement('details');
+  mine.className = 'circle-nearby__mine';
+  const mineSummary = document.createElement('summary');
+  mineSummary.className = 'circle-nearby__mine-summary';
+  const mineChips = [allows.card ? tr('circle.nearbyScreen.mine_card_on') : null, allows.chat ? tr('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean);
+  mineSummary.textContent = `${tr('circle.nearbyScreen.mine_title')} · ${mineChips.length ? mineChips.join(' · ') : tr('circle.nearbyScreen.mine_none')}`;
+  mine.appendChild(mineSummary);
+  mine.appendChild(allowsBlock);
 
   if (allows.card) {
     const form = document.createElement('form');
@@ -425,7 +444,7 @@ export function renderCircleNearby(container, {
       if (!name) return;
       if (typeof onSubmitCard === 'function') onSubmitCard({ label: name, line: line.value.trim() });
     });
-    container.appendChild(form);
+    mine.appendChild(form);
   }
 
   // `chat === null` means "I have not joined" — deliberately distinct from an empty conversation.
@@ -481,7 +500,16 @@ export function renderCircleNearby(container, {
     });
     block.appendChild(form);
 
-    container.appendChild(block);
+    // The room chat is its own pane (sketch §2), open when you are in it.
+    const pane = document.createElement('details');
+    pane.className = 'circle-nearby__chat-pane';
+    pane.open = true;
+    const paneSummary = document.createElement('summary');
+    paneSummary.className = 'circle-nearby__chat-pane-summary';
+    paneSummary.textContent = tr('circle.nearbyScreen.chat_title');
+    pane.appendChild(paneSummary);
+    pane.appendChild(block);
+    container.appendChild(pane);
   }
 
   const footer = document.createElement('div');
@@ -497,7 +525,8 @@ export function renderCircleNearby(container, {
     ? skills.join(', ')
     : tr('circle.nearbyScreen.own_profile_empty');
   footer.appendChild(ownSkills);
-  container.appendChild(footer);
+  mine.appendChild(footer);
+  container.appendChild(mine);
 
   return container;
 }

@@ -2927,6 +2927,22 @@
     "becoming_visible_body": {
       "text": "The radio is being told to announce you; a moment.",
       "doc": "Second line of that banner."
+    },
+    "mine_title": {
+      "text": "You here",
+      "doc": "The folded \"your side\" section of Nearby (allows, card, what others see) — sketch §2."
+    },
+    "mine_card_on": {
+      "text": "card shown",
+      "doc": "Summary chip when the card allow is on."
+    },
+    "mine_chat_on": {
+      "text": "in the chat",
+      "doc": "Summary chip when the chat allow is on."
+    },
+    "mine_none": {
+      "text": "nothing shown yet",
+      "doc": "Summary when neither allow is on."
     }
   },
   "viewAsSplit": {

@@ -2927,6 +2927,22 @@
     "becoming_visible_body": {
       "text": "De radio krijgt net de opdracht je aan te kondigen; een ogenblik.",
       "doc": "Second line of that banner."
+    },
+    "mine_title": {
+      "text": "Jij hier",
+      "doc": "The folded \"your side\" section of Nearby (allows, card, what others see) — sketch §2."
+    },
+    "mine_card_on": {
+      "text": "kaartje zichtbaar",
+      "doc": "Summary chip when the card allow is on."
+    },
+    "mine_chat_on": {
+      "text": "in het gesprek",
+      "doc": "Summary chip when the chat allow is on."
+    },
+    "mine_none": {
+      "text": "nog niets getoond",
+      "doc": "Summary when neither allow is on."
     }
   },
   "viewAsSplit": {

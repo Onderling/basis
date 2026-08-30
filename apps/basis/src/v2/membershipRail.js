@@ -23,6 +23,9 @@ export const MEMBERSHIP_CATCHUP_SUBTYPES = Object.freeze({
 });
 
 /** The default key↔ref binding source: the roster's proof-checked circleAddress rows (shared with governance). */
+/** How long one spineless roster read serves a verification burst (a fold verifies every statement). */
+export const SPINELESS_MEMO_MS = 300;
+
 export function rosterBindingVerifier(callSkill) {
   // NO re-entrancy breaker, BY CONSTRUCTION (2026-08-21): this verifier reads the roster
   // SPINELESS (trail + display only), so verifying a statement never re-enters the statement
@@ -79,8 +82,17 @@ export function rosterBindingVerifier(callSkill) {
  * back to the interim any-attested rule — the arc's named, shrinking window. Spineless roster
  * reads, like the base verifier (no recursion, no breaker).
  */
-export function membershipBindingVerifier(callSkill, { circleIdentityFor = null } = {}) {
+export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, memoMs = SPINELESS_MEMO_MS } = {}) {
   // Spineless read → no recursion → no breaker (see rosterBindingVerifier above).
+  const memo = new Map();   // circleId → { at, promise }
+  const spinelessRoster = (circleId) => {
+    const hit = memo.get(circleId);
+    if (hit && Date.now() - hit.at < memoMs) return hit.promise;
+    const promise = callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
+    memo.set(circleId, { at: Date.now(), promise });
+    promise.catch(() => memo.delete(circleId));
+    return promise;
+  };
   return async ({ author, ref, circleId, kind }) => {
     try {
       // SELF-BINDING — a device can always verify its OWN key, with no roster involved. This is the
@@ -94,8 +106,12 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null 
           if (mine?.pubKey && mine.pubKey === author) return true;
         } catch { /* fall through to the roster read */ }
       }
-      // SPINELESS, for the same reason as the base verifier above.
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
+      // SPINELESS, for the same reason as the base verifier above — and memoised for a moment: a fold
+      // verifies EVERY statement of a circle, and each verification re-read the whole trail. On the
+      // phone that was the roster read running ~1.5×/s continuously and the JS thread so busy that
+      // taps were dropped (2026-08-30). One read per burst is the same answer at a fraction of the cost;
+      // the window is short enough that a row landing mid-burst is seen by the next one.
+      const r = await spinelessRoster(circleId);
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;

@@ -517,7 +517,11 @@ function circlePodCustodyRN() {
 export async function provisionCircleMedium(circleId) {
   try {
     const policy = await _defaultPolicyOf(circleId);
-    if (circleStoreMode(policy?.pod) !== 'cache') return null;   // no-pod → shared local backing
+    const mode = circleStoreMode(policy?.pod);
+    // Say which posture the store answered with: "pod-carried" for a circle its creator made "No pod" is
+    // otherwise unexplainable from the log alone (the walk's W27).
+    if (typeof console !== 'undefined') console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy?.pod ?? null)} → ${mode}`);
+    if (mode !== 'cache') return null;   // no-pod → shared local backing
     const localBackend = asyncStorageRef
       ? createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-cache-${circleId}` })
       : createMemoryBackend();

@@ -68,6 +68,7 @@ const V0_DEFAULT_CIRCLE_ID = 'household';
 export async function createTasksAgent({
   itemBackend,
   localStoreBundle,
+  vault,               // the grant managers' durable store when the mesh agent is SHARED (see buildMeshAgent)
   roles,
   members:    initialMembers,
   pod:        podCfg,
@@ -143,11 +144,12 @@ export async function createTasksAgent({
   const notifier = providedNotifier ?? null;
 
   // ── MeshAgent (process-level shared agent) ────────────────────────
-  const { meshAgent: agent, vault, identity: id } = await buildMeshAgent({
+  const { meshAgent: agent, vault: grantVault, identity: id } = await buildMeshAgent({
     identity,
     transport,
     localStoreBundle,
     identityVault,
+    vault,
     label,
     // This circle's issuer-side revocation truth (its taskGrantManager + the botAgentRegistry
     // Circle.js parks on it later) reaches the engine THROUGH the CircleState, which is built a
@@ -171,7 +173,7 @@ export async function createTasksAgent({
   // revocation set in memory only, so a restart re-admits holders it had already cut off while their
   // tokens are still signed and unexpired — and it says so loudly on construction rather than
   // degrading in silence.
-  const taskGrantManager = new TaskGrantManager({ identity: id, store: vault });
+  const taskGrantManager = new TaskGrantManager({ identity: id, store: grantVault });
 
   // OfferingMatch (Phase 4.2 — composes core.Agent + pubSub directly).
   let offeringMatch = null;

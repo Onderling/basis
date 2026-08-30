@@ -113,7 +113,20 @@ export function labelOf(options, id) {
  * @returns {object} new state with `kind` + policy axes filled
  */
 export function setKind(state, kind) {
-  return applyTemplate(state, kind);
+  const next = applyTemplate(state, kind);
+  // ONE storage fact. The wizard's storage radio (`storagePolicy`) and the policy's `pod` axis are the
+  // same choice, and the RADIO is the authority: its default is "No pod (local only — simplest)", and a
+  // template's `pod` (every template says `personal` or `shared`) is a preference that only means
+  // something once a pod is actually attached. They used to be two fields: the person's "No pod" went to
+  // stoop while the template's `personal` went into the policy the store reads — a phone circle created
+  // "local only" ran pod-carried with no pod, and nothing fanned (W27, 2026-08-30).
+  const storagePolicy = state?.storagePolicy ?? DEFAULT_CIRCLE_STORAGE_POSTURE;
+  return { ...next, storagePolicy, pod: storagePolicy };
+}
+
+/** The person's storage choice — sets both names of the one fact and marks the axis as theirs. */
+export function setStoragePolicy(state, value) {
+  return markAxisTouched({ ...state, storagePolicy: value, pod: value }, 'pod');
 }
 
 /* ─── N1 — neighbourhood size + chat advice ─────────────────────────────── */
@@ -197,9 +210,13 @@ export function policyPatchFromState(state) {
   const s = state && typeof state === 'object' ? state : {};
   const patch = {};
   if (s.features && typeof s.features === 'object') patch.features = s.features;
-  for (const ax of ['revealPolicy', 'pod', 'llmTool', 'agents']) {
+  for (const ax of ['revealPolicy', 'llmTool', 'agents']) {
     if (s[ax] !== undefined) patch[ax] = s[ax];
   }
+  // The storage choice IS the policy's `pod` axis: `setKind` seeds it from the template and
+  // `setStoragePolicy` sets it to the person's choice (both keep `storagePolicy` equal to it). A wizard
+  // that picked neither writes nothing — the policy keeps its own default, as for every other axis.
+  if (s.pod !== undefined) patch.pod = s.pod;
   // The wizard's "decide together?" axis COMPILES to the decision table (the decision-kind
   // unification): true → policy changes need admin agreement (admin-quorum); false → an admin
   // saves directly (any-admin, the lived default). The boolean never reaches the policy shape.

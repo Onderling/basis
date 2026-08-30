@@ -228,6 +228,7 @@ export async function createBrowserMultiCircleTasksAgent({
       },
       localStoreBundle,
       identity,
+      vault:                identityVault,   // every JOINED circle's grant managers get the durable store too
       transport:            meshAgent.transport,
       agent:                meshAgent,
       registerSkills:       false,

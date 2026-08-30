@@ -12,8 +12,7 @@ import {
   CIRCLE_TEMPLATES, SIZE_BANDS, bandForCount, recommendChat,
 } from '../src/v2/circleTemplates.js';
 import {
-  initialState, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
-} from '../src/core/wizards/createGroupState.js';
+  initialState, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState, setStoragePolicy } from '../src/core/wizards/createGroupState.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { isFeatureEnabled } from '../src/v2/circlePolicy.js';
 
@@ -119,11 +118,24 @@ describe('persistence — wizard policy reaches the circle store (E8 link)', () 
     expect(isFeatureEnabled(await store.get('circle-westend'), 'chat')).toBe(true);
   });
 
+  it('the storage choice IS the policy\'s pod axis: "No pod" beats the template\'s personal', () => {
+    // Two names for one fact used to be two fields: the person's "No pod" went to stoop as
+    // `storagePolicy`, the template's `personal` went into the policy as `pod` — the field the store
+    // reads. A phone circle created "local only" ran pod-carried and nothing fanned (W27, 2026-08-30).
+    const seeded = setKind(initialState(), 'neighbourhood');
+    expect(seeded.storagePolicy, 'the radio keeps its own default — a template\'s pod is a preference, not a choice').toBe('none');
+    expect(policyPatchFromState(seeded).pod, 'and the policy follows the radio, never the template').toBe('none');
+    const chosen = setStoragePolicy(seeded, 'shared');
+    expect(policyPatchFromState(chosen).pod).toBe('shared');
+    expect(policyPatchFromState(setKind(chosen, 'household')).pod, 'a later kind change keeps the person\'s choice').toBe('shared');
+  });
   it('policyPatchFromState carries features + template axes (web/RN shared)', () => {
     const patch = policyPatchFromState(setKind(initialState(), 'neighbourhood'));
     expect(patch.features.chat).toBe(false);
     expect(patch.revealPolicy).toBe('pairwise');   // from the neighbourhood template
-    expect(patch.pod).toBe('personal');
+    // The pod axis is NOT a template axis any more: the storage radio is the authority and its default is
+    // "No pod" — a template's `personal` only means something once a pod is attached (W27, 2026-08-30).
+    expect(patch.pod).toBe('none');
     // A bare state (no template) yields an empty patch.
     expect(policyPatchFromState(initialState())).toEqual({});
   });

@@ -30,6 +30,7 @@ import {
   CIRCLE_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
+  setStoragePolicy,
 } from '../../core/wizards/createGroupState.js';
 import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 // B5 — the ceiling field. `markAxisTouched` so an explicit choice survives a kind switch (the same
@@ -372,7 +373,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     'How the circle stores its data + how the encryption key rotates.');
 
   appendRadioField(wrap, doc, t('wizard.create.storage'), state.storagePolicy, STORAGE_POLICIES,
-    (v) => { state.storagePolicy = v; rerender(); }, { consequenceGroup: 'storagePolicy' });
+    (v) => { Object.assign(state, setStoragePolicy(state, v)); rerender(); }, { consequenceGroup: 'storagePolicy' });
 
   // Conditional pod URI field for centralised/hybrid.
   if (state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') {

@@ -61,6 +61,10 @@ export async function buildMeshAgent({
   label = 'TasksMeshAgent',
   circleStates,
   agent: existingAgent,
+  // The vault the grant managers use as their durable store. A SHARED agent (the basis composition)
+  // carries no vault of its own, so without this the managers got `null` and warned "revocations are
+  // MEMORY-ONLY" on every boot — on the phone too (W19). The caller hands the host's identity vault.
+  vault: providedVault = null,
 } = {}) {
   // Multi-circle runtime (2026-05-14, Tasks V2 sixth slice) — when a
   // pre-built `core.Agent` is supplied, reuse it instead of creating
@@ -71,7 +75,7 @@ export async function buildMeshAgent({
   if (existingAgent) {
     return {
       meshAgent:     existingAgent,
-      vault:         existingAgent.vault ?? null,
+      vault:         existingAgent.vault ?? providedVault ?? null,
       identity:      existingAgent.identity,
       identityVault,
       policyEngine:  existingAgent.policyEngine ?? null,

@@ -56,7 +56,7 @@ describe('setKind — fills policy axes from the template', () => {
     const s = setKind(initialState(), 'unknownStyle');
     expect(s.kind).toBe('unknownStyle');
     expect(s.revealPolicy).toBe(CIRCLE_TEMPLATES._default.revealPolicy);
-    expect(s.pod).toBe(CIRCLE_TEMPLATES._default.pod);
+    expect(s.pod, 'the pod axis follows the storage radio (default: no pod), never the template').toBe(s.storagePolicy);
     expect(s.llmTool).toBe(CIRCLE_TEMPLATES._default.llmTool);
   });
 

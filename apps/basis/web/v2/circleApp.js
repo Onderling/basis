@@ -7643,7 +7643,9 @@ async function boot() {
       provisionCircleMedium: async (circleId) => {
         try {
           const policy = await _circlePolicy(circleId);
-          if (circleStoreMode(policy.pod) !== 'cache') return null;   // no-pod → shared local backing
+          const mode = circleStoreMode(policy.pod);
+          console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy.pod ?? null)} → ${mode}`);   // web ≡ mobile
+          if (mode !== 'cache') return null;   // no-pod → shared local backing
           const medium = createCircleCacheMedium({
             localBackend: pickWebBackend(`cc-circle-cache-${circleId}`),
             deviceId:     `circle-cache-${circleId}`,

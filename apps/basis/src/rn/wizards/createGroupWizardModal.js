@@ -22,7 +22,7 @@ import {
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
-  CIRCLE_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
+  CIRCLE_KINDS, setKind, setSize, setStoragePolicy, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
 } from '../../core/wizards/createGroupState.js';
@@ -343,7 +343,7 @@ export default function CreateGroupWizardModal({
                   label="Storage policy"
                   value={state.storagePolicy}
                   options={attachConsequences('storagePolicy', STORAGE_POLICIES, t)}
-                  onChange={(v) => setState((s) => ({ ...s, storagePolicy: v }))}
+                  onChange={(v) => setState((s) => setStoragePolicy(s, v))}
                   consequenceLabel={t('common.consequences')}
                 />
                 {(state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') && (

@@ -8,15 +8,14 @@
  * store just accepted: a canonical noticeboard type, written here (not received), tagged with a circle.
  * The next post kind rides the same door without anyone listing it.
  */
-import { isNoticeboardPost, schema } from '@onderling/item-types';
+import { isNoticeboardPostType } from '@onderling/item-types';
 import { itemCircleId } from './circleScope.js';
 
 /** Should this freshly-stored item go to the circle's other members? */
 export function shouldFanNoticeboardItem(item) {
   if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id) return false;
   if (item.source?.broadcast === true) return false;        // it ARRIVED here — fanning it again is an echo
-  if (!isNoticeboardPost(item)) return false;               // system rows (rules, codes, redemptions, chat)
-  return !!schema(item.type);                                // a canonical type — bespoke rows (a report) stay local
+  return isNoticeboardPostType(item);                       // a canonical POST type; system rows and bespoke rows (a report) stay local
 }
 
 /**
@@ -31,7 +30,7 @@ export function noticeboardFanPayload(item, { from, groupId = null } = {}) {
     : (groupId ? [{ kind: 'group', groupId }] : []);
   return {
     requestId:      item.id,
-    text:           item.text ?? '',
+    text:           item.text ?? item.body ?? '',   // a circle-store row carries `body` (canonical), stoop's index `text`
     from,
     type:           item.type ?? 'request',
     kind:           item.kind ?? null,

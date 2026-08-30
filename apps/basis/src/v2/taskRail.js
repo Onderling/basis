@@ -51,7 +51,7 @@ export const TASK_CATCHUP_SUBTYPES = Object.freeze({
  * @param {(circleId:string)=>({put:Function, delete:Function}|null)} a.storeFor  the circle's CircleItemStore
  * @param {Function} [a.verifyBinding]   override the roster binding verifier (tests)
  */
-export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null }) {
+export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null }) {
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
   const base = makeCircleEntryRail({
     eventLog,
@@ -72,6 +72,9 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       await store.put(item, { sync: false, origin: true });
+      // A snapshot that LANDED (verified, merged) — the seam for anything that indexes what the store holds
+      // (the noticeboard bridge into stoop's index). Best-effort: an indexer must never fail the merge.
+      if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item); } catch { /* indexed later by catch-up */ } }
     } else if (body.kind === 'remove') {
       const id = body.payload?.id ?? body.subject;
       if (typeof id === 'string' && id) await store.delete(id, { sync: false });

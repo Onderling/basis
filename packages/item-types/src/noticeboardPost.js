@@ -23,6 +23,9 @@
  * "Withdraw" action when it was yours — and, because a chat item carries its circle as
  * `source.circleId` (a hint the circle-scope reader does not read), on EVERY circle's Noticeboard.
  */
+/** The canonical types a noticeboard post can be — what the board shows and what the circle carries as a post. */
+export const NOTICEBOARD_POST_TYPES = Object.freeze(['request', 'offer', 'announcement']);
+
 export const SYSTEM_STOOP_TYPES = new Set([
   'group-rules', 'membership-code', 'membership-redemption', 'circle-chat-message',
 ]);
@@ -50,4 +53,9 @@ export function isNoticeboardPost(item) {
     if (typeof src.msgId === 'string' && src.msgId) return false;
   }
   return true;
+}
+
+/** Is this row a noticeboard POST (a canonical post type, not a system row)? Stricter than `isNoticeboardPost`, which only excludes system rows. */
+export function isNoticeboardPostType(item) {
+  return NOTICEBOARD_POST_TYPES.includes(item?.type) && isNoticeboardPost(item);
 }

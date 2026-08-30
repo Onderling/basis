@@ -215,6 +215,7 @@ import { makeHandleCalendarInvite } from '../../src/core/handlers/calendarInvite
 import { makeHandleFileShare }      from '../../src/core/handlers/fileShare.js';
 import { makeHandleCalendarRsvp }   from '../../src/core/handlers/calendarRsvp.js';
 import { makeHandleCirclePost }     from '../../src/core/handlers/circlePost.js';
+import { landedNoticeboardHandler } from '../../src/v2/noticeboardCarry.js';
 import { makeHandleCalendarCancel } from '../../src/core/handlers/calendarCancel.js';
 // Theme B — the settings chatbot: template-driven guided setup (remote-loadable, bundled fallback).
 import { renderGuidedSetup } from './guidedSetupPanel.js';
@@ -8049,9 +8050,6 @@ async function boot() {
             publishEvent:  publishEventToLog,
           }),
           'calendar-rsvp':           makeHandleCalendarRsvp({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
-          // A noticeboard post from another member. The sender side is shared (`realAgent` fans `circle-post`
-          // on postRequest), the receiver was mobile-only — so on web a post reached nobody but its author.
-          'circle-post':             makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
           'calendar-cancel':         makeHandleCalendarCancel({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
           // a peer shared a file → announce it in the circle with a [Download] button (bytes ride in the
           // embed; we stash them so the tap can save). Classic parity (handleFileShare).
@@ -8134,6 +8132,12 @@ async function boot() {
         },
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
+      // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
+      // the shell bridges it into stoop's index + the notification — the same handler the old envelope fed.
+      agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
+        handleCirclePost: makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
+        self: agent.identity?.pubKey ?? null,
+      }));
       // Rebuild the delivery ladder from the ONE log (the outbox-as-projection): my recent sends seed
       // maybe-received (which also restores the receipt gate's key set — an empty post-restart map was
       // refusing receipts for pre-restart sends), logged receipts advance to stored. The agent's own

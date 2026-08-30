@@ -92,7 +92,8 @@ import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
 import { createBrowserStoopAgent } from '@onderling-app/stoop/browser';
 import { STOOP_OP_ALIAS } from '../../v2/stoopOpAliases.js';
-import { shouldFanNoticeboardItem, noticeboardFanPayload, noticeboardItemCircle } from '../../v2/noticeboardFan.js';
+import { shouldFanNoticeboardItem, noticeboardItemCircle } from '../../v2/noticeboardFan.js';
+import { toCircleStorePost } from '../../v2/noticeboardCarry.js';
 import { createBrowserFolioAgent } from '@onderling-app/folio/browser';
 // agents — the read-only "your agents" surface (2026-07-09). buildAgentSkills
 // derives the two defineSkill-shaped handlers (listAgents / viewAgent) from
@@ -2221,6 +2222,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: chatId.pubKey,
       callSkill: (...a) => callSkill(...a),
       storeFor: (circleId) => (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null),
+      // A landed snapshot that is a noticeboard post goes to the shell's bridge (stoop's index + notification).
+      onItemApplied: (circleId, item) => (typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item) : undefined),
     });
     taskEmit = makeTaskEmitter({
       rail: taskRail,
@@ -2607,48 +2610,37 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /**
-   * Fan a noticeboard item to the circle's roster as a `circle-post` envelope (the receiver's
-   * `ingestRemotePost` dedupes on the item id). Which items, and what payload, is `noticeboardFan.js`'s
-   * decision; this only resolves the circle(s) and delivers through the hold-forward sender.
+   * A noticeboard item stoop just accepted goes into the CIRCLE's store — and the store's own mirror carries
+   * it (a signed task-lane snapshot, fanned + catch-up served). This retired the second sync
+   * implementation (a `circle-post` envelope fanned by hand, 2026-08-30 — option B). Which items qualify is
+   * `noticeboardFan.js`'s decision; the canonical shape the store's registry needs is `noticeboardCarry.js`'s.
    */
   async function fanNoticeboardItem(item) {
     if (!shouldFanNoticeboardItem(item)) return;
-    if (sa?.peer?.status !== 'connected') {
-      if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan skipped — peer transport not connected (status=' + sa?.peer?.status + ')');
-      return;
-    }
     try {
       const explicit = noticeboardItemCircle(item);
       const circleIds = explicit ? [explicit] : await _listMyKnownCircles();
       if (circleIds.length === 0) {
-        if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan: the item names no circle and none is known — it stays local');
+        if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard: the item names no circle and none is known — it stays local');
         return;
       }
-      const sent = new Set();
-      for (const groupId of circleIds) {
-        const rosterReply = await chatAgent.invoke(stoopAgent.address, 'listGroupRoster', [DataPart({ groupId })]);
-        const roster = rosterReply?.[0]?.data?.members ?? [];
-        if (roster.length === 0) continue;
-        const payload = noticeboardFanPayload(item, { from: chatId.pubKey, groupId });
-        for (const m of roster) {
-          if (!m?.addr || sent.has(m.addr)) continue;
-          sent.add(m.addr);
-          try {
-            await _saSendWithRetry(sa, m.addr, {
-              type: 'p2p-chat', subtype: 'circle-post', groupId, fromPubKey: chatId.pubKey, payload, sentAt: Date.now(),
-            });
-          } catch (err) {
-            if (typeof console !== 'undefined') console.warn('[realAgent] circle-post fan failed for', String(m.addr).slice(0, 16), err?.message ?? err);
-          }
+      for (const circleId of circleIds) {
+        try {
+          await ensureCircleSync(circleId);   // the publish valve is wired at open; a post may come first
+          const store = householdService.stores.getStore(circleId);
+          await store.put(toCircleStorePost(item, { from: chatId.pubKey }), { by: chatId.pubKey });
+          if (typeof console !== 'undefined') console.info(`[realAgent] noticeboard ${item.type} ${item.id} → circle store ${circleId} (the lane carries it)`);
+        } catch (err) {
+          if (typeof console !== 'undefined') console.warn(`[realAgent] noticeboard → circle store ${circleId} failed:`, err?.message ?? err);
         }
       }
-      if (typeof console !== 'undefined') {
-        console.info(`[realAgent] circle-post fanned ${item.type} ${item.id} to ${sent.size} peer(s) across ${circleIds.length} circle(s)`);
-      }
     } catch (err) {
-      if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan failed', err);
+      if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard carry failed', err);
     }
   }
+  /** The shell's bridge for a post that LANDED in a circle store from another member (see noticeboardCarry.js). */
+  let _noticeboardLanded = null;
+
   async function _listMyKnownCircles() {
     try {
       const result = await chatAgent.invoke(
@@ -4550,6 +4542,8 @@ export async function createRealHouseholdAgent(opts = {}) {
      * route it MAY use is waiting on us, not on the peer — no presence signal will release it. Re-stamp
      * every hold with the terms as they are NOW (the same live read each send makes) and re-send.
      */
+    /** The shell registers what happens when another member's post LANDS in a circle store (see noticeboardCarry.js). */
+    setNoticeboardLandedHook(fn) { _noticeboardLanded = typeof fn === 'function' ? fn : null; },
     retryHeldUnderCurrentTerms() {
       const requireAliasCapable = !addressFallbackOn();
       return sa.flushHeld?.({

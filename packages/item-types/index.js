@@ -11,7 +11,7 @@
  */
 
 import { createRegistry }           from './src/registry.js';
-export { SYSTEM_STOOP_TYPES, isNoticeboardPost } from './src/noticeboardPost.js';
+export { SYSTEM_STOOP_TYPES, NOTICEBOARD_POST_TYPES, isNoticeboardPost, isNoticeboardPostType } from './src/noticeboardPost.js';
 import { registerCanonicalTypes }   from './src/canonical.js';
 
 // Pre-load the default canonical registry.

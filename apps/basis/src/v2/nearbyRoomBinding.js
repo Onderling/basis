@@ -57,12 +57,21 @@ export function createNearbyRoomBinding({
   if (typeof sendPeerMessage !== 'function') throw new TypeError('nearbyRoomBinding: sendPeerMessage required');
 
   const report = (err, phase) => { try { onError?.(err, phase); } catch { /* diagnostics only */ } };
+  const heldAsks = new Map();   // ask.id → ask (see below)
   const askChannel = createAskChannel({
     listPeers,
     sendTo: (address, payload) => sendPeerMessage(address, payload),
     now,
     onError,
   });
+  // An ask this device answered is settled here too: the screen forgets it, and so must the hold, or the
+  // next open replays a question already answered (walked 2026-08-30: the answered ask came back).
+  const sendAnswerRaw = askChannel.sendAnswer.bind(askChannel);
+  askChannel.sendAnswer = async (answer, toAddress) => {
+    const r = await sendAnswerRaw(answer, toAddress);
+    if (r?.ok && answer?.askId) heldAsks.delete(answer.askId);
+    return r;
+  };
 
   // One subscriber set per kind. A throwing subscriber must not stop its siblings or the router.
   const subs = { ask: new Set(), answer: new Set(), card: new Set(), chat: new Set(), invite: new Set() };
@@ -71,7 +80,6 @@ export function createNearbyRoomBinding({
   // Walked 2026-08-30: an ask from the other phone arrived while this one was answering the companion,
   // nobody was subscribed, and it was gone; the asker had been told "asked 2 of 2". So live asks are kept
   // here, bounded by their own expiry and the room's cap, and handed to the next subscriber.
-  const heldAsks = new Map();   // ask.id → ask
   const sweepAsks = () => { for (const [id, ask] of heldAsks) if (!isAskLive(ask, now)) heldAsks.delete(id); };
   const subscribe = (kind) => (fn) => {
     if (typeof fn !== 'function') return () => {};

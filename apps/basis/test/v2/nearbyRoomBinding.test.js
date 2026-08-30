@@ -118,6 +118,15 @@ describe('an ask that arrives while nobody is listening', () => {
     expect(seen.map((x) => x.id)).toEqual([ask.id]);
   });
 
+  it('an ask this device ANSWERED is not replayed either', async () => {
+    const { a, b } = pair();
+    const ask = createAsk({ text: 'anyone?', from: 'a', now }).ask;
+    await a.askChannel.broadcast(ask);
+    const answer = answerAsk({ ask, text: 'me', from: 'b', now }).answer;
+    expect((await b.askChannel.sendAnswer(answer, 'a')).ok).toBe(true);
+    expect(b.heldAsks()).toHaveLength(0);
+  });
+
   it('an expired ask is not replayed', async () => {
     let t = T0;
     const nodes = {};

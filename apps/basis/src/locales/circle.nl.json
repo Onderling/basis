@@ -329,6 +329,22 @@
     "limit_reached": {
       "text": "Deze uitnodiging heeft iedereen toegelaten die mocht. Vraag de beheerder van de kring om een nieuwe.",
       "doc": "B5 — the joiner-facing message when the ISSUER refuses an over-ceiling redemption. No count: the joiner is not told the circle’s limit, only that this invite is spent."
+    },
+    "announce_nearby": {
+      "text": "Ook aankondigen in de buurt-kamer (15 min)",
+      "doc": "The door from the invite QR into the Nearby room broadcast (PLAN-nearby §5). Admin-only by construction: only an admin holds a uri."
+    },
+    "announce_nearby_done": {
+      "text": "Aangekondigd aan {{reached}} van {{peers}} in de buurt",
+      "doc": "Real reach, like an ask: peers the transport handed it to."
+    },
+    "announce_nearby_nobody": {
+      "text": "Nu niemand in de buurt — open eerst In de buurt",
+      "doc": "The room is empty or this device is not listening; nothing was sent."
+    },
+    "announce_nearby_failed": {
+      "text": "Aankondigen is niet gelukt",
+      "doc": "The broadcast threw; the QR still works."
     }
   },
   "members": {

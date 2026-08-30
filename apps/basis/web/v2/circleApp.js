@@ -4539,6 +4539,27 @@ async function showCircleInvite(circleId) {
   code.textContent = deepLink;
   code.style.cssText = 'display:block;word-break:break-all;font-size:11px;margin-top:6px;opacity:.7';
   card.appendChild(code);
+  // The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is listed
+  // nearby for 15 minutes. Only an admin reaches this line (a non-admin got `admin-only` above).
+  const announce = document.createElement('button');
+  announce.type = 'button';
+  announce.className = 'cc-btn';
+  announce.dataset.testid = 'invite-announce-nearby';
+  announce.textContent = t('circle.invite.announce_nearby');
+  announce.style.cssText = 'margin-top:10px';
+  const announced = document.createElement('p');
+  announced.style.cssText = 'font-size:12px;opacity:.8';
+  announce.addEventListener('click', async () => {
+    announce.disabled = true;
+    const res = await ensureNearbyRoom()?.announceInvite({ uri: r.uri, circleId, expiresAt: r.expiresAt ?? null })
+      ?? { ok: false, reason: 'nobody-nearby' };
+    announced.textContent = res.ok
+      ? t('circle.invite.announce_nearby_done', { reached: res.reached ?? 0, peers: res.peers ?? 0 })
+      : t(res.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed');
+    announce.disabled = false;
+  });
+  card.appendChild(announce);
+  card.appendChild(announced);
 }
 
 // reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —

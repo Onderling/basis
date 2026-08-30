@@ -29,6 +29,11 @@ describe('the Nearby room reaches both shells', () => {
     expect(src).toMatch(/subscribeToAnswers\(/);
   });
 
+  it('both shells offer the invite-into-the-room door next to the QR (PLAN-nearby §5)', () => {
+    expect(read('../../web/v2/circleApp.js')).toMatch(/announceInvite\(\{ uri: r\.uri, circleId/);
+    expect(read('../../../basis-mobile/src/screens/v2/CircleLauncherScreen.js')).toMatch(/nearbyRoom\?\.announceInvite\?\.\(\{/);
+  });
+
   it('mobile: the bundle builds the binding, the host spreads screenDeps(), the router spreads handlers', () => {
     const bundle = read('../../../basis-mobile/src/core/agentBundle.js');
     expect(bundle).toMatch(/createNearbyRoomBinding\(\{/);

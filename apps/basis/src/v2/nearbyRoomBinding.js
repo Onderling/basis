@@ -52,7 +52,7 @@
 import { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE } from './nearbyAskChannel.js';
 import { isAskLive } from './nearbyAsks.js';
 import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE, CHAT_MAX_KEPT, ASKS_MAX_KEPT } from './nearbyRoom.js';
-import { receiveInvite, isInviteLive, INVITE_MESSAGE } from './nearbyInvites.js';
+import { receiveInvite, isInviteLive, prepareBroadcastInvite, INVITE_MESSAGE } from './nearbyInvites.js';
 import { receiveReceipt, deliveryAfterSend } from './deliveryState.js';
 
 export const PRESENCE_MESSAGE = 'nearby-presence';
@@ -262,6 +262,27 @@ export function createNearbyRoomBinding({
         subscribeToPresence: this.subscribeToPresence,
         myRoomAddress:       this.myRoomAddress,
       };
+    },
+    /**
+     * The door from a circle's invite screen: announce this invite into the room, to whoever is listed
+     * right now. The act IS the per-circle publish consent (PLAN-nearby §5: admin-only, off by default —
+     * the admin pressing this button is the "on"), the 15-minute ceiling applies as always, and the room
+     * re-tells it to newcomers while it lives. Reports the real reach; an empty room is said, not hidden.
+     */
+    async announceInvite({ uri, circleId, circleName = '', expiresAt = null } = {}) {
+      const peers = peersNow();
+      if (peers.length === 0) return { ok: false, reason: 'nobody-nearby', peers: 0 };
+      const built = prepareBroadcastInvite({
+        uri, circleId, circleName, expiresAt, allows: { [circleId]: true }, from: this.myRoomAddress(), now,
+      });
+      if (!built.ok) return built;
+      try {
+        const r = await askChannel.broadcastKind(INVITE_MESSAGE, { invite: built.invite });
+        return { ok: true, invite: built.invite, ...r };
+      } catch (err) {
+        report(err, 'announceInvite');
+        return { ok: false, reason: err?.message ?? 'broadcast-failed' };
+      }
     },
     /** The shell's receipt sender goes here — the SAME one chat uses. */
     setLandedHook(fn) { landedHook = typeof fn === 'function' ? fn : null; },

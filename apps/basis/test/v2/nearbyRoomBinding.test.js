@@ -304,3 +304,19 @@ describe('heard, not sent — the room rides the app\'s delivery receipts', () =
     expect(receipts).toEqual([]);
   });
 });
+
+describe('the invite door — announcing a circle invite into the room', () => {
+  it('announces to whoever is listed, tells newcomers, and reports the real reach', async () => {
+    const { a, b } = pair();
+    const invites = []; b.subscribeToInvites((i) => invites.push(i));
+    const res = await a.announceInvite({ uri: INVITE_URI, circleId: 'c1', circleName: 'Buren', expiresAt: T0 + 60_000 });
+    expect(res).toMatchObject({ ok: true, sent: 1, peers: 1 });
+    expect(invites).toHaveLength(1);
+    expect(invites[0]).toMatchObject({ circleId: 'c1', circleName: 'Buren', from: 'a' });
+  });
+
+  it('an empty room is said, not hidden', async () => {
+    const a = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [], now });
+    expect(await a.announceInvite({ uri: INVITE_URI, circleId: 'c1' })).toMatchObject({ ok: false, reason: 'nobody-nearby', peers: 0 });
+  });
+});

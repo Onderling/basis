@@ -779,6 +779,10 @@ export async function createSecureAgent(opts = {}) {
         peers: [...pendingHold].map(([addr, q]) => [addr, [...q].map(([k, e]) => [k, {
           payload: e.payload, opts: e.opts ?? null, ts: e.ts ?? Date.now(),
         }])]),
+        // The dead-address verdict rides along: an address written off after N failures stays written off
+        // across a restart (for `holdDeadTtlMs`), so every launch does not re-pay a full HI budget per dead
+        // roster address (seen on the phone: three dead addresses × a 15 s wait, every boot).
+        dead: [...deliveryFailures].map(([addr, f]) => [addr, { n: f.n, at: f.at }]),
       });
     } catch { return holdPersist; }          // a queue we cannot serialise stays in memory
     holdPersist = holdPersist.then(async () => {
@@ -803,6 +807,13 @@ export async function createSecureAgent(opts = {}) {
     if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.peers)) return 0;
     let restored = 0;
     const now = Date.now();
+    if (Array.isArray(parsed.dead)) {
+      for (const [addr, f] of parsed.dead) {
+        if (typeof addr !== 'string' || !f || typeof f.n !== 'number') continue;
+        if (holdDeadTtlMs > 0 && now - (f.at ?? 0) >= holdDeadTtlMs) continue;   // old verdicts expire
+        if (!deliveryFailures.has(addr)) deliveryFailures.set(addr, { n: f.n, at: f.at ?? now });
+      }
+    }
     for (const [addr, entries] of parsed.peers) {
       if (typeof addr !== 'string' || !Array.isArray(entries)) continue;
       const q = pendingHold.get(addr) ?? new Map();
@@ -829,6 +840,8 @@ export async function createSecureAgent(opts = {}) {
   /** Consecutive failed delivery attempts to one address before we stop attempting (0 = never stop). */
   const holdMaxDeliveryFailures = Number.isFinite(opts.holdMaxDeliveryFailures)
     ? opts.holdMaxDeliveryFailures : 3;
+  /** How long a persisted dead-address verdict holds across restarts (0 = not restored). A presence signal clears it at once. */
+  const holdDeadTtlMs = Number.isFinite(opts.holdDeadTtlMs) ? opts.holdDeadTtlMs : 6 * 60 * 60 * 1000;
   /**
    * Told about every held message we give up on: `{addr, msgId, reason, ageMs}`.
    *
@@ -966,19 +979,21 @@ export async function createSecureAgent(opts = {}) {
    * prove otherwise — any presence signal or successful send clears the count (`clearDeliveryFailures`).
    */
   function recordDeliveryFailure(addr) {
-    const n = (deliveryFailures.get(addr) ?? 0) + 1;
-    deliveryFailures.set(addr, n);
-    return holdMaxDeliveryFailures > 0 && n >= holdMaxDeliveryFailures;
+    const n = (deliveryFailures.get(addr)?.n ?? 0) + 1;
+    deliveryFailures.set(addr, { n, at: Date.now() });
+    const writtenOff = holdMaxDeliveryFailures > 0 && n >= holdMaxDeliveryFailures;
+    if (writtenOff) persistHolds();          // the verdict is worth keeping across a restart
+    return writtenOff;
   }
 
   /** This address answered (or announced itself) — it is not a dead address after all. */
   function clearDeliveryFailures(addr) {
-    deliveryFailures.delete(addr);
+    if (deliveryFailures.delete(addr)) persistHolds();
   }
 
   /** Have we given up on attempting delivery to this address until it shows a sign of life? */
   function isProbeSuppressed(addr) {
-    return holdMaxDeliveryFailures > 0 && (deliveryFailures.get(addr) ?? 0) >= holdMaxDeliveryFailures;
+    return holdMaxDeliveryFailures > 0 && (deliveryFailures.get(addr)?.n ?? 0) >= holdMaxDeliveryFailures;
   }
 
   /**

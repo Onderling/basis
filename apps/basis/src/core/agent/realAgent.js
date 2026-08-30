@@ -522,6 +522,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // ranks them alongside nkn/relay/rendezvous. Web injects none.
     transports:          opts.meshTransports,      // RN passes { mdns, ble }; web omits
     onTransportError:    opts.onTransportError,     // optional per-transport inject hook
+    // The outbox (held messages + the dead-address verdict) on a DEVICE-LOCAL store, so neither resets
+    // on every launch. Same builder as the settings store; never the pod — a held message is this
+    // device's promise to try again, not the person's data.
+    holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource(opts.outboxPersistDb) : undefined,
+    holdStoreUri: 'mem://basis/outbox.json',
     // onPeerMessage + nknLib supplied later via setPeerWiring().
     // Pass-through for extra factory opts (tests + future ops):
     // identityResolver, capabilityIssuer, policyEngine, groupManager,

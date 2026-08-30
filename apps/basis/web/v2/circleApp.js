@@ -7695,6 +7695,8 @@ async function boot() {
       // #36 — persist the PARAMETER REGISTER's settings (retention etc.) in IndexedDB so a set-param survives
       // a reload (cross-app-settings shared.json / devices/<id>.json layout, on this store).
       settingsPersistDb: { dbName: 'cc-settings-state', storeName: 'settings' },
+      // The outbox — held messages + the dead-address verdict — survives a reload (device-local, never the pod).
+      outboxPersistDb: { dbName: 'cc-outbox-state', storeName: 'outbox' },
       // #36 pod-sync — when signed in, hand realAgent the SELF-SEALED settings pod inner so agent/circle
       // params ride the user's OWN pod (not a device-local island): `attachInner` write-throughs the local
       // cache to `<pod>/basis/settings/…`, sealed to this agent's key. Not signed in → null → local-only

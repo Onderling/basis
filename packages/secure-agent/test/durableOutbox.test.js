@@ -100,3 +100,40 @@ describe('the durable outbox', () => {
     await expect(agent.outboxRestored()).resolves.toBe(0);
   }, 30_000);
 });
+
+describe('the dead-address verdict survives a restart (bounded)', () => {
+  it('an address written off before the restart is not attempted again after it — until presence or the TTL', async () => {
+    const store = memoryStore();
+    const { InternalBus, InternalTransport } = await import('@onderling/core');
+    class BlackHole extends InternalTransport {
+      constructor(bus, addr) { super(bus, addr); this.puts = 0; }
+      canReach() { return true; }
+      async _put(to, env) { this.puts += 1; return super._put(to, env); }
+    }
+    const boot = async (extra = {}) => {
+      const identity = await AgentIdentity.generate(new VaultMemory());
+      const a = await createSecureAgent({ identity, holdStore: store, holdStoreUri: URI, holdMaxDeliveryFailures: 1, ...extra });
+      const tx = new BlackHole(new InternalBus(), a.identity.pubKey);
+      await a.addSecureTransport('relay', tx);
+      await a.outboxRestored;
+      return { a, tx };
+    };
+    const FAST = { firstSendTimeoutMs: 100, retryDelays: [], guarantee: 'hold-forward' };
+    const first = await boot();
+    await first.a.peer.sendTo(PEER, { msgId: 'm1' }, FAST);       // fails once → written off (max 1)
+    expect(first.tx.puts).toBeGreaterThan(0);
+    await first.a.shutdown();
+    expect(JSON.parse(store.map.get(URI)).dead.map(([addr]) => addr)).toEqual([PEER]);
+
+    const second = await boot();
+    const r = await second.a.peer.sendTo(PEER, { msgId: 'm2' }, FAST);
+    expect(second.tx.puts, 'a written-off address must not cost a handshake after a restart').toBe(0);
+    expect(r).toMatchObject({ held: false, delivered: false });
+    await second.a.shutdown();
+
+    const third = await boot({ holdDeadTtlMs: 1 });               // the verdict has expired
+    await third.a.peer.sendTo(PEER, { msgId: 'm3' }, FAST);
+    expect(third.tx.puts).toBeGreaterThan(0);
+    await third.a.shutdown();
+  });
+});

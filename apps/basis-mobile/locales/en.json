@@ -313,16 +313,6 @@
       "doc": "Placeholder shown inside the slash-FAB's TextInput when empty"
     }
   },
-  "scan_qr": {
-    "not_available": {
-      "text": "QR scanner not available on this device.",
-      "doc": "Defensive — localBuiltins fired but openQrScanner wasn't wired"
-    },
-    "opening": {
-      "text": "Opening QR scanner…",
-      "doc": "Returned to chat when /scan-qr fires; the modal then takes over"
-    }
-  },
   "logs": {
     "panel_title": {
       "text": "Logs",
@@ -355,58 +345,6 @@
     "panel_opened": {
       "text": "Logs panel opened.",
       "doc": "Echoed back when a bare /logs opens the side-panel"
-    }
-  },
-  "sync": {
-    "row_ago": {
-      "text": "{{ago}} ago",
-      "doc": "Per-row staleness badge on list items (renderer.js → formatLastSync; {{ago}} comes pre-formatted as '2h' / '30m' / etc. via relativeAgo)"
-    },
-    "saved_locally": {
-      "text": "saved locally — awaiting peer sync",
-      "doc": "Decentralized sync hint when 0 peers are reachable yet"
-    },
-    "synced_to": {
-      "text": "synced to {{ok}} of {{total}}",
-      "doc": "Decentralized sync hint — N of M peers confirmed"
-    },
-    "pending": {
-      "text": "{{count}} pending",
-      "doc": "Decentralized sync hint — count of peers not yet confirmed"
-    },
-    "unreachable": {
-      "text": "{{count}} unreachable ({{list}})",
-      "doc": "Decentralized sync hint — count + comma-separated WebIDs"
-    },
-    "podless_empty": {
-      "text": "no peers polled yet",
-      "doc": "Pod-less sync hint — empty lastSeen map"
-    },
-    "podless": {
-      "text": "{{count}} peers · last seen {{ago}} ago",
-      "doc": "Pod-less sync hint — count + relative-ago of oldest peer"
-    }
-  },
-  "embed-file": {
-    "pick_cancelled": {
-      "text": "File picker cancelled.",
-      "doc": "Said when the person closes the file picker without choosing (shared embed-file builtin)."
-    }
-  },
-  "lookup": {
-    "failed": {
-      "text": "Lookup failed: {{error}}",
-      "doc": "Peer lookup failed; {{error}} is the underlying reason."
-    },
-    "unavailable": {
-      "text": "Peer lookup unavailable (sign in to your pod first).",
-      "doc": "Peer lookup needs a signed-in pod session."
-    }
-  },
-  "publishPeerAddrCmd": {
-    "unavailable": {
-      "text": "Pod publish unavailable (sign in first).",
-      "doc": "Publishing this device’s peer address needs a signed-in pod session."
     }
   },
   "common": {

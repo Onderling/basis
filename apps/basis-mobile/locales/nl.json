@@ -313,16 +313,6 @@
       "doc": "Placeholder in de slash-FAB-TextInput wanneer leeg"
     }
   },
-  "scan_qr": {
-    "not_available": {
-      "text": "QR-scanner niet beschikbaar op dit toestel.",
-      "doc": "Defensief — localBuiltins maar openQrScanner ontbreekt"
-    },
-    "opening": {
-      "text": "QR-scanner wordt geopend…",
-      "doc": "Retour na /scan-qr; modal neemt over"
-    }
-  },
   "logs": {
     "panel_title": {
       "text": "Logboek",
@@ -355,58 +345,6 @@
     "panel_opened": {
       "text": "Logboek geopend.",
       "doc": "Bij bare /logs"
-    }
-  },
-  "sync": {
-    "row_ago": {
-      "text": "{{ago}} geleden",
-      "doc": "Rij-staleness-badge (renderer.js → formatLastSync)"
-    },
-    "saved_locally": {
-      "text": "lokaal opgeslagen — wacht op sync",
-      "doc": "Decentrale sync-hint zonder bereikbare peers"
-    },
-    "synced_to": {
-      "text": "gesynced naar {{ok}} van {{total}}",
-      "doc": "Decentrale sync-hint"
-    },
-    "pending": {
-      "text": "{{count}} in afwachting",
-      "doc": "Decentrale sync-hint"
-    },
-    "unreachable": {
-      "text": "{{count}} onbereikbaar ({{list}})",
-      "doc": "Decentrale sync-hint"
-    },
-    "podless_empty": {
-      "text": "nog geen peers gepolld",
-      "doc": "Pod-loze sync-hint — lege lastSeen-map"
-    },
-    "podless": {
-      "text": "{{count}} peers · laatst gezien {{ago}} geleden",
-      "doc": "Pod-loze sync-hint"
-    }
-  },
-  "embed-file": {
-    "pick_cancelled": {
-      "text": "Bestandskiezer geannuleerd.",
-      "doc": "Said when the person closes the file picker without choosing (shared embed-file builtin)."
-    }
-  },
-  "lookup": {
-    "failed": {
-      "text": "Opzoeken mislukt: {{error}}",
-      "doc": "Peer lookup failed; {{error}} is the underlying reason."
-    },
-    "unavailable": {
-      "text": "Peer-opzoeken niet beschikbaar (eerst inloggen op je pod).",
-      "doc": "Peer lookup needs a signed-in pod session."
-    }
-  },
-  "publishPeerAddrCmd": {
-    "unavailable": {
-      "text": "Pod-publiceren niet beschikbaar (eerst inloggen).",
-      "doc": "Publishing this device’s peer address needs a signed-in pod session."
     }
   },
   "common": {

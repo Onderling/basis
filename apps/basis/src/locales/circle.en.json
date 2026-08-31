@@ -2844,6 +2844,26 @@
       "text": "You can see who is around; they cannot see you.",
       "doc": "Visibility banner body in ghost mode."
     },
+    "radio_off_title": {
+      "text": "Nearby is off",
+      "doc": "Visibility banner heading while the persisted radio switch is off."
+    },
+    "radio_off_body": {
+      "text": "Nothing is browsed or announced on the local network until you turn it back on.",
+      "doc": "Radio-off banner body — states both halves plainly: not seen AND not seeing."
+    },
+    "quiet_toggle": {
+      "text": "Go quiet — keep seeing the room without being seen (this visit only)",
+      "doc": "Session-only ghost switch behind the visibility banner. Resets when the screen closes."
+    },
+    "radio_toggle_off": {
+      "text": "Turn Nearby's radio fully off",
+      "doc": "The persisted OFF: nothing browsed or announced until turned back on."
+    },
+    "radio_toggle_on": {
+      "text": "Turn Nearby's radio back on",
+      "doc": "Leaves the radio-off state; the open screen becomes visible again."
+    },
     "still_visible_title": {
       "text": "Still visible",
       "doc": "Banner heading when the device could NOT honour \"hidden\" (older native build)."
@@ -3740,9 +3760,21 @@
       "text": "Nearby",
       "doc": "Label for the passive local-network 'who's here' row on the v2 launcher (5.9c)."
     },
+    "count_one": {
+      "text": "{{count}} device",
+      "doc": "Device count, singular."
+    },
+    "count_other": {
+      "text": "{{count}} devices",
+      "doc": "Device count, plural — replaces the raw \"device(s)\" template."
+    },
     "count": {
       "text": "{{count}} device(s)",
-      "doc": "Device count formatted by formatNearbyLabel; {{count}} interpolated."
+      "doc": "Fallback when the plural forms cannot resolve; the _one/_other pair is what renders."
+    },
+    "off": {
+      "text": "off",
+      "doc": "The launcher row while the persisted radio switch is off — no count is claimed, because a radio that is off has seen nothing."
     }
   },
   "extension": {

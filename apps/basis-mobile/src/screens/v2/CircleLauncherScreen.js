@@ -14,7 +14,7 @@
  */
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
-import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace } from '../../core/nearbyAllowsStore.js';
+import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio } from '../../core/nearbyAllowsStore.js';
 import { pushContactReply } from '../../core/contactReplyInbox.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState } from 'react-native';
@@ -1987,7 +1987,7 @@ export default function CircleLauncherScreen({
             {bundle?.mdns ? (
               <Pressable style={styles.nearbyRow} testID="circle-nearby" accessibilityRole="button" onPress={() => setView('nearby')}>
                 <Text style={styles.nearbyText}>
-                  {formatNearbyLabel(nearbyCount, t)}
+                  {formatNearbyLabel(nearbyCount, t, { radioOff: readNearbyRadio() === 'off' })}
                 </Text>
               </Pressable>
             ) : null}
@@ -4712,6 +4712,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
     ...(bundle?.nearbyRoom?.screenDeps?.() ?? {}),
     allows:             readNearbyAllows(),   // per device, kept across opens
     control:            bundle?.discoverability ?? null,
+    radio:              { get: readNearbyRadio, set: writeNearbyRadio },   // the persisted radio switch
     subscribeToPeers:   bundle?.nearbyPeers ? (fn) => bundle.nearbyPeers.subscribe(fn) : null,
     subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
     mySkills:           () => [],
@@ -4810,6 +4811,8 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
       onSay={say}
       onInviteAction={inviteAction}
       onFaceChange={() => bundle?.nearbyRoom?.announceFace?.()}
+      onSetQuiet={(v) => screen?.setQuiet?.(v)}
+      onSetRadio={(v) => screen?.setRadio?.(v)}
       onCompose={() => { setNotice(null); setComposing(true); }}
       composing={composing}
       answering={!!answering}
@@ -4835,7 +4838,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
   model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onFaceChange, onSubmitCard, onSay, onInviteAction,
+  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onFaceChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -4881,6 +4884,20 @@ function NearbyScreen({
             <Text style={styles.muted}>{t(`circle.nearbyScreen.${visKey}_body`)}</Text>
           ) : null}
         </Pressable>
+      ) : null}
+      {(visKey && (bannerOpen || visKey === 'radio_off') && (model?.hasRadioControl ?? false)) ? (
+        // The two switches live behind the state line they change — not per row, not in a far-away
+        // settings page. Quiet is session-only; the radio switch is the persisted, honest OFF.
+        <View>
+          {visKey !== 'radio_off' ? (
+            <Pressable accessibilityRole="button" testID="nearby-quiet-toggle" onPress={() => onSetQuiet?.(!(model?.quiet))}>
+              <Text style={styles.muted}>{model?.quiet ? '☑' : '☐'} {t('circle.nearbyScreen.quiet_toggle')}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable accessibilityRole="button" testID="nearby-radio-toggle" onPress={() => onSetRadio?.(model?.radioOff ? 'on' : 'off')}>
+            <Text style={styles.muted}>{t(model?.radioOff ? 'circle.nearbyScreen.radio_toggle_on' : 'circle.nearbyScreen.radio_toggle_off')}</Text>
+          </Pressable>
+        </View>
       ) : null}
       <Text style={styles.muted}>{headerText}</Text>
       {rows.length === 0 ? (

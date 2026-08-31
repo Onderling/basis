@@ -839,3 +839,64 @@ describe('the seconds between opening and the radio answering', () => {
     resolveSet?.({ requested: 'browse', effective: 'browse', degraded: false, shortfall: false });
   });
 });
+
+describe('quiet and the radio switch — "off is off" (decided 2026-08-31)', () => {
+  const radioStore = (initial = 'on') => {
+    let v = initial;
+    return { get: () => v, set: (n) => { v = n; }, _read: () => v };
+  };
+
+  it('going quiet drops to unlisted while the screen stays open — and resets on close', async () => {
+    const { screen, control } = build({ radio: radioStore() });
+    screen.open(); await settle();
+    expect(control.report().effective).toBe(DISCOVERABILITY.PUBLISH);
+
+    screen.setQuiet(true); await settle();
+    expect(control.report().effective).toBe(DISCOVERABILITY.BROWSE);
+    expect(screen.model().quiet).toBe(true);
+    expect(nearbyVisibilityKey(screen.model().visibility)).toBe('hidden');
+
+    // Session-only by design: the next open starts visible again.
+    screen.close(); await settle();
+    screen.open(); await settle();
+    expect(screen.model().quiet).toBe(false);
+    expect(control.report().effective).toBe(DISCOVERABILITY.PUBLISH);
+    screen.close();
+  });
+
+  it('with the radio off, opening the screen does not touch the radio — and the banner says so', async () => {
+    const store = radioStore('off');
+    const { screen, control } = build({ radio: store });
+    screen.open(); await settle();
+    // The switch outranks the screen: nothing was raised.
+    expect(control.report().effective).toBe(DISCOVERABILITY.OFF);
+    expect(screen.model().radioOff).toBe(true);
+    expect(nearbyVisibilityKey(screen.model().visibility)).toBe('radio_off');
+    screen.close();
+  });
+
+  it('setRadio persists first, then applies: off kills the radio, on brings the open screen back', async () => {
+    const store = radioStore('on');
+    const { screen, control } = build({ radio: store });
+    screen.open(); await settle();
+    expect(control.report().effective).toBe(DISCOVERABILITY.PUBLISH);
+
+    screen.setRadio('off'); await settle();
+    expect(store._read()).toBe('off');
+    expect(control.report().effective).toBe(DISCOVERABILITY.OFF);
+
+    screen.setRadio('on'); await settle();
+    expect(store._read()).toBe('on');
+    expect(control.report().effective).toBe(DISCOVERABILITY.PUBLISH);   // the screen is open → visible again
+    screen.close(); await settle();
+    expect(control.report().effective).toBe(DISCOVERABILITY.BROWSE);    // and closing rests as always
+  });
+
+  it('a host without a radio store offers no control — and the model says so', async () => {
+    const { screen } = build({});
+    screen.open();
+    expect(screen.model().hasRadioControl).toBe(false);
+    expect(screen.model().radioOff).toBe(false);
+    screen.close();
+  });
+});

@@ -46,6 +46,21 @@ export function writeNearbyFace(next) {
   AsyncStorage.setItem(FACE_KEY, next).catch(() => {});
 }
 
+/**
+ * The Nearby radio switch, persisted: 'on' (default) or 'off'. Off means nothing is browsed or
+ * announced on the local network — at boot, at rest, and while the screen is open — until it is
+ * turned back on. Same synchronous cache as the allows.
+ */
+const RADIO_KEY = 'cc.nearbyRadio';
+let radio = 'on';
+AsyncStorage.getItem(RADIO_KEY).then((raw) => { if (raw === 'on' || raw === 'off') radio = raw; }).catch(() => {});
+export function readNearbyRadio() { return radio; }
+export function writeNearbyRadio(next) {
+  if (next !== 'on' && next !== 'off') return;
+  radio = next;
+  AsyncStorage.setItem(RADIO_KEY, next).catch(() => {});
+}
+
 export function writeNearbyAllows(next) {
   if (!next || typeof next !== 'object') return;
   cached = { card: next.card === true, chat: next.chat === true };

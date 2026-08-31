@@ -72,6 +72,7 @@ export const NEARBY_INVITE_LABELS = Object.freeze({
  */
 export function nearbyVisibilityKey(visibility) {
   if (!visibility) return null;
+  if (visibility.radioOff)    return 'radio_off';
   if (visibility.degraded)    return 'still_visible';
   if (visibility.unavailable) return 'unavailable';
   if (visibility.pending)     return 'becoming_visible';
@@ -128,6 +129,10 @@ export function createNearbyScreen({
   judge,
   now = () => Date.now(),
   restingState,
+  // The persisted radio switch, a {get, set} port over 'on'|'off' (a shell's device-local store).
+  // Absent ⇒ this host offers no radio control and the toggles stay off-screen — a switch that
+  // quietly does nothing is worse than an absent one.
+  radio = null,
   t,
   onError = null,
 } = {}) {
@@ -140,9 +145,18 @@ export function createNearbyScreen({
     onDegraded: () => emit(),
   });
 
+  // Session-only ghost: stay in the room without being announced. Deliberately NOT persisted —
+  // it resets when the screen closes, so "quiet" can never silently become this device's standing state.
+  let quiet = false;
+  const radioIsOff = () => { try { return radio?.get?.() === 'off'; } catch { return false; } };
+
   const session = createProximitySession({
-    startAdvertising: adapter.startAdvertising,
-    stopAdvertising:  adapter.stopAdvertising,
+    // The radio switch outranks the screen: opening the view must never turn a switched-off radio on.
+    startAdvertising: () => {
+      if (radioIsOff()) return;
+      if (quiet) adapter.goQuiet(); else adapter.startAdvertising();
+    },
+    stopAdvertising:  () => { if (radioIsOff()) return; adapter.stopAdvertising(); },
     subscribe:        subscribeToPeers ?? undefined,
     onError,
   });
@@ -287,6 +301,9 @@ export function createNearbyScreen({
       // next; "becoming visible" is what is happening (seen on the phone: ~3–5 s per open).
       pending: session.isOpen() && (report?.requested ?? 'off') === 'browse+publish' && effective !== 'browse+publish'
         && report?.degraded !== true && !(report?.shortfall === true && effective === 'off'),
+      // The persisted switch: nothing browsed or announced. Outranks every other banner state.
+      radioOff: radioIsOff(),
+      quiet,
       perTransport: report?.perTransport ?? [],
     };
   }
@@ -366,6 +383,10 @@ export function createNearbyScreen({
       // anything", which is a different fact from "I am not in this chat".
       chat: allows.chat ? chat.list() : null,
       visibility: visibility(),
+      quiet,
+      radioOff: radioIsOff(),
+      // Whether THIS host can offer the quiet/radio toggles at all (it has both a control and a store).
+      hasRadioControl: !!(radio && control),
       isOpen: session.isOpen(),
     };
   }
@@ -454,12 +475,38 @@ export function createNearbyScreen({
       roomInvites.clear();
       chat.clear();     // leaving the room forgets the conversation — there is no history to come back to
       session.close();
+      quiet = false;    // session-only by design: the next open starts visible again
       emit();
     },
 
     isOpen: () => session.isOpen(),
     model,
     visibility,
+
+    /** Session-only ghost: stay in the room and keep seeing it, without being announced. */
+    setQuiet(v) {
+      const next = v === true;
+      if (next === quiet) return;
+      quiet = next;
+      if (session.isOpen() && !radioIsOff()) {
+        if (quiet) adapter.goQuiet(); else adapter.goVisible();
+      }
+      emit();
+    },
+
+    /**
+     * The persisted radio switch. 'off' means nothing is browsed or announced on the local network —
+     * not while the screen is open, not at rest — until it is turned back on. The store is written
+     * FIRST so a crash right after still lands on the safe side.
+     */
+    setRadio(v) {
+      if (v !== 'on' && v !== 'off') return;
+      try { radio?.set?.(v); } catch (err) { try { onError?.(err, 'setRadio'); } catch { /* diagnostics only */ } }
+      if (v === 'off') adapter.radioOff();
+      else if (session.isOpen()) { if (quiet) adapter.goQuiet(); else adapter.startAdvertising(); }
+      else adapter.radioOn();
+      emit();
+    },
 
     /**
      * Put an ask into the room.

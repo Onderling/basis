@@ -80,6 +80,18 @@ export function makeNearbySessionAdapter({
     /** Closing Nearby — back to the resting state, never left announcing. */
     stopAdvertising() { apply(restingState, 'stop'); },
 
+    /** Go quiet WHILE the view stays open: unlisted (the resting state), still seeing the room. */
+    goQuiet() { apply(restingState, 'quiet'); },
+
+    /** Back from quiet to announced, the view still open. */
+    goVisible() { apply(DISCOVERABILITY.PUBLISH, 'unquiet'); },
+
+    /** The full radio switch, off: nothing browsed, nothing announced, the transport disconnected. */
+    radioOff() { apply(DISCOVERABILITY.OFF, 'radio-off'); },
+
+    /** The radio back on — to the resting state; an open view raises it through startAdvertising. */
+    radioOn(state) { apply(state ?? restingState, 'radio-on'); },
+
     /** What the transports last reported — the truthful answer to "am I visible?". */
     // The control's own report is the live truth (it moves when a transport lands after our request —
     // `settle()`); the memo of our last answer only stands in for a control that cannot report.

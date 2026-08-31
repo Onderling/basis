@@ -12,7 +12,10 @@
  *
  * Defensive against non-finite / negative counts (treats them as 0).
  */
-export function formatNearbyLabel(count, t) {
+export function formatNearbyLabel(count, t, { radioOff = false } = {}) {
+  // The switch outranks the count: a radio that is off has SEEN nothing, so claiming a number —
+  // even zero — would be the count row pretending to look.
+  if (radioOff) return `${t('circle.nearby.label')}: ${t('circle.nearby.off')}`;
   const n = Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
   return `${t('circle.nearby.label')}: ${t('circle.nearby.count', { count: n })}`;
 }

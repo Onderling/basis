@@ -2844,6 +2844,26 @@
       "text": "Jij ziet wie er is; zij zien jou niet.",
       "doc": "Visibility banner body in ghost mode."
     },
+    "radio_off_title": {
+      "text": "Nearby staat uit",
+      "doc": "Visibility banner heading while the persisted radio switch is off."
+    },
+    "radio_off_body": {
+      "text": "Er wordt niets op het lokale netwerk gezocht of aangekondigd tot je het weer aanzet.",
+      "doc": "Radio-off banner body — states both halves plainly."
+    },
+    "quiet_toggle": {
+      "text": "Even stil — blijf de ruimte zien zonder gezien te worden (alleen deze keer)",
+      "doc": "Session-only ghost switch behind the visibility banner."
+    },
+    "radio_toggle_off": {
+      "text": "Zet de Nearby-radio helemaal uit",
+      "doc": "The persisted OFF."
+    },
+    "radio_toggle_on": {
+      "text": "Zet de Nearby-radio weer aan",
+      "doc": "Leaves the radio-off state."
+    },
     "still_visible_title": {
       "text": "Nog steeds zichtbaar",
       "doc": "Banner heading when the device could NOT honour \"hidden\" (older native build)."
@@ -3740,9 +3760,21 @@
       "text": "In de buurt",
       "doc": "Label for the passive local-network 'who's here' row on the v2 launcher (5.9c)."
     },
+    "count_one": {
+      "text": "{{count}} apparaat",
+      "doc": "Enkelvoud."
+    },
+    "count_other": {
+      "text": "{{count}} apparaten",
+      "doc": "Meervoud."
+    },
     "count": {
       "text": "{{count}} apparaten",
       "doc": "Device count formatted by formatNearbyLabel; {{count}} interpolated."
+    },
+    "off": {
+      "text": "uit",
+      "doc": "De launcher-rij terwijl de radio uit staat — geen aantal, want een uitgeschakelde radio heeft niets gezien."
     }
   },
   "extension": {

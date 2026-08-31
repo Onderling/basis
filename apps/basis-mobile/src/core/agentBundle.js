@@ -51,7 +51,7 @@ import { sendA2ATask } from '@onderling/core';
 import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
-import { readNearbyFace } from './nearbyAllowsStore.js';
+import { readNearbyFace, readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -490,9 +490,10 @@ export async function bootAgentBundle(opts = {}) {
         enable: { ble: false, relay: false },
         // Rest in BROWSE: see the room, announce nothing. The builder's default is PUBLISH and the native
         // start() announces, so without this the phone advertised `_onderling._tcp` with its pubKey at all
-        // times — the presence beacon the companion's L61 decision refused. Opening the Nearby screen
-        // raises to PUBLISH for as long as it is open (nearbyDiscoverability.js); closing it drops back.
-        discoverability: DISCOVERABILITY.BROWSE,
+        // times — a presence beacon nobody asked for. Opening the Nearby screen raises to PUBLISH for as
+        // long as it is open (nearbyDiscoverability.js); closing it drops back. The persisted radio
+        // switch outranks all of it: off means OFF from the first boot moment, nothing browsed either.
+        discoverability: readNearbyRadio() === 'off' ? DISCOVERABILITY.OFF : DISCOVERABILITY.BROWSE,
         hostnamePrefix: 'cc',
         permissions: { ble: false },
         surface: meshSurface,

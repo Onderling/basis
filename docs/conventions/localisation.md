@@ -18,7 +18,10 @@ is a refactor. **Build for translation from the first commit.**
    (UI label, error message, push body, email subject, CLI prompt)
    is referenced by key, not inlined.
 2. **Strings live in per-app locale files.** Not in substrates, not
-   in the kernel.
+   in the kernel. **An app with more than one SHELL** (basis: a web
+   shell and a mobile shell) splits them one level further — see
+   "Adding a string" below. `apps/basis/src/locales/` *is* the app's
+   own locale directory, not a substrate's.
 3. **Substrates emit error codes, never user-facing strings.** Apps
    are responsible for translating substrate error codes into
    localised text. This keeps substrates locale-agnostic.
@@ -28,6 +31,44 @@ is a refactor. **Build for translation from the first commit.**
    locale per app.
 6. **Locale fallback is automatic.** Missing key in `nl` → fall back
    to `en`. Missing in both → render the key + warn in dev.
+
+## Adding a string — the decision, in order
+
+*Added 2026-08-31, when basis had two shells and two hand-maintained bundles that had drifted. This is
+the rule a future agent follows; the guards below enforce it, so getting it wrong fails rather than
+ships.*
+
+1. **Does a person read it?** Then it goes through `t()` with a locale entry. No exceptions — a
+   hardcoded English string is a defect (invariant 8).
+2. **Which shells can render the file you are calling from?** That, and nothing else, decides which
+   bundle the entry belongs in:
+
+   | the calling file | who renders it | the entry goes in |
+   |---|---|---|
+   | `apps/basis/src/web/**`, `apps/basis/web/**` | web only | `apps/basis/locales/{en,nl}.json` |
+   | `apps/basis/src/rn/**`, `apps/basis-mobile/**` | mobile only | `apps/basis-mobile/locales/{en,nl}.json` |
+   | anything else under `apps/basis/src/**` | **both** | `apps/basis/src/locales/` — the SHARED blocks |
+
+   Shared code with its string in one shell's bundle is the single most common form of this bug: it
+   renders correctly for you and shows a raw key on the other shell, and nothing fails. If in doubt,
+   shared is the safe answer.
+3. **Both languages, always.** `en` and `nl`, `{ "text": …, "doc": … }`, where `doc` says what the
+   string is FOR (a translator, and the next reader, both need it).
+4. **A key is defined once.** Never the same dotted key in two bundles — if both shells need it, it is
+   shared by definition.
+5. **Counting something?** Author `key_one` + `key_other` (i18next's JSON-v4 shape; both translators
+   read it), and keep a generic `key` beside them for callers that pass no count.
+6. **`defaultValue` is allowed** — both shells honour it. It is an escape hatch for a genuinely
+   optional string, not a way to skip step 3.
+7. **Adding a whole shared BLOCK?** One new file in `apps/basis/src/locales/` and one line in its
+   `index.js`. Do not name it in either shell's loader — they spread `sharedLocale` and name nothing,
+   which is what stops a block reaching one shell and not the other.
+
+**What will catch you** (all in `npm run guards` / the fitness suites):
+`labelKeysResolve` — every static `t`/`tr`/`tt` key resolves, per shell, in both languages ·
+`localeNoDuplicateKeys` — no key twice in one file · `localeSingleSource` — no block declared in two
+places · `sharedLocaleSeam` — neither loader names blocks · `translatorContract` — both `t()`
+implementations agree about what the files mean.
 
 ## File layout (per app)
 

@@ -35,7 +35,14 @@ const MODE = process.argv.includes('--json') ? 'json'
 // Scanned roots. The RN shell is where sibling components (CircleDetail-style)
 // live, so the whole shell src is in scope — a new screen is covered the day it
 // lands, not when someone remembers to list it. `.js` only; tests excluded.
-const SCOPED_ROOTS = ['apps/basis-mobile/src'];
+//
+// `apps/basis/src/rn` joined on 2026-08-31: the RN wizard MODALS live in the basis package rather
+// than the mobile app, so they sat outside every scope check — and it showed. A block added to the
+// join wizard landed inside the `useState` lazy initialiser instead of the component body: valid
+// JavaScript, no test could see it (nothing renders these files), and the phone answered
+// "Property 'requestClose' doesn't exist" on the next open. Pointing the existing guard at the
+// directory catches exactly that, and the directory was clean when it was added.
+const SCOPED_ROOTS = ['apps/basis-mobile/src', 'apps/basis/src/rn'];
 
 function walkJs(absDir, out = []) {
   for (const ent of readdirSync(absDir, { withFileTypes: true })) {

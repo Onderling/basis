@@ -5,7 +5,7 @@
  * coverage REPORT whether an op had a screen, and that report credits a screen to any op whose verb is
  * creative (`add`/`register`), because `renderWeb` auto-projects a compose form for those.
  *
- * Measured 2026-08-31: fifteen basis ops carry `verb: 'add'` while creating nothing — `signin`, `mute`,
+ * Measured 2026-08-31: twelve basis ops carry `verb: 'add'` while creating nothing — `signin`, `mute`,
  * `rotate-identity`, `peer-connect`, `test-peer`, `send-file` — so the report credited each with a
  * screen that does not exist, and the net skipped precisely the ops that had nowhere else to be. They
  * had one declared door, `surfaces.slash`, and the chat shell that served it was folded into the circle
@@ -28,9 +28,9 @@ describe('the Advanced surface reaches every op with no declared screen', () => 
     expect(listed.has('mute'), 'an op with no declared screen must be reachable in Advanced').toBe(true);
   });
 
-  it('lists EVERY basis op that declares neither ui nor page', () => {
+  it('lists EVERY basis op that declares no door of its own', () => {
     const doorless = basisManifest.operations
-      .filter((o) => !o?.surfaces?.ui && !o?.surfaces?.page)
+      .filter((o) => !o?.surfaces?.ui && !o?.surfaces?.page && !o?.surfaces?.attach)
       .map((o) => o.id);
     const missing = doorless.filter((id) => !listed.has(id));
     expect(missing, 'these ops declare no screen and are not in the Advanced list either — '
@@ -41,6 +41,18 @@ describe('the Advanced surface reaches every op with no declared screen', () => 
     // `me` declares `surfaces.page` — it has the Me tab, so the fallback list should not repeat it.
     expect(basisManifest.operations.find((o) => o.id === 'me')?.surfaces?.page).toBeTruthy();
     expect(listed.has('me')).toBe(false);
+  });
+
+  it('does NOT repeat an op whose door is the attach menu', () => {
+    // `embed-file` declares `surfaces.attach`: `renderAttachments` puts it in the composer's "+" menu
+    // on both shells, and a tap there compiles to the same {opId, args} a slash command does. A
+    // declared door is a door, whichever projector paints it — the list of last resort skips it.
+    for (const id of ['embed', 'embed-file', 'embed-time']) {
+      expect(basisManifest.operations.find((o) => o.id === id)?.surfaces?.attach,
+        `precondition: ${id} declares an attach surface`).toBeTruthy();
+      expect(listed.has(id), `${id} is reachable from the attach menu, so Advanced need not repeat it`)
+        .toBe(false);
+    }
   });
 
   it('says how each doorless op can be run — directly, or through its own form', () => {

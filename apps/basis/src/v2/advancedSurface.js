@@ -35,19 +35,24 @@ export function advancedOpRows({ manifests = [] } = {}) {
   //
   // The report's `screen` column is true when an op declares `surfaces.ui`/`page` OR its verb is
   // creative (`add`/`register`), because `renderWeb` auto-projects a compose form for those. That is a
-  // fair estimate for a REPORT and the wrong rule for a NET: fifteen basis ops are tagged `verb: 'add'`
+  // fair estimate for a REPORT and the wrong rule for a NET: twelve basis ops are tagged `verb: 'add'`
   // while creating nothing — `signin`, `mute`, `rotate-identity`, `test-peer` — so the matrix credited
   // them with a screen that does not exist, and this list, whose whole promise is "every op with no
   // bespoke screen is reachable here", skipped exactly the ops that had nowhere else to be.
-  // Measured 2026-08-31: 15 of basis's 18 screen-claims were inferred from the verb alone.
+  // Measured 2026-08-31: 12 of basis's 15 screen-claims were inferred from the verb alone.
   //
   // A net may not assume coverage it cannot verify. Declared surfaces are checkable; a verb is a guess.
   // (The mis-tagged verbs are a separate defect — they also make `renderWeb` project nonsense compose
   // forms — recorded on the work list rather than fixed here.)
+  //
+  // `surfaces.attach` counts as a door for the same reason `ui` and `page` do: it is DECLARED, and
+  // `renderAttachments` projects it into the composer's "+" menu on both shells, where a tap compiles
+  // to the same `{opId, args}` a slash command does. The three embed ops reach people that way, so
+  // repeating them here would pad the list of last resort with ops that are not stranded.
   return cov.rows
     .filter((r) => {
-      const op = opIndex.get(`${r.app}:${r.op}`);
-      return !op?.surfaces?.ui && !op?.surfaces?.page;
+      const s = opIndex.get(`${r.app}:${r.op}`)?.surfaces;
+      return !s?.ui && !s?.page && !s?.attach;
     })
     .map((r) => {
       const op = opIndex.get(`${r.app}:${r.op}`);

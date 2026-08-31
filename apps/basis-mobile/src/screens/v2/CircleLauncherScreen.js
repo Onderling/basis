@@ -420,8 +420,9 @@ export default function CircleLauncherScreen({
   // M3 — sub-view within the launcher: 'list' | 'availability' | 'detail'
   // | 'settings' | 'override'.  `selected` carries the active circle for
   // detail/settings/override.
-  // boot lands on the Screens tab (primary). Was 'list' (= Circles).
-  const [view, setView] = useState('screens');
+  // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
+  // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
+  const [view, setView] = useState('list');
   // The member's saved assistant endpoint config (settings → My data). Persisted to AsyncStorage;
   // CircleDetail re-reads it on mount, so a save applies the next time a circle opens.
   const [userLlmCfg, setUserLlmCfg] = useState({});

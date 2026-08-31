@@ -8422,12 +8422,11 @@ async function boot() {
   // In-app onboarding (task #13) — provision the default help circle + the Onderling-bot once (idempotent),
   // then refresh the launcher list so its tile appears. Best-effort; a failure never blocks the app.
   await maybeProvisionHelpCircle();
-  // α.3 — Screens is the primary landing tab.  First-run seeds the
-  // default Stream screen inside showScreens.
-  showScreens().catch((err) => {
-    console.warn('[circleApp] showScreens failed; falling back to launcher', err);
-    showLauncher();
-  });
+  // The landing tab is CIRCLES for now (Frits, 2026-08-31): a fresh person should meet the social
+  // front door, not the screen manager. The landing choice is to become a SETTING later — with
+  // "last used" among its options — so this stays a default, not a rule. (Screens' first-run seed
+  // still happens on the first visit to that tab.)
+  showLauncher();
 }
 
 boot();

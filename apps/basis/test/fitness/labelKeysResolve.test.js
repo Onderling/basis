@@ -9,7 +9,7 @@
  * RENAMED and a map is left pointing at the old one, which is the more likely long-run drift.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 import { DELIVERY_LABELS }        from '../../src/v2/deliveryState.js';
 import { POINT_SOURCE_LABELS }    from '../../src/v2/connectionPoints.js';
@@ -17,6 +17,7 @@ import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
 } from '../../src/v2/nearbyScreen.js';
 import { CIRCLE_KINDS }           from '../../src/v2/circleTemplates.js';
+import { RULES_QUESTIONS }        from '../../src/v2/circleRules.js';
 import { ROLE_CONTROL_KEYS }      from '../../src/v2/circleRoleControl.js';
 
 /**
@@ -28,6 +29,14 @@ import { ROLE_CONTROL_KEYS }      from '../../src/v2/circleRoleControl.js';
  */
 const DERIVED = {
   'CIRCLE_KINDS → circle.kind.*': { ids: CIRCLE_KINDS, key: (id) => `circle.kind.${id}` },
+  // The rules questions, asked by the create + join wizards on both shells. Their call sites addressed
+  // `circle.rules.q.<key>.text` — one level too deep, because the loader collapses every `{text, doc}`
+  // leaf to the bare string before i18next ever sees it, so `.text` is not part of the key. Four of the
+  // six rendered as raw key names in the create wizard's rules step (walked 2026-08-31); the seventh
+  // call site had it right, which is what made the other six look plausible.
+  'RULES_QUESTIONS → circle.rules.q.*': {
+    ids: RULES_QUESTIONS.map((q) => q.key), key: (id) => `circle.rules.q.${id}`,
+  },
 };
 
 const MAPS = {
@@ -78,3 +87,135 @@ for (const lang of ['en', 'nl']) {
     }
   });
 }
+
+/**
+ * FITNESS (2026-08-31): every STATIC `t('…')` key in the shells resolves to real copy, in both languages.
+ *
+ * The map check above catches a label VOCABULARY pointing at a dead key. It cannot catch the far more
+ * common shape: a `t()` call written against a namespace that does not exist. That is not an error
+ * anywhere — i18next returns the key, so the UI renders `wizard.create.name` and the app looks broken
+ * rather than untranslated.
+ *
+ * Found by walking the create-circle wizard on 2026-08-31: all 32 of its labels rendered as raw keys,
+ * and so did the settings, dispute, backup, restore and audience wizards — 55 keys. The copy existed the
+ * whole time. It lives in the SHARED circle block (`src/locales/circle.*.json`), which every shell merges
+ * under the `circle` namespace, so the keys are `circle.wizard.create.name`; the call sites had dropped
+ * the prefix. One character of namespace, six wizards dark, and nothing failed.
+ *
+ * WHY IT RESOLVES PER SHELL: each shell merges its OWN app bundle with the three shared blocks —
+ * web `apps/basis/locales/*.json`, mobile `apps/basis-mobile/locales/*.json` (see the two
+ * `localisation.js` files). A key is checked against the bundles of the shells that can actually render
+ * the file it appears in: `src/web/**` + `web/**` are web, `src/rn/**` and the mobile app are mobile,
+ * and everything else is shared code that must resolve in BOTH.
+ */
+const SHARED_BLOCKS = ['circle', 'consequence', 'role'];
+
+/** Where each shell's own bundle lives, relative to the repo root. */
+const SHELLS = {
+  web: 'apps/basis/locales',
+  mob: 'apps/basis-mobile/locales',
+};
+
+/**
+ * Shared files whose strings were only ever added to ONE shell's bundle. Not an exemption from being
+ * correct — a recorded gap, pinned so it cannot spread: the file is still fully checked against the
+ * shell it does serve, so a NEW dead key in it still fails here.
+ *
+ * `localBuiltins.js` holds the slash-command builtins (/mute, /peer, /relay, /sendfile …). Their ~100
+ * strings live in the web bundle only; the mobile bundle has no such blocks, so on a phone those
+ * commands answer with their key names. Recorded as a finding on the work list rather than fixed here:
+ * closing it is ~100 strings × 2 languages, and the honest fix is to stop keeping two app bundles at all.
+ */
+const KNOWN_SHELL_GAPS = {
+  'apps/basis/src/core/localBuiltins.js': ['mob'],
+};
+
+const ROOT = new URL('../../../../', import.meta.url);   // apps/basis/test/fitness → repo root
+const SCAN = ['apps/basis/src', 'apps/basis/web', 'apps/basis-mobile/src'];
+
+/** `t('some.key'` — static, single-quoted keys only; an interpolated key cannot be checked statically. */
+const T_CALL = /[^A-Za-z0-9_.$]t\(\s*'([A-Za-z0-9_.\-]+)'/g;
+
+/**
+ * The whole call text from `t(` to its matching `)`, by paren balance rather than "up to the next `)`" —
+ * an argument like `{ error: String(e), defaultValue: 'x' }` closes a paren of its own halfway through,
+ * and a naive scan stops there and never sees the `defaultValue` that makes the call safe.
+ */
+function callTextAt(src, keyEnd) {
+  let depth = 1;
+  for (let i = src.indexOf('(', keyEnd - 40) + 1 || keyEnd; i < src.length && i < keyEnd + 600; i += 1) {
+    if (src[i] === '(') depth += 1;
+    else if (src[i] === ')') { depth -= 1; if (depth === 0) return src.slice(keyEnd, i); }
+  }
+  return src.slice(keyEnd, keyEnd + 600);
+}
+
+function walkJs(dir, out = []) {
+  let entries = [];
+  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+    const full = `${dir}/${e.name}`;
+    if (e.isDirectory()) walkJs(full, out);
+    else if (/\.(js|jsx)$/.test(e.name)) out.push(full);
+  }
+  return out;
+}
+
+/** Which shells can render this file — the mirror of how the two shells compose their bundles. */
+function shellsFor(rel) {
+  if (rel.startsWith('apps/basis/src/web/') || rel.startsWith('apps/basis/web/')) return ['web'];
+  if (rel.startsWith('apps/basis/src/rn/') || rel.startsWith('apps/basis-mobile/')) return ['mob'];
+  return ['web', 'mob'];
+}
+
+/** A key resolves when it lands on a `{text}` leaf (or a bare string) — a branch is not copy. */
+function resolvesIn(tree, key) {
+  let node = tree;
+  for (const part of key.split('.')) {
+    if (!node || typeof node !== 'object' || !(part in node)) return false;
+    node = node[part];
+  }
+  return typeof node === 'string' || typeof node?.text === 'string';
+}
+
+const bundles = {};
+for (const [shell, dir] of Object.entries(SHELLS)) {
+  for (const lang of ['en', 'nl']) {
+    let own;
+    try { own = JSON.parse(readFileSync(new URL(`${dir}/${lang}.json`, ROOT), 'utf8')); }
+    catch { continue; }   // a shell that is not checked out is skipped, never a false red
+    const shared = Object.fromEntries(SHARED_BLOCKS.map((b) => [b, JSON.parse(readFileSync(
+      new URL(`apps/basis/src/locales/${b}.${lang}.json`, ROOT), 'utf8'))]));
+    bundles[`${shell}.${lang}`] = { ...own, ...shared };
+  }
+}
+
+describe('FITNESS: every static t() key resolves in both languages, in every shell that renders it', () => {
+  const files = SCAN.flatMap((d) => walkJs(new URL(d, ROOT).pathname))
+    .map((abs) => abs.slice(new URL('.', ROOT).pathname.length));
+
+  it('finds source to scan (the walk itself is load-bearing)', () => {
+    expect(files.length).toBeGreaterThan(50);
+  });
+
+  it('no t() call renders its own key name', () => {
+    const dead = [];
+    for (const rel of files) {
+      const src = readFileSync(new URL(rel, ROOT), 'utf8');
+      for (const m of src.matchAll(T_CALL)) {
+        const key = m[1];
+        // `defaultValue` is i18next's own fallback: such a call renders copy even with no entry.
+        if (callTextAt(src, m.index + m[0].length).includes('defaultValue')) continue;
+        const gap = KNOWN_SHELL_GAPS[rel] ?? [];
+        for (const shell of shellsFor(rel).filter((s) => !gap.includes(s))) {
+          for (const lang of ['en', 'nl']) {
+            const bundle = bundles[`${shell}.${lang}`];
+            if (bundle && !resolvesIn(bundle, key)) dead.push(`${key}  (${shell}/${lang})  ${rel}`);
+          }
+        }
+      }
+    }
+    expect([...new Set(dead)].sort(), 'these keys would render as raw key names on screen').toEqual([]);
+  });
+});

@@ -62,7 +62,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
       'This OVERWRITES your current identity.  You will lose access to anything keyed to the old identity unless YOU still have its mnemonic.  Read carefully.');
     const warn = doc.createElement('div');
     warn.className = 'cc-wizard-warn';
-    warn.textContent = t('wizard.restore.identity_warning');
+    warn.textContent = t('circle.wizard.restore.identity_warning');
     body.appendChild(warn);
     mkCheck(body, doc, 'I understand this REPLACES my current identity.', state.understandsLoss, (v) => { state.understandsLoss = v; rerender(); });
     mkCheck(body, doc, 'I have saved my current mnemonic somewhere safe (or I don\'t need it).', state.confirmedNoUndo, (v) => { state.confirmedNoUndo = v; rerender(); });

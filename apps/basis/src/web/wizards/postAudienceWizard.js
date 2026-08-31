@@ -76,7 +76,7 @@ export function renderPostAudienceWizard(opts) {
     // km distance grid
     const distLabel = doc.createElement('div');
     distLabel.className = 'cc-wizard-field-label';
-    distLabel.textContent = t('wizard.audience.max_distance');
+    distLabel.textContent = t('circle.wizard.audience.max_distance');
     body.appendChild(distLabel);
     const distGrid = doc.createElement('div');
     distGrid.className = 'cc-wizard-distance-grid';

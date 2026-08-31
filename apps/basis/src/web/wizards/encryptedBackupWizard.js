@@ -58,7 +58,7 @@ export function renderEncryptedBackupWizard(opts) {
 
     const warn = doc.createElement('div');
     warn.className = 'cc-wizard-warn';
-    warn.textContent = t('wizard.backup.passphrase_warning');
+    warn.textContent = t('circle.wizard.backup.passphrase_warning');
     body.appendChild(warn);
 
     mkError(body, doc, state.submitError);
@@ -96,7 +96,7 @@ export function renderEncryptedBackupWizard(opts) {
     const downloadBtn = doc.createElement('button');
     downloadBtn.type = 'button';
     downloadBtn.className = 'cc-wizard-btn cc-wizard-btn-primary';
-    downloadBtn.textContent = t('wizard.backup.download');
+    downloadBtn.textContent = t('circle.wizard.backup.download');
     downloadBtn.addEventListener('click', () => {
       try {
         const blob = new Blob([blobText], { type: 'application/octet-stream' });

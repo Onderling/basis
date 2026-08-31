@@ -842,6 +842,14 @@
     }
   },
   "settings": {
+    "changed": {
+      "text": "Taal: {{lang}}",
+      "doc": "Confirmation after /settings changes the app language; {{lang}} is the new code."
+    },
+    "no_changes": {
+      "text": "(geen wijzigingen)",
+      "doc": "Answer when /settings was called with nothing to change."
+    },
     "userLlm": {
       "title": {
         "text": "Mijn assistent (als een kring mij laat kiezen)",

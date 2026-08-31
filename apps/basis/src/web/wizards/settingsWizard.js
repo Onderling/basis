@@ -44,24 +44,24 @@ export function renderSettingsWizard(opts) {
     if (state.loading) {
       const note = doc.createElement('div');
       note.className = 'cc-wizard-blurb';
-      note.textContent = t('wizard.settings.loading');
+      note.textContent = t('circle.wizard.settings.loading');
       body.appendChild(note);
       container.appendChild(body);
       return;
     }
 
-    body.appendChild(renderSection(doc, t('wizard.settings.general'), [
+    body.appendChild(renderSection(doc, t('circle.wizard.settings.general'), [
       renderLangControl(doc, state, getLang, setLang, rerender),
       renderTransportControl(doc, opts),
     ]));
 
-    body.appendChild(renderSection(doc, t('wizard.settings.circle'), [
+    body.appendChild(renderSection(doc, t('circle.wizard.settings.circle'), [
       renderHandleControl(doc, state, callSkill, rerender),
       renderDisplayNameControl(doc, state, callSkill, rerender),
       renderHolidayControl(doc, state, callSkill, rerender),
     ]));
 
-    body.appendChild(renderSection(doc, t('wizard.settings.about'), [
+    body.appendChild(renderSection(doc, t('circle.wizard.settings.about'), [
       renderInfo(doc, 'peer address',
         opts.getMyPeerAddr ? (opts.getMyPeerAddr() ?? '(not connected)') : '(unknown)'),
     ]));
@@ -73,7 +73,7 @@ export function renderSettingsWizard(opts) {
     const close = doc.createElement('button');
     close.type = 'button';
     close.className = 'cc-wizard-btn cc-wizard-btn-primary';
-    close.textContent = t('wizard.settings.close');
+    close.textContent = t('circle.wizard.settings.close');
     close.addEventListener('click', onClose);
     actions.appendChild(close);
     container.appendChild(actions);
@@ -98,7 +98,7 @@ function renderLangControl(doc, state, getLang, setLang, rerender) {
   row.className = 'cc-settings-row';
   const label = doc.createElement('label');
   label.className = 'cc-settings-label';
-  label.textContent = t('wizard.settings.language');
+  label.textContent = t('circle.wizard.settings.language');
   row.appendChild(label);
   const cur = (typeof getLang === 'function') ? getLang() : 'en';
   const select = doc.createElement('select');
@@ -125,7 +125,7 @@ function renderTransportControl(doc, opts) {
   row.className = 'cc-settings-row';
   const label = doc.createElement('label');
   label.className = 'cc-settings-label';
-  label.textContent = t('wizard.settings.transport');
+  label.textContent = t('circle.wizard.settings.transport');
   row.appendChild(label);
   const select = doc.createElement('select');
   select.className = 'cc-settings-control';
@@ -149,26 +149,26 @@ function renderHandleControl(doc, state, callSkill, rerender) {
   row.className = 'cc-settings-row';
   const label = doc.createElement('label');
   label.className = 'cc-settings-label';
-  label.textContent = t('wizard.settings.handle');
+  label.textContent = t('circle.wizard.settings.handle');
   row.appendChild(label);
   const input = doc.createElement('input');
   input.type = 'text';
   input.className = 'cc-settings-control';
   input.value = state.profile?.handle ?? '';
-  input.placeholder = t('wizard.settings.handle_hint');
+  input.placeholder = t('circle.wizard.settings.handle_hint');
   const save = doc.createElement('button');
   save.type = 'button';
   save.className = 'cc-wizard-btn cc-wizard-btn-secondary';
-  save.textContent = t('wizard.settings.save');
+  save.textContent = t('circle.wizard.settings.save');
   save.addEventListener('click', async () => {
     save.disabled = true;
     const r = await saveHandle({ callSkill, handle: input.value });
     if (r.ok) {
       save.textContent = '✓';
-      setTimeout(() => { save.textContent = t('wizard.settings.save'); save.disabled = false; }, 1500);
+      setTimeout(() => { save.textContent = t('circle.wizard.settings.save'); save.disabled = false; }, 1500);
     } else {
       save.textContent = '✗';
-      setTimeout(() => { save.textContent = t('wizard.settings.save'); save.disabled = false; }, 2000);
+      setTimeout(() => { save.textContent = t('circle.wizard.settings.save'); save.disabled = false; }, 2000);
     }
   });
   row.appendChild(input);
@@ -181,26 +181,26 @@ function renderDisplayNameControl(doc, state, callSkill, rerender) {
   row.className = 'cc-settings-row';
   const label = doc.createElement('label');
   label.className = 'cc-settings-label';
-  label.textContent = t('wizard.settings.display_name');
+  label.textContent = t('circle.wizard.settings.display_name');
   row.appendChild(label);
   const input = doc.createElement('input');
   input.type = 'text';
   input.className = 'cc-settings-control';
   input.value = state.profile?.displayName ?? '';
-  input.placeholder = t('wizard.settings.display_hint');
+  input.placeholder = t('circle.wizard.settings.display_hint');
   const save = doc.createElement('button');
   save.type = 'button';
   save.className = 'cc-wizard-btn cc-wizard-btn-secondary';
-  save.textContent = t('wizard.settings.save');
+  save.textContent = t('circle.wizard.settings.save');
   save.addEventListener('click', async () => {
     save.disabled = true;
     const r = await saveDisplayName({ callSkill, displayName: input.value });
     if (r.ok) {
       save.textContent = '✓';
-      setTimeout(() => { save.textContent = t('wizard.settings.save'); save.disabled = false; }, 1500);
+      setTimeout(() => { save.textContent = t('circle.wizard.settings.save'); save.disabled = false; }, 1500);
     } else {
       save.textContent = '✗';
-      setTimeout(() => { save.textContent = t('wizard.settings.save'); save.disabled = false; }, 2000);
+      setTimeout(() => { save.textContent = t('circle.wizard.settings.save'); save.disabled = false; }, 2000);
     }
   });
   row.appendChild(input);
@@ -213,7 +213,7 @@ function renderHolidayControl(doc, state, callSkill, rerender) {
   row.className = 'cc-settings-row';
   const label = doc.createElement('label');
   label.className = 'cc-settings-label';
-  label.textContent = t('wizard.settings.holiday');
+  label.textContent = t('circle.wizard.settings.holiday');
   row.appendChild(label);
   const toggle = doc.createElement('label');
   toggle.className = 'cc-settings-toggle';

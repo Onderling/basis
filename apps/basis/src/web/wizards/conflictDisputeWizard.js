@@ -62,7 +62,7 @@ export function renderConflictDisputeWizard(opts) {
       card.className = 'cc-wizard-context-card';
       const label = doc.createElement('div');
       label.className = 'cc-wizard-field-label';
-      label.textContent = t('wizard.dispute.about');
+      label.textContent = t('circle.wizard.dispute.about');
       card.appendChild(label);
       const quote = doc.createElement('blockquote');
       quote.className = 'cc-wizard-context-quote';
@@ -94,7 +94,7 @@ export function renderConflictDisputeWizard(opts) {
     const body = mkBody(doc, 'Propose a resolution',
       'What would resolve this for you?  Even if you\'re not sure, write what would feel "good enough" so the mediator has a starting point.');
     const validProposal = () => isProposalValid(state.proposal);
-    mkTextarea(body, doc, t('wizard.dispute.proposal'), state.proposal, (v) => {
+    mkTextarea(body, doc, t('circle.wizard.dispute.proposal'), state.proposal, (v) => {
       state.proposal = v;
       refreshActions(container, { proposalOk: validProposal });
     }, { placeholder: 'e.g. "an apology + agreement not to use my tools without asking"', rows: 4 });
@@ -112,15 +112,15 @@ export function renderConflictDisputeWizard(opts) {
       'Review + confirm.  Filed disputes are visible to admins (and mediators if you picked mediation).  You can withdraw via /leave-group → re-join, or via a follow-up post.');
     const dl = doc.createElement('dl');
     dl.className = 'cc-wizard-review';
-    appendKV(dl, doc, t('wizard.dispute.summary'),          state.summary, { pre: true });
-    if (state.aboutPostId) appendKV(dl, doc, t('wizard.dispute.about_post'), state.aboutPostId, { mono: true });
-    appendKV(dl, doc, t('wizard.dispute.escalation'),       labelOf(ESCALATION_PATHS, state.escalation));
-    appendKV(dl, doc, t('wizard.dispute.proposal'), state.proposal, { pre: true });
+    appendKV(dl, doc, t('circle.wizard.dispute.summary'),          state.summary, { pre: true });
+    if (state.aboutPostId) appendKV(dl, doc, t('circle.wizard.dispute.about_post'), state.aboutPostId, { mono: true });
+    appendKV(dl, doc, t('circle.wizard.dispute.escalation'),       labelOf(ESCALATION_PATHS, state.escalation));
+    appendKV(dl, doc, t('circle.wizard.dispute.proposal'), state.proposal, { pre: true });
     body.appendChild(dl);
 
     const warn = doc.createElement('div');
     warn.className = 'cc-wizard-warn';
-    warn.textContent = t('wizard.dispute.substrate_note');
+    warn.textContent = t('circle.wizard.dispute.substrate_note');
     body.appendChild(warn);
 
     mkError(body, doc, state.submitError);

@@ -186,7 +186,7 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
       sec.dataset.field = key;
       const h = doc.createElement('h4');
       h.className = 'cc-wizard-rules-doc-q';
-      h.textContent = t(`circle.rules.q.${key}.text`);
+      h.textContent = t(`circle.rules.q.${key}`);
       const p = doc.createElement('p');
       p.className = 'cc-wizard-rules-doc-a';
       p.textContent = v;

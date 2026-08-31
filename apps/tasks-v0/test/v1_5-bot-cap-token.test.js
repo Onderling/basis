@@ -280,6 +280,27 @@ describe('V1.5 — cap-token-bound bot agent', () => {
     expect(ok.allowed).toBe(true);
   });
 
+  it('the host\'s onBotTokenRevoked port hears the revoke (the cross-device seam)', async () => {
+    // Same seam as the task grants: basis appends these ids to its grants lane so unbinding a bot
+    // here refuses its token at the owner's other devices too. Here we prove the composition
+    // actually threads the port and a revoke fires it with the real token.
+    const seen = [];
+    const bundle = buildBundle();
+    const wired = await createCircleAgent({
+      circleConfig:           CIRCLE,
+      localStoreBundle:     bundle,
+      wireOnboardingSkills: false,
+      onBotTokenRevoked:    (r) => { seen.push(r); },
+    });
+    await call(wired, 'setBotChatBinding', { chatId: ANNE_CHAT, webid: ANNE }, ANNE);
+    await call(wired, 'issueBotToken',     { chatId: ANNE_CHAT, ttlDays: 1 }, ANNE);
+    const { tokenId, botPubKey } = wired.botAgentRegistry.get(ANNE_CHAT).binding;
+
+    await wired.botAgentRegistry.revoke({ chatId: ANNE_CHAT });
+    expect(seen).toEqual([{ chatId: ANNE_CHAT, tokens: [{ id: tokenId, subject: botPubKey }] }]);
+    await wired.close();
+  });
+
   it('a revoked bot token is STILL revoked after a fresh boot (the revocation set is persisted)', async () => {
     // The defect this closes: revoking a binding deleted its persisted row (so the bot never
     // re-spawned) but kept the revocation set in memory only — after a restart the issuer forgot

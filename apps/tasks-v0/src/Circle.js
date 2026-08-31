@@ -293,8 +293,10 @@ export async function createCircleAgent({
   // one mirror; tasks-v0's own substrate mirror is skipped (the host owns the
   // single fan-out path). Absent / returns null ⇒ standalone self-wired store.
   circleStoreFor,
-  // Cross-device revocation appender — threaded to the TaskGrantManager (see Agent.js).
+  // Cross-device revocation appenders — threaded to the TaskGrantManager (see Agent.js) and the
+  // BotAgentRegistry: the host turns each revoke into a grants-lane statement.
   onTaskGrantsRevoked,
+  onBotTokenRevoked,
 } = {}) {
   const circle = _normaliseConfig(circleConfig ?? { ...IMPLICIT_HOUSEHOLD_CONFIG });
 
@@ -471,6 +473,7 @@ export async function createCircleAgent({
           tasksAgent: bundle.agent,
           dataSource: localStoreBundle.cache,
           circleId:     liveCircle.circleId,
+          onRevoked:  onBotTokenRevoked,
         })
       : null;
     // Parking the registry on the CircleState IS the wiring: the agent's PolicyEngine was built with

@@ -170,6 +170,7 @@ export async function createBrowserMultiCircleTasksAgent({
   // the EXTRA SOURCE (this engine also asks the lane's fold, so a sibling device's revoke binds at
   // THIS door). Absent ⇒ circle-local truth only, exactly as before.
   onTaskGrantsRevoked = null,
+  onBotTokenRevoked = null,
   isRevokedAlso = null,
 }) {
   if (!bus) throw new TypeError('createBrowserMultiCircleTasksAgent: bus required');
@@ -215,6 +216,7 @@ export async function createBrowserMultiCircleTasksAgent({
     wireOnboardingSkills: false,
     circleStoreFor,
     onTaskGrantsRevoked,
+    onBotTokenRevoked,
   });
   const primaryCircleState = primaryBundle._circleState;
   const circlesMap = new Map([[primaryCircleState.circleId, primaryCircleState]]);
@@ -243,6 +245,7 @@ export async function createBrowserMultiCircleTasksAgent({
       wireOnboardingSkills: false,
       circleStoreFor,
       onTaskGrantsRevoked,
+      onBotTokenRevoked,
     });
     const cs = spawned._circleState;
     circlesMap.set(circleId, cs);

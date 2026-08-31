@@ -68,6 +68,8 @@ export class BotAgentRegistry {
   #revoked = new Set();
   /** Resolves once the persisted revocation set has loaded; already-resolved without persistence. */
   #ready = Promise.resolve();
+  /** Optional appender port: called after every revoke with the revoked token (see constructor). */
+  #onRevoked = null;
 
   /**
    * @param {object} args
@@ -79,8 +81,13 @@ export class BotAgentRegistry {
    *   cap-token bindings survive CLI restarts. Caller must pass
    *   `circleId` alongside.
    * @param {string} [args.circleId]
+   * @param {(revoked: {chatId: string, tokens: Array<{id: string, subject: string}>}) => *} [args.onRevoked]
+   *   — APPENDER port for cross-device binding, the same seam `TaskGrantManager` carries: called
+   *   (awaited, best-effort) after every revoke with the cancelled token. The HOST (basis) appends
+   *   the id to its grants lane, so unbinding a bot here refuses its token at the owner's other
+   *   devices' doors too — not only at this one until TTL.
    */
-  constructor({ bus, tasksAgent, dataSource, circleId }) {
+  constructor({ bus, tasksAgent, dataSource, circleId, onRevoked = null }) {
     if (!bus) throw new TypeError('BotAgentRegistry: bus required');
     // The engine is what ENFORCES the tokens this registry issues (verify + revocation); a registry
     // whose agent has no gate would mint authority nothing checks. It is not wired here — see `isRevoked`.
@@ -91,6 +98,7 @@ export class BotAgentRegistry {
     this.#tasksAgent = tasksAgent;
     this.#dataSource = dataSource ?? null;
     this.#circleId     = circleId     ?? null;
+    this.#onRevoked   = typeof onRevoked === 'function' ? onRevoked : null;
     // The revocation set is issuer-side TRUTH, so it hydrates with the registry: without this a
     // restart forgot every revoke while the token itself stayed signed and unexpired — the same
     // defect the grant managers in core had, fixed the same way. Best-effort: no persistence, no load.
@@ -260,6 +268,14 @@ export class BotAgentRegistry {
     this.#entries.delete(chatId);
     if (this.persisting) {
       try { await this.#dataSource.delete(this.#pathFor(chatId)); } catch { /* noop */ }
+    }
+    // The appender port (cross-device half) — best-effort AND loud, like the local write above.
+    if (this.#onRevoked) {
+      try {
+        await this.#onRevoked({ chatId, tokens: [{ id: entry.binding.tokenId, subject: entry.binding.botPubKey }] });
+      } catch (err) {
+        console.warn(`[BotAgentRegistry] onRevoked appender failed for ${chatId} — the revoke holds on THIS device; other devices learn it only at catch-up/TTL: ${err?.message ?? err}`);
+      }
     }
     return { ok: true };
   }

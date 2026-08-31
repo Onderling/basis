@@ -2086,6 +2086,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!ok) console.warn(`[realAgent] task ${taskId}: grant revoke did not reach the grants lane — it binds on this device; siblings learn it at catch-up/TTL`);
     },
     isRevokedAlso: async (tokenId) => Boolean(await surfaceGrants.isRevoked(tokenId)),
+    // Unbinding a bot is the same story: its token id goes onto the lane too.
+    onBotTokenRevoked: async ({ chatId, tokens }) => {
+      const ok = await surfaceGrants.revokeTokens((tokens ?? []).map((t) => t?.id), { reason: 'bot-token' })
+        .catch(() => false);
+      if (!ok) console.warn(`[realAgent] bot ${chatId}: token revoke did not reach the grants lane — it binds on this device; siblings learn it at catch-up/TTL`);
+    },
   });
   await chatAgent.hello(tasksCircle.address);
 

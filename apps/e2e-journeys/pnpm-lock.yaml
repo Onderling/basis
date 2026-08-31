@@ -21,6 +21,9 @@ importers:
       '@onderling-app/stoop':
         specifier: workspace:*
         version: link:../stoop
+      '@onderling/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
       '@onderling/blob-gateway':
         specifier: workspace:*
         version: link:../../packages/blob-gateway

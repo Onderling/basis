@@ -78,22 +78,29 @@ export function renderCircleNearby(container, {
     banner.dataset.visibility = key;
     if (visibility.degraded) banner.setAttribute('role', 'alert');
 
-    const bTitle = document.createElement('div');
-    bTitle.className = 'circle-nearby__visibility-title';
-    bTitle.textContent = tr(`circle.nearbyScreen.${key}_title`);
-    banner.appendChild(bTitle);
-
-    // The sentence behind the state, one tap away rather than three lines on every open (sketch §2). A
-    // degraded state keeps its sentence in view: that one is a warning, not an explanation.
+    // The sentence behind the state, one tap away rather than three lines on every open. A degraded
+    // state keeps its sentence in view: that one is a warning, not an explanation.
     const bBody = document.createElement('div');
     bBody.className = 'circle-nearby__visibility-body';
     bBody.textContent = tr(`circle.nearbyScreen.${key}_body`);
-    if (visibility.degraded) banner.appendChild(bBody);
-    else {
+
+    if (visibility.degraded) {
+      const bTitle = document.createElement('div');
+      bTitle.className = 'circle-nearby__visibility-title';
+      bTitle.textContent = tr(`circle.nearbyScreen.${key}_title`);
+      banner.appendChild(bTitle);
+      banner.appendChild(bBody);
+    } else {
+      // THE STATE LINE IS THE AFFORDANCE. It used to be a title above a `<summary>` holding "…",
+      // which rendered as a bare "▶ …" under the state — a control that named nothing and looked
+      // like a rendering fault (walked 2026-08-31). Mobile had it right: the state line itself is
+      // what you press. Putting the title in the summary says what opening it will explain, and
+      // makes the two shells the same gesture.
       const more = document.createElement('details');
       more.className = 'circle-nearby__visibility-more';
       const sum = document.createElement('summary');
-      sum.textContent = '…';
+      sum.className = 'circle-nearby__visibility-title';
+      sum.textContent = tr(`circle.nearbyScreen.${key}_title`);
       more.appendChild(sum);
       more.appendChild(bBody);
       banner.appendChild(more);
@@ -107,12 +114,10 @@ export function renderCircleNearby(container, {
   header.textContent = headerLabel;
   container.appendChild(header);
 
-  if (!rows.length) {
-    const empty = document.createElement('div');
-    empty.className = 'circle-nearby__empty';
-    empty.textContent = tr('circle.nearbyScreen.header_empty');
-    container.appendChild(empty);
-  } else {
+  // No empty-state line of its own: when nobody is around the model has ALREADY put
+  // "nobody nearby" in the header above (`buildNearbyModel` swaps the header line for
+  // `header_empty` at zero peers), and rendering it again said one fact twice.
+  if (rows.length) {
     const list = document.createElement('div');
     list.className = 'circle-nearby__list';
     for (const row of rows) {

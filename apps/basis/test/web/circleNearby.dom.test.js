@@ -65,6 +65,27 @@ describe('the visibility banner', () => {
     expect(banner.getAttribute('role')).toBeNull();
   });
 
+  it('the state line itself opens the explanation — there is no bare "…" control', () => {
+    // It used to render the state as a title, then a `<summary>` whose whole text was "…": on screen a
+    // stray "▶ …" that named nothing and read as a rendering fault. The sentence belongs behind the
+    // state line, and the state line is what you press — which is also the gesture mobile already had.
+    const el = render(model({ visibility: { publishing: false, degraded: false, unavailable: false } }));
+    const sum = el.querySelector('.circle-nearby__visibility summary');
+    expect(sum, 'the banner should fold behind its own state line').not.toBeNull();
+    expect(sum.textContent).toBe('circle.nearbyScreen.hidden_title');
+    expect(el.querySelector('.circle-nearby__visibility-body').textContent)
+      .toBe('circle.nearbyScreen.hidden_body');
+  });
+
+  it('a DEGRADED state keeps its sentence in view instead of folding it away', () => {
+    // The one state that is a warning rather than an explanation: being announced after asking to be
+    // hidden must not need a click to be read.
+    const el = render(model({ visibility: { publishing: true, degraded: true, unavailable: false } }));
+    expect(el.querySelector('.circle-nearby__visibility summary')).toBeNull();
+    expect(el.querySelector('.circle-nearby__visibility-body').textContent)
+      .toBe('circle.nearbyScreen.still_visible_body');
+  });
+
   it('renders no banner when the model carries no visibility (old caller)', () => {
     expect(render(model()).querySelector('.circle-nearby__visibility')).toBeNull();
   });
@@ -128,9 +149,14 @@ describe('invariant 8 — every string is translated', () => {
     }
   });
 
-  it('the empty state and own-profile footer still render', () => {
-    const el = render(model());
-    expect(el.querySelector('.circle-nearby__empty').textContent).toBe('circle.nearbyScreen.header_empty');
+  it('an empty room says so ONCE, and the own-profile footer still renders', () => {
+    // The production shape: at zero peers `buildNearbyModel` swaps the header line itself for
+    // `header_empty`. The renderer used to add a second line with the same key underneath, so the
+    // screen said "Nobody nearby right now." twice — one fact, twice, which is the thing the Nearby
+    // fold exists to stop.
+    const el = render(model({ headerLabel: 'circle.nearbyScreen.header_empty' }));
+    const times = el.textContent.split('circle.nearbyScreen.header_empty').length - 1;
+    expect(times, 'the empty-room sentence belongs on screen exactly once').toBe(1);
     expect(el.querySelector('.circle-nearby__own-skills').textContent)
       .toBe('circle.nearbyScreen.own_profile_empty');
   });

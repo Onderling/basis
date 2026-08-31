@@ -900,3 +900,70 @@ describe('quiet and the radio switch — "off is off" (decided 2026-08-31)', () 
     screen.close();
   });
 });
+
+describe('a peer that ARRIVES while the screen is open (the count and the rows are one list)', () => {
+  // Reported 2026-08-31 as "the count says 1 and no row renders, re-entering the tab fixes it". It did
+  // not reproduce on a phone afterwards — arrival, departure and a fresh boot all showed the two
+  // agreeing — and it cannot: `buildNearbyModel` derives `counts.total` from `rows.length`, so they are
+  // the same list counted twice. These pin that, and pin the case that COULD have produced the report:
+  // a peer with nothing to call it by must still render as a row, not as an empty line.
+  const labelless = { pubKey: 'VHilb7PsgU8slBFuWUjDhMsvucBt' };
+
+  it('shows up in the rows AND the count, in the same model', async () => {
+    const { screen, setPeers } = build({ radio: null });
+    screen.open(); await settle();
+    expect(screen.model().rows).toEqual([]);
+    expect(screen.model().counts.total).toBe(0);
+
+    setPeers([peer('anna'), labelless]);
+    const m = screen.model();
+    expect(m.counts.total, 'the count is the rows counted, not a second source').toBe(m.rows.length);
+    expect(m.counts.total).toBe(2);
+    screen.close();
+  });
+
+  it('a peer with NO name still renders as a row with something to read', async () => {
+    // `pickPeerLabel` falls back to a short key fragment. If that ever returns nothing the row would
+    // paint an empty line — present in the count, invisible on screen, which is exactly the shape the
+    // report described.
+    const { screen, setPeers } = build({ radio: null });
+    screen.open(); await settle();
+    setPeers([labelless]);
+    const [row] = screen.model().rows;
+    expect(row, 'a nameless peer is still a peer').toBeTruthy();
+    expect(typeof row.pseudonym).toBe('string');
+    expect(row.pseudonym.trim().length, 'a row with no text is an invisible row').toBeGreaterThan(0);
+    screen.close();
+  });
+
+  it('…and so does one with no key at all — never a blank row', async () => {
+    const { screen, setPeers } = build({ radio: null });
+    screen.open(); await settle();
+    setPeers([{ source: 'mdns' }]);
+    const [row] = screen.model().rows;
+    expect(row.pseudonym.trim().length).toBeGreaterThan(0);
+    screen.close();
+  });
+
+  it('and LEAVING empties both halves together', async () => {
+    const { screen, setPeers } = build({ radio: null });
+    screen.open(); await settle();
+    setPeers([peer('anna')]);
+    expect(screen.model().counts.total).toBe(1);
+    setPeers([]);
+    expect(screen.model().rows).toEqual([]);
+    expect(screen.model().counts.total).toBe(0);
+    screen.close();
+  });
+
+  it('a subscriber is told, so a shell repaints without re-entering the tab', async () => {
+    // The re-entry workaround in the report would be explained by a screen that never emits. It does.
+    const { screen, setPeers } = build({ radio: null });
+    const seen = [];
+    const off = screen.subscribe((m) => seen.push(m.counts.total));
+    screen.open(); await settle();
+    setPeers([peer('anna')]);
+    expect(seen.at(-1), 'the model that reached the shell carries the arrival').toBe(1);
+    off(); screen.close();
+  });
+});

@@ -40,8 +40,7 @@ export function renderEncryptedBackupWizard(opts) {
   }
 
   function renderPassphraseStep() {
-    const body = mkBody(doc, 'Encrypted backup',
-      'A passphrase-protected snapshot of YOUR stoop state. The passphrase never leaves your device — without it the backup is useless.');
+    const body = mkBody(doc, t('circle.wizard.backup.title'), t('circle.wizard.backup.intro'));
 
     mkField(body, doc, 'Passphrase', state.passphrase,
       (v) => {
@@ -81,8 +80,7 @@ export function renderEncryptedBackupWizard(opts) {
   }
 
   function renderDownloadStep() {
-    const body = mkBody(doc, '✓ Backup ready',
-      'Download + store the file somewhere safe. Email it to yourself, copy to a USB stick, sync to a cloud you trust — anywhere, since it\'s encrypted.');
+    const body = mkBody(doc, t('circle.wizard.backup.ready_title'), t('circle.wizard.backup.ready_intro'));
 
     const blobText = typeof state.blob === 'string' ? state.blob : JSON.stringify(state.blob);
     const filename = suggestedFilename();

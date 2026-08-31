@@ -51,8 +51,7 @@ export function renderConflictDisputeWizard(opts) {
   }
 
   function renderRaiseStep() {
-    const body = mkBody(doc, 'Raise a dispute',
-      'Describe what happened.  This goes to the circle; admins and (if your conflict-policy is mediation) two random members see it.');
+    const body = mkBody(doc, t('circle.wizard.dispute.raise_title'), t('circle.wizard.dispute.raise_intro'));
     const validSummary = () => isSummaryValid(state.summary);
     // 2026-05-24 — when launched from a row button (postId pre-filled),
     // show the post text as a read-only context card instead of a raw
@@ -91,8 +90,7 @@ export function renderConflictDisputeWizard(opts) {
   }
 
   function renderProposeStep() {
-    const body = mkBody(doc, 'Propose a resolution',
-      'What would resolve this for you?  Even if you\'re not sure, write what would feel "good enough" so the mediator has a starting point.');
+    const body = mkBody(doc, t('circle.wizard.dispute.propose_title'), t('circle.wizard.dispute.propose_intro'));
     const validProposal = () => isProposalValid(state.proposal);
     mkTextarea(body, doc, t('circle.wizard.dispute.proposal'), state.proposal, (v) => {
       state.proposal = v;
@@ -108,8 +106,7 @@ export function renderConflictDisputeWizard(opts) {
   }
 
   function renderFileStep() {
-    const body = mkBody(doc, 'File the dispute',
-      'Review + confirm.  Filed disputes are visible to admins (and mediators if you picked mediation).  You can withdraw via /leave-group → re-join, or via a follow-up post.');
+    const body = mkBody(doc, t('circle.wizard.dispute.file_title'), t('circle.wizard.dispute.file_intro'));
     const dl = doc.createElement('dl');
     dl.className = 'cc-wizard-review';
     appendKV(dl, doc, t('circle.wizard.dispute.summary'),          state.summary, { pre: true });
@@ -142,8 +139,7 @@ export function renderConflictDisputeWizard(opts) {
 }
 
 function renderSuccessStep(container, doc, state, onClose) {
-  const body = mkBody(doc, '✓ Dispute filed',
-    'Admins (and mediators if you picked mediation) will see it in the circle feed.');
+  const body = mkBody(doc, t('circle.wizard.dispute.filed_title'), t('circle.wizard.dispute.filed_intro'));
   container.appendChild(body);
   mkActions(container, doc, [{ label: 'Done', onClick: onClose, kind: 'primary' }]);
 }

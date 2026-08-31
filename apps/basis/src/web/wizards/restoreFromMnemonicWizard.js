@@ -41,8 +41,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
   }
 
   function renderMnemonicStep() {
-    const body = mkBody(doc, 'Restore from mnemonic',
-      'Enter the 12 or 24-word recovery phrase you saved when you first set up basis.');
+    const body = mkBody(doc, t('circle.wizard.restore.title'), t('circle.wizard.restore.intro'));
     mkField(body, doc, 'Mnemonic phrase', state.mnemonic, (v) => {
       state.mnemonic = v;
       // No rerender — would lose input focus.  Just refresh the
@@ -58,8 +57,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
   }
 
   function renderConfirmStep() {
-    const body = mkBody(doc, 'Confirm — destructive operation',
-      'This OVERWRITES your current identity.  You will lose access to anything keyed to the old identity unless YOU still have its mnemonic.  Read carefully.');
+    const body = mkBody(doc, t('circle.wizard.restore.confirm_title'), t('circle.wizard.restore.confirm_intro'));
     const warn = doc.createElement('div');
     warn.className = 'cc-wizard-warn';
     warn.textContent = t('circle.wizard.restore.identity_warning');
@@ -76,7 +74,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
   }
 
   function renderRestoreStep() {
-    const body = mkBody(doc, 'Restore now', 'One last check.  Click [Restore now] to apply.');
+    const body = mkBody(doc, t('circle.wizard.restore.apply_title'), t('circle.wizard.restore.apply_intro'));
     const summary = doc.createElement('div');
     summary.className = 'cc-wizard-blurb';
     summary.textContent = `Mnemonic: ${mnemonicWordCount(state.mnemonic)} words.  After restore you'll be using the new identity immediately.`;
@@ -100,8 +98,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
 }
 
 function renderSuccessStep(container, doc, state, onClose) {
-  const body = mkBody(doc, '✓ Identity restored',
-    'Your new identity is active.  Reload the page so the chat shell picks up the new pubKey + stableId.');
+  const body = mkBody(doc, t('circle.wizard.restore.done_title'), t('circle.wizard.restore.done_intro'));
   const newKey = doc.createElement('code');
   newKey.className = 'cc-wizard-code';
   newKey.textContent = state.successResult?.newPubKey ?? '(unknown)';

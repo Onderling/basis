@@ -5722,6 +5722,18 @@
       "ready": {
         "text": "Backup ready",
         "doc": "Mobile backup wizard, the done step."
+      },
+      "intro": {
+        "text": "A snapshot of your own data, protected by a passphrase. The passphrase never leaves this device — without it the backup is useless to anyone, including you.",
+        "doc": "Backup wizard step 1 body."
+      },
+      "ready_title": {
+        "text": "✓ Backup ready",
+        "doc": "Backup wizard, the final screen."
+      },
+      "ready_intro": {
+        "text": "Download it and keep it somewhere safe — mail it to yourself, copy it to a USB stick, put it in a cloud you trust. It is encrypted, so where it sits matters less than whether you still have it.",
+        "doc": "Backup wizard, the final screen."
       }
     },
     "restore": {
@@ -5736,6 +5748,30 @@
       "confirm_title": {
         "text": "Restore identity",
         "doc": "Mobile restore wizard, the confirm step."
+      },
+      "intro": {
+        "text": "Enter the 12 or 24 word recovery phrase you saved when you first set this up.",
+        "doc": "Restore wizard step 1 body."
+      },
+      "confirm_intro": {
+        "text": "This REPLACES the identity on this device. Anything held by the old identity is out of reach unless you still have its phrase. Read that again before you continue.",
+        "doc": "Restore wizard step 2 body — a destructive step."
+      },
+      "apply_title": {
+        "text": "Restore now",
+        "doc": "Restore wizard step 3 title."
+      },
+      "apply_intro": {
+        "text": "One last check before it is applied.",
+        "doc": "Restore wizard step 3 body."
+      },
+      "done_title": {
+        "text": "✓ Identity restored",
+        "doc": "Restore wizard, the final screen."
+      },
+      "done_intro": {
+        "text": "The recovered identity is active. Reload the page so the rest of the app picks it up.",
+        "doc": "Restore wizard, the final screen."
       }
     },
     "audience": {
@@ -5746,6 +5782,10 @@
       "title": {
         "text": "Post with audience",
         "doc": "Mobile post-audience wizard heading."
+      },
+      "intro": {
+        "text": "Pick who this reaches. Leave it empty and it goes to everyone in your circle.",
+        "doc": "Audience wizard step 1 body."
       }
     },
     "dispute": {
@@ -5772,6 +5812,38 @@
       "proposal": {
         "text": "Proposed resolution",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "raise_title": {
+        "text": "Raise a dispute",
+        "doc": "Dispute wizard step 1 title."
+      },
+      "raise_intro": {
+        "text": "Describe what happened. This goes to the circle; admins see it, and two random members do too if the circle resolves conflicts by mediation.",
+        "doc": "Dispute wizard step 1 body."
+      },
+      "propose_title": {
+        "text": "Propose a resolution",
+        "doc": "Dispute wizard step 2 title."
+      },
+      "propose_intro": {
+        "text": "What would settle this for you? Even if you are not sure, write what would feel good enough, so a mediator has somewhere to start.",
+        "doc": "Dispute wizard step 2 body."
+      },
+      "file_title": {
+        "text": "File the dispute",
+        "doc": "Dispute wizard step 3 title."
+      },
+      "file_intro": {
+        "text": "Check it over. A filed dispute is visible to admins, and to mediators if the circle uses mediation. You can follow it up with another post.",
+        "doc": "Dispute wizard step 3 body."
+      },
+      "filed_title": {
+        "text": "✓ Dispute filed",
+        "doc": "Dispute wizard, the final screen."
+      },
+      "filed_intro": {
+        "text": "Admins will see it in the circle, and mediators too if the circle uses mediation.",
+        "doc": "Dispute wizard, the final screen."
       }
     },
     "embed_time": {

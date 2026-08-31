@@ -45,8 +45,7 @@ export function renderPostAudienceWizard(opts) {
 
   function rerender() {
     container.innerHTML = '';
-    const body = mkBody(doc, 'Post with audience',
-      'Pick a target audience.  Empty = everyone in your circle.');
+    const body = mkBody(doc, t('circle.wizard.audience.title'), t('circle.wizard.audience.intro'));
 
     // Circle picker (only when we have a real list).  Single-circle
     // users see one radio for clarity; multi-circle users see all.

@@ -5722,6 +5722,18 @@
       "ready": {
         "text": "Back-up klaar",
         "doc": "Mobile backup wizard, the done step."
+      },
+      "intro": {
+        "text": "Een momentopname van je eigen gegevens, beveiligd met een wachtwoordzin. Die zin verlaat dit apparaat nooit — zonder de zin heeft niemand iets aan de back-up, jij ook niet.",
+        "doc": "Backup wizard step 1 body."
+      },
+      "ready_title": {
+        "text": "✓ Back-up klaar",
+        "doc": "Backup wizard, the final screen."
+      },
+      "ready_intro": {
+        "text": "Download hem en bewaar hem ergens veilig — mail hem naar jezelf, zet hem op een usb-stick, of in een cloud die je vertrouwt. Hij is versleuteld, dus waar hij staat maakt minder uit dan of je hem nog hebt.",
+        "doc": "Backup wizard, the final screen."
       }
     },
     "restore": {
@@ -5736,6 +5748,30 @@
       "confirm_title": {
         "text": "Identiteit herstellen",
         "doc": "Mobile restore wizard, the confirm step."
+      },
+      "intro": {
+        "text": "Vul de herstelzin van 12 of 24 woorden in die je bewaard hebt toen je hiermee begon.",
+        "doc": "Restore wizard step 1 body."
+      },
+      "confirm_intro": {
+        "text": "Dit VERVANGT de identiteit op dit apparaat. Alles wat aan de oude identiteit hangt is onbereikbaar, tenzij je die zin nog hebt. Lees dat nog een keer voor je verdergaat.",
+        "doc": "Restore wizard step 2 body — a destructive step."
+      },
+      "apply_title": {
+        "text": "Nu herstellen",
+        "doc": "Restore wizard step 3 title."
+      },
+      "apply_intro": {
+        "text": "Nog één keer nakijken voor het wordt toegepast.",
+        "doc": "Restore wizard step 3 body."
+      },
+      "done_title": {
+        "text": "✓ Identiteit hersteld",
+        "doc": "Restore wizard, the final screen."
+      },
+      "done_intro": {
+        "text": "De herstelde identiteit is actief. Herlaad de pagina zodat de rest van de app hem oppakt.",
+        "doc": "Restore wizard, the final screen."
       }
     },
     "audience": {
@@ -5746,6 +5782,10 @@
       "title": {
         "text": "Plaatsen met publiek",
         "doc": "Mobile post-audience wizard heading."
+      },
+      "intro": {
+        "text": "Kies wie dit bereikt. Laat je het leeg, dan gaat het naar iedereen in je kring.",
+        "doc": "Audience wizard step 1 body."
       }
     },
     "dispute": {
@@ -5772,6 +5812,38 @@
       "proposal": {
         "text": "Voorgestelde oplossing",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "raise_title": {
+        "text": "Bezwaar maken",
+        "doc": "Dispute wizard step 1 title."
+      },
+      "raise_intro": {
+        "text": "Beschrijf wat er gebeurd is. Dit gaat naar de kring; beheerders zien het, en twee willekeurige leden ook als de kring conflicten met bemiddeling oplost.",
+        "doc": "Dispute wizard step 1 body."
+      },
+      "propose_title": {
+        "text": "Stel een oplossing voor",
+        "doc": "Dispute wizard step 2 title."
+      },
+      "propose_intro": {
+        "text": "Wat zou dit voor jou oplossen? Ook als je het niet zeker weet: schrijf op wat goed genoeg zou voelen, dan heeft een bemiddelaar een begin.",
+        "doc": "Dispute wizard step 2 body."
+      },
+      "file_title": {
+        "text": "Bezwaar indienen",
+        "doc": "Dispute wizard step 3 title."
+      },
+      "file_intro": {
+        "text": "Kijk het na. Een ingediend bezwaar is zichtbaar voor beheerders, en voor bemiddelaars als de kring bemiddeling gebruikt. Je kunt er later een bericht over plaatsen.",
+        "doc": "Dispute wizard step 3 body."
+      },
+      "filed_title": {
+        "text": "✓ Bezwaar ingediend",
+        "doc": "Dispute wizard, the final screen."
+      },
+      "filed_intro": {
+        "text": "Beheerders zien het in de kring, en bemiddelaars ook als de kring bemiddeling gebruikt.",
+        "doc": "Dispute wizard, the final screen."
       }
     },
     "embed_time": {

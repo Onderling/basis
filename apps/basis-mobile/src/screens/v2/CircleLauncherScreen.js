@@ -4899,10 +4899,10 @@ function NearbyScreen({
           </Pressable>
         </View>
       ) : null}
+      {/* The header line already says "nobody nearby" when the room is empty — the model swaps it
+          in at zero peers — so there is no second empty-state line under it. */}
       <Text style={styles.muted}>{headerText}</Text>
-      {rows.length === 0 ? (
-        <Text style={styles.muted}>{t('circle.nearbyScreen.header_empty')}</Text>
-      ) : (
+      {rows.length === 0 ? null : (
         <ScrollView contentContainerStyle={styles.list}>
           {rows.map((row) => (
             <View

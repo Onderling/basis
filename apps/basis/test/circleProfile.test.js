@@ -55,6 +55,20 @@ describe('renderCircleProfile — location', () => {
     expect(onGeocode).toHaveBeenCalledWith('Groningen');
   });
 
+  it('the who-sees-my-location hint is a DOOR to the persona surface, not a note', () => {
+    // The geo editor sets the coarse place; who may SEE it is a disclosure on the persona layer, so
+    // the hint has to open that layer. Its twin (the offerings pointer, above) was already pinned;
+    // this one was not, and an unpinned door is one refactor away from being a paragraph again —
+    // which is exactly what it still is on a shell that forgets to wire the handler.
+    const onOpenMij = vi.fn();
+    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, onOpenMij });
+    const link = el.querySelector('.cc-profile__loc-disclosure-link');
+    expect(link, 'the location hint should be a link when the host wires onOpenMij').not.toBeNull();
+    expect(link.textContent).toBe('circle.profile.loc_disclosure_hint');
+    link.click();
+    expect(onOpenMij).toHaveBeenCalled();
+  });
+
   it('renders a geocode result + saves it; shows current + clear when set', () => {
     const onSaveLocation = vi.fn(); const onClearLocation = vi.fn();
     const el = renderCircleProfile(document.createElement('div'), {

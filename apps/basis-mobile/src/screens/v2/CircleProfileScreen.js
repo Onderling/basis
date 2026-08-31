@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
-import { t, currentLang } from '../../core/localisation.js';
+import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 
 export default function CircleProfileScreen({ callSkill, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced }) {
@@ -27,7 +27,7 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
     if (typeof callSkill !== 'function') return;
     const [prof, cats] = await Promise.all([
       callSkill('stoop', 'getMyProfile', {}).catch(() => null),
-      callSkill('stoop', 'listOfferingCategories', { lang: currentLang() }).catch(() => null),
+      callSkill('stoop', 'listOfferingCategories', { lang: lang() }).catch(() => null),
     ]);
     const entry = prof?.entry ?? {};
     setProfile(entry);

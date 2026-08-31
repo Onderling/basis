@@ -8,6 +8,7 @@
  * are shared, this file is platform DOM only (web≡mobile: RN mirrors the SAME selector).
  */
 import { pickableRecipients, outOfCircleLinkWarning } from '../../src/v2/shareRecipients.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderRecipientPicker(container, {
   contacts = [],
@@ -19,7 +20,7 @@ export function renderRecipientPicker(container, {
   notice = null,
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'recipientPicker.js');
   container.innerHTML = '';
   container.className = 'cc-recipient-picker';
 

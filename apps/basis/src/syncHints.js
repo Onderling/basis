@@ -20,6 +20,8 @@
  * Phase v0.6 sub-slices 6.1 + 6.2.
  */
 
+import { translatorOr } from './locales/translatorOr.js';
+
 /**
  * @typedef {object} SyncHints
  * @property {'central' | 'decentralized' | 'pod-less'} style
@@ -43,7 +45,7 @@
  */
 export function formatSyncHints(sync, t, now = Date.now) {
   if (!sync || typeof sync !== 'object') return '';
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'syncHints.js');
 
   if (sync.style === 'central') {
     // No sync hint — the convention is "client knows when offline".
@@ -103,7 +105,7 @@ export function formatSyncHints(sync, t, now = Date.now) {
  */
 export function formatLastSync(lastSync, t, now = Date.now) {
   if (typeof lastSync !== 'number' || !Number.isFinite(lastSync)) return '';
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'syncHints.js');
   const ago = relativeAgo(lastSync, now());
   return tr('sync.row_ago', { ago });
 }

@@ -1,30 +1,8 @@
 {
-  "common": {
-    "ok": {
-      "text": "✓",
-      "doc": "Generic success indicator rendered when a skill returns { ok: true } with no message."
-    },
-    "failed": {
-      "text": "Failed",
-      "doc": "Generic failure fallback when a skill returns { ok: false } with no error text."
-    },
-    "error": {
-      "text": "Error",
-      "doc": "Generic error label when an error envelope has no message or code."
-    },
-    "consequences": {
-      "text": "Consequences of this choice",
-      "doc": "N2 — ⓘ tooltip/aria label on a radio option that reveals its consequence."
-    }
-  },
   "reply": {
     "unknown_command": {
       "text": "Didn't understand “{{input}}”. Try /help for the commands available here.",
       "doc": "Shown when parser falls through to kind:'unknown' — user input matched no slash command."
-    },
-    "bulk_no_list": {
-      "text": "No recent list to apply “all” to — run a list command first.",
-      "doc": "E2 — shown when `/<op> all` has no recent listing to fan out over."
     }
   },
   "thread": {
@@ -53,10 +31,6 @@
     "respond_neither_ok": {
       "text": "Neither local audit nor NKN delivery succeeded.",
       "doc": "[Help with] flow — both substrate and NKN paths failed."
-    },
-    "counter_prompt": {
-      "text": "Type your counter-offer below.",
-      "doc": "Hint after [Counter] click on a responder card."
     }
   },
   "form": {
@@ -95,28 +69,6 @@
     "stub": {
       "text": "[demo] {{op}} clicked on {{item}} — backing app not built yet (tracked).",
       "doc": "Receiver-action stub on file/time cards before real backing apps exist."
-    }
-  },
-  "logs": {
-    "no_log": {
-      "text": "Event log not available in this build.",
-      "doc": "Defensive."
-    },
-    "heading": {
-      "text": "Last {{count}} events:",
-      "doc": "First line of /logs output."
-    },
-    "empty": {
-      "text": "No events matched (try /logs --app=household).",
-      "doc": "Empty state."
-    },
-    "muted": {
-      "text": "✓ Muted events: {{app}}:{{type}}. /logs --mute=... toggles.",
-      "doc": "Mute confirmation."
-    },
-    "panel_opened": {
-      "text": "Logs panel opened. Click [×] to close.",
-      "doc": "Confirmation when bare /logs opens the side-panel UI."
     }
   },
   "fileShare": {
@@ -250,64 +202,16 @@
     }
   },
   "chat": {
-    "followup_prompt": {
-      "text": "What's your {{param}}? (for /{{opId}})",
-      "doc": "Generic prompt when a circle command trips needsForm with a single missing field — the bot asks, the user's next message answers (shared src/v2/followUp.js)."
-    },
-    "followup_prompt_respond_to_item_body": {
-      "text": "What help are you offering?",
-      "doc": "Friendlier prompt for respondToItem.body (picked via pickPromptKey)."
-    },
-    "form_title": {
-      "text": "Complete /{{opId}}",
-      "doc": "Title at the top of the multi-field circle form bubble (2+ missing fields → beginFormFollowUp). Mirrors basis-mobile so web≡mobile."
-    },
-    "form_submit": {
-      "text": "Submit",
-      "doc": "Submit button on the multi-field circle form bubble."
-    },
-    "form_label_body": {
-      "text": "Body",
-      "doc": "Label for the 'body' field — used by respondToItem etc."
-    },
-    "form_label_title": {
-      "text": "Title",
-      "doc": "Label for the 'title' field."
-    },
-    "form_label_name": {
-      "text": "Name",
-      "doc": "Label for the 'name' field."
-    },
-    "form_label_text": {
-      "text": "Text",
-      "doc": "Label for the 'text' field."
-    },
-    "form_label_when": {
-      "text": "When",
-      "doc": "Label for the 'when' field — calendar/availability ops."
-    },
-    "form_label_audience": {
-      "text": "Audience",
-      "doc": "Label for the 'audience' field."
-    },
     "file": {
       "open": {
         "text": "Open",
         "doc": "E1 — file-reply card: open the file URL in a new tab."
-      },
-      "unnamed": {
-        "text": "Untitled file",
-        "doc": "E1 — file-reply card fallback name when none is given."
       }
     },
     "nav": {
       "backToChat": {
         "text": "← back to chat",
         "doc": "E4 — chat-nav floating button: return to the thread a side-panel was opened from."
-      },
-      "openInFull": {
-        "text": "Open in full",
-        "doc": "E5 — record/mini-page panel: expand the card into the wide side panel."
       }
     }
   }

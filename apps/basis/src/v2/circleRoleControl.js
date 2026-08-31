@@ -42,6 +42,7 @@
 // the same app is a reference living twice.
 import { mockStoopManifest as stoopManifest } from '../core/manifests/mockManifests.js';
 import { confirmRequestForOp } from './confirmGate.js';
+import { translatorOr } from '../locales/translatorOr.js';
 
 /** The op this control drives, and its declaration. */
 const SET_MEMBER_ROLE = 'setMemberRole';
@@ -148,6 +149,6 @@ export function roleControlFor({ members, member, myRef } = {}) {
  */
 export function roleChangeConfirm({ control, name, t } = {}) {
   if (!control) return null;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleRoleControl.js');
   return confirmRequestForOp(SET_MEMBER_ROLE_OP, { t: tr, message: tr(control.confirmKey, { name }) });
 }

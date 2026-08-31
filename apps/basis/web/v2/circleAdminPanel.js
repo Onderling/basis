@@ -19,6 +19,7 @@ import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
 // decision (web ≡ mobile); the panel paints it and works nothing out for itself.
 import { roleControlFor } from '../../src/v2/circleRoleControl.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
@@ -37,7 +38,7 @@ export function renderCircleAdminPanel(container, {
   onBack,
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleAdminPanel.js');
   container.innerHTML = '';
   container.className = 'cc-admin';
 

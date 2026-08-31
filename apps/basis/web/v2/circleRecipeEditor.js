@@ -19,6 +19,7 @@ import { BLOCK_TYPES } from '../../src/v2/circleRecipe.js';
 import { BLOCK_REGISTRY } from '../../src/v2/circleRecipeBlocks.js';
 import { detectRecipeConflicts, applyResolution } from '../../src/v2/recipeConflict.js';
 import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
  * @param {HTMLElement} container
@@ -72,7 +73,7 @@ export function renderRecipeEditor(container, {
   onIncomingApplied,
   onIncomingDiscarded,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleRecipeEditor.js');
   container.innerHTML = '';
   container.classList.add('circle-recipe-editor');
   container.dataset.mode = mode;

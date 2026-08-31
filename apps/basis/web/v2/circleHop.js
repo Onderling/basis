@@ -8,6 +8,8 @@
  * `chain` + handlers + `t`. Unit-testable under happy-dom.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 export function renderCircleHop(container, {
   hopMode = { global: false },
   chain = null,
@@ -16,7 +18,7 @@ export function renderCircleHop(container, {
   onAskRelay,
   onBack,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleHop.js');
   container.innerHTML = '';
   container.classList.add('circle-hop');
 

@@ -19,6 +19,8 @@
  *   onShareToCircle(circleId, personaId)             → push the release to the roster
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -57,7 +59,7 @@ export function renderMij(container, {
   currentPicture = null,
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleMij.js');
   container.innerHTML = '';
   container.className = 'cc-mij';
 

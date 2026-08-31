@@ -21,6 +21,7 @@
  */
 
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { translatorOr } from '../locales/translatorOr.js';
 
 // Parameter register (#36) — how many shared skills a nearby row shows (scope:device, kind:internal — a
 // render cap). Caller-overridable via arg. `param()` returns 3 unchanged.
@@ -55,7 +56,7 @@ export function buildNearbyModel({
   t,
   maxSharedSkillsPerRow = SHARED_SKILLS_DEFAULT_MAX,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleNearby.js');
   const myKeyed = new Set(asArray(mySkills).map(pickSkillKey).filter(Boolean));
   const myPublishedSkills = asArray(mySkills).map(pickSkillText).filter(Boolean);
 

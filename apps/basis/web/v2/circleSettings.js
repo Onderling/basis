@@ -36,6 +36,7 @@ import { renderRecipeConsentCard } from './recipeConsentCard.js';
 // not a hardcoded tr('circle.settings.title') call.  Pure selector in shared src.
 import { pageLabel } from '../../src/v2/pageProjection.js';
 import { SETTINGS_ENUM_AXES } from '../../src/v2/circlePolicy.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 // 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' —
 // 'cross-stream' retired with the Stream view, batch 5); an admin picks which surface
@@ -112,7 +113,7 @@ export function renderCircleSettings(container, {
   transport = null,
   onControl,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleSettings.js');
   const emit = (patch) => { if (typeof onChange === 'function') onChange(patch); };
   container.innerHTML = '';
   container.classList.add('circle-settings');

@@ -13,6 +13,8 @@
  * triple the renderer styles.
  */
 
+import { translatorOr } from '../locales/translatorOr.js';
+
 // Order maps the privacy/sovereignty gradient:
 //   none < shared < personal < hybrid
 // 'up' moves toward more-pod (more durable + more individual control).
@@ -80,7 +82,7 @@ export function classifyPodChange({ from, to, hasContent = false } = {}) {
  */
 export function renderPodMigrationCopy(verdict, t) {
   if (!verdict || verdict.severity === 'none') return null;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'podMigrationWarning.js');
   return {
     severity: verdict.severity,
     text:     tr(verdict.summary, { /* future: from/to interpolation */ }),

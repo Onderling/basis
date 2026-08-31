@@ -1,4 +1,6 @@
 // basis v2 — shared one-line circle-bubble text from a runDispatch reply (web + mobile).
+
+import { translatorOr } from '../locales/translatorOr.js';
 //
 // The circle stream renders plain chat bubbles (no rich cards), so a dispatched command surfaces as a
 // one-line confirmation; the real effect (task added/completed, …) propagates through the substrate to
@@ -14,7 +16,7 @@
  * @returns {string}
  */
 export function circleReplyText(reply, { verb, t } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleReply.js');
   if (reply && reply.error) {
     return tr('circle.bot.failed', { msg: (reply.error && reply.error.message) || String(reply.error || '') });
   }

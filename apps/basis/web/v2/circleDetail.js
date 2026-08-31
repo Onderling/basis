@@ -14,6 +14,7 @@
  */
 import { circleActions } from '../../src/v2/actionProjection.js';
 import { basisManifest } from '../../src/index.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 // D / Surface 2 — the detail-bar CSS token per action id.  Purely shell-side
 // styling (the manifest carries no CSS): keeps each button's original class
@@ -48,7 +49,7 @@ export function renderCircleDetail(container, {
   onLists,
   onShare,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleDetail.js');
   container.innerHTML = '';
   container.classList.add('circle-detail');
 

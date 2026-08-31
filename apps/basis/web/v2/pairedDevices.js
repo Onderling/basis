@@ -19,11 +19,12 @@
  * @param {(addr:string)=>Promise<string[]>} opts.onRemove  unpair a device; resolves to the new list.
  */
 import { makePairUri, parsePairUri } from '../../src/core/qrSchemes.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderPairedDevices(container, opts = {}) {
   if (!container) return container;
   const { selfAddr = '', t, onAdd, onRemove } = opts;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'pairedDevices.js');
   let peers = Array.isArray(opts.peers) ? [...opts.peers] : [];
 
   const short = (a) => (a && a.length > 16 ? `${a.slice(0, 8)}…${a.slice(-6)}` : a);

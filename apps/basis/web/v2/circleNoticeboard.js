@@ -15,6 +15,7 @@
 
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 import { buildAttachControl } from './attachControl.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 const INTENTS = ['ask', 'offer', 'lend'];
 
@@ -41,7 +42,7 @@ export function renderCircleNoticeboard(container, {
   onEmbedOpen,              // ({type, ref, screen}) => void — tap a "See also" chip to open the item
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleNoticeboard.js');
   container.innerHTML = '';
   container.className = 'cc-noticeboard';
 

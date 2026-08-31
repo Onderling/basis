@@ -22,6 +22,7 @@ import { folioLevel, glyphForFile, formatFileSize } from '@onderling-app/folio/b
 // (get × file) from the member's matrix. Shared logic lives in src/; this
 // renderer stays a thin adapter that just applies the returned treatment.
 import { folioFileOpenTreatment } from '../../src/v2/circleFolio.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 const FILTERS = ['all', 'favourites', 'recent'];
 // share-toggle row above the filter strip.
@@ -96,7 +97,7 @@ export function renderCircleFolioBrowser(container, {
   capabilityMatrix = [],
   appOrigin = 'folio',
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleFolio.js');
   const navigable = typeof onNavigate === 'function';
   const podMode = sourceMode === 'pod';
   // Uniform across all file rows (same get × file capability): resolve once.

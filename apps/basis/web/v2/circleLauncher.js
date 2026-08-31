@@ -8,6 +8,7 @@
  */
 
 import { circleTint } from '../../src/v2/theme.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 // β.3 — fixed display order for circle-kind section headers; anything not in
 // this list is bucketed under 'other' (last).  Mirrors the values produced by
@@ -48,7 +49,7 @@ export function renderCircleLauncher(container, {
   // empty account paint the same "No circles yet.", and people conclude their data is gone.
   bootFailure = null,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleLauncher.js');
   container.innerHTML = '';
   container.classList.add('circle-launcher');
 

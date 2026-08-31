@@ -8,8 +8,10 @@
  * merges + re-renders + persists. Pure → unit-testable under happy-dom.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 export function renderCircleAvailability(container, { availability, t, onChange, onBack, onSave, onHop } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleAvailability.js');
   const emit = (patch) => { if (typeof onChange === 'function') onChange(patch); };
   const a = availability || {};
   const h = a.holiday || {};

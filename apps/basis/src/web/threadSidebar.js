@@ -24,6 +24,7 @@ import {
   formStateFromThread,
   submitThreadForm,
 } from '../core/threads/threadFormState.js';
+import { translatorOr } from '../locales/translatorOr.js';
 
 /**
  * @typedef {object} SidebarContext
@@ -54,7 +55,7 @@ import {
 export function renderSidebar(container, ctx) {
   if (!container) throw new TypeError('renderSidebar: container required');
   const { doc, store, onSelect, t } = ctx;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'threadSidebar.js');
 
   while (container.firstChild) container.removeChild(container.firstChild);
 
@@ -88,7 +89,7 @@ export function renderSidebar(container, ctx) {
 
 function renderThreadRow(thread, ctx, container) {
   const { doc, store, onSelect, t } = ctx;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'threadSidebar.js');
   const li = doc.createElement('li');
   const isActive = thread.id === store.activeId;
   li.className = `cc-thread-row${isActive ? ' cc-thread-active' : ''}`;
@@ -166,7 +167,7 @@ function toggleForm(container, ctx, existingThread) {
 
 function renderThreadForm(ctx, existingThread, onDone) {
   const { doc, store, onSelect, t, knownApps, knownEventTypes } = ctx;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'threadSidebar.js');
   const editing = !!existingThread;
 
   const form = doc.createElement('form');

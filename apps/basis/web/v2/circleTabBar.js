@@ -14,10 +14,11 @@
  */
 import { circleTabs } from '../../src/v2/tabProjection.js';
 import { basisManifest } from '../../src/index.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onNearby, onContacts, onMij } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleTabBar.js');
   // id → the host-wired handler.  Keyed by the projected tab id, so the
   // callback contract (onScreens/onCircles/onContacts/onMij) is unchanged.
   const handlers = { screens: onScreens, circles: onCircles, nearby: onNearby, contacten: onContacts, mij: onMij };

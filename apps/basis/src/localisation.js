@@ -17,7 +17,7 @@ import en from '../locales/en.json' with { type: 'json' };
 import nl from '../locales/nl.json' with { type: 'json' };
 // The shared `circle`/`consequence`/`role` blocks live in ONE place (src/locales/) so web + mobile
 // can't drift; merge them in.
-import { sharedLocale } from './locales/index.js';
+import { sharedLocale, mergeShared } from './locales/index.js';
 
 let initialised = false;
 
@@ -60,8 +60,8 @@ export async function initLocalisation({ lng = 'en', fallbackLng = 'en' } = {}) 
       // One spread, no block names: a block added to `src/locales/index.js` lands on both shells
       // without either loader being edited. (It used to name each block here and in the mobile
       // loader — three files to keep in step, and nothing failed when they fell out of step.)
-      en: { translation: unwrapLeaves({ ...en, ...sharedLocale.en }) },
-      nl: { translation: unwrapLeaves({ ...nl, ...sharedLocale.nl }) },
+      en: { translation: unwrapLeaves(mergeShared(en, sharedLocale.en)) },
+      nl: { translation: unwrapLeaves(mergeShared(nl, sharedLocale.nl)) },
     },
     interpolation: { escapeValue: false },
   });

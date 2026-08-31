@@ -27,6 +27,7 @@
  * — the picker copy is identical across the three flows.
  */
 import { BLOCK_REGISTRY } from '../../src/v2/circleRecipeBlocks.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
  * @param {HTMLElement} container
@@ -51,7 +52,7 @@ export function renderRecipeConflictResolver(container, {
   onCancel,
   title = null,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'recipeConflictResolver.js');
   container.innerHTML = '';
   container.classList.add('circle-recipe-conflict');
   // Self-contained backdrop — fixed positioning so the modal sits on

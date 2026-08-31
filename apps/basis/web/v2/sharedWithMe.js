@@ -8,6 +8,8 @@
  * `entries`, `t`, and an `onOpen(entry)` that opens the copy with the user's own network-derived sealing key.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 export function renderSharedWithMe(container, {
   entries = [],
   t,
@@ -15,7 +17,7 @@ export function renderSharedWithMe(container, {
   onOpen,
   loading = false,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'sharedWithMe.js');
   container.innerHTML = '';
   container.classList.add('shared-with-me');
 

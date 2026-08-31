@@ -15,6 +15,7 @@
  */
 
 import { normalizeAvailability } from './memberAvailability.js';
+import { translatorOr } from '../locales/translatorOr.js';
 
 /**
  * Add `days` to the current holiday end-date (ISO yyyy-mm-dd).  Returns
@@ -75,7 +76,7 @@ export function setHolidayUntil(availability, untilIso) {
 export function buildHolidayAutoReply({ availability, name, t } = {}) {
   const a = normalizeAvailability(availability);
   if (!a.holiday.active) return { active: false, text: null };
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'holidayShortcuts.js');
   const safeName = typeof name === 'string' && name.trim() ? name.trim() : null;
   if (a.holiday.until) {
     return {

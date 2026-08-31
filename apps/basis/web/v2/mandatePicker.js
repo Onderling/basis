@@ -41,6 +41,7 @@ export {
   GRANT_KIND_SPECS,
   grantKindOptions,
 } from '../../src/v2/mandate.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
  * Render the entrust picker into `container`.
@@ -75,7 +76,7 @@ export function renderMandatePicker(container, {
   notice = null,
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'mandatePicker.js');
   container.innerHTML = '';
   container.className = 'cc-mandate-picker';
 
@@ -361,7 +362,7 @@ export function renderMandatePicker(container, {
  * @returns {HTMLElement}
  */
 export function renderMandateLegibility(grants, { members = [], offerings = [], t } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'mandatePicker.js');
   const wrap = document.createElement('div');
   wrap.className = 'cc-mandate-legibility';
   wrap.style.cssText = 'margin:0 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--card)';

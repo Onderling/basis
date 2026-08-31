@@ -25,6 +25,7 @@
 
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
  * Render an array of materialized blocks into a container.
@@ -43,7 +44,7 @@ import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '.
  * @returns {HTMLElement}
  */
 export function renderCircleScreen(container, { blocks = [], t, refreshing = false, onAction, onEmbedOpen, highlightRef } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleScreen.js');
   container.innerHTML = '';
   container.classList.add('circle-screen');
 

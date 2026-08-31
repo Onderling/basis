@@ -1,30 +1,8 @@
 {
-  "common": {
-    "ok": {
-      "text": "✓",
-      "doc": "Generic success indicator rendered when a skill returns { ok: true } with no message."
-    },
-    "failed": {
-      "text": "Mislukt",
-      "doc": "Generic failure fallback when a skill returns { ok: false } with no error text."
-    },
-    "error": {
-      "text": "Fout",
-      "doc": "Generic error label when an error envelope has no message or code."
-    },
-    "consequences": {
-      "text": "Gevolgen als je dit kiest",
-      "doc": "N2 — ⓘ tooltip/aria label on a radio option that reveals its consequence."
-    }
-  },
   "reply": {
     "unknown_command": {
       "text": "Begreep „{{input}}” niet. Probeer /help voor de beschikbare commando's.",
       "doc": "Shown when parser falls through to kind:'unknown' — user input matched no slash command."
-    },
-    "bulk_no_list": {
-      "text": "Geen recente lijst om “alle” op toe te passen — voer eerst een lijst-commando uit.",
-      "doc": "E2 — shown when `/<op> all` has no recent listing to fan out over."
     }
   },
   "thread": {
@@ -53,10 +31,6 @@
     "respond_neither_ok": {
       "text": "Noch de lokale opslag noch de NKN-aflevering lukte.",
       "doc": "[Help with] flow — both substrate and NKN paths failed."
-    },
-    "counter_prompt": {
-      "text": "Typ je tegenvoorstel hieronder.",
-      "doc": "Hint after [Counter] click on a responder card."
     }
   },
   "form": {
@@ -95,28 +69,6 @@
     "stub": {
       "text": "[demo] {{op}} aangeklikt op {{item}} — onderliggende app nog niet gebouwd (getrackt).",
       "doc": "Receiver-action stub on file/time cards before real backing apps exist."
-    }
-  },
-  "logs": {
-    "no_log": {
-      "text": "Event-log niet beschikbaar in deze build.",
-      "doc": "Defensive."
-    },
-    "heading": {
-      "text": "Laatste {{count}} events:",
-      "doc": "First line of /logs output."
-    },
-    "empty": {
-      "text": "Geen events gevonden (probeer /logs --app=household).",
-      "doc": "Empty state."
-    },
-    "muted": {
-      "text": "✓ Events gedempt: {{app}}:{{type}}.",
-      "doc": "Mute confirmation."
-    },
-    "panel_opened": {
-      "text": "Log-paneel geopend. Klik [×] om te sluiten.",
-      "doc": "Confirmation when bare /logs opens the side-panel UI."
     }
   },
   "fileShare": {
@@ -250,64 +202,16 @@
     }
   },
   "chat": {
-    "followup_prompt": {
-      "text": "Wat is je {{param}}? (voor /{{opId}})",
-      "doc": "Generieke prompt als een circle-commando needsForm geeft met één ontbrekend veld — de bot vraagt, het volgende bericht is het antwoord (gedeeld src/v2/followUp.js)."
-    },
-    "followup_prompt_respond_to_item_body": {
-      "text": "Welke hulp bied je aan?",
-      "doc": "Vriendelijkere prompt voor respondToItem.body (via pickPromptKey)."
-    },
-    "form_title": {
-      "text": "Voltooi /{{opId}}",
-      "doc": "Titel boven het multi-field circle-formulier (2+ ontbrekende velden → beginFormFollowUp). Spiegelt basis-mobile zodat web≡mobile."
-    },
-    "form_submit": {
-      "text": "Verstuur",
-      "doc": "Submit-knop op het multi-field circle-formulier."
-    },
-    "form_label_body": {
-      "text": "Bericht",
-      "doc": "Label voor 'body' veld — gebruikt door respondToItem enz."
-    },
-    "form_label_title": {
-      "text": "Titel",
-      "doc": "Label voor 'title' veld."
-    },
-    "form_label_name": {
-      "text": "Naam",
-      "doc": "Label voor 'name' veld."
-    },
-    "form_label_text": {
-      "text": "Tekst",
-      "doc": "Label voor 'text' veld."
-    },
-    "form_label_when": {
-      "text": "Wanneer",
-      "doc": "Label voor 'when' veld — kalender/beschikbaarheid."
-    },
-    "form_label_audience": {
-      "text": "Publiek",
-      "doc": "Label voor 'audience' veld."
-    },
     "file": {
       "open": {
         "text": "Openen",
         "doc": "E1 — file-reply card: open the file URL in a new tab."
-      },
-      "unnamed": {
-        "text": "Naamloos bestand",
-        "doc": "E1 — file-reply card fallback name when none is given."
       }
     },
     "nav": {
       "backToChat": {
         "text": "← terug naar chat",
         "doc": "E4 — chat-nav floating button: return to the thread a side-panel was opened from."
-      },
-      "openInFull": {
-        "text": "Volledig openen",
-        "doc": "E5 — record/mini-page panel: expand the card into the wide side panel."
       }
     }
   }

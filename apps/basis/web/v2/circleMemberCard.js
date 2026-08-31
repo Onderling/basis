@@ -21,6 +21,7 @@
  */
 
 import { revealPresetLabelKey } from '../../src/v2/memberCards.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
  * @param {HTMLElement} container
@@ -31,7 +32,7 @@ import { revealPresetLabelKey } from '../../src/v2/memberCards.js';
  * @param {function} [opts.onBack]
  */
 export function renderMemberPersonaCard(container, { member = {}, split = { sees: [], hides: [] }, t, onBack, resolvePicture, onReport } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleMemberCard.js');
   container.innerHTML = '';
   container.classList.add('circle-membercard');
 
@@ -86,7 +87,7 @@ export function renderSelfViewCard(container, {
   me = {}, members = [], viewer = { kind: 'stranger' }, split = { sees: [], hides: [] },
   t, onPickViewer, onBack, resolvePicture,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleMemberCard.js');
   const pick = (v) => { if (typeof onPickViewer === 'function') onPickViewer(v); };
   container.innerHTML = '';
   container.classList.add('circle-membercard', 'circle-membercard--self');

@@ -28,6 +28,7 @@ import {
 } from '../../src/v2/nearbyScreen.js';
 import { ASK_MAX_TEXT } from '../../src/v2/nearbyAsks.js';
 import { CARD_MAX_LABEL, CARD_MAX_LINE, CHAT_MAX_TEXT } from '../../src/v2/nearbyRoom.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -46,7 +47,7 @@ export function renderCircleNearby(container, {
   onSay = null,
   onInviteAction = null,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleNearby.js');
   container.innerHTML = '';
   container.classList.add('circle-nearby');
 

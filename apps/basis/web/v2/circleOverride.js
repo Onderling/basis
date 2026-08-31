@@ -13,6 +13,7 @@
  */
 import { noticeOverrideRows } from '../../src/v2/noticeSettings.js';
 import { buildCapabilityMatrix } from '@onderling/app-manifest';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 const TOP_TOGGLES = ['chatOff', 'revealOpen', 'agentsMayContactMe'];
 const FLOW_TOGGLES = ['tasksToPersonal', 'calendarToPersonal'];
@@ -29,7 +30,7 @@ const PUSH_TOGGLES = [
 ];
 
 export function renderCircleOverride(container, { override, t, onChange, onBack, onSave, sources = [], policy = {} } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleOverride.js');
   const emit = (patch) => { if (typeof onChange === 'function') onChange(patch); };
   container.innerHTML = '';
   container.classList.add('circle-override');

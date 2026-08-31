@@ -10,6 +10,8 @@
  * components.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 // Privacy-badge palette (§10c) — the discrete states map to Onderling status tokens (mirrors
 // apps/basis/src/v2/theme.js). Colour AMPLIFIES the shape; quiet is a NEUTRAL slate outline (never green).
 const PRIVACY_BADGE_STYLE = {
@@ -47,7 +49,7 @@ export function renderContactThread(container, {
   onPrivacyTap = null,     // tap the badge → the surface's why/change affordance (surface.showPrivacy)
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'contactThread.js');
   container.innerHTML = '';
   container.className = 'cc-cthread';
 

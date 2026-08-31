@@ -17,7 +17,7 @@ import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
 } from '../../src/v2/nearbyScreen.js';
 import { CIRCLE_KINDS }           from '../../src/v2/circleTemplates.js';
-import { sharedLocale }           from '../../src/locales/index.js';
+import { sharedLocale, mergeShared } from '../../src/locales/index.js';
 import { RULES_QUESTIONS }        from '../../src/v2/circleRules.js';
 import { ROLE_CONTROL_KEYS }      from '../../src/v2/circleRoleControl.js';
 
@@ -201,7 +201,10 @@ for (const [shell, dir] of Object.entries(SHELLS)) {
     let own;
     try { own = JSON.parse(readFileSync(new URL(`${dir}/${lang}.json`, ROOT), 'utf8')); }
     catch { continue; }   // a shell that is not checked out is skipped, never a false red
-    bundles[`${shell}.${lang}`] = { ...own, ...sharedLocale[lang] };
+    // `mergeShared`, not a spread — the shells merge one level deeper, and a spread here would
+    // REPLACE a shell's whole `chat`/`common`/`logs` block with the shared one, hiding 45 keys the
+    // phone really has. (It did, the moment those blocks became partly shared.)
+    bundles[`${shell}.${lang}`] = mergeShared(own, sharedLocale[lang]);
   }
 }
 

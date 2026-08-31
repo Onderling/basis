@@ -570,5 +570,57 @@
       "text": "Thread-werkruimte niet beschikbaar in deze build.",
       "doc": "Defensive."
     }
+  },
+  "chat": {
+    "form_submit": {
+      "text": "Verstuur",
+      "doc": "Submit-knop op het multi-field circle-formulier."
+    },
+    "nav": {
+      "openInFull": {
+        "text": "Volledig openen",
+        "doc": "E5 — record/mini-page panel: expand the card into the wide side panel."
+      }
+    }
+  },
+  "common": {
+    "consequences": {
+      "text": "Gevolgen als je dit kiest",
+      "doc": "N2 — ⓘ tooltip/aria label on a radio option that reveals its consequence."
+    },
+    "error": {
+      "text": "Fout",
+      "doc": "Generic error label when an error envelope has no message or code."
+    },
+    "failed": {
+      "text": "Mislukt",
+      "doc": "Generic failure fallback when a skill returns { ok: false } with no error text."
+    },
+    "ok": {
+      "text": "✓",
+      "doc": "Generic success indicator rendered when a skill returns { ok: true } with no message."
+    }
+  },
+  "logs": {
+    "empty": {
+      "text": "Geen events gevonden (probeer /logs --app=household).",
+      "doc": "Empty state."
+    },
+    "heading": {
+      "text": "Laatste {{count}} events:",
+      "doc": "First line of /logs output."
+    },
+    "muted": {
+      "text": "✓ Events gedempt: {{app}}:{{type}}.",
+      "doc": "Mute confirmation."
+    },
+    "no_log": {
+      "text": "Event-log niet beschikbaar in deze build.",
+      "doc": "Defensive."
+    },
+    "panel_opened": {
+      "text": "Logboek geopend.",
+      "doc": "Bij bare /logs"
+    }
   }
 }

@@ -18,6 +18,8 @@
  * something.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 /**
  * @param {HTMLElement} container
  * @param {object}   args
@@ -34,7 +36,7 @@ export function renderScreensPicker(container, {
   t,
   onOpenScreen, onAddScreen, onRenameScreen, onRemoveScreen, onSetActive,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleScreensPicker.js');
   container.innerHTML = '';
   container.classList.add('circle-screens-picker');
 

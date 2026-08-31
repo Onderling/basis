@@ -6,6 +6,8 @@
  * passes the rendered list + `t` + handlers.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 export function renderCircleMyThings(container, {
   files = [],
   t,
@@ -13,7 +15,7 @@ export function renderCircleMyThings(container, {
   onOpen,
   loading = false,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleMyThings.js');
   container.innerHTML = '';
   container.classList.add('circle-my-things');
 

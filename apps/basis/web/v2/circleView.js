@@ -57,6 +57,7 @@ import { chunkBubble } from '../../src/feedback/feedbackSurface.js';
 // the shared selector (platform + feature gated), NOT a hardcoded MORE_ITEMS list.
 import { circleActions } from '../../src/v2/actionProjection.js';
 import { basisManifest } from '../../src/index.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleView(container, {
   circle = {},
@@ -190,7 +191,7 @@ export function renderCircleView(container, {
   policy = null,
   t,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleView.js');
   container.innerHTML = '';
   container.classList.add('circle-view');
 

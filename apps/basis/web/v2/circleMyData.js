@@ -13,6 +13,7 @@
 import { renderUserLlmSettings } from './userLlmSettings.js';
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -77,7 +78,7 @@ export function renderCircleMyData(container, {
                           // routes through the generic panel instead of the bespoke inline form below.
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleMyData.js');
   container.innerHTML = '';
   container.className = 'cc-mydata';
 

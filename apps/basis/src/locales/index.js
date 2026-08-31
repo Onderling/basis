@@ -45,6 +45,36 @@ export const sharedRoleLocale = { en: roleEn, nl: roleNl };
 export const sharedHostLocale = { en: hostEn, nl: hostNl };
 
 /**
+ * Merge a shell's own bundle with the shared blocks, one level deeper than a spread.
+ *
+ * A spread replaces a whole top-level block, which was fine while every shared block was shared
+ * ENTIRELY. Three are not: `chat`, `common` and `logs` each hold a few strings that shared code writes
+ * (`renderer.js`'s answer to every skill result; the `/logs` replies) sitting beside strings only one
+ * shell renders (mobile's chat composer, its logs panel). Spreading a shared `common` would have wiped
+ * mobile's `common.back` / `common.next`; keeping the shared ones per-shell is what let the SAME
+ * sentence drift into two.
+ *
+ * So: blocks merge key-by-key, and SHARED WINS. Precedence never actually decides anything — the
+ * ownership guard requires a key to be defined in exactly one place, so an overlap is a build error
+ * rather than a quiet override — but when it does fire, the shared source is the one that is meant to
+ * be true. (A leaf here is `{text, doc}`; it is replaced whole, never merged field-by-field.)
+ *
+ * `apps/tasks-v0/src/ui/localisationMerge.js` holds a twin of this with the opposite precedence and no
+ * production consumer. Consolidating the two is worth doing when either app next touches it.
+ */
+export function mergeShared(app, shared) {
+  const out = { ...app };
+  for (const [block, sharedBlock] of Object.entries(shared ?? {})) {
+    const own = out[block];
+    const mergeable = own && typeof own === 'object' && !Array.isArray(own)
+      && sharedBlock && typeof sharedBlock === 'object' && !Array.isArray(sharedBlock)
+      && typeof own.text !== 'string' && typeof sharedBlock.text !== 'string';
+    out[block] = mergeable ? mergeShared(own, sharedBlock) : sharedBlock;
+  }
+  return out;
+}
+
+/**
  * EVERY shared block, per language — the ONE thing a shell merges.
  *
  * Both loaders used to name the blocks themselves:

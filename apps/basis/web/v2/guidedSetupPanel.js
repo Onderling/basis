@@ -10,10 +10,11 @@
  */
 
 import { stepOf } from '../../src/v2/guidedSetup.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderGuidedSetup(container, { template, state, t, onAnswer, onClose } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'guidedSetupPanel.js');
   container.innerHTML = '';
   container.className = 'cc-guided';
 

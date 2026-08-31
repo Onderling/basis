@@ -17,6 +17,7 @@
  */
 
 import { DRIVER_KINDS } from '@onderling/agent-registry';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 function section(titleText) {
   const el = document.createElement('section');
@@ -38,7 +39,7 @@ export function renderAboutMe(container, {
   onBack,
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleAboutMe.js');
   container.innerHTML = '';
   container.className = 'cc-aboutme';
 

@@ -9,8 +9,10 @@
  * No new user-facing strings — the empty state reuses the panel's
  * existing `circle.screen.empty` key (invariant #8).
  */
+
+import { translatorOr } from '../../src/locales/translatorOr.js';
 export function renderRecordScreen(container, { record, t } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'recordScreen.js');
   container.innerHTML = '';
   container.classList.add('record-screen');
   if (!record || typeof record !== 'object') {

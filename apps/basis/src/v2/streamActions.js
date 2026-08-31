@@ -14,6 +14,8 @@
  * testable.
  */
 
+import { translatorOr } from '../locales/translatorOr.js';
+
 const KIND_CHIPS = {
   ask:         ['help', 'ignore'],
   lend:        ['offer', 'ignore'],
@@ -186,7 +188,7 @@ function pickMandateKind(row, ev, payload) {
  * }}
  */
 export function buildStreamComposeContext({ focusedRow, t } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'streamActions.js');
   if (!focusedRow || typeof focusedRow !== 'object') {
     return {
       targetCircleId:   null,

@@ -17,6 +17,8 @@
  * Phase v0.3 (DOM half).
  */
 
+import { translatorOr } from '../locales/translatorOr.js';
+
 /**
  * @param {import('../forms/buildFormSpec.js').FormSpec} spec
  * @param {object} ctx
@@ -36,7 +38,7 @@ export function renderForm(spec, ctx) {
     throw new TypeError('renderForm: ctx.onSubmit required');
   }
   const { doc, onSubmit, onCancel, t, pickerFetcher } = ctx;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'domForm.js');
 
   const wrap = doc.createElement('div');
   wrap.className = `cc-message cc-shell cc-form cc-form-${spec.strategy}`;

@@ -570,5 +570,57 @@
       "text": "Thread workspace not available in this build.",
       "doc": "Defensive."
     }
+  },
+  "chat": {
+    "form_submit": {
+      "text": "Submit",
+      "doc": "Submit button on the multi-field circle form bubble."
+    },
+    "nav": {
+      "openInFull": {
+        "text": "Open in full",
+        "doc": "E5 — record/mini-page panel: expand the card into the wide side panel."
+      }
+    }
+  },
+  "common": {
+    "consequences": {
+      "text": "Consequences of this choice",
+      "doc": "N2 — ⓘ tooltip/aria label on a radio option that reveals its consequence."
+    },
+    "error": {
+      "text": "Error",
+      "doc": "Generic error label when an error envelope has no message or code."
+    },
+    "failed": {
+      "text": "Failed",
+      "doc": "Generic failure fallback when a skill returns { ok: false } with no error text."
+    },
+    "ok": {
+      "text": "✓",
+      "doc": "Generic success indicator rendered when a skill returns { ok: true } with no message."
+    }
+  },
+  "logs": {
+    "empty": {
+      "text": "No events matched (try /logs --app=household).",
+      "doc": "Empty state."
+    },
+    "heading": {
+      "text": "Last {{count}} events:",
+      "doc": "First line of /logs output."
+    },
+    "muted": {
+      "text": "✓ Muted events: {{app}}:{{type}}. /logs --mute=... toggles.",
+      "doc": "Mute confirmation."
+    },
+    "no_log": {
+      "text": "Event log not available in this build.",
+      "doc": "Defensive."
+    },
+    "panel_opened": {
+      "text": "Logs panel opened.",
+      "doc": "Echoed back when a bare /logs opens the side-panel"
+    }
   }
 }

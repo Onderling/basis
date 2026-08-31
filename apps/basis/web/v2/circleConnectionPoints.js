@@ -9,6 +9,7 @@
  */
 
 import { POINT_SOURCE_LABELS } from '../../src/v2/connectionPoints.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderConnectionPoints(container, {
   points = [],
@@ -21,7 +22,7 @@ export function renderConnectionPoints(container, {
   /** The url currently being confirmed, plus its impact report. */
   removing = null,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleConnectionPoints.js');
   container.innerHTML = '';
   container.classList.add('circle-points');
 

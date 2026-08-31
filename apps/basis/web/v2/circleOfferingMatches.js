@@ -8,11 +8,12 @@
  * happy-dom; mirrors circleStream's list renderer.
  */
 import { buildOfferingMatches } from '@onderling/kring-host/circleOfferings';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderOfferingMatches(container, {
   matches = [], t, onBack,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleOfferingMatches.js');
   container.innerHTML = '';
   container.classList.add('circle-offering-matches');
 

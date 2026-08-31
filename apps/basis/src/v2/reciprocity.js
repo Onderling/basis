@@ -21,6 +21,8 @@
  * queue substrate.
  */
 
+import { translatorOr } from '../locales/translatorOr.js';
+
 /**
  * Resolve whether `recipientId` is reachable via chat in `circleId`.
  * Tolerant: any throw / non-boolean response collapses to "available".
@@ -55,7 +57,7 @@ export async function isRecipientUnavailable({ recipientId, circleId, getRecipie
  * when names aren't available — never leaks an id.
  */
 export function buildUnavailableNotice({ recipientName, circleName, t } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'reciprocity.js');
   if (recipientName && circleName) {
     return tr('circle.reciprocity.unavailable', {
       name: recipientName, circle: circleName,

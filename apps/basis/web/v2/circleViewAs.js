@@ -9,6 +9,7 @@
  * under happy-dom.
  */
 import { viewAsDirectory, VIEWER_KINDS } from '../../src/v2/circleViewAs.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleViewAs(container, {
   members = [],
@@ -18,7 +19,7 @@ export function renderCircleViewAs(container, {
   onPickViewer,
   onBack,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleViewAs.js');
   const pick = (v) => { if (typeof onPickViewer === 'function') onPickViewer(v); };
   container.innerHTML = '';
   container.classList.add('circle-viewas');

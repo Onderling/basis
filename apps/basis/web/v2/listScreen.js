@@ -9,6 +9,7 @@
  */
 
 import { buildScreenModel } from '../../src/v2/screenModel.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
  * Render just the rows list (label + capability-gated action buttons); re-callable for partial updates.
@@ -20,7 +21,7 @@ import { buildScreenModel } from '../../src/v2/screenModel.js';
  * span (unchanged).
  */
 export function renderListRows(listEl, { rows = [], t, onRowAction, onRowOpen } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'listScreen.js');
   listEl.innerHTML = '';
   if (!rows.length) {
     const empty = document.createElement('li');
@@ -116,7 +117,7 @@ function categoryBar(container, { categories, onToggle }) {
 export function renderListScreen(container, {
   model, t, title, query = '', onQuery, onToggleCategory, onRowAction, onRowOpen,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'listScreen.js');
   container.innerHTML = '';
   container.classList.add('list-screen');
   if (title) {
@@ -142,7 +143,7 @@ export function renderListScreen(container, {
  * @param {object} block  { items, categoryField?, labelField?, searchFields?, manifestsByOrigin?, appOrigin?, title? }
  */
 export function renderListBlock(container, { block = {}, t, onRowAction, onRowOpen, capabilityMatrix = [] } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'listScreen.js');
   container.innerHTML = '';
   container.classList.add('list-screen');
   let query = '';

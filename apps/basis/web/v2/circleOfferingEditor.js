@@ -9,13 +9,14 @@
  * under happy-dom. Local discovery is out of scope for this slice.
  */
 import { OFFERING_AXES } from '@onderling/kring-host/circleOfferings';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 const AXES = ['openness', 'posture', 'status', 'radius'];
 
 export function renderOfferingEditor(container, {
   skill, t, onChange, onBack, onSave,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleOfferingEditor.js');
   const emit = (patch) => { if (typeof onChange === 'function') onChange(patch); };
   container.innerHTML = '';
   container.classList.add('circle-offering');

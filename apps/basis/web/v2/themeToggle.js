@@ -11,6 +11,8 @@
  * `document.documentElement.dataset.theme`; the pre-paint hook in index.html reads the same key at boot).
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 /** The three choices, least→most specific. `system` = follow the OS (the stored key is removed). */
 export const THEME_CHOICES = Object.freeze(['system', 'light', 'dark']);
 
@@ -27,7 +29,7 @@ export const THEME_CHOICES = Object.freeze(['system', 'light', 'dark']);
  */
 export function renderThemeToggle(container, { themePref, onSetTheme, t, className = 'cc-mydata__theme-toggle' } = {}) {
   if (typeof onSetTheme !== 'function' || !container) return null;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'themeToggle.js');
 
   const toggle = document.createElement('div');
   toggle.className = className;

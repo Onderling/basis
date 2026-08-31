@@ -50,10 +50,11 @@ describe('the shared locale seam', () => {
     expect(Object.keys(sharedLocale.en).length).toBeGreaterThan(0);
   });
 
-  it('neither loader names a shared block any more — they spread the seam', () => {
+  it('neither loader names a shared block any more — they go through the seam', () => {
     for (const rel of ['apps/basis/src/localisation.js', 'apps/basis-mobile/src/core/localisation.js']) {
       const src = read(rel);
-      expect(src, `${rel} should spread the seam`).toMatch(/\.\.\.sharedLocale(\.|\[)/);
+      expect(src, `${rel} should take the shared blocks through the seam`)
+        .toMatch(/mergeShared\(\w+, sharedLocale(\.|\[)/);
       expect(src, `${rel} still names a block by hand — add it to src/locales/index.js instead`)
         .not.toMatch(/(circle|consequence|role):\s*shared\w+Locale/);
     }

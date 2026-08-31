@@ -8,9 +8,11 @@
  * in that thread); tapping a row opens its 1:1 DM thread.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 export function renderContactsRoster(container, { contacts = [], t, onOpen, onAdd } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
   container.className = 'cc-contacts';
 

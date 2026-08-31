@@ -19,6 +19,7 @@
  * hardcoded tr('circle.profile.title'). Pure selector lives in shared src.
  */
 import { pageLabel } from '../../src/v2/pageProjection.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleProfile(container, {
   profile = {},
@@ -50,7 +51,7 @@ export function renderCircleProfile(container, {
   profilePage = null,
 } = {}) {
   if (!container) return container;
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleProfile.js');
   container.innerHTML = '';
   container.className = 'cc-profile';
 

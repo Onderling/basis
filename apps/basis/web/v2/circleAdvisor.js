@@ -7,6 +7,8 @@
  * (or null) + handlers + `t`. No LLM — the rules live in `circleAdvisor`.
  */
 
+import { translatorOr } from '../../src/locales/translatorOr.js';
+
 export function renderCircleAdvisor(container, {
   advice = null,
   t,
@@ -14,7 +16,7 @@ export function renderCircleAdvisor(container, {
   onDismiss,
   onBack,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleAdvisor.js');
   container.innerHTML = '';
   container.classList.add('circle-advisor');
 

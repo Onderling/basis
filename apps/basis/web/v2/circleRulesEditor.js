@@ -18,6 +18,7 @@
 import { RULES_QUESTIONS, isRulesComplete } from '../../src/v2/circleRules.js';
 import { detectRulesConflicts, applyRulesResolution, decisionsForMerges } from '../../src/v2/rulesConflict.js';
 import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 // 5.5d — `onPreview` removed: the join wizard now inlines the consent
 // rendering from the same doc, so a separate preview-as-joiner button
@@ -48,7 +49,7 @@ export function renderRulesEditor(container, {
   onIncomingApplied,
   onIncomingDiscarded,
 } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleRulesEditor.js');
   const emit = (patch) => { if (typeof onChange === 'function') onChange(patch); };
   container.innerHTML = '';
   container.classList.add('circle-rules');

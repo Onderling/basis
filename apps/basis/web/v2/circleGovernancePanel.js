@@ -9,6 +9,7 @@
  */
 
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../src/v2/circlePolicy.js';
+import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /** decision-class / action / status → a locale key (values carry hyphens; keys don't). */
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
@@ -36,7 +37,7 @@ function el(tag, cls, text) {
  * @param {(reportId:string)=>void} [opts.onActReport]
  */
 export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed, reports = [], onDismissReport, onActReport } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'circleGovernancePanel.js');
   container.innerHTML = '';
   container.classList.add('circle-governance');
 

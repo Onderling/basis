@@ -34,6 +34,8 @@
  * (warn/danger) NEVER executes without an explicit confirmation step.
  */
 
+import { translatorOr } from '../locales/translatorOr.js';
+
 /**
  * @typedef {object} ConfirmRequest
  * @property {'warn'|'danger'} severity     styling hint (danger → red/destructive)
@@ -89,7 +91,7 @@ export function confirmRequestForOp(op, { t, message } = {}) {
 
 /** The one ConfirmRequest shape, however the caller reached the gate. */
 function buildRequest({ severity, message, opId, appOrigin, t }) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'confirmGate.js');
   return {
     severity: severity === 'danger' ? 'danger' : 'warn',
     // The declared message is the body; only a declaration WITHOUT a message

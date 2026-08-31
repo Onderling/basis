@@ -29,6 +29,8 @@
  *                wired, a resource-ENUMERATION surface is the remaining slice.
  */
 
+import { translatorOr } from '../locales/translatorOr.js';
+
 // ── Resource-access mandate constants (G20/#28–31) ──────────────────────────
 //
 // The per-resource READ scope contract. It MUST stay byte-identical to
@@ -185,7 +187,7 @@ export const GRANT_KIND_SPECS = [
  * A kind that expands to zero rows (e.g. offerings when you hold none) is omitted.
  */
 export function grantKindOptions({ offerings = [], resources = [], t } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'mandate.js');
   const groups = [];
   for (const spec of GRANT_KIND_SPECS) {
     const rows = spec.expand({ offerings, resources, tr });
@@ -279,7 +281,7 @@ export function mandateConfirmPayload({
  * @returns {Array<{member:string, who:string, what:string}>}
  */
 export function mandateLegibilityRows(grants, { members = [], offerings = [], t } = {}) {
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'mandate.js');
   const byWebid = new Map((members || []).map((m) => [(m && (m.webid ?? m.id)) || '', m]));
   const offeringLabel = new Map((offerings || []).filter((o) => o && o.key).map((o) => [o.key, o.text || o.label || o.key]));
   const out = [];

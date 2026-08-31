@@ -15,7 +15,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 import {
   initialState, decodeInvite, fetchGroupRules,
   handleSuggestions, isValidHandle,
-  finalSubmit, loadPersonas, setPersona,
+  finalSubmit, loadPersonas, setPersona, isJoinDirty,
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
 } from '../../core/wizards/joinGroupState.js';
@@ -46,6 +46,15 @@ export default function JoinGroupWizardModal({
     decodeInvite(args?.invite ?? args?.id ?? args, s);
     return s;
   });
+
+  // Dismissing while there is something to lose asks first. Both accidental paths (the hardware back
+  // button and a tap outside the sheet) went straight to onClose, so a half-filled join vanished with
+  // no way back — the explicit Cancel button is left alone, since that one is the person saying so.
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const requestClose = useCallback(() => {
+    if (isJoinDirty(state)) { setConfirmingDiscard(true); return; }
+    onClose?.();
+  }, [state, onClose]);
 
   useEffect(() => {
     let active = true;
@@ -107,13 +116,26 @@ export default function JoinGroupWizardModal({
   return (
     // The kit's primitives read their palette from here, so the sheet and its contents cannot disagree.
     <WizardTheme theme={theme}>
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={requestClose}>
+      <Pressable style={styles.backdrop} onPress={requestClose}>
         <Pressable
           style={styles.sheet}
           onPress={(e) => e.stopPropagation()}
           testID="join-group-wizard"
         >
+          {confirmingDiscard ? (
+            <View testID="join-discard-confirm">
+              <Body
+                title={t('circle.join.wizard.discard_title')}
+                intro={t('circle.join.wizard.discard_body')}
+              />
+              <Actions buttons={[
+                { label: t('circle.join.wizard.discard_stay'), onPress: () => setConfirmingDiscard(false) },
+                { label: t('circle.join.wizard.discard_leave'), onPress: () => { setConfirmingDiscard(false); onClose?.(); }, kind: 'primary' },
+              ]} />
+            </View>
+          ) : (
+          <>
           <Steps labels={[t('circle.join.wizard.steps.rules'), t('circle.join.wizard.steps.privacy'), t('circle.join.wizard.steps.handle')]} current={state.step} />
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
@@ -273,6 +295,8 @@ export default function JoinGroupWizardModal({
                 disabled: !isValidHandle(state.handle) || state.submitting },
             ];
           })()} />
+          </>
+          )}
         </Pressable>
       </Pressable>
     </Modal>

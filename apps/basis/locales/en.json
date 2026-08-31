@@ -78,6 +78,20 @@
     }
   },
   "form": {
+    "picker": {
+      "loading": {
+        "text": "Loading the choices…",
+        "doc": "Picker field in a form panel, while its source is being fetched."
+      },
+      "empty": {
+        "text": "Nothing to choose from here.",
+        "doc": "Picker field whose source returned no items — an empty list, not a failure."
+      },
+      "error": {
+        "text": "Could not load the choices: {{error}}",
+        "doc": "Picker field whose source threw; {{error}} is the underlying reason."
+      }
+    },
     "heading": {
       "text": "Fill in {{opId}}:",
       "doc": "Form heading; opId is the manifest op."

@@ -79,6 +79,12 @@ describe('FITNESS: no duplicate keys in any locale bundle', () => {
     '../../src/locales/role.nl.json',
     '../../../basis-mobile/locales/en.json',
     '../../../basis-mobile/locales/nl.json',
+    // The WEB app bundle was the one file this scan did not cover — every other bundle in the tree
+    // was listed. It is also the bundle carrying most of the shared strings (measured 2026-08-31:
+    // 126 of its 194 leaves are reached by code both shells render), so it is the one where a
+    // duplicated key would do the most damage before anyone noticed.
+    '../../../basis/locales/en.json',
+    '../../../basis/locales/nl.json',
   ];
   for (const rel of bundles) {
     it(`${rel} — raw-text scan finds no duplicate keys (JSON.parse would hide them)`, () => {

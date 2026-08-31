@@ -128,13 +128,33 @@ const SHELLS = {
  */
 const KNOWN_SHELL_GAPS = {
   'apps/basis/src/core/localBuiltins.js': ['mob'],
+  // Same class, found the day the scanner was widened: this handler answers `/embed`-driven media
+  // errors, and its six `media.*` strings live in the web bundle only, so a phone reads
+  // "media.no_gateway" verbatim. It calls through a local alias (`tt(`), which is why no guard had
+  // ever seen it. Both entries go away together when the shared blocks move.
+  'apps/basis/src/core/handlers/mediaEmbed.js': ['mob'],
 };
 
 const ROOT = new URL('../../../../', import.meta.url);   // apps/basis/test/fitness → repo root
 const SCAN = ['apps/basis/src', 'apps/basis/web', 'apps/basis-mobile/src'];
 
-/** `t('some.key'` — static, single-quoted keys only; an interpolated key cannot be checked statically. */
-const T_CALL = /[^A-Za-z0-9_.$]t\(\s*'([A-Za-z0-9_.\-]+)'/g;
+/**
+ * A translate call with a static, single-quoted key — under every ALIAS this tree actually uses.
+ *
+ * `t(` alone misses about a third of the call surface (measured 2026-08-31: 1398 sites seen, 1994
+ * present). Shared modules take their translator by injection and almost always name it `tr` — 570
+ * static sites — so the code this guard most needs to watch was the code it could not see. `tt(` is
+ * one module's local alias, and `ctx.t(` / `opts.t(` are the two call-through shapes. An interpolated
+ * key still cannot be checked statically; those are covered by the derived-key maps above.
+ */
+const T_CALL = /(?:(?:^|[^A-Za-z0-9_.$])(?:t|tr|tt)|\b(?:ctx|opts)\.t)\(\s*'([A-Za-z0-9_.\-]+)'/gm;
+
+/**
+ * The call surface this scanner is expected to see. A floor, not an exact count: it fails loudly if a
+ * future alias slips past the regex (the number drops) rather than going quiet, which is exactly how
+ * the `tr(` blind spot survived unnoticed.
+ */
+const MIN_CALL_SITES = 1900;
 
 /**
  * The whole call text from `t(` to its matching `)`, by paren balance rather than "up to the next `)`" —
@@ -197,6 +217,15 @@ describe('FITNESS: every static t() key resolves in both languages, in every she
 
   it('finds source to scan (the walk itself is load-bearing)', () => {
     expect(files.length).toBeGreaterThan(50);
+  });
+
+  it(`sees at least ${MIN_CALL_SITES} translate calls — a shrinking number means an alias slipped past`, () => {
+    let sites = 0;
+    for (const rel of files) {
+      for (const _ of readFileSync(new URL(rel, ROOT), 'utf8').matchAll(T_CALL)) sites += 1;
+    }
+    expect(sites, 'the scanner stopped seeing calls it used to see — check for a new translator alias')
+      .toBeGreaterThanOrEqual(MIN_CALL_SITES);
   });
 
   it('no t() call renders its own key name', () => {

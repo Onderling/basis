@@ -108,7 +108,7 @@ export async function createBrowserStoopAgent({
 
   const seedMembers = Array.isArray(members) && members.length > 0
     ? members
-    : [{ webid: localActor, displayName: 'me', role: 'admin' }];
+    : [{ webid: localActor, role: 'admin' }];
 
   const bundle = await createNeighbourhoodAgent({
     identity,

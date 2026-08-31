@@ -2049,7 +2049,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // chatAgent's pubKey is what tasks-v0 sees as `from`; bind
         // it to the local-demo-user webid + admin role. This is the
         // only real member of a fresh circle — the creator.
-        { webid: chatId.pubKey, displayName: 'me', role: 'admin' },
+        { webid: chatId.pubKey, role: 'admin' },
         // Demo-only aliases (Anne/Karl/Maria) — gated behind the opt-in
         // seedDemoData flag (OFF by default) so a fresh REAL circle's roster
         // holds only real members. With the flag on they let the demo +
@@ -2379,7 +2379,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     localActor: chatId.pubKey,
     group:      opts.stoopGroup ?? 'cc-default-circle',
     members:    opts.stoopMembers ?? [
-      { webid: chatId.pubKey,     displayName: 'me',    role: 'admin'       },
+      { webid: chatId.pubKey,     role: 'admin'       },
       // Demo-only phantom members — gated behind seedDemoData (OFF by default)
       // so a fresh REAL circle's roster shows only the creator + actual joiners.
       ...(seedDemoData ? [
@@ -2433,12 +2433,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   // seedStoopProfile:false.
   if (opts.seedStoopProfile !== false) {
     try {
-      await chatAgent.invoke(stoopAgent.address, 'setMyHandle', [DataPart({
-        handle: opts.stoopHandle ?? 'nieuwe-buur',
-      })]);
-      await chatAgent.invoke(stoopAgent.address, 'setMyDisplayName', [DataPart({
-        displayName: opts.stoopDisplayName ?? 'Nieuwe buur',
-      })]);
+      if (opts.stoopHandle) {
+        await chatAgent.invoke(stoopAgent.address, 'setMyHandle', [DataPart({ handle: opts.stoopHandle })]);
+      }
+      if (opts.stoopDisplayName) {
+        await chatAgent.invoke(stoopAgent.address, 'setMyDisplayName', [DataPart({ displayName: opts.stoopDisplayName })]);
+      }
     } catch (err) {
       if (typeof console !== 'undefined') {
         console.warn('[realAgent] seed stoop profile failed:', err.message ?? err);

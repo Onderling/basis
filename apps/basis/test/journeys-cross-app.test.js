@@ -345,11 +345,26 @@ describe('CC-ST.4 — stoop profile record', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });
 
-  it('/stoop-profile returns a record reply with handle + displayName', async () => {
+  it('a fresh profile carries NO name until the person gives one', async () => {
+    // Until 2026-08-31 every agent was seeded with the handle `nieuwe-buur` and the display name
+    // `Nieuwe buur`, so this journey passed on scaffolding rather than on anything a person did. The
+    // seed was there to give the chat-era `/stoop-profile` something to print, and it cost more than it
+    // bought: one Dutch string as everybody's identity in a bilingual app, the SAME string for every
+    // person in a room whose whole job is telling them apart, and no way for "not introduced yet" to
+    // exist — which is the state the Nearby face picker and its retraction are about.
     const r = await ws.userInput('/stoop-profile');
     expect(r.shape).toBe('record');
-    expect(r.payload.handle).toBeTruthy();
-    expect(r.payload.displayName).toBeTruthy();
+    expect(r.payload.handle, 'nobody is named before they say so').toBeFalsy();
+    expect(r.payload.displayName).toBeFalsy();
+  });
+
+  it('…and shows it once they do', async () => {
+    await ws.callSkill('stoop', 'setMyHandle', { handle: 'ada' });
+    await ws.callSkill('stoop', 'setMyDisplayName', { displayName: 'Ada Lovelace' });
+    const r = await ws.userInput('/stoop-profile');
+    expect(r.shape).toBe('record');
+    expect(r.payload.handle).toBe('ada');
+    expect(r.payload.displayName).toBe('Ada Lovelace');
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VIEWER_KINDS, viewAsDirectory } from '../../src/v2/circleViewAs.js';
+import { VIEWER_KINDS, viewAsDirectory, revealedMemberLabel } from '../../src/v2/circleViewAs.js';
 
 // `realName` is RELEASE-sourced (the member's own per-circle disclosure); `released` states the
 // fact. Carol has a name in her local display cache (`ownDisplayName`) but released nothing —
@@ -65,5 +65,33 @@ describe('viewAsDirectory', () => {
     // the handle and is honestly not `revealed`)
     expect(rows.filter((r) => r.id !== 'carol').every((r) => r.revealed)).toBe(true);
     expect(rows.find((r) => r.id === 'carol').displayName).toBe('Heron');
+  });
+});
+
+describe('the last resort when nobody has given a name', () => {
+  // Live from 2026-08-31, when the invented default names went (`nieuwe-buur` and the creator row's
+  // "me"). Before that a fresh circle always had SOMETHING to print, so this branch was only ever
+  // reached with fixture ids like "bob" — and the first real circle after the removal showed its
+  // founder as a 43-character key.
+  const label = (m) => revealedMemberLabel(m, { viewerId: null, policy: 'pairwise' }).primary;
+
+  it('shortens an opaque key to something a person can tell apart', () => {
+    const key = 'PflwUn2aVLieLdb-DW-0VkmQH6ZMMq4WRRGlBolrrtw';
+    expect(label({ id: key })).toBe('peer-PflwUn');
+    expect(label({ id: key }).length, 'a row you can read at a glance').toBeLessThan(16);
+  });
+
+  it('leaves a webid alone — that IS a name someone chose', () => {
+    expect(label({ id: 'webid:anne' })).toBe('webid:anne');
+    expect(label({ id: 'https://ada.example/profile#me' })).toBe('https://ada.example/profile#me');
+  });
+
+  it('still prefers a handle, and never borrows an unreleased real name', () => {
+    expect(label({ id: 'PflwUn2aVLieLdb-DW', handle: 'ada' })).toBe('@ada');
+    expect(label({ id: 'PflwUn2aVLieLdb-DW', realName: 'Ada Lovelace' })).toBe('peer-PflwUn');
+  });
+
+  it('tolerates a missing id rather than painting "undefined"', () => {
+    expect(label({})).toBe('');
   });
 });

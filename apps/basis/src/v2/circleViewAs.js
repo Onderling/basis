@@ -93,7 +93,27 @@ export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwis
   return {
     revealed,
     // Never fall back to the real name for an unreleased member — the id is the honest last resort.
-    primary: handle ? `@${handle}` : ((revealed && realName) ? realName : (m.id ?? '')),
+    primary: handle ? `@${handle}` : ((revealed && realName) ? realName : shortId(m.id)),
     secondary: (revealed && realName && handle) ? realName : null,
   };
+}
+
+/**
+ * The id, shortened enough to read — the last resort when nobody has given a name.
+ *
+ * Honest and readable are not in tension here. A 43-character key IS the honest answer and it is not one
+ * a person can hold in their head or tell two rows apart by; Nearby settled this already (`pickPeerLabel`
+ * in `circleNearby.js`: *"short-suffix the pubKey so rows are distinguishable without leaking the whole
+ * identity. Anonymous-by-default per design."*), and a roster wants the same answer for the same reason.
+ *
+ * It mattered from 2026-08-31, when the invented default names were removed: before that a fresh circle
+ * called its creator "me", so nothing ever reached this branch with a real key in it.
+ *
+ * Only an opaque key is shortened. A `webid:` or a URL is already a name a person chose to be known by,
+ * and cutting it would mangle it.
+ */
+function shortId(id) {
+  if (typeof id !== 'string' || !id) return '';
+  if (id.includes(':') || id.includes('/') || id.length <= 12) return id;
+  return `peer-${id.slice(0, 6)}`;
 }

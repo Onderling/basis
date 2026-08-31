@@ -59,7 +59,7 @@ export default function PostAudienceWizardModal({
         >
           <ScrollView style={styles.scroll}>
             <Body
-              title="Post with audience"
+              title={t('circle.wizard.audience.title')}
               intro="Compose a post; pick a trust filter, optional tags, distance, and recipients."
             >
               <Textarea

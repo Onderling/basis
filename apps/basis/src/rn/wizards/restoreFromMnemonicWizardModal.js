@@ -54,7 +54,7 @@ export default function RestoreFromMnemonicWizardModal({
               <ScrollView style={styles.scroll}>
                 {state.step === 1 && (
                   <Body
-                    title="Restore from mnemonic"
+                    title={t('circle.wizard.restore.title')}
                     intro="Paste your 12- or 24-word recovery phrase. This WILL replace your current identity — make sure you've backed up anything important first."
                   >
                     <Textarea
@@ -85,7 +85,7 @@ export default function RestoreFromMnemonicWizardModal({
                 )}
                 {state.step === 3 && (
                   <Body
-                    title="Restore identity"
+                    title={t('circle.wizard.restore.confirm_title')}
                     intro="Tap Restore to overwrite your current identity with the phrase above."
                   >
                     <ErrorBanner message={state.submitError} />

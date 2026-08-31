@@ -5546,6 +5546,30 @@
       "review_rotation_days": {
         "text": "Verversen na (dagen)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "step_identity": {
+        "text": "Een kring maken",
+        "doc": "Mobile create-wizard, step 1 heading."
+      },
+      "step_members": {
+        "text": "Leden + bestuur",
+        "doc": "Mobile create-wizard, step 2 heading."
+      },
+      "step_rules": {
+        "text": "Regels + conflict",
+        "doc": "Mobile create-wizard, step 3 heading."
+      },
+      "step_offerings": {
+        "text": "Aanbod (optioneel)",
+        "doc": "Mobile create-wizard, step 4 heading."
+      },
+      "step_tech": {
+        "text": "Techniek + opslag",
+        "doc": "Mobile create-wizard, step 5 heading."
+      },
+      "offering_remove_row": {
+        "text": "Aanbod verwijderen",
+        "doc": "Mobile create-wizard: remove one offering row."
       }
     },
     "settings": {
@@ -5598,8 +5622,24 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "holiday": {
-        "text": "Even niet bereikbaar",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+        "text": "Vakantiestand",
+        "doc": "Mobile settings wizard: the holiday toggle."
+      },
+      "save_handle": {
+        "text": "Handle opslaan",
+        "doc": "Mobile settings wizard: save the handle."
+      },
+      "save_display": {
+        "text": "Weergavenaam opslaan",
+        "doc": "Mobile settings wizard: save the display name."
+      },
+      "display_placeholder": {
+        "text": "Wat anderen zien",
+        "doc": "Mobile settings wizard: display-name field placeholder."
+      },
+      "other_url": {
+        "text": "Anders (voer URL in)",
+        "doc": "Mobile settings wizard: the custom-relay option."
       }
     },
     "backup": {
@@ -5610,18 +5650,38 @@
       "download": {
         "text": "Downloaden",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "title": {
+        "text": "Versleutelde back-up",
+        "doc": "Mobile backup wizard heading."
+      },
+      "ready": {
+        "text": "Back-up klaar",
+        "doc": "Mobile backup wizard, the done step."
       }
     },
     "restore": {
       "identity_warning": {
         "text": "Na herstellen gebruikt de app de herstelde identiteit. Je huidige handle, contacten, kringen en openstaande uitnodigingen horen bij de oude identiteit en lijken dan weg. Ze zijn niet gewist, maar je kunt er niets mee zonder de oude herstelzin.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "title": {
+        "text": "Herstellen met je zin",
+        "doc": "Mobile restore wizard heading."
+      },
+      "confirm_title": {
+        "text": "Identiteit herstellen",
+        "doc": "Mobile restore wizard, the confirm step."
       }
     },
     "audience": {
       "max_distance": {
         "text": "Tot hoever?",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "title": {
+        "text": "Plaatsen met publiek",
+        "doc": "Mobile post-audience wizard heading."
       }
     },
     "dispute": {
@@ -5648,6 +5708,12 @@
       "proposal": {
         "text": "Voorgestelde oplossing",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "embed_time": {
+      "title": {
+        "text": "Een tijd toevoegen",
+        "doc": "Mobile embed-time wizard heading."
       }
     }
   },

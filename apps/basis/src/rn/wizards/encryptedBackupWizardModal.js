@@ -54,7 +54,7 @@ export default function EncryptedBackupWizardModal({
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
               <Body
-                title="Encrypted backup"
+                title={t('circle.wizard.backup.title')}
                 intro="Pick a passphrase to encrypt your local stoop data. Keep it safe — without it the backup is unrecoverable."
               >
                 <Field
@@ -75,7 +75,7 @@ export default function EncryptedBackupWizardModal({
             )}
             {state.step === 2 && (
               <Body
-                title="Backup ready"
+                title={t('circle.wizard.backup.ready')}
                 intro={`Your encrypted backup is ${blobSize(state.blob)} bytes. Suggested filename: ${suggestedFilename()}`}
               >
                 <Warn>Saving / sharing the backup file is wired in Bundle F P4 (#260 — expo-sharing + expo-file-system). For now the bytes live in app memory only.</Warn>

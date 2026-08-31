@@ -210,7 +210,7 @@ export default function SettingsWizardModal({
                       monospace
                     />
                     <TouchableOpacity onPress={onSaveHandle} style={styles.saveBtn}>
-                      <Text style={styles.saveBtnText}>Save handle</Text>
+                      <Text style={styles.saveBtnText}>{t('circle.wizard.settings.save_handle')}</Text>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.section}>
@@ -218,15 +218,15 @@ export default function SettingsWizardModal({
                       label="Display name"
                       value={displayInput}
                       onChangeText={setDisplayInput}
-                      placeholder="What others see"
+                      placeholder={t('circle.wizard.settings.display_placeholder')}
                     />
                     <TouchableOpacity onPress={onSaveDisplay} style={styles.saveBtn}>
-                      <Text style={styles.saveBtnText}>Save display name</Text>
+                      <Text style={styles.saveBtnText}>{t('circle.wizard.settings.save_display')}</Text>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.section}>
                     <View style={styles.row}>
-                      <Text style={styles.rowLabel}>Holiday mode</Text>
+                      <Text style={styles.rowLabel}>{t('circle.wizard.settings.holiday')}</Text>
                       <TouchableOpacity
                         onPress={onToggleHoliday}
                         style={[styles.toggle, state.holiday && styles.toggleOn]}
@@ -298,7 +298,7 @@ export default function SettingsWizardModal({
                             accessibilityState={{ selected: pickerIssuer === 'custom' }}
                           >
                             <View style={[styles.radio, pickerIssuer === 'custom' && styles.radioOn]} />
-                            <Text style={styles.radioLabel}>Other (enter URL)</Text>
+                            <Text style={styles.radioLabel}>{t('circle.wizard.settings.other_url')}</Text>
                           </TouchableOpacity>
                           {pickerIssuer === 'custom' && (
                             <Field

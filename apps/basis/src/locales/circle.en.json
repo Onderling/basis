@@ -5546,6 +5546,30 @@
       "review_rotation_days": {
         "text": "Rotate after (days)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "step_identity": {
+        "text": "Create a circle",
+        "doc": "Mobile create-wizard, step 1 heading."
+      },
+      "step_members": {
+        "text": "Members + governance",
+        "doc": "Mobile create-wizard, step 2 heading."
+      },
+      "step_rules": {
+        "text": "Rules + conflict",
+        "doc": "Mobile create-wizard, step 3 heading."
+      },
+      "step_offerings": {
+        "text": "Offerings (optional)",
+        "doc": "Mobile create-wizard, step 4 heading."
+      },
+      "step_tech": {
+        "text": "Tech + storage",
+        "doc": "Mobile create-wizard, step 5 heading."
+      },
+      "offering_remove_row": {
+        "text": "Remove offering",
+        "doc": "Mobile create-wizard: remove one offering row."
       }
     },
     "settings": {
@@ -5598,8 +5622,24 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "holiday": {
-        "text": "Away",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+        "text": "Holiday mode",
+        "doc": "Mobile settings wizard: the holiday toggle."
+      },
+      "save_handle": {
+        "text": "Save handle",
+        "doc": "Mobile settings wizard: save the handle."
+      },
+      "save_display": {
+        "text": "Save display name",
+        "doc": "Mobile settings wizard: save the display name."
+      },
+      "display_placeholder": {
+        "text": "What others see",
+        "doc": "Mobile settings wizard: display-name field placeholder."
+      },
+      "other_url": {
+        "text": "Other (enter URL)",
+        "doc": "Mobile settings wizard: the custom-relay option."
       }
     },
     "backup": {
@@ -5610,18 +5650,38 @@
       "download": {
         "text": "Download",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "title": {
+        "text": "Encrypted backup",
+        "doc": "Mobile backup wizard heading."
+      },
+      "ready": {
+        "text": "Backup ready",
+        "doc": "Mobile backup wizard, the done step."
       }
     },
     "restore": {
       "identity_warning": {
         "text": "After restoring, the app uses the recovered identity. Your current handle, contacts, circles and pending invites belong to the old identity and will appear gone. They are not deleted, but you cannot act on them without the old recovery phrase.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "title": {
+        "text": "Restore from mnemonic",
+        "doc": "Mobile restore wizard heading."
+      },
+      "confirm_title": {
+        "text": "Restore identity",
+        "doc": "Mobile restore wizard, the confirm step."
       }
     },
     "audience": {
       "max_distance": {
         "text": "How far?",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "title": {
+        "text": "Post with audience",
+        "doc": "Mobile post-audience wizard heading."
       }
     },
     "dispute": {
@@ -5648,6 +5708,12 @@
       "proposal": {
         "text": "Proposed resolution",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "embed_time": {
+      "title": {
+        "text": "Embed a time",
+        "doc": "Mobile embed-time wizard heading."
       }
     }
   },

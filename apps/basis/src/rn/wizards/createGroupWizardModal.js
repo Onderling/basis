@@ -130,7 +130,7 @@ export default function CreateGroupWizardModal({
           <Steps labels={STEP_NAMES} current={state.step} />
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
-              <Body title="Create a circle" intro="A circle is a self-governing circle group.">
+              <Body title={t('circle.wizard.create.step_identity')} intro="A circle is a self-governing circle group.">
                 {/* N1+E8 — kind picker.  Applies the matching template
                     (β.4) in place; for a neighbourhood it also surfaces the size
                     question + chat advice (noticeboard-first, chat off). */}
@@ -193,7 +193,7 @@ export default function CreateGroupWizardModal({
               </Body>
             )}
             {state.step === 2 && (
-              <Body title="Members + governance" intro="Who can join, who can leave, and how.">
+              <Body title={t('circle.wizard.create.step_members')} intro="Who can join, who can leave, and how.">
                 <Field
                   label="Additional admin WebIDs (optional, comma-separated)"
                   value={state.additionalAdmins}
@@ -235,7 +235,7 @@ export default function CreateGroupWizardModal({
               </Body>
             )}
             {state.step === 3 && (
-              <Body title="Rules + conflict" intro="House rules and how to resolve conflicts.">
+              <Body title={t('circle.wizard.create.step_rules')} intro="House rules and how to resolve conflicts.">
                 {/* 5.5a — structured v2 rules doc.  Step 1 captured `purpose`
                     already, so we ask the other five questions here.  Question
                     text comes from the same locale block the consent screen uses. */}
@@ -264,7 +264,7 @@ export default function CreateGroupWizardModal({
             )}
             {/* 5.5c — Offerings step (slotted between Rules and Tech). */}
             {state.step === 4 && (
-              <Body title="Offerings (optional)" intro="What members can do / offer in this circle.  Each offering is named + has four axes.">
+              <Body title={t('circle.wizard.create.step_offerings')} intro="What members can do / offer in this circle.  Each offering is named + has four axes.">
                 {state.offerings.map((row, i) => (
                   <View key={i} style={{ borderWidth: 1, borderColor: '#d8d1bc', borderRadius: 6, padding: 10, marginBottom: 10 }}>
                     <Field
@@ -295,7 +295,7 @@ export default function CreateGroupWizardModal({
                     <Pressable
                       onPress={() => setState((s) => ({ ...s, offerings: s.offerings.filter((_, j) => j !== i) }))}
                     >
-                      <Text style={{ color: '#b04a30', marginTop: 4 }}>Remove offering</Text>
+                      <Text style={{ color: '#b04a30', marginTop: 4 }}>{t('circle.wizard.create.offering_remove_row')}</Text>
                     </Pressable>
                   </View>
                 ))}
@@ -307,7 +307,7 @@ export default function CreateGroupWizardModal({
               </Body>
             )}
             {state.step === 5 && (
-              <Body title="Tech + storage" intro="Cryptography + storage knobs. Defaults are sane.">
+              <Body title={t('circle.wizard.create.step_tech')} intro="Cryptography + storage knobs. Defaults are sane.">
                 <RadioGroup
                   label="Key rotation mode"
                   value={state.keyRotationMode}

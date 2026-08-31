@@ -49,6 +49,20 @@ const ASSIGN = /\.(textContent|innerText|placeholder|title|ariaLabel|alt)\s*=\s*
 const ATTR = /setAttribute\(\s*['"](?:aria-label|title|placeholder|alt)['"]\s*,\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
 /**
+ * The same sinks, in JSX — because the mobile shell has no `.textContent`, and this guard could not
+ * see a word of it. `apps/basis-mobile/src/**` had been in SCOPE since the guard was written, which
+ * reads as coverage; measured on 2026-08-31 it was vacuous, and seventeen English sentences were
+ * shipping to Dutch users out of the RN wizards ("Create a circle", "Members + governance", "Save
+ * handle"). A guard whose scope says yes while its detector says nothing is worse than an absent one,
+ * because it answers the question people ask of it.
+ *
+ * Prose only, on the same terms as the DOM half: a literal with a space in it, sitting where a person
+ * reads it. `<Text>{expr}</Text>` and `title={t('…')}` are untouched — their words come from elsewhere.
+ */
+const JSX_TEXT = /<Text\b[^>]*>\s*([A-Z][A-Za-z][^<>{}\n]*\s[^<>{}\n]*)<\/Text>/g;
+const JSX_PROP = /\b(?:placeholder|accessibilityLabel|accessibilityHint|title|label)=["']([A-Z][^"']*\s[^"']*)["']/g;
+
+/**
  * Is this literal PROSE a person reads, rather than a key, a token or CSS?
  *
  * Deliberately generous toward "not prose": a false positive costs someone a confusing red build on a
@@ -75,11 +89,11 @@ export function findHardcoded(files, read = (f) => readFileSync(f, 'utf8')) {
   for (const file of files) {
     let src;
     try { src = read(file); } catch { continue; }
-    for (const re of [ASSIGN, ATTR]) {
+    for (const re of [ASSIGN, ATTR, JSX_TEXT, JSX_PROP]) {
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(src))) {
-        const text = re === ASSIGN ? m[3] : m[2];
+        const text = re === ASSIGN ? m[3] : re === ATTR ? m[2] : m[1];
         if (!isProse(text)) continue;
         hits.push({ file, line: src.slice(0, m.index).split('\n').length, text });
       }

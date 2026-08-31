@@ -58,7 +58,7 @@ export default function EmbedTimeWizardModal({
         >
           <ScrollView style={styles.scroll}>
             <Body
-              title="Embed a time"
+              title={t('circle.wizard.embed_time.title')}
               intro="Drops a time card into the active thread. Date accepts ISO format (2026-05-30T15:00) OR natural language (tomorrow 3pm, next Friday)."
             >
               <Field

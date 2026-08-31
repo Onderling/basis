@@ -68,7 +68,7 @@
   },
   "pnpm": {
     "//": "Collapse conflicts a clean install can't otherwise place. CRYPTO libs (@noble/*, @scure/*) are",
-    "//2": "deliberately UNIFIED to one version each \u2014 one audited crypto version, not two \u2014 and .syncpackrc",
+    "//2": "deliberately UNIFIED to one version each — one audited crypto version, not two — and .syncpackrc",
     "//3": "enforces they never drift. The rest are transitional and dissolve with the file:->workspace:",
     "//4": "migration (batch 2), which lets pnpm's isolated store hold per-package versions natively.",
     "overrides": {

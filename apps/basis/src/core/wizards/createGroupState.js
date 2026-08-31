@@ -73,6 +73,21 @@ export const KEY_ROTATION_MODES = Object.freeze([
 // promotes Tech→5 and Review→6 without touching the increment logic.
 export const STEP_NAMES = Object.freeze(['Identity', 'Governance', 'Rules', 'Offerings', 'Tech', 'Review']);
 
+/**
+ * What the step dots SAY, one locale key per step — parallel to `STEP_NAMES`, which stays the canonical
+ * list because renderers drive their step machinery off its length and its entries identify a step in
+ * code. Two jobs had been sharing one array: the count, and the words a person reads. The words were
+ * English, painted straight into both shells' dots, on a screen that is otherwise Dutch.
+ */
+export const STEP_LABEL_KEYS = Object.freeze([
+  'circle.wizard.create.dot_identity',
+  'circle.wizard.create.dot_governance',
+  'circle.wizard.create.dot_rules',
+  'circle.wizard.create.dot_offerings',
+  'circle.wizard.create.dot_tech',
+  'circle.wizard.create.dot_review',
+]);
+
 /** A fresh blank offering row for the wizard's "+ Add offering" affordance. */
 export function newOfferingRow() {
   return { ...DEFAULT_OFFERING };

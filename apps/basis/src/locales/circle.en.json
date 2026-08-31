@@ -5574,6 +5574,66 @@
       "offering_remove_row": {
         "text": "Remove offering",
         "doc": "Mobile create-wizard: remove one offering row."
+      },
+      "step_identity_intro": {
+        "text": "A circle is a closed group with its own posts, members and rules.",
+        "doc": "Create wizard step 1 body. Both shells; replaced two different sentences (web: this one, mobile: \"a self-governing circle group\")."
+      },
+      "step_members_intro": {
+        "text": "Who runs the circle, how people join, and how they leave.",
+        "doc": "Create wizard step 2 body."
+      },
+      "step_rules_intro": {
+        "text": "Members see these rules when they accept the invite, and when they ask what the circle expects of them.",
+        "doc": "Create wizard step 3 body."
+      },
+      "step_offerings_intro": {
+        "text": "What members can do or offer here. Each offering has a name and four axes (openness, posture, status, radius). You can skip this and edit it later.",
+        "doc": "Create wizard step 4 body."
+      },
+      "step_tech_intro": {
+        "text": "How the circle stores its data, and how the encryption key rotates.",
+        "doc": "Create wizard step 5 body."
+      },
+      "step_review": {
+        "text": "Review + create",
+        "doc": "Create wizard step 6 title."
+      },
+      "step_review_intro": {
+        "text": "Everything you have set. After you create it you get a one-time membership code to share.",
+        "doc": "Create wizard step 6 body."
+      },
+      "created_title": {
+        "text": "✓ Circle created",
+        "doc": "Create wizard, the final screen."
+      },
+      "created_intro": {
+        "text": "{{circleId}} is live.",
+        "doc": "Create wizard, the final screen: which circle was made."
+      },
+      "dot_identity": {
+        "text": "Identity",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_governance": {
+        "text": "Governance",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_rules": {
+        "text": "Rules",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_offerings": {
+        "text": "Offerings",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_tech": {
+        "text": "Tech",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_review": {
+        "text": "Review",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
       }
     },
     "settings": {

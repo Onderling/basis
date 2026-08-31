@@ -22,7 +22,7 @@
 // mobile's RN wizard can reuse them.
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES,
-  STORAGE_POLICIES, KEY_ROTATION_MODES, STEP_NAMES,
+  STORAGE_POLICIES, KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
   initialState, slugify, isValidSlug, labelOf,
   buildRulesObjectFromState, finalSubmit,
   newOfferingRow, OFFERING_AXES,
@@ -152,18 +152,20 @@ export function renderCreateGroupWizard(opts) {
 function renderStepHeader(container, doc, step) {
   const header = doc.createElement('div');
   header.className = 'cc-wizard-steps';
-  for (let n = 1; n <= 5; n++) {
+  // The list decides how many dots there are — it was hardcoded to 5 while the wizard has had 6 steps
+  // since Offerings was slotted in, so Review had no dot on web while mobile (which passes the whole
+  // array) drew one. Two shells, two step counts, in the same wizard.
+  for (let n = 1; n <= STEP_LABEL_KEYS.length; n++) {
     const dot = doc.createElement('span');
     dot.className = `cc-wizard-step ${n === step ? 'cc-wizard-step-active' : ''} ${n < step ? 'cc-wizard-step-done' : ''}`;
-    dot.textContent = STEP_NAMES[n - 1];
+    dot.textContent = t(STEP_LABEL_KEYS[n - 1]);
     header.appendChild(dot);
   }
   container.appendChild(header);
 }
 
 function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
-  const wrap = makeBody(doc, 'Circle identity & purpose',
-    'A circle is a closed group with its own posts, members, and rules.');
+  const wrap = makeBody(doc, t('circle.wizard.create.step_identity'), t('circle.wizard.create.step_identity_intro'));
 
   // N1+E8 — kind picker.  Picking a kind applies the matching template
   // (β.4) in place; for a neighbourhood it also surfaces the size question +
@@ -236,8 +238,7 @@ function refreshActionsLocal(container, ok) {
 }
 
 function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, rerender) {
-  const wrap = makeBody(doc, 'Members & governance',
-    'Who runs the circle + how people join + how they leave.');
+  const wrap = makeBody(doc, t('circle.wizard.create.step_members'), t('circle.wizard.create.step_members_intro'));
 
   appendField(wrap, doc, t('circle.wizard.create.extra_admins'), 'additionalAdmins',
     state.additionalAdmins, (v) => { state.additionalAdmins = v; },
@@ -282,8 +283,7 @@ function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, r
 }
 
 function renderRulesStep(container, doc, state, onNext, onBack, onCancel, rerender) {
-  const wrap = makeBody(doc, 'Rules & conflict resolution',
-    'Members see these rules when they accept the invite + when they ask "what does this group expect of me?"');
+  const wrap = makeBody(doc, t('circle.wizard.create.step_rules'), t('circle.wizard.create.step_rules_intro'));
 
   // 5.5a — render the v2 structured rules doc.  Step 1 already captured
   // `purpose` (the one-liner), so we skip that question here; the rules
@@ -321,8 +321,7 @@ function renderRulesStep(container, doc, state, onNext, onBack, onCancel, rerend
 // rows.  Each row's four axes are radio groups over `OFFERING_AXES`.
 // Unnamed rows are dropped at submit (see buildRulesObjectFromState).
 function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, rerender) {
-  const wrap = makeBody(doc, 'Offerings (optional)',
-    'What members can do / offer in this circle.  Each offering is named + has four axes (openness / posture / status / radius).  You can skip this step or edit it later.');
+  const wrap = makeBody(doc, t('circle.wizard.create.step_offerings'), t('circle.wizard.create.step_offerings_intro'));
 
   state.offerings.forEach((row, i) => {
     const card = doc.createElement('div');
@@ -369,8 +368,7 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
 }
 
 function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerender) {
-  const wrap = makeBody(doc, 'Tech & storage',
-    'How the circle stores its data + how the encryption key rotates.');
+  const wrap = makeBody(doc, t('circle.wizard.create.step_tech'), t('circle.wizard.create.step_tech_intro'));
 
   appendRadioField(wrap, doc, t('circle.wizard.create.storage'), state.storagePolicy, STORAGE_POLICIES,
     (v) => { Object.assign(state, setStoragePolicy(state, v)); rerender(); }, { consequenceGroup: 'storagePolicy' });
@@ -411,7 +409,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
 }
 
 function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onSubmit) {
-  const wrap = makeBody(doc, 'Review & create', 'Everything you\'ve configured.  After [Create circle] you\'ll get a one-time membership code to hand out.');
+  const wrap = makeBody(doc, t('circle.wizard.create.step_review'), t('circle.wizard.create.step_review_intro'));
 
   const dl = doc.createElement('dl');
   dl.className = 'cc-wizard-review';
@@ -467,7 +465,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
 }
 
 function renderSuccessStep(container, doc, state, onClose) {
-  const wrap = makeBody(doc, '✓ Circle created', `${state.successResult.groupId} is live.`);
+  const wrap = makeBody(doc, t('circle.wizard.create.created_title'), t('circle.wizard.create.created_intro', { circleId: state.successResult.groupId }));
 
   // Encode {kind, groupId, code, expiresAt, adminPeerAddr?} as a onderling-invite://
   // URL so the invitee can paste a single string into /join-group.  The

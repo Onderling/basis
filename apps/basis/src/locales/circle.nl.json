@@ -5574,6 +5574,66 @@
       "offering_remove_row": {
         "text": "Aanbod verwijderen",
         "doc": "Mobile create-wizard: remove one offering row."
+      },
+      "step_identity_intro": {
+        "text": "Een kring is een besloten groep met eigen berichten, leden en afspraken.",
+        "doc": "Create wizard step 1 body. Both shells; replaced two different sentences (web: this one, mobile: \"a self-governing circle group\")."
+      },
+      "step_members_intro": {
+        "text": "Wie de kring beheert, hoe mensen erbij komen en hoe ze weggaan.",
+        "doc": "Create wizard step 2 body."
+      },
+      "step_rules_intro": {
+        "text": "Leden zien deze afspraken als ze de uitnodiging aannemen, en als ze willen weten wat de kring van hen verwacht.",
+        "doc": "Create wizard step 3 body."
+      },
+      "step_offerings_intro": {
+        "text": "Wat leden hier kunnen doen of aanbieden. Elk aanbod heeft een naam en vier assen (openheid, houding, status, straal). Je kunt dit overslaan en later aanpassen.",
+        "doc": "Create wizard step 4 body."
+      },
+      "step_tech_intro": {
+        "text": "Hoe de kring gegevens bewaart, en hoe de sleutel wisselt.",
+        "doc": "Create wizard step 5 body."
+      },
+      "step_review": {
+        "text": "Nakijken + maken",
+        "doc": "Create wizard step 6 title."
+      },
+      "step_review_intro": {
+        "text": "Alles wat je hebt ingesteld. Na het maken krijg je een eenmalige lidmaatschapscode om te delen.",
+        "doc": "Create wizard step 6 body."
+      },
+      "created_title": {
+        "text": "✓ Kring gemaakt",
+        "doc": "Create wizard, the final screen."
+      },
+      "created_intro": {
+        "text": "{{circleId}} staat live.",
+        "doc": "Create wizard, the final screen: which circle was made."
+      },
+      "dot_identity": {
+        "text": "Identiteit",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_governance": {
+        "text": "Bestuur",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_rules": {
+        "text": "Regels",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_offerings": {
+        "text": "Aanbod",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_tech": {
+        "text": "Techniek",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "dot_review": {
+        "text": "Nakijken",
+        "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
       }
     },
     "settings": {

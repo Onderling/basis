@@ -17,7 +17,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
-  KEY_ROTATION_MODES, STEP_NAMES,
+  KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
   initialState, slugify, isValidSlug, labelOf,
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl,
   newOfferingRow, OFFERING_AXES,
@@ -127,10 +127,10 @@ export default function CreateGroupWizardModal({
           onPress={(e) => e.stopPropagation()}
           testID="create-group-wizard"
         >
-          <Steps labels={STEP_NAMES} current={state.step} />
+          <Steps labels={STEP_LABEL_KEYS.map((k) => t(k))} current={state.step} />
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
-              <Body title={t('circle.wizard.create.step_identity')} intro="A circle is a self-governing circle group.">
+              <Body title={t('circle.wizard.create.step_identity')} intro={t('circle.wizard.create.step_identity_intro')}>
                 {/* N1+E8 — kind picker.  Applies the matching template
                     (β.4) in place; for a neighbourhood it also surfaces the size
                     question + chat advice (noticeboard-first, chat off). */}
@@ -193,7 +193,7 @@ export default function CreateGroupWizardModal({
               </Body>
             )}
             {state.step === 2 && (
-              <Body title={t('circle.wizard.create.step_members')} intro="Who can join, who can leave, and how.">
+              <Body title={t('circle.wizard.create.step_members')} intro={t('circle.wizard.create.step_members_intro')}>
                 <Field
                   label="Additional admin WebIDs (optional, comma-separated)"
                   value={state.additionalAdmins}
@@ -235,7 +235,7 @@ export default function CreateGroupWizardModal({
               </Body>
             )}
             {state.step === 3 && (
-              <Body title={t('circle.wizard.create.step_rules')} intro="House rules and how to resolve conflicts.">
+              <Body title={t('circle.wizard.create.step_rules')} intro={t('circle.wizard.create.step_rules_intro')}>
                 {/* 5.5a — structured v2 rules doc.  Step 1 captured `purpose`
                     already, so we ask the other five questions here.  Question
                     text comes from the same locale block the consent screen uses. */}
@@ -264,7 +264,7 @@ export default function CreateGroupWizardModal({
             )}
             {/* 5.5c — Offerings step (slotted between Rules and Tech). */}
             {state.step === 4 && (
-              <Body title={t('circle.wizard.create.step_offerings')} intro="What members can do / offer in this circle.  Each offering is named + has four axes.">
+              <Body title={t('circle.wizard.create.step_offerings')} intro={t('circle.wizard.create.step_offerings_intro')}>
                 {state.offerings.map((row, i) => (
                   <View key={i} style={{ borderWidth: 1, borderColor: '#d8d1bc', borderRadius: 6, padding: 10, marginBottom: 10 }}>
                     <Field
@@ -307,7 +307,7 @@ export default function CreateGroupWizardModal({
               </Body>
             )}
             {state.step === 5 && (
-              <Body title={t('circle.wizard.create.step_tech')} intro="Cryptography + storage knobs. Defaults are sane.">
+              <Body title={t('circle.wizard.create.step_tech')} intro={t('circle.wizard.create.step_tech_intro')}>
                 <RadioGroup
                   label="Key rotation mode"
                   value={state.keyRotationMode}
@@ -370,7 +370,7 @@ export default function CreateGroupWizardModal({
             {state.step === 6 && (() => {
               const rules = buildRulesObjectFromState(state);
               return (
-                <Body title="Review" intro="Confirm the settings, then create the circle.">
+                <Body title={t('circle.wizard.create.step_review')} intro={t('circle.wizard.create.step_review_intro')}>
                   <ReviewList items={[
                     { label: 'Name',        value: state.name },
                     { label: 'Circle id',    value: state.groupId, monospace: true },

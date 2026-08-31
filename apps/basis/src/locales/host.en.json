@@ -39,6 +39,22 @@
     "no_runner": {
       "text": "Brief aggregator not available in this build.",
       "doc": "Defensive."
+    },
+    "title": {
+      "text": "Morning brief",
+      "doc": "Heading of the brief panel."
+    },
+    "refresh": {
+      "text": "↻ Refresh",
+      "doc": "Brief panel: re-run the aggregator."
+    },
+    "refresh_hint": {
+      "text": "Re-run /brief and bypass the cache",
+      "doc": "title on the brief refresh button."
+    },
+    "empty": {
+      "text": "Nothing to report.",
+      "doc": "Brief ran and found nothing."
     }
   },
   "debug": {
@@ -101,6 +117,18 @@
     "no_runner": {
       "text": "Search not available in this build.",
       "doc": "Defensive."
+    },
+    "no_matches": {
+      "text": "No matches.",
+      "doc": "Find reply with no results."
+    },
+    "extensive": {
+      "text": "Extensive search (pod + network)",
+      "doc": "Find panel: widen the search beyond local."
+    },
+    "extensive_hint": {
+      "text": "Not wired yet — the backing skills land per app",
+      "doc": "title on the extensive-search button."
     }
   },
   "help": {
@@ -531,6 +559,18 @@
         "text": "Open in full",
         "doc": "E5 — record/mini-page panel: expand the card into the wide side panel."
       }
+    },
+    "list_empty": {
+      "text": "(no items)",
+      "doc": "Shown inside a list-kind bubble when items is empty."
+    },
+    "record_stale": {
+      "text": "(stale — refresh to see latest)",
+      "doc": "Record panel showing a cached snapshot."
+    },
+    "record_no_fields": {
+      "text": "(no fields)",
+      "doc": "Record panel whose snapshot carries no fields."
     }
   },
   "common": {
@@ -549,6 +589,26 @@
     "ok": {
       "text": "✓",
       "doc": "Generic success indicator rendered when a skill returns { ok: true } with no message."
+    },
+    "close": {
+      "text": "Close",
+      "doc": "Generic close control on a panel, card or lightbox (host chrome)."
+    },
+    "close_panel": {
+      "text": "Close panel",
+      "doc": "aria-label on the side-panel close button."
+    },
+    "copy": {
+      "text": "Copy",
+      "doc": "Copy-to-clipboard button on a QR/text field."
+    },
+    "copied": {
+      "text": "Copied!",
+      "doc": "Momentary confirmation shown in place of Copy for ~1.5s."
+    },
+    "claim": {
+      "text": "Claim",
+      "doc": "Take on an embed offered to the circle (see circle.settings.verb.claim)."
     }
   },
   "logs": {
@@ -571,6 +631,26 @@
     "panel_opened": {
       "text": "Logs panel opened.",
       "doc": "Echoed back when a bare /logs opens the side-panel"
+    },
+    "network_events": {
+      "text": "Network events",
+      "doc": "Heading of the logs panel."
+    },
+    "show_muted": {
+      "text": "Show muted",
+      "doc": "Logs panel checkbox: include muted event kinds."
+    },
+    "no_match": {
+      "text": "No events match the current filters.",
+      "doc": "Logs panel with every row filtered out."
+    },
+    "view_context": {
+      "text": "View context",
+      "doc": "Logs row action: show the event payload."
+    },
+    "open_in_chat": {
+      "text": "Open in chat",
+      "doc": "Logs row action: jump to the message it came from."
     }
   }
 }

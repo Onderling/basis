@@ -46,10 +46,6 @@
       "text": "/{{opId}} is een chat-shell-commando — nog niet bedraad op mobiel.",
       "doc": "Toont wanneer een basis-host op (/help, /threads, /settings, …) gebruikt wordt; de RN-port is een latere #253-substap"
     },
-    "list_empty": {
-      "text": "(geen items)",
-      "doc": "Toont in een list-bubble wanneer items leeg is"
-    },
     "button_tap": {
       "text": "{{label}} → {{item}}",
       "doc": "Synthetische gebruiker-bubble bij een rij-knop tap (#253 stap 2)"

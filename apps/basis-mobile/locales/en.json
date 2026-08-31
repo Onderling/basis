@@ -46,10 +46,6 @@
       "text": "/{{opId}} is a chat-shell command — not wired on mobile yet.",
       "doc": "Shown when the user invokes a basis-host op (/help, /threads, /settings, …) that webMain routes via localBuiltins; the RN port is a later #253 sub-step"
     },
-    "list_empty": {
-      "text": "(no items)",
-      "doc": "Shown inside a list-kind bubble when items is empty"
-    },
     "button_tap": {
       "text": "{{label}} → {{item}}",
       "doc": "Synthetic user-bubble shown when a row button is tapped (#253 step 2 — label is the button label, item the targeted item id)"

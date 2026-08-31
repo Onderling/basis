@@ -30,6 +30,17 @@ import { execSync } from 'node:child_process';
 /**
  * The surfaces a circle member sees. Widen ONE directory at a time, each after it is clean.
  *
+ * SCOPE entries are DIRECTORIES, not `**` globs, and that is load-bearing. Written as
+ * with a doubled-star segment and a trailing `.js` glob — as they were until 2026-08-31 — git's
+ * wildmatch requires an intervening directory, so the pattern matched the wizards under `src/web/` but
+ * not one file sitting directly in it, and it matched NOTHING AT ALL under `web/v2/`: every screen the
+ * member looks
+ * at, `circleApp.js` included, sat outside a guard whose own header says it covers "the surfaces a
+ * circle member actually sees". 59 files, and 27 English strings on live web panels — "Close",
+ * "Copy", "Claim", "Morning brief", "No events match the current filters." — none of which any of the
+ * three greens above could ever have seen. A directory pathspec matches everything beneath it; the
+ * `.js` filter below does the narrowing the glob used to pretend to do.
+ *
  * `src/web/**` was added 2026-08-28, after a scoping premise of mine turned out to be wrong: I had
  * called it "the older adapter + wizards" and left it out, and it is in fact where the CREATE wizard
  * lives — `circleApp.js` imports `renderCreateGroupWizard` from it and "+ new circle" mounts it. Two
@@ -38,9 +49,9 @@ import { execSync } from 'node:child_process';
  * person sees when they make a circle.
  */
 const SCOPE = [
-  'apps/basis/web/v2/**/*.js',
-  'apps/basis/src/web/**/*.js',
-  'apps/basis-mobile/src/**/*.js',
+  'apps/basis/web/v2/',
+  'apps/basis/src/web/',
+  'apps/basis-mobile/src/',
 ];
 
 /** Assignment to a sink a person reads. */
@@ -104,7 +115,9 @@ export function findHardcoded(files, read = (f) => readFileSync(f, 'utf8')) {
 
 function tracked() {
   return execSync(`git ls-files ${SCOPE.map((g) => `'${g}'`).join(' ')}`, { encoding: 'utf8' })
-    .split('\n').filter(Boolean).filter((f) => !/\.test\.|\/test\//.test(f));
+    .split('\n').filter(Boolean)
+    .filter((f) => f.endsWith('.js'))
+    .filter((f) => !/\.test\.|\/test\//.test(f));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

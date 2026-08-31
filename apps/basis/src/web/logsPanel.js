@@ -73,6 +73,7 @@ export function renderLogsPanel(container, ctx) {
 
 function paint(container, ctx, state, rerender) {
   const { doc, eventLog, onClose, onViewContext, onMute, onOpenInChat } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   while (container.firstChild) container.removeChild(container.firstChild);
 
   /* ── header ── */
@@ -80,7 +81,7 @@ function paint(container, ctx, state, rerender) {
   header.className = 'cc-logs-header';
   const title = doc.createElement('h2');
   title.className = 'cc-logs-title';
-  title.textContent = 'Network events';
+  title.textContent = tt('logs.network_events', 'Network events');
   header.appendChild(title);
   if (typeof onClose === 'function') {
     const closeBtn = doc.createElement('button');
@@ -135,7 +136,7 @@ function paint(container, ctx, state, rerender) {
   cb.addEventListener('change', () => { state.showMuted = cb.checked; rerender(); });
   mutedChip.appendChild(cb);
   const cbLabel = doc.createElement('span');
-  cbLabel.textContent = 'Show muted';
+  cbLabel.textContent = tt('logs.show_muted', 'Show muted');
   mutedChip.appendChild(cbLabel);
   chips.appendChild(mutedChip);
 
@@ -160,10 +161,10 @@ function paint(container, ctx, state, rerender) {
   if (events.length === 0) {
     const empty = doc.createElement('div');
     empty.className = 'cc-logs-empty';
-    empty.textContent = 'No events match the current filters.';
+    empty.textContent = tt('logs.no_match', 'No events match the current filters.');
     list.appendChild(empty);
   } else {
-    for (const e of events) list.appendChild(renderEventRow(e, doc, eventLog, { onViewContext, onMute, onOpenInChat, rerender }));
+    for (const e of events) list.appendChild(renderEventRow(e, doc, eventLog, { onViewContext, onMute, onOpenInChat, rerender, t: ctx.t }));
   }
   container.appendChild(list);
 
@@ -189,6 +190,7 @@ function paint(container, ctx, state, rerender) {
 }
 
 function renderEventRow(event, doc, eventLog, ctx) {
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   const row = doc.createElement('div');
   row.className = 'cc-logs-row';
   if (eventLog.isMuted(event.app, event.type)) row.classList.add('cc-logs-row-muted');
@@ -216,7 +218,7 @@ function renderEventRow(event, doc, eventLog, ctx) {
     const btn = doc.createElement('button');
     btn.type = 'button';
     btn.className = 'cc-logs-row-action';
-    btn.textContent = 'View context';
+    btn.textContent = tt('logs.view_context', 'View context');
     btn.addEventListener('click', () => ctx.onViewContext(event.itemRef));
     actions.appendChild(btn);
   }
@@ -236,7 +238,7 @@ function renderEventRow(event, doc, eventLog, ctx) {
     const btn = doc.createElement('button');
     btn.type = 'button';
     btn.className = 'cc-logs-row-action';
-    btn.textContent = 'Open in chat';
+    btn.textContent = tt('logs.open_in_chat', 'Open in chat');
     btn.addEventListener('click', () => ctx.onOpenInChat(event));
     actions.appendChild(btn);
   }

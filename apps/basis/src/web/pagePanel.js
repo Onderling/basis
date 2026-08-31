@@ -97,7 +97,7 @@ export function openPagePanel(opts) {
   const closeBtn = doc.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'cc-page-close';
-  closeBtn.setAttribute('aria-label', 'Close panel');
+  closeBtn.setAttribute('aria-label', opts.t ? opts.t('common.close_panel') : 'Close panel');
   closeBtn.textContent = '×';
   const teardown = () => {
     container.innerHTML = '';
@@ -180,7 +180,7 @@ export function openContentPanel(opts) {
   const closeBtn = doc.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'cc-page-close';
-  closeBtn.setAttribute('aria-label', 'Close panel');
+  closeBtn.setAttribute('aria-label', opts.t ? opts.t('common.close_panel') : 'Close panel');
   closeBtn.textContent = '×';
   const teardown = () => {
     container.innerHTML = '';

@@ -316,6 +316,7 @@ function renderErrorBubble(rendered, state, { doc }) {
 
 function renderListMessage(rendered, state, ctx) {
   const { doc, onButtonTap } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   const wrap = doc.createElement('div');
   wrap.className = `cc-message cc-shell cc-list cc-${state}`;
   if (rendered.messageId) wrap.dataset.messageId = rendered.messageId;
@@ -335,7 +336,7 @@ function renderListMessage(rendered, state, ctx) {
   if (items.length === 0) {
     const empty = doc.createElement('div');
     empty.className = 'cc-list-empty';
-    empty.textContent = '(no items)';
+    empty.textContent = tt('chat.list_empty', '(no items)');
     wrap.appendChild(empty);
     return wrap;
   }
@@ -410,6 +411,7 @@ function renderListMessage(rendered, state, ctx) {
  */
 function renderRecordPanel(rendered, state, ctx, variant) {
   const { doc, onCloseMessage, onButtonTap, onExpandPanel } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
 
   // E5 — "⤢ Open in full" button (record / mini-page → wide side panel).
   // Returns null when no expand handler is wired so the title bar omits it.
@@ -448,7 +450,7 @@ function renderRecordPanel(rendered, state, ctx, variant) {
     wrap.classList.add('cc-panel-stale');
     const indicator = doc.createElement('div');
     indicator.className = 'cc-panel-stale-indicator';
-    indicator.textContent = '(stale — refresh to see latest)';
+    indicator.textContent = tt('chat.record_stale', '(stale — refresh to see latest)');
     wrap.appendChild(indicator);
   }
 
@@ -468,7 +470,7 @@ function renderRecordPanel(rendered, state, ctx, variant) {
       closeBtn.type = 'button';
       closeBtn.className = 'cc-panel-close';
       closeBtn.textContent = '×';
-      closeBtn.title = 'Close';
+      closeBtn.title = tt('common.close', 'Close');
       closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
       bar.appendChild(closeBtn);
     }
@@ -497,7 +499,7 @@ function renderRecordPanel(rendered, state, ctx, variant) {
   if (fields.length === 0) {
     const empty = doc.createElement('div');
     empty.className = 'cc-panel-empty';
-    empty.textContent = '(no fields)';
+    empty.textContent = tt('chat.record_no_fields', '(no fields)');
     wrap.appendChild(empty);
   } else {
     for (const field of fields) {
@@ -510,7 +512,7 @@ function renderRecordPanel(rendered, state, ctx, variant) {
         // Render the QR canvas above the URL text so scannable image
         // is primary, fallback URL secondary (copy/paste).  See
         // renderQrCanvas comment for the lazy-load story.
-        renderQrField(dd, doc, String(field.value));
+        renderQrField(dd, doc, String(field.value), tt);
       } else if (field.kind === 'refs') {
         // (B9) — render an array of {type, ref, label} as a row
         // of "See also" chips.  Click-handlers TBD: future slice
@@ -542,8 +544,9 @@ function renderRecordPanel(rendered, state, ctx, variant) {
  * @param {HTMLElement} container  the <dd> the QR + URL go into
  * @param {Document}    doc
  * @param {string}      text       the URI to encode (full URL)
+ * @param {(key: string, fallback: string) => string} tt  the caller's translator (invariant #8)
  */
-function renderQrField(container, doc, text) {
+function renderQrField(container, doc, text, tt) {
   const canvas = doc.createElement('canvas');
   canvas.className = 'cc-field-qr-canvas';
   canvas.width = 240;
@@ -564,12 +567,12 @@ function renderQrField(container, doc, text) {
   const copyBtn = doc.createElement('button');
   copyBtn.type = 'button';
   copyBtn.className = 'cc-field-qr-copy';
-  copyBtn.textContent = 'Copy';
+  copyBtn.textContent = tt('common.copy', 'Copy');
   copyBtn.addEventListener('click', () => {
     try {
       void navigator.clipboard.writeText(text);
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      copyBtn.textContent = tt('common.copied', 'Copied!');
+      setTimeout(() => { copyBtn.textContent = tt('common.copy', 'Copy'); }, 1500);
     } catch { /* clipboard API may be unavailable; fall through */ }
   });
   urlLine.appendChild(copyBtn);
@@ -719,6 +722,7 @@ function formatFieldValue(v) {
  */
 function renderEmbedCard(rendered, state, ctx) {
   const { doc, onButtonTap, onCloseMessage, onClaimEmbed, manifestsByOrigin, localActor } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   const embed = rendered.embed;
   const wrap = doc.createElement('div');
   wrap.className = `cc-message cc-shell cc-embed-card cc-${state}`;
@@ -737,7 +741,7 @@ function renderEmbedCard(rendered, state, ctx) {
     closeBtn.type = 'button';
     closeBtn.className = 'cc-panel-close';
     closeBtn.textContent = '×';
-    closeBtn.title = 'Close';
+    closeBtn.title = tt('common.close', 'Close');
     closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
     header.appendChild(closeBtn);
   }
@@ -799,7 +803,7 @@ function renderEmbedCard(rendered, state, ctx) {
     const claimBtn = doc.createElement('button');
     claimBtn.type = 'button';
     claimBtn.className = 'cc-embed-claim-btn';
-    claimBtn.textContent = 'Claim';
+    claimBtn.textContent = tt('common.claim', 'Claim');
     claimBtn.addEventListener('click', () => onClaimEmbed(rendered.messageId));
     wrap.appendChild(claimBtn);
   }
@@ -1063,7 +1067,7 @@ function openMediaLightbox(doc, { openFull, line, mime, alt, t } = {}) {
   closeBtn.type = 'button';
   closeBtn.className = 'cc-media-lightbox__close';
   closeBtn.textContent = '×';
-  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.setAttribute('aria-label', tt('common.close', 'Close'));
   closeBtn.addEventListener('click', () => close());
   sheet.appendChild(closeBtn);
 
@@ -1282,6 +1286,7 @@ function appendDemoActions(wrap, embed, state, ctx, doc, actions) {
 
 function appendEmbedHeader(wrap, embed, ctx, doc) {
   const { onCloseMessage } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   const header = doc.createElement('div');
   header.className = 'cc-embed-header';
   const appBadge = doc.createElement('span');
@@ -1293,7 +1298,7 @@ function appendEmbedHeader(wrap, embed, ctx, doc) {
     closeBtn.type = 'button';
     closeBtn.className = 'cc-panel-close';
     closeBtn.textContent = '×';
-    closeBtn.title = 'Close';
+    closeBtn.title = tt('common.close', 'Close');
     closeBtn.addEventListener('click', () => onCloseMessage(wrap.dataset.messageId));
     header.appendChild(closeBtn);
   }
@@ -1320,6 +1325,7 @@ function appendIssuerClaimerMeta(wrap, embed, doc) {
 
 function appendClaimButton(wrap, embed, state, ctx, doc) {
   const { onClaimEmbed, localActor } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   if (state !== 'disabled'
       && embed
       && !embed.claimedBy
@@ -1328,7 +1334,7 @@ function appendClaimButton(wrap, embed, state, ctx, doc) {
     const claimBtn = doc.createElement('button');
     claimBtn.type = 'button';
     claimBtn.className = 'cc-embed-claim-btn';
-    claimBtn.textContent = 'Claim';
+    claimBtn.textContent = tt('common.claim', 'Claim');
     claimBtn.addEventListener('click', () => onClaimEmbed(wrap.dataset.messageId));
     wrap.appendChild(claimBtn);
   }
@@ -1366,6 +1372,7 @@ function formatTime(iso) {
  */
 function renderBrief(rendered, state, ctx) {
   const { doc, onCloseMessage, onBriefRefresh, onButtonTap } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   const wrap = doc.createElement('div');
   wrap.className = `cc-message cc-shell cc-brief cc-${state}`;
   if (rendered.messageId) wrap.dataset.messageId = rendered.messageId;
@@ -1375,7 +1382,7 @@ function renderBrief(rendered, state, ctx) {
   header.className = 'cc-brief-header';
   const title = doc.createElement('span');
   title.className = 'cc-brief-title';
-  title.textContent = 'Morning brief';
+  title.textContent = tt('brief.title', 'Morning brief');
   header.appendChild(title);
 
   const actions = doc.createElement('span');
@@ -1384,8 +1391,8 @@ function renderBrief(rendered, state, ctx) {
     const refresh = doc.createElement('button');
     refresh.type = 'button';
     refresh.className = 'cc-brief-refresh';
-    refresh.textContent = '↻ Refresh';
-    refresh.title = 'Re-run /brief and bypass the cache';
+    refresh.textContent = tt('brief.refresh', '↻ Refresh');
+    refresh.title = tt('brief.refresh_hint', 'Re-run /brief and bypass the cache');
     refresh.addEventListener('click', () => onBriefRefresh());
     actions.appendChild(refresh);
   }
@@ -1394,7 +1401,7 @@ function renderBrief(rendered, state, ctx) {
     closeBtn.type = 'button';
     closeBtn.className = 'cc-panel-close';
     closeBtn.textContent = '×';
-    closeBtn.title = 'Close';
+    closeBtn.title = tt('common.close', 'Close');
     closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
     actions.appendChild(closeBtn);
   }
@@ -1405,7 +1412,7 @@ function renderBrief(rendered, state, ctx) {
   if (!Array.isArray(rendered.sections) || rendered.sections.length === 0) {
     const empty = doc.createElement('div');
     empty.className = 'cc-brief-empty';
-    empty.textContent = 'Nothing to report.';
+    empty.textContent = tt('brief.empty', 'Nothing to report.');
     wrap.appendChild(empty);
     return wrap;
   }
@@ -1526,6 +1533,7 @@ function renderFormShape(rendered, state, { doc }) {
  */
 function renderFind(rendered, state, ctx) {
   const { doc, onCloseMessage, onButtonTap } = ctx;
+  const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
   const wrap = doc.createElement('div');
   wrap.className = `cc-message cc-shell cc-find cc-${state}`;
   if (rendered.messageId) wrap.dataset.messageId = rendered.messageId;
@@ -1551,7 +1559,7 @@ function renderFind(rendered, state, ctx) {
   if (!Array.isArray(rendered.groups) || rendered.groups.length === 0) {
     const empty = doc.createElement('div');
     empty.className = 'cc-brief-empty';
-    empty.textContent = 'No matches.';
+    empty.textContent = tt('find.no_matches', 'No matches.');
     wrap.appendChild(empty);
   } else {
     for (const group of rendered.groups) {
@@ -1591,8 +1599,8 @@ function renderFind(rendered, state, ctx) {
     const btn = doc.createElement('button');
     btn.type = 'button';
     btn.className = 'cc-keyboard-btn cc-find-extensive';
-    btn.textContent = 'Extensive search (pod + network)';
-    btn.title = 'Stub — backing skills land per-app';
+    btn.textContent = tt('find.extensive', 'Extensive search (pod + network)');
+    btn.title = tt('find.extensive_hint', 'Not wired yet — the backing skills land per app');
     btn.addEventListener('click', () => onButtonTap('demo-extensive-search', rendered.query));
     footer.appendChild(btn);
     wrap.appendChild(footer);

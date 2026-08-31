@@ -3024,6 +3024,10 @@
       "text": "Nobody",
       "doc": "withhold the label; rows show the key fragment."
     },
+    "face_empty": {
+      "text": "You have not set that yet, so nobody nearby sees a name — your key fragment shows instead.",
+      "doc": "Nearby face picker: the chosen face (name or handle) resolves to nothing, so a retraction was announced."
+    },
     "face_caveat": {
       "text": "A stable face re-identifies you across places, even though your address rotates.",
       "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."

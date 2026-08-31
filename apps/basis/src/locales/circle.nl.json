@@ -3024,6 +3024,10 @@
       "text": "Niemand",
       "doc": "withhold the label; rows show the key fragment."
     },
+    "face_empty": {
+      "text": "Dat heb je nog niet ingesteld, dus niemand in de buurt ziet een naam — je sleutelfragment staat er.",
+      "doc": "Nearby face picker: the chosen face (name or handle) resolves to nothing, so a retraction was announced."
+    },
     "face_caveat": {
       "text": "Een vast gezicht maakt je herkenbaar op verschillende plekken, ook al wisselt je adres.",
       "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."

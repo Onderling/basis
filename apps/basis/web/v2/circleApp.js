@@ -738,7 +738,7 @@ import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
-import { createNearbyRoomBinding } from '../../src/v2/nearbyRoomBinding.js';
+import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
@@ -3650,7 +3650,14 @@ function showNearby() {
     },
     onAskAction: handleNearbyAskAction,
     face: readNearbyFace(),
-    onFaceChange: (v) => { writeNearbyFace(v); ensureNearbyRoom()?.announceFace?.(); draw(nearbyScreen.model()); },
+    onFaceChange: async (v) => {
+      writeNearbyFace(v);
+      // "My handle" with no handle set announces nothing and looks identical to "Nobody". The binding
+      // reports the label it actually sent, so say so rather than leaving the person to guess.
+      const r = await ensureNearbyRoom()?.announceFace?.();
+      notice = faceNoticeFor({ choice: v, result: r });
+      draw(nearbyScreen.model());
+    },
     onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); notice = null; draw(nearbyScreen.model()); },
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);

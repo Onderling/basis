@@ -936,6 +936,28 @@ describe('a peer that ARRIVES while the screen is open (the count and the rows a
     screen.close();
   });
 
+  it('a face RETRACTION drops the label the row was carrying, back to the fragment', async () => {
+    // The other half of the same story: the sender now announces `label: null` when its face resolves
+    // to nothing, and the row must stop showing the name it was given. Otherwise switching to "Nobody"
+    // is a change only the person making it can see.
+    let pushFace = null;
+    const { screen, setPeers } = build({
+      radio: null,
+      subscribeToPresence: (fn) => { pushFace = fn; return () => { pushFace = null; }; },
+    });
+    screen.open(); await settle();
+    setPeers([labelless]);
+
+    pushFace({ from: labelless.pubKey, label: 'Ada' });
+    expect(screen.model().rows[0].pseudonym, 'the announced face is what the row shows').toBe('Ada');
+
+    pushFace({ from: labelless.pubKey, label: null });
+    const [row] = screen.model().rows;
+    expect(row.pseudonym, 'the retracted name is gone').not.toBe('Ada');
+    expect(row.pseudonym.trim().length, 'and the row is still readable').toBeGreaterThan(0);
+    screen.close();
+  });
+
   it('…and so does one with no key at all — never a blank row', async () => {
     const { screen, setPeers } = build({ radio: null });
     screen.open(); await settle();

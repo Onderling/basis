@@ -4,7 +4,7 @@
  * by the module that owns it, `from` taken from the wire.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createNearbyRoomBinding, NEARBY_ROOM_SUBTYPES } from '../../src/v2/nearbyRoomBinding.js';
+import { createNearbyRoomBinding, NEARBY_ROOM_SUBTYPES, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 import { createAsk, answerAsk } from '../../src/v2/nearbyAsks.js';
 import { createCard, createChatMessage, roomAllows } from '../../src/v2/nearbyRoom.js';
@@ -385,12 +385,46 @@ describe('the face picker (L63)', () => {
       listPeers: () => [{ pubKey: 'x' }, { pubKey: 'y' }],
       myFace: () => (label ? { label } : null), now,
     });
-    expect(await b.announceFace()).toEqual({ announced: 2 });
+    expect(await b.announceFace()).toEqual({ announced: 2, label: 'Frits' });
     expect(sent.map((s) => s.payload)).toMatchObject([
       { subtype: 'nearby-presence', presence: { label: 'Frits' } },
       { subtype: 'nearby-presence', presence: { label: 'Frits' } },
     ]);
-    label = null;                                            // "nobody": nothing to announce
-    expect(await b.announceFace()).toEqual({ announced: 0 });
+    // "Nobody" — or a handle the profile does not have. Either way the room is holding a name that is
+    // no longer yours, and staying silent leaves it there for as long as the peer is listed. A face
+    // that resolves to nothing is a RETRACTION, and it has to travel.
+    label = null;
+    sent.length = 0;
+    // The null label comes back too: "handle" with no handle set looks exactly like "Nobody" from the
+    // outside, and the shell can only say so if the binding tells it what actually went out.
+    expect(await b.announceFace()).toEqual({ announced: 2, label: null });
+    expect(sent.map((s) => s.payload)).toMatchObject([
+      { subtype: 'nearby-presence', presence: { label: null } },
+      { subtype: 'nearby-presence', presence: { label: null } },
+    ]);
+  });
+
+  it('the shells are told when a pick announced nothing — and NOT when "Nobody" was the pick', () => {
+    // Both shells ask this one function rather than reading `result.label` themselves: the two of them
+    // deciding it separately is exactly how a rule like this drifts into two rules.
+    expect(faceNoticeFor({ choice: 'handle', result: { announced: 2, label: null } })).toEqual({ key: 'face_empty' });
+    expect(faceNoticeFor({ choice: 'name',   result: { announced: 0, label: null } })).toEqual({ key: 'face_empty' });
+    expect(faceNoticeFor({ choice: 'none',   result: { announced: 2, label: null } }),
+      'choosing Nobody got exactly what it asked for').toBeNull();
+    expect(faceNoticeFor({ choice: 'handle', result: { announced: 2, label: 'Ada' } })).toBeNull();
+    expect(faceNoticeFor({ choice: 'handle', result: undefined }),
+      'no room wired ⇒ nothing to report').toBeNull();
+  });
+
+  it('a retraction arriving from a peer CLEARS the label it had set', async () => {
+    const b = createNearbyRoomBinding({
+      sendPeerMessage: async () => {}, listPeers: () => [{ pubKey: 'peer-1' }], now,
+    });
+    b.onPeerMessage('peer-1', { subtype: 'nearby-presence', presence: { label: 'Ada' } });
+    expect(b.presenceOf('peer-1')).toMatchObject({ label: 'Ada' });
+
+    b.onPeerMessage('peer-1', { subtype: 'nearby-presence', presence: { label: null } });
+    expect(b.presenceOf('peer-1'), 'the stored face is cleared, not left at its last value')
+      .toMatchObject({ label: null });
   });
 });

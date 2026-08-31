@@ -87,6 +87,26 @@ export function receiveReach(payload, fromAddress, now = () => Date.now()) {
   return Object.freeze({ from: fromAddress ?? null, transports, wantBack: raw.wantBack === true, at: now() });
 }
 
+/**
+ * What to tell the person after their face pick was announced — the shells' half of the retraction.
+ *
+ * Picking "my name" or "my handle" when the profile carries neither announces a RETRACTION, which is
+ * correct on the wire and indistinguishable from picking "Nobody" on the screen. That silence is how
+ * the defect was reported in the first place, so the answer is said rather than inferred. Choosing
+ * "Nobody" needs no notice: the person asked for exactly what they got.
+ *
+ * Lives here, next to `announceFace`, because it reads that call's own return value — and once, because
+ * two shells deciding this separately is how they drift apart.
+ *
+ * @param {{choice: string, result: {label: string|null}|null|undefined}} a
+ * @returns {{key: string}|null} a `circle.nearbyScreen.*` notice key, or null for "say nothing"
+ */
+export function faceNoticeFor({ choice, result } = {}) {
+  if (choice === 'none') return null;
+  if (!result || result.label !== null) return null;
+  return { key: 'face_empty' };
+}
+
 /** A presence payload, rebuilt field by field; `from` from the wire. */
 export function receivePresence(payload, fromAddress, now = () => Date.now()) {
   if (payload?.subtype !== PRESENCE_MESSAGE) return null;
@@ -338,17 +358,31 @@ export function createNearbyRoomBinding({
         return { ok: false, reason: err?.message ?? 'send-failed' };
       }
     },
-    /** The face changed (the picker in "You here"): tell everyone listed, now — not only newcomers. */
+    /**
+     * The face changed (the picker in "You here"): tell everyone listed, now — not only newcomers.
+     *
+     * A face that resolves to NOTHING is announced too, as `label: null`. It has to be: the room stores
+     * the last label it was given, so a device that goes quiet by saying nothing leaves its old name on
+     * every screen that has it, for as long as those peers stay listed. `myFace()` yields nothing in two
+     * situations and both are retractions — the person picked "Nobody", or they picked a handle their
+     * profile does not have. Receivers already read a null label as "clear this face" (`receivePresence`
+     * normalises it, and the row falls back to the key fragment), so only the send was missing.
+     *
+     * Returns the `label` it announced as well as the count, because the shells need it: picking "my
+     * handle" with no handle set is indistinguishable from picking "Nobody" unless something says so,
+     * and that silence is how the original report happened. The binding is the only place that knows,
+     * so it answers rather than making each shell re-derive it.
+     */
     async announceFace() {
       let face = null;
       try { face = await (typeof myFace === 'function' ? myFace() : null); } catch { face = null; }
-      if (!face?.label) return { announced: 0 };
+      const label = face?.label ? String(face.label) : null;
       let announced = 0;
       for (const p of peersNow()) {
         const id = peerId(p);
-        if (id) { await sendTo(id, { subtype: PRESENCE_MESSAGE, presence: { label: String(face.label) } }, 'announceFace'); announced += 1; }
+        if (id) { await sendTo(id, { subtype: PRESENCE_MESSAGE, presence: { label } }, 'announceFace'); announced += 1; }
       }
-      return { announced };
+      return { announced, label };
     },
     /** A reach this peer sent that the shell has not settled yet (show "share back?" while this is set). */
     pendingReachFrom: (from) => pendingReach.get(from) ?? null,

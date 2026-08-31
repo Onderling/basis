@@ -14,6 +14,7 @@
  */
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
+import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio } from '../../core/nearbyAllowsStore.js';
 import { pushContactReply } from '../../core/contactReplyInbox.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -4845,7 +4846,12 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
       onSubmitCard={submitCard}
       onSay={say}
       onInviteAction={inviteAction}
-      onFaceChange={() => bundle?.nearbyRoom?.announceFace?.()}
+      onFaceChange={async (v) => {
+        // Same as web: a face that resolves to nothing is announced as a retraction, and the person is
+        // told, because "my handle" with no handle looks exactly like "Nobody" from the inside.
+        const r = await bundle?.nearbyRoom?.announceFace?.();
+        setNotice(faceNoticeFor({ choice: v, result: r }));
+      }}
       onSetQuiet={(v) => screen?.setQuiet?.(v)}
       onSetRadio={(v) => screen?.setRadio?.(v)}
       onCompose={() => { setNotice(null); setComposing(true); }}

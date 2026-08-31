@@ -189,6 +189,30 @@
     "unavailable": {
       "text": "Agent-identiteit niet beschikbaar.",
       "doc": "Defensive."
+    },
+    "heading": {
+      "text": "Je agent-identiteit (blijft na verversen bestaan):",
+      "doc": "The /me reply, first line. The field names under it (pubKey, stableId) stay as they are — they are terms of art, not words to translate."
+    },
+    "peer_heading": {
+      "text": "Bereikbaar vanaf andere apparaten (NKN):",
+      "doc": "The /me reply: the section that gives your peer address."
+    },
+    "peer_share": {
+      "text": "→ geef dit aan iemand; daarmee kan die je bereiken.",
+      "doc": "The /me reply: what to do with the peer address."
+    },
+    "connecting": {
+      "text": "Verbinden… de eerste verbinding duurt 5 tot 90 seconden.",
+      "doc": "The /me reply when the peer transport is still coming up."
+    },
+    "failed": {
+      "text": "Verbinden lukte niet — {{reason}}",
+      "doc": "The /me reply when the peer transport failed."
+    },
+    "offline": {
+      "text": "Niet verbonden. Gebruik peer-connect om andere apparaten te bereiken.",
+      "doc": "The /me reply when no peer transport is up."
     }
   },
   "media": {
@@ -245,6 +269,10 @@
     "empty": {
       "text": "Blokkeerlijst is leeg.",
       "doc": "/blocked op lege lijst."
+    },
+    "list_heading": {
+      "text": "Gedempt, {{count}} in totaal:",
+      "doc": "The /muted reply, the line above the list."
     }
   },
   "peer": {

@@ -312,26 +312,30 @@ async function meIdentity(_args, { agent, t }) {
   if (!agent?.identity?.chat) return { message: t('me.unavailable') };
   const id   = agent.identity.chat;
   const peer = agent.peer ?? {};
+  // The SENTENCES are translated; the field names under them are not. `pubKey` and `stableId` are the
+  // words this system uses for those things everywhere else, and a Dutch rendering of them would name
+  // nothing a person could look up (Frits, 2026-08-31: translate what a member reads, leave the terms
+  // of art). Same rule for `NKN`, which is a network's name.
   const lines = [
-    'Your agent identity (persists across refresh):',
+    t('me.heading'),
     `  pubKey:    ${id.pubKey}`,
     `  stableId:  ${id.stableId ?? '(none)'}`,
   ];
   // v0.7.P3b — peer address (the thing peers send to).
   if (peer.address) {
     lines.push('');
-    lines.push('Cross-peer (NKN):');
+    lines.push(t('me.peer_heading'));
     lines.push(`  peer address: ${peer.address}`);
-    lines.push('  → share this with a peer; they /test-peer <this-address> hello');
+    lines.push(`  ${t('me.peer_share')}`);
   } else if (peer.status === 'connecting') {
     lines.push('');
-    lines.push('NKN: connecting… (5-90s on first connect)');
+    lines.push(t('me.connecting'));
   } else if (peer.status === 'error') {
     lines.push('');
-    lines.push(`NKN: connect failed — ${peer.error ?? 'unknown error'}`);
+    lines.push(t('me.failed', { reason: peer.error ?? 'unknown error' }));
   } else {
     lines.push('');
-    lines.push('NKN: not connected.  /peer-connect to enable cross-peer chat.');
+    lines.push(t('me.offline'));
   }
   return { message: lines.join('\n') };
 }
@@ -599,7 +603,7 @@ async function mutedHandler(_args, { agent, t }) {
   if (!sa?.mute) return { ok: false, error: t('mute.unavailable') };
   const list = sa.mute.list();
   if (list.length === 0) return { message: t('mute.empty') };
-  const lines = [`Muted peers (${list.length}):`];
+  const lines = [t('mute.list_heading', { count: list.length })];
   for (const p of list) {
     lines.push(`  - ${p.length > 64 ? p.slice(0, 60) + '…' : p}`);
   }

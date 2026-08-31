@@ -189,6 +189,30 @@
     "unavailable": {
       "text": "Agent identity not available.",
       "doc": "Defensive: agent boot missing identity."
+    },
+    "heading": {
+      "text": "Your agent identity (it survives a refresh):",
+      "doc": "The /me reply, first line. The field names under it (pubKey, stableId) stay as they are — they are terms of art, not words to translate."
+    },
+    "peer_heading": {
+      "text": "Reachable from other devices (NKN):",
+      "doc": "The /me reply: the section that gives your peer address."
+    },
+    "peer_share": {
+      "text": "→ give this to someone; they can reach you with it.",
+      "doc": "The /me reply: what to do with the peer address."
+    },
+    "connecting": {
+      "text": "Connecting… the first connection takes 5 to 90 seconds.",
+      "doc": "The /me reply when the peer transport is still coming up."
+    },
+    "failed": {
+      "text": "Could not connect — {{reason}}",
+      "doc": "The /me reply when the peer transport failed."
+    },
+    "offline": {
+      "text": "Not connected. Run peer-connect to reach other devices.",
+      "doc": "The /me reply when no peer transport is up."
     }
   },
   "media": {
@@ -245,6 +269,10 @@
     "empty": {
       "text": "Block set is empty.",
       "doc": "/blocked on empty set."
+    },
+    "list_heading": {
+      "text": "Muted, {{count}} in total:",
+      "doc": "The /muted reply, the line above the list."
     }
   },
   "peer": {

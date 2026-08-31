@@ -137,7 +137,7 @@ export default function JoinGroupWizardModal({
                       const v = state.rulesDoc[key];
                       if (!v || !String(v).trim()) return null;
                       const label = (typeof t === 'function')
-                        ? t(`circle.rules.q.${key}.text`) : key;
+                        ? t(`circle.rules.q.${key}`) : key;
                       return (
                         <View key={key} style={{ marginBottom: 8 }}>
                           <Text style={{ fontWeight: '600', marginBottom: 2 }}>{label}</Text>

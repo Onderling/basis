@@ -387,7 +387,41 @@
       "doc": "Pod-less sync hint — count + relative-ago of oldest peer"
     }
   },
+  "embed-file": {
+    "pick_cancelled": {
+      "text": "File picker cancelled.",
+      "doc": "Said when the person closes the file picker without choosing (shared embed-file builtin)."
+    }
+  },
+  "lookup": {
+    "failed": {
+      "text": "Lookup failed: {{error}}",
+      "doc": "Peer lookup failed; {{error}} is the underlying reason."
+    },
+    "unavailable": {
+      "text": "Peer lookup unavailable (sign in to your pod first).",
+      "doc": "Peer lookup needs a signed-in pod session."
+    }
+  },
+  "publishPeerAddrCmd": {
+    "unavailable": {
+      "text": "Pod publish unavailable (sign in first).",
+      "doc": "Publishing this device’s peer address needs a signed-in pod session."
+    }
+  },
   "common": {
+    "error": {
+      "text": "Error",
+      "doc": "Heading on the error bubble a failed op renders (shared renderer)."
+    },
+    "failed": {
+      "text": "Failed",
+      "doc": "Fallback when an op reports ok:false and names no error (shared renderer)."
+    },
+    "ok": {
+      "text": "✓",
+      "doc": "Confirmation when an op reports ok:true and returns no message (shared renderer)."
+    },
     "cancel": {
       "text": "Cancel",
       "doc": "Generic cancel-button label (slash FAB modal)"

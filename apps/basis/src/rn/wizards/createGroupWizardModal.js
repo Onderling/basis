@@ -243,7 +243,7 @@ export default function CreateGroupWizardModal({
                   <Textarea
                     key={q.key}
                     label={(typeof t === 'function'
-                      ? t(`circle.rules.q.${q.key}.text`)
+                      ? t(`circle.rules.q.${q.key}`)
                       : q.key) + (q.required ? ' *' : '')}
                     value={state.rulesDoc[q.key] ?? ''}
                     onChangeText={(v) => setState((s) => ({
@@ -384,7 +384,7 @@ export default function CreateGroupWizardModal({
                       const v = rules[q.key];
                       if (!v) return [];
                       const label = (typeof t === 'function')
-                        ? t(`circle.rules.q.${q.key}.text`) : q.key;
+                        ? t(`circle.rules.q.${q.key}`) : q.key;
                       return [{ label, value: v, pre: true }];
                     }),
                     { label: 'Conflict',    value: labelOf(CONFLICT_POLICIES, state.conflictPolicy) },

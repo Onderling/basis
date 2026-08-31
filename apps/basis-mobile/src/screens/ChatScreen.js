@@ -967,7 +967,7 @@ export default function ChatScreen({
         const nudged = await mount.nudge(activeThreadId, {
           alreadyNudged: (r) => seen.has(r),
           notify: ({ round, message }) => presentLocalNotification({
-            title: t('feedback.nudge_title'), body: message || t('feedback.nudge_body'), data: { round },
+            title: t('circle.feedback.nudge_title'), body: message || t('circle.feedback.nudge_body'), data: { round },
           }),
         });
         if (nudged?.length) { nudged.forEach((r) => seen.add(r)); await AsyncStorage.setItem('fp.nudged', JSON.stringify([...seen])); }

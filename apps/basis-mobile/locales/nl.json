@@ -387,7 +387,41 @@
       "doc": "Pod-loze sync-hint"
     }
   },
+  "embed-file": {
+    "pick_cancelled": {
+      "text": "Bestandskiezer geannuleerd.",
+      "doc": "Said when the person closes the file picker without choosing (shared embed-file builtin)."
+    }
+  },
+  "lookup": {
+    "failed": {
+      "text": "Opzoeken mislukt: {{error}}",
+      "doc": "Peer lookup failed; {{error}} is the underlying reason."
+    },
+    "unavailable": {
+      "text": "Peer-opzoeken niet beschikbaar (eerst inloggen op je pod).",
+      "doc": "Peer lookup needs a signed-in pod session."
+    }
+  },
+  "publishPeerAddrCmd": {
+    "unavailable": {
+      "text": "Pod-publiceren niet beschikbaar (eerst inloggen).",
+      "doc": "Publishing this device’s peer address needs a signed-in pod session."
+    }
+  },
   "common": {
+    "error": {
+      "text": "Fout",
+      "doc": "Heading on the error bubble a failed op renders (shared renderer)."
+    },
+    "failed": {
+      "text": "Mislukt",
+      "doc": "Fallback when an op reports ok:false and names no error (shared renderer)."
+    },
+    "ok": {
+      "text": "✓",
+      "doc": "Confirmation when an op reports ok:true and returns no message (shared renderer)."
+    },
     "cancel": {
       "text": "Annuleren",
       "doc": "Generieke annuleren-knop (slash-FAB modal)"

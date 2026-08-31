@@ -19,6 +19,8 @@ import consequenceEn from './consequence.en.json';
 import consequenceNl from './consequence.nl.json';
 import roleEn from './role.en.json';
 import roleNl from './role.nl.json';
+import hostEn from './host.en.json';
+import hostNl from './host.nl.json';
 
 /** The canonical `circle` block per language (union of the former web + mobile copies; 0 value conflicts). */
 export const sharedCircleLocale = { en: circleEn, nl: circleNl };
@@ -28,6 +30,19 @@ export const sharedConsequenceLocale = { en: consequenceEn, nl: consequenceNl };
 
 /** The canonical `role` block per language (identical across both shells; 0 value conflicts). */
 export const sharedRoleLocale = { en: roleEn, nl: roleNl };
+
+/**
+ * What the APP ITSELF says — the slash-command replies, sync/transport status, security notices,
+ * the embed and picker chrome. 30 blocks, spread at the TOP level (so `sync.synced_to` keeps its
+ * name; only the file that holds it changed).
+ *
+ * These lived in the web shell's bundle while being written by code both shells run, which is why a
+ * phone answered `/mute` with the string "mute.added" — 102 keys the mobile bundle simply did not
+ * have, and nothing failed, because a missing translation is a string. `threadsCmd.*` is the one
+ * rename: the `/threads` replies could not keep the name `threads`, which the mobile thread drawer
+ * owns (the `publishPeerAddrCmd` block beside it is the precedent for the suffix).
+ */
+export const sharedHostLocale = { en: hostEn, nl: hostNl };
 
 /**
  * EVERY shared block, per language — the ONE thing a shell merges.
@@ -43,6 +58,6 @@ export const sharedRoleLocale = { en: roleEn, nl: roleNl };
  * way to reach one block when that is what you mean.
  */
 export const sharedLocale = {
-  en: { circle: circleEn, consequence: consequenceEn, role: roleEn },
-  nl: { circle: circleNl, consequence: consequenceNl, role: roleNl },
+  en: { circle: circleEn, consequence: consequenceEn, role: roleEn, ...hostEn },
+  nl: { circle: circleNl, consequence: consequenceNl, role: roleNl, ...hostNl },
 };

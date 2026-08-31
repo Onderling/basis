@@ -17,6 +17,7 @@ import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
 } from '../../src/v2/nearbyScreen.js';
 import { CIRCLE_KINDS }           from '../../src/v2/circleTemplates.js';
+import { sharedLocale }           from '../../src/locales/index.js';
 import { RULES_QUESTIONS }        from '../../src/v2/circleRules.js';
 import { ROLE_CONTROL_KEYS }      from '../../src/v2/circleRoleControl.js';
 
@@ -108,7 +109,10 @@ for (const lang of ['en', 'nl']) {
  * the file it appears in: `src/web/**` + `web/**` are web, `src/rn/**` and the mobile app are mobile,
  * and everything else is shared code that must resolve in BOTH.
  */
-const SHARED_BLOCKS = ['circle', 'consequence', 'role'];
+// The shared half comes from the SEAM, not from a list of block names re-typed here. When
+// `src/locales/host.*` landed, this guard's own copy of that list did not know about it and 470 keys
+// "stopped resolving" — the guard reporting the shape of its own staleness. A test that re-implements
+// the thing it is guarding will eventually guard the wrong thing.
 
 /** Where each shell's own bundle lives, relative to the repo root. */
 const SHELLS = {
@@ -117,23 +121,15 @@ const SHELLS = {
 };
 
 /**
- * Shared files whose strings were only ever added to ONE shell's bundle. Not an exemption from being
- * correct — a recorded gap, pinned so it cannot spread: the file is still fully checked against the
- * shell it does serve, so a NEW dead key in it still fails here.
+ * Shared files whose strings were only ever added to ONE shell's bundle.
  *
- * `localBuiltins.js` holds the slash-command builtins (/mute, /peer, /relay, /sendfile …). Their ~100
- * strings live in the web bundle only; the mobile bundle has no such blocks, so on a phone those
- * commands answer with their key names. Recorded as a finding on the work list rather than fixed here:
- * closing it is ~100 strings × 2 languages, and the honest fix is to stop keeping two app bundles at all.
+ * **Empty since 2026-08-31, and that is the point.** It held two entries: `localBuiltins.js` (the
+ * slash-command replies) and `handlers/mediaEmbed.js` — about a hundred strings that shared code
+ * wrote and only the web bundle had, so `/mute` on a phone answered with the string "mute.added".
+ * Both went away when the shared blocks moved into `src/locales/host.*`; nothing is exempt now, and a
+ * new entry here should be argued for rather than added.
  */
-const KNOWN_SHELL_GAPS = {
-  'apps/basis/src/core/localBuiltins.js': ['mob'],
-  // Same class, found the day the scanner was widened: this handler answers `/embed`-driven media
-  // errors, and its six `media.*` strings live in the web bundle only, so a phone reads
-  // "media.no_gateway" verbatim. It calls through a local alias (`tt(`), which is why no guard had
-  // ever seen it. Both entries go away together when the shared blocks move.
-  'apps/basis/src/core/handlers/mediaEmbed.js': ['mob'],
-};
+const KNOWN_SHELL_GAPS = {};
 
 const ROOT = new URL('../../../../', import.meta.url);   // apps/basis/test/fitness → repo root
 const SCAN = ['apps/basis/src', 'apps/basis/web', 'apps/basis-mobile/src'];
@@ -205,9 +201,7 @@ for (const [shell, dir] of Object.entries(SHELLS)) {
     let own;
     try { own = JSON.parse(readFileSync(new URL(`${dir}/${lang}.json`, ROOT), 'utf8')); }
     catch { continue; }   // a shell that is not checked out is skipped, never a false red
-    const shared = Object.fromEntries(SHARED_BLOCKS.map((b) => [b, JSON.parse(readFileSync(
-      new URL(`apps/basis/src/locales/${b}.${lang}.json`, ROOT), 'utf8'))]));
-    bundles[`${shell}.${lang}`] = { ...own, ...shared };
+    bundles[`${shell}.${lang}`] = { ...own, ...sharedLocale[lang] };
   }
 }
 

@@ -1348,13 +1348,13 @@ function createDmThread(args, { threadStore, setActive, t }) {
  */
 function listThreads({ threadStore, t }) {
   if (!threadStore) {
-    return { message: t('threads.no_store') };
+    return { message: t('threadsCmd.no_store') };
   }
   const all = threadStore.listThreads();
   if (all.length === 0) {
-    return { message: t('threads.empty') };
+    return { message: t('threadsCmd.empty') };
   }
-  const lines = [t('threads.heading')];
+  const lines = [t('threadsCmd.heading')];
   for (const th of all) {
     const filt    = describeFilter(th.filter);
     const filtStr = filt === '*' ? '' : ` (${filt})`;

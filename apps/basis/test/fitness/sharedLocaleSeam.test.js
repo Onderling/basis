@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  sharedLocale, sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale,
+  sharedLocale, sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale,
 } from '../../src/locales/index.js';
 
 const ROOT = new URL('../../../../', import.meta.url);
@@ -29,7 +29,19 @@ describe('the shared locale seam', () => {
         circle: sharedCircleLocale[lng],
         consequence: sharedConsequenceLocale[lng],
         role: sharedRoleLocale[lng],
+        // `host.*` spreads at the TOP level — its blocks keep their own names (`sync`, `me`, `mute`…),
+        // so only the file holding them changed, not a single call site.
+        ...sharedHostLocale[lng],
       });
+    }
+  });
+
+  it('the host blocks land at the top level, keeping their own names', () => {
+    // If these ever nested under a `host.` prefix, every call site would have to change — the whole
+    // point of the move was that none did.
+    for (const b of ['sync', 'mute', 'peer', 'relay', 'sendFile', 'threadsCmd']) {
+      expect(sharedLocale.en, `${b} should be a top-level block`).toHaveProperty(b);
+      expect(sharedLocale.nl).toHaveProperty(b);
     }
   });
 

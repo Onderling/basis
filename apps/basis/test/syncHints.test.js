@@ -1,4 +1,12 @@
 /**
+ * NOTE (2026-08-31, locale consolidation): five expectations here changed text, not behaviour. These
+ * strings were defined in BOTH shells' bundles with different wording — this projector is shared, so
+ * the same status line read differently on a phone than in a browser. Consolidating to one source
+ * forced a pick per string; the mobile phrasing won four ("{{ago}} ago" rather than "stale {{ago}}
+ * ago", which is not English), and the web phrasing won "synced to {{ok}}/{{total}} peers", because
+ * "synced to 3 of 5" does not say five of what. → plans/PLAN-locale-consolidation.md, ledger L68.
+ */
+/**
  * basis — sync-hint tests.  v0.6 sub-slices 6.1 + 6.2.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -57,13 +65,13 @@ describe('formatSyncHints — decentralized style', () => {
     expect(formatSyncHints({
       style: 'decentralized',
       peers: ['webid:a'], pending: [], unreachable: ['webid:b', 'webid:c'],
-    }, t, NOW)).toBe('synced to 1/3 peers · 2 unreachable: webid:b, webid:c');
+    }, t, NOW)).toBe('synced to 1/3 peers · 2 unreachable (webid:b, webid:c)');
   });
 
   it("returns 'saved locally; awaiting peer sync' when no peers at all (OQ-6.A catch-up)", () => {
     expect(formatSyncHints({
       style: 'decentralized', peers: [], pending: [], unreachable: [],
-    }, t, NOW)).toBe('Saved locally; awaiting peer sync');
+    }, t, NOW)).toBe('saved locally — awaiting peer sync');
   });
 });
 
@@ -75,12 +83,12 @@ describe('formatSyncHints — pod-less style', () => {
       'webid:c': NOW() - 3_600_000,      // 1h ago
     };
     expect(formatSyncHints({ style: 'pod-less', lastSeen }, t, NOW))
-      .toBe('polled 3 peers · oldest 2h ago');
+      .toBe('3 peers · last seen 2h ago');
   });
 
-  it("empty lastSeen → 'no peers polled'", () => {
+  it("empty lastSeen → 'no peers polled yet'", () => {
     expect(formatSyncHints({ style: 'pod-less', lastSeen: {} }, t, NOW))
-      .toBe('no peers polled');
+      .toBe('no peers polled yet');
   });
 });
 
@@ -96,7 +104,7 @@ describe('formatSyncHints — defensive cases', () => {
 
 describe('formatLastSync', () => {
   it('formats epoch ms as "stale Xh ago"', () => {
-    expect(formatLastSync(NOW() - 7_200_000, t, NOW)).toBe('stale 2h ago');
+    expect(formatLastSync(NOW() - 7_200_000, t, NOW)).toBe('2h ago');
   });
 
   it('returns "" for non-number input', () => {

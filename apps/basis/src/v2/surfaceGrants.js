@@ -164,7 +164,11 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
     const { bodies } = await rail.readVerifiedBodies(OWN_DEVICES_SCOPE);
     const byView = new Map();   // viewPubKey → { grants: [], revokes: [] }
     const byHash = new Map(bodies.map((b) => [b.hash, b]));
+    // Plain token cancellations (task grants etc.) — no view semantics, no causal contest:
+    // a named id is dead, full stop. Collected here, folded into the door's set below.
+    const tokenRevokes = [];
     for (const b of bodies) {
+      if (b.kind === 'token-revoke') { tokenRevokes.push(b); continue; }
       if (typeof b.subject !== 'string' || !b.subject) continue;
       const slot = byView.get(b.subject) ?? { grants: [], revokes: [] };
       if (b.kind === 'grant') slot.grants.push(b);
@@ -203,6 +207,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
         else if (typeof t === 'string' && t) revokedIds.add(t);
       }
     };
+    for (const b of tokenRevokes) addTokenIds(b.payload?.tokenIds);
     for (const [viewPubKey, { grants, revokes }] of byView) {
       for (const r of revokes) addTokenIds(r.payload?.tokenIds);
       // Alive = the grant causally saw EVERY revoke of this view (deny wins on any ordering).
@@ -323,6 +328,28 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
         kind: 'grant-revoke',
         subject: viewPubKey,
         payload: statementPayload({ viewPubKey, tokenIds: (entry.tokens ?? []).map((t) => t.id) }),
+      });
+      if (!res) return false;
+      await recompute();
+      if (typeof fan === 'function') { try { fan(res.statement); } catch { /* fan is best-effort */ } }
+      return true;
+    },
+
+    /**
+     * Cancel named tokens by id, whatever minted them — the cross-device half of an issuer-side
+     * revoke (a task grant ending, say): the statement lands on the lane, fans to the owner's
+     * other devices, and every door consulting this fold refuses the ids from then on. No view
+     * semantics and no causal contest — a named id is simply dead.
+     * @returns {Promise<boolean>} whether a statement was appended
+     */
+    async revokeTokens(tokenIds, { reason = null } = {}) {
+      await settled();
+      const ids = (Array.isArray(tokenIds) ? tokenIds : [tokenIds]).filter((t) => typeof t === 'string' && t);
+      if (!ids.length) return false;
+      const res = await rail.append(OWN_DEVICES_SCOPE, {
+        kind: 'token-revoke',
+        subject: boundAgentId,
+        payload: statementPayload({ tokenIds: ids, ...(reason ? { reason } : {}) }),
       });
       if (!res) return false;
       await recompute();

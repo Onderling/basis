@@ -125,6 +125,31 @@ describe('J8 — task-scoped grant', () => {
     expect(denied?.message).toMatch(/revoked/i);
   });
 
+  it('the host\'s onTaskGrantsRevoked port hears every task-ending revoke (the cross-device seam)', async () => {
+    // basis hands this port down so the revoked ids become grants-lane statements; here we only
+    // prove the tasks-v0 composition actually threads it to the manager and that a task ending
+    // fires it with the real token.
+    const seen = [];
+    const wired = await createTasksAgent({
+      roles: ROLES, members: MEMBERS,
+      onTaskGrantsRevoked: (r) => { seen.push(r); },
+    });
+    const callWired = (skillId, args, from) => wired.agent.skills.get(skillId).handler({
+      parts: args === undefined ? [] : [DataPart(args)], from, agent: wired.agent, envelope: null,
+    });
+
+    const { task } = await callWired('addTask', { text: 'port-wired task' }, ANNE);
+    await callWired('attachTaskGrant', { taskId: task.id, member: BOT_PUBKEY, grant: { skill: 'listOpen' } }, ANNE);
+    const [token] = wired.taskGrantManager.tokensForTask(task.id);
+
+    await callWired('claimTask', { id: task.id }, ANNE);
+    await callWired('completeTask', { id: task.id }, ANNE);
+    // completeTask fires the revoke best-effort (not awaited) — settle the microtask chain.
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(seen).toEqual([{ taskId: task.id, tokens: [{ id: token.id, subject: BOT_PUBKEY }] }]);
+  });
+
   it('removing/cancelling a task also revokes its grants', async () => {
     const { task } = await callSkill('addTask', { text: 'cancellable' }, ANNE);
     await callSkill('attachTaskGrant', {

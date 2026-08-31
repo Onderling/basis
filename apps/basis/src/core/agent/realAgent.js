@@ -2075,6 +2075,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     // live in the ONE per-circle store and sync over the ONE household mirror
     // (ensureCircleSync); tasks-v0 skips its own substrate mirror.
     circleStoreFor: (id) => householdService.stores.getStore(id),
+    // Cross-device task-grant revocation, composed HERE because this is where both halves meet:
+    // every revoke's token ids become a signed statement on the GRANTS LANE (fanned between the
+    // owner's devices, surviving restart + restore), and the tasks engine ALSO consults the
+    // lane's fold — so completing a task on this device kills its grants at the other devices'
+    // doors too, not only at this one.
+    onTaskGrantsRevoked: async ({ taskId, tokens }) => {
+      const ok = await surfaceGrants.revokeTokens((tokens ?? []).map((t) => t?.id), { reason: 'task-grant' })
+        .catch(() => false);
+      if (!ok) console.warn(`[realAgent] task ${taskId}: grant revoke did not reach the grants lane — it binds on this device; siblings learn it at catch-up/TTL`);
+    },
+    isRevokedAlso: async (tokenId) => Boolean(await surfaceGrants.isRevoked(tokenId)),
   });
   await chatAgent.hello(tasksCircle.address);
 

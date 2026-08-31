@@ -275,6 +275,37 @@ describe('TaskGrantManager — a revocation must outlive the process', () => {
     warn.mockRestore();
   });
 
+  it('the onRevoked appender port is handed every revoked token, id and subject', async () => {
+    // The cross-device half rides this port: the host appends these ids to its grants lane.
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const seen = [];
+    const mgr = new TaskGrantManager({ identity, store: memStore(), onRevoked: (r) => { seen.push(r); } });
+
+    const token = await mgr.attachGrant({ taskId: 't-port', memberPubKey: 'member-pub', grant: { skill: 'echo' } });
+    await mgr.revokeTaskGrants('t-port');
+
+    expect(seen).toEqual([{ taskId: 't-port', tokens: [{ id: token.id, subject: 'member-pub' }] }]);
+    // A task with nothing to revoke does not fire the port — no empty statements on any lane.
+    await mgr.revokeTaskGrants('t-empty');
+    expect(seen.length).toBe(1);
+  });
+
+  it('a throwing appender does not fail the revoke — it binds locally and complains out loud', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const mgr = new TaskGrantManager({
+      identity, store: memStore(),
+      onRevoked: () => { throw new Error('lane unreachable'); },
+    });
+    const token = await mgr.attachGrant({ taskId: 't-throw', memberPubKey: 'm', grant: { skill: 'echo' } });
+
+    const { revokedTokenIds } = await mgr.revokeTaskGrants('t-throw');
+    expect(revokedTokenIds).toEqual([token.id]);
+    expect(await mgr.isRevoked(token.id)).toBe(true);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/onRevoked appender failed/));
+    warn.mockRestore();
+  });
+
   it('a check racing the load answers from the persisted set, not an empty one', async () => {
     // The boot window: the engine can be asked about a token BEFORE the store's read resolves.
     // `isRevoked` awaits hydration internally (the closure `RoleGrantManager` already had), so the

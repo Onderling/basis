@@ -165,6 +165,12 @@ export async function createBrowserMultiCircleTasksAgent({
   // every circle (primary + lazily-spawned). Absent ⇒ each circle self-wires
   // its own store, exactly as before.
   circleStoreFor,
+  // Cross-device revocation, both halves, host-supplied (basis): the APPENDER (every task-grant
+  // revoke's token ids go onto the host's grants lane, which fans between the owner's devices) and
+  // the EXTRA SOURCE (this engine also asks the lane's fold, so a sibling device's revoke binds at
+  // THIS door). Absent ⇒ circle-local truth only, exactly as before.
+  onTaskGrantsRevoked = null,
+  isRevokedAlso = null,
 }) {
   if (!bus) throw new TypeError('createBrowserMultiCircleTasksAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserMultiCircleTasksAgent: identityVault required');
@@ -195,6 +201,7 @@ export async function createBrowserMultiCircleTasksAgent({
     // ONE resolver at construction, so a circle spawned later must be REACHABLE from it rather than
     // pushing itself in — the map is that reach.
     circleStates: () => circlesMap.values(),
+    isRevokedAlso,
   });
 
   const primaryBundle = await createCircleAgent({
@@ -207,6 +214,7 @@ export async function createBrowserMultiCircleTasksAgent({
     registerSkills:       false,   // wireSkills owns registration below
     wireOnboardingSkills: false,
     circleStoreFor,
+    onTaskGrantsRevoked,
   });
   const primaryCircleState = primaryBundle._circleState;
   const circlesMap = new Map([[primaryCircleState.circleId, primaryCircleState]]);
@@ -234,6 +242,7 @@ export async function createBrowserMultiCircleTasksAgent({
       registerSkills:       false,
       wireOnboardingSkills: false,
       circleStoreFor,
+      onTaskGrantsRevoked,
     });
     const cs = spawned._circleState;
     circlesMap.set(circleId, cs);

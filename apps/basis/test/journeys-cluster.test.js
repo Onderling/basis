@@ -478,12 +478,12 @@ describe('J8 — task-scoped grant (GREEN: off-by-default, attenuated, revoked-o
     // The manager is the SOURCE a PolicyEngine is constructed over — the engine reads `isRevoked`,
     // the manager never pushes itself in (a settable hook is last-writer-wins).
     const revokedCheck = (id) => mgr.isRevoked(id);
-    expect(revokedCheck(token.id)).toBe(false); // live before complete → checkInbound would allow
+    expect(await revokedCheck(token.id)).toBe(false); // live before complete → checkInbound would allow
 
     // complete/cancel the task → every grant it carried is revoked.
     await mgr.revokeTaskGrants('task-1');
-    expect(mgr.isRevoked(token.id)).toBe(true);
-    expect(revokedCheck(token.id)).toBe(true); // the source now rejects it → checkInbound would deny
+    expect(await mgr.isRevoked(token.id)).toBe(true);
+    expect(await revokedCheck(token.id)).toBe(true); // the source now rejects it → checkInbound would deny
     expect(mgr.tokensForTask('task-1')).toEqual([]); // tracking dropped
   });
 });

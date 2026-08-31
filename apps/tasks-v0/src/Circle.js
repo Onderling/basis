@@ -293,6 +293,8 @@ export async function createCircleAgent({
   // one mirror; tasks-v0's own substrate mirror is skipped (the host owns the
   // single fan-out path). Absent / returns null ⇒ standalone self-wired store.
   circleStoreFor,
+  // Cross-device revocation appender — threaded to the TaskGrantManager (see Agent.js).
+  onTaskGrantsRevoked,
 } = {}) {
   const circle = _normaliseConfig(circleConfig ?? { ...IMPLICIT_HOUSEHOLD_CONFIG });
 
@@ -372,6 +374,7 @@ export async function createCircleAgent({
     registerSkills,
     // One-store-per-circle — pass the host's store through when supplied.
     circleStore:  injectedCircleStore,
+    onTaskGrantsRevoked,
     // Multi-circle runtime — when a shared agent is supplied (the CLI's
     // multi-circle path), each circle bundle MUST use its own item-store
     // root so writes don't leak across circles on the same localStore.

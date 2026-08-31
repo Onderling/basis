@@ -65,6 +65,10 @@ export async function buildMeshAgent({
   // carries no vault of its own, so without this the managers got `null` and warned "revocations are
   // MEMORY-ONLY" on every boot — on the phone too (W19). The caller hands the host's identity vault.
   vault: providedVault = null,
+  // An EXTRA revocation source unioned into the engine (deny-wins) — basis hands the grants
+  // lane's fold here, so a revoke made on a sibling device binds at THIS engine's door too.
+  // Absent ⇒ circle-local truth only, exactly as before.
+  isRevokedAlso = null,
 } = {}) {
   // Multi-circle runtime (2026-05-14, Tasks V2 sixth slice) — when a
   // pre-built `core.Agent` is supplied, reuse it instead of creating
@@ -143,6 +147,9 @@ export async function buildMeshAgent({
           return false;
         }
         : null,
+      // The host's cross-device source (the grants lane's fold). Fail-closed rides along: the
+      // fold answers "revoked" until its first fold lands, and anyRevoked stops at truthy.
+      typeof isRevokedAlso === 'function' ? isRevokedAlso : null,
     ]),
   });
   Object.defineProperty(agent, 'policyEngine', { value: policyEngine, configurable: true });

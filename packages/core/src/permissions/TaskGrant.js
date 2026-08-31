@@ -124,6 +124,8 @@ export class TaskGrantManager {
   #grants = new Map();
   /** Optional `{get,set}` persistence port — the same one `RoleGrantManager` takes. */
   #store = null;
+  /** Optional appender port: called after every revoke with the revoked tokens (see constructor). */
+  #onRevoked = null;
   /** Resolves once the persisted state has loaded; already-resolved when there is no store. */
   #ready = Promise.resolve();
 
@@ -142,8 +144,14 @@ export class TaskGrantManager {
    *   same port since it was written; this class did not, and its header called its bare Set "the
    *   single revocation enforcement point". Omitting the store WARNS rather than degrading quietly.
    *   A PORT, not an adapter — the kernel never imports a concrete vault (invariant 5).
+   * @param {(revoked: {taskId: string, tokens: Array<{id: string, subject: string}>}) => *} [opts.onRevoked]
+   *   — APPENDER port for cross-device binding: called (and awaited, best-effort) after every
+   *   `revokeTaskGrants` with the revoked tokens. The HOST composes it — basis appends the ids to
+   *   its grants lane, which fans between the owner's devices, so the revoke binds at the other
+   *   devices' doors too. This class stays a device-local revocation SOURCE either way; the port
+   *   is how a revoke becomes a signed statement rather than this kernel importing any lane.
    */
-  constructor({ identity, agentId, parentToken, store = null } = {}) {
+  constructor({ identity, agentId, parentToken, store = null, onRevoked = null } = {}) {
     if (!identity) throw new Error('TaskGrantManager requires identity');
     this.#identity = identity;
     this.#agentId  = agentId ?? identity.pubKey;
@@ -159,6 +167,7 @@ export class TaskGrantManager {
     this.#parentToken = parentToken
       ? (parentToken instanceof CapabilityToken ? parentToken : CapabilityToken.fromJSON(parentToken))
       : null;
+    this.#onRevoked = typeof onRevoked === 'function' ? onRevoked : null;
   }
 
   /**
@@ -273,6 +282,18 @@ export class TaskGrantManager {
     // The in-memory effect is immediate — the await is the DURABILITY, which is the whole point of
     // this step: before it, a revoke survived exactly as long as the process did.
     await this.#persist();
+    // The appender port (cross-device half): best-effort AND loud — the local revoke already
+    // binds here; a failed append means the other devices' doors stay open until catch-up or TTL,
+    // which is worth a line in the log rather than silence.
+    if (this.#onRevoked && revokedTokenIds.length) {
+      try {
+        await this.#onRevoked({ taskId, tokens: tokens.map((t) => ({ id: t.id, subject: t.subject })) });
+      } catch (err) {
+        if (typeof console !== 'undefined') {
+          console.warn(`[TaskGrantManager] onRevoked appender failed for task ${taskId} — the revoke holds on THIS device; other devices learn it only at catch-up/TTL: ${err?.message ?? err}`);
+        }
+      }
+    }
     return { revokedTokenIds };
   }
 

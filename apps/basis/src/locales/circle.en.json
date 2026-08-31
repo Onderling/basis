@@ -17,7 +17,7 @@
       "doc": "Feedback activation — shown when /feedback <code> runs without a pod session."
     },
     "activation_failed": {
-      "text": "Activation failed: {error}",
+      "text": "Activation failed: {{error}}",
       "doc": "Feedback activation — shown when buildFeedbackVerifyPods throws."
     },
     "edit_hint": {
@@ -649,8 +649,8 @@
   },
   "calendar": {
     "invited": {
-      "text": "📅 You're invited: {title} — it's on your calendar.",
-      "doc": "Inbound calendar-invite circle heads-up; {title} is the event title."
+      "text": "📅 You're invited: {{title}} — it's on your calendar.",
+      "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
     }
   },
   "embed": {
@@ -935,7 +935,7 @@
       "doc": "Advanced tab: the op ran (its reply is in chat where applicable)."
     },
     "via_chat": {
-      "text": "In chat: {slash}",
+      "text": "In chat: {{slash}}",
       "doc": "Advanced tab: an op that needs input routes via its chat/slash form — the executor every op has by construction."
     },
     "via_chat_generic": {
@@ -1027,11 +1027,11 @@
       "doc": "Agent-detail activity card empty state."
     },
     "row": {
-      "text": "{op} — {outcome}",
+      "text": "{{op}} — {{outcome}}",
       "doc": "One trail row: the op exercised and how it ended. Never shows content — the trail records THAT, version history records what."
     },
     "via": {
-      "text": "via {via}",
+      "text": "via {{via}}",
       "doc": "The authority tag on a trail row (grant:<id> | mandate:<task> | owner)."
     }
   },
@@ -4722,8 +4722,8 @@
       "doc": "Empty state on the shared-with-me list."
     },
     "row": {
-      "text": "{type} from {from}",
-      "doc": "A shared-with-me row; {type} is the item type, {from} the sender."
+      "text": "{{type}} from {{from}}",
+      "doc": "A shared-with-me row; {{type}} is the item type, {{from}} the sender."
     }
   },
   "confirm": {
@@ -5002,7 +5002,7 @@
       "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)."
     },
     "tally": {
-      "text": "{yes} of {need} needed · {of} members",
+      "text": "{{yes}} of {{need}} needed · {{of}} members",
       "doc": "Governance — the running vote tally."
     },
     "deadline": {
@@ -5014,7 +5014,7 @@
       "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."
     },
     "disputed_line": {
-      "text": "conflicting history from {who} — evidence attached",
+      "text": "conflicting history from {{who}} — evidence attached",
       "doc": "Governance L3 — equivocation (fork-proof) alert."
     },
     "review_remove": {
@@ -5034,7 +5034,7 @@
       "doc": "Governance §8 — prompt for the report reason."
     },
     "notify_vote_opened": {
-      "text": "A decision opened: {action} — your vote may be needed",
+      "text": "A decision opened: {{action}} — your vote may be needed",
       "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)."
     },
     "reports_title": {
@@ -5722,7 +5722,7 @@
     }
   },
   "boot_failed": {
-    "text": "The app could not start ({reason}). Your data is still on this device — nothing here is empty, it is unread.",
+    "text": "The app could not start ({{reason}}). Your data is still on this device — nothing here is empty, it is unread.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
   },
   "notices": {

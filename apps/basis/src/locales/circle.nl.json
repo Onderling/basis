@@ -17,7 +17,7 @@
       "doc": "Feedback activation — shown when /feedback <code> runs without a pod session."
     },
     "activation_failed": {
-      "text": "Activatie mislukt: {error}",
+      "text": "Activatie mislukt: {{error}}",
       "doc": "Feedback activation — shown when buildFeedbackVerifyPods throws."
     },
     "edit_hint": {
@@ -649,8 +649,8 @@
   },
   "calendar": {
     "invited": {
-      "text": "📅 Je bent uitgenodigd: {title} — het staat in je agenda.",
-      "doc": "Inbound calendar-invite circle heads-up; {title} is the event title."
+      "text": "📅 Je bent uitgenodigd: {{title}} — het staat in je agenda.",
+      "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
     }
   },
   "embed": {
@@ -935,7 +935,7 @@
       "doc": "Geavanceerd: de opdracht is uitgevoerd."
     },
     "via_chat": {
-      "text": "In de chat: {slash}",
+      "text": "In de chat: {{slash}}",
       "doc": "Geavanceerd: een opdracht met invoer loopt via zijn chatvorm."
     },
     "via_chat_generic": {
@@ -1027,11 +1027,11 @@
       "doc": "Lege staat van de activiteitenkaart."
     },
     "row": {
-      "text": "{op} — {outcome}",
+      "text": "{{op}} — {{outcome}}",
       "doc": "Eén spoorregel: de uitgevoerde op en de afloop. Nooit inhoud — het spoor zegt DAT, versiegeschiedenis zegt wat."
     },
     "via": {
-      "text": "via {via}",
+      "text": "via {{via}}",
       "doc": "Het bevoegdheidslabel op een spoorregel (grant:<id> | mandate:<taak> | owner)."
     }
   },
@@ -4722,8 +4722,8 @@
       "doc": "Lege staat van de met-mij-gedeeld-lijst."
     },
     "row": {
-      "text": "{type} van {from}",
-      "doc": "Een met-mij-gedeeld-rij; {type} is het itemtype, {from} de afzender."
+      "text": "{{type}} van {{from}}",
+      "doc": "Een met-mij-gedeeld-rij; {{type}} is het itemtype, {{from}} de afzender."
     }
   },
   "confirm": {
@@ -5002,7 +5002,7 @@
       "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)."
     },
     "tally": {
-      "text": "{yes} van {need} nodig · {of} leden",
+      "text": "{{yes}} van {{need}} nodig · {{of}} leden",
       "doc": "Governance — the running vote tally."
     },
     "deadline": {
@@ -5014,7 +5014,7 @@
       "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."
     },
     "disputed_line": {
-      "text": "tegenstrijdige historie van {who} — bewijs bijgevoegd",
+      "text": "tegenstrijdige historie van {{who}} — bewijs bijgevoegd",
       "doc": "Governance L3 — equivocation (fork-proof) alert."
     },
     "review_remove": {
@@ -5034,7 +5034,7 @@
       "doc": "Governance §8 — prompt for the report reason."
     },
     "notify_vote_opened": {
-      "text": "Er is een besluit geopend: {action} — je stem is misschien nodig",
+      "text": "Er is een besluit geopend: {{action}} — je stem is misschien nodig",
       "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)."
     },
     "reports_title": {
@@ -5722,7 +5722,7 @@
     }
   },
   "boot_failed": {
-    "text": "De app kon niet starten ({reason}). Je gegevens staan nog op dit apparaat — er is niets weg, het is alleen niet ingelezen.",
+    "text": "De app kon niet starten ({{reason}}). Je gegevens staan nog op dit apparaat — er is niets weg, het is alleen niet ingelezen.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
   },
   "notices": {

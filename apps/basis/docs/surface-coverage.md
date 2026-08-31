@@ -5,10 +5,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 | app | op | verb | chat | slash | gate | attach | web/mobile | inline | gate verbs |
 |---|---|---|---|---|---|---|---|---|---|
 | **basis** | `help` | help | ✅ | ✅ | · | · | · | · |  |
-|  | `newthread` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `help-with` | add | ✅ | ✅ | · | · | ✅ | · |  |
-|  | `threads` | list | ✅ | ✅ | · | · | · | · |  |
-|  | `startDm` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `embed` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
 |  | `embed-file` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
 |  | `embed-time` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
@@ -18,7 +15,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `brief` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `compare` | list | ✅ | · | · | · | · | · |  |
 |  | `signin` | add | ✅ | ✅ | · | · | ✅ | · |  |
-|  | `reset-thread` | remove | ✅ | ✅ | · | · | · | · |  |
 |  | `whoami` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `me` | list | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `send-file` | add | ✅ | ✅ | · | · | ✅ | · |  |
@@ -39,7 +35,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `test-peer` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `signout` | remove | ✅ | ✅ | · | · | · | · |  |
 |  | `apps` | list | ✅ | ✅ | · | · | · | · |  |
-|  | `sendto` | add | ✅ | ✅ | · | · | ✅ | · |  |
 | **household** | `addItem` | add | ✅ | ✅ | ✅ | · | ✅ | · | add, toevoegen, noteer, voeg toe |
 |  | `listOpen` | list | ✅ | ✅ | ✅ | · | · | · | list, show, lijst, toon |
 |  | `markComplete` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | done, complete, bought, did, finished, klaar, gedaan, gekocht |
@@ -262,7 +257,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 257 ops | | 240 | 127 | 34 | 3 | 151 | 71 | |
+| **totals** | 252 ops | | 235 | 122 | 34 | 3 | 148 | 71 | |
 
 ### Flows
 
@@ -275,6 +270,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (223/257): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:reassign, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer …
-- **missing inline** (186/257): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:addItem, household:listOpen, household:help, household:addTask …
-- **missing chat** (17/257): household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch
+- **missing gate** (218/252): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, household:reassign, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants …
+- **missing inline** (181/252): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:enrollDevice …
+- **missing chat** (17/252): household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch

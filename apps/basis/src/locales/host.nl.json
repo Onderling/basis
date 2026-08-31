@@ -219,20 +219,6 @@
       "doc": "/blocked op lege lijst."
     }
   },
-  "newthread": {
-    "created": {
-      "text": "✓ Thread „{{name}}\" aangemaakt. Overgeschakeld.",
-      "doc": "Confirmation when /newthread succeeds."
-    },
-    "no_name": {
-      "text": "Geef een naam op: /newthread <naam>",
-      "doc": "When /newthread fires with no name arg."
-    },
-    "no_store": {
-      "text": "Thread-werkruimte niet beschikbaar in deze build.",
-      "doc": "Defensive."
-    }
-  },
   "peer": {
     "unavailable": {
       "text": "Peer-transport niet beschikbaar in deze build.",
@@ -301,20 +287,6 @@
     "connect_failed": {
       "text": "Relay-verbinding mislukt: {{reason}}",
       "doc": "/set-relay ving een fout op van sa.relay.connect()."
-    }
-  },
-  "reset": {
-    "no_store": {
-      "text": "Thread-store niet beschikbaar in deze build.",
-      "doc": "Defensive: threadStore dependency not wired."
-    },
-    "no_thread": {
-      "text": "Geen actieve thread om te wissen.",
-      "doc": "Defensive: no active thread selected."
-    },
-    "done": {
-      "text": "✓ Thread gewist (berichten + lijstcache leeg).",
-      "doc": "/reset-thread confirmation."
     }
   },
   "rotate": {
@@ -410,14 +382,6 @@
     }
   },
   "sendto": {
-    "no_peer": {
-      "text": "Geef een peer op: /send-to <peer> <itemId>",
-      "doc": "When /send-to fires with no peer."
-    },
-    "no_id": {
-      "text": "Geef een item-id op: /send-to <peer> <itemId>",
-      "doc": "When /send-to fires with no itemId."
-    },
     "unknown_peer": {
       "text": "Onbekende peer „{{peer}}\". Probeer: anne",
       "doc": "When the peer name isn't in simPeers."
@@ -555,20 +519,6 @@
     "signed_in": {
       "text": "Ingelogd als {{webid}}.",
       "doc": "/whoami signed in."
-    }
-  },
-  "threadsCmd": {
-    "empty": {
-      "text": "Nog geen threads.",
-      "doc": "Shown when no threads exist."
-    },
-    "heading": {
-      "text": "Threads:",
-      "doc": "First line of /threads output."
-    },
-    "no_store": {
-      "text": "Thread-werkruimte niet beschikbaar in deze build.",
-      "doc": "Defensive."
     }
   },
   "chat": {

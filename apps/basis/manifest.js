@@ -46,6 +46,20 @@ export const basisManifest = {
         },
       },
     },
+    {
+      id:    'help-with',
+      verb:  'add',
+      params: [
+        { name: 'postId', kind: 'string', required: true },
+      ],
+      surfaces: {
+        slash: { command: '/help-with' },
+        chat:  {
+          reply: 'text',
+          hint:  'open a private thread on a stoop post',
+        },
+      },
+    },
 
     /*
      * NOTE (feedback-split F2, 2026-07-08): the `/feedback` + `/feedback-stop` ops were RETIRED here.
@@ -62,20 +76,7 @@ export const basisManifest = {
      * sidebar's Configure (rename / filter / permissions) — v0.3+.
      * After creation, the new thread becomes active.
      */
-    {
-      id:    'newthread',
-      verb:  'add',
-      params: [
-        { name: 'name', kind: 'string', required: true },
-      ],
-      surfaces: {
-        slash: { command: '/newthread' },
-        chat:  {
-          reply: 'text',
-          hint:  'create a new chat thread',
-        },
-      },
-    },
+
 
     /**
      * `/help-with <post-id>` — v0.7.cc.  Spawn (or activate) a chat
@@ -84,36 +85,12 @@ export const basisManifest = {
      * thread on that post — DEMO.md §1.  Chat-shell builtin (no
      * stoop-side skill needed: filters on itemRef.id).
      */
-    {
-      id:    'help-with',
-      verb:  'add',
-      params: [
-        { name: 'postId', kind: 'string', required: true },
-      ],
-      surfaces: {
-        slash: { command: '/help-with' },
-        chat:  {
-          reply: 'text',
-          hint:  'open a private thread on a stoop post',
-        },
-      },
-    },
+
 
     /**
      * `/threads` — list every chat thread in the workspace.
      */
-    {
-      id:    'threads',
-      verb:  'list',
-      params: [],
-      surfaces: {
-        slash: { command: '/threads' },
-        chat:  {
-          reply: 'text',
-          hint:  'list every chat thread',
-        },
-      },
-    },
+
 
     /**
      * `/dm <webid>`. Slash-only entry in the
@@ -123,15 +100,7 @@ export const basisManifest = {
      * itemTypes).  Chat-shell-internal — main.js intercepts the
      * button + localBuiltins handles the slash.
      */
-    {
-      id:    'startDm',
-      verb:  'add',
-      params: [{ name: 'webid', kind: 'string', required: true }],
-      surfaces: {
-        slash: { command: '/dm' },
-        chat:  { reply: 'text', hint: 'open a DM with a peer by webid' },
-      },
-    },
+
 
     /**
      * `/embed <itemId> [--claim]` — v0.5 J7 demo.  Posts an embed-
@@ -369,15 +338,7 @@ export const basisManifest = {
      * permissive-filter era.  Future: replace with per-thread
      * settings panel.
      */
-    {
-      id:    'reset-thread',
-      verb:  'remove',
-      params: [],
-      surfaces: {
-        slash: { command: '/reset-thread' },
-        chat:  { reply: 'text', hint: "clear this thread's message history" },
-      },
-    },
+
 
     /**
      * `/whoami` — v0.7.. Returns the current Solid webid (if
@@ -830,18 +791,7 @@ export const basisManifest = {
      * browser tab without real network.  Real cross-peer delivery
      * happens through each hosting app's chat surface (v0.5.3 audit).
      */
-    {
-      id:    'sendto',
-      verb:  'add',
-      params: [
-        { name: 'peer',   kind: 'string', required: true },
-        { name: 'itemId', kind: 'string', required: true },
-      ],
-      surfaces: {
-        slash: { command: '/send-to' },
-        chat:  { reply: 'text', hint: 'simulate sending an embed to a peer thread' },
-      },
-    },
+
   ],
   views: [],   // chat shell does not surface its own views in nav;
                //   threads are managed via the chat UI, not a section

@@ -1,13 +1,12 @@
 /**
  * basis — local built-ins tests.  /help today.
  */
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 
 import { basisManifest }              from '../manifest.js';
 import { mergeManifests }                  from '../src/manifestMerge.js';
 import { createLocalBuiltins }             from '../src/core/localBuiltins.js';
 import { initLocalisation, t, setLang }    from '../src/localisation.js';
-import { ThreadStore }                     from '../src/threadStore.js';
 
 const householdLite = {
   app:       'household', itemTypes: ['chore'],
@@ -104,103 +103,23 @@ describe('basisManifest now carries /help', () => {
   });
 });
 
-describe('/newthread', () => {
-  let store, setActiveCalls;
-  beforeAll(async () => { await initLocalisation({ lng: 'en' }); });
-  beforeEach(() => {
-    store = new ThreadStore();
-    store.createThread({ id: 'main', name: 'Main' });
-    setActiveCalls = [];
+describe('the chat-era thread ops are RETRACTED from the manifest (2026-08-31)', () => {
+  // They declared a door — `/newthread`, `/threads`, `/dm`, `/reset-thread`, `/send-to` — onto a
+  // surface that no longer exists: the chat shell was folded into the circle view in July, and the
+  // circle model has no threads of its own (a conversation with one person is a contact thread).
+  // The manifest is the contract, so it should not offer what nothing can serve. The HANDLERS stay
+  // for now — `lint-typed-commands-reachable` tracks them — because deleting them is a separate,
+  // larger piece of work than withdrawing the claim.
+  it('the manifest no longer declares them', () => {
+    const ids = new Set((basisManifest.operations ?? []).map((o) => o.id));
+    for (const gone of ['newthread', 'threads', 'startDm', 'reset-thread', 'sendto']) {
+      expect(ids.has(gone), `${gone} is declared again — it has no surface to be reached on`).toBe(false);
+    }
   });
 
-  it("creates a new thread + switches active", async () => {
-    const catalogue  = mergeManifests([{ manifest: basisManifest }]);
-    const builtins = createLocalBuiltins({
-      catalogue, t, threadStore: store,
-      setActive: (id) => setActiveCalls.push(id),
-    });
-    const r = await builtins.newthread({ name: 'Project Alpha' });
-    expect(r.ok).toBe(true);
-    expect(r.message).toMatch(/Created thread "Project Alpha"/);
-    expect(r.threadId).toBeTruthy();
-    expect(store.size).toBe(2);
-    expect(store.getThread(r.threadId).name).toBe('Project Alpha');
-    expect(setActiveCalls).toEqual([r.threadId]);
-  });
-
-  it("rejects empty name", async () => {
-    const builtins = createLocalBuiltins({
-      catalogue: mergeManifests([{ manifest: basisManifest }]),
-      t, threadStore: store, setActive: () => {},
-    });
-    const r1 = await builtins.newthread({});
-    const r2 = await builtins.newthread({ name: '   ' });
-    expect(r1.ok).toBe(false);
-    expect(r1.error).toMatch(/Please provide a name/);
-    expect(r2.ok).toBe(false);
-    expect(store.size).toBe(1);
-  });
-
-  it("fails gracefully when no threadStore wired", async () => {
-    const builtins = createLocalBuiltins({
-      catalogue: mergeManifests([{ manifest: basisManifest }]),
-      t,
-    });
-    const r = await builtins.newthread({ name: 'X' });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/not available/);
-  });
-});
-
-describe('/threads', () => {
-  let store;
-  beforeEach(() => {
-    store = new ThreadStore();
-    store.createThread({ id: 'main',  name: 'Main' });
-    store.createThread({ id: 'inbox', name: 'Inbox',
-                         filter: { eventTypes: ['notification'] } });
-  });
-
-  it('lists every thread with active marker', async () => {
-    const builtins = createLocalBuiltins({
-      catalogue:     mergeManifests([{ manifest: basisManifest }]),
-      t,
-      threadStore: store,
-    });
-    const r = await builtins.threads();
-    expect(r.message).toMatch(/Threads:/);
-    expect(r.message).toMatch(/Main ●/);   // active (created first)
-    expect(r.message).toMatch(/Inbox/);
-    expect(r.message).toMatch(/type:notification/);
-  });
-
-  it('shows "no threads" when store empty', async () => {
-    const empty = new ThreadStore();
-    const builtins = createLocalBuiltins({
-      catalogue: mergeManifests([{ manifest: basisManifest }]),
-      t, threadStore: empty,
-    });
-    const r = await builtins.threads();
-    expect(r.message).toMatch(/No threads yet/);
-  });
-});
-
-describe('basisManifest now also carries /newthread + /threads', () => {
-  it('declares both ops', () => {
-    const ids = basisManifest.operations.map((o) => o.id);
-    expect(ids).toContain('newthread');
-    expect(ids).toContain('threads');
-  });
-
-  it('newthread has a required name param', () => {
-    const op = basisManifest.operations.find((o) => o.id === 'newthread');
-    expect(op.params).toEqual([{ name: 'name', kind: 'string', required: true }]);
-    expect(op.surfaces.slash.command).toBe('/newthread');
-  });
-
-  it('threads has no params + /threads slash', () => {
-    const op = basisManifest.operations.find((o) => o.id === 'threads');
-    expect(op.params).toEqual([]);
-    expect(op.surfaces.slash.command).toBe('/threads');
+  it('…but `help-with` stays: two journeys still exercise its story', () => {
+    // "Ask privately about a post" is a live user story (CC-ST.2, JM-1). It needs a circle-era home
+    // rather than a retraction — recorded on the work list.
+    expect(new Set((basisManifest.operations ?? []).map((o) => o.id)).has('help-with')).toBe(true);
   });
 });

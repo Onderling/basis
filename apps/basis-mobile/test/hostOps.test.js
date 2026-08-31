@@ -68,8 +68,7 @@ describe('Bundle F P1 — buildMobileLocalBuiltins', () => {
 
   it('exposes core host-op handlers (≥ 15 commands)', () => {
     const present = [
-      'help', 'me', 'whoami', 'reset-thread', 'security-status',
-      'threads', 'newthread', 'rotate-identity',
+      'help', 'me', 'whoami', 'security-status', 'rotate-identity',
       'mute', 'unmute', 'muted', 'transports', 'transport-mode',
       'set-relay', 'audit-tail', 'debug-dump',
       'test-peer', 'peer-connect',
@@ -94,29 +93,12 @@ describe('Bundle F P1 — buildMobileLocalBuiltins', () => {
     expect(typeof r.message === 'string' || Array.isArray(r.items)).toBe(true);
   });
 
-  it('/threads lists threads via the mobile adapter', async () => {
-    const r = await h.handlers.threads({});
-    expect(r.message).toContain('Main');
-  });
-
-  it('/newthread creates a thread + auto-switches (verified via threadStateRef)', async () => {
-    const before = h.getState().threads.size;
-    const r = await h.handlers.newthread({ name: 'Circle' });
-    expect(r.ok).toBe(true);
-    const after = h.getState();
-    expect(after.threads.size).toBe(before + 1);
-    expect(after.activeThreadId).toBe(r.threadId);
-    expect(after.threads.get(r.threadId).name).toBe('Circle');
-  });
-
-  it('/reset-thread clears the active thread\'s messages', async () => {
-    // Pre-populate the Main thread with a message via adapter — we
-    // don\'t have appendMessage directly, but listing should still work.
-    const r = await h.handlers['reset-thread']({});
-    // Whether the message-clear path is wired through threadStore or
-    // not, the handler should at least return a recognisable shape
-    // (ok flag + a message OR an error reason).
-    expect(r).toBeTruthy();
+  it('the retracted chat-era thread ops are gone from the mobile table too', () => {
+    // Mobile builds its table from the SHARED createLocalBuiltins, so a
+    // retraction on the basis side must land here without a second edit.
+    for (const opId of ['threads', 'newthread', 'startDm', 'sendto', 'reset-thread']) {
+      expect(h.handlers[opId], `/${opId} should be retracted`).toBeUndefined();
+    }
   });
 
   it('/whoami falls back to "unavailable" when podAuth is not wired', async () => {

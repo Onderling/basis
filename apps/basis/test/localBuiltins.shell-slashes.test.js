@@ -2,10 +2,9 @@
  * basis — chat-shell slash handlers, dispatch-wiring tests.
  *
  * Sibling file to localBuiltins.test.js: keeps the slash-audit-2026-05-27
- * "uncovered residue" suite (/dm, /send-to, /apps on|off, /peer-connect,
- * /test-peer, /transports, /transport-mode, /set-relay, /debug-dump,
- * /reset-thread) in its own file so the host-op fixtures don't bloat
- * the primary template.
+ * "uncovered residue" suite (/apps on|off, /peer-connect, /test-peer,
+ * /transports, /transport-mode, /set-relay, /debug-dump) in its own file
+ * so the host-op fixtures don't bloat the primary template.
  *
  * Pattern matches localBuiltins.test.js — instantiate createLocalBuiltins
  * with focused dep stubs + invoke the handler directly.  The TEST's job
@@ -13,13 +12,12 @@
  * transport.  Where a dep is hard to stand up (secure-agent's relay /
  * vault), we mock with a vi.fn and assert the call shape.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 import { basisManifest }              from '../manifest.js';
 import { mergeManifests }                  from '../src/manifestMerge.js';
 import { createLocalBuiltins }             from '../src/core/localBuiltins.js';
 import { initLocalisation, t }             from '../src/localisation.js';
-import { ThreadStore }                     from '../src/threadStore.js';
 import { AppRegistry }                     from '../src/appRegistry.js';
 
 beforeAll(async () => {
@@ -44,120 +42,7 @@ function catalogueWithEmbedFactory({ opId = 'cardSnap', appOrigin = 'household',
   };
 }
 
-/* ─────────── 1. /dm — DM thread spawn ─────────── */
-
-describe('/dm', () => {
-  let store;
-  beforeEach(() => {
-    store = new ThreadStore();
-    store.createThread({ id: 'main', name: 'Main' });
-  });
-
-  it('creates a new DM thread with the given peer + activates it', async () => {
-    const setActiveCalls = [];
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t,
-      threadStore: store,
-      setActive: (id) => setActiveCalls.push(id),
-    });
-    const r = await builtins.startDm({ webid: 'webid:anne@pod.example' });
-    expect(r.ok).toBe(true);
-    expect(r.threadId).toBeTruthy();
-    expect(r.message).toMatch(/Started DM/);
-    const thread = store.getThread(r.threadId);
-    expect(thread).toBeTruthy();
-    expect(thread.filter.dm).toBe(true);
-    expect(thread.filter.actors).toContain('webid:anne@pod.example');
-    expect(setActiveCalls).toEqual([r.threadId]);
-  });
-
-  it('re-uses an existing DM thread with the same peer (idempotent)', async () => {
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t,
-      threadStore: store,
-      setActive: () => {},
-    });
-    const r1 = await builtins.startDm({ webid: 'webid:bob' });
-    const sizeAfter = store.size;
-    const r2 = await builtins.startDm({ webid: 'webid:bob' });
-    expect(r2.threadId).toBe(r1.threadId);
-    expect(store.size).toBe(sizeAfter);
-    expect(r2.message).toMatch(/Opened DM/);
-  });
-
-  it('rejects when no peer id is supplied', async () => {
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t, threadStore: store, setActive: () => {},
-    });
-    const r = await builtins.startDm({});
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/webid or peer address/);
-  });
-});
-
-/* ─────────── 2. /send-to — sim-peers cross-thread synthesis ─────────── */
-
-describe('/send-to', () => {
-  let store, simPeers;
-
-  beforeEach(() => {
-    store = new ThreadStore();
-    store.createThread({ id: 'main',  name: 'Main' });
-    store.createThread({ id: 'anne',  name: 'Anne' });
-    simPeers = { anne: { threadId: 'anne', webid: 'webid:anne' } };
-  });
-
-  it("synthesises an embed-card into the peer's thread + reports success", async () => {
-    const catalogue  = catalogueWithEmbedFactory();
-    const callSkill = vi.fn(async () => ({
-      id: 'c-1', title: 'Dishwasher', type: 'chore', state: 'open',
-    }));
-    const builtins = createLocalBuiltins({
-      catalogue, t,
-      threadStore: store,
-      callSkill,
-      localActor: 'webid:me',
-      simPeers,
-    });
-    const r = await builtins.sendto({ peer: 'anne', itemId: 'c-1' });
-    expect(r.ok).toBe(true);
-    expect(r.message).toMatch(/Dishwasher/);
-    expect(r.message).toMatch(/anne/);
-    expect(callSkill).toHaveBeenCalledWith('household', 'cardSnap', { choreId: 'c-1' });
-    // The peer's thread should now hold the embed-card shell message.
-    const anneThread = store.getThread('anne');
-    const last = anneThread.messages.at(-1);
-    expect(last.origin).toBe('shell');
-    expect(last.rendered.kind).toBe('embed-card');
-    expect(last.rendered.embed.snapshot.id).toBe('c-1');
-    expect(last.rendered.embed.issuedBy).toBe('webid:me');
-  });
-
-  it('rejects unknown peer', async () => {
-    const builtins = createLocalBuiltins({
-      catalogue: catalogueWithEmbedFactory(), t,
-      threadStore: store, callSkill: vi.fn(), simPeers,
-    });
-    const r = await builtins.sendto({ peer: 'mallory', itemId: 'c-1' });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Unknown peer/);
-  });
-
-  it('rejects missing args (no peer / no itemId)', async () => {
-    const builtins = createLocalBuiltins({
-      catalogue: catalogueWithEmbedFactory(), t,
-      threadStore: store, callSkill: vi.fn(), simPeers,
-    });
-    const r1 = await builtins.sendto({});
-    const r2 = await builtins.sendto({ peer: 'anne' });
-    expect(r1.ok).toBe(false);
-    expect(r1.error).toMatch(/peer/);
-    expect(r2.ok).toBe(false);
-    expect(r2.error).toMatch(/item id/);
-  });
-});
-
-/* ─────────── 3. /apps on/off — positional-arg toggle ─────────── */
+/* ─────────── 1. /apps on/off — positional-arg toggle ─────────── */
 
 describe('/apps on|off', () => {
   it('enables an app via positional args parsed from _match', async () => {
@@ -218,7 +103,7 @@ describe('/apps on|off', () => {
   });
 });
 
-/* ─────────── 4. /peer-connect — connectPeer wiring ─────────── */
+/* ─────────── 2. /peer-connect — connectPeer wiring ─────────── */
 
 describe('/peer-connect', () => {
   it('invokes connectPeer + reports the resulting address', async () => {
@@ -250,7 +135,7 @@ describe('/peer-connect', () => {
   });
 });
 
-/* ─────────── 5. /test-peer — ping over agent.sendPeerMessage ─────────── */
+/* ─────────── 3. /test-peer — ping over agent.sendPeerMessage ─────────── */
 
 describe('/test-peer', () => {
   it('sends a p2p-chat envelope to the supplied address', async () => {
@@ -315,7 +200,7 @@ describe('/test-peer', () => {
   });
 });
 
-/* ─────────── 6. /transports — pure status formatter ─────────── */
+/* ─────────── 4. /transports — pure status formatter ─────────── */
 
 describe('/transports', () => {
   it('returns a record reply with nkn + relay side-by-side fields', async () => {
@@ -354,7 +239,7 @@ describe('/transports', () => {
   });
 });
 
-/* ─────────── 7. /transport-mode — vault persistence + validation ─── */
+/* ─────────── 5. /transport-mode — vault persistence + validation ─── */
 
 describe('/transport-mode', () => {
   function makeAgent() {
@@ -400,7 +285,7 @@ describe('/transport-mode', () => {
   });
 });
 
-/* ─────────── 8. /set-relay — relay URL persist + clear path ─────────── */
+/* ─────────── 6. /set-relay — relay URL persist + clear path ─────────── */
 
 describe('/set-relay', () => {
   function makeAgent({ relayStatus = 'idle' } = {}) {
@@ -464,7 +349,7 @@ describe('/set-relay', () => {
   });
 });
 
-/* ─────────── 9. /debug-dump — sa.recentTraffic snapshot formatter ─── */
+/* ─────────── 7. /debug-dump — sa.recentTraffic snapshot formatter ─── */
 
 describe('/debug-dump', () => {
   function makeSa({ recent = [], status = {} } = {}) {
@@ -528,46 +413,3 @@ describe('/debug-dump', () => {
   });
 });
 
-/* ─────────── 10. /reset-thread — threadStore active-thread clear ─── */
-
-describe('/reset-thread', () => {
-  let store;
-  beforeEach(() => {
-    store = new ThreadStore();
-    store.createThread({ id: 'main', name: 'Main' });
-  });
-
-  it('clears the active thread messages + reports done', async () => {
-    const active = store.getActiveThread();
-    active.messages.push({ kind: 'user-message', text: 'hi' });
-    active.messages.push({ kind: 'shell-message', text: 'reply' });
-    expect(active.messages.length).toBe(2);
-
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t, threadStore: store,
-    });
-    const r = await builtins['reset-thread']();
-    expect(r.ok).toBe(true);
-    expect(r.message).toMatch(/Thread cleared/);
-    expect(active.messages.length).toBe(0);
-  });
-
-  it('reports no_thread when there is no active thread', async () => {
-    const empty = new ThreadStore();
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t, threadStore: empty,
-    });
-    const r = await builtins['reset-thread']();
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/No active thread/);
-  });
-
-  // 2026-05-27 slash audit close-out — distinguishes "no store" from
-  // "no active thread".  Two separate conditions, two locale keys.
-  it('reports no_store when threadStore is not wired', async () => {
-    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t });
-    const r = await builtins['reset-thread']();
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Thread store not available/);
-  });
-});

@@ -42,9 +42,9 @@ async function parseDateLazy(input) {
  * @param {import('../manifestMerge.js').MergedCatalogue} deps.catalogue
  * @param {(key: string, params?: object) => string}   deps.t
  * @param {import('../threadStore.js').ThreadStore}    [deps.threadStore]
- *   Required for /newthread and /threads.
+ *   Required for /help-with and the embed commands.
  * @param {(threadId: string) => void}                 [deps.setActive]
- *   Called by /newthread to switch active thread to the new one.
+ *   Called by /help-with to switch the active thread to the post it made.
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} [deps.callSkill]
  *   Required for /embed — fetches the snapshot via the catalogue's
  *   declaration.
@@ -73,20 +73,12 @@ export function createLocalBuiltins({
 }) {
   return {
     help: async () => formatHelp(catalogue, t),
-    newthread: async (args) => createNewThread(args, { threadStore, setActive, t }),
-    threads:   async ()     => listThreads({ threadStore, t }),
-    // dm <webid> opens a DM thread with the given peer.
-    // Same outcome as the [DM] row button (which intercepts in main.js).
-    startDm:   async (args) => createDmThread(args, { threadStore, setActive, t }),
     embed:     async (args) => createEmbed(args, { catalogue, callSkill, t, localActor }),
     'embed-file': async (args) => createFileEmbed(args, {
       localActor, t, simPeers, threadStore, callSkill, openFilePicker,
       mediaGateway, encodeImage, storeMediaItem,
     }),
     'embed-time': async (args) => createTimeEmbed(args, { localActor, t, simPeers, threadStore, callSkill }),
-    sendto:    async (args) => sendToPeer(args, {
-      catalogue, callSkill, t, localActor, simPeers, threadStore,
-    }),
     apps:      async (args) => appsToggle(args, { catalogue, appRegistry, t }),
     // v0.7.5 / v0.7.1c — also expose openLogsPanel reachable to
     // handlers (currently only used by /logs but reads well at this
@@ -114,21 +106,6 @@ export function createLocalBuiltins({
     'help-with':        async (args) => helpWithPost(args, { threadStore, setActive, t }),
     'debug-dump':       async ()     => debugDump({ agent, t }),
     signout:   async (args) => signOutFlow(args, { podAuth, t, onSignOut }),
-    'reset-thread': async () => {
-      // v0.7.-followup — clear the active thread's messages.
-      // 2026-05-27 slash audit close-out — distinguish "no store"
-      // (threadStore not wired in this build) from "no active thread"
-      // (store wired but nothing selected).  Two distinct conditions
-      // → two distinct locale keys.
-      if (!threadStore) return { ok: false, error: t('reset.no_store') };
-      const active = threadStore.getActiveThread?.();
-      if (!active) return { ok: false, error: t('reset.no_thread') };
-      active.messages = [];
-      active._listings?.clear?.();
-      // Fire onChange so IDB persistence catches up.
-      active._notifyChange?.('reset');
-      return { ok: true, message: t('reset.done') };
-    },
     brief:     async (args) => runBriefBuiltin(args, { briefRunner, t }),
     logs:      async (args) => runLogsBuiltin(args, { eventLog, t, openLogsPanel }),
     find:      async (args) => runFindBuiltin(args, { findRunner, t }),
@@ -857,76 +834,6 @@ async function appsToggle(args, { catalogue, appRegistry, t }) {
 }
 
 /**
- * `/send-to <peer> <itemId>` — v0.5.6 simulated cross-peer demo.
- *
- * Resolves the peer's destination thread from simPeers, builds an
- * embed against the catalogue's factory (same path as /embed),
- * then appends a synthesised embed-card shell message DIRECTLY to
- * the peer's thread.  Returns a text confirmation in the sender's
- * active thread.
- *
- * This fakes the round-trip in a single browser tab.  Real cross-
- * peer delivery rides on the hosting app's chat surface (per v0.5.3).
- */
-async function sendToPeer(args, { catalogue, callSkill, t, localActor, simPeers, threadStore }) {
-  const peer   = String(args?.peer ?? '').trim();
-  const itemId = String(args?.itemId ?? '').trim();
-  if (!peer)   return { ok: false, error: t('sendto.no_peer') };
-  if (!itemId) return { ok: false, error: t('sendto.no_id') };
-  if (!simPeers || !simPeers[peer]) {
-    return { ok: false, error: t('sendto.unknown_peer', { peer }) };
-  }
-  const target = simPeers[peer];
-  const destThread = threadStore?.getThread(target.threadId);
-  if (!destThread) {
-    return { ok: false, error: t('sendto.no_thread', { threadId: target.threadId }) };
-  }
-
-  // Use the same factory-discovery as /embed but make the recipient
-  // perspective explicit — the embed's issuedBy is the local user;
-  // the destination thread renders the [Claim] button because the
-  // recipient (peer) is NOT the issuer.
-  let snapshotSkill = null, snapshotAppOrigin = null;
-  for (const [opId] of catalogue.opsById) {
-    const decl = catalogue.embedSnapshotFor?.(opId);
-    if (decl) { snapshotSkill = decl.snapshotSkill; snapshotAppOrigin = decl.appOrigin; break; }
-  }
-  if (!snapshotSkill) return { ok: false, error: t('embed.no_factory') };
-
-  let snapshot;
-  try {
-    snapshot = await callSkill(snapshotAppOrigin, snapshotSkill, { choreId: itemId });
-  } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) };
-  }
-  if (!snapshot || snapshot.ok === false) {
-    return { ok: false, error: snapshot?.error ?? 'snapshot failed' };
-  }
-
-  const embed = buildEmbed({
-    appOrigin: snapshotAppOrigin,
-    snapshot,
-    issuedBy:  localActor ?? 'webid:local-demo-user',
-  });
-
-  // Synthesise an embed-card RenderedReply directly into the peer's
-  // thread.  Bypasses the dispatch pipeline — this is the cross-peer
-  // simulation path.
-  destThread.addShellMessage({
-    kind:           'embed-card',
-    messageId:      `embed-from-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    threadId:       target.threadId,
-    lifecycleState: 'live',
-    embed,
-  });
-
-  return {
-    ok:      true,
-    message: t('sendto.sent', { peer, item: snapshot.title ?? itemId }),
-  };
-}
-
-/**
  * `/embed-file` — v0.7.13.  Three modes:
  *   path=<existing> → look up via folio's getFileSnapshot;
  *                        embed real file metadata
@@ -1282,86 +1189,6 @@ async function createEmbed(args, { catalogue, callSkill, t, localActor }) {
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };
   }
-}
-
-/**
- * `/newthread <name>` — create + switch.
- *
- * @param {{name: string}} args
- */
-function createNewThread(args, { threadStore, setActive, t }) {
-  if (!threadStore) {
-    return { ok: false, error: t('newthread.no_store') };
-  }
-  const name = String(args?.name ?? '').trim();
-  if (!name) {
-    return { ok: false, error: t('newthread.no_name') };
-  }
-  const thread = threadStore.createThread({
-    name,
-    filter:      {},   // wildcard — user can refine via sidebar later
-    permissions: { allowCommands: true },
-  });
-  if (typeof setActive === 'function') setActive(thread.id);
-  return {
-    ok: true,
-    message: t('newthread.created', { name: thread.name }),
-    threadId: thread.id,
-  };
-}
-
-/**
- * `/dm <webid>` — open (or activate) a DM thread paired
- * with the given peer.  Mirrors main.js's ensureDmThread; lives in
- * localBuiltins so the slash dispatch path is symmetric with the
- * button-click intercept.
- */
-function createDmThread(args, { threadStore, setActive, t }) {
-  if (!threadStore) {
-    return { ok: false, error: t('newthread.no_store', { defaultValue: 'Thread store unavailable.' }) };
-  }
-  const peerId = String(args?.webid ?? args?.id ?? '').trim();
-  if (!peerId) {
-    return { ok: false, error: 'Pass a webid or peer address: /dm <peerId>' };
-  }
-  // Look for an existing DM with this peer; activate it if found.
-  const existing = [...threadStore.listThreads()].find(th =>
-    th.filter?.dm === true
-      && Array.isArray(th.filter?.actors)
-      && th.filter.actors.includes(peerId),
-  );
-  if (existing) {
-    if (typeof setActive === 'function') setActive(existing.id);
-    return { ok: true, message: `Opened DM with ${peerId.slice(0, 16)}…`, threadId: existing.id };
-  }
-  const thread = threadStore.createThread({
-    name:   `DM: ${peerId.slice(0, 16)}…`,
-    filter: { actors: [peerId], dm: true },
-    permissions: { allowCommands: true },
-  });
-  if (typeof setActive === 'function') setActive(thread.id);
-  return { ok: true, message: `Started DM with ${peerId.slice(0, 16)}…`, threadId: thread.id };
-}
-
-/**
- * `/threads` — list all threads with their filters.
- */
-function listThreads({ threadStore, t }) {
-  if (!threadStore) {
-    return { message: t('threadsCmd.no_store') };
-  }
-  const all = threadStore.listThreads();
-  if (all.length === 0) {
-    return { message: t('threadsCmd.empty') };
-  }
-  const lines = [t('threadsCmd.heading')];
-  for (const th of all) {
-    const filt    = describeFilter(th.filter);
-    const filtStr = filt === '*' ? '' : ` (${filt})`;
-    const active  = th.id === threadStore.activeId ? ' ●' : '';
-    lines.push(`  ${th.name}${active}${filtStr}`);
-  }
-  return { message: lines.join('\n') };
 }
 
 /**

@@ -39,7 +39,7 @@ describe('the shared locale seam', () => {
   it('the host blocks land at the top level, keeping their own names', () => {
     // If these ever nested under a `host.` prefix, every call site would have to change — the whole
     // point of the move was that none did.
-    for (const b of ['sync', 'mute', 'peer', 'relay', 'sendFile', 'threadsCmd']) {
+    for (const b of ['sync', 'mute', 'peer', 'relay', 'sendFile', 'me']) {
       expect(sharedLocale.en, `${b} should be a top-level block`).toHaveProperty(b);
       expect(sharedLocale.nl).toHaveProperty(b);
     }

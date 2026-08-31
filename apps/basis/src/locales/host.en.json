@@ -219,20 +219,6 @@
       "doc": "/blocked on empty set."
     }
   },
-  "newthread": {
-    "created": {
-      "text": "✓ Created thread \"{{name}}\". Switched to it.",
-      "doc": "Confirmation when /newthread succeeds."
-    },
-    "no_name": {
-      "text": "Please provide a name: /newthread <name>",
-      "doc": "When /newthread fires with no name arg."
-    },
-    "no_store": {
-      "text": "Thread workspace not available in this build.",
-      "doc": "Defensive — should never trigger in the standard web build."
-    }
-  },
   "peer": {
     "unavailable": {
       "text": "Peer transport not available in this build.",
@@ -301,20 +287,6 @@
     "connect_failed": {
       "text": "Relay connect failed: {{reason}}",
       "doc": "/set-relay caught an exception from sa.relay.connect()."
-    }
-  },
-  "reset": {
-    "no_store": {
-      "text": "Thread store not available in this build.",
-      "doc": "Defensive: threadStore dependency not wired."
-    },
-    "no_thread": {
-      "text": "No active thread to reset.",
-      "doc": "Defensive: no active thread selected."
-    },
-    "done": {
-      "text": "✓ Thread cleared (messages + list cache wiped).",
-      "doc": "/reset-thread confirmation."
     }
   },
   "rotate": {
@@ -410,14 +382,6 @@
     }
   },
   "sendto": {
-    "no_peer": {
-      "text": "Please name a peer: /send-to <peer> <itemId>",
-      "doc": "When /send-to fires with no peer."
-    },
-    "no_id": {
-      "text": "Please provide an item id: /send-to <peer> <itemId>",
-      "doc": "When /send-to fires with no itemId."
-    },
     "unknown_peer": {
       "text": "Unknown peer \"{{peer}}\". Try: anne",
       "doc": "When the peer name isn't in simPeers."
@@ -555,20 +519,6 @@
     "signed_in": {
       "text": "Signed in as {{webid}}.",
       "doc": "/whoami result when signed in."
-    }
-  },
-  "threadsCmd": {
-    "empty": {
-      "text": "No threads yet.",
-      "doc": "Shown when no threads exist."
-    },
-    "heading": {
-      "text": "Threads:",
-      "doc": "First line of /threads output."
-    },
-    "no_store": {
-      "text": "Thread workspace not available in this build.",
-      "doc": "Defensive."
     }
   },
   "chat": {

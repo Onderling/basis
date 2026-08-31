@@ -35,8 +35,6 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
  * or by deleting the handler. A new entry needs a sentence saying why a person should not reach it.
  */
 const UNREACHED = new Set([
-  // Chat-era nouns the circle model does not have: threads, DMs and the thread-scoped commands.
-  'threads', 'newthread', 'startDm', 'sendto', 'reset-thread',
   // Composer affordances the circle UI now does with buttons rather than typing.
   'embed', 'embed-file', 'embed-time', 'send-file', 'scanQr',
   // Still meaningful, no door since chat was folded into the circle view (2026-07) — the L70 set.

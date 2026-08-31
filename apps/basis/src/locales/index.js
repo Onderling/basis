@@ -28,3 +28,21 @@ export const sharedConsequenceLocale = { en: consequenceEn, nl: consequenceNl };
 
 /** The canonical `role` block per language (identical across both shells; 0 value conflicts). */
 export const sharedRoleLocale = { en: roleEn, nl: roleNl };
+
+/**
+ * EVERY shared block, per language — the ONE thing a shell merges.
+ *
+ * Both loaders used to name the blocks themselves:
+ * `{ ...appLocale, circle: sharedCircleLocale.en, consequence: …, role: … }`, in two files. Adding a
+ * shared block therefore meant editing three files and a re-export, and forgetting one of them dropped
+ * the block on one shell silently — the same failure this directory exists to end. Now a shell spreads
+ * `sharedLocale[lng]` and names nothing, so a new block reaches both by construction: one file here,
+ * one line below.
+ *
+ * The three named exports above stay: tests and callers already import them, and they are the honest
+ * way to reach one block when that is what you mean.
+ */
+export const sharedLocale = {
+  en: { circle: circleEn, consequence: consequenceEn, role: roleEn },
+  nl: { circle: circleNl, consequence: consequenceNl, role: roleNl },
+};

@@ -13,7 +13,7 @@ import en from '../../locales/en.json';
 import nl from '../../locales/nl.json';
 // The shared `circle`/`consequence`/`role` blocks live in ONE place in the basis package
 // (src/locales/) so web + mobile can't drift; merge them over the mobile-only keys below.
-import { sharedLocale } from '@onderling-app/basis';
+import { sharedLocale, mergeShared } from '@onderling-app/basis';
 
 function unwrapLeaves(node) {
   if (node === null || typeof node !== 'object') return node;
@@ -30,8 +30,8 @@ function unwrapLeaves(node) {
 const BUNDLES = {
   // One spread, no block names — see `src/locales/index.js`: a shared block cannot be added to one
   // shell and forgotten on the other, because neither shell names blocks any more.
-  en: unwrapLeaves({ ...en, ...sharedLocale.en }),
-  nl: unwrapLeaves({ ...nl, ...sharedLocale.nl }),
+  en: unwrapLeaves(mergeShared(en, sharedLocale.en)),
+  nl: unwrapLeaves(mergeShared(nl, sharedLocale.nl)),
 };
 
 let currentLang = 'en';

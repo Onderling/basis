@@ -54,45 +54,9 @@
       "text": "{{label}} → {{item}}",
       "doc": "Synthetic user-bubble shown when a row button is tapped (#253 step 2 — label is the button label, item the targeted item id)"
     },
-    "followup_prompt": {
-      "text": "What's your {{param}}? (for /{{opId}})",
-      "doc": "Generic fallback prompt when a row-tap dispatch returns needsForm and the op doesn't have an op-specific entry in pickPromptKey (#253 step 4)"
-    },
     "followup_prompt_respond_to_item_body": {
       "text": "What help are you offering?",
       "doc": "Friendlier prompt for [Help with] on a stoop post (respondToItem.body) — picked via pickPromptKey in src/core/followUp.js"
-    },
-    "form_title": {
-      "text": "Complete /{{opId}}",
-      "doc": "Title at the top of the multi-field form bubble (#253 step 6)"
-    },
-    "form_submit": {
-      "text": "Submit",
-      "doc": "Submit button on the multi-field form bubble"
-    },
-    "form_label_body": {
-      "text": "Body",
-      "doc": "Label for the 'body' field — used by respondToItem etc."
-    },
-    "form_label_title": {
-      "text": "Title",
-      "doc": "Label for the 'title' field"
-    },
-    "form_label_name": {
-      "text": "Name",
-      "doc": "Label for the 'name' field"
-    },
-    "form_label_text": {
-      "text": "Text",
-      "doc": "Label for the 'text' field"
-    },
-    "form_label_when": {
-      "text": "When",
-      "doc": "Label for the 'when' field — calendar/availability ops"
-    },
-    "form_label_audience": {
-      "text": "Audience",
-      "doc": "Label for the 'audience' field"
     },
     "download_not_wired": {
       "text": "This file has no inline bytes to save — file id: {{fileId}}",
@@ -179,21 +143,12 @@
       "doc": "[Download] hit a filesystem error (#266)"
     },
     "file": {
-      "open": {
-        "text": "Open",
-        "doc": "E1 — file-reply card: open the file URL in a new tab."
-      },
       "unnamed": {
         "text": "Untitled file",
         "doc": "E1 — file-reply card fallback name when none is given."
       }
     },
-    "nav": {
-      "openInFull": {
-        "text": "Open in full",
-        "doc": "E5 — record/mini-page bubble: open the card in a full-height detail modal."
-      }
-    }
+    "nav": {}
   },
   "responder": {
     "header_offer_of_help": {
@@ -325,41 +280,9 @@
     "panel_empty": {
       "text": "No events logged yet.",
       "doc": "Empty-state when EventLog has no entries"
-    },
-    "no_log": {
-      "text": "Logs are not available on this device yet.",
-      "doc": "Returned by localBuiltins.logs when eventLog dep is missing"
-    },
-    "empty": {
-      "text": "No events match those filters.",
-      "doc": "Returned by localBuiltins.logs when query returns 0 events"
-    },
-    "heading": {
-      "text": "{{count}} event(s):",
-      "doc": "Heading shown above an inline /logs list result"
-    },
-    "muted": {
-      "text": "Muted {{app}}/{{type}}.",
-      "doc": "Confirmation after /logs --mute=app:type"
-    },
-    "panel_opened": {
-      "text": "Logs panel opened.",
-      "doc": "Echoed back when a bare /logs opens the side-panel"
     }
   },
   "common": {
-    "error": {
-      "text": "Error",
-      "doc": "Heading on the error bubble a failed op renders (shared renderer)."
-    },
-    "failed": {
-      "text": "Failed",
-      "doc": "Fallback when an op reports ok:false and names no error (shared renderer)."
-    },
-    "ok": {
-      "text": "✓",
-      "doc": "Confirmation when an op reports ok:true and returns no message (shared renderer)."
-    },
     "cancel": {
       "text": "Cancel",
       "doc": "Generic cancel-button label (slash FAB modal)"
@@ -379,10 +302,6 @@
     "done": {
       "text": "Done",
       "doc": "Final dismiss after wizard success"
-    },
-    "consequences": {
-      "text": "Consequences of this choice",
-      "doc": "N2 — ⓘ tooltip/aria label on a radio option that reveals its consequence."
     }
   },
   "wizards": {

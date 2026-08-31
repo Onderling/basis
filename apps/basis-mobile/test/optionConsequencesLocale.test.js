@@ -6,7 +6,10 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { CONSEQUENCE_OPTIONS, consequenceKeyFor, attachConsequences, sharedConsequenceLocale } from '@onderling-app/basis';
+import {
+  CONSEQUENCE_OPTIONS, consequenceKeyFor, attachConsequences, sharedConsequenceLocale,
+  sharedLocale, mergeShared,
+} from '@onderling-app/basis';
 import enRaw from '../locales/en.json';
 import nlRaw from '../locales/nl.json';
 // `consequence.*` now lives in the shared source (like `circle.*`), merged into both shells; merge it
@@ -24,9 +27,14 @@ describe('mobile consequence locales', () => {
     }
   });
 
-  it('common.consequences (ⓘ label) exists on mobile', () => {
-    expect(en.common?.consequences?.text).toBeTruthy();
-    expect(nl.common?.consequences?.text).toBeTruthy();
+  it('common.consequences (ⓘ label) resolves on mobile', () => {
+    // Asserted against the bundle the shell actually composes, not against this shell's JSON file.
+    // The string is written by code BOTH shells render, so it moved to the shared source
+    // (2026-08-31) — it reaches the phone through the merge, and a test that insisted on the file
+    // would be pinning where a string lives rather than whether a person sees it.
+    for (const [lng, own] of [['en', enRaw], ['nl', nlRaw]]) {
+      expect(mergeShared(own, sharedLocale[lng]).common?.consequences?.text).toBeTruthy();
+    }
   });
 
   it('attachConsequences with a real mobile-locale lookup yields text', () => {

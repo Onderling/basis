@@ -54,45 +54,9 @@
       "text": "{{label}} → {{item}}",
       "doc": "Synthetische gebruiker-bubble bij een rij-knop tap (#253 stap 2)"
     },
-    "followup_prompt": {
-      "text": "Wat is je {{param}}? (voor /{{opId}})",
-      "doc": "Generieke prompt bij needsForm zonder op-specifieke entry (#253 stap 4)"
-    },
     "followup_prompt_respond_to_item_body": {
       "text": "Welke hulp bied je aan?",
       "doc": "Vriendelijkere prompt voor [Help met] op een stoop-post (respondToItem.body)"
-    },
-    "form_title": {
-      "text": "Voltooi /{{opId}}",
-      "doc": "Titel boven het multi-field formulier (#253 stap 6)"
-    },
-    "form_submit": {
-      "text": "Verstuur",
-      "doc": "Submit-knop in multi-field form bubble"
-    },
-    "form_label_body": {
-      "text": "Bericht",
-      "doc": "Label voor 'body' veld"
-    },
-    "form_label_title": {
-      "text": "Titel",
-      "doc": "Label voor 'title' veld"
-    },
-    "form_label_name": {
-      "text": "Naam",
-      "doc": "Label voor 'name' veld"
-    },
-    "form_label_text": {
-      "text": "Tekst",
-      "doc": "Label voor 'text' veld"
-    },
-    "form_label_when": {
-      "text": "Wanneer",
-      "doc": "Label voor 'when' veld — kalender/beschikbaarheid"
-    },
-    "form_label_audience": {
-      "text": "Publiek",
-      "doc": "Label voor 'audience' veld"
     },
     "download_not_wired": {
       "text": "Dit bestand heeft geen inline data om op te slaan — bestand: {{fileId}}",
@@ -179,21 +143,12 @@
       "doc": "[Download] kreeg een filesystem-fout (#266)"
     },
     "file": {
-      "open": {
-        "text": "Openen",
-        "doc": "E1 — file-reply card: open the file URL in a new tab."
-      },
       "unnamed": {
         "text": "Naamloos bestand",
         "doc": "E1 — file-reply card fallback name when none is given."
       }
     },
-    "nav": {
-      "openInFull": {
-        "text": "Volledig openen",
-        "doc": "E5 — record/mini-page bubble: open the card in a full-height detail modal."
-      }
-    }
+    "nav": {}
   },
   "responder": {
     "header_offer_of_help": {
@@ -325,41 +280,9 @@
     "panel_empty": {
       "text": "Nog geen events gelogd.",
       "doc": "Lege-staat voor EventLog"
-    },
-    "no_log": {
-      "text": "Logboek nog niet beschikbaar op dit apparaat.",
-      "doc": "Bij ontbrekende eventLog dep"
-    },
-    "empty": {
-      "text": "Geen events met die filters.",
-      "doc": "Bij query met 0 results"
-    },
-    "heading": {
-      "text": "{{count}} event(s):",
-      "doc": "Inline /logs lijst-kop"
-    },
-    "muted": {
-      "text": "{{app}}/{{type}} gedempt.",
-      "doc": "Bevestiging na /logs --mute"
-    },
-    "panel_opened": {
-      "text": "Logboek geopend.",
-      "doc": "Bij bare /logs"
     }
   },
   "common": {
-    "error": {
-      "text": "Fout",
-      "doc": "Heading on the error bubble a failed op renders (shared renderer)."
-    },
-    "failed": {
-      "text": "Mislukt",
-      "doc": "Fallback when an op reports ok:false and names no error (shared renderer)."
-    },
-    "ok": {
-      "text": "✓",
-      "doc": "Confirmation when an op reports ok:true and returns no message (shared renderer)."
-    },
     "cancel": {
       "text": "Annuleren",
       "doc": "Generieke annuleren-knop (slash-FAB modal)"
@@ -379,10 +302,6 @@
     "done": {
       "text": "Klaar",
       "doc": "Definitieve sluit-knop na wizard-succes"
-    },
-    "consequences": {
-      "text": "Gevolgen als je dit kiest",
-      "doc": "N2 — ⓘ tooltip/aria label on a radio option that reveals its consequence."
     }
   },
   "wizards": {

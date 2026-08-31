@@ -12,13 +12,14 @@ import { QrCodeView } from '@onderling/react-native/qr/view';
 import { useTheme } from './themeContext.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
 import { makePairUri, parsePairUri } from '../../../../basis/src/core/qrSchemes.js';
+import { translatorOr } from '../../../../basis/src/locales/translatorOr.js';
 
 const short = (a) => (a && a.length > 16 ? `${a.slice(0, 8)}…${a.slice(-6)}` : a);
 
 export default function PairedDevices({ selfAddr = '', peers: initialPeers = [], t, onAdd, onRemove }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const tr = typeof t === 'function' ? t : (k) => k;
+  const tr = translatorOr(t, 'PairedDevices.js');
   const [peers, setPeers] = useState(Array.isArray(initialPeers) ? initialPeers : []);
   const [draft, setDraft] = useState('');
   const [err, setErr] = useState(false);

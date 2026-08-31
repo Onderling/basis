@@ -233,7 +233,7 @@ describe('V1.5 — cap-token-bound bot agent', () => {
     // Use the public API but skip the agent.stop() side-effect by
     // calling revoke and then NOT counting on the bot agent.
     await circle.botAgentRegistry.revoke({ chatId: ANNE_CHAT });
-    expect(circle.botAgentRegistry.isRevoked(tokenBlob.id)).toBe(true);
+    expect(await circle.botAgentRegistry.isRevoked(tokenBlob.id)).toBe(true);
 
     // Re-create a fresh bot agent that holds the same token blob
     // (the "attacker still has the stolen token") and invoke.
@@ -278,6 +278,41 @@ describe('V1.5 — cap-token-bound bot agent', () => {
       agentPubKey: circle.agent.pubKey,
     });
     expect(ok.allowed).toBe(true);
+  });
+
+  it('a revoked bot token is STILL revoked after a fresh boot (the revocation set is persisted)', async () => {
+    // The defect this closes: revoking a binding deleted its persisted row (so the bot never
+    // re-spawned) but kept the revocation set in memory only — after a restart the issuer forgot
+    // the revoke while the token blob stayed signed and unexpired, so a holder it had already cut
+    // off was re-admitted until TTL. Same class as the task-grant one, same honest model: build a
+    // SECOND registry over the same store and ask IT.
+    const sharedStore = new Map();
+
+    // ── Boot 1: issue, capture the token id, revoke.
+    const bundle1 = buildBundle({ localStore: sharedStore });
+    const circle1 = await createCircleAgent({
+      circleConfig:           CIRCLE,
+      localStoreBundle:     bundle1,
+      wireOnboardingSkills: false,
+    });
+    await call(circle1, 'setBotChatBinding', { chatId: ANNE_CHAT, webid: ANNE }, ANNE);
+    await call(circle1, 'issueBotToken',     { chatId: ANNE_CHAT, ttlDays: 1 }, ANNE);
+    const tokenId = circle1.botAgentRegistry.get(ANNE_CHAT).binding.tokenId;
+    await circle1.botAgentRegistry.revoke({ chatId: ANNE_CHAT });
+    expect(await circle1.botAgentRegistry.isRevoked(tokenId)).toBe(true);
+    await circle1.close();
+
+    // ── Boot 2 (the restart): the revoke must still bind.
+    const bundle2 = buildBundle({ localStore: sharedStore });
+    const circle2 = await createCircleAgent({
+      circleConfig:           CIRCLE,
+      localStoreBundle:     bundle2,
+      wireOnboardingSkills: false,
+    });
+    expect(await circle2.botAgentRegistry.isRevoked(tokenId)).toBe(true);
+    // And the binding row is gone, so nothing re-spawned either.
+    expect(circle2.botAgentRegistry.get(ANNE_CHAT)).toBeNull();
+    await circle2.close();
   });
 
   it('persists bot identity + token; restoreAll re-spawns the bot after a fresh boot', async () => {

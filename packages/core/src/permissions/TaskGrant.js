@@ -162,10 +162,9 @@ export class TaskGrantManager {
   }
 
   /**
-   * Await hydration. A composer that builds the `PolicyEngine` at boot should await this BEFORE the
-   * engine can be asked anything: `isRevoked` is synchronous, so a check racing the load would report
-   * "not revoked" for a token that is. (`RoleGrantManager` carries the same race and no seam to wait
-   * on; worth closing there too.)
+   * Await hydration. `isRevoked` awaits it internally (so a check racing the load answers from the
+   * real state), but a composer that wants the load settled before serving anything at all — or a
+   * test modelling a restart — can still wait on it explicitly.
    * @returns {Promise<void>}
    */
   whenReady() { return this.#ready; }
@@ -284,8 +283,15 @@ export class TaskGrantManager {
 
   /**
    * Issuer-side revocation truth for this manager, and the seam a `PolicyEngine` composer reads:
-   * `anyRevoked([(id) => mgr.isRevoked(id), …])` at engine construction.
-   * @returns {boolean} whether `tokenId` has been revoked on this side.
+   * `anyRevoked([(id) => mgr.isRevoked(id), …])` at engine construction. ASYNC on purpose — the
+   * same closure `RoleGrantManager.isRevoked` makes: a check racing the persisted load must not
+   * answer "not revoked" from a set that has not finished hydrating, so the answer awaits `#ready`
+   * first (immediate when there is no store). The engine awaits its resolver, and a throwing
+   * check denies.
+   * @returns {Promise<boolean>} whether `tokenId` has been revoked on this side.
    */
-  isRevoked(tokenId) { return this.#revoked.has(tokenId); }
+  async isRevoked(tokenId) {
+    await this.#ready;
+    return this.#revoked.has(tokenId);
+  }
 }

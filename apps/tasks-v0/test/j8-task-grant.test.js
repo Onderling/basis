@@ -117,7 +117,7 @@ describe('J8 — task-scoped grant', () => {
     expect(done.task).toBeTruthy();
 
     // The SAME token no longer passes checkInbound (revoked with the task).
-    expect(bundle.taskGrantManager.isRevoked(token.id)).toBe(true);
+    expect(await bundle.taskGrantManager.isRevoked(token.id)).toBe(true);
     const denied = await checkInbound(token, { peerPubKey: BOT_PUBKEY, skillId: 'listOpen' })
       .catch((e) => e);
     expect(denied?.name).toBe('PolicyDeniedError');
@@ -133,7 +133,7 @@ describe('J8 — task-scoped grant', () => {
     const [token] = bundle.taskGrantManager.tokensForTask(task.id);
 
     await callSkill('removeTask', { id: task.id }, ANNE);   // admin-only hard-delete
-    expect(bundle.taskGrantManager.isRevoked(token.id)).toBe(true);
+    expect(await bundle.taskGrantManager.isRevoked(token.id)).toBe(true);
     const denied = await checkInbound(token, { peerPubKey: BOT_PUBKEY, skillId: 'listOpen' })
       .catch((e) => e);
     expect(denied?.code).toBe('INVALID_TOKEN');

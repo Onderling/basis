@@ -66,6 +66,8 @@ export class BotAgentRegistry {
   #entries = new Map();
   /** follow-up C — issuer-side revocation list. Set<tokenId>. */
   #revoked = new Set();
+  /** Resolves once the persisted revocation set has loaded; already-resolved without persistence. */
+  #ready = Promise.resolve();
 
   /**
    * @param {object} args
@@ -89,6 +91,32 @@ export class BotAgentRegistry {
     this.#tasksAgent = tasksAgent;
     this.#dataSource = dataSource ?? null;
     this.#circleId     = circleId     ?? null;
+    // The revocation set is issuer-side TRUTH, so it hydrates with the registry: without this a
+    // restart forgot every revoke while the token itself stayed signed and unexpired — the same
+    // defect the grant managers in core had, fixed the same way. Best-effort: no persistence, no load.
+    if (this.persisting) this.#ready = this.#loadRevoked();
+  }
+
+  /** One row, OUTSIDE `botAgents/` — `restoreAll` lists that directory as bindings. */
+  #revokedPath() {
+    return `mem://tasks/circles/${this.#circleId}/botRevoked.json`;
+  }
+
+  /** Hydrate the revocation set. Best-effort: a missing or corrupt row starts empty. */
+  async #loadRevoked() {
+    try {
+      const raw = await this.#dataSource.read(this.#revokedPath());
+      const body = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      for (const id of (body?.revoked ?? [])) this.#revoked.add(id);
+    } catch { /* no row yet, or unreadable → start empty; the next revoke re-establishes it */ }
+  }
+
+  /** Persist after a revoke. Best-effort: a failed write must not fail the revoke's in-memory effect. */
+  async #persistRevoked() {
+    if (!this.persisting) return;
+    try {
+      await this.#dataSource.write(this.#revokedPath(), JSON.stringify({ revoked: [...this.#revoked] }));
+    } catch { /* best-effort */ }
   }
 
   /**
@@ -99,8 +127,15 @@ export class BotAgentRegistry {
    * engine already had — the last registry built silently disarmed every earlier one. The engine
    * now takes one resolver at construction and `MeshAgent.buildMeshAgent` unions this source in
    * alongside every other circle's, so a second registry can no longer cancel the first.
+   *
+   * ASYNC: the answer awaits the persisted set's hydration first (immediate without persistence),
+   * so a check racing boot answers from the real state rather than an empty one — the union in
+   * `buildMeshAgent` awaits every source already.
    */
-  isRevoked(tokenId) { return this.#revoked.has(tokenId); }
+  async isRevoked(tokenId) {
+    await this.#ready;
+    return this.#revoked.has(tokenId);
+  }
 
   /** True when `dataSource` was supplied — bindings will be persisted. */
   get persisting() { return !!(this.#dataSource && this.#circleId); }
@@ -218,6 +253,10 @@ export class BotAgentRegistry {
     // list so PolicyEngine.checkInbound rejects any in-flight or
     // future call carrying the now-stale token.
     this.#revoked.add(entry.binding.tokenId);
+    // The await is the DURABILITY: without it a restart re-admitted a holder this side had already
+    // cut off, because deleting the binding row (below) only stops the bot re-spawning — it does
+    // nothing to a token blob still held elsewhere.
+    await this.#persistRevoked();
     this.#entries.delete(chatId);
     if (this.persisting) {
       try { await this.#dataSource.delete(this.#pathFor(chatId)); } catch { /* noop */ }

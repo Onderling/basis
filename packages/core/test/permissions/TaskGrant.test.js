@@ -155,7 +155,7 @@ describe('TaskGrantManager.revokeTaskGrants — grants expire with the task', ()
     // Task completes → revoke its grants.
     const { revokedTokenIds } = await mgr.revokeTaskGrants('task-1');
     expect(revokedTokenIds).toEqual([token.id]);
-    expect(mgr.isRevoked(token.id)).toBe(true);
+    expect(await mgr.isRevoked(token.id)).toBe(true);
     expect(mgr.tokensForTask('task-1')).toEqual([]);
 
     // After: the SAME token no longer passes.
@@ -179,8 +179,8 @@ describe('TaskGrantManager.revokeTaskGrants — grants expire with the task', ()
 
     // Revoke only task-A.
     await mgr.revokeTaskGrants('task-A');
-    expect(mgr.isRevoked(tokA.id)).toBe(true);
-    expect(mgr.isRevoked(tokB.id)).toBe(false);
+    expect(await mgr.isRevoked(tokA.id)).toBe(true);
+    expect(await mgr.isRevoked(tokB.id)).toBe(false);
 
     // task-A's grant is dead; task-B's still authorises.
     await expect(pe.checkInbound({ peerPubKey: A, skillId: 'predict.run', token: tokA.toJSON() }))
@@ -197,7 +197,7 @@ describe('TaskGrantManager — OFF by default', () => {
     // No implicit / default grant.
     expect(mgr.tokensForTask('any-task')).toEqual([]);
     expect(await mgr.revokeTaskGrants('any-task')).toEqual({ revokedTokenIds: [] });
-    expect(mgr.isRevoked('whatever')).toBe(false);
+    expect(await mgr.isRevoked('whatever')).toBe(false);
   });
 
   it('rejects an empty grant (must specify at least one of skill / pod / actingAs)', async () => {
@@ -233,12 +233,12 @@ describe('TaskGrantManager — a revocation must outlive the process', () => {
       taskId: 'task-1', memberPubKey: 'member-pub', grant: { skill: 'echo' },
     });
     await before.revokeTaskGrants('task-1');
-    expect(before.isRevoked(token.id)).toBe(true);
+    expect(await before.isRevoked(token.id)).toBe(true);
 
     // The restart.
     const after = new TaskGrantManager({ identity, store });
     await after.whenReady();
-    expect(after.isRevoked(token.id)).toBe(true);
+    expect(await after.isRevoked(token.id)).toBe(true);
   });
 
   it('a LIVE grant also survives, so a later revoke can still find its tokens', async () => {
@@ -259,7 +259,7 @@ describe('TaskGrantManager — a revocation must outlive the process', () => {
 
     const { revokedTokenIds } = await after.revokeTaskGrants('task-2');
     expect(revokedTokenIds).toEqual([token.id]);
-    expect(after.isRevoked(token.id)).toBe(true);
+    expect(await after.isRevoked(token.id)).toBe(true);
   });
 
   it('without a store it still works, and says out loud that revocations are not durable', async () => {
@@ -271,8 +271,33 @@ describe('TaskGrantManager — a revocation must outlive the process', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/MEMORY-ONLY|not survive a restart/));
     const token = await mgr.attachGrant({ taskId: 't', memberPubKey: 'm', grant: { skill: 'echo' } });
     await mgr.revokeTaskGrants('t');
-    expect(mgr.isRevoked(token.id)).toBe(true);      // still correct in-process
+    expect(await mgr.isRevoked(token.id)).toBe(true);      // still correct in-process
     warn.mockRestore();
+  });
+
+  it('a check racing the load answers from the persisted set, not an empty one', async () => {
+    // The boot window: the engine can be asked about a token BEFORE the store's read resolves.
+    // `isRevoked` awaits hydration internally (the closure `RoleGrantManager` already had), so the
+    // caller needs no `whenReady` discipline for correctness — the answer is simply late, not wrong.
+    const identity = await AgentIdentity.generate(new VaultMemory());
+
+    const seed = new TaskGrantManager({ identity, store: memStore() });
+    const token = await seed.attachGrant({ taskId: 't-race', memberPubKey: 'm', grant: { skill: 'echo' } });
+    await seed.revokeTaskGrants('t-race');
+
+    // A store whose read only resolves when WE let it — the racing check must wait on it.
+    const persisted = JSON.stringify({ revoked: [token.id], grants: [] });
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const slowStore = {
+      get: async () => { await gate; return persisted; },
+      set: async () => {},
+    };
+
+    const mgr = new TaskGrantManager({ identity, store: slowStore });
+    const racing = mgr.isRevoked(token.id);   // asked before the load resolved — no whenReady
+    release();
+    expect(await racing).toBe(true);
   });
 
   it('a corrupt blob starts empty rather than throwing at construction', async () => {
@@ -282,6 +307,6 @@ describe('TaskGrantManager — a revocation must outlive the process', () => {
 
     const mgr = new TaskGrantManager({ identity, store });
     await expect(mgr.whenReady()).resolves.toBeUndefined();
-    expect(mgr.isRevoked('anything')).toBe(false);
+    expect(await mgr.isRevoked('anything')).toBe(false);
   });
 });

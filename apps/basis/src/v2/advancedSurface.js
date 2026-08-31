@@ -31,8 +31,24 @@ export function advancedOpRows({ manifests = [] } = {}) {
     const app = m.appId ?? m.app ?? m.id ?? '';
     for (const op of m.operations) opIndex.set(`${app}:${op.id}`, op);
   }
+  // SURFACE-LESS means "no screen this op DECLARES", not "no screen the coverage report guesses at".
+  //
+  // The report's `screen` column is true when an op declares `surfaces.ui`/`page` OR its verb is
+  // creative (`add`/`register`), because `renderWeb` auto-projects a compose form for those. That is a
+  // fair estimate for a REPORT and the wrong rule for a NET: fifteen basis ops are tagged `verb: 'add'`
+  // while creating nothing — `signin`, `mute`, `rotate-identity`, `test-peer` — so the matrix credited
+  // them with a screen that does not exist, and this list, whose whole promise is "every op with no
+  // bespoke screen is reachable here", skipped exactly the ops that had nowhere else to be.
+  // Measured 2026-08-31: 15 of basis's 18 screen-claims were inferred from the verb alone.
+  //
+  // A net may not assume coverage it cannot verify. Declared surfaces are checkable; a verb is a guess.
+  // (The mis-tagged verbs are a separate defect — they also make `renderWeb` project nonsense compose
+  // forms — recorded on the work list rather than fixed here.)
   return cov.rows
-    .filter((r) => !r.screen)
+    .filter((r) => {
+      const op = opIndex.get(`${r.app}:${r.op}`);
+      return !op?.surfaces?.ui && !op?.surfaces?.page;
+    })
     .map((r) => {
       const op = opIndex.get(`${r.app}:${r.op}`);
       const params = Array.isArray(op?.params) ? op.params : [];

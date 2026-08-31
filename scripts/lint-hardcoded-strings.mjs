@@ -74,6 +74,29 @@ const JSX_TEXT = /<Text\b[^>]*>\s*([A-Z][A-Za-z][^<>{}\n]*\s[^<>{}\n]*)<\/Text>/
 const JSX_PROP = /\b(?:placeholder|accessibilityLabel|accessibilityHint|title|label)=["']([A-Z][^"']*\s[^"']*)["']/g;
 
 /**
+ * The REPORT-BUILDER shape: a literal pushed onto an array, or standing alone as an array element.
+ *
+ * Every sink above is a moment where one string meets one element. This is the other way a screen gets
+ * written — a function assembling a whole page of prose into a list and joining it at the end, touching
+ * no DOM node and no JSX prop on the way. Both shells do it (a wizard's step copy, a diagnostic report),
+ * and none of the detectors above can see a word of it.
+ *
+ * Added 2026-08-31, after the web wizards' step titles and intros were found hardcoded in exactly this
+ * shape — twenty-two English sentences in a Dutch app, in the wizard where a person replaces their
+ * identity. The DOM sinks had been green over them since the guard was written.
+ */
+const LINES = /(?:\.push\(|^[ \t]*)(['"])((?:\\.|(?!\1)[^\\])*)\1\s*[,)]/gm;
+
+/**
+ * A literal that is only ever thrown is a message to whoever is reading a stack trace, not to a person
+ * using the app — the one place in this file where the SINK, not the string, decides. Kept narrow: it
+ * looks just behind the match, so a sentence that happens to sit near a throw is still caught.
+ */
+function isThrown(src, index) {
+  return /\bthrow new [A-Za-z]*Error\(\s*$/.test(src.slice(Math.max(0, index - 80), index));
+}
+
+/**
  * Is this literal PROSE a person reads, rather than a key, a token or CSS?
  *
  * Deliberately generous toward "not prose": a false positive costs someone a confusing red build on a
@@ -89,6 +112,9 @@ export function isProse(text) {
   if (/^(https?:|data:|blob:|\/|#|\.|@)/.test(t)) return false;             // urls, paths, selectors, css-at
   if (/[{};]|@keyframes|^[a-z-]+\s*:\s*[^ ]+$/i.test(t)) return false;      // css
   if (/^[a-z][a-zA-Z0-9-]*$/.test(t)) return false;   // a single technical token (`button`, `aria-live`)
+  if (/^[A-Z][A-Z0-9-]*$/.test(t)) return false;      // …and its shouted twin (`PURGE`, `M-SEARCH`) — a
+                                                      // protocol constant, which is what an all-caps word
+                                                      // with no lowercase in it always turns out to be.
   // Prose: either more than one word, or a capitalised word of real length. Trailing punctuation
   // counts as part of the sentence — "Copied!" and "Close." are exactly the strings that get typed
   // straight into a shell and never translated.
@@ -100,12 +126,13 @@ export function findHardcoded(files, read = (f) => readFileSync(f, 'utf8')) {
   for (const file of files) {
     let src;
     try { src = read(file); } catch { continue; }
-    for (const re of [ASSIGN, ATTR, JSX_TEXT, JSX_PROP]) {
+    for (const re of [ASSIGN, ATTR, JSX_TEXT, JSX_PROP, LINES]) {
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(src))) {
-        const text = re === ASSIGN ? m[3] : re === ATTR ? m[2] : m[1];
+        const text = re === ASSIGN ? m[3] : (re === ATTR || re === LINES) ? m[2] : m[1];
         if (!isProse(text)) continue;
+        if (re === LINES && isThrown(src, m.index)) continue;
         hits.push({ file, line: src.slice(0, m.index).split('\n').length, text });
       }
     }

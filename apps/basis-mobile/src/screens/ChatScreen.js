@@ -88,9 +88,6 @@ import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin
 // log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
 import { refreshCircleKeyEventsFromLane } from '../core/circlePods.js';
 import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler } from '../../../basis/src/v2/keyRail.js';
-import {
-  makeRequestCatchUpFromKnownPeers,
-} from '../../../basis/src/core/handlers/catchUp.js';
 // ε.4 — negotiated catch-up protocol substrate.
 import { makeHandleCalendarRsvp }
                                from '../../../basis/src/core/handlers/calendarRsvp.js';
@@ -924,9 +921,6 @@ export default function ChatScreen({
     });
     return {
       onPeerMessage:  makePeerRouter({ handlers, defaultHandler }),
-      // The neighbourhood-POST catch-up (a stoop noticeboard concern): the hi-water peer poll. Chat/tasks/
-      // governance/membership ride their device-log lanes' own catch-ups (registered above).
-      requestCatchUp: makeRequestCatchUpFromKnownPeers({ callSkill, sendPeer }),
     };
   }, []);
 

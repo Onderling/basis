@@ -173,7 +173,6 @@ describe('#222 basis-mobile portable-core boot', () => {
     expect(typeof bundle.attachPeerWiring).toBe('function');
     expect(() => bundle.attachPeerWiring({
       onPeerMessage:  () => {},
-      requestCatchUp: () => {},
     })).not.toThrow();
     // Tolerant of a partial / empty attach (defensive).
     expect(() => bundle.attachPeerWiring()).not.toThrow();

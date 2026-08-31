@@ -321,10 +321,6 @@ import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/household
 import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/circleChatRehydrate.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
-// ε.4 — negotiated catch-up protocol substrate.
-import {
-  makeRequestCatchUpFromKnownPeers,
-} from '../../src/core/handlers/catchUp.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePendingStorage.js';
@@ -8320,14 +8316,6 @@ async function boot() {
       catch { /* the live ladder still works from here on */ }
       tryConnectPeerTransport(agent, peerMessageRouter).catch(() => { /* logged inside */ });
 
-      // The circle-POST catch-up (a stoop noticeboard concern, untouched by the chat re-root): on
-      // reconnect, poll each circle's peers for posts after the hi-water mark. Chat/tasks/governance/
-      // membership all ride their lanes' own catch-ups below.
-      const requestCatchUpAll = makeRequestCatchUpFromKnownPeers({
-        callSkill: agent.callSkill,
-        sendPeer:  sendToPeerForCU,
-        logger:    console,
-      });
       // OBJ-2 S1c-shell — feed the household no-pod sync roster from a circle's
       // MEMBERS (the stoop group roster = people with reachable peer addrs), NOT
       // the bot contacts: a bot must never receive household items. `addCirclePeer`
@@ -8339,8 +8327,6 @@ async function boot() {
       // Fire after a short delay so the NKN HI handshake settles.
       // 1.5s mirrors web/main.js's existing kick-off timing.
       setTimeout(() => {
-        requestCatchUpAll().catch((err) =>
-          console.warn('[catch-up] kick-off failed', err?.message ?? err));
         // Governance pull-all rides the same kick — any one complete peer suffices (idempotent ingest).
         govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});

@@ -99,57 +99,6 @@ describe('makeResolvingCallSkill — catalogue short-circuit (Perf #2)', () => {
   });
 });
 
-// ── Perf #4: catch-up short-circuit when roster is empty ──────────
-
-describe('requestCatchUpFromKnownPeers — 0-peer short-circuit (Perf #4)', () => {
-  it('skips getLatestPostAddedAt + sendPeer entirely when roster is empty', async () => {
-    // Dynamic import keeps this self-contained alongside the resolver tests.
-    const { makeRequestCatchUpFromKnownPeers }
-      = await import('../../src/core/handlers/catchUp.js');
-    const callLog = [];
-    const sendPeerLog = [];
-    const callSkill = async (origin, opId, args) => {
-      callLog.push(opId);
-      if (opId === 'listMyCircles')      return { circles: ['bert', 'oosterpoort'] };
-      if (opId === 'listGroupRoster')   return { members: [] };   // 0 peers everywhere
-      if (opId === 'getLatestPostAddedAt') return { latestAt: 999 };
-      return null;
-    };
-    const sendPeer = async (addr, payload) => { sendPeerLog.push({ addr, payload }); };
-    const run = makeRequestCatchUpFromKnownPeers({
-      callSkill, sendPeer, logger: { info() {}, warn() {} },
-    });
-    await run();
-
-    // listMyCircles once + listGroupRoster per circle (2 circles → 2 rosters).
-    // CRITICALLY: zero getLatestPostAddedAt calls AND zero sendPeer calls.
-    expect(callLog).toEqual(['listMyCircles', 'listGroupRoster', 'listGroupRoster']);
-    expect(callLog).not.toContain('getLatestPostAddedAt');
-    expect(sendPeerLog).toHaveLength(0);
-  });
-
-  it('still fires getLatestPostAddedAt + sendPeer when roster has peers', async () => {
-    const { makeRequestCatchUpFromKnownPeers }
-      = await import('../../src/core/handlers/catchUp.js');
-    const callLog = [];
-    const sendPeerLog = [];
-    const callSkill = async (origin, opId, args) => {
-      callLog.push(opId);
-      if (opId === 'listMyCircles')      return { circles: ['bert'] };
-      if (opId === 'listGroupRoster')   return { members: [{ addr: 'peer-A' }, { addr: 'peer-B' }] };
-      if (opId === 'getLatestPostAddedAt') return { latestAt: 999 };
-      return null;
-    };
-    const sendPeer = async (addr, payload) => { sendPeerLog.push({ addr, payload }); };
-    const run = makeRequestCatchUpFromKnownPeers({
-      callSkill, sendPeer, logger: { info() {}, warn() {} },
-    });
-    await run();
-
-    expect(callLog).toEqual(['listMyCircles', 'listGroupRoster', 'getLatestPostAddedAt']);
-    expect(sendPeerLog.map((s) => s.addr)).toEqual(['peer-A', 'peer-B']);
-  });
-});
 
 // ── Perf #1: seeding skipped when circle is already populated ──────
 

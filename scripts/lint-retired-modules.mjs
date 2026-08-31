@@ -14,6 +14,13 @@
  *   device-log lanes with the roster-binding verify): spineCatchUp (the tactical pull prototype) ·
  *   the `getSpineSince` skill · `ingestSpineItems`. Replacement: the per-lane catch-up subtypes
  *   (MEMBERSHIP_CATCHUP_SUBTYPES and siblings) over `circleEntryRail`.
+ * Retired 2026-08-31 (the last lane to converge — a post now rides the TASK lane, signed and
+ *   catch-up-served, and the `circle-post` envelope went with it): `handlers/catchUp.js` ·
+ *   `makeRequestCatchUpFromKnownPeers` · `makeHandleCatchUpRequest` · the `catch-up-request` subtype.
+ *   It had been dead in BOTH directions and still shipping: both shells fired a `catch-up-request` at
+ *   every peer 1.5s after connect, no router anywhere registered that subtype, and the answer it asked
+ *   for (`circle-post`) had no receiver left either. Traffic on every reconnect, for an answer nobody
+ *   could send and nobody would have read.
  *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
@@ -33,6 +40,8 @@ const RETIRED = [
   { name: 'cc.circleProposals',   re: /['"]cc\.circleProposals['"]/ },
   { name: 'spineCatchUp',         re: /from\s+['"][^'"]*spineCatchUp(?:\.js)?['"]|ingestSpineItems\s*\(/ },
   { name: 'getSpineSince',        re: /['"]getSpineSince['"]/ },
+  { name: 'handlers/catchUp',     re: /from\s+['"][^'"]*handlers\/catchUp(?:\.js)?['"]|makeRequestCatchUpFromKnownPeers\s*\(|makeHandleCatchUpRequest\s*\(/ },
+  { name: 'catch-up-request',     re: /['"]catch-up-request['"]/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

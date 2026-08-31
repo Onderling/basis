@@ -148,8 +148,7 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * @param {function}[opts.publishEvent]        forwarded; defaults to no-op
  * @param {object}  [opts.nknLib]              optional runtime nkn-sdk module; if present, connectPeerTransport is wired
  * @param {function}[opts.onPeerMessage]       NKN inbound callback (only meaningful when nknLib provided)
- * @param {function}[opts.requestCatchUp] Bundle H: fired 1.5s after NKN connect; mirrors web's requestCatchUpFromKnownPeers
- * @param {function}[opts.buildPeerWiring] Bundle H: factory `({agent, callSkill}) => {onPeerMessage, requestCatchUp}`. Called after agent is created but before connect. Lets the caller build router/trigger that depend on the live agent without a chicken-and-egg with the returned bundle. Takes precedence over the explicit `opts.onPeerMessage` + `opts.requestCatchUp` when present.
+ * @param {function}[opts.buildPeerWiring] Bundle H: factory `({agent, callSkill}) => {onPeerMessage}`. Called after agent is created but before connect. Lets the caller build router/trigger that depend on the live agent without a chicken-and-egg with the returned bundle. Takes precedence over the explicit `opts.onPeerMessage` + `opts.requestCatchUp` when present.
  * @param {function}[opts.skillStub]           test-only — bypass the real factory entirely
  *
  * @returns {Promise<{
@@ -157,7 +156,7 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  *   callSkill: (appOrigin: string, opId: string, args?: object) => Promise<object>,
  *   agent: object | null,
  *   transport: { kind: 'none' | 'nkn' | 'stub', connected?: boolean } ,
- *   attachPeerWiring: (wiring: { onPeerMessage?: function, requestCatchUp?: function }) => void,
+ *   attachPeerWiring: (wiring: { onPeerMessage?: function }) => void,
  *   dispose: () => Promise<void>,
  * }>}
  */
@@ -391,7 +390,7 @@ export async function bootAgentBundle(opts = {}) {
   // mount attach lands well before any inbound message or the 1.5s
   // catch-up fires.  `buildPeerWiring`/`opts.onPeerMessage` are still
   // honoured for the boot-time path (tests, single-screen callers).
-  const peerWiringRef = { onPeerMessage: undefined, requestCatchUp: undefined };
+  const peerWiringRef = { onPeerMessage: undefined };
   // Captured at connect so `reconnectPeer` (in-app relay setting change) can re-invoke connectPeerTransport
   // with the fresh relay URL + the same nkn/rtc libs — a LIVE reconnect, no app reload. Mirrors web.
   let _connNknLib = null; let _connRtcLib = null;
@@ -403,17 +402,14 @@ export async function bootAgentBundle(opts = {}) {
     try {
       const w = opts.buildPeerWiring({ agent, callSkill: agent.callSkill });
       peerWiringRef.onPeerMessage  = w?.onPeerMessage;
-      peerWiringRef.requestCatchUp = w?.requestCatchUp;
     } catch (err) {
       console.warn('[cc/boot] buildPeerWiring threw', err?.message ?? err);
     }
   }
   peerWiringRef.onPeerMessage  ??= opts.onPeerMessage;
-  peerWiringRef.requestCatchUp ??= opts.requestCatchUp;
 
-  const attachPeerWiring = ({ onPeerMessage, requestCatchUp } = {}) => {
-    if (typeof onPeerMessage === 'function')  peerWiringRef.onPeerMessage  = onPeerMessage;
-    if (typeof requestCatchUp === 'function') peerWiringRef.requestCatchUp = requestCatchUp;
+  const attachPeerWiring = ({ onPeerMessage } = {}) => {
+    if (typeof onPeerMessage === 'function') peerWiringRef.onPeerMessage = onPeerMessage;
   };
 
   // 5.9c — best-effort local mDNS discovery for the "Nearby" row on the
@@ -650,22 +646,6 @@ export async function bootAgentBundle(opts = {}) {
         });
         console.log('[cc/boot] peer transport connected, address:', agent.peer?.address);
         registerCirclePresence();   // G13 — fire-and-forget; never awaited (self-catching)
-        // fire the catch-up trigger
-        // 1.5s after connect so HI handshake settles first.  Mirrors
-        // web/main.js:1338.  Read the slot at fire time — null/undefined
-        // (test-mode / not-yet-attached) skips silently.
-        setTimeout(() => {
-          const requestCatchUp = peerWiringRef.requestCatchUp;
-          if (typeof requestCatchUp !== 'function') return;
-          try {
-            const r = requestCatchUp();
-            if (r && typeof r.catch === 'function') {
-              r.catch((err) => console.warn('[cc/boot] catch-up failed', err?.message ?? err));
-            }
-          } catch (err) {
-            console.warn('[cc/boot] catch-up threw', err?.message ?? err);
-          }
-        }, 1500);
       } catch (err) {
         // Connect failures are non-fatal — local-only flows stay live.
         // Log so /me can be debugged when it shows "not connected".

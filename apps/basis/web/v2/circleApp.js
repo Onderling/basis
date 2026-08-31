@@ -4672,7 +4672,7 @@ async function showMnemonicReveal() {
   const done = document.createElement('button');
   done.type = 'button';
   done.className = 'cc-wizard-btn cc-wizard-btn-primary';
-  done.textContent = t('circle.mydata.close');
+  done.textContent = t('common.close');
   done.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
   card.appendChild(done);
   overlay.appendChild(card);
@@ -5060,7 +5060,7 @@ function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
     card.appendChild(msg);
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.textContent = outcome === 'ok' ? t('circle.mydata.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
+    btn.textContent = outcome === 'ok' ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
       if (outcome === 'ok') return done();
       close(); showRevokeDeviceFlow(deviceId, { onClosed });
@@ -5217,7 +5217,7 @@ async function openCircleScreenPanel(screenId, { highlightRef, context } = {}) {
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'cc-screen-panel__close';
-  close.setAttribute('aria-label', t('circle.mydata.close'));
+  close.setAttribute('aria-label', t('common.close'));
   close.textContent = '✕';
   close.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
   head.appendChild(title); head.appendChild(close);
@@ -5351,7 +5351,7 @@ async function openAboutMePanel(personaId) {
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'cc-screen-panel__close';
-  close.setAttribute('aria-label', t('circle.mydata.close'));
+  close.setAttribute('aria-label', t('common.close'));
   close.textContent = '✕';
   close.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
   head.appendChild(title); head.appendChild(close);

@@ -9,7 +9,9 @@
 import { describe, it, expect } from 'vitest';
 import { sharedCircleLocale } from '@onderling-app/basis';
 
-const KEYS = ['keys', 'backup', 'view_mnemonic', 'restore', 'mnemonic_title', 'mnemonic_warn', 'mnemonic_none', 'close'];
+// `close` left this set on 2026-08-31: four blocks each carried their own "Close"/"Sluiten", so the
+// screen now reads the one `common.close` in the shared host block. The section's OWN words stay here.
+const KEYS = ['keys', 'backup', 'view_mnemonic', 'restore', 'mnemonic_title', 'mnemonic_warn', 'mnemonic_none'];
 
 describe('mobile My-data key-management locale (shared circle source)', () => {
   for (const lang of ['en', 'nl']) {
@@ -23,6 +25,14 @@ describe('mobile My-data key-management locale (shared circle source)', () => {
       }
     });
   }
+
+  it('the close control reads the ONE shared close, not a fourth copy of the word', () => {
+    // The duplication this replaced: circle.join.wizard.close, circle.guided.close, circle.mydata.close
+    // and circle.wizard.settings.close, four keys with one value, drifting independently by definition.
+    for (const lang of ['en', 'nl']) {
+      expect(sharedCircleLocale[lang].mydata.close, 'the per-block copy is gone').toBeUndefined();
+    }
+  });
 
   it('keeps web ≡ mobile: the same key set exists in both locales', () => {
     const en = Object.keys(sharedCircleLocale.en.mydata);

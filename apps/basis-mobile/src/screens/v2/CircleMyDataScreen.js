@@ -686,7 +686,7 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
                 </>)
               : (<Text style={styles.mWarn}>{t('circle.mydata.mnemonic_none')}</Text>)}
             <Pressable style={styles.action} onPress={() => setMnemonic(null)}>
-              <Text style={styles.actionLabel}>{t('circle.mydata.close')}</Text>
+              <Text style={styles.actionLabel}>{t('common.close')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>

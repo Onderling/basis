@@ -543,7 +543,7 @@ function renderError(container, doc, message, onClose) {
   wrap.appendChild(err);
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: t('circle.join.wizard.close'), onClick: onClose, kind: 'secondary' },
+    { label: t('common.close'), onClick: onClose, kind: 'secondary' },
   ]);
 }
 

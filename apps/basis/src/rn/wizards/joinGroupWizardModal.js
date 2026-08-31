@@ -103,7 +103,7 @@ export default function JoinGroupWizardModal({
             <ScrollView style={styles.scroll}>
               <Body title={t('circle.join.wizard.invite_error')} intro={state.inviteParseError} />
             </ScrollView>
-            <Actions buttons={[{ label: t('circle.join.wizard.close'), onPress: onClose, kind: 'primary' }]} />
+            <Actions buttons={[{ label: t('common.close'), onPress: onClose, kind: 'primary' }]} />
           </Pressable>
         </Pressable>
       </Modal>

@@ -175,10 +175,6 @@
         "text": "Join",
         "doc": "Join wizard — final submit."
       },
-      "close": {
-        "text": "Close",
-        "doc": "Join wizard — close the error view."
-      },
       "submitting": {
         "text": "Joining…",
         "doc": "Join wizard — submit-in-progress status."
@@ -693,10 +689,6 @@
     "title": {
       "text": "Guided setup",
       "doc": "Theme B — guided-setup panel heading."
-    },
-    "close": {
-      "text": "Close",
-      "doc": "Theme B — close the guided-setup panel."
     },
     "continue": {
       "text": "Continue",
@@ -4330,10 +4322,6 @@
       "text": "No recovery phrase is available on this device.",
       "doc": "S5 — reveal-mnemonic empty state."
     },
-    "close": {
-      "text": "Close",
-      "doc": "S5 — close a my-data dialog."
-    },
     "notifications": {
       "text": "Notifications",
       "doc": "S5 — web-push section heading."
@@ -5639,10 +5627,6 @@
     "settings": {
       "loading": {
         "text": "Loading settings…",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "close": {
-        "text": "Close",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "general": {

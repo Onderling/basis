@@ -94,7 +94,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
                   </Pressable>
                 ) : null}
                 <Pressable style={styles.cancel} onPress={finish} testID="revoke-close">
-                  <Text style={styles.cancelText}>{t('circle.mydata.close', { defaultValue: 'Sluiten' })}</Text>
+                  <Text style={styles.cancelText}>{t('common.close', { defaultValue: 'Sluiten' })}</Text>
                 </Pressable>
               </View>
             </View>

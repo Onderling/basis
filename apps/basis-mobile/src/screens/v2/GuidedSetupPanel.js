@@ -81,7 +81,7 @@ export default function GuidedSetupPanel({
             <Pressable
               onPress={() => close({ handoff: false })}
               accessibilityRole="button"
-              accessibilityLabel={t('circle.guided.close')}
+              accessibilityLabel={t('common.close')}
               testID="guided-close"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >

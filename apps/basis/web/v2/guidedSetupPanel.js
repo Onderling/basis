@@ -28,7 +28,7 @@ export function renderGuidedSetup(container, { template, state, t, onAnswer, onC
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'cc-guided__close';
-    close.setAttribute('aria-label', tr('circle.guided.close'));
+    close.setAttribute('aria-label', tr('common.close'));
     close.textContent = '✕';
     close.addEventListener('click', () => onClose({ handoff: false }));
     head.appendChild(close);

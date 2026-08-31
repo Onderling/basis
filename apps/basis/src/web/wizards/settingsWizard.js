@@ -73,7 +73,7 @@ export function renderSettingsWizard(opts) {
     const close = doc.createElement('button');
     close.type = 'button';
     close.className = 'cc-wizard-btn cc-wizard-btn-primary';
-    close.textContent = t('circle.wizard.settings.close');
+    close.textContent = t('common.close');
     close.addEventListener('click', onClose);
     actions.appendChild(close);
     container.appendChild(actions);

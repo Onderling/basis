@@ -4355,7 +4355,15 @@ export function buildSkills({
       // What stands meanwhile, measured: an outsider's rules edit never reaches a member
       // (J-eviction asserts it), so the exposure is that the CALLER is told a version landed when
       // the circle never took it — a divergence a shell would render as current.
-      const newVersion = (a.rules.version ?? 0) + 1;
+      // The next version comes from the STORED head, not the caller's input. Trusting the caller
+      // made every edit without a version field fan out as v1 — and since the invite carries the
+      // current doc, every receiver already HELD v1, so the strictly-newer apply refused the update
+      // on every device while the writer's own screen showed it (found by the absence/last-admin
+      // journeys, 2026-08-31). The caller's version still counts as a floor for compositions that
+      // track it themselves; it can no longer roll the circle back.
+      const _head = await _findLatestGroupRules(store, a.groupId).catch(() => null);
+      const _headVersion = Number.parseInt(_head?.source?.version ?? _head?.source?.rules?.version ?? 0, 10) || 0;
+      const newVersion = Math.max(_headVersion, Number.parseInt(a.rules.version, 10) || 0) + 1;
       // The rules-update rider: the new doc + version also ride the governance lane as a signed
       // statement, so every member's device learns the CURRENT version peer-to-peer (their
       // stale-banner lights without a pod). Emitted FIRST so the durable head below can PRESERVE

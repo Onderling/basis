@@ -13,7 +13,7 @@ import en from '../../locales/en.json';
 import nl from '../../locales/nl.json';
 // The shared `circle`/`consequence`/`role` blocks live in ONE place in the basis package
 // (src/locales/) so web + mobile can't drift; merge them over the mobile-only keys below.
-import { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale } from '@onderling-app/basis';
+import { sharedLocale } from '@onderling-app/basis';
 
 function unwrapLeaves(node) {
   if (node === null || typeof node !== 'object') return node;
@@ -28,8 +28,10 @@ function unwrapLeaves(node) {
 }
 
 const BUNDLES = {
-  en: unwrapLeaves({ ...en, circle: sharedCircleLocale.en, consequence: sharedConsequenceLocale.en, role: sharedRoleLocale.en }),
-  nl: unwrapLeaves({ ...nl, circle: sharedCircleLocale.nl, consequence: sharedConsequenceLocale.nl, role: sharedRoleLocale.nl }),
+  // One spread, no block names — see `src/locales/index.js`: a shared block cannot be added to one
+  // shell and forgotten on the other, because neither shell names blocks any more.
+  en: unwrapLeaves({ ...en, ...sharedLocale.en }),
+  nl: unwrapLeaves({ ...nl, ...sharedLocale.nl }),
 };
 
 let currentLang = 'en';
@@ -62,9 +64,26 @@ function pluralKey(key, params) {
   return `${key}_${n === 1 ? 'one' : 'other'}`;
 }
 
-function interpolate(template, params) {
-  if (!params) return template;
-  return template.replace(/\{\{(\w+)\}\}/g, (_, k) => (params[k] ?? `{{${k}}}`));
+/**
+ * `{{name}}` substitution. A value the caller did not supply leaves the placeholder ON SCREEN — which
+ * is ugly, and is exactly what web's i18next does with the same entry, so the two shells agree.
+ *
+ * They very nearly stopped agreeing here: the consolidation plan recorded (from READING i18next, not
+ * running it) that it substitutes an empty string, and this function was changed to match. The
+ * translator contract failed on its first run and said otherwise. The rendering is therefore
+ * deliberate rather than merely inherited — pinned in `translatorContract.js` — and the dev warning
+ * is the part worth adding, because a missing value is silent either way.
+ */
+function interpolate(template, params, key) {
+  if (!/\{\{\w+\}\}/.test(template)) return template;
+  return template.replace(/\{\{(\w+)\}\}/g, (_, k) => {
+    const v = params?.[k];
+    if (v === undefined || v === null) {
+      if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn(`[locale] "${key}" wants {{${k}}} and no value was passed — the placeholder will show.`);
+      return `{{${k}}}`;
+    }
+    return v;
+  });
 }
 
 const LANG_KEY = 'circle.app.lang';
@@ -100,8 +119,13 @@ export function t(key, params, lng) {
   // not the plural pair should answer in its own words, not switch language mid-sentence.
   const pk = pluralKey(key, params);
   const inBundle = (b) => (pk ? lookup(b, pk) : undefined) ?? lookup(b, key);
-  const hit = inBundle(BUNDLES[L]) ?? inBundle(BUNDLES.en) ?? key;
-  return interpolate(hit, params);
+  // `defaultValue` is i18next's escape hatch and web has always honoured it. Here it was ignored, so
+  // five call sites that read fine in a browser rendered their raw key on a phone — and the fitness
+  // guard SKIPS a call that carries one, on the assumption both shells mean the same thing by it.
+  // That assumption is true from here on.
+  const fallback = typeof params?.defaultValue === 'string' ? params.defaultValue : key;
+  const hit = inBundle(BUNDLES[L]) ?? inBundle(BUNDLES.en) ?? fallback;
+  return interpolate(hit, params, key);
 }
 
 export const __test__ = { unwrapLeaves, lookup, pluralKey, BUNDLES };

@@ -54,8 +54,10 @@ describe('5.9c formatNearbyLabel', () => {
     setLang('en');
   });
 
-  it('a caller that passes NO count still gets a sentence, not a key', () => {
+  it('a caller that passes NO count still gets the generic entry, not a key', () => {
     // `count` stays beside the pair for exactly this: nothing to pluralise, so nothing to choose.
+    // The placeholder stays visible, which is what web's i18next does with the same entry — pinned in
+    // `translatorContract.js` so the two shells cannot drift apart on it again.
     expect(t('circle.nearby.count')).toBe('{{count}} device(s)');
   });
 });

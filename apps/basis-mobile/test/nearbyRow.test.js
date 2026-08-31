@@ -25,30 +25,38 @@ import { formatNearbyLabel }            from '../src/core/nearbyLabel.js';
 import { initLocalisation, setLang, t } from '../src/core/localisation.js';
 
 describe('5.9c formatNearbyLabel', () => {
-  it('renders "<label>: 0 device(s)" at zero peers (honest empty signal)', async () => {
+  it('renders "<label>: 0 devices" at zero peers (honest empty signal)', async () => {
     await initLocalisation({ lng: 'en' });
-    expect(formatNearbyLabel(0, t)).toBe('Nearby: 0 device(s)');
+    expect(formatNearbyLabel(0, t)).toBe('Nearby: 0 devices');
   });
 
-  it('renders "<label>: N device(s)" with the supplied count', async () => {
+  it('AGREES WITH ITSELF about number — one device is not "1 device(s)"', async () => {
+    // The row read "Nearby: 1 device(s)" on a phone (2026-08-31). The locale had carried a proper
+    // `count_one` / `count_other` pair for a while; mobile's small hand-rolled t() had no plural
+    // branch, so it never looked at them and fell through to the generic entry beside them. Web,
+    // reading the SAME shared file through i18next, rendered it correctly — one source, two answers.
     await initLocalisation({ lng: 'en' });
-    expect(formatNearbyLabel(3, t)).toBe('Nearby: 3 device(s)');
-    expect(formatNearbyLabel(1, t)).toBe('Nearby: 1 device(s)');
+    expect(formatNearbyLabel(1, t)).toBe('Nearby: 1 device');
+    expect(formatNearbyLabel(3, t)).toBe('Nearby: 3 devices');
   });
 
   it('coerces non-finite / negative counts to 0 (defensive)', async () => {
     await initLocalisation({ lng: 'en' });
-    expect(formatNearbyLabel(-1,        t)).toBe('Nearby: 0 device(s)');
-    expect(formatNearbyLabel(NaN,       t)).toBe('Nearby: 0 device(s)');
-    expect(formatNearbyLabel(undefined, t)).toBe('Nearby: 0 device(s)');
+    expect(formatNearbyLabel(-1,        t)).toBe('Nearby: 0 devices');
+    expect(formatNearbyLabel(NaN,       t)).toBe('Nearby: 0 devices');
+    expect(formatNearbyLabel(undefined, t)).toBe('Nearby: 0 devices');
   });
 
-  it('localises in Dutch via the nl bundle', async () => {
+  it('localises in Dutch via the nl bundle — and counts in Dutch too', async () => {
     setLang('nl');
-    const s = formatNearbyLabel(2, t);
-    expect(s).toMatch(/In de buurt/);
-    expect(s).toMatch(/2/);
+    expect(formatNearbyLabel(1, t)).toBe('In de buurt: 1 apparaat');
+    expect(formatNearbyLabel(2, t)).toBe('In de buurt: 2 apparaten');
     setLang('en');
+  });
+
+  it('a caller that passes NO count still gets a sentence, not a key', () => {
+    // `count` stays beside the pair for exactly this: nothing to pluralise, so nothing to choose.
+    expect(t('circle.nearby.count')).toBe('{{count}} device(s)');
   });
 });
 
@@ -72,9 +80,9 @@ describe('5.9c launcher → mdns contract', () => {
   it('mdns.connectionCount is the read-side the formatter reads', async () => {
     await initLocalisation({ lng: 'en' });
     const mdns = mkSyntheticMdns(0);
-    expect(formatNearbyLabel(mdns.connectionCount, t)).toBe('Nearby: 0 device(s)');
+    expect(formatNearbyLabel(mdns.connectionCount, t)).toBe('Nearby: 0 devices');
     mdns._setCount(3);
-    expect(formatNearbyLabel(mdns.connectionCount, t)).toBe('Nearby: 3 device(s)');
+    expect(formatNearbyLabel(mdns.connectionCount, t)).toBe('Nearby: 3 devices');
   });
 
   it('subscribing to peer-discovered + peer-disconnected fires the listener', () => {
@@ -105,6 +113,6 @@ describe('5.9c launcher → mdns contract', () => {
     expect(bundleWithMdns.mdns).toBeTruthy();
     expect(bundleWithoutMdns.mdns).toBeFalsy();
     expect(formatNearbyLabel(bundleWithMdns.mdns.connectionCount, t))
-      .toBe('Nearby: 0 device(s)');
+      .toBe('Nearby: 0 devices');
   });
 });

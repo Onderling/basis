@@ -606,6 +606,34 @@ export const JOIN_FLOW_STEPS = Object.freeze([
   Object.freeze({ id: 'identity', next: null }),
 ]);
 
+/**
+ * Has the person put anything INTO this wizard yet?
+ *
+ * Shared because both shells ask it and neither should answer it its own way: a dismissal that throws
+ * away a read set of rules, an acknowledged privacy notice and a typed handle is the same loss on a
+ * phone and in a browser. It is deliberately generous — anything that took a decision counts, including
+ * turning the address-sharing default OFF, which is a choice even though it leaves no text behind.
+ *
+ * Step 1 with nothing touched is NOT dirty: opening an invite and immediately backing out should cost
+ * no dialog. (Found 2026-08-31: hardware back and a tap outside the sheet both discarded a half-filled
+ * join silently — three times in one sitting, twice mid-typing.)
+ *
+ * @param {object} state — a `joinGroupState` shape
+ * @returns {boolean}
+ */
+export function isJoinDirty(state) {
+  if (!state || typeof state !== 'object') return false;
+  if (state.submitting) return true;              // mid-flight: never drop it on a stray tap
+  if (Number(state.step) > 1) return true;
+  if (state.rulesAccepted === true) return true;
+  if (state.privacyAccepted === true) return true;
+  if (typeof state.handle === 'string' && state.handle.trim() !== '') return true;
+  if (state.persona != null) return true;
+  if (Array.isArray(state.capabilityOptOuts) && state.capabilityOptOuts.length > 0) return true;
+  if (state.shareAddress === false) return true;  // the mesh-consent default is ON, so OFF is a choice
+  return false;
+}
+
 export function initialState() {
   return {
     step:             1,            // 1..3 — JOIN_FLOW_STEPS[step - 1] is the declared name

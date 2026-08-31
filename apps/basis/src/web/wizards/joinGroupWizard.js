@@ -50,8 +50,7 @@ import {
   prepareJoinIdentity,
   setLinkChoice,
   setJoinReveal,
-  REVEAL_PRESETS,
-} from '../../core/wizards/joinGroupState.js';
+  REVEAL_PRESETS, isJoinDirty } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
 
@@ -68,7 +67,7 @@ import { t } from '../../localisation.js';
  * @param {Function}    [opts.onDispatched]  fired after final success with the redeemInvite reply
  */
 export function renderJoinGroupWizard(opts) {
-  const { container, doc, args, callSkill, onClose, onDispatched, sendPeerRedeem, sources,
+  const { container, doc, args, callSkill, onClose, onDispatched, sendPeerRedeem, sources, setCloseGuard,
     circles, circleAddressFor, signCircleLink,
     // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
     dialEndpoint, activeEndpointUrl } = opts;
@@ -102,6 +101,13 @@ export function renderJoinGroupWizard(opts) {
     // list for the "continue as an existing self" key choice). Failure leaves safe defaults.
     prepareJoinIdentity({ state, callSkill, circles }).then(rerender).catch(() => {});
   }
+
+  // Dismissing by clicking outside the card used to discard a half-filled join without a word — the same
+  // fault the phone had with its hardware back button. The host asks this before closing that way; the
+  // explicit Cancel button is untouched, since that one is the person saying so. A host that does not
+  // offer the seam behaves exactly as before.
+  setCloseGuard?.(() => !isJoinDirty(state)
+    || globalThis.confirm?.(t('circle.join.wizard.discard_body')) === true);
 
   rerender();
 

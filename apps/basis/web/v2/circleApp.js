@@ -4414,13 +4414,24 @@ function mountMyDataWizard(renderWizard, extra = {}) {
   const card = document.createElement('div');
   card.className = 'cc-mydata-modal__card';
   overlay.appendChild(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  // A wizard with something to lose can refuse a click-outside (the join wizard asks first). Absent a
+  // guard this is the same immediate dismissal it always was.
+  let closeGuard = null;
+  overlay.addEventListener('click', (e) => {
+    if (e.target !== overlay) return;
+    if (typeof closeGuard === 'function' && closeGuard() !== true) return;
+    close();
+  });
   document.body.appendChild(overlay);
   function close() { try { overlay.remove(); } catch { /* defensive */ } }
   try {
     // Thin adapter: hand the shared renderer this shell's DOM + rawCallSkill; `extra` lets a wizard that
     // needs more (the join wizard wants `args`/`sendPeerRedeem`) get it without a bespoke mount fn.
-    renderWizard({ container: card, doc: document, callSkill: rawCallSkill, onClose: close, onDispatched: () => {}, ...extra });
+    renderWizard({
+      container: card, doc: document, callSkill: rawCallSkill, onClose: close, onDispatched: () => {},
+      setCloseGuard: (fn) => { closeGuard = typeof fn === 'function' ? fn : null; },
+      ...extra,
+    });
   } catch (err) { close(); globalThis.alert?.(err?.message ?? String(err)); }
 }
 

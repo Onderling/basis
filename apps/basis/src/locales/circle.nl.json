@@ -129,6 +129,22 @@
       }
     },
     "wizard": {
+      "discard_title": {
+        "text": "Stoppen met meedoen?",
+        "doc": "Heading of the confirm shown when a dismissal would discard a half-filled join."
+      },
+      "discard_body": {
+        "text": "Je antwoorden hier gaan verloren — de regels die je accepteerde en de naam die je koos.",
+        "doc": "Says exactly what is thrown away, rather than a generic 'unsaved changes'."
+      },
+      "discard_stay": {
+        "text": "Verdergaan",
+        "doc": "Returns to the wizard with everything still filled in."
+      },
+      "discard_leave": {
+        "text": "Stoppen",
+        "doc": "Confirms the dismissal; the wizard closes and its answers are gone."
+      },
       "steps": {
         "rules": {
           "text": "Regels",

@@ -129,6 +129,22 @@
       }
     },
     "wizard": {
+      "discard_title": {
+        "text": "Stop joining?",
+        "doc": "Heading of the confirm shown when a dismissal would discard a half-filled join."
+      },
+      "discard_body": {
+        "text": "Your answers here are lost — the rules you accepted, and the name you picked.",
+        "doc": "Says exactly what is thrown away, rather than a generic 'unsaved changes'."
+      },
+      "discard_stay": {
+        "text": "Keep going",
+        "doc": "Returns to the wizard with everything still filled in."
+      },
+      "discard_leave": {
+        "text": "Stop joining",
+        "doc": "Confirms the dismissal; the wizard closes and its answers are gone."
+      },
       "steps": {
         "rules": {
           "text": "Rules",

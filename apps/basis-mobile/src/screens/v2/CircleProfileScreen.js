@@ -120,6 +120,15 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
           </View>
         )}
         {profile.location?.label && <Pressable style={styles.secondary} onPress={clearLocation}><Text style={styles.secondaryText}>{t('circle.profile.loc_clear')}</Text></Pressable>}
+        {/* The geo editor sets the coarse place; WHO sees it is a disclosure on the persona layer.
+            A quiet pointer, exactly as web has had — mobile was missing it entirely. */}
+        {typeof onOpenMij === 'function' ? (
+          <Pressable onPress={onOpenMij} accessibilityRole="button" testID="profile-loc-disclosure">
+            <Text style={styles.offeringsMoved}>{t('circle.profile.loc_disclosure_hint')}</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.offeringsMoved} testID="profile-loc-disclosure">{t('circle.profile.loc_disclosure_hint')}</Text>
+        )}
       </Section>
 
       {typeof onAvailability === 'function' && (

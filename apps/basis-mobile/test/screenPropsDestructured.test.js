@@ -118,3 +118,43 @@ describe('the two props from the 2026-07-30 breakage in particular', () => {
     expect(propsDeclaredBy('ChatScreen', chat).has('onCirclesChanged')).toBe(true);
   });
 });
+
+/**
+ * FITNESS — a control a screen renders only "if the host passed the handler" must have a host that
+ * passes it. Otherwise the screen quietly draws the inert branch and the affordance is decoration.
+ *
+ * The bug this pins (2026-08-31): `CircleProfileScreen` shows two pointers into the "Mij → persona's"
+ * surface — where offerings live now, and where who-sees-your-location is set. Both render as a
+ * Pressable when `onOpenMij` is a function and as plain Text when it is not. The launcher rendered the
+ * screen without that prop, so on mobile both were plain text: the copy told people to go to
+ * Me → personas while the Me tab had no way of getting there. Nothing failed — the fallback branch is
+ * legitimate code, and it is what an older caller is supposed to get.
+ */
+describe('FITNESS: an affordance a screen gates on is actually passed by its host', () => {
+  const HOSTED = [
+    { child: 'CircleProfileScreen', host: 'CircleLauncherScreen',
+      file: path.join(here, '..', 'src', 'screens', 'v2', 'CircleProfileScreen.js') },
+  ];
+
+  /** Props the screen only draws a control for when they are functions. */
+  const gatedAffordances = (source) => new Set(
+    [...source.matchAll(/typeof\s+([a-zA-Z_$][\w$]*)\s*===\s*'function'/g)].map((m) => m[1]));
+
+  for (const { child, host, file } of HOSTED) {
+    const childSrc = readFileSync(file, 'utf-8');
+    const hostSrc = readFileSync(path.join(here, '..', 'src', 'screens', 'v2', `${host}.js`), 'utf-8');
+
+    it(`${child} gates at least one control on a handler (the guard has something to check)`, () => {
+      expect(gatedAffordances(childSrc).size).toBeGreaterThan(0);
+      expect(propsPassedTo(child, hostSrc), `no <${child} …/> found in ${host}`).toBeTruthy();
+    });
+
+    it(`${host} passes every handler ${child} gates a control on`, () => {
+      const gated = gatedAffordances(childSrc);
+      const passed = propsPassedTo(child, hostSrc);
+      const inert = [...gated].filter((n) => !passed.has(n));
+      expect(inert, `${child} draws a control only when these are functions, and ${host} never passes `
+        + 'them — so the control renders as dead text and the copy points somewhere unreachable').toEqual([]);
+    });
+  }
+});

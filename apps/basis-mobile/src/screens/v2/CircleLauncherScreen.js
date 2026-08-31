@@ -364,6 +364,44 @@ const DEFAULT_SCREEN_RECIPE = Object.freeze({
 });
 
 // Wrap a top-level surface (Circles / Stroom / Mij) with the bottom tab bar.
+/**
+ * The "Mij → persona's" surface as a panel, so BOTH places that can reach it render the same one:
+ * a circle's agents surface (a profile row) and the Me tab, whose profile page points at it twice —
+ * "offerings now live under Me → personas" and the location-disclosure hint. It used to be written
+ * inline inside `CircleDetail`, so the Me tab had nothing to open and its pointer degraded to plain
+ * text: the signpost was real, the door was not.
+ *
+ * The circle-scoped extras are optional on purpose. Opened from Me there is no ONE circle — the
+ * panel takes the whole circle LIST and shows the per-circle table, which is what it does on web
+ * too, where it has always been a global overlay.
+ */
+function PersonaPanel({
+  personaId, onClose, styles, callSkill, circles = [],
+  sendPersonaUpdate = null, lastShared = null, resealMediaForCircle = null, profilePicture = null,
+}) {
+  return (
+    <Modal visible={!!personaId} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.panelBackdrop}>
+        <View style={styles.panelCard} testID="circle-aboutme-panel">
+          <View style={styles.panelHead}>
+            <Text style={styles.panelTitle}>{t('circle.mij.title')}</Text>
+            <Pressable onPress={onClose} testID="circle-aboutme-panel-close">
+              <Text style={styles.panelClose}>✕</Text>
+            </Pressable>
+          </View>
+          {personaId ? (
+            <CircleMijScreen
+              callSkill={callSkill} sendPersonaUpdate={sendPersonaUpdate} lastShared={lastShared}
+              resealMediaForCircle={resealMediaForCircle} profilePicture={profilePicture}
+              personaId={personaId} circles={circles}
+            />
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function WithTabBar({ active, onSelect, children }) {
   return (
     <View style={{ flex: 1 }}>
@@ -415,6 +453,8 @@ export default function CircleLauncherScreen({
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [circles, setCircles] = useState([]);
+  // The persona the Me tab's pointers open (the general one — there is no circle context here).
+  const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   // M3 — sub-view within the launcher: 'list' | 'availability' | 'detail'
@@ -1519,7 +1559,11 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} />
+        <PersonaPanel
+          personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
+          callSkill={bundle?.callSkill} circles={circles}
+        />
       </WithTabBar>
     );
   }
@@ -4124,22 +4168,13 @@ function CircleDetail({
         </View>
       </Modal>
 
-      {/* mij#personas — the "Mij → persona's" surface (web parity with openAboutMePanel). */}
-      <Modal visible={!!aboutMePersona} animationType="slide" transparent onRequestClose={() => setAboutMePersona(null)}>
-        <View style={styles.panelBackdrop}>
-          <View style={styles.panelCard} testID="circle-aboutme-panel">
-            <View style={styles.panelHead}>
-              <Text style={styles.panelTitle}>{t('circle.mij.title')}</Text>
-              <Pressable onPress={() => setAboutMePersona(null)} testID="circle-aboutme-panel-close">
-                <Text style={styles.panelClose}>✕</Text>
-              </Pressable>
-            </View>
-            {aboutMePersona ? (
-              <CircleMijScreen callSkill={rawCallSkill} sendPersonaUpdate={sendPersonaUpdate} lastShared={disclosureShareMemo} resealMediaForCircle={resealMediaForCircle} profilePicture={profilePicture} personaId={aboutMePersona} circles={circles} />
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+      {/* The "Mij → persona's" surface, opened from a profile row on the agents surface. */}
+      <PersonaPanel
+        personaId={aboutMePersona} onClose={() => setAboutMePersona(null)} styles={styles}
+        callSkill={rawCallSkill} circles={circles} sendPersonaUpdate={sendPersonaUpdate}
+        lastShared={disclosureShareMemo} resealMediaForCircle={resealMediaForCircle}
+        profilePicture={profilePicture}
+      />
 
       {/* Entrust (mandate) — the task-scoped grant picker (RN twin of web's openMandatePicker
           overlay). Confirm routes through the shared confirm/gate waist via onMandateConfirm. */}

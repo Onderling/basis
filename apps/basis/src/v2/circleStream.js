@@ -129,10 +129,12 @@ export function projectEntries({
   // The agent-trail lens (one-log step E): the SAME log, narrowed to one actor — an agent's activity
   // card is `projectEntries({ actor })`, not a second store. Exact match on the entry's stamped actor.
   if (actor != null) out = out.filter((r) => r.actor === actor);
-  // The PERSON-mute view filter (the chat-lane sitting's rule: a muted member's messages LAND on the
-  // log — refusing them at ingest would silently discard history — and are hidden HERE, at the one
-  // projection every chat surface reads; unmute restores everything). `excludeActors` is the resolved
-  // set of muted actor refs (see `mutedActorSet`). An unresolvable/absent actor is never hidden.
+  // The PERSON-block view filter, and the half of a block that acts on HISTORY. Blocking someone also
+  // refuses their envelopes at the boundary, so what they send after it never lands — but what they
+  // said BEFORE is already here, and deleting it is not what anyone means by blocking someone. It is
+  // hidden at this one projection every chat surface reads, and unblocking shows it again.
+  // `excludeActors` is the resolved set of blocked actor refs (see `mutedActorSet`). An
+  // unresolvable/absent actor is never hidden.
   if (excludeActors && (excludeActors.size ?? excludeActors.length)) {
     const hide = excludeActors instanceof Set ? excludeActors : new Set(excludeActors);
     out = out.filter((r) => !(typeof r.actor === 'string' && hide.has(r.actor)));

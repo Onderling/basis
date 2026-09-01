@@ -24,6 +24,8 @@
 //                  refused too, without the blocker doing anything more.
 import { checker, declaredOp, wait } from './_util.mjs';
 import { bootAppCircle, sendCircleChat, untilTrue, addressOf } from './_app.mjs';
+// The projection both shells render their chat through — the hide half lives here, not in a view.
+import { mutedActorSet } from '../../basis/src/v2/circleStream.js';
 
 export const name = 'J-block (blocking a person holds everywhere, and only for the blocker)';
 
@@ -48,6 +50,8 @@ export async function run({ relayUrl }) {
     circle = await bootAppCircle({ relayUrl, circleId: CIRCLE, handles: ['anne', 'bram', 'cato'] });
     const [anne, bram, cato] = circle.people;
     const block = (node, op, peer) => node.agent.callSkill('basis', op, { peer });
+    const rosterRows = async () =>
+      (await anne.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
 
     // A baseline, so "nothing arrived" can be told apart from "nothing ever worked".
     await sendCircleChat(bram, { groupId: CIRCLE, msgId: 'before-1', text: 'ik heb een ladder' });
@@ -89,6 +93,23 @@ export async function run({ relayUrl }) {
     const catoList = await cato.agent.callSkill('basis', 'muted', {});
     check('[BYSTANDER] and has nobody blocked of its own',
       Array.isArray(catoList?.peers) && catoList.peers.length === 0);
+
+    // ── 1b. HIDE, the other half ────────────────────────────────────────────────────────────────
+    // The two halves act on DIFFERENT messages, and the difference is the one a user feels:
+    //   • what they send AFTER the block is refused at the boundary — it never lands, and unblocking
+    //     cannot bring it back (there is nothing to bring). That is [REFUSE], above.
+    //   • what they sent BEFORE is already on the log and STAYS there. Blocking someone must not
+    //     delete what they already said to you; it is hidden at the one projection every chat surface
+    //     reads, and unblocking shows it again.
+    // The hiding itself is projection logic with its own tests (`personMuteViewFilter`, which covers
+    // "the log keeps everything; unmute restores" through `chatRows`). What only three real devices
+    // can show is the half those cannot: that the block, acting at the transport, left the history
+    // alone — and that the key the block was made with is one the view filter can resolve to a person.
+    check('[HIDE] blocking did not delete what they said before it',
+      subjectsOn(anne).includes('before-1'), subjectsOn(anne).join(','));
+    const hideSet = mutedActorSet([bramAddr], await rosterRows());
+    check('[HIDE] …and the blocked key resolves to an actor the view filter can hide',
+      hideSet.size === 1, JSON.stringify([...hideSet]).slice(0, 120));
 
     // ── 4. REVERSIBLE ───────────────────────────────────────────────────────────────────────────
     // The post sent DURING the block stays gone — it was refused, not held. What must come back is

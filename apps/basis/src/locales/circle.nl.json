@@ -4128,8 +4128,8 @@
         "doc": "S1 — per-post action: report abuse (reportPost)."
       },
       "mute": {
-        "text": "Dempen",
-        "doc": "S3 — per-post action: mute the author (mutePeer)."
+        "text": "Blokkeren",
+        "doc": "Actie per bericht: blokkeer de afzender (basis:mute) — hun berichten worden geweigerd."
       },
       "assign": {
         "text": "Toewijzen",
@@ -4761,16 +4761,16 @@
       "doc": "S3 — transient state."
     },
     "muted": {
-      "text": "Gedempte peers",
-      "doc": "S3 — muted-peers section."
+      "text": "Geblokkeerde mensen",
+      "doc": "Blokkade-sectie in het beheerpaneel — dezelfde lijst als \"Geblokkeerd\" bij Mij."
     },
     "no_muted": {
-      "text": "Geen gedempte peers.",
-      "doc": "S3 — empty muted list."
+      "text": "Je hebt niemand geblokkeerd.",
+      "doc": "Lege blokkade-lijst."
     },
     "unmute": {
-      "text": "Dempen opheffen",
-      "doc": "S3 — unmute a peer."
+      "text": "Deblokkeren",
+      "doc": "Draait de blokkade terug (basis:unmute)."
     },
     "removed": {
       "text": "{{name}} zit niet meer in deze kring. Andere kringen die jullie delen blijven ongewijzigd.",

@@ -271,7 +271,7 @@
       "doc": "/blocked on empty set."
     },
     "list_heading": {
-      "text": "Muted, {{count}} in total:",
+      "text": "Blocked, {{count}} in total:",
       "doc": "The /muted reply, the line above the list."
     }
   },

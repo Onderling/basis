@@ -4128,8 +4128,8 @@
         "doc": "S1 — per-post action: report abuse (reportPost)."
       },
       "mute": {
-        "text": "Mute",
-        "doc": "S3 — per-post action: mute the author (mutePeer)."
+        "text": "Block",
+        "doc": "Per-post action: block the author (basis:mute) — their messages are refused."
       },
       "assign": {
         "text": "Assign",
@@ -4761,16 +4761,16 @@
       "doc": "S3 — transient state."
     },
     "muted": {
-      "text": "Muted peers",
-      "doc": "S3 — muted-peers section."
+      "text": "Blocked people",
+      "doc": "Block section in the admin panel — the same list as \"Blocked\" under Me."
     },
     "no_muted": {
-      "text": "No muted peers.",
-      "doc": "S3 — empty muted list."
+      "text": "You have not blocked anyone.",
+      "doc": "Empty block list."
     },
     "unmute": {
-      "text": "Unmute",
-      "doc": "S3 — unmute a peer."
+      "text": "Unblock",
+      "doc": "Reverses the block (basis:unmute)."
     },
     "removed": {
       "text": "{{name}} is no longer in this circle. They keep any other circle you share.",

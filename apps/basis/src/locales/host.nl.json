@@ -271,7 +271,7 @@
       "doc": "/blocked op lege lijst."
     },
     "list_heading": {
-      "text": "Gedempt, {{count}} in totaal:",
+      "text": "Geblokkeerd, {{count}} in totaal:",
       "doc": "The /muted reply, the line above the list."
     }
   },

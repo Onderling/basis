@@ -70,6 +70,49 @@ describe('lint-register-bypass', () => {
     }
   });
 
+  it('FAILS on a cache WRITE that skips the register — the bug this half was added for', () => {
+    // The shape that shipped: a screen saves the relay URL through the pref store and never echoes the
+    // register, so the setting reverts on the next app open while another door writes both. The write
+    // goes through a factory-made store, not `setItem`, which is exactly why a naive check misses it.
+    const dir = path.join(ROOT, 'apps', 'basis-mobile', 'src', '.guard-fixture-tmp');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'saver.js'), [
+      "import { createRelayPrefStore, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';",
+      'const relayStore = createRelayPrefStore(asyncStorageRelayIo(null));',
+      'export const save = (url) => relayStore.set(url);',
+    ].join('\n'));
+    try {
+      expect(runFails()).toMatch(/writes the 'cc\.relayUrl' cache .* never writes the register param 'relay\.url'/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('PASSES a writer that echoes the register, and a READER that changes nothing', () => {
+    const dir = path.join(ROOT, 'apps', 'basis-mobile', 'src', '.guard-fixture-tmp');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'saver.js'), [
+      "import { createRelayPrefStore, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';",
+      'const relayStore = createRelayPrefStore(asyncStorageRelayIo(null));',
+      'export const save = async (url, callSkill) => {',
+      '  const saved = await relayStore.set(url);',
+      "  callSkill('params', 'set-param', { key: 'relay.url', value: saved });",
+      '};',
+    ].join('\n'));
+    // …and the reader beside it: the transport loads the relay at connect and writes nothing. Asking
+    // this file for a register write reported three innocent files the first time round.
+    writeFileSync(path.join(dir, 'reader.js'), [
+      "import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';",
+      'export const read = async () => resolveRelayUrl(await asyncStorageRelayIo(null).load(), null);',
+    ].join('\n'));
+    try {
+      const out = execFileSync(process.execPath, [SCRIPT], { cwd: ROOT, encoding: 'utf8' });
+      expect(out).toMatch(/no raw bypass/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('FAILS when a mirror entry goes stale — the list only ever shrinks', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'guard-'));
     try {

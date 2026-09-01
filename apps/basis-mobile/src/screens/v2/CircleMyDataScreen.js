@@ -106,6 +106,12 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const saveRelay = useCallback(async () => {
     try {
       const saved = await relayStore.set(relayInput);
+      // The bare key is only the PRE-BOOT CACHE (the transport connects before the agent exists); the
+      // register is the authority. Writing one and not the other is how this setting reverted on the
+      // next app open — the launcher's own relay op already wrote both, so the two doors disagreed
+      // about what the user had chosen. Same value, both homes, idempotent.
+      callSkill?.('params', 'set-param', { key: 'relay.url', value: saved ?? '' })
+        ?.catch?.(() => { /* the cache stands */ });
       setRelayInput(saved);
       // Live reconnect when the host wired it (bundle.reconnectPeer); otherwise it applies on next app open.
       if (typeof onReconnectPeer === 'function') {
@@ -118,7 +124,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         setRelayNote(t('circle.mydata.relay_saved_reload', { url: saved || t('circle.mydata.relay_off') }));
       }
     } catch (e) { setRelayNote(t('circle.mydata.relay_error', { msg: e?.message ?? '' })); }
-  }, [relayStore, relayInput, onReconnectPeer]);
+  }, [callSkill, relayStore, relayInput, onReconnectPeer]);
 
   // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
   // the device knows, which circles ride each, and what removing one would cost.
@@ -651,7 +657,12 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           <Pressable
             key={lg}
             style={[styles.action, lg === lang() && styles.actionActive]}
-            onPress={() => setLang(lg)}
+            onPress={() => {
+              setLang(lg);   // the pre-boot cache — i18n initialises before the agent exists
+              // …and the register, which is the authority. Without this the choice reverts the moment
+              // something reconciles from the register, the same way the relay setting did.
+              callSkill?.('params', 'set-param', { key: 'app.lang', value: lg })?.catch?.(() => {});
+            }}
             testID={`mydata-lang-${lg}`}
           >
             <Text style={[styles.actionLabel, lg === lang() && styles.actionActiveLabel]}>{lg.toUpperCase()}</Text>

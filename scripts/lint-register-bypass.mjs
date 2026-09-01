@@ -171,6 +171,76 @@ for (const touch of rawTouches()) {
   }
 }
 
+/**
+ * A WRITE to a mirrored cache must also write the register, or the two homes drift and whichever is read
+ * later wins. That is not hypothetical: the mobile "My data" screen saved the relay URL to the cache
+ * only, while the launcher's own relay op wrote both — so the setting reverted on the next app open and
+ * two doors disagreed about what the user had chosen. The language button beside it had the same shape.
+ *
+ * Finding it needs one more step than the read check, because a cache write is rarely a `setItem` at the
+ * call site: it goes through the pref module that owns the key (`relayStore.set(url)`, `setLang(lg)`).
+ * A guard that only matched `setItem` passed straight over both bugs — it did, when this was first
+ * written. So: locate the module that DECLARES each mirrored key, find who imports it, and require any
+ * importer that calls a writer to name the register param too.
+ */
+const declaringFile = (key) => execSync(
+  `grep -rl "const [A-Za-z_$][A-Za-z0-9_$]* = '${key}'" --include=*.js ${SCAN.join(' ')} | grep -v node_modules || true`,
+  { cwd: ROOT, encoding: 'utf8' },
+).trim().split('\n').filter(Boolean)[0] ?? null;
+
+/**
+ * The writer exports of a mirror's own module — the functions through which the cache is actually
+ * changed. Derived from the module, not guessed: a list of likely-looking names matched any store in
+ * an importing file and reported four innocents on its first run.
+ */
+const writersOf = (src) => [...src.matchAll(/export (?:async )?function ([A-Za-z_$][\w$]*)/g)]
+  .map((m) => m[1])
+  .filter((n) => /^(?:set|create|make)/.test(n) || /(?:Store|Io)$/.test(n));
+
+for (const [key, param] of mirrors ?? []) {
+  const home = declaringFile(key);
+  if (!home) continue;                      // no declaring module: the read check covers the literals
+  const base = home.split('/').pop().replace(/\.js$/, '');
+  const writers = writersOf(read(home));
+  if (!writers.length) continue;
+  const importers = execSync(
+    `grep -rln "from '[^']*${base}\.js'" --include=*.js ${SCAN.join(' ')} | grep -v node_modules || true`,
+    { cwd: ROOT, encoding: 'utf8' },
+  ).trim().split('\n').filter(Boolean).filter((f) => !/\/test\/|\.test\.|__tests__/.test(f));
+
+  for (const file of importers) {
+    if (file === home) continue;
+    const src = read(file);
+    // Only an importer that actually IMPORTS one of those writers and CALLS it is writing the cache.
+    // Everything else importing this module is reading it (`t`, `lang`) and changes nothing.
+    // Two conditions, both needed, and each one learned from a false positive: the name must come from
+    // THIS module (a `setLang` handed in through opts is the caller's own, not the cache's), and the
+    // call must be a WRITE (`asyncStorageRelayIo(AsyncStorage).load()` is how the transport READS the
+    // relay at connect — that file changes nothing and must not be asked to write the register).
+    const imported = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*'[^']*${base}\\.js'`).exec(src);
+    const names = imported ? imported[1].split(',').map((n) => n.trim().split(/\s+as\s+/).pop()) : [];
+    const used = writers.filter((w) => names.includes(w) && new RegExp(`\\b${w}\\s*\\(`).test(src));
+    const writesThrough = used.some((w) => {
+      if (!/(?:Store|Io)$/.test(w)) return true;          // a plain setter: calling it IS the write
+      if (/\.\s*save\(/.test(src)) return true;             // the raw IO, written directly
+      // The usual shape: the factory's result is held in a const, and THAT is what gets `.set()`.
+      // Missing this hop is why the guard first passed over the relay half of the very bug it was
+      // written for, while catching the language half two functions below it.
+      const held = [...src.matchAll(new RegExp(`(?:const|let)\\s+([A-Za-z_$][\\w$]*)[^=\\n]*=[^;\\n]*\\b${w}\\s*\\(`, 'g'))]
+        .map((m) => m[1]);
+      return held.some((v) => new RegExp(`\\b${v}\\s*\\.\\s*(?:set|save)\\(`).test(src));
+    });
+    if (!used.length || !writesThrough) continue;
+    if (src.includes(`'${param}'`)) continue;
+    problems.push(
+      `${file} writes the '${key}' cache (via ${base}) but never writes the register param '${param}'. `
+      + `Echo it: \`callSkill('params','set-param',{ key: '${param}', value })\`. A cache written alone `
+      + 'reverts the moment anything reconciles from the register — which is how the relay setting on '
+      + 'mobile silently went back to its old value after every restart.',
+    );
+  }
+}
+
 // The mirror map must stay honest: an entry nothing touches any more is a cache that has been retired.
 // "Touches" includes naming the key in a constant the shells store through — the cache is the KEY, not
 // any one call site.

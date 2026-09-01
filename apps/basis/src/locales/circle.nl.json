@@ -1886,6 +1886,10 @@
       "agents": {
         "text": "Agents",
         "doc": "S6.C — app label (agents, 2026-07-09). Key MUST match the DEFAULT_CIRCLE_ORIGINS origin 'agents' (the read-only 'your agents' surface)."
+      },
+      "lists": {
+        "text": "Lijsten",
+        "doc": "The composable lists app, in the circle's app list (settings + the freedom matrix)."
       }
     },
     "storage_err": {
@@ -3557,6 +3561,38 @@
     "pick_type": {
       "text": "Toevoegen als:",
       "doc": "K2 lists panel — the ambiguous-type picker prompt."
+    },
+    "need_name": {
+      "text": "Een lijst heeft een naam nodig.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "made": {
+      "text": "Lijst \"{{name}}\" gemaakt.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "need_list_and_text": {
+      "text": "Zeg welke lijst, en wat erbij moet.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "no_such_list": {
+      "text": "Geen lijst \"{{name}}\" hier.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "added": {
+      "text": "\"{{text}}\" toegevoegd aan {{name}}.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "no_circle": {
+      "text": "Open eerst een kring.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "need_item": {
+      "text": "Zeg welk item.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "done": {
+      "text": "Afgevinkt.",
+      "doc": "The composable lists feature, spoken from the waist."
     }
   },
   "share": {
@@ -5344,6 +5380,14 @@
     "task": {
       "text": "Taak",
       "doc": "Het +-menu-item dat een taak maakt in dit gesprek."
+    },
+    "new_list": {
+      "text": "Nieuwe lijst",
+      "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "list_item": {
+      "text": "Lijstitem",
+      "doc": "A \"+\" menu entry for the composable lists."
     }
   },
   "conversationKinds": {
@@ -5923,6 +5967,12 @@
     "share": {
       "text": "Deel hier",
       "doc": "Rij-actie op een itemkaart: zet dit item in het gesprek."
+    }
+  },
+  "list": {
+    "done": {
+      "text": "Klaar",
+      "doc": "Row action on a list item: tick it off."
     }
   }
 }

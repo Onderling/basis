@@ -272,6 +272,7 @@ import { composerReplyToStream } from '../../src/v2/composerReply.js';
 import { attachEntriesFor } from '../../src/v2/attachEntries.js';
 import { cardForCreatedItem } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
+import { listsManifest } from '../../../lists/manifest.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -850,6 +851,61 @@ function webFilePicker() {
  *  Rebuilt per call so a rescope (an app toggled off) is reflected without a second cache to keep. */
 function circleComposerCommands() {
   return createComposerCommands({ kind: 'circle', catalogue: circleCatalogue ?? undefined });
+}
+
+/**
+ * The composable LISTS feature, on the waist.
+ *
+ * Its service is per-circle (`getCircleLists` — the circle's own store and seal strategy), which is why
+ * it is mounted by the shell rather than served by the agent: the handlers hold state only a running
+ * shell has. Each op takes the circle it acts in, so one mount serves every circle.
+ *
+ * This is what the panel has been calling directly. Now the "+" can offer it, a slash command reaches
+ * it, and a journey can drive it — the feature stops being something only its own screen can open.
+ */
+function listsOpsFor() {
+  const svcFor = async (circleId) => getCircleLists(circleId, await policyStore.get(circleId).catch(() => ({})));
+  const circleOf = (args) => args?.circleId ?? getActiveCircle();
+  return {
+    createList: async (args) => {
+      const cid = circleOf(args);
+      const text = String(args?.text ?? '').trim();
+      if (!cid || !text) return { ok: false, error: t('circle.lists.need_name') };
+      const svc = await svcFor(cid);
+      const made = await svc.createList(cid, text, LOCAL_ACTOR);
+      return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.made', { name: text }) };
+    },
+    addToList: async (args) => {
+      const cid = circleOf(args);
+      const text = String(args?.text ?? '').trim();
+      const listRef = String(args?.list ?? '').trim();
+      if (!cid || !text || !listRef) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      const svc = await svcFor(cid);
+      // The list may be named rather than identified — a person types "boodschappen", not an id.
+      const containers = await svc.listContainers(cid);
+      const target = containers.find((c) => c.id === listRef)
+        ?? containers.find((c) => String(c.text ?? '').toLowerCase() === listRef.toLowerCase());
+      if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: listRef }) };
+      const kind = String(args?.kind ?? '').trim() || undefined;
+      const made = await svc.addItem(cid, target.id, text, LOCAL_ACTOR, kind ? { hint: kind } : undefined);
+      return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.added', { text, name: target.text ?? listRef }) };
+    },
+    listLists: async (args) => {
+      const cid = circleOf(args);
+      if (!cid) return { ok: false, error: t('circle.lists.no_circle') };
+      const svc = await svcFor(cid);
+      const containers = await svc.listContainers(cid);
+      return { ok: true, items: containers.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
+    },
+    markListItemDone: async (args) => {
+      const cid = circleOf(args);
+      const itemId = String(args?.itemId ?? '').trim();
+      if (!cid || !itemId) return { ok: false, error: t('circle.lists.need_item') };
+      const svc = await svcFor(cid);
+      await svc.markDone(cid, itemId, LOCAL_ACTOR);
+      return { ok: true, message: t('circle.lists.done') };
+    },
+  };
 }
 
 /** Build and mount the table. Called at boot and again whenever the catalogue is rescoped, because
@@ -2031,6 +2087,9 @@ function buildCircleBot(agent) {
     { manifest: mockStoopManifest },
     { manifest: mockFolioManifest },
     { manifest: calendarManifest },
+    // The composable LISTS feature's own contract. It has been running behind its panel since the
+    // container work; declaring it is what lets the "+", a slash command and a journey reach it.
+    { manifest: listsManifest },
     // agents LAST (2026-07-09): no op-id collisions expected (listAgents/viewAgent
     // are unique), and last-in-order means any future collision resolves to the
     // earlier, established app.  Mirrors composeManifests.js on mobile — the two
@@ -8103,6 +8162,8 @@ async function boot() {
         publishEvent: publishEventToLog,
       });
       mountBasisOpsOnAgent(agent);
+      // …and the composable lists, whose service the shell owns per circle.
+      try { agent.mountAppOps?.('lists', listsOpsFor(), listsManifest); } catch { /* older composition */ }
       // Governance rides the RAIL: signed, circle-scoped statements. The shell exposes the agent's
       // per-circle signer resolver to the bind sites, and builds the receive-side rail (same declaration
       // + roster-binding rules) for the peer router's governance ingest below.

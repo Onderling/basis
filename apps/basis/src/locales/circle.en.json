@@ -1886,6 +1886,10 @@
       "agents": {
         "text": "Agents",
         "doc": "S6.C — app label (agents, 2026-07-09). Key MUST match the DEFAULT_CIRCLE_ORIGINS origin 'agents' (the read-only 'your agents' surface)."
+      },
+      "lists": {
+        "text": "Lists",
+        "doc": "The composable lists app, in the circle's app list (settings + the freedom matrix)."
       }
     },
     "storage_err": {
@@ -3557,6 +3561,38 @@
     "pick_type": {
       "text": "Add as:",
       "doc": "K2 lists panel — the ambiguous-type picker prompt."
+    },
+    "need_name": {
+      "text": "A list needs a name.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "made": {
+      "text": "List \"{{name}}\" made.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "need_list_and_text": {
+      "text": "Say which list, and what to add.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "no_such_list": {
+      "text": "No list called \"{{name}}\" here.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "added": {
+      "text": "Added \"{{text}}\" to {{name}}.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "no_circle": {
+      "text": "Open a circle first.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "need_item": {
+      "text": "Say which item.",
+      "doc": "The composable lists feature, spoken from the waist."
+    },
+    "done": {
+      "text": "Ticked off.",
+      "doc": "The composable lists feature, spoken from the waist."
     }
   },
   "share": {
@@ -5344,6 +5380,14 @@
     "task": {
       "text": "Task",
       "doc": "The + menu entry that creates a task in this conversation."
+    },
+    "new_list": {
+      "text": "New list",
+      "doc": "A \"+\" menu entry for the composable lists."
+    },
+    "list_item": {
+      "text": "List item",
+      "doc": "A \"+\" menu entry for the composable lists."
     }
   },
   "conversationKinds": {
@@ -5923,6 +5967,12 @@
     "share": {
       "text": "Share here",
       "doc": "Row action on an item card: put this item in the conversation."
+    }
+  },
+  "list": {
+    "done": {
+      "text": "Done",
+      "doc": "Row action on a list item: tick it off."
     }
   }
 }

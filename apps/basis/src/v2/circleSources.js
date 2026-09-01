@@ -63,7 +63,11 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
 // composed-app scope for its ops to survive scopeCatalogueToApps and reach the
 // slash-suggest / LLM tool list on web. Matches the merge order in
 // circleApp.js baseSources + mobile composeManifests.js (manifest-pipeline.md).
-export const DEFAULT_CIRCLE_ORIGINS = ['stoop', 'tasks', 'household', 'calendar', 'folio', 'agents'];
+// 'lists' (2026-09-01) — the composable lists. Circle CONTENT, so it belongs in the composed scope like
+// any other app: without it the "+" cannot offer a list entry, the bot cannot put milk on the shopping
+// list, and a slash command resolves to nothing. Its ops all declare `requires: ['lists']`, so a circle
+// with the feature switched off still offers none of them — the feature gate does that work, not this list.
+export const DEFAULT_CIRCLE_ORIGINS = ['stoop', 'tasks', 'household', 'calendar', 'folio', 'agents', 'lists'];
 
 // Perf #2 (2026-05-30) — does `catalogue` declare `opId` on `origin`?
 // The merged catalogue stores ops under either the bare `opId` (then

@@ -2725,6 +2725,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   let selfAgent = null;
   let mountedBasisOps = null;
   let defaultBasisOps = null;
+  // Other LOCAL apps a shell mounts — a feature whose handlers hold the shell's own per-circle state
+  // (its store, its seal strategy) and so cannot be an agent's skills. `lists` is the first: the
+  // composable-lists service lived behind its own panel because nothing declared it.
+  const mountedLocalApps = new Map();   // appOrigin → { manifest, ops }
   const basisOps = () => mountedBasisOps ?? (defaultBasisOps ??= createLocalBuiltins({
     catalogue: mergeManifests([{ manifest: basisManifest }]),
     // No localisation on a bare agent: a key IS the message, and a key is at least true. A shell that
@@ -3289,6 +3293,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         // caller is a surface painting a row, and a throw there is an app that looks broken.
         return { ok: false, error: 'not-mounted', app: 'basis', op: opId };
       }
+      return handler(args ?? {});
+    }
+    // A local app a shell mounted (see `mountAppOps`). Same contract as the `basis` branch above: the
+    // app's own manifest gates which ops exist, an absent handler is a structured refusal, never a throw.
+    const local = mountedLocalApps.get(appOrigin);
+    if (local) {
+      if (!local.manifest?.operations?.some((o) => o.id === opId)) {
+        return { ok: false, error: 'unknown-op', app: appOrigin, op: opId };
+      }
+      const handler = local.ops?.[opId];
+      if (typeof handler !== 'function') return { ok: false, error: 'not-mounted', app: appOrigin, op: opId };
       return handler(args ?? {});
     }
     throw new Error(`realAgent: unknown appOrigin "${appOrigin}"`);
@@ -4774,9 +4789,17 @@ export async function createRealHouseholdAgent(opts = {}) {
      * @param {string} appOrigin  'basis' (the only local app today)
      * @param {Record<string, Function>} ops  opId → handler, e.g. `createLocalBuiltins({…})`
      */
-    mountAppOps: (appOrigin, ops) => {
-      if (appOrigin !== 'basis') throw new Error(`mountAppOps: "${appOrigin}" is not a local app`);
-      mountedBasisOps = ops && typeof ops === 'object' ? ops : null;
+    mountAppOps: (appOrigin, ops, manifest = null) => {
+      if (appOrigin === 'basis') {
+        mountedBasisOps = ops && typeof ops === 'object' ? ops : null;
+        return;
+      }
+      // Any other local app must bring its MANIFEST, because that is what says which ops exist —
+      // basis's is known here, another app's is not, and a table with no contract behind it is exactly
+      // the "feature only its own screen can open" this mechanism exists to end.
+      if (!manifest?.operations) throw new Error(`mountAppOps: "${appOrigin}" needs its manifest`);
+      if (ops && typeof ops === 'object') mountedLocalApps.set(appOrigin, { manifest, ops });
+      else mountedLocalApps.delete(appOrigin);
     },
   };
   selfAgent = api;

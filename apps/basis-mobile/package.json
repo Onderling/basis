@@ -24,7 +24,6 @@
     "@onderling/blob-gateway": "file:../../packages/blob-gateway",
     "@onderling/core": "file:../../packages/core",
     "@onderling/kring-host": "file:../../packages/kring-host",
-    "onderling-feedback": "link:../../../feedback",
     "@onderling/local-store": "file:../../packages/local-store",
     "@onderling/manifest-host": "file:../../packages/manifest-host",
     "@onderling/oidc-session": "file:../../packages/oidc-session",
@@ -80,6 +79,9 @@
     "@onderling/item-store": "workspace:*",
     "@onderling/pod-client": "workspace:*",
     "@onderling/pseudo-pod": "workspace:*"
+  },
+  "optionalDependencies": {
+    "onderling-feedback": "link:../../../feedback"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",

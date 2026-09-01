@@ -85,9 +85,11 @@
     "i18next": "^23.15.0",
     "qrcode": "^1.5.4",
     "@onderling/attribute-charter": "workspace:*",
-    "onderling-feedback": "link:../../../feedback",
     "@onderling/logger": "workspace:*",
     "@onderling/sync-engine": "workspace:*"
+  },
+  "optionalDependencies": {
+    "onderling-feedback": "link:../../../feedback"
   },
   "devDependencies": {
     "@onderling/pseudo-pod": "workspace:*",

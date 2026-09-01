@@ -869,6 +869,15 @@
 }
 .cc-cthread__skill:hover { background: var(--accent); color: var(--accent-contrast); }
 .cc-cthread__error { font-size: 13px; color: var(--danger); padding: 6px 4px; }
+/* The contact thread's slash-command suggest — the circle composer's list, in this thread's chrome.
+   Not floating: a contact thread's composer sits at the end of the flow, so the list simply stacks
+   above it rather than needing a positioned parent. */
+.cc-cthread__suggest { list-style: none; margin: 10px 0 0 0; padding: 4px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
+.cc-cthread__suggest[hidden] { display: none; }
+.cc-cthread__suggest-item { display: flex; align-items: baseline; gap: 10px; padding: 6px 12px; cursor: pointer; }
+.cc-cthread__suggest-item:hover { background: var(--paper-2); }
+.cc-cthread__suggest-cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); font-weight: 600; }
+.cc-cthread__suggest-hint { font-size: 12px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cc-cthread__composer { display: flex; gap: 8px; margin-top: 10px; }
 .cc-cthread__input {
   flex: 1 1 auto; font: inherit; font-size: 14px; padding: 10px 12px;

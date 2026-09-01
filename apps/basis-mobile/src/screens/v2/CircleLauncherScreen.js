@@ -81,7 +81,6 @@ import {
   // Phase 3 — the shared circle label→candidate lookup (base items + app-qualified live fetch).
   makeCircleLookup,
   // Composer parity — the classic shell's slash-command suggest, shared so mobile renders the same set.
-  suggestCommands,
   // Conversational follow-up for needsForm (shared) — ask for a missing field, next message answers.
   // beginFormFollowUp/completeMultiFieldFollowUp drive the 2+-field inline form (parity with web).
   beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp,
@@ -128,6 +127,7 @@ import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
 import { parseCircleBuiltin } from '../../../../basis/src/v2/circleComposerBuiltins.js';
+import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 // The SHARED security-status report — the SAME handler web reaches (circleApp.js). Mobile's circle composer
 // classified `/security-status` (it's in CIRCLE_BUILTIN_COMMANDS) but had no branch, so it fell through to the
 // bot/feedback path — a web≡mobile drift (#18). This restores parity.
@@ -2622,9 +2622,12 @@ function CircleDetail({
   // same logic + set as web's dropdown). Tapping a row fills the command; the bash-style ArrowUp/Down
   // history that web also has is a keyboard affordance with no touch-gesture equivalent, so it's
   // intentionally desktop-only (the suggest list is the mobile parity surface).
+  // Through the shared composer seam, which the contact thread uses too: one entry point, one filter
+  // rule, two contexts (a circle's scoped catalogue here; the peer's exposed skills there).
+  const composerCommands = useMemo(
+    () => createComposerCommands({ kind: 'circle', catalogue }), [catalogue]);
   const suggestMatches = useMemo(
-    () => (catalogue ? suggestCommands(catalogue, composerText) : []),
-    [catalogue, composerText],
+    () => composerCommands.suggest(composerText), [composerCommands, composerText],
   );
   // Permission gate (classic shell's `allowCommands` analog): chat disabled for this circle ⇒ read-only.
   const canPost = isFeatureEnabled(policy, 'chat');

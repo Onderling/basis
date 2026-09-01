@@ -10,6 +10,7 @@
  * components.
  */
 
+import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 // Privacy-badge palette (§10c) — the discrete states map to Onderling status tokens (mirrors
@@ -169,13 +170,52 @@ export function renderContactThread(container, {
   }
 
   // ── composer ──────────────────────────────────────────────────────────────
+  // The typed door. This thread already knew what the peer exposes (`skills`, the chips above) and had
+  // no way to TYPE any of it — a `/` line went out as chat. Mobile had a hand-written parser for the
+  // same thing; both now read the one seam, so "what can I do here" has one answer per context and one
+  // implementation. A bot is a contact, so this is also how a person asks a bot what it offers.
+  const commands = createComposerCommands({ kind: 'contact', skills });
   const composer = document.createElement('form');
   composer.className = 'cc-cthread__composer';
+  const suggestEl = document.createElement('ul');
+  suggestEl.className = 'cc-cthread__suggest';
+  suggestEl.hidden = true;
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'cc-cthread__input';
   input.placeholder = inputHint || tr('circle.contacts.composer', { name });
   if (inputValue) { input.value = inputValue; }
+  const paintSuggest = () => {
+    const rows = commands.suggest(input.value);
+    suggestEl.replaceChildren();
+    for (const row of rows) {
+      const li = document.createElement('li');
+      li.className = 'cc-cthread__suggest-item';
+      li.dataset.opId = row.opId;
+      const cmd = document.createElement('span');
+      cmd.className = 'cc-cthread__suggest-cmd';
+      cmd.textContent = row.command;
+      li.appendChild(cmd);
+      if (row.hint) {
+        const hint = document.createElement('span');
+        hint.className = 'cc-cthread__suggest-hint';
+        hint.textContent = row.hint;
+        li.appendChild(hint);
+      }
+      // Fill the command plus a space, the way the circle composer does — then keep typing arguments.
+      // `mousedown`, not `click`: the input blurs first otherwise and the list is gone before the tap.
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        input.value = `${row.command} `;
+        paintSuggest();
+        input.focus();
+      });
+      suggestEl.appendChild(li);
+    }
+    suggestEl.hidden = rows.length === 0;
+  };
+  input.addEventListener('input', paintSuggest);
+  container.appendChild(suggestEl);
   composer.appendChild(input);
   const sendBtn = document.createElement('button');
   sendBtn.type = 'submit';
@@ -187,6 +227,11 @@ export function renderContactThread(container, {
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
+    suggestEl.hidden = true;
+    // A command this peer offers runs; anything else — including a `/` line they do not expose — is an
+    // ordinary turn, because in a conversation a slash is sometimes just a slash.
+    const cmd = commands.parse(text);
+    if (cmd && typeof onSkillTap === 'function') { onSkillTap({ id: cmd.opId }, cmd.rest); return; }
     if (typeof onSend === 'function') onSend(text);
   });
   container.appendChild(composer);

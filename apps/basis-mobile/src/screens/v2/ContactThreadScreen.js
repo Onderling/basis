@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { subscribeContactReplies } from '../../core/contactReplyInbox.js';
@@ -24,6 +25,10 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
   // the bot's skills, shown as in-thread quick actions (dispatched to
   // the bot via the registry, distinct from a conversational turn).
   const skills = registry?.skillsFor?.(contactId) ?? [];
+  // The typed door, over the SAME seam every other composer uses. What it offers is what this peer
+  // exposes — a bot is a contact, so this is also "what can this bot do". Replaced a hand-written
+  // `/skill args` parser that did the same job in one place only.
+  const commands = useMemo(() => createComposerCommands({ kind: 'contact', skills }), [skills]);
 
   // A thread may open WITH its first lines — the ask that was answered and the answer (Nearby).
   const [messages, setMessages] = useState(() => (Array.isArray(contact?.seed) ? contact.seed : []));
@@ -43,6 +48,9 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
     }
   };
   const [input, setInput] = useState('');
+  // …and what to offer while the command word is being typed (closes as soon as a space is typed).
+  const suggestions = useMemo(
+    () => (input.startsWith('/') ? commands.suggest(input) : []), [commands, input]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const scrollRef = useRef(null);
@@ -77,13 +85,10 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
     const text = input.trim();
     if (!text || !channel) return;
     setInput('');
-    // `/skill args` → dispatch as a skill; otherwise a conversational turn.
-    if (text.startsWith('/')) {
-      const sp = text.slice(1).indexOf(' ');
-      const skillId = sp === -1 ? text.slice(1) : text.slice(1, sp + 1);
-      const rest = sp === -1 ? '' : text.slice(sp + 2).trim();
-      if (skills.some((s) => s.id === skillId)) { await runSkill(skillId, rest ? { text: rest } : {}); return; }
-    }
+    // A command this peer offers → dispatch it; anything else (including a `/` line they do not expose)
+    // is a conversational turn, because in a conversation a slash is sometimes just a slash.
+    const cmd = commands.parse(text);
+    if (cmd) { await runSkill(cmd.opId, cmd.rest ? { text: cmd.rest } : {}); return; }
     setError(false);
     setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text }]);
     setBusy(true);
@@ -95,7 +100,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
     } finally {
       setBusy(false);
     }
-  }, [input, channel, peerAddr, contactId, skills, runSkill]);
+  }, [input, channel, peerAddr, contactId, commands, runSkill]);
 
   return (
     <View style={styles.wrap} testID="contact-thread-screen">
@@ -160,6 +165,23 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
           <Text style={styles.sendText}>{t('circle.nearbyScreen.reach_share')}</Text>
         </Pressable>
       ) : null}
+      {/* The typed door: what this peer offers, while the command word is being typed. */}
+      {suggestions.length > 0 && (
+        <View style={styles.suggest} testID="contact-thread-suggest">
+          {suggestions.map((e) => (
+            <Pressable
+              key={e.command}
+              onPress={() => setInput(`${e.command} `)}
+              accessibilityRole="button"
+              testID={`contact-thread-suggest-${e.opId}`}
+              style={styles.suggestRow}
+            >
+              <Text style={styles.suggestCmd}>{e.command}</Text>
+              <Text style={styles.suggestHint} numberOfLines={1}>{e.hint}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       <View style={styles.composer}>
         <TextInput
           style={styles.input}
@@ -210,6 +232,10 @@ const makeStyles = (theme) => StyleSheet.create({
   bubbleBotText: { color: theme.color.ink, fontSize: 14, lineHeight: 20 },
   sending: { fontSize: 12, color: theme.color.inkSoft, fontStyle: 'italic', paddingHorizontal: 4 },
   skills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  suggest: { borderTopWidth: 1, borderTopColor: theme.color.line, paddingVertical: 4 },
+  suggestRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 6, paddingHorizontal: 12 },
+  suggestCmd: { color: theme.color.ink, fontWeight: '600' },
+  suggestHint: { color: theme.color.inkSoft, flexShrink: 1 },
   skill: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: theme.color.accent },
   skillText: { fontSize: 12, fontWeight: '600', color: theme.color.accent },
   error: { fontSize: 13, color: '#b3261e', paddingVertical: 6 },

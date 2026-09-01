@@ -20,6 +20,7 @@ export const DEFAULT_THEME_PREF = 'system';
 // The shared storage key. Web reads/writes it on localStorage; mobile on
 // AsyncStorage. Same string ⇒ one contract (a device that syncs prefs across a
 // web+mobile install lands on the same choice by construction).
+// pre-boot cache of display.theme
 export const THEME_PREF_KEY = 'basis.theme';
 
 /** Normalize an arbitrary value to a known preference. */

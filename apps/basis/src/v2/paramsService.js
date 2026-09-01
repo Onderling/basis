@@ -82,6 +82,25 @@ export const BASIS_USER_PARAMS = [
 ];
 
 /**
+ * The three pre-boot caches, as DATA — which raw storage key mirrors which param.
+ *
+ * The comment above says this in prose; a guard cannot read prose, and the two names differ on
+ * purpose (`basis.theme` predates the register and is a shared web↔mobile contract of its own), so
+ * no string comparison finds the pairing. Declared here, beside the params, because this is the one
+ * place that knows what the register owns: `lint-register-bypass` reads this map to decide whether a
+ * raw `getItem('…')` is a legitimate mirror (marked at its site) or a bypass.
+ *
+ * A new param does NOT belong here. This list only ever shrinks — an entry leaves when its value can
+ * be read from the register at every site that needs it, which is when the pre-boot ordering that
+ * forced the cache no longer applies.
+ */
+export const PARAM_PREBOOT_MIRRORS = Object.freeze({
+  'basis.theme':     'display.theme',   // the pre-paint hook in index.html stamps data-theme before any module loads
+  'circle.app.lang': 'app.lang',        // i18n initialises before the agent exists
+  'cc.relayUrl':     'relay.url',       // the transport connects before the agent exists
+});
+
+/**
  * Build a param register seeded with basis's settable params. Injected DOWN into whatever needs the live
  * value or the set op. `extraParams` lets a test or a later cluster declare more without editing this factory.
  */

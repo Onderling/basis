@@ -86,6 +86,7 @@ function interpolate(template, params, key) {
   });
 }
 
+// pre-boot cache of app.lang
 const LANG_KEY = 'circle.app.lang';
 const _langListeners = new Set();
 /** Subscribe to app-language changes (App.js re-renders the tree). Returns an unsubscribe fn. */

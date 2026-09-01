@@ -7,6 +7,7 @@
 // Mirrors the userLlmDefault store shape (createStore + per-platform IO adapters) so the two settings feel
 // the same in the Mij/My-data screen.
 
+// pre-boot cache of relay.url
 const STORAGE_KEY = 'cc.relayUrl';
 
 /** Coerce raw input to a valid ws://|wss:// relay URL, or '' (blank ⇒ use the env fallback). */

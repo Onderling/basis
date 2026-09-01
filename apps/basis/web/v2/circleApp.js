@@ -1171,6 +1171,7 @@ const eventLog = new EventLog({ initial: [], muted: [], retention: retentionFrom
  * the theme control. The pre-paint hook in index.html reads the same key at boot; 'system' = follow the OS.
  */
 function getThemePref() {
+  // pre-boot cache of display.theme
   try { return localStorage.getItem('basis.theme') || 'system'; } catch { return 'system'; }
 }
 
@@ -1183,6 +1184,7 @@ function getThemePref() {
 function setThemePref(v) {
   if (v !== 'system' && v !== 'light' && v !== 'dark') return false;
   try {
+    // pre-boot cache of display.theme — written through so the pre-paint hook sees the new choice
     if (v === 'system') localStorage.removeItem('basis.theme');
     else localStorage.setItem('basis.theme', v);
   } catch { /* best-effort */ }
@@ -4383,6 +4385,7 @@ async function showMyData() {
     await setLang(lng);
     // localStorage stays the PRE-BOOT CACHE (i18n initialises before the agent); the register is
     // the authority (device-params consolidation).
+    // pre-boot cache of app.lang
     try { localStorage.setItem('circle.app.lang', lng); } catch { /* best-effort */ }
     circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'app.lang', value: lng })
       .catch(() => { /* the cache stands */ });
@@ -7911,6 +7914,7 @@ async function boot() {
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.
+  // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
   await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
   renderCircleLauncher(rootEl, { loading: true, t });
@@ -8071,8 +8075,10 @@ async function boot() {
         const th = agent.getParamValue?.('display.theme');
         if ((th === 'light' || th === 'dark' || th === 'system') && th !== getThemePref()) setThemePref(th);
         const lg = agent.getParamValue?.('app.lang');
+        // pre-boot cache of app.lang
         let cachedLang = null; try { cachedLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
         if ((lg === 'nl' || lg === 'en') && lg !== cachedLang) {
+          // pre-boot cache of app.lang
           try { localStorage.setItem('circle.app.lang', lg); } catch { /* best-effort */ }
           setLang(lg).catch(() => {});
         }

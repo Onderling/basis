@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="./v2/theme.css" />
     <!-- theme pre-paint: apply a saved light/dark choice before first render;
          without a choice (or without JS) the OS preference decides. -->
+    <!-- pre-boot cache of display.theme — this runs before any module, which is why the cache exists -->
     <script>try{var _t=localStorage.getItem('basis.theme');if(_t==='dark'||_t==='light')document.documentElement.dataset.theme=_t}catch(e){}</script>
     <link rel="stylesheet" href="./v2/circle.css" />
     <!-- SP-13.2.1 — nkn-sdk CDN.  circleApp.js bootstraps NKN at boot

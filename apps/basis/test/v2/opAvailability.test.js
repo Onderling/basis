@@ -76,16 +76,28 @@ describe('opAvailability', () => {
   });
 
   it('greys where the capability matrix greys, hides where it hides', () => {
+    // The row shape is the freedom matrix's own — `{app, atom, noun, enabled, optedOut, consequence}`.
+    // These cases used to pass a hand-shaped `{treatment}` row and then accept EITHER outcome
+    // (`greyed || available`), which is a test agreeing with whatever happens: the row matched nothing,
+    // every op read as allowed, and the gate was never exercised. Found by a journey that asserted the
+    // refusal outright and went red. A capability gate that cannot fail its own test is not a gate.
+    const withheld = (consequence) => [{
+      app: 'basis', atom: 'add', noun: null, enabled: false, optedOut: false, consequence,
+    }];
     const grey = makeOpAvailability({
-      manifestsByOrigin, catalogue: catalogueWith('embed'),
-      capabilityMatrix: [{ app: 'basis', atom: 'add', treatment: 'grey' }],
+      manifestsByOrigin, catalogue: catalogueWith('embed'), capabilityMatrix: withheld('greyed'),
     });
     const hide = makeOpAvailability({
-      manifestsByOrigin, catalogue: catalogueWith('embed'),
-      capabilityMatrix: [{ app: 'basis', atom: 'add', treatment: 'hide' }],
+      manifestsByOrigin, catalogue: catalogueWith('embed'), capabilityMatrix: withheld('hidden'),
     });
-    expect(grey.of('embed').state === 'greyed' || grey.of('embed').state === 'available').toBe(true);
-    expect(['hidden', 'available']).toContain(hide.of('embed').state);
+    expect(grey.of('embed')).toEqual({ state: 'greyed', reason: UNAVAILABLE.CAPABILITY });
+    expect(hide.of('embed')).toEqual({ state: 'hidden', reason: UNAVAILABLE.CAPABILITY });
+    // An AUTHORISED row is not a refusal — the gate only speaks when the capability is withheld.
+    const ok = makeOpAvailability({
+      manifestsByOrigin, catalogue: catalogueWith('embed'),
+      capabilityMatrix: [{ app: 'basis', atom: 'add', noun: null, enabled: true, optedOut: false, consequence: 'hidden' }],
+    });
+    expect(ok.of('embed').state).toBe('available');
   });
 
   it('an op no manifest declares is unknown — a typo must not read as "not switched on"', () => {

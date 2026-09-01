@@ -10,8 +10,9 @@
 //   1. THE GATE — an attachment must be sealed. Plaintext bytes and `data:` thumbnails are refused
 //      at the write, not hidden by a UI that happens not to offer them. This is the enforceability
 //      test applied to files: could a different app version post the bytes anyway?
-//   2. THE CORRIDOR — a message carrying a media pointer reaches the other people with the pointer
-//      intact, and the wire carries no plaintext.
+//   2. THE CORRIDOR — a message carrying a card reaches the other people with its payload intact, and
+//      the wire carries no plaintext. Every card variant, not only a photo: the whitelist used to
+//      match `media-card` by name, so an appointment shared from the + menu reached nobody.
 //
 // Runs in the app composition, so the chat lane is the real one (signed, verified at each rail).
 import { checker } from './_util.mjs';
@@ -81,13 +82,13 @@ export async function run({ relayUrl }) {
     }
 
     // ── 3. THE CORRIDOR — a message carrying a media pointer reaches the others ───────────────────
-    const media = {
+    const card = {
       kind: 'media-card',
       pointer: { type: 'blob', ref: 'blob://circle-e2e/att-1' },
       snapshot: { source: { type: 'blob', ref: 'blob://circle-e2e/att-1', enc: { sealed: true } } },
     };
     // Send it the way a shell does — append the signed entry AND fan it.
-    const sent = await sendCircleChat(anne, { groupId: CIRCLE, msgId: 'att-1', text: 'hier is de foto', media });
+    const sent = await sendCircleChat(anne, { groupId: CIRCLE, msgId: 'att-1', text: 'hier is de foto', card });
     check('the message with a media card is signed and sent', !sent?.error, JSON.stringify(sent)?.slice(0, 140));
 
     // What actually leaves the device is the WHITELISTED wire payload — assert on the statement.
@@ -101,6 +102,41 @@ export async function run({ relayUrl }) {
       const landed = await untilTrue(async () => node.chatRail.storedStatements(CIRCLE)
         .some((s) => s?.body?.subject === 'att-1'));
       check(`${who} receives the message carrying the attachment`, landed);
+    }
+
+    // ── 4. THE OTHER CARD KINDS — a photo was never the only thing a message can carry ────────────
+    // The + menu puts an APPOINTMENT in the conversation the same way it puts a photo there. That did
+    // not travel: the wire whitelist matched `media-card` by name and returned null for everything
+    // else, so an appointment rendered on the sender's screen and reached nobody — the failure this
+    // corridor exists to catch, one variant over. The snapshot must arrive INTACT, because the card a
+    // peer paints is built from it and nothing else.
+    const appointment = {
+      kind: 'time-card',
+      appOrigin: 'calendar',
+      itemRef: { app: 'calendar', type: 'calendar-event', id: 'evt-e2e-1' },
+      snapshot: {
+        id: 'evt-e2e-1', type: 'calendar-event', title: 'Koffie bij Frits',
+        startAt: '2026-09-02T13:00:00.000Z', endAt: '2026-09-02T14:00:00.000Z', timezone: 'UTC',
+      },
+      issuedBy: anne.pubKey,
+    };
+    const sentTime = await sendCircleChat(anne, {
+      groupId: CIRCLE, msgId: 'att-time-1', text: '📅 Koffie bij Frits', card: appointment,
+    });
+    check('a message carrying an APPOINTMENT card is signed and sent', !sentTime?.error,
+      JSON.stringify(sentTime)?.slice(0, 140));
+
+    const timeWire = JSON.stringify(anne.chatRail.storedStatements(CIRCLE)
+      .find((st) => st?.body?.subject === 'att-time-1')?.body?.payload ?? {});
+    check('the appointment SURVIVES the wire whitelist — title and start, not an empty card',
+      timeWire.includes('time-card') && timeWire.includes('Koffie bij Frits')
+        && timeWire.includes('2026-09-02T13:00'), timeWire.slice(0, 160));
+
+    for (const [who, node] of [['the second person', bram], ['the third person', cato]]) {
+      const landed = await untilTrue(async () => node.chatRail.storedStatements(CIRCLE)
+        .some((s) => s?.body?.subject === 'att-time-1'
+          && JSON.stringify(s.body.payload ?? {}).includes('Koffie bij Frits')));
+      check(`${who} receives the appointment card with its title intact`, landed);
     }
   } catch (err) {
     check('the attachment corridor completed', false, String(err?.message ?? err).slice(0, 200));

@@ -715,8 +715,8 @@ export async function teardown(...nodes) {
  * (`broadcastCircleChatStatement` → transport / pod routing per the circle's policy). The drop-in
  * replacement for the deleted plain-envelope `broadcastCircleMessage` in every journey test.
  */
-export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now(), media } = {}) {
-  const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, media });
+export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now(), card } = {}) {
+  const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, card });
   if (!res) return { error: 'no-circle-signer' };
   return node.agent.callSkill('stoop', 'broadcastCircleChatStatement', { groupId, event: res.statement, msgId, ts });
 }

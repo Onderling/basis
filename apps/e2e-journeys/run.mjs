@@ -51,8 +51,9 @@ import * as scope         from './journeys/scope.journey.mjs';
 import * as doors         from './journeys/doors.journey.mjs';
 import * as promotion     from './journeys/promotion.journey.mjs';
 import * as reach         from './journeys/reach.journey.mjs';
+import * as attachOffer   from './journeys/attach.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts, taskSession, lastAdmin, scope, doors, promotion, reach];
+const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts, taskSession, lastAdmin, scope, doors, promotion, reach, attachOffer];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const { readFile, writeFile } = await import('node:fs/promises');

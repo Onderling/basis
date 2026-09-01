@@ -267,6 +267,7 @@ import { EventLog } from '../../src/eventLog.js';
 // composition that never built the table at all — which is why every Advanced row for a basis op did
 // nothing here (`unknown appOrigin "basis"`), and why `/find` and `/brief` had no web route either.
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
+import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -840,6 +841,12 @@ function webFilePicker() {
     document.body.appendChild(input);
     input.click();
   });
+}
+
+/** The composer's typed door for this circle: what the place offers, then what this device can do.
+ *  Rebuilt per call so a rescope (an app toggled off) is reflected without a second cache to keep. */
+function circleComposerCommands() {
+  return createComposerCommands({ kind: 'circle', catalogue: circleCatalogue ?? undefined });
 }
 
 /** Build and mount the table. Called at boot and again whenever the catalogue is rescoped, because
@@ -6568,6 +6575,24 @@ function showCircle(id, circle, policy) {
             }));
             return;
           }
+        }
+        // Any OTHER command this device declares — the typed door for basis's own ops, now that they are
+        // on the waist. The five above are hand-written because each does more than dispatch an op (opens
+        // a screen, persists a relay URL, flips a transport); everything else IS just the op, so it goes
+        // through the same `{opId, args} → callSkill` every other surface uses, with the args read by the
+        // rule the manifest declared. This is what `lint-typed-commands-reachable`'s list of 24 was about.
+        const typed = circleComposerCommands()?.parse(line);
+        if (typed && typed.appOrigin === 'basis') {
+          try {
+            const r = await rawCallSkill('basis', typed.opId, typed.args ?? {});
+            const said = typeof r?.message === 'string' ? r.message
+              : typeof r?.error === 'string' ? r.error
+              : r == null ? '' : JSON.stringify(r);
+            if (said) circleNote(said);
+          } catch (err) {
+            circleNote(String(err?.message ?? err));
+          }
+          return;
         }
         const shareCmd = line.match(/^\/shareitem\s+(\S+)\s+(?:to\s+)?(\S+)\s*$/i);
         if (shareCmd) {

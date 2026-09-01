@@ -45,7 +45,7 @@ import { renderToDom } from '../../src/web/domAdapter.js';
 import { renderCircleScreen } from './circleScreen.js';
 import { renderCircleNoticeboard } from './circleNoticeboard.js';
 import { buildAttachControl } from './attachControl.js';
-import { suggestCommands } from '../../src/v2/commandSuggest.js';
+import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 // Convergence — the invite-circle feedback review renders the SAME editable per-point cards as the
 // contact-thread flow (not a flattened text bubble). Shared renderer, one look across both surfaces.
@@ -493,7 +493,12 @@ export function renderCircleView(container, {
       });
       suggestEl.hidden = false;
     };
-    const refreshSuggest = () => paintSuggest(catalogue ? suggestCommands(catalogue, input.value) : []);
+    // What can I do HERE: the circle's own commands, then this device's own — the shared seam both
+    // shells and both kinds of thread ask, so a person sees the same list wherever they type. It used to
+    // read the catalogue directly, which is scoped to the circle's apps, so `/whoami` and `/logs` were
+    // typeable-in-principle and undiscoverable in practice.
+    const composerCommands = createComposerCommands({ kind: 'circle', catalogue });
+    const refreshSuggest = () => paintSuggest(composerCommands.suggest(input.value));
     const acceptSuggest = (i) => {
       const m = entries[i];
       if (!m) return;

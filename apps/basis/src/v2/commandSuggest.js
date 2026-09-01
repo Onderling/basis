@@ -27,6 +27,9 @@ export function buildCommandPool(catalogue) {
       command: slash,
       hint: (op.surfaces.chat && op.surfaces.chat.hint) || op.id || '',
       opId: op.id || '',
+      // WHICH app owns the command, carried so a caller can dispatch it without re-resolving the id.
+      // Two apps may declare the same op id under different commands, so the id alone is not an address.
+      appOrigin: (entry && entry.appOrigin) || '',
     });
   }
   return out.sort((a, b) => a.command.localeCompare(b.command));

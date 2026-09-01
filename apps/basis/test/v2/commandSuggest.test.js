@@ -15,12 +15,15 @@ const SAMPLE = catalogueOf([
 
 describe('buildCommandPool', () => {
   it('extracts every op with a slash command, sorted by command, with hint (or id fallback)', () => {
-    expect(buildCommandPool(SAMPLE)).toEqual([
+    // `appOrigin` rides along so a caller can DISPATCH a row without re-resolving the op id — two apps
+    // may declare the same id under different commands, so the id alone is not an address.
+    expect(buildCommandPool(SAMPLE)).toMatchObject([
       { command: '/addtask',       hint: 'add a task',    opId: 'addTask' },
       { command: '/apps',          hint: 'apps',          opId: 'apps' },        // hint fell back to id
       { command: '/complete-task', hint: 'finish a task', opId: 'completeTask' },
       { command: '/feedback',      hint: 'give feedback', opId: 'feedback' },
     ]);
+    for (const row of buildCommandPool(SAMPLE)) expect(row).toHaveProperty('appOrigin');
   });
   it('accepts the bare-op entry shape too (entry without a nested .op)', () => {
     const cat = { opsById: new Map([['x', { id: 'x', surfaces: { slash: { command: '/x' } } }]]) };

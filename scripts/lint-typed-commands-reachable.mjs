@@ -30,32 +30,38 @@ const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).tri
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
 /**
- * Handlers that exist and cannot be typed, pending L70. Dated so the list reads as debt, not design.
- * A ROUTED SCREEN COUNTS AS A DOOR (2026-09-01, corrected the same day by a walk). An op that declares
- * `surfaces.ui`/`surfaces.page` AND is routed by a shell is reached by tapping it, and asking it to ALSO
- * be typeable would be calling a second door's absence a defect. ROUTED is the load-bearing word: a page
- * nothing paints is not a door, and declaring one is worse than declaring nothing, because
- * `advancedOpRows` drops declared-page ops from the Advanced drawer — the only painter of a generic page
- * form on either shell. `find`/`brief`/`logs` were declared into that gap and vanished from the app
- * entirely; the browser walk found them missing. Hence `routedInAShell`: a declaration alone can no
- * longer quiet this guard, which is the property that let it be quieted wrongly in the first place.
+ * Handlers that exist and cannot be typed. EMPTY since 2026-09-01, and the emptiness is the point.
  *
- * SHRINK THIS by giving a command a door (add it to `CIRCLE_BUILTIN_COMMANDS` and wire both composers,
- * or declare `surfaces.ui`/`surfaces.page` on the op) or by deleting the handler. A new entry needs a
- * sentence saying why a person should not reach it.
+ * The list used to hold 24 names because "typeable" meant "in `CIRCLE_BUILTIN_COMMANDS`" — five commands
+ * each shell hand-parsed and hand-dispatched, because basis's ops were not on the agent's waist and a
+ * shell had to do something bespoke to reach them. With the ops mounted (`realAgent`'s `basis` branch),
+ * both circle composers dispatch the GENERAL case through the shared seam: `composerCommands.parse` reads
+ * the line against the manifest — the op's own `body` rule, so `/logs --app=stoop` and `/block alice`
+ * mean what they always meant — and the shell calls `callSkill('basis', opId, args)`.
+ *
+ * So reachability is no longer a list to maintain: an op is typeable BECAUSE it declares a slash command.
+ * This guard therefore checks the two things that could stop being true — that each shell still wires the
+ * general route, and that every handler still declares a command — and only falls back to the hardcoded
+ * five if a shell has dropped its route, which is the regression worth failing over.
+ *
+ * A new entry here needs a sentence saying why a person should not be able to type that op.
  */
-const UNREACHED = new Set([
-  // Composer affordances the circle UI now does with buttons rather than typing.
-  'embed', 'embed-file', 'embed-time', 'send-file', 'scanQr',
-  // Still meaningful, no door since chat was folded into the circle view (2026-07) — the L70 set.
-  'audit-tail', 'debug-dump', 'help', 'help-with',
-  // Reachable ONLY through the Advanced drawer's generic param form (2026-09-01). Each deserves a door
-  // of its own — search is a member act, the brief is a daily one, the event list answers "what happened
-  // while I was away" — and each needs a shell to paint it, which is UI work, not a manifest line.
-  'find', 'brief', 'logs',
-  'lookup-peer', 'me', 'mute', 'muted', 'unmute', 'peer-connect', 'publish-peer', 'rotate-identity',
-  'signin', 'signout', 'test-peer', 'whoami',
-]);
+const UNREACHED = new Set([]);
+
+/**
+ * Does this shell still dispatch ANY declared basis command, or only the hand-written five? Two things
+ * must both be present: the seam that reads the line (`composerCommands`), and the waist call that runs
+ * it. Either one missing means that shell has quietly gone back to five.
+ */
+function shellRoutesEveryCommand(rel) {
+  const src = read(rel);
+  return /composerCommands|createComposerCommands/.test(src)
+    && /appOrigin === 'basis'/.test(src);
+}
+const GENERAL_ROUTE = [
+  'apps/basis/web/v2/circleApp.js',
+  'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js',
+].filter((f) => !shellRoutesEveryCommand(f));
 
 /** The command keys of the chat builtins table — the first object `createLocalBuiltins` returns. */
 function chatBuiltins() {
@@ -97,6 +103,20 @@ const routedInAShell = (opId) => new RegExp(`['\`"]${opId}['\`"]`).test(shellSrc
  * while REMOVING the op from the drawer that was painting it. That is not a hypothetical; see above.
  */
 const manifestSrc = read('apps/basis/manifest.js');
+/**
+ * Does this op declare a slash command? Read off its OWN block, because the command is not the op id —
+ * `mute` is typed `/block`, `muted` is `/blocked`, `scanQr` is `/scan-qr`. Matching the two by name is
+ * the mistake that would make this guard demand commands that already exist.
+ */
+function declaresSlashCommand(opId) {
+  const at = manifestSrc.indexOf(`id:    '${opId}'`) >= 0
+    ? manifestSrc.indexOf(`id:    '${opId}'`)
+    : manifestSrc.indexOf(`id:   '${opId}'`);
+  if (at < 0) return false;
+  const nextId = manifestSrc.indexOf("id:    '", at + 10);
+  const body = manifestSrc.slice(at, nextId > 0 ? nextId : manifestSrc.length);
+  return /slash:\s*\{\s*command:\s*'\//.test(body);
+}
 function hasOwnDoor(opId) {
   const at = manifestSrc.indexOf(`id:    '${opId}'`) >= 0
     ? manifestSrc.indexOf(`id:    '${opId}'`)
@@ -113,9 +133,19 @@ const problems = [];
 const table = chatBuiltins();
 if (table.length === 0) problems.push('could not read the chat builtins table — the parse needle moved');
 
+for (const shell of GENERAL_ROUTE) {
+  problems.push(`${shell} no longer dispatches the general typed command (the composerCommands seam + the basis waist call). Without it only the five hand-written builtins can be typed there, and this guard's list goes back to 24.`);
+}
+
+const typeable = (cmd) => {
+  if (circleSet.has(cmd)) return true;                       // hand-written, dispatched by both shells
+  if (GENERAL_ROUTE.length > 0) return false;                // a shell dropped the route — five only
+  return declaresSlashCommand(cmd);
+};
+
 for (const cmd of table) {
-  if (circleSet.has(cmd) || UNREACHED.has(cmd) || hasOwnDoor(cmd)) continue;
-  problems.push(`"${cmd}" is a handler a person cannot type: it is not in CIRCLE_BUILTIN_COMMANDS (which both shells run) and not declared unreached. Give it a door, or say why it should not have one.`);
+  if (typeable(cmd) || UNREACHED.has(cmd) || hasOwnDoor(cmd)) continue;
+  problems.push(`"${cmd}" is a handler a person cannot type: it declares no slash command, and is not declared unreached. Give it one, or say why it should not have one.`);
 }
 for (const cmd of UNREACHED) {
   if (circleSet.has(cmd)) problems.push(`"${cmd}" is declared unreached AND present in CIRCLE_BUILTIN_COMMANDS — it has a door now, so remove it from UNREACHED.`);
@@ -127,4 +157,5 @@ if (problems.length) {
   for (const p of problems) console.error(`  • ${p}`);
   process.exit(1);
 }
-console.log(`✓ lint-typed-commands-reachable: ${table.length} handlers — ${circleSet.size} reachable in both shells, ${UNREACHED.size} declared unreached (ledger L70).`);
+const typeableCount = table.filter(typeable).length;
+console.log(`✓ lint-typed-commands-reachable: ${table.length} handlers — ${typeableCount} typeable in both shells (${circleSet.size} hand-written + the general route), ${UNREACHED.size} declared unreached.`);

@@ -23,20 +23,39 @@ const CIRCLE = catalogue([
 describe('a circle composer offers what the circle composes', () => {
   const cc = createComposerCommands({ kind: 'circle', catalogue: CIRCLE });
 
-  it('lists only ops that declare a slash command', () => {
-    expect(cc.pool.map((e) => e.command)).toEqual(['/brief', '/find', '/logs']);
+  it('lists the place\'s ops that declare a slash command, then this DEVICE\'s own', () => {
+    // The circle's catalogue is scoped to the apps it composes, which excludes basis on purpose (the
+    // bot's LLM must not pick `/me` out of a hundred ops). A person's own typing is the other case:
+    // `/whoami` and `/logs` are things this device does, equally true in every circle and in none.
+    const commands = cc.pool.map((e) => e.command);
+    expect(commands.slice(0, 3), 'the place comes first').toEqual(['/brief', '/find', '/logs']);
+    expect(commands, 'and the device\'s own are there too').toContain('/whoami');
+    expect(commands, 'de-duplicated: the place wins a collision')
+      .toEqual([...new Set(commands)]);
   });
 
   it('suggests while the command word is being typed, and stops at the space', () => {
-    expect(cc.suggest('/f').map((e) => e.command)).toEqual(['/find']);
-    expect(cc.suggest('/'), 'a bare slash offers everything here').toHaveLength(3);
+    expect(cc.suggest('/f').map((e) => e.command)).toContain('/find');
+    expect(cc.suggest('/'), 'a bare slash offers everything here').not.toHaveLength(0);
     expect(cc.suggest('/find ada'), 'past the word, the person is into arguments').toEqual([]);
     expect(cc.suggest('hello')).toEqual([]);
   });
 
-  it('parses a typed line into {opId, rest}', () => {
-    expect(cc.parse('/find ada lovelace')).toEqual({ opId: 'find', rest: 'ada lovelace' });
-    expect(cc.parse('/brief')).toEqual({ opId: 'brief', rest: '' });
+  it('parses a typed line into a dispatch: which app, which op, and the args as declared', () => {
+    // `rest` stays for a shell that only wants the raw tail; `args` is the manifest's own reading of it
+    // (`flags` → --key=value, `argline`/`match` → the whole line as `_match`), so a shell never has to
+    // re-invent per command — which is how five hand-parsed builtins became the only typeable ops.
+    expect(cc.parse('/find ada lovelace')).toMatchObject({ opId: 'find', rest: 'ada lovelace' });
+    expect(cc.parse('/brief')).toMatchObject({ opId: 'brief', rest: '' });
+    const typed = cc.parse('/whoami');
+    expect(typed, 'a device command carries its own origin, so the shell can dispatch it')
+      .toMatchObject({ opId: 'whoami', appOrigin: 'basis' });
+    // Read against the DEVICE's own declarations — this fixture's `/logs` is the fixture's op, and the
+    // body rule that matters here is the one basis declares.
+    const device = createComposerCommands({ kind: 'circle' });
+    expect(device.parse('/logs --app=stoop').args).toEqual({ app: 'stoop' });
+    expect(device.parse('/block alice').args, 'an argline body lands as _match, as the handlers read it')
+      .toEqual({ _match: 'alice' });
   });
 
   it('returns null for a slash line this place does not offer — chat, not a refusal', () => {
@@ -72,7 +91,7 @@ describe('a contact composer offers what THAT PEER exposes — not your own ops'
 
   it('suggests and parses over the peer’s list', () => {
     expect(cc.suggest('/s').map((e) => e.command)).toEqual(['/summarise']);
-    expect(cc.parse('/translate hallo')).toEqual({ opId: 'translate', rest: 'hallo' });
+    expect(cc.parse('/translate hallo')).toMatchObject({ opId: 'translate', rest: 'hallo' });
   });
 
   it('a peer that exposes nothing offers nothing, and says so by being empty', () => {
@@ -88,14 +107,17 @@ describe('the two contexts are the same shape', () => {
     const circle = createComposerCommands({ kind: 'circle', catalogue: CIRCLE });
     const contact = createComposerCommands({ kind: 'contact', skills: [{ id: 'x', description: 'y' }] });
     for (const row of [...circle.pool, ...contact.pool]) {
-      expect(Object.keys(row).sort()).toEqual(['command', 'hint', 'opId']);
+      expect(Object.keys(row).sort()).toEqual(expect.arrayContaining(['command', 'hint', 'opId']));
     }
   });
 
   it('tolerates a missing context rather than throwing into a composer', () => {
     const empty = createComposerCommands();
-    expect(empty.pool).toEqual([]);
-    expect(empty.suggest('/')).toEqual([]);
-    expect(empty.parse('/x')).toBeNull();
+    // No place, so nothing of the place's — but this device's own commands do not depend on being
+    // anywhere, which is the point of them: a person with no circle can still ask `/whoami`.
+    expect(() => empty.suggest('/')).not.toThrow();
+    expect(empty.pool.map((e) => e.command)).toContain('/whoami');
+    expect(empty.parse('/whoami')).toMatchObject({ opId: 'whoami', appOrigin: 'basis' });
+    expect(empty.parse('/x'), 'and a line nothing offers is still chat').toBeNull();
   });
 });

@@ -546,7 +546,18 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
     input.value = '/';
     input.dispatchEvent(new Event('input'));
     expect(suggest.hidden).toBe(false);
-    expect(el.querySelectorAll('.circle-view__suggest-item').length).toBe(2);
+    // The circle's own commands come first, then this DEVICE's — `/whoami` and the rest are things this
+    // device does, equally true in every circle, so they ride alongside what the place offers rather
+    // than being scoped away by it. (They were typeable before this and discoverable nowhere.)
+    const shown = [...el.querySelectorAll('.circle-view__suggest-item')].map((li) => li.textContent);
+    expect(shown.length).toBeGreaterThan(2);
+    expect(shown.filter((x) => /addtask|complete-task/.test(x)).length, "the place's own are offered").toBe(2);
+    expect(shown.some((x) => !/addtask|complete-task/.test(x)), "and so are the device's").toBe(true);
+    // …and typing toward one finds it: the list is ranked by what is being typed, not by who owns it.
+    input.value = '/wh';
+    input.dispatchEvent(new Event('input'));
+    expect([...el.querySelectorAll('.circle-view__suggest-item')].map((li) => li.textContent).join(' '))
+      .toContain('/whoami');
     input.value = '/addtask milk';
     input.dispatchEvent(new Event('input'));
     expect(suggest.hidden).toBe(true);

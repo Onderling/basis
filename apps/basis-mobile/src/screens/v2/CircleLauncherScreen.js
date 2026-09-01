@@ -106,6 +106,9 @@ import { circleActionsMobile } from '../../../../basis/src/v2/actionProjection.j
 import { leaveCircleLocally } from '../../../../basis/src/v2/circleMembershipHygiene.js';
 import { unregisterCircleAddresses } from '../../../../basis/src/v2/circleAddressRegistration.js';
 import { basisManifest } from '../../../../basis/src/index.js';
+// Which ops the DEVICE declares — the gate on the typed door's general case, read from the one contract
+// rather than from a list kept beside it.
+const basisDeclaresOp = (opId) => basisManifest.operations.some((o) => o.id === opId);
 // S6.B/C — open-screen surface + per-circle gate (shared with web).
 import { isAppSurfaceEnabled } from '../../../../basis/src/v2/appFeature.js';
 // the capability gate + the affordance matrix (web≡mobile, shared core).
@@ -567,6 +570,15 @@ export default function CircleLauncherScreen({
       }
     }
     loadCircleTransport();
+    // Anything else the DEVICE declares — the typed door's general case. The branches above exist
+    // because each does more than dispatch an op (persists a relay URL, flips a transport, reads live
+    // state); this is the rest, and it is the same `{opId, args} → callSkill` every other surface uses.
+    // It lives here, not in CircleDetail, because the launcher owns the agent bundle — CircleDetail is
+    // threaded the specific callback on purpose.
+    if (basisDeclaresOp(opId)) {
+      try { return await bundle?.callSkill?.('basis', opId, args ?? {}); }
+      catch (err) { return { ok: false, error: String(err?.message ?? err) }; }
+    }
     return null;
   }, [bundle, loadCircleTransport]);
   // the contact (bot/peer) whose DM thread is open under the Contacten tab.
@@ -3707,6 +3719,21 @@ function CircleDetail({
         return;
       }
     }
+    // Any OTHER command this device declares — the typed door for basis's own ops, now that they are on
+    // the waist. The five above are hand-written because each does more than dispatch an op (opens a
+    // screen, persists a relay URL, flips a transport); everything else IS just the op, so it goes
+    // through the same `{opId, args} → callSkill` every other surface uses, with the args read by the
+    // rule the manifest declared. web ≡ mobile: circleApp.js does exactly this, from the same seam.
+    const typedCommand = composerCommands.parse(text);
+    if (typedCommand && typedCommand.appOrigin === 'basis') {
+      setComposerText('');
+      const r = await onCircleControl?.(typedCommand.opId, typedCommand.args ?? {});
+      const said = typeof r?.message === 'string' ? r.message
+        : typeof r?.error === 'string' ? r.error
+        : r == null ? '' : JSON.stringify(r);
+      if (said) appendCircleMessage({ actor: 'bot', text: said });
+      return;
+    }
     setComposerText('');
     // Feedback review-card edit: the ✏ prefilled the composer with a point's text; this send is the EDIT.
     // Route it as an `fp:edit:<id>:<text>` control to the feedback surface (its dispatcher re-curates + shows
@@ -3800,7 +3827,7 @@ function CircleDetail({
       // so a newly-created task appears there without a manual reload.
       if (activeTab === 'tasks') setTasksReloadTick((n) => n + 1);
     }).catch(() => {});
-  }, [composerText, eventLog, circle?.id, appendCircleMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, buildFeedbackMount, emitFeedbackLangOptions, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, t]);
+  }, [composerText, eventLog, circle?.id, appendCircleMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, buildFeedbackMount, emitFeedbackLangOptions, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, composerCommands, t]);
 
   // δ.2 — tap-to-retry on the failed icon.  Looks up the original
   // text from the eventLog so we don't have to remember it elsewhere.

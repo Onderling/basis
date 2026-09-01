@@ -271,6 +271,7 @@ import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
 import { attachEntriesFor } from '../../src/v2/attachEntries.js';
 import { cardForCreatedItem } from '../../src/v2/createdCard.js';
+import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -1723,6 +1724,10 @@ if (typeof window !== 'undefined') {
 }
 let circleApplyUserLlm = null;   // (cfg) => {ok,mode}|{ok:false,error} — rebuild the live LLM/embed providers from the member's settings
 let circleEmbedButtonTap = null; // S6.A — dispatch an inline embed button {opId,itemId} from a bot reply
+// The open circle's composer runner, so an inline button can reach a DEVICE op. A row action like
+// "share this here" belongs to basis, and the circle catalogue does not carry basis on purpose — the
+// same blind spot that made the "+" render nothing, one surface over.
+let _runComposerOpForCircle = null;
 let circleSyncFolioNoteEmbedder = null; // 52.25 — re-wire folio /zoek's embedder from the active circle's embed policy
 // The circle-policy embedder resolver, published out of the scope that owns `policyFor` / `userDefault` /
 // `embedProviders`. The agent-boot block below needs it and cannot see any of those three: it was calling
@@ -2479,7 +2484,7 @@ function buildCircleBot(agent) {
   // A tapped bubble button: S6.B screen button (has `screen`) → open the panel;
   // S6.A inline button (has `opId`) → dispatch its op against the item (resolve the
   // gate's `arg` / a picker param / else `id`).
-  circleEmbedButtonTap = ({ opId, itemId, screen, action }) => {
+  circleEmbedButtonTap = ({ opId, itemId, screen, action, app }) => {
     // General in-chat bot menus: a button may carry an `action` callback for a NON-circle bot, routed by
     // source. (Feedback's fp:* buttons render in the fp-bot thread, handled there by onButtonTap →
     // surface.tapButton — no longer in the circle composer since F2 retired the in-circle mount.)
@@ -2513,6 +2518,19 @@ function buildCircleBot(agent) {
     }
     if (screen) { openCircleScreenPanel(screen); return; }
     if (!opId) return;
+    // A DEVICE op (the item's "share here") goes through the composer runner, which dispatches on the
+    // waist and puts the resulting card in the conversation. Routing it through the bot's dispatch
+    // would resolve against a catalogue that has never carried basis.
+    const deviceOp = basisManifest.operations.find((o) => o.id === opId);
+    if (deviceOp && _runComposerOpForCircle) {
+      const deviceArg = (deviceOp.params ?? []).find((p) => p?.required)?.name ?? 'itemId';
+      _runComposerOpForCircle(
+        opId,
+        { ...(itemId != null ? { [deviceArg]: itemId } : {}), ...(app ? { app } : {}) },
+        'basis',
+      );
+      return;
+    }
     const op = catalogue?.opsById?.get(opId)?.op;
     const arg = op?.surfaces?.slash?.match?.arg
       ?? (op?.params || []).find((p) => p?.pickerSource)?.name
@@ -6239,6 +6257,7 @@ function showCircle(id, circle, policy) {
   }
 
   /** Run a device op for this conversation and put whatever it answered where it belongs. */
+  _runComposerOpForCircle = (opId, args, appOrigin) => runComposerOp(opId, args, appOrigin);
   async function runComposerOp(opId, args, appOrigin = 'basis') {
     let reply = null;
     try { reply = await rawCallSkill(appOrigin, opId, args ?? {}); }
@@ -6266,8 +6285,15 @@ function showCircle(id, circle, policy) {
     if (out.kind === 'note') { _circleRender?.botBubble(out.text); return; }
     const msgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
     const ts = Date.now();
+    // The card's own row actions — claim the task, RSVP the event, share it on. A card without them is
+    // a picture of a thing; with them it is the thing, which is the whole reason a card beats a line of
+    // text. The buttons are the manifest's answer (`computeEmbedButtons`), not this shell's.
+    let buttons;
+    try { buttons = computeEmbedButtons({ manifestsByOrigin: circleManifestsByOrigin ?? {}, embed: out.card }); }
+    catch { buttons = undefined; }
     eventLog.append(circleChatMessageEvent({
       msgId, ts, circleId: id, actor: LOCAL_ACTOR, text: out.text, scope: 'circle', card: out.card,
+      buttons: buttons?.length ? buttons : undefined,
     }));
     rerender();
     broadcastFanOut({ msgId, text: out.text, ts, card: out.card });

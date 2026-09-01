@@ -1091,7 +1091,10 @@ function renderBubble(row, {
       if (b.opId) btn.dataset.opId = b.opId;
       if (b.itemId != null) btn.dataset.itemId = String(b.itemId);
       if (b.screen) btn.dataset.screen = b.screen;
-      btn.textContent = b.label ?? b.opId ?? b.screen ?? b.action;
+      // A `labelKey` is resolved; a literal `label` is printed as given. An op that declares neither
+      // shows its id, which is honest and ugly enough to get noticed — the state 31 stoop buttons were
+      // in while `labelKey` was validated and read by nothing.
+      btn.textContent = (b.labelKey ? tr(b.labelKey) : null) ?? b.label ?? b.opId ?? b.screen ?? b.action;
       btn.addEventListener('click', () => onEmbedButton(b));   // pass the whole button so a non-circle source survives
       bRow.appendChild(btn);
     }

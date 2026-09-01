@@ -49,7 +49,9 @@ describe('computeEmbedButtons', () => {
     expect(out.map((b) => b.opId)).toEqual(['downloadFile', 'saveToMyPod']);
     expect(out[0]).toEqual({
       label: 'Download', callbackData: 'downloadFile:f1',
-      opId: 'downloadFile', itemId: 'f1',
+      // `app` rides along so a DEVICE row action ("share this here") knows whose item it is, instead of
+      // leaving the snapshot read to take whichever app declares one first.
+      opId: 'downloadFile', itemId: 'f1', app: 'folio',
     });
   });
 

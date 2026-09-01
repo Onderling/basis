@@ -122,6 +122,9 @@ export const basisManifest = {
           // becomes a [pick] button that auto-submits.
           pickerSource: { listOp: 'listOpen', appOrigin: 'household' } },
         { name: 'claim',  kind: 'boolean', required: false },
+        // Which app's item — the row action knows (the card carries its origin) and says so, instead of
+        // letting the snapshot search take whichever app declares one first.
+        { name: 'app',    kind: 'string',  required: false },
       ],
       surfaces: {
         slash: { command: '/embed', body: 'flags' },
@@ -129,13 +132,22 @@ export const basisManifest = {
           reply: 'embed-card',
           hint:  'embed an item card; --claim for claim-on-behalf',
         },
-        // (J4) — the ATTACHMENT projector (`renderAttachments`). Mirrors
-        // `surfaces.slash`: one declaration → the op appears in the composer's
-        // "+" attach menu. `label` is a locale key (invariant #8; the surface
-        // renderer resolves it via t()). Tapping "Kaart" fires this op's
-        // `{opId,args}` → callSkill, identical to typing `/embed`.
-        attach: { label: 'circle.attach.card', group: 'embed' },
+        // A ROW ACTION on the item, not an entry in the "+".
+        //
+        // It was a "+" entry, and could not work as one: it takes `itemId`, so the menu opened a form
+        // asking a person to type an id. Nobody knows item ids. A picker would have been a new surface
+        // for a question the app already answers — the item is on the screen, and it knows its own id.
+        // So "share this in the conversation" lives ON the task, the post, the event; the "+" is for
+        // things that do not exist yet, and this is for things that do.
+        ui: { control: 'button', labelKey: 'circle.item.share' },
       },
+      // ANY item with a card, deliberately typeless. `appliesTo.type` is validated against the
+      // declaring app's OWN `itemTypes`, and rightly — an app may not claim to act on nouns it does
+      // not define. But this action is not about a noun: putting a thing in the conversation is true
+      // of a task, an event, a file and a post alike, and none of them are basis's to declare. An
+      // `appliesTo` with no type is the contract's existing way to say "any item" (`matchesAppliesTo`
+      // returns true when type is absent), which is exactly what a device-level row action means.
+      appliesTo: {},
     },
 
     /**

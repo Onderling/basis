@@ -5918,5 +5918,11 @@
       "text": "📷 {{title}}",
       "doc": "Caption on a message carrying a photo card."
     }
+  },
+  "item": {
+    "share": {
+      "text": "Share here",
+      "doc": "Row action on an item card: put this item in the conversation."
+    }
   }
 }

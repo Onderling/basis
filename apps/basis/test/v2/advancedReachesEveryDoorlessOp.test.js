@@ -43,16 +43,23 @@ describe('the Advanced surface reaches every op with no declared screen', () => 
     expect(listed.has('me')).toBe(false);
   });
 
-  it('does NOT repeat an op whose door is the attach menu', () => {
-    // `embed-file` declares `surfaces.attach`: `renderAttachments` puts it in the composer's "+" menu
-    // on both shells, and a tap there compiles to the same {opId, args} a slash command does. A
-    // declared door is a door, whichever projector paints it — the list of last resort skips it.
-    for (const id of ['embed', 'embed-file', 'embed-time']) {
+  it('does NOT repeat an op whose door is the attach menu, or a row action on an item', () => {
+    // A declared door is a door, whichever projector paints it — the list of last resort skips it.
+    // `renderAttachments` puts an `attach` op in the composer's "+" on both shells; `itemRowButtons`
+    // puts a `ui.control` op on the item it applies to. Both compile to the same {opId, args} a slash
+    // command does.
+    for (const id of ['embed-file', 'embed-time']) {
       expect(basisManifest.operations.find((o) => o.id === id)?.surfaces?.attach,
         `precondition: ${id} declares an attach surface`).toBeTruthy();
       expect(listed.has(id), `${id} is reachable from the attach menu, so Advanced need not repeat it`)
         .toBe(false);
     }
+    // `embed` is the row action: it takes an item id, and the only surface that can supply one without
+    // asking a person to type it is the item itself.
+    const embed = basisManifest.operations.find((o) => o.id === 'embed');
+    expect(embed?.surfaces?.ui?.control, 'precondition: embed is a row action').toBe('button');
+    expect(embed?.appliesTo, 'precondition: a row action says what it applies to').toBeTruthy();
+    expect(listed.has('embed'), 'reachable from any item that can be shared').toBe(false);
   });
 
   it('every row says which shelf it belongs on, and the shelf is DECLARED not guessed', () => {

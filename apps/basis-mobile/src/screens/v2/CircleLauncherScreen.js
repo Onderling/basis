@@ -165,6 +165,7 @@ import QrScannerModal from '../../rn/QrScannerModal.js';
 import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
 import { cardForCreatedItem } from '../../../../basis/src/v2/createdCard.js';
+import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
 import { makeOpAvailability } from '../../../../basis/src/v2/opAvailability.js';
 import { composerReplyToStream } from '../../../../basis/src/v2/composerReply.js';
 import { cardSummary } from '../../../../basis/src/v2/cardSummary.js';
@@ -2907,7 +2908,13 @@ function CircleDetail({
     const out = composerReplyToStream(card ?? reply, { t });
     if (!out) return reply;
     if (out.kind === 'note') { appendCircleMessage({ actor: 'bot', text: out.text }); return reply; }
-    const sent = appendCircleMessage({ actor: 'me', text: out.text, scope: 'circle', card: out.card });
+    // The card's own row actions — web parity: a card without them is a picture of a thing.
+    let buttons;
+    try { buttons = computeEmbedButtons({ manifestsByOrigin, embed: out.card }); } catch { buttons = undefined; }
+    const sent = appendCircleMessage({
+      actor: 'me', text: out.text, scope: 'circle', card: out.card,
+      buttons: buttons?.length ? buttons.map((b) => ({ ...b, id: b.callbackData ?? b.opId })) : undefined,
+    });
     if (sent) broadcastFanOut({ msgId: sent.msgId, text: out.text, ts: sent.ts, card: out.card });
     return reply;
   }, [onCircleControl, callSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t]);
@@ -3430,6 +3437,18 @@ function CircleDetail({
     }
     if (button?.screen) { setScreenPanel({ screen: button.screen }); return; }
     if (button?.opId) {
+      // A DEVICE op (an item's "share here") goes through the composer runner — web parity. The circle
+      // catalogue does not carry basis on purpose, so resolving there would find nothing.
+      const deviceOp = basisManifest.operations.find((o) => o.id === button.opId);
+      if (deviceOp) {
+        const deviceArg = (deviceOp.params ?? []).find((p) => p?.required)?.name ?? 'itemId';
+        runComposerOp(
+          button.opId,
+          { ...(button.itemId != null ? { [deviceArg]: button.itemId } : {}), ...(button.app ? { app: button.app } : {}) },
+          'basis',
+        );
+        return;
+      }
       const op = catalogue?.opsById?.get(button.opId)?.op;
       const arg = op?.surfaces?.slash?.match?.arg
         ?? (op?.params || []).find((p) => p?.pickerSource)?.name
@@ -3438,7 +3457,7 @@ function CircleDetail({
       return;
     }
     if (button?.id) clarify.pick(button.id, { id: circle?.id });
-  }, [clarify, circle?.id, catalogue, runCircleCommandResolved, switchCircleFeedbackLang, onAcceptFallback, acknowledgeCaretakerNotice]);
+  }, [clarify, circle?.id, catalogue, runCircleCommandResolved, runComposerOp, switchCircleFeedbackLang, onAcceptFallback, acknowledgeCaretakerNotice]);
 
   // B (two-level LLM policy) — the member's PERSONAL default, consulted when the circle policy is
   // 'user'. Persisted via AsyncStorage; seeded from the configured route until a settings UI lands
@@ -4694,7 +4713,10 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
                 testID={`circle-msgbtn-${b.id}`}
                 onPress={() => { if (onBubbleButton) onBubbleButton(b); }}
               >
-                <Text style={[styles.rowActionText, primary && styles.consentBtnPrimaryText]}>{b.label}</Text>
+                <Text style={[styles.rowActionText, primary && styles.consentBtnPrimaryText]}>
+                  {/* web parity: a declared `labelKey` is resolved, a literal `label` printed as given. */}
+                  {b.labelKey ? t(b.labelKey) : b.label}
+                </Text>
               </Pressable>
             );
           })}

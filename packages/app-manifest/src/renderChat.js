@@ -263,7 +263,12 @@ export function itemRowButtons(manifest, item) {
     if (!matchesAppliesTo(op.appliesTo, item)) continue;
     out.push({
       opId:         op.id,
-      label:        ui.label ?? op.id,
+      // `labelKey` is the localised name and `label` a literal one; a surface resolves the key when it
+      // has one and falls back to the literal. Emitting only the literal is why an op could declare a
+      // `labelKey`, pass schema validation, and still render its own id at people — a hole an op could
+      // not climb out of, since a literal label is untranslatable by construction.
+      ...(typeof ui.labelKey === 'string' && ui.labelKey ? { labelKey: ui.labelKey } : {}),
+      label:        ui.label ?? ui.labelKey ?? op.id,
       callbackData: `${op.id}:${item?.id ?? ''}`,
     });
   }

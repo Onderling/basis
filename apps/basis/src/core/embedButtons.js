@@ -41,6 +41,18 @@ export function computeEmbedButtons({ manifestsByOrigin, embed } = {}) {
     type:  snap.type,
     state: snap.state,
   };
-  return itemRowButtons(manifest, item)
-    .map(({ opId, label, callbackData }) => ({ label, callbackData, opId, itemId: String(item.id ?? '') }));
+  // The item's OWN app decides what can be done to it — claim a task, RSVP an event. The DEVICE has
+  // item actions too ("put this in the conversation"), and they are not the app's to declare: they are
+  // true of any item, in any app, the same way the composer's own entries are true in any circle. So
+  // both manifests are asked, the app's first.
+  const deviceOps = manifestsByOrigin.basis && manifestsByOrigin.basis !== manifest
+    ? itemRowButtons(manifestsByOrigin.basis, item)
+    : [];
+  return [...itemRowButtons(manifest, item), ...deviceOps]
+    .map(({ opId, label, labelKey, callbackData }) => ({
+      label, ...(labelKey ? { labelKey } : {}), callbackData, opId, itemId: String(item.id ?? ''),
+      // The card's own app rides along, so a DEVICE action ("share this here") can say whose item it
+      // is rather than leaving the snapshot read to guess.
+      app: embed.appOrigin,
+    }));
 }

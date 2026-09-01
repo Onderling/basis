@@ -1120,22 +1120,33 @@ async function createEmbed(args, { catalogue, callSkill, t, localActor }) {
     return { ok: false, error: t('embed.no_callskill') };
   }
 
+  // WHICH app's item is this? A caller that knows says so (`args.app` — the row action on a card knows,
+  // because the card carries its origin). Only a caller that does not know falls back to the search,
+  // and the search takes the FIRST snapshot declaration it finds: with tasks, calendar and folio all
+  // declaring one, a bare `/embed <id>` reads the item through whichever app happens to be first. That
+  // is a real defect and it is why the row action passes the app rather than hoping.
+  const wantApp = String(args?.app ?? '').trim() || null;
   let snapshotSkill = null;
   let snapshotAppOrigin = null;
-  for (const [opId, entry] of catalogue.opsById) {
+  for (const [opId] of catalogue.opsById) {
     const decl = catalogue.embedSnapshotFor?.(opId);
-    if (decl) {
-      snapshotSkill     = decl.snapshotSkill;
-      snapshotAppOrigin = decl.appOrigin;
-      break;
-    }
+    if (!decl) continue;
+    if (wantApp && decl.appOrigin !== wantApp) continue;
+    snapshotSkill     = decl.snapshotSkill;
+    snapshotAppOrigin = decl.appOrigin;
+    break;
   }
   if (!snapshotSkill) {
     return { ok: false, error: t('embed.no_factory') };
   }
 
   try {
-    const snapshot = await callSkill(snapshotAppOrigin, snapshotSkill, { choreId: itemId });
+    // The snapshot skill's OWN param name, read off its declaration. It was hardcoded `choreId`, which
+    // is the household vocabulary from when household was the only app with cards; tasks and calendar
+    // both call it `id`, so the read arrived with no id at all and the skill refused.
+    const snapOp = catalogue.opsById.get(snapshotSkill)?.op ?? null;
+    const idParam = (snapOp?.params ?? []).find((p) => p?.required)?.name ?? 'id';
+    const snapshot = await callSkill(snapshotAppOrigin, snapshotSkill, { [idParam]: itemId });
     if (!snapshot || snapshot.ok === false) {
       return { ok: false, error: snapshot?.error ?? 'snapshot failed' };
     }

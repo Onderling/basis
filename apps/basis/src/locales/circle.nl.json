@@ -5918,5 +5918,11 @@
       "text": "📷 {{title}}",
       "doc": "Onderschrift bij een bericht met een fotokaart."
     }
+  },
+  "item": {
+    "share": {
+      "text": "Deel hier",
+      "doc": "Rij-actie op een itemkaart: zet dit item in het gesprek."
+    }
   }
 }

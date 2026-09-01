@@ -28,7 +28,10 @@ describe('renderAttachments(basisManifest) — the ATTACHMENT projector', () => 
   const { attachMenu } = renderAttachments(basisManifest);
 
   it('lists exactly the ops that declare surfaces.attach, in manifest order', () => {
-    expect(attachMenu.map((e) => e.opId)).toEqual(['embed', 'embed-file', 'embed-time']);
+    // `embed` is NOT here, and its absence is the decision: it takes an item id, so as a "+" entry it
+    // could only open a form asking a person to type one. It is a ROW ACTION on the item instead —
+    // the item is on the screen and knows its own id. The "+" is for things that do not exist yet.
+    expect(attachMenu.map((e) => e.opId)).toEqual(['embed-file', 'embed-time']);
   });
 
   it('projects the file entry (embed-file → "Bestand") with its itemType', () => {
@@ -63,8 +66,8 @@ describe('noticeboard composer — the projected "+" attach menu', () => {
     expect(trigger).not.toBeNull();
     expect(trigger.textContent).toBe('+');            // "+" affordance, no 📎
     const items = [...el.querySelectorAll('.cc-noticeboard__attach-item')];
-    expect(items.map((i) => i.dataset.opId)).toEqual(['embed', 'embed-file', 'embed-time']);
-    expect(items.map((i) => i.textContent)).toEqual(['Kaart', 'Bestand', 'Afspraak']);
+    expect(items.map((i) => i.dataset.opId)).toEqual(['embed-file', 'embed-time']);
+    expect(items.map((i) => i.textContent)).toEqual(['Bestand', 'Afspraak']);
   });
 
   it('the "+" toggles the menu open', () => {
@@ -118,7 +121,7 @@ describe('circle composer — the same projected "+" menu', () => {
       attachMenu, onAttachMedia, onAttachCommand,
     });
     const items = [...el.querySelectorAll('.circle-view__attach-item')];
-    expect(items.map((i) => i.dataset.opId)).toEqual(['embed', 'embed-file', 'embed-time']);
+    expect(items.map((i) => i.dataset.opId)).toEqual(['embed-file', 'embed-time']);
 
     const fileInput = el.querySelector('.circle-view__file');
     fileInput.click = vi.fn();

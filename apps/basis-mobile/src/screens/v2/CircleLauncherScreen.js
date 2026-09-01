@@ -2767,7 +2767,9 @@ function CircleDetail({
       // projection HIDES these — muted messages land, unmute restores). Rides the same effect because
       // the key→ref resolution needs the roster; `membersReloadTick` refreshes both together.
       try {
-        const mk = (await rawCallSkill('stoop', 'listMutedPeers', {}))?.peers ?? [];
+        // ONE block set (web parity): the act that refuses a person's envelopes is the act that hides
+        // their posts. Two sets meant "blocked" depended on which button you pressed.
+        const mk = (await rawCallSkill('basis', 'muted', {}))?.peers ?? [];
         if (alive) setMutedActors(mutedActorSet(mk, mem));
       } catch { /* keep the previous set — hiding is best-effort */ }
     })();

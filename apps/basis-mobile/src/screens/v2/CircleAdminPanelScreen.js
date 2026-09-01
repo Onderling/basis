@@ -26,6 +26,7 @@ import { roleControlFor, roleChangeConfirm } from '../../../../basis/src/v2/circ
 // this platform's presenter.
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { useTheme } from './themeContext.js';
+import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 
 export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack }) {
   const theme = useTheme();
@@ -40,7 +41,8 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     if (typeof callSkill !== 'function') return;
     const [mem, mut, who] = await Promise.all([
       callSkill('stoop', 'listGroupMembers', { groupId }).catch(() => null),
-      callSkill('stoop', 'listMutedPeers', {}).catch(() => null),
+      // The ONE block set — the same list the stream filters by and the transport refuses on.
+      callSkill('basis', 'muted', {}).catch(() => null),
       callSkill('stoop', 'whoAmI', {}).catch(() => null),
     ]);
     setMyWebid(who?.webid ?? who?.webId ?? '');
@@ -96,8 +98,14 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     try { const r = await callSkill('stoop', 'postAnnouncement', { groupId, text }); setNotice(r?.error ? t('circle.admin.refused') : t('circle.admin.announced')); }
     catch { setNotice(t('circle.admin.refused')); }
   }, [announce, callSkill, groupId]);
+  // The same projection the web shell paints — a raw key is not a person's name, and the two shells
+  // must not disagree about who is on this list or what they are called.
+  const blocked = buildBlockedList({ peers: muted, members });
+
   const unmute = useCallback(async (key) => {
-    try { await callSkill('stoop', 'unmutePeer', key.startsWith('webid:') ? { peerWebid: key.slice(6) } : { peerStableId: key }); } catch { /* */ }
+    // Unblock takes the key as it is listed — the block set stores whatever the block was made on
+    // (a webid from a post's author, an address from `/block`), and hands the same string back.
+    try { await callSkill('basis', 'unmute', { peer: key.startsWith('webid:') ? key.slice(6) : key }); } catch { /* */ }
     load();
   }, [callSkill, load]);
 
@@ -147,9 +155,9 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       {/* reports moved to the §8 governance "Decisions" Reports section — see the header note */}
 
       <Section title={t('circle.admin.muted')}>
-        {muted.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : muted.map((key) => (
+        {blocked.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : blocked.map(({ key, label }) => (
           <View key={key} style={styles.row}>
-            <Text style={styles.name}>{String(key).replace(/^webid:/, '')}</Text>
+            <Text style={styles.name}>{label}</Text>
             <Pressable style={styles.secondary} onPress={() => unmute(key)}><Text style={styles.secondaryText}>{t('circle.admin.unmute')}</Text></Pressable>
           </View>
         ))}

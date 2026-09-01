@@ -161,7 +161,9 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
       else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); else await callSkill('stoop', 'reportPost', { itemId: post.id }); }
       else if (action === 'markReturned') await callSkill('stoop', 'markReturned', { requestId: post.id });
       else if (action === 'mute' && post.addedBy) {
-        await callSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
+        // BLOCK the person — both halves, one act (web parity). Keyed on the webid, which is what
+        // makes it a block of a PERSON rather than of one address.
+        await callSkill('basis', 'mute', { peer: post.addedBy });
         try { onPeerMuted?.(); } catch { /* the chat hide-set refresh is best-effort */ }
       }
     } catch { /* reload reflects the real state */ }

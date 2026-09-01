@@ -114,9 +114,6 @@ importers:
       i18next:
         specifier: ^23.15.0
         version: 23.16.8
-      onderling-feedback:
-        specifier: link:../../../feedback
-        version: link:../../../feedback
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -151,6 +148,10 @@ importers:
       vitest:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@25.9.1)(happy-dom@15.11.7)
+    optionalDependencies:
+      onderling-feedback:
+        specifier: link:../../../feedback
+        version: link:../../../feedback
 
 packages:
 

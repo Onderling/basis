@@ -159,9 +159,6 @@ importers:
       nkn-sdk:
         specifier: ^1.3.6
         version: 1.3.6
-      onderling-feedback:
-        specifier: link:../../../feedback
-        version: link:../../../feedback
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -220,6 +217,10 @@ importers:
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@26.1.2)(lightningcss@1.27.0)(terser@5.49.0)
+    optionalDependencies:
+      onderling-feedback:
+        specifier: link:../../../feedback
+        version: link:../../../feedback
 
 packages:
 
@@ -7018,8 +7019,9 @@ snapshots:
       '@onderling/web-adapter': link:../../packages/web-adapter
       chrono-node: 2.10.1
       i18next: 23.16.8
-      onderling-feedback: link:../../../feedback
       qrcode: 1.5.4
+    optionalDependencies:
+      onderling-feedback: link:../../../feedback
 
   '@onderling/app-manifest@file:../../packages/app-manifest':
     dependencies:

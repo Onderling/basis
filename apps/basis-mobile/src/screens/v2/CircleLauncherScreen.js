@@ -109,10 +109,7 @@ import { basisManifest } from '../../../../basis/src/index.js';
 // Which ops the DEVICE declares — the gate on the typed door's general case, read from the one contract
 // rather than from a list kept beside it.
 const basisDeclaresOp = (opId) => basisManifest.operations.some((o) => o.id === opId);
-// The composer's "+" entries, projected from the manifest exactly as web projects them. What differs
-// between the shells is which seams are wired (a native picker here, a file input there) — never which
-// entries exist, which is why this reads the same projector rather than a mobile list.
-const BASIS_ATTACH_MENU = renderAttachments(basisManifest).attachMenu;
+
 // S6.B/C — open-screen surface + per-circle gate (shared with web).
 import { isAppSurfaceEnabled } from '../../../../basis/src/v2/appFeature.js';
 // the capability gate + the affordance matrix (web≡mobile, shared core).
@@ -166,7 +163,8 @@ import QrScannerModal from '../../rn/QrScannerModal.js';
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
-import { renderAttachments } from '@onderling/app-manifest';
+import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { cardForCreatedItem } from '../../../../basis/src/v2/createdCard.js';
 import { makeOpAvailability } from '../../../../basis/src/v2/opAvailability.js';
 import { composerReplyToStream } from '../../../../basis/src/v2/composerReply.js';
 import { cardSummary } from '../../../../basis/src/v2/cardSummary.js';
@@ -2667,19 +2665,15 @@ function CircleDetail({
   // appointment in a conversation by any route. Same projected entries as web, narrowed the same way.
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachForm, setAttachForm] = useState(null);   // the entry whose params must be filled first
-  const attachEntries = useMemo(() => {
-    const av = makeOpAvailability({
-      catalogue: catalogue ?? null,
-      manifestsByOrigin,
-      policy: policy ?? null,
-    });
-    return BASIS_ATTACH_MENU
-      .filter((e) => av.of(e.opId).state !== 'hidden')
-      // An entry whose dispatch path is not wired is NOT painted (Frits: never offer what does not
-      // work). The file entry rides the sealed-media pipeline, which a circle with no media
-      // composition does not have — so it is absent here rather than offered and refused on tap.
-      .filter((e) => (e.via === 'media' ? !!circleMedia : true));
-  }, [catalogue, manifestsByOrigin, policy, circleMedia]);
+  const attachEntries = useMemo(() => attachEntriesFor({
+    manifestsByOrigin,
+    availability: makeOpAvailability({
+      catalogue: catalogue ?? null, manifestsByOrigin, policy: policy ?? null,
+    }),
+    // An entry whose dispatch path is not wired is NOT painted (never offer what does not work): the
+    // file entry rides the sealed-media pipeline, which a circle with no media composition lacks.
+    mediaWired: !!circleMedia,
+  }), [catalogue, manifestsByOrigin, policy, circleMedia]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   const [pendingFollowUp, setPendingFollowUp] = useState(null);
   const [pendingForm, setPendingForm] = useState(null);   // 2+-field needsForm → inline form (parity with web)
@@ -2900,15 +2894,23 @@ function CircleDetail({
    * of web's `runComposerOp`. The DECISION (card or note) is the shared `composerReplyToStream`; only
    * the painting differs. A card is a message the circle sees, so it is appended AND fanned out.
    */
-  const runComposerOp = useCallback(async (opId, args) => {
-    const reply = await onCircleControl?.(opId, args ?? {});
-    const out = composerReplyToStream(reply, { t });
+  const runComposerOp = useCallback(async (opId, args, appOrigin = 'basis') => {
+    const reply = appOrigin === 'basis'
+      ? await onCircleControl?.(opId, args ?? {})
+      : await callSkill?.(appOrigin, opId, args ?? {});
+    // A CREATOR answers `{ok, itemId}`; if it declares how its card is read, read it, so the thing
+    // appears in the conversation it was made in and not only in its own tab.
+    const declared = manifestsByOrigin?.[appOrigin]?.operations?.find((o) => o.id === opId) ?? null;
+    const card = await cardForCreatedItem({
+      reply, op: declared, appOrigin, callSkill, localActor: 'me',
+    });
+    const out = composerReplyToStream(card ?? reply, { t });
     if (!out) return reply;
     if (out.kind === 'note') { appendCircleMessage({ actor: 'bot', text: out.text }); return reply; }
     const sent = appendCircleMessage({ actor: 'me', text: out.text, scope: 'circle', card: out.card });
     if (sent) broadcastFanOut({ msgId: sent.msgId, text: out.text, ts: sent.ts, card: out.card });
     return reply;
-  }, [onCircleControl, appendCircleMessage, broadcastFanOut, t]);
+  }, [onCircleControl, callSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t]);
 
   // The fallback offer speaks HERE while this circle is open (web parity: the chat makes the offer, at the
   // moment the person is confused about why nobody replied). `scope: 'self'` — a local bubble, never
@@ -4343,9 +4345,10 @@ function CircleDetail({
         {attachForm ? (
           <OpPageModal
             visible
-            appOrigin="basis"
-            op={basisManifest.operations.find((o) => o.id === attachForm.opId) ?? { id: attachForm.opId, params: attachForm.params }}
-            callSkill={async (_app, opId, args) => runComposerOp(opId, args)}
+            appOrigin={attachForm.appOrigin ?? 'basis'}
+            op={(manifestsByOrigin?.[attachForm.appOrigin ?? 'basis']?.operations ?? basisManifest.operations)
+              .find((o) => o.id === attachForm.opId) ?? { id: attachForm.opId, params: attachForm.params }}
+            callSkill={async (app, opId, args) => runComposerOp(opId, args, app)}
             onClose={() => setAttachForm(null)}
             onDispatched={() => setAttachForm(null)}
           />
@@ -4367,7 +4370,7 @@ function CircleDetail({
                   // An entry that needs input opens the op's OWN form (the shared page sheet the
                   // Advanced drawer uses); one that needs none dispatches straight away.
                   if (required.length > 0) setAttachForm(e);
-                  else runComposerOp(e.opId, {});
+                  else runComposerOp(e.opId, {}, e.appOrigin);
                 }}
               >
                 <Text style={styles.attachItemText}>{t(e.label) === e.label ? e.label : t(e.label)}</Text>

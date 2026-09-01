@@ -112,7 +112,7 @@ import { scopeCatalogueToApps } from '../../src/v2/circleCatalogueScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
 // B · (4c) — the member's capability matrix drives affordance greying/hiding on reply buttons.
-import { buildCapabilityMatrix, renderAttachments } from '@onderling/app-manifest';
+import { buildCapabilityMatrix } from '@onderling/app-manifest';
 // D / consumer-switch — select the projected PAGE surface (renderWeb) for
 // the settings op so the live settings header is manifest-driven (invariant #4).
 import { pageForOp, flowForOp } from '../../src/v2/pageProjection.js';
@@ -269,6 +269,8 @@ import { EventLog } from '../../src/eventLog.js';
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
+import { attachEntriesFor } from '../../src/v2/attachEntries.js';
+import { cardForCreatedItem } from '../../src/v2/createdCard.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -389,10 +391,9 @@ function openCircleConfirmDialog(request) {
   });
 }
 
-// (J4) — the ATTACHMENT projector's menu for the composer "+", projected ONCE from
-// the (static) basis manifest. Feeds BOTH the noticeboard + circle composers; each entry
-// taps to {opId,args} → dispatch, identical to the matching slash command.
-const basisAttachMenu = renderAttachments(basisManifest).attachMenu;
+// The composer "+" is projected per circle now (`attachEntriesFor` over everything the circle
+// composes, narrowed by what it can actually do), because a task entry belongs to the tasks app and a
+// menu built once from the basis manifest can never carry it. `circleAttachMenu` holds the result.
 
 // The app-wide DEFAULT lists service, PERSISTENT: an IndexedDB-backed DataSource (lists survive a reload).
 // Lazy + memoised (the DataSource build is async); falls back to in-memory if IDB is unavailable (e.g. SSR/tests).
@@ -5864,9 +5865,14 @@ function showCircle(id, circle, policy) {
       // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
       // over whether it works. Gating it on the catalogue would hide a working affordance to guard
       // against a failure it cannot have. The manifest declares this; the id is not hardcoded here.
-      circleAttachMenu = basisAttachMenu.filter(
-        (e) => e.via === 'media' || av.of(e.opId).state !== 'hidden',
-      );
+      // Every composed app's entries, not only basis's — a circle that composes tasks offers "+ → Task"
+      // by DECLARATION, and the filter (composition · feature · capability · is the path even wired) is
+      // the one shared answer both shells and the journey read.
+      circleAttachMenu = attachEntriesFor({
+        manifestsByOrigin: circleManifestsByOrigin ?? {},
+        availability: av,
+        mediaWired: !!circleMedia,
+      });
     } catch { circleAttachMenu = []; }
     try { rerender(); } catch { /* the circle may have closed */ }
   })();
@@ -6212,34 +6218,38 @@ function showCircle(id, circle, policy) {
     if (!entry || !entry.opId) return;
     const required = (Array.isArray(entry.params) ? entry.params : []).filter((p) => p?.required);
     if (required.length > 0) { openAttachEntryForm(entry); return; }
-    await runComposerOp(entry.opId, {});
+    await runComposerOp(entry.opId, {}, entry.appOrigin);
   }
 
   /** The op's own form, in the docked page panel — the same one the Advanced drawer opens. */
   function openAttachEntryForm(entry) {
-    const declared = basisManifest.operations.find((o) => o.id === entry.opId) ?? { id: entry.opId, params: entry.params };
+    const origin = entry.appOrigin ?? 'basis';
+    const declared = (circleManifestsByOrigin?.[origin]?.operations ?? basisManifest.operations)
+      .find((o) => o.id === entry.opId) ?? { id: entry.opId, params: entry.params };
     const op = {
       ...declared,
       surfaces: { ...(declared.surfaces ?? {}), page: { kind: 'side-panel', title: entry.label ? t(entry.label) : entry.opId } },
     };
     openPagePanel({
-      container: ensurePagePanel(), doc: document, op, appOrigin: 'basis',
+      container: ensurePagePanel(), doc: document, op, appOrigin: origin,
       // The form dispatches; this is where its reply becomes a card or a note, exactly as a no-arg tap does.
-      callSkill: async (app, opId, args) => {
-        const reply = await rawCallSkill(app, opId, args);
-        showComposerReply(reply);
-        return reply;
-      },
+      callSkill: async (app, opId, args) => runComposerOp(opId, args, app),
       onClose: () => {}, onDispatched: () => {}, t,
     });
   }
 
   /** Run a device op for this conversation and put whatever it answered where it belongs. */
-  async function runComposerOp(opId, args) {
+  async function runComposerOp(opId, args, appOrigin = 'basis') {
     let reply = null;
-    try { reply = await rawCallSkill('basis', opId, args ?? {}); }
+    try { reply = await rawCallSkill(appOrigin, opId, args ?? {}); }
     catch (err) { reply = { ok: false, error: String(err?.message ?? err) }; }
-    showComposerReply(reply);
+    // A CREATOR answers `{ok, itemId}` — making the thing is its job, and the conversation is not its
+    // business. If it declares how its card is read, read it, so the thing appears where it was made.
+    const declared = circleManifestsByOrigin?.[appOrigin]?.operations?.find((o) => o.id === opId) ?? null;
+    const card = await cardForCreatedItem({
+      reply, op: declared, appOrigin, callSkill: rawCallSkill, localActor: LOCAL_ACTOR,
+    });
+    showComposerReply(card ?? reply);
     return reply;
   }
 

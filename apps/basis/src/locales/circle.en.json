@@ -5340,6 +5340,10 @@
     "menu": {
       "text": "Add",
       "doc": "P2/J4 — aria/title for the composer + attach-menu trigger."
+    },
+    "task": {
+      "text": "Task",
+      "doc": "The + menu entry that creates a task in this conversation."
     }
   },
   "conversationKinds": {

@@ -5340,6 +5340,10 @@
     "menu": {
       "text": "Toevoegen",
       "doc": "P2/J4 — aria/title for the composer + attach-menu trigger."
+    },
+    "task": {
+      "text": "Taak",
+      "doc": "Het +-menu-item dat een taak maakt in dit gesprek."
     }
   },
   "conversationKinds": {

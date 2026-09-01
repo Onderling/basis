@@ -120,7 +120,15 @@ export const tasksManifest = {
             body:         'text-only',
             dropTrailing: ['to', 'aan', 'op', 'toe'],
           } },
-        chat: { reply: 'text', hint: 'Create a task; rejects on dependency cycles. Blocked when circle is paused/archived.' },
+        chat: {
+          reply: 'text', hint: 'Create a task; rejects on dependency cycles. Blocked when circle is paused/archived.',
+          // The created task's own card — the snapshot a composer reads back so a task made from the
+          // conversation APPEARS in the conversation, instead of only existing in the Tasks tab.
+          embed: { cardSnapshotSkill: 'getTaskSnapshot' },
+        },
+        // A composer affordance: "+ → Task" makes one here, in the conversation people are having.
+        // Declared, not coded — the menu is `renderAttachments` over whatever the circle composes.
+        attach: { label: 'circle.attach.task', group: 'create' },
       },
     },
     {

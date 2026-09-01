@@ -21,8 +21,10 @@
 // Both are shared seams, so this drives them directly — the shells only paint what these return.
 import { checker } from './_util.mjs';
 import { declaredOp } from './_util.mjs';
-import { renderAttachments } from '@onderling/app-manifest';
 import basisManifest from '../../basis/manifest.js';
+import tasksManifest from '../../tasks-v0/manifest.js';
+import { attachEntriesFor } from '../../basis/src/v2/attachEntries.js';
+import { cardForCreatedItem } from '../../basis/src/v2/createdCard.js';
 import { makeOpAvailability } from '../../basis/src/v2/opAvailability.js';
 import { composerReplyToStream } from '../../basis/src/v2/composerReply.js';
 
@@ -31,16 +33,13 @@ export const name = 'J-attach (what the + offers here, and what a tap becomes)';
 /** The catalogue a circle actually has: its composed apps, and never basis — the scope the bot reads. */
 const circleCatalogue = (...opIds) => ({ opsById: new Map(opIds.map((id) => [id, {}])) });
 
-/** What the composer paints: the projected entries, minus anything this circle cannot do. */
-function offeredHere({ catalogue, policy = null, wiredFilePath = false }) {
-  const av = makeOpAvailability({ catalogue, manifestsByOrigin: { basis: basisManifest }, policy });
-  return renderAttachments(basisManifest).attachMenu
-    .filter((e) => av.of(e.opId).state !== 'hidden')
-    // The shells' last filter (`buildAttachControl`): an entry whose dispatch path is not wired is not
-    // painted. The FILE entry needs the media pipeline, which a circle with no sealed-media
-    // composition does not have — so it is left out rather than offered and refused on tap.
-    .filter((e) => (e.via === 'media' ? wiredFilePath : true))
-    .map((e) => e.opId);
+/** What the composer paints — the SAME function both shells call, not a copy of its rules. */
+function offeredHere({ catalogue, policy = null, wiredFilePath = false, apps = { basis: basisManifest } }) {
+  return attachEntriesFor({
+    manifestsByOrigin: apps,
+    availability: makeOpAvailability({ catalogue, manifestsByOrigin: apps, policy }),
+    mediaWired: wiredFilePath,
+  }).map((e) => e.opId);
 }
 
 export async function run() {
@@ -74,10 +73,13 @@ export async function run() {
     const withheld = (consequence) => [{
       app: 'basis', atom: 'add', noun: null, enabled: false, optedOut: false, consequence,
     }];
-    const offeredWhenHidden = renderAttachments(basisManifest).attachMenu.filter((e) => makeOpAvailability({
-      catalogue: circleCatalogue('addTask'), manifestsByOrigin: { basis: basisManifest },
-      capabilityMatrix: withheld('hidden'),
-    }).of(e.opId).state !== 'hidden');
+    const offeredWhenHidden = attachEntriesFor({
+      manifestsByOrigin: { basis: basisManifest },
+      availability: makeOpAvailability({
+        catalogue: circleCatalogue('addTask'), manifestsByOrigin: { basis: basisManifest },
+        capabilityMatrix: withheld('hidden'),
+      }),
+    });
     check('a member whose capability is withheld is offered nothing to attach',
       offeredWhenHidden.length === 0, offeredWhenHidden.map((e) => e.opId).join(','));
 
@@ -87,6 +89,16 @@ export async function run() {
     }).of('embed-time');
     check('…and a GREYED capability greys rather than hides — the circle chose to show the limit',
       greyed.state === 'greyed' && greyed.reason === 'capability', JSON.stringify(greyed));
+
+    // An APP's entry is offered where that app is composed, and nowhere else — the composition rung
+    // still applies to apps; only the device is exempt from it.
+    const apps = { basis: basisManifest, tasks: tasksManifest };
+    const withTasks = offeredHere({ catalogue: circleCatalogue('addTask'), apps });
+    check('a circle that composes tasks is offered "+ → Task" — by DECLARATION, not by shell code',
+      withTasks.includes('addTask'), withTasks.join(','));
+    const withoutTasks = offeredHere({ catalogue: circleCatalogue('listOpen'), apps });
+    check('…and a circle that does not compose tasks is not',
+      !withoutTasks.includes('addTask'), withoutTasks.join(','));
 
     // ── 2 · WHAT A TAP BECOMES ────────────────────────────────────────────────────────────────────
     const t = (k, v) => (v?.title ? `${k}:${v.title}` : k);
@@ -111,6 +123,34 @@ export async function run() {
     check('an op with nothing to say says nothing — never a bubble of JSON',
       composerReplyToStream({ ok: true }, { t }) === null
       && composerReplyToStream(null, { t }) === null);
+
+    // ── 3 · A CREATOR'S CARD ──────────────────────────────────────────────────────────────────────
+    // "+ → Task" dispatches `tasks:addTask`, which answers `{ok, itemId}` — creating is its job and
+    // the conversation is not its business. Without the read-back the task would exist in the Tasks
+    // tab and the conversation it was made in would show a bare "ok". The bridge is declared, not
+    // coded: the op says which skill reads its snapshot.
+    const addTask = tasksManifest.operations.find((o) => o.id === 'addTask');
+    check('the task entry declares how its card is read', !!addTask?.surfaces?.chat?.embed?.cardSnapshotSkill,
+      addTask?.surfaces?.chat?.embed?.cardSnapshotSkill ?? '(none)');
+
+    const asked = [];
+    const made = await cardForCreatedItem({
+      reply: { ok: true, itemId: 't-42' }, op: addTask, appOrigin: 'tasks', localActor: 'me',
+      callSkill: async (app, skill, args) => {
+        asked.push(`${app}:${skill}`);
+        return { id: args.id, type: 'task', title: 'Afwas', status: 'open' };
+      },
+    });
+    check('a created task becomes a card, read back from the app that made it',
+      made?.kind === 'item-card' && made.itemRef?.app === 'tasks' && made.snapshot?.title === 'Afwas',
+      JSON.stringify(made)?.slice(0, 120));
+    check('…asked of the SAME app, not of whichever app declares a snapshot first',
+      asked.join(',') === 'tasks:getTaskSnapshot', asked.join(','));
+
+    const noCard = await cardForCreatedItem({
+      reply: { ok: true, itemId: 'x' }, op: { surfaces: {} }, appOrigin: 'tasks', callSkill: async () => ({}),
+    });
+    check('an op that declares no card gets none — the reply stands on its own', noCard === null);
   } catch (err) {
     check('the attach-offer corridor completed', false, String(err?.message ?? err).slice(0, 200));
   }

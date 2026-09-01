@@ -24,6 +24,7 @@
  */
 
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
+import { pickRowText } from '../../src/v2/rowText.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
@@ -331,10 +332,3 @@ function renderRules(section, block, tr) {
 
 /* ─────────────────────────────────────────────────────────────────────── */
 
-function pickRowText(row) {
-  const p = row?.event?.payload && typeof row.event.payload === 'object' ? row.event.payload : {};
-  for (const k of ['text', 'title', 'body', 'name', 'message']) {
-    if (typeof p[k] === 'string' && p[k]) return p[k];
-  }
-  return '';
-}

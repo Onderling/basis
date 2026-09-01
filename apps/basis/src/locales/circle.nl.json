@@ -3593,6 +3593,10 @@
     "done": {
       "text": "Afgevinkt.",
       "doc": "The composable lists feature, spoken from the waist."
+    },
+    "not_accepted": {
+      "text": "Die lijst neemt dat soort dingen niet aan.",
+      "doc": "Refusal when a container's accepts policy has no place for the requested kind of child."
     }
   },
   "share": {

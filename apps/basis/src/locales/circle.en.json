@@ -3593,6 +3593,10 @@
     "done": {
       "text": "Ticked off.",
       "doc": "The composable lists feature, spoken from the waist."
+    },
+    "not_accepted": {
+      "text": "That list does not take that kind of thing.",
+      "doc": "Refusal when a container's accepts policy has no place for the requested kind of child."
     }
   },
   "share": {

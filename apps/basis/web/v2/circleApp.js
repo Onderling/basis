@@ -273,6 +273,7 @@ import { attachEntriesFor } from '../../src/v2/attachEntries.js';
 import { cardForCreatedItem } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
+import { makeListsOps } from '../../src/v2/listsOps.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -397,16 +398,21 @@ function openCircleConfirmDialog(request) {
 // composes, narrowed by what it can actually do), because a task entry belongs to the tasks app and a
 // menu built once from the basis manifest can never carry it. `circleAttachMenu` holds the result.
 
-// The app-wide DEFAULT lists service, PERSISTENT: an IndexedDB-backed DataSource (lists survive a reload).
-// Lazy + memoised (the DataSource build is async); falls back to in-memory if IDB is unavailable (e.g. SSR/tests).
+// The lists service over THE CIRCLE'S OWN STORE — `agent.circleStoreFor(circleId)`, the same
+// `CircleItemStore` a task, a message and a noticeboard post live in.
+//
+// It used to build its own IndexedDB DataSource (`cc-circle-lists-state`) and its own store registry, so
+// a circle had TWO stores: the one the rail mirrors and the one lists wrote to. The architecture names
+// that exactly — "two stores for one circle is a defect, not a design", and "a type that reaches a peer
+// some other way is a second implementation of sync". Nothing carried a list to anybody; the feature
+// had a private pod path instead. On the shared store it rides the ONE fan-out path with no lane code
+// written, and it obeys the circle's own data-move branch (fan-out · pod-signal · pod-only · ref+blob)
+// like everything else — which is the rule Frits stated: circle-dependent, not datatype-dependent.
 let _circleListsPromise = null;
 function getDefaultCircleLists() {
   if (!_circleListsPromise) {
     _circleListsPromise = (async () => {
-      let dataSource;
-      try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-circle-lists-state', storeName: 'items' }); }
-      catch { dataSource = undefined; }   // no IDB → in-memory (makeCircleLists' default)
-      return makeCircleLists({ dataSource });
+      return makeCircleLists({ storeFor: (circleId) => circleHouseholdAgent?.circleStoreFor?.(circleId) });
     })();
   }
   return _circleListsPromise;
@@ -454,45 +460,13 @@ function getContactDmStore() {
 // resolves a sealing strategy (a sealed p2/p3 posture with an available group key), the circle's lists persist
 // to the user's REAL pod with content sealed at rest under the group key — the keys BE the canonical
 // `resourceUriFor` pod URIs (rootPrefix = `<podRoot>/group/`). Absent a session/strategy this returns null and
-// the caller keeps the IDB/memory default, so NOTHING breaks when no pod session is configured (additive).
-const _podCircleListsByCircle = new Map();   // circleId → Promise<listsSvc | null>
-async function getPodCircleLists(circleId, policy) {
-  if (!circleId || !circleAuthedFetch || !circleRealPodRouting?.podRoot) return null;
-  if (!_podCircleListsByCircle.has(circleId)) {
-    _podCircleListsByCircle.set(circleId, (async () => {
-      try {
-        // The circle's CONTENT seal/open strategy (group-key custody via its control-agent). p0/p1 or a
-        // not-yet-provisioned group key → null; we then decline the pod path rather than write plaintext.
-        const strategy = await getCircleSealStrategy(circleId, policy);
-        if (!strategy) return null;
-        const dataSource = createSealedPodDataSource({
-          fetch: circleAuthedFetch,
-          podUrl: circleRealPodRouting.podRoot,
-          strategy,
-        });
-        // K plug-in point — NOW WIRED (app-level share op). With this sealed DataSource live, cross-circle
-        // sharing binds through `getCircleShareEnforcement(circleId, policy)` below, which builds
-        //   makeCircleShareEnforcement({ sharing: prod.podClient.sharing,
-        //     resourceUriFor: sharedRefResourceUri(makeResourceUriResolver({ podUri: podRoot })),
-        //     open: strategy.open })
-        // — all inputs (sharing via prod.podClient, the strategy, podRoot) are resolved here / in
-        // ensureCirclePod. Deviation from the original note: `seal` is OMITTED — the live posture is the
-        // group-key one (p2/p3 group-key provisioning), where the recipient already holds the key via the
-        // roster, so the substrate's makeShareGrantHook explicitly skips re-seal (no source-item rewrite).
-        return makeCircleLists({ dataSource, rootPrefix: podGroupPrefix(circleRealPodRouting.podRoot) });
-      } catch (err) {
-        if (typeof console !== 'undefined') console.warn('[circleApp] pod-backed lists unavailable:', err?.message ?? err);
-        return null;
-      }
-    })());
-  }
-  return _podCircleListsByCircle.get(circleId);
-}
-
-// Resolve the lists service for a circle: the sealed pod-backed one when available, else the app default.
-async function getCircleLists(circleId, policy) {
-  const pod = await getPodCircleLists(circleId, policy);
-  return pod || getDefaultCircleLists();
+// The lists service for a circle. ONE service over the circle's own store — the pod-backed variant is
+// gone, and its absence is the point: a circle whose data lives on a pod already has that as its
+// data-move branch (`pod-only` / `pod-signal`, `circleDataPolicy.js`), and the circle store honours it
+// like it does for a task or a message. A lists-private pod path was a second implementation of sync,
+// which is what left lists sharing nothing at all in every circle that had no pod.
+async function getCircleLists() {
+  return getDefaultCircleLists();
 }
 
 // the POD-TIER enforcement binder for a circle's cross-circle SHARE, built at the K plug-in
@@ -854,58 +828,16 @@ function circleComposerCommands() {
 }
 
 /**
- * The composable LISTS feature, on the waist.
- *
- * Its service is per-circle (`getCircleLists` — the circle's own store and seal strategy), which is why
- * it is mounted by the shell rather than served by the agent: the handlers hold state only a running
- * shell has. Each op takes the circle it acts in, so one mount serves every circle.
- *
- * This is what the panel has been calling directly. Now the "+" can offer it, a slash command reaches
- * it, and a journey can drive it — the feature stops being something only its own screen can open.
+ * The composable LISTS on the waist. The behaviour lives in shared `src/v2/listsOps.js`; this hands it
+ * the three things only a running shell has — which store, which translator, which circle is open.
  */
-function listsOpsFor() {
-  const svcFor = async (circleId) => getCircleLists(circleId, await policyStore.get(circleId).catch(() => ({})));
-  const circleOf = (args) => args?.circleId ?? getActiveCircle();
-  return {
-    createList: async (args) => {
-      const cid = circleOf(args);
-      const text = String(args?.text ?? '').trim();
-      if (!cid || !text) return { ok: false, error: t('circle.lists.need_name') };
-      const svc = await svcFor(cid);
-      const made = await svc.createList(cid, text, LOCAL_ACTOR);
-      return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.made', { name: text }) };
-    },
-    addToList: async (args) => {
-      const cid = circleOf(args);
-      const text = String(args?.text ?? '').trim();
-      const listRef = String(args?.list ?? '').trim();
-      if (!cid || !text || !listRef) return { ok: false, error: t('circle.lists.need_list_and_text') };
-      const svc = await svcFor(cid);
-      // The list may be named rather than identified — a person types "boodschappen", not an id.
-      const containers = await svc.listContainers(cid);
-      const target = containers.find((c) => c.id === listRef)
-        ?? containers.find((c) => String(c.text ?? '').toLowerCase() === listRef.toLowerCase());
-      if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: listRef }) };
-      const kind = String(args?.kind ?? '').trim() || undefined;
-      const made = await svc.addItem(cid, target.id, text, LOCAL_ACTOR, kind ? { hint: kind } : undefined);
-      return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.added', { text, name: target.text ?? listRef }) };
-    },
-    listLists: async (args) => {
-      const cid = circleOf(args);
-      if (!cid) return { ok: false, error: t('circle.lists.no_circle') };
-      const svc = await svcFor(cid);
-      const containers = await svc.listContainers(cid);
-      return { ok: true, items: containers.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
-    },
-    markListItemDone: async (args) => {
-      const cid = circleOf(args);
-      const itemId = String(args?.itemId ?? '').trim();
-      if (!cid || !itemId) return { ok: false, error: t('circle.lists.need_item') };
-      const svc = await svcFor(cid);
-      await svc.markDone(cid, itemId, LOCAL_ACTOR);
-      return { ok: true, message: t('circle.lists.done') };
-    },
-  };
+function listsOpsForShell() {
+  return makeListsOps({
+    storeFor: (circleId) => circleHouseholdAgent?.circleStoreFor?.(circleId),
+    t,
+    activeCircle: () => getActiveCircle(),
+    localActor: LOCAL_ACTOR,
+  });
 }
 
 /** Build and mount the table. Called at boot and again whenever the catalogue is rescoped, because
@@ -8163,7 +8095,7 @@ async function boot() {
       });
       mountBasisOpsOnAgent(agent);
       // …and the composable lists, whose service the shell owns per circle.
-      try { agent.mountAppOps?.('lists', listsOpsFor(), listsManifest); } catch { /* older composition */ }
+      try { agent.mountAppOps?.('lists', listsOpsForShell(), listsManifest); } catch { /* older composition */ }
       // Governance rides the RAIL: signed, circle-scoped statements. The shell exposes the agent's
       // per-circle signer resolver to the bind sites, and builds the receive-side rail (same declaration
       // + roster-binding rules) for the peer router's governance ingest below.

@@ -11,11 +11,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, TextInput, StyleSheet, ScrollView } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
-import { getCircleLists } from '../../core/circlePods.js';
+import { makeCircleLists } from '@onderling/kring-host/circleLists';
 
 const typeLabel = (type) => t(`circle.container.type.${type}`);
 
-export default function CircleListsScreen({ circleId, policy = null, onBack }) {
+export default function CircleListsScreen({ circleId, storeFor, onBack }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const svcRef = useRef(null);
@@ -32,14 +32,12 @@ export default function CircleListsScreen({ circleId, policy = null, onBack }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      // The SHARED assembly, not a store of this screen's own. It used to build `makeCircleLists` over
-      // `cc-circle-lists-cache` while every other caller — the share flow, and now the composer's "+" —
-      // went through `getCircleLists`, which uses `cc-circle-lists-state` and adds the sealed-pod path.
-      // One feature, two stores, on one device: a list made from the conversation did not appear on this
-      // screen and a list made here was invisible to everything else. Same class as the two block sets.
-      const svc = await getCircleLists(circleId, policy ?? null);
+      // THE CIRCLE'S OWN STORE — the same one the waist ops write to and the rail carries. This screen
+      // used to build a service over a DataSource of its own (`cc-circle-lists-cache`), so a list made in
+      // the conversation was invisible here and one made here reached nobody: two stores for one circle,
+      // which the architecture names as a defect outright.
       if (!alive) return;
-      svcRef.current = svc;
+      svcRef.current = makeCircleLists({ storeFor });
       setReady(true);
     })();
     return () => { alive = false; };

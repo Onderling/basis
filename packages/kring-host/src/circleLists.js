@@ -19,19 +19,10 @@ import { TASKS_ACCEPTS_MANIFEST } from './tasksInLists.js';
 // Re-export so a shell importing from circleLists gets the tasks-in-lists declaration alongside the module.
 export { TASKS_ACCEPTS_MANIFEST } from './tasksInLists.js';
 
-const LIST_SCHEMA = Object.freeze({
-  type: 'object', properties: { type: { const: 'list' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
-});
-const ITEM_SCHEMA = Object.freeze({
-  type: 'object',
-  properties: { type: { const: 'list-item' }, text: { type: 'string', minLength: 1 }, completedAt: { type: ['number', 'null'] } },
-  required: ['type', 'text'],
-});
-// A `board` — a HETEROGENEOUS container: it accepts EITHER an item OR a sub-list, with NO default, so "+ add"
-// is a genuine CHOICE (the ambiguous case that drives the type picker). Same {text} shape as a list.
-const BOARD_SCHEMA = Object.freeze({
-  type: 'object', properties: { type: { const: 'board' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
-});
+// The three container schemas are CANONICAL types now (`@onderling/item-types`), not this module's own.
+// They had to be: a type the circle's shared store must hold is a shared noun, and registering them on a
+// private registry is what gave lists a second store per circle — the thing the architecture calls a
+// defect ("two stores for one circle is a defect, not a design").
 
 /**
  * The lists feature's manifest-style `accepts` declaration (surfacing): a `list` CONTAINS
@@ -56,16 +47,27 @@ export const LISTS_ACCEPTS_MANIFEST = Object.freeze({
  * store's physical keys BE the canonical `resourceUriFor` pod URIs (`<podRoot>/group/<circleId>/items/<id>.json`).
  * Omitted → `createCircleStores`' `mem://circles/` default (the no-pod memory/IDB path).
  */
-export function makeCircleLists({ dataSource, manifests, rootPrefix } = {}) {
-  const registry = createRegistry();
-  registerCanonicalTypes(registry);
-  registry.registerType('list', LIST_SCHEMA);
-  registry.registerType('list-item', ITEM_SCHEMA);
-  registry.registerType('board', BOARD_SCHEMA);
-  // `task` (the canonical noun) is ALREADY registered by registerCanonicalTypes above, so a list/list-item
-  // can hold a real `task` child (TASKS_ACCEPTS_MANIFEST) with no extra type registration here.
-  const stores = createCircleStores({ dataSource: dataSource || memoryDataSource(), registry, rootPrefix });
-  const s = (circleId) => stores.getStore(circleId);
+export function makeCircleLists({ storeFor, dataSource, manifests, rootPrefix } = {}) {
+  // WHICH STORE. A composition that has one — every production shell — passes `storeFor`, the circle's
+  // own `CircleItemStore`, and lists then live where every other item lives: one store per circle, on the
+  // one fan-out path, obeying the circle's data-move branch (fan-out · pod-signal · pod-only · ref+blob)
+  // like a task or a message. That is the whole sharing story, and it is not this module's to invent.
+  //
+  // `dataSource` stays for tests and for a composition with no circle stores: it builds a private
+  // registry + stores exactly as before. It is the fallback, not the path.
+  const own = storeFor ? null : (() => {
+    const registry = createRegistry();
+    registerCanonicalTypes(registry);   // the container types are canonical now — no private registration
+    return createCircleStores({ dataSource: dataSource || memoryDataSource(), registry, rootPrefix });
+  })();
+  const s = (circleId) => {
+    if (!storeFor) return own.getStore(circleId);
+    const store = storeFor(circleId);
+    // A composition that promised a store and cannot produce one is a wiring fault, and it must SAY so:
+    // silently falling back to a private store is how this feature came to have two of them.
+    if (!store) throw new Error(`circleLists: no store for circle "${circleId}" — the composition wired storeFor but it returned nothing`);
+    return store;
+  };
   const CONTAINER_TYPES = ['list', 'board'];   // heterogeneous containers rendered by the panel (no row-actions)
 
   // The accepts policy: the lists declaration + the tasks-in-lists declaration (a list/list-item ALSO accepts
@@ -89,10 +91,13 @@ export function makeCircleLists({ dataSource, manifests, rootPrefix } = {}) {
   };
 
   return {
-    // the underlying per-circle store registry (createCircleStores). Exposed so the app-level
-    // cross-circle SHARE op (circleShare.js) can thread shareIntoAudience / resolveSharedRef through the
-    // SAME sealed-or-memory stores this service persists to. Read-only handle; the lists API is unchanged.
-    stores,
+    // The per-circle store registry, exposed so the app-level cross-circle SHARE op (`circleShare.js`)
+    // threads shareIntoAudience / resolveSharedRef through the SAME stores this service persists to.
+    // With `storeFor` injected there is no registry of our own to hand out — the caller already holds
+    // the circle's stores, which is the point — so this is the private-registry case only.
+    stores: own,
+    /** The circle's store, however this service was composed. One place that answers "which store". */
+    storeFor: s,
     createList:  (circleId, text, by) => s(circleId).put({ type: 'list', text }, { by }),
     createBoard: (circleId, text, by) => s(circleId).put({ type: 'board', text }, { by }),   // multi-type container
     /**

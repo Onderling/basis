@@ -46,6 +46,7 @@ import { renderCircleScreen } from './circleScreen.js';
 import { renderCircleNoticeboard } from './circleNoticeboard.js';
 import { buildAttachControl } from './attachControl.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
+import { pickRowText } from '../../src/v2/rowText.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 // Convergence — the invite-circle feedback review renders the SAME editable per-point cards as the
 // contact-thread flow (not a flattened text bubble). Shared renderer, one look across both surfaces.
@@ -935,7 +936,14 @@ function renderBubble(row, {
   // flattened text — the convergence with the contact-thread flow. The event still carries `text` (the
   // intro) as a fallback for renderers that don't know `review`.
   const reviewData = row.event?.payload?.review;
-  const fullText = pickRowText(row) ?? tr(`circle.streamAction.${row.type ?? 'unknown'}`) ?? '';
+  // A row with no text of its own falls back to a label for its TYPE — and if no such label is declared,
+  // to NOTHING. `tr` returns the key when it cannot resolve one, so this used to print
+  // `circle.streamAction.<type>` at the person: a raw key in a chat bubble, which invariant 8 forbids and
+  // which only got likelier as more item types reached the circle store. An unlabelled row says nothing
+  // rather than saying its own key.
+  const typeKey = `circle.streamAction.${row.type ?? 'unknown'}`;
+  const typeLabel = tr(typeKey);
+  const fullText = pickRowText(row) ?? (typeLabel === typeKey ? '' : typeLabel) ?? '';
   const text = document.createElement('div');
   text.className = 'circle-view__bubble-text';
   if (reviewData) {
@@ -1238,14 +1246,6 @@ function formatDayLabel(ts, tr) {
   if (sameDay)     return tr('circle.view.day_today');
   if (isYesterday) return tr('circle.view.day_yesterday');
   return d.toLocaleDateString();
-}
-
-function pickRowText(row) {
-  const p = row?.event?.payload && typeof row.event.payload === 'object' ? row.event.payload : {};
-  for (const k of ['text', 'title', 'body', 'name', 'message']) {
-    if (typeof p[k] === 'string' && p[k]) return p[k];
-  }
-  return null;
 }
 
 function pickKindLabel(row) {

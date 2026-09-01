@@ -3304,6 +3304,13 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       const handler = local.ops?.[opId];
       if (typeof handler !== 'function') return { ok: false, error: 'not-mounted', app: appOrigin, op: opId };
+      // An op that acts IN a circle gets that circle's sync wired first — the same line the household and
+      // tasks branches run, for the same reason: the publish valve is wired at open, and a write to a
+      // store whose valve was never wired stays local with nothing saying so. Until now this depended on
+      // some OTHER op having opened the circle first, which is true in a running shell and false in a
+      // journey, and "true by accident of ordering" is how a fan-out path quietly stops being one.
+      const inCircle = typeof args?.circleId === 'string' && args.circleId ? args.circleId : null;
+      if (inCircle) await ensureCircleSync(inCircle);
       return handler(args ?? {});
     }
     throw new Error(`realAgent: unknown appOrigin "${appOrigin}"`);
@@ -4763,6 +4770,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     /** Drop a circle's authorize snapshot — the circle was left. */
     forgetCircleSenders: (circleId) => circleSenders.forgetCircleSenders(circleId),
+    /**
+     * THE circle's store — one per circle, the `CircleItemStore` every typed item lives in and the one
+     * the rail mirrors. Exposed because a composition that needs items (the lists service, and any
+     * feature after it) must be handed THIS store rather than building one: "two stores for one circle
+     * is a defect, not a design", and a second store is how a feature comes to reach no peer at all.
+     */
+    circleStoreFor: (circleId) => householdService.stores.getStore(circleId),
     /** Diagnostics for `/security-status`: how strong this device's membership check actually is. */
     circleSenderAuthorization: () => ({
       installed:               !!sa.senderAuthorizerInstalled,

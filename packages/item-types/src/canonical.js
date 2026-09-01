@@ -32,6 +32,22 @@ import { INBOX_ITEM_SCHEMA }        from './types/inbox-item.js';
  * trio. Old names persist as **aliases** (see `LEGACY_ALIASES` below)
  * so already-written data + apps in transition keep validating.
  */
+/* ── The composable containers (2026-09-01, lifted from `kring-host/circleLists.js`) ─────────────── */
+/** A list: a named container of entries. */
+const LIST_SCHEMA = Object.freeze({
+  type: 'object', properties: { type: { const: 'list' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
+});
+/** An entry in a container — and itself a container, which is what makes the nesting composable. */
+const LIST_ITEM_SCHEMA = Object.freeze({
+  type: 'object',
+  properties: { type: { const: 'list-item' }, text: { type: 'string', minLength: 1 }, completedAt: { type: ['number', 'null'] } },
+  required: ['type', 'text'],
+});
+/** A board: a HETEROGENEOUS container with NO default child type, so "+ add" is a genuine choice. */
+const BOARD_SCHEMA = Object.freeze({
+  type: 'object', properties: { type: { const: 'board' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
+});
+
 export const CANONICAL_TYPES = Object.freeze({
   'task':               TASK_SCHEMA,
   'note':               NOTE_SCHEMA,
@@ -60,6 +76,18 @@ export const CANONICAL_TYPES = Object.freeze({
   // instead of approving" failed at the store — while the manifest had been declaring
   // `{type: 'inbox-item', kind: …}` for them all along. This is that declaration, made real.
   'inbox-item':         INBOX_ITEM_SCHEMA,
+  // The composable CONTAINERS (2026-09-01). They were registered privately by `circleLists.js` on a
+  // registry of its own, which is what put lists in a SECOND store per circle — and the architecture is
+  // explicit that "two stores for one circle is a defect, not a design", and that a type reaching a peer
+  // some other way is a second implementation of sync. A type the shared store must hold is a canonical
+  // noun; declaring them here is what lets a list item ride the one fan-out path every other item takes.
+  //
+  // `list` — a container of entries. `list-item` — an entry, itself a container (the nesting is real, and
+  // what a container ACCEPTS is the `accepts` policy's business, not the schema's). `board` — a container
+  // with no default child type, so "+ add" is a genuine choice.
+  'list':               LIST_SCHEMA,
+  'list-item':          LIST_ITEM_SCHEMA,
+  'board':              BOARD_SCHEMA,
 });
 
 /**

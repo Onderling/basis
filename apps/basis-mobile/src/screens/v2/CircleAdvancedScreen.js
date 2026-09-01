@@ -78,10 +78,20 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
 
       <Text style={styles.section}>{t('circle.advanced.ops_title')}</Text>
       {ops.length === 0 ? <Text style={styles.hint}>{t('circle.advanced.ops_empty')}</Text> : null}
-      {ops.map((o) => {
+      {/* Grouped, not flat — the shelf is declared on the op and projected by `advancedOpRows`, so web
+          and mobile shelve identically rather than each deciding. A heading renders when the group
+          changes, which is why the projector's order matters and is stable. */}
+      {ops.map((o, i) => {
         const key = `${o.app}:${o.op}`;
+        const newGroup = i === 0 || ops[i - 1].group !== o.group;
         return (
-          <View key={key} style={styles.row}>
+          <React.Fragment key={key}>
+          {newGroup ? (
+            <Text style={styles.group} testID={`advanced-group-${o.group}`}>
+              {t(`circle.advanced.group.${o.group}`)}
+            </Text>
+          ) : null}
+          <View style={styles.row}>
             <View style={styles.opLeft}>
               <Text style={styles.code}>{key}</Text>
               {o.description ? <Text style={styles.hint}>{o.description}</Text> : null}
@@ -99,6 +109,7 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
               </View>
             )}
           </View>
+          </React.Fragment>
         );
       })}
       <OpPageModal
@@ -121,6 +132,7 @@ const makeStyles = (theme) => StyleSheet.create({
   title:    { fontSize: 20, fontWeight: '700', color: theme.color.ink, marginBottom: 12 },
   section:  { fontSize: 14, fontWeight: '700', color: theme.color.ink, marginTop: 18, marginBottom: 4 },
   hint:     { fontSize: 12, color: theme.color.inkSoft },
+  group:    { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, color: theme.color.inkSoft, marginTop: 18, marginBottom: 4 },
   row:      { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   code:     { fontSize: 13, color: theme.color.ink, fontFamily: 'monospace' },
   controls: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 },

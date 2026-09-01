@@ -55,6 +55,27 @@ describe('the Advanced surface reaches every op with no declared screen', () => 
     }
   });
 
+  it('every row says which shelf it belongs on, and the shelf is DECLARED not guessed', () => {
+    // A flat list of twenty is a place things are put, not a door — nobody scans it, which is how an op
+    // that had lost its door could sit here and still be unreachable in practice. The group rides the
+    // manifest so the shells only paint it, and so two shells cannot shelve the same op differently.
+    for (const r of rows) {
+      expect(typeof r.group, `${r.op} has no group`).toBe('string');
+      expect(r.group.length).toBeGreaterThan(0);
+    }
+    const groups = new Set(rows.map((r) => r.group));
+    expect(groups.has('other'), 'nothing should be falling through to the catch-all today').toBe(false);
+    expect(groups.size, 'a handful of shelves, not one per op').toBeLessThanOrEqual(8);
+  });
+
+  it('groups the ops a person came looking for apart from the ones they did not', () => {
+    const of = (g) => rows.filter((r) => r.group === g).map((r) => r.op).sort();
+    expect(of('identity')).toEqual(['rotate-identity', 'signin', 'signout', 'whoami']);
+    expect(of('diagnostics')).toEqual(['audit-tail', 'debug-dump', 'security-status']);
+    expect(of('people'), 'blocking someone is a social act, not a transport setting')
+      .toEqual(['mute', 'muted', 'unmute']);
+  });
+
   it('says how each doorless op can be run — directly, or through its own form', () => {
     for (const r of rows) expect(['run', 'form']).toContain(r.via);
   });

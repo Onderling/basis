@@ -20,7 +20,6 @@
 import { describeFilter }    from '../filter.js';
 import { buildEmbed }        from '../embed.js';
 import { openExternalFlow }  from '../externalFlow.js';
-import { compareForCuration } from '../v2/curation.js';   // `compare` op handler
 // Media Phase 1 (2026-07) — sealed media path for picked images (chat → blob-gateway).
 import { createMediaEmbed, hasMediaGateway, isImageMime } from './handlers/mediaEmbed.js';
 
@@ -79,7 +78,6 @@ export function createLocalBuiltins({
       mediaGateway, encodeImage, storeMediaItem,
     }),
     'embed-time': async (args) => createTimeEmbed(args, { localActor, t, simPeers, threadStore, callSkill }),
-    apps:      async (args) => appsToggle(args, { catalogue, appRegistry, t }),
     // v0.7.5 / v0.7.1c — also expose openLogsPanel reachable to
     // handlers (currently only used by /logs but reads well at this
     // layer).
@@ -110,9 +108,6 @@ export function createLocalBuiltins({
     logs:      async (args) => runLogsBuiltin(args, { eventLog, t, openLogsPanel }),
     find:      async (args) => runFindBuiltin(args, { findRunner, t }),
     scanQr:    async ()     => runScanQrBuiltin({ openQrScanner, t }),
-    // before/after curation; returns a compareForCuration payload, rendered
-    // via the manifest's `curation` reply shape.
-    compare:   async (args) => compareForCuration(args?.before, args?.after),
   };
 }
 
@@ -803,50 +798,6 @@ async function signOutFlow(_args, { podAuth, t, onSignOut }) {
   }
 }
 
-/**
- * `/apps [on|off] [name]` — v0.6 OQ-4.B chat-inline app-toggle.
- * Bare call lists apps + enabled state.  With action+name, toggles
- * and reports.
- */
-async function appsToggle(args, { catalogue, appRegistry, t }) {
-  if (!appRegistry) return { ok: false, error: t('apps.no_registry') };
-
-  // Positional binding: '/apps off stoop' parses to args._match='off stoop'
-  // because flags-body packs positionals into _match for the router's
-  // single-required-param binding.  Multi-positional commands like
-  // /apps need to unpack manually.  Same pattern applies to any
-  // 2+ positional flags-body op (user-reported 2026-05-23).
-  const tokens = String(args?._match ?? '').trim().split(/\s+/).filter(Boolean);
-  const action = args?.action ?? tokens[0];
-  const name   = args?.app    ?? tokens[1];
-
-  if (!action) {
-    // List mode.
-    const lines = [t('apps.heading')];
-    const origins = catalogue?.appOrigins ?? [];
-    for (const origin of origins) {
-      const on = appRegistry.isEnabled(origin) ? '●' : '○';
-      lines.push(`  ${on} ${origin}`);
-    }
-    if (origins.length === 0) lines.push(`  ${t('apps.empty')}`);
-    return { message: lines.join('\n') };
-  }
-
-  if (!name) {
-    return { ok: false, error: t('apps.no_name', { action }) };
-  }
-
-  if (action === 'on' || action === 'off') {
-    appRegistry.setEnabled(name, action === 'on');
-    return {
-      ok: true,
-      message: action === 'on'
-        ? t('apps.enabled',  { app: name })
-        : t('apps.disabled', { app: name }),
-    };
-  }
-  return { ok: false, error: t('apps.unknown_action', { action }) };
-}
 
 /**
  * `/embed-file` — v0.7.13.  Three modes:
@@ -1221,15 +1172,23 @@ function formatHelp(catalogue, t) {
     return { message: t('help.empty') };
   }
 
-  // Group by appOrigin.  Sort each group's commands alphabetically.
+  // Grouped the way the Advanced drawer groups — by the op's DECLARED `group`, falling back to its app
+  // when it declares none. One vocabulary, two interfaces: the drawer paints the shelves, this prints
+  // them, and a person who learns the shape in one place reads the other without relearning it.
+  //
+  // Deliberately NOT the same LIST. `/help` answers "what can I type here" (the circle's command menu);
+  // the drawer answers "which ops have no door of their own". Those are different questions with
+  // different memberships, and collapsing them would make one of the two answers wrong — most likely
+  // help's, which would stop naming the commands a person can actually type.
   /** @type {Map<string, Array<{command: string, opId: string, hint: string}>>} */
   const byOrigin = new Map();
   for (const entry of commands) {
     const op   = catalogue.opsById?.get(entry.opId)?.op;
     const hint = op?.surfaces?.chat?.hint ?? op?.id ?? '';
-    const arr  = byOrigin.get(entry.appOrigin) ?? [];
+    const key  = (typeof op?.group === 'string' && op.group) ? `group:${op.group}` : entry.appOrigin;
+    const arr  = byOrigin.get(key) ?? [];
     arr.push({ command: entry.command, opId: entry.opId, hint });
-    byOrigin.set(entry.appOrigin, arr);
+    byOrigin.set(key, arr);
   }
   for (const arr of byOrigin.values()) {
     arr.sort((a, b) => a.command.localeCompare(b.command));
@@ -1246,9 +1205,11 @@ function formatHelp(catalogue, t) {
     return a.localeCompare(b);
   });
   for (const origin of origins) {
-    const label = origin === 'basis'
-      ? t('help.section_chat')
-      : t('help.section_app', { app: origin });
+    const label = origin.startsWith('group:')
+      ? t(`circle.advanced.group.${origin.slice('group:'.length)}`)
+      : origin === 'basis'
+        ? t('help.section_chat')
+        : t('help.section_app', { app: origin });
     lines.push('');
     lines.push(label);
     for (const { command, hint } of byOrigin.get(origin)) {

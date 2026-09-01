@@ -4150,7 +4150,19 @@ async function showAdvanced() {
     empty.textContent = t('circle.advanced.ops_empty');
     wrap.appendChild(empty);
   }
+  // Grouped, not flat. Twenty rows in one column is a place things are put; nobody reads it, which is
+  // how ops that had lost their door could sit here and still be unreachable in practice. The shelf is
+  // declared on the op (`group`) and projected by `advancedOpRows`, so both shells shelve identically.
+  let lastGroup = null;
   for (const o of ops) {
+    if (o.group !== lastGroup) {
+      lastGroup = o.group;
+      const gh = document.createElement('h4');
+      gh.className = 'cc-advanced__group';
+      gh.dataset.group = o.group;
+      gh.textContent = t(`circle.advanced.group.${o.group}`);
+      wrap.appendChild(gh);
+    }
     const row = document.createElement('div');
     row.className = 'cc-advanced__op';
     row.style.cssText = 'display:flex;gap:.5rem;align-items:baseline;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--line,#eee);';

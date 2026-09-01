@@ -957,6 +957,36 @@
     "cancel": {
       "text": "Annuleer",
       "doc": "The page form: close without dispatching."
+    },
+    "group": {
+      "identity": {
+        "text": "Identiteit",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "device": {
+        "text": "Dit apparaat",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "people": {
+        "text": "Mensen",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "connectivity": {
+        "text": "Verbindingen",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "diagnostics": {
+        "text": "Diagnostiek",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "help": {
+        "text": "Hulp",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "other": {
+        "text": "Overig",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      }
     }
   },
   "settings_restore": {
@@ -5861,6 +5891,20 @@
     "decisionOpened": {
       "text": "Er is een besluit geopend",
       "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    }
+  },
+  "page": {
+    "find": {
+      "text": "Zoeken",
+      "doc": "The label of the find op's own page (surfaces.page.labelKey), painted by both shells."
+    },
+    "brief": {
+      "text": "Briefing",
+      "doc": "The label of the brief op's own page (surfaces.page.labelKey), painted by both shells."
+    },
+    "logs": {
+      "text": "Gebeurtenissen",
+      "doc": "The label of the logs op's own page (surfaces.page.labelKey), painted by both shells."
     }
   }
 }

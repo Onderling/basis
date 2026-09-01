@@ -134,15 +134,6 @@ describe('Bundle F P1 — buildMobileLocalBuiltins', () => {
     expect(Array.isArray(r.groups) || typeof r.message === 'string').toBe(true);
   });
 
-  it('/apps returns an apps-list reply (no no_registry sentinel)', async () => {
-    const r = await h.handlers.apps({});
-    expect(r).toBeTruthy();
-    // appsToggle on success returns a message or items shape; on
-    // missing-registry it would have returned { ok: false, error:
-    // 'apps.no_registry' }.  Either typeof message is string or
-    // items array exists.
-    expect(r.error ?? '').not.toContain('apps.no_registry');
-  });
 
   // Bundle G3 — /lookup-peer + /publish-peer.
   it('/lookup-peer + /publish-peer report unavailable when sessionRef is not wired', async () => {

@@ -63,6 +63,12 @@ export function advancedOpRows({ manifests = [] } = {}) {
         app: r.app,
         op: r.op,
         verb: r.verb ?? '',
+        // Which shelf of the drawer this belongs on, DECLARED on the op rather than guessed here.
+        // A flat list of twenty is a place things are put, not a door: nobody scans it, which is how
+        // ops that had lost their door could sit in it and still be unreachable in practice. The
+        // shells paint the shelves; this only reports which one. An op with no `group` falls to
+        // `other`, which is honest — an ungrouped op is one nobody has decided about yet.
+        group: typeof op?.group === 'string' && op.group ? op.group : 'other',
         description: typeof op?.description === 'string' ? op.description
           : typeof op?.surfaces?.chat?.hint === 'string' ? op.surfaces.chat.hint : '',
         slash,

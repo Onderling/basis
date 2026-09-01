@@ -36,6 +36,7 @@ export const basisManifest = {
      */
     {
       id:    'help',
+      group: 'help',
       verb:  'help',
       params: [],
       surfaces: {
@@ -48,6 +49,7 @@ export const basisManifest = {
     },
     {
       id:    'help-with',
+      group: 'help',
       verb:  'add',
       params: [
         { name: 'postId', kind: 'string', required: true },
@@ -225,6 +227,8 @@ export const basisManifest = {
       surfaces: {
         slash: { command: '/logs', body: 'flags' },
         chat:  { reply: 'list', hint: 'recent events; --app= / --type= / --mute=app:type' },
+        // "What happened while I was away" is a member question, not only an operator one.
+        page:  { kind: 'side-panel', title: 'Events', labelKey: 'circle.page.logs' },
       },
     },
 
@@ -240,6 +244,7 @@ export const basisManifest = {
      */
     {
       id:    'scanQr',
+      group: 'device',
       verb:  'list',
       params: [],
       surfaces: {
@@ -264,6 +269,10 @@ export const basisManifest = {
       surfaces: {
         slash: { command: '/find' },
         chat:  { reply: 'find', hint: 'search across all apps cached items' },
+        // A door of its own: search is a member act, not a diagnostic, and the drawer is the place
+        // things go when they have nowhere better. Both shells project this — web docks the panel,
+        // mobile opens `OpPageModal` — over the op's own declared params.
+        page:  { kind: 'side-panel', title: 'Search', labelKey: 'circle.page.find' },
       },
     },
 
@@ -283,23 +292,10 @@ export const basisManifest = {
       surfaces: {
         slash: { command: '/brief', body: 'flags' },
         chat:  { reply: 'brief', hint: 'morning summary across all apps' },
+        page:  { kind: 'side-panel', title: 'Brief', labelKey: 'circle.page.brief' },
       },
     },
 
-    /**
-     * `compare` — (feedback-extension). Before/after curation of two content
-     * versions (e.g. an original message vs its curated form). Reuses folio's
-     * `objectDiff` compute and renders via the `curation` reply shape (a
-     * before/after view, distinct from folio's file-merge look). A composable op
-     * (a mapping/composite step) — no slash surface; args `{ before, after }`.
-     */
-    {
-      id:    'compare',
-      verb:  'list',
-      surfaces: {
-        chat:  { reply: 'curation', hint: 'before/after curation of two versions' },
-      },
-    },
 
     /**
      * `/signin` — v0.6.2 external-flow demo (J6 framework).
@@ -311,6 +307,7 @@ export const basisManifest = {
      */
     {
       id:    'signin',
+      group: 'identity',
       verb:  'add',
       params: [
         { name: 'issuer', kind: 'string', required: false },
@@ -350,6 +347,7 @@ export const basisManifest = {
      */
     {
       id:    'whoami',
+      group: 'identity',
       verb:  'list',
       params: [],
       surfaces: {
@@ -376,6 +374,7 @@ export const basisManifest = {
      */
     {
       id:    'me',
+      group: 'identity',
       verb:  'list',
       params: [],
       surfaces: {
@@ -396,6 +395,7 @@ export const basisManifest = {
      */
     {
       id:    'send-file',
+      group: 'connectivity',
       verb:  'add',
       params: [
         { name: 'peer', kind: 'string', required: true },
@@ -415,6 +415,7 @@ export const basisManifest = {
      */
     {
       id:    'lookup-peer',
+      group: 'connectivity',
       verb:  'list',
       params: [
         { name: 'webid', kind: 'string', required: true },
@@ -433,6 +434,7 @@ export const basisManifest = {
      */
     {
       id:    'publish-peer',
+      group: 'connectivity',
       verb:  'add',
       params: [],
       surfaces: {
@@ -450,6 +452,7 @@ export const basisManifest = {
      */
     {
       id:    'rotate-identity',
+      group: 'identity',
       verb:  'add',
       params: [],
       surfaces: {
@@ -467,6 +470,7 @@ export const basisManifest = {
      */
     {
       id:    'security-status',
+      group: 'diagnostics',
       verb:  'list',
       params: [],
       surfaces: {
@@ -486,6 +490,7 @@ export const basisManifest = {
      */
     {
       id:    'set-relay',
+      group: 'device',
       verb:  'submit',
       params: [
         { name: 'url',   kind: 'string',  required: false },
@@ -509,6 +514,7 @@ export const basisManifest = {
      */
     {
       id:    'transport-mode',
+      group: 'device',
       verb:  'submit',
       params: [
         { name: 'mode', kind: 'enum', of: ['nkn', 'relay', 'both'], required: true },
@@ -525,6 +531,7 @@ export const basisManifest = {
      */
     {
       id:    'transports',
+      group: 'device',
       verb:  'list',
       params: [],
       surfaces: {
@@ -542,6 +549,7 @@ export const basisManifest = {
      */
     {
       id:    'settings',
+      group: 'device',
       verb:  'list',
       params: [
         {
@@ -647,6 +655,7 @@ export const basisManifest = {
      */
     {
       id:    'mute',
+      group: 'people',
       verb:  'add',
       params: [
         { name: 'peer', kind: 'string', required: true },
@@ -663,6 +672,7 @@ export const basisManifest = {
      */
     {
       id:    'unmute',
+      group: 'people',
       verb:  'add',
       params: [
         { name: 'peer', kind: 'string', required: true },
@@ -678,6 +688,7 @@ export const basisManifest = {
      */
     {
       id:    'muted',
+      group: 'people',
       verb:  'list',
       params: [],
       surfaces: {
@@ -696,6 +707,7 @@ export const basisManifest = {
      */
     {
       id:    'debug-dump',
+      group: 'diagnostics',
       verb:  'list',
       params: [],
       surfaces: {
@@ -712,6 +724,7 @@ export const basisManifest = {
      */
     {
       id:    'audit-tail',
+      group: 'diagnostics',
       verb:  'list',
       params: [
         { name: 'n',     kind: 'number', required: false },
@@ -731,6 +744,7 @@ export const basisManifest = {
      */
     {
       id:    'peer-connect',
+      group: 'connectivity',
       verb:  'add',
       params: [],
       surfaces: {
@@ -747,6 +761,7 @@ export const basisManifest = {
      */
     {
       id:    'test-peer',
+      group: 'connectivity',
       verb:  'add',
       params: [
         // 2026-05-27 slash audit close-out — param renamed
@@ -766,6 +781,7 @@ export const basisManifest = {
      */
     {
       id:    'signout',
+      group: 'identity',
       verb:  'remove',
       params: [],
       surfaces: {
@@ -774,18 +790,6 @@ export const basisManifest = {
       },
     },
 
-    {
-      id:    'apps',
-      verb:  'list',
-      params: [
-        { name: 'action', kind: 'enum', of: ['on', 'off'], required: false },
-        { name: 'app',    kind: 'string',                  required: false },
-      ],
-      surfaces: {
-        slash: { command: '/apps', body: 'flags' },
-        chat:  { reply: 'text', hint: 'list or toggle apps; /apps on|off <name>' },
-      },
-    },
 
     /**
      * `/send-to <peer> <itemId>` — v0.5.6 simulated cross-peer demo.

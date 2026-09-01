@@ -41,68 +41,6 @@ function catalogueWithEmbedFactory({ opId = 'cardSnap', appOrigin = 'household',
     commandMenu: [],
   };
 }
-
-/* ─────────── 1. /apps on/off — positional-arg toggle ─────────── */
-
-describe('/apps on|off', () => {
-  it('enables an app via positional args parsed from _match', async () => {
-    const registry = new AppRegistry();
-    registry.syncWithCatalogue(['household', 'stoop']);
-    registry.setEnabled('stoop', false);
-    const catalogue = emptyCatalogue();
-    const builtins = createLocalBuiltins({ catalogue, t, appRegistry: registry });
-    const r = await builtins.apps({ _match: 'on stoop' });
-    expect(r.ok).toBe(true);
-    expect(r.message).toMatch(/enabled/);
-    expect(registry.isEnabled('stoop')).toBe(true);
-  });
-
-  it('disables an app via positional args', async () => {
-    const registry = new AppRegistry();
-    registry.syncWithCatalogue(['household']);
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t, appRegistry: registry,
-    });
-    const r = await builtins.apps({ _match: 'off household' });
-    expect(r.ok).toBe(true);
-    expect(r.message).toMatch(/disabled/);
-    expect(registry.isEnabled('household')).toBe(false);
-  });
-
-  it('accepts explicit action+app args (not just _match)', async () => {
-    const registry = new AppRegistry();
-    registry.syncWithCatalogue(['folio']);
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t, appRegistry: registry,
-    });
-    const r = await builtins.apps({ action: 'off', app: 'folio' });
-    expect(r.ok).toBe(true);
-    expect(registry.isEnabled('folio')).toBe(false);
-  });
-
-  it('rejects an unknown action', async () => {
-    const registry = new AppRegistry();
-    registry.syncWithCatalogue(['household']);
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t, appRegistry: registry,
-    });
-    const r = await builtins.apps({ _match: 'toggle household' });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Unknown action/);
-  });
-
-  it('reports missing-name when action is given without an app', async () => {
-    const registry = new AppRegistry();
-    registry.syncWithCatalogue(['household']);
-    const builtins = createLocalBuiltins({
-      catalogue: emptyCatalogue(), t, appRegistry: registry,
-    });
-    const r = await builtins.apps({ _match: 'on' });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/name an app/);
-  });
-});
-
 /* ─────────── 2. /peer-connect — connectPeer wiring ─────────── */
 
 describe('/peer-connect', () => {

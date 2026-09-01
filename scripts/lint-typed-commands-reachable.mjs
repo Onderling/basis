@@ -31,14 +31,22 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
 /**
  * Handlers that exist and cannot be typed, pending L70. Dated so the list reads as debt, not design.
- * SHRINK THIS by giving a command a door (add it to `CIRCLE_BUILTIN_COMMANDS` and wire both composers)
- * or by deleting the handler. A new entry needs a sentence saying why a person should not reach it.
+ * A DECLARED SCREEN COUNTS AS A DOOR (2026-09-01). The guard originally knew one kind — a typed command
+ * in `CIRCLE_BUILTIN_COMMANDS` — because when it was written that was the only kind basis's ops had. An
+ * op that declares `surfaces.ui` or `surfaces.page` is reached by tapping it, on both shells, through
+ * the page projection; asking such an op to ALSO be typeable would be asking for a second door and
+ * calling its absence a defect. So `find`, `brief` and `logs` leave the list by gaining a page, not by
+ * being excused — which is the shrink this guard asks for, arriving in a shape it had not anticipated.
+ *
+ * SHRINK THIS by giving a command a door (add it to `CIRCLE_BUILTIN_COMMANDS` and wire both composers,
+ * or declare `surfaces.ui`/`surfaces.page` on the op) or by deleting the handler. A new entry needs a
+ * sentence saying why a person should not reach it.
  */
 const UNREACHED = new Set([
   // Composer affordances the circle UI now does with buttons rather than typing.
   'embed', 'embed-file', 'embed-time', 'send-file', 'scanQr',
   // Still meaningful, no door since chat was folded into the circle view (2026-07) — the L70 set.
-  'apps', 'audit-tail', 'brief', 'compare', 'debug-dump', 'find', 'help', 'help-with', 'logs',
+  'audit-tail', 'debug-dump', 'help', 'help-with',
   'lookup-peer', 'me', 'mute', 'muted', 'unmute', 'peer-connect', 'publish-peer', 'rotate-identity',
   'signin', 'signout', 'test-peer', 'whoami',
 ]);
@@ -61,12 +69,29 @@ const circleSet = new Set(
     .matchAll(/'([a-z][a-z-]*)'/g)].map((m) => m[1]),
 );
 
+/**
+ * Does this op declare a door of its own? Read off the manifest SOURCE rather than imported, so the
+ * guard stays a cheap text check like its siblings and cannot be broken by an import cycle. A `page` or
+ * a `ui` block inside the op's `surfaces` is a screen both shells project — tapping it is reaching it.
+ */
+const manifestSrc = read('apps/basis/manifest.js');
+function hasOwnDoor(opId) {
+  const at = manifestSrc.indexOf(`id:    '${opId}'`) >= 0
+    ? manifestSrc.indexOf(`id:    '${opId}'`)
+    : manifestSrc.indexOf(`id:   '${opId}'`);
+  if (at < 0) return false;
+  // The op's own literal: from its id to the end of its surfaces block, bounded by the next op's id.
+  const nextId = manifestSrc.indexOf("id:    '", at + 10);
+  const body = manifestSrc.slice(at, nextId > 0 ? nextId : manifestSrc.length);
+  return /\bpage:\s*\{/.test(body) || /\bui:\s*\{/.test(body);
+}
+
 const problems = [];
 const table = chatBuiltins();
 if (table.length === 0) problems.push('could not read the chat builtins table — the parse needle moved');
 
 for (const cmd of table) {
-  if (circleSet.has(cmd) || UNREACHED.has(cmd)) continue;
+  if (circleSet.has(cmd) || UNREACHED.has(cmd) || hasOwnDoor(cmd)) continue;
   problems.push(`"${cmd}" is a handler a person cannot type: it is not in CIRCLE_BUILTIN_COMMANDS (which both shells run) and not declared unreached. Give it a door, or say why it should not have one.`);
 }
 for (const cmd of UNREACHED) {

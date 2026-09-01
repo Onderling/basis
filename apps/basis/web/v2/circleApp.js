@@ -778,6 +778,8 @@ import { makeHandleSharedCopy } from '../../src/core/handlers/sharedCopyReceive.
 // SILENT out-of-circle delivery — the "shared with me" VIEW (web DOM projector) + the shared
 // open selector. The nav entry lives on the Mij profile (personal, cross-circle inbox).
 import { renderSharedWithMe } from './sharedWithMe.js';
+import { renderBlockedList } from './blockedList.js';
+import { buildBlockedList } from '../../src/v2/blockedList.js';
 import { buildSharedWithMe, openSharedCopy } from '../../src/v2/sharedWithMe.js';
 // SILENT out-of-circle delivery — THIS device's network-derived sealing OPENER (shared web≡mobile). Injects the
 // pod-client sealing adapter into the encapsulated identity secret; only the opener closure escapes.
@@ -4114,6 +4116,9 @@ async function showMij() {
     onConnectionPoints: showConnectionPoints,
     // SILENT out-of-circle delivery — the personal, cross-circle "shared with me" inbox.
     onSharedWithMe: showSharedWithMe,
+    // The way back from a block. Blocking is one tap on a post; without this the only undo was
+    // `/unblock <key>`, typed from memory.
+    onBlocked: showBlocked,
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: showAdvanced,
   });
@@ -4150,6 +4155,38 @@ async function showSharedWithMe() {
       try { await openSharedCopy(entry, opener); } catch { /* wrong key / not a recipient — deny-safe */ }
     },
   });
+}
+
+/**
+ * The people this device blocks. Reads the ONE block set (`basis:muted` — the same set the
+ * transport refuses on and the stream filters by), names them against the circle roster, and
+ * offers the only undo there is.
+ */
+async function showBlocked() {
+  hideCircleTabBar(tabBarEl);
+  const paint = async (loading) => {
+    let peers = [];
+    let members = [];
+    if (!loading) {
+      try { peers = (await rawCallSkill('basis', 'muted', {}))?.peers ?? []; } catch { peers = []; }
+      // The roster is only here to put NAMES on keys — a screen that fails to load it still shows the
+      // list (as keys), because a block you cannot see is worse than one you cannot read.
+      try {
+        const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: getActiveCircle() });
+        members = normalizeCircleMembers(res);
+      } catch { members = []; }
+    }
+    renderBlockedList(rootEl, {
+      rows: buildBlockedList({ peers, members }),
+      t, loading, onBack: showMij,
+      onUnblock: async (key) => {
+        try { await rawCallSkill('basis', 'unmute', { peer: key }); } catch { /* re-read tells the truth */ }
+        await paint(false);
+      },
+    });
+  };
+  await paint(true);
+  await paint(false);
 }
 
 // "My data": where your data lives (pod/relay) + privacy + usage + key
@@ -6100,7 +6137,12 @@ function showCircle(id, circle, policy) {
     // (the sitting's rule: muted messages LAND, the view filters; unmute restores). Loaded with the
     // roster because the key→ref resolution needs it; refreshed by the mute/unmute actions.
     try {
-      const mk = (await rawCallSkill('stoop', 'listMutedPeers', {}))?.peers ?? [];
+      // ONE block set, read from the act that made it. There used to be two — the secure agent's
+      // (`basis:mute`, which refuses a person's envelopes) and stoop's (a local view filter) — so
+      // "blocked" meant two different things depending on which button you had pressed, and neither
+      // did what a person means by it. One act now does both halves: the transport refuses them and
+      // the view hides them, off the same list.
+      const mk = (await rawCallSkill('basis', 'muted', {}))?.peers ?? [];
       circleMutedActors = mutedActorSet(mk, circleRoster);
     } catch { /* keep the previous set — hiding is best-effort, never a crash */ }
     if (getActiveCircle() === id) {
@@ -6331,10 +6373,13 @@ function showCircle(id, circle, policy) {
       } else if (action === 'markReturned') {
         await stoopCall('stoop', 'markReturned', { requestId: post.id });
       } else if (action === 'mute') {
-        // S3 #9 — mute the post's author (local-only; hides them in the circle stream + chat).
+        // BLOCK this person — both halves, one act: their envelopes are refused at this device's
+        // boundary AND their posts stop showing here. Keyed on the WEBID, which is what makes it a
+        // block of a PERSON: the transport check resolves an address to its owner's aliases and
+        // matches, so a second address of theirs is blocked too, and the view matches the roster row.
         if (post.addedBy) {
-          await rawCallSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
-          await loadRoster();   // re-resolve the mute set → the hide takes effect on the next paint
+          await rawCallSkill('basis', 'mute', { peer: post.addedBy });
+          await loadRoster();   // re-resolve the block set → the hide takes effect on the next paint
         }
       } else if (action === 'assign') {
         // S3 #4 — lender assigns a borrower to a lend post.

@@ -92,6 +92,7 @@ export async function createBrowserStoopAgent({
   // The rules-update rider: a rules-doc edit also fans a signed statement on the governance lane
   // (absent → store-local only, the pre-propagation behaviour).
   rulesUpdateEmit,
+  mutedSet,
 }) {
   if (!bus)           throw new TypeError('createBrowserStoopAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserStoopAgent: identityVault required');
@@ -125,6 +126,7 @@ export async function createBrowserStoopAgent({
     circleSignerFor,       // circle-scoped spine signing (absent → legacy global-identity signer, unchanged)
     membershipEmit,        // the membership rider's device-log emitter (absent → store-based, unchanged)
     membershipRead,        // the rider's verified reader for the roster fold
+    mutedSet,              // the SHELL's block set — this app reads it, never writes it
     rulesUpdateEmit,       // the rules-update rider's governance-lane emitter (absent → store-local only)
   });
 

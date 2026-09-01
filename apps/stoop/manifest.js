@@ -420,35 +420,6 @@ export const stoopManifest = {
         ui: { control: 'button' },
       },
     },
-    {
-      id:   'mutePeer',
-      verb: 'mute',  // F-SP1-e: non-canonical.  No canonical verb
-                     // fits (it's not add/remove/list — it's a
-                     // local-only filter flag).
-      params: [
-        // Either is accepted; the skill resolves both via
-        // `_resolveMuteKey`.  Modelled as separate optional params;
-        // the slash body picks one or the other.
-        { name: 'peerStableId', kind: 'string' },
-        { name: 'peerWebid',    kind: 'string' },
-      ],
-      surfaces: {
-        chat:  { hint: 'Locally mute a peer (does not affect anyone else). Prefer peerStableId; peerWebid back-compat.' },
-        slash: {
-          command: '/mute',
-          shape:   '/mute <peer-handle-or-stableId>',
-          // `match` body: single token gets stored as `peerStableId`;
-          // the consumer can transform handles → stableId before
-          // dispatch.
-          match: {
-            verbs:   ['mute', 'demp'],
-            body:    'match',
-            onEmpty: { skillId: 'mutePeer', args: {} },
-          },
-        },
-      },
-    },
-
     // ── Profile / reveals ───────────────────────────────────────────
     {
       id:   'setMyOfferings',
@@ -560,8 +531,7 @@ export const stoopManifest = {
     // ── Pod session ─────────────────────────────────────────────────
     // adoption (2026-05-21). signOutOfPod disconnects the
     // OIDC session from the user's Solid pod.  No appliesTo — same
-    // pattern as listMyRequests / mutePeer (session-scoped, not
-    // per-item).
+    // pattern as listMyRequests (session-scoped, not per-item).
     {
       id:   'signOutOfPod',
       verb: 'remove',  // canonical — signing out is removal of session.
@@ -1473,27 +1443,6 @@ export const stoopManifest = {
       resolves: [{ field: 'acceptedBy', policy: 'claim' }],
       surfaces: {
         chat: { hint: 'Accept one of the people who responded to a request.' },
-        ui:   { control: 'button' },
-      },
-    },
-    {
-      id:   'listMutedPeers', verb: 'list',
-      params: [{ name: 'handle', kind: 'string' }],
-      surfaces: {
-        chat: { hint: 'The peers muted on this device.' },
-        ui:   { control: 'page' },
-      },
-    },
-    {
-      id:   'unmutePeer', verb: 'mute',
-      // Takes peerStableId OR peerWebid — the handler refuses when neither is given, so neither is
-      // marked required on its own.
-      params: [
-        { name: 'peerStableId', kind: 'string' },
-        { name: 'peerWebid',    kind: 'string' },
-      ],
-      surfaces: {
-        chat: { hint: 'Unmute a peer, by stable id or webid.' },
         ui:   { control: 'button' },
       },
     },

@@ -608,12 +608,15 @@ async function mutedHandler(_args, { agent, t }) {
   const sa = agent?.sa;
   if (!sa?.mute) return { ok: false, error: t('mute.unavailable') };
   const list = sa.mute.list();
-  if (list.length === 0) return { message: t('mute.empty') };
+  // The list is DATA as well as prose: the stream and the noticeboard hide a blocked person's posts by
+  // reading this same set, so it has to be readable by something other than a person. It was a message
+  // only, which is why the view had to keep a second block set of its own to filter by.
+  if (list.length === 0) return { ok: true, peers: [], message: t('mute.empty') };
   const lines = [t('mute.list_heading', { count: list.length })];
   for (const p of list) {
     lines.push(`  - ${p.length > 64 ? p.slice(0, 60) + '…' : p}`);
   }
-  return { message: lines.join('\n') };
+  return { ok: true, peers: list, message: lines.join('\n') };
 }
 
 /**

@@ -108,7 +108,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assignLend` | reassign | ✅ | ✅ | · | · | · | · |  |
 |  | `markReturned` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | returned, teruggebracht, terug, mark returned |
 |  | `reportPost` | report | ✅ | ✅ | ✅ | · | ✅ | ✅ | report, rapporteer, flag |
-|  | `mutePeer` | mute | ✅ | ✅ | ✅ | · | · | · | mute, demp |
 |  | `setMyOfferings` | set | ✅ | ✅ | · | · | · | · |  |
 |  | `setPeerReveal` | set | ✅ | ✅ | · | · | · | · |  |
 |  | `leaveGroup` | remove | ✅ | ✅ | · | · | · | · |  |
@@ -185,8 +184,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `recordPeerIntro` | add | ✅ | · | · | · | ✅ | · |  |
 |  | `addContactFromQr` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `acceptResponder` | confirm | ✅ | · | · | · | ✅ | ✅ |  |
-|  | `listMutedPeers` | list | ✅ | · | · | · | ✅ | · |  |
-|  | `unmutePeer` | mute | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `broadcastCircleGovernance` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleKeyStatement` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleMembership` | share | ✅ | · | · | · | ✅ | · |  |
@@ -255,7 +252,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 250 ops | | 231 | 121 | 34 | 3 | 148 | 72 | |
+| **totals** | 247 ops | | 228 | 120 | 33 | 3 | 146 | 71 | |
 
 ### Flows
 
@@ -268,6 +265,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (216/250): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:reassign, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, tasks:getTaskSnapshot, tasks:removeTask …
-- **missing inline** (178/250): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase …
-- **missing chat** (19/250): basis:signin, basis:signout, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch
+- **missing gate** (214/247): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:reassign, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, tasks:getTaskSnapshot, tasks:removeTask …
+- **missing inline** (176/247): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase …
+- **missing chat** (19/247): basis:signin, basis:signout, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch

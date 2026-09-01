@@ -90,7 +90,7 @@ import { EvictionRoster }    from './lib/EvictionRoster.js';
  *   offeringMatch: OfferingMatch,
  *   notifier:   object | null,
  *   reveals:    Reveals | null,
- *   muted:      Set<string>,
+ *   muted:      Set<string>,   // the shell's block set when one was given
  * }>}
  */
 export async function createNeighbourhoodAgent({
@@ -123,6 +123,7 @@ export async function createNeighbourhoodAgent({
   persistDb,
   notifier:      providedNotifier,
   reveals:       providedReveals,
+  mutedSet:      providedMutedSet,
   /**
    * Stoop V1 Phase 18 (2026-05-06): in-process usage counter.  When
    * omitted, the factory creates a fresh `UsageMetrics`; callers wire
@@ -412,9 +413,11 @@ export async function createNeighbourhoodAgent({
   });
 
   // ── Per-bundle local state (Stoop V1 Phase 3) ─────────────────────────────
-  // `muted` is a per-viewer Set<peerWebid>.  `mutePeer` writes; UI
-  // consumers query.  Pure local — never broadcast.
-  const muted = new Set();
+  // Blocking a person is a whole-device decision, so the set belongs to the
+  // shell, not to this app: the host hands its own set in and this app only
+  // reads it (ingest filtering).  The empty default is for running headless,
+  // where there is no shell and so nobody is blocked.
+  const muted = providedMutedSet ?? new Set();
   // Phase 14 fix (2026-05-06): when the caller doesn't supply a
   // Reveals store, mint a default in-memory one so `requestReveal`
   // (the bilateral "Connectie accepteren" button) works out of the

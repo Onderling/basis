@@ -31,7 +31,7 @@ async function callSkill(agent, skillId, args, fromWebid) {
  * Build a 2-agent cluster (Anne + Bob) on a shared bus, with each
  * peer wired so they can `agent.message(other.pubKey, ...)` directly.
  */
-async function buildPair() {
+async function buildPair({ anneBlocks } = {}) {
   const bus = new InternalBus();
   const anneId = await AgentIdentity.generate(new VaultMemory());
   const bobId  = await AgentIdentity.generate(new VaultMemory());
@@ -46,6 +46,7 @@ async function buildPair() {
       { webid: BOB,  handle: 'bob',  stableId: bobId.stableId,  pubKey: bobId.pubKey  },
     ],
     reveals: new Reveals(),
+    mutedSet: anneBlocks,
   });
   const bob = await createNeighbourhoodAgent({
     identity:  bobId,
@@ -143,10 +144,12 @@ describe('Stoop V1 Phase 14 — peer chat round-trip', () => {
       .toEqual({ error: 'threadId required' });
   });
 
-  it('mute suppresses incoming chat-messages from the muted peer', async () => {
-    const { anne, bob, anneId, bobId } = await buildPair();
-    // Anne mutes Bob (by stableId).
-    await callSkill(anne.agent, 'mutePeer', { peerStableId: bobId.stableId }, ANNE);
+  it('a blocked peer\'s chat-messages do not arrive', async () => {
+    // The block set is the SHELL's, handed in at construction — this app never
+    // writes it, it only refuses ingest from whoever is in it.
+    const anneBlocks = new Set();
+    const { anne, bob, anneId, bobId } = await buildPair({ anneBlocks });
+    anneBlocks.add(bobId.stableId);
 
     await callSkill(bob.agent, 'sendChatMessage',
       { toStableId: anneId.stableId, threadId: 't', body: 'should not arrive' }, BOB);

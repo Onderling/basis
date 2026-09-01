@@ -2377,6 +2377,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     membershipEmit,
     membershipRead,
     rulesUpdateEmit,
+    // One block set for the whole device. Blocking is a decision about a PERSON, so it cannot live
+    // per-app: the boundary refuses their envelopes, and this app's ingest filter reads the same set
+    // so anything that arrived by another road is dropped too. Keys line up because in basis' binding
+    // a member's actor/webid IS their chat pubKey — the address the set is keyed on.
+    mutedSet: sa.mute,
     // Bind chatAgent's pubKey as the local actor so real stoop
     // skills' `from` lookups resolve back to 'me' (admin role).
     localActor: chatId.pubKey,

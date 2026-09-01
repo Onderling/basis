@@ -186,27 +186,7 @@ describe('Stoop V1 — lend lifecycle (postRequest + markReturned + notifier)', 
 
 // ── Mute / report ─────────────────────────────────────────────────────────
 
-describe('Stoop V1 — moderation skills (mute / report)', () => {
-  it('mutePeer adds to local mute set; listMutedPeers returns it; unmute reverses', async () => {
-    const bundle = await buildAgent();
-
-    expect((await callSkill(bundle.agent, 'listMutedPeers')).peers).toEqual([]);
-    await callSkill(bundle.agent, 'mutePeer', { peerWebid: BOB });
-    expect((await callSkill(bundle.agent, 'listMutedPeers')).peers).toEqual([BOB]);
-    expect(bundle.muted.has(BOB)).toBe(true);
-
-    const u = await callSkill(bundle.agent, 'unmutePeer', { peerWebid: BOB });
-    expect(u).toMatchObject({ unmuted: BOB, had: true });
-    expect(bundle.muted.has(BOB)).toBe(false);
-  });
-
-  it('mutePeer / unmutePeer reject missing peerWebid', async () => {
-    const bundle = await buildAgent();
-    // Phase 11 (2026-05-06): mutePeer accepts peerStableId OR peerWebid.
-    expect(await callSkill(bundle.agent, 'mutePeer', {})).toEqual({ error: 'peerStableId or peerWebid required' });
-    expect(await callSkill(bundle.agent, 'unmutePeer', {})).toEqual({ error: 'peerStableId or peerWebid required' });
-  });
-
+describe('Stoop V1 — moderation skills (report)', () => {
   it('reportPost creates a type:"report" item referencing the original', async () => {
     const bundle = await buildAgent();
 

@@ -54,7 +54,7 @@ async function buildBundle({ peers = [] } = {}) {
   return bundle;
 }
 
-async function buildPair() {
+async function buildPair({ bobBlocks } = {}) {
   const bus = new InternalBus();
   const anneId = await AgentIdentity.generate(new VaultMemory());
   const bobId  = await AgentIdentity.generate(new VaultMemory());
@@ -69,6 +69,7 @@ async function buildPair() {
     offeringMatch: { group: 'oosterpoort', localActor: BOB,
                   peers: [{ pubKey: anneId.pubKey }] },
     members: [{ webid: ANNE, pubKey: anneId.pubKey }, { webid: BOB }],
+    mutedSet: bobBlocks,
   });
   anne.agent.addPeer(bobId.pubKey, bobId.pubKey);
   bob.agent.addPeer(anneId.pubKey, anneId.pubKey);
@@ -292,9 +293,10 @@ describe('Stoop V2 Phase 27.4/27.7 — broadcast-post receiver filter', () => {
     expect(post.source.viaAutoMatch).toBe(true);    // sender NOT a contact
   });
 
-  it('muted senders get filtered out (no item stored)', async () => {
-    const { anne, bob } = await buildPair();
-    await callSkill(bob.agent, 'mutePeer', { peerWebid: ANNE }, BOB);
+  it('blocked senders get filtered out (no item stored)', async () => {
+    // The shell's block set, handed in — this app reads it, never writes it.
+    const bobBlocks = new Set([ANNE]);
+    const { anne, bob } = await buildPair({ bobBlocks });
     await anne.chat.send({
       toWebid:  BOB,
       subtype:  'broadcast-post',

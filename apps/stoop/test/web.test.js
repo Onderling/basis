@@ -176,18 +176,6 @@ describe('Stoop V1 web UI — Phase 5 (intent tabs + moderation)', () => {
     expect(offers.items.every(i => i.type === 'offer' && i.kind === 'give')).toBe(true);
   });
 
-  it('mutePeer + listMutedPeers via REST', async () => {
-    const m = await callRest('mutePeer', { peerWebid: 'https://id.example/marie' });
-    expect(m).toMatchObject({ muted: 'https://id.example/marie' });
-
-    const list = await callRest('listMutedPeers', {});
-    expect(list.peers).toContain('https://id.example/marie');
-
-    await callRest('unmutePeer', { peerWebid: 'https://id.example/marie' });
-    const list2 = await callRest('listMutedPeers', {});
-    expect(list2.peers).not.toContain('https://id.example/marie');
-  });
-
   it('reportPost via REST creates a type:"report" item', async () => {
     const post = await callRest('postRequest', {
       text: 'something problematic',

@@ -41,6 +41,7 @@ import * as podModes      from './journeys/podModes.journey.mjs';
 import * as governanceVote from './journeys/governanceVote.journey.mjs';
 import * as attachments   from './journeys/attachments.journey.mjs';
 import * as eviction      from './journeys/eviction.journey.mjs';
+import * as block         from './journeys/block.journey.mjs';
 import * as keyRotation   from './journeys/keyRotation.journey.mjs';
 import * as absence       from './journeys/absence.journey.mjs';
 import * as custody       from './journeys/custody.journey.mjs';
@@ -53,7 +54,7 @@ import * as promotion     from './journeys/promotion.journey.mjs';
 import * as reach         from './journeys/reach.journey.mjs';
 import * as attachOffer   from './journeys/attach.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts, taskSession, lastAdmin, scope, doors, promotion, reach, attachOffer];
+const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts, taskSession, lastAdmin, scope, doors, promotion, reach, attachOffer, block];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const { readFile, writeFile } = await import('node:fs/promises');

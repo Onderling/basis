@@ -81,54 +81,6 @@ describe('Stoop V1 Phase 11 — setMyOfferings / addMySkill / removeMySkill', ()
   });
 });
 
-// ── mutePeer migration ────────────────────────────────────────────────────
-
-describe('Stoop V1 Phase 11 — mutePeer by stableId (with webid back-compat)', () => {
-  it('mutes by peerStableId when supplied', async () => {
-    const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'mutePeer', { peerStableId: 'sid-bob-42' });
-    expect(r).toMatchObject({ muted: 'sid-bob-42' });
-    expect(bundle.muted.has('sid-bob-42')).toBe(true);
-  });
-
-  it('webid-only mute resolves to stableId via MemberMap when known', async () => {
-    const bundle = await buildAgent({
-      members: [
-        { webid: ANNE },
-        { webid: BOB, stableId: 'sid-bob-known' },
-      ],
-    });
-    const r = await callSkill(bundle.agent, 'mutePeer', { peerWebid: BOB });
-    expect(r).toMatchObject({ muted: 'sid-bob-known' });
-    expect(bundle.muted.has('sid-bob-known')).toBe(true);
-  });
-
-  it('webid-only mute falls back to webid when MemberMap has no stableId', async () => {
-    const bundle = await buildAgent({
-      members: [{ webid: ANNE }, { webid: BOB }],   // BOB has no stableId
-    });
-    const r = await callSkill(bundle.agent, 'mutePeer', { peerWebid: BOB });
-    expect(r).toMatchObject({ muted: BOB });
-    expect(bundle.muted.has(BOB)).toBe(true);
-  });
-
-  it('unmute round-trips via the same key resolution', async () => {
-    const bundle = await buildAgent({
-      members: [{ webid: ANNE }, { webid: BOB, stableId: 'sid-bob' }],
-    });
-    await callSkill(bundle.agent, 'mutePeer',   { peerWebid: BOB });
-    const u = await callSkill(bundle.agent, 'unmutePeer', { peerWebid: BOB });
-    expect(u).toMatchObject({ unmuted: 'sid-bob', had: true });
-    expect(bundle.muted.has('sid-bob')).toBe(false);
-  });
-
-  it('error when neither identifier supplied', async () => {
-    const bundle = await buildAgent();
-    expect(await callSkill(bundle.agent, 'mutePeer', {}))
-      .toEqual({ error: 'peerStableId or peerWebid required' });
-  });
-});
-
 // ── stableId end-to-end through the agent factory ─────────────────────────
 
 describe('Stoop V1 Phase 11 — stableId reaches the bundle', () => {

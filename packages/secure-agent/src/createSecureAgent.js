@@ -298,7 +298,20 @@ export async function createSecureAgent(opts = {}) {
   //      bound is a no-op there (every sender reads as "known").
   //   3. user-supplied gate (optional): tokenGate(string) | groupGate | custom fn.
   const userHelloGate = resolveHelloGate(opts.helloGate);
-  const muteBlockGate = async (env) => !muteSet.has(env?._from);
+  // A block is on a PERSON, not on an address. The envelope drop and the outbound refusal have gone
+  // through `isPeerMuted` (which fans the check across a peer's known aliases — pubKey, webid, stableId)
+  // since the identity resolver landed; this gate still asked the raw set, so a blocked person's HI from
+  // a SECOND address walked straight in and registered, and only their envelopes were dropped afterwards.
+  // Blocking one address is not blocking someone. `isPeerMuted` degrades to the same sync check when no
+  // resolver is wired, so a composition without one is unchanged.
+  // Refusing a blocked person is a SILENT drop — nothing is sent back, by design (an error reply
+  // would confirm to them that they reached you). Silent to them, not to us: every refusal bumps
+  // this counter, so "their message never arrived" can be told apart from "the transport flaked".
+  let mutedDrops = 0;
+  const muteBlockGate = async (env) => {
+    if (await isPeerMuted(env?._from)) { mutedDrops += 1; return false; }
+    return true;
+  };
   const rl = (opts.helloRateLimit && typeof opts.helloRateLimit === 'object') ? opts.helloRateLimit : {};
   const boundGate = firstContactRateGate({
     isKnown: async (from) => !agent.peers || !!(await agent.peers.get(from)),
@@ -521,7 +534,13 @@ export async function createSecureAgent(opts = {}) {
   async function isPeerMuted(addr) {
     if (!addr) return false;
     if (muteSet.has(addr)) return true;
-    if (!resolverMemberMap) return false;
+    // The fan across a person's other addresses is what makes a block about a PERSON. It used to be
+    // skipped unless a MemberMap was supplied — but `aliasesFor` never needed one: its first and most
+    // important source is the device-local alias map the roster binding fills in, which is exactly
+    // where a per-circle address is linked to the person who speaks from it. With that guard in
+    // place, a shell that supplies no MemberMap (the app does not) got address-deep blocking only:
+    // block someone from a post, and their next circle message — sent from their per-circle address —
+    // arrived anyway. Ask the resolver for whatever it knows and check all of it.
     const aliases = await peerResolver.aliasesFor(addr);
     for (const a of aliases) if (muteSet.has(a)) return true;
     return false;
@@ -1224,7 +1243,7 @@ export async function createSecureAgent(opts = {}) {
       // drop envelopes from muted peers BEFORE any further
       // bookkeeping (no reciprocal HI, no onPeerMessage fire).
       // fanout the check across resolver-known aliases.
-      if (await isPeerMuted(env?._from)) return;
+      if (await isPeerMuted(env?._from)) { mutedDrops += 1; return; }
       // 5.7c — circle override enforcement runs AFTER mute (so muted
       // peers never reach the override layer) and BEFORE rate-limit /
       // reciprocal HI / onPeerMessage.  When the local user has
@@ -2163,6 +2182,7 @@ export async function createSecureAgent(opts = {}) {
       helloedPeers:   [...helloedPeers],
       // mute state
       muteCount:       muteSet.size,
+      mutedDrops,      // envelopes refused at the boundary because their sender is blocked
       mutedPeers:      muteSet.list(),
       muteIsPersistent: !!opts.muteListVaultKey,
       helloGateWired:  !!userHelloGate,

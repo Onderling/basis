@@ -4269,6 +4269,28 @@
     "sharedWithMe": {
       "text": "Met mij gedeeld →",
       "doc": "Nav label (Mij sub-screen) opening the personal, cross-circle inbox of sealed copies peers shared privately to this device."
+    },
+    "blocked": {
+      "text": "Geblokkeerd →",
+      "doc": "De lijst met mensen die dit apparaat blokkeert — en de enige plek waar je een blokkade terugdraait."
+    }
+  },
+  "blocked": {
+    "title": {
+      "text": "Geblokkeerd",
+      "doc": "Kop van het scherm met de geblokkeerde mensen."
+    },
+    "note": {
+      "text": "Deze mensen bereiken je niet meer: hun berichten worden geweigerd en je ziet niets meer van ze. Alleen jij ziet deze lijst.",
+      "doc": "Uitleg boven de lijst — wat een blokkade doet en dat hij lokaal is."
+    },
+    "empty": {
+      "text": "Je hebt niemand geblokkeerd.",
+      "doc": "Lege lijst."
+    },
+    "unblock": {
+      "text": "Deblokkeren",
+      "doc": "Knop per rij — draait de blokkade terug."
     }
   },
   "mydata": {

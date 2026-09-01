@@ -26,8 +26,8 @@
  *     `notifier.scheduleBefore({ cancelKey: 'due:<itemId>' })`.
  *   - `markReturned({requestId})` cancels that reminder + completes
  *     the item.
- *   - `mutePeer({peerWebid})` / `unmutePeer({peerWebid})` /
- *     `listMutedPeers()` — local-only mute set; pure UI filter.
+ *   - blocking a person lives in the shell's own set (one set for the
+ *     whole device); this app only READS it, through `scope.muted`.
  *   - `reportPost({itemId, reason})` — appends a `kind: 'report'`
  *     item referencing the original.
  *   - `listOpen` / `listMyRequests` outputs hydrate each item's
@@ -455,31 +455,6 @@ async function _findLatestActiveCode(store, groupId) {
 }
 
 /**
- * Resolve a mute / reveal target reference to the canonical key.
- * Phase 11 (2026-05-06): stableId wins; webid is back-compat.
- *
- * @param {{peerStableId?: string, peerWebid?: string}} args
- * @param {import('@onderling/identity-resolver').MemberMap} [members]
- * @returns {Promise<string | null>}
- */
-async function _resolveMuteKey(args, members) {
-  if (typeof args?.peerStableId === 'string' && args.peerStableId) {
-    return args.peerStableId;
-  }
-  if (typeof args?.peerWebid === 'string' && args.peerWebid) {
-    // Prefer the stableId when MemberMap knows the peer; otherwise
-    // fall back to the webid as-is (a URL, which can't collide with
-    // a base64url stableId — disambiguation by shape).
-    if (members) {
-      const m = await members.resolveByWebid(args.peerWebid);
-      if (m?.stableId) return m.stableId;
-    }
-    return args.peerWebid;
-  }
-  return null;
-}
-
-/**
  * Hydrate a single item's `addedBy` (and any present `completedBy`,
  * `assignee`) into a `display` block via `identity-resolver.resolve()`.
  * No-op if `members` or `reveals` is missing — returns the raw item.
@@ -797,15 +772,6 @@ async function assignLendCore(scope, a, ctx) {
     return { error: 'already-assigned', current: claimResult.current };
   }
   return { item: claimResult, by: ctx.from, _sync: simulateSync() };
-}
-
-async function mutePeerCore(scope, a, ctx) {
-  const { members, muted, metrics } = scope;
-  const key = await _resolveMuteKey(a, members);
-  if (!key) return { error: 'peerStableId or peerWebid required' };
-  muted?.add(key);
-  metrics?.record?.('mute-peer');
-  return { muted: key, _sync: simulateSync() };
 }
 
 async function getHolidayModeCore(scope, a, ctx) {
@@ -1249,7 +1215,6 @@ export const STOOP_CORES = Object.freeze({
   listMyRequests:   listMyRequestsCore,
   cancelRequest:    cancelRequestCore,
   assignLend:       assignLendCore,
-  mutePeer:         mutePeerCore,
   getHolidayMode:   getHolidayModeCore,
   getGroupRules:    getGroupRulesCore,
   listGroupMembers: listGroupMembersCore,
@@ -1956,8 +1921,8 @@ export function buildSkills({
     // ── Stoop V1 Phase 3 (2026-05-06) additions ────────────────────────────
     //
     // **Substrate candidate (rule of two — first consumer):** the
-    // moderation skill set below (`mutePeer`/`unmutePeer`/`listMutedPeers`,
-    // `reportPost`, plus the deferred `removeMember`, `leaveGroup`,
+    // moderation skill set below (`reportPost`, plus the deferred
+    // `removeMember`, `leaveGroup`,
     // `setMemberRole`, `requestProofRefresh`) is generic to any
     // closed-group SDK app.  When the second app (likely `apps/household`,
     // `apps/archive`, or `apps/tasks-v0`) needs these, extract into
@@ -2056,46 +2021,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * mutePeer({peerStableId | peerWebid})  — local-only filter; never broadcast.
-     *
-     * Stoop V1 Phase 11 migration: prefer `peerStableId` (survives
-     * the peer's handle changes + network-pubkey rotation + pod
-     * absence).  `peerWebid` still accepted for back-compat — looked
-     * up in MemberMap and stored as the corresponding stableId when
-     * one is known; otherwise stored as `webid:<webid>` so old
-     * callers' state survives without losing entries.
-     */
-    wire('mutePeer', {
-      description: 'Locally mute a peer (does not affect anyone else). Prefer peerStableId; peerWebid back-compat.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * unmutePeer({peerStableId | peerWebid})
-     */
-    defineSkill('unmutePeer', async ({ parts }) => {
-      const a = dataArgs(parts);
-      const key = await _resolveMuteKey(a, members);
-      if (!key) return { error: 'peerStableId or peerWebid required' };
-      const had = muted?.delete(key) ?? false;
-      return { unmuted: key, had, _sync: simulateSync() };
-    }, {
-      description: 'Reverse a local mute.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * listMutedPeers() — returns the raw mute keys (mostly stableIds;
-     * legacy entries may be `webid:<webid>` for callers that pre-date
-     * the Phase 11 migration).
-     */
-    defineSkill('listMutedPeers', async () => {
-      return { peers: muted ? [...muted] : [], _sync: simulateSync() };
-    }, {
-      description: 'List locally muted peer keys (stableId, or "webid:<webid>" for legacy entries).',
-      visibility:  'authenticated',
-    }),
 
     // ── Stoop V1 Phase 6 (2026-05-06) — handle / displayName / reveal ─────
 

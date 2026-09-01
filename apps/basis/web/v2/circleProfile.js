@@ -41,6 +41,10 @@ export function renderCircleProfile(container, {
   // inbox (sealed copies peers pushed to this device). A Mij sub-screen link, peer of
   // availability/my-data. Absent ⇒ the link is simply omitted (older callers / tests).
   onSharedWithMe,
+  // The people this device has blocked. A block has to be reversible from a place you can FIND —
+  // the block itself is one tap on a post, and until this existed the only way back was to type
+  // `/unblock` with a key nobody can read off a screen. Absent ⇒ omitted, like its peers.
+  onBlocked,
   // The advanced surface — surface-less ops + settable params. Absent ⇒ omitted.
   onAdvanced,
   // D / consumer-switch — the projected PAGE surface for the `me` op
@@ -151,6 +155,10 @@ export function renderCircleProfile(container, {
   if (typeof onSharedWithMe === 'function') {
     const shared = button(tr('circle.profile.sharedWithMe'), 'cc-profile__shared-with-me', onSharedWithMe);
     container.appendChild(shared);
+  }
+  if (typeof onBlocked === 'function') {
+    const blocked = button(tr('circle.profile.blocked'), 'cc-profile__blocked', onBlocked);
+    container.appendChild(blocked);
   }
   // The ADVANCED entry — the default place every op and settable value has (the
   // "default places for any new opId" rule). Absent ⇒ omitted, like its peers.

@@ -14,23 +14,18 @@
 //   THE TYPED DOOR  a `/command` in any composer, offered and filtered by what this place actually has
 //                (`createComposerCommands`), in a circle and in a 1:1 contact thread alike.
 //
-// ── WHAT THIS JOURNEY FOUND ─────────────────────────────────────────────────────────────────────────
-// The handlers all work. The DRAWER's dispatch does not reach them, on either shell, for any basis op.
-// Both drawers dispatch a row with `callSkill(row.app, row.op, args)` — web `circleApp.js`, mobile
-// `CircleAdvancedScreen` via `bundle.callSkill` — and that is the AGENT's waist, which serves the
-// composed apps (stoop · tasks · household · calendar · folio · agents · params). basis's own ops are
-// not agent skills: they are the `createLocalBuiltins` table, and the v2 web shell never builds one at
-// all (only mobile's legacy ChatScreen does). So the agent answers, verbatim:
+// ── WHY THE LAST CHECK EXISTS ───────────────────────────────────────────────────────────────────────
+// When this journey was written the handlers all worked and the DRAWER reached none of them. Both
+// drawers dispatch a tapped row with `callSkill(row.app, row.op, args)` — web `circleApp.js`, mobile
+// `CircleAdvancedScreen` via `bundle.callSkill` — which is the AGENT's waist, and basis's own ops were
+// not on it. The agent answered `unknown appOrigin "basis"` while the form said "✓ Submitted": twenty-
+// three rows a person could read, tap, and get nothing from.
 //
-//     realAgent: unknown appOrigin "basis"
-//
-// …and the form says "✓ Submitted" over it. Twenty-three rows a person can read, tap, and get nothing
-// from. The last check below states the story that SHOULD hold and is on the known-failures list until
-// the route exists; every check before it drives the same op through the table the shells' typed
-// commands use, so the handler side is proven and only the missing wiring is red.
-//
-// That is also the honest reading of `lint-typed-commands-reachable`'s list of 24 "cannot be typed"
-// handlers: the number is not about typing. Those ops have NO door at all.
+// basis's ops are now mounted on the waist like any other app's (`realAgent`'s `basis` branch, upgraded
+// per shell with `mountAppOps`), so the last check passes. It stays because it is the only check that
+// asks the question a person's tap asks, and the answer was silently no for months. Every check before
+// it drives the same handler through the table directly, so a red there says "the handler broke" and a
+// red in the last one says "the route broke" — which half is which, not merely that something is.
 import { readFileSync } from 'node:fs';
 import { checker } from './_util.mjs';
 import { declaredOp } from './_util.mjs';
@@ -212,18 +207,40 @@ export async function run() {
       contactDoor.parse('/ping hello')?.opId === 'ping'
         && (contactDoor.suggest('/pi') ?? []).length > 0, JSON.stringify(contactDoor.parse('/ping hello')));
 
-    // ── The gap ───────────────────────────────────────────────────────────────────────────────────
-    // What the drawer ACTUALLY calls when a row is tapped, on both shells. Everything above proves the
-    // handlers answer; this proves nobody can reach them that way. Known failure until basis's ops have
-    // a waist route — see the header, and the finding on the work list.
+    // ── The route ─────────────────────────────────────────────────────────────────────────────────
+    // What the drawer ACTUALLY calls when a row is tapped, on both shells. Asserted as ARRIVAL, not as
+    // success: `whoami` on a device nobody has signed in on correctly answers "not signed in", and a
+    // check that demanded ok:true would go red for the honest reason and hide the dishonest one. What
+    // must be true is that the reply is the HANDLER's own (it says whether you are signed in) and not
+    // the boundary's (`unknown-op` / `not-mounted`, or a throw).
     let dispatched = null;
     let dispatchErr = '';
     try {
       dispatched = await me.agent.callSkill('basis', 'whoami', {});
     } catch (err) { dispatchErr = String(err?.message ?? err).slice(0, 120); }
     check('tapping a drawer row dispatches it — callSkill(basis, …) reaches the handler',
-      !!dispatched && dispatched.ok !== false,
+      !dispatchErr && typeof dispatched?.signedIn === 'boolean'
+        && dispatched.error !== 'unknown-op' && dispatched.error !== 'not-mounted',
       dispatchErr || JSON.stringify(dispatched).slice(0, 120));
+
+    // …and an op that needs nothing but the agent runs end to end over that same route, on a bare
+    // composition with no shell in it: the promise is "mounted everywhere", not "mounted where a shell
+    // remembered to". A person who blocked someone can ask who they blocked from the drawer.
+    const overTheWaist = await me.agent.callSkill('basis', 'muted', {});
+    check('and an op that needs only the agent runs end to end over the waist, with no shell mounted',
+      !!overTheWaist && overTheWaist.ok !== false, JSON.stringify(overTheWaist).slice(0, 90));
+
+    // An op the manifest does not declare refuses in a shape a surface can paint, rather than throwing
+    // at the boundary — the difference between "not available here" and "the app broke".
+    //
+    // The id is BUILT rather than written, and that is deliberate: `lint-callskill-literals` reads every
+    // literal `callSkill('app','op')` and fails when the op is not in that app's manifest, which is
+    // exactly the typo this journey would otherwise look like. The one call site whose purpose is to be
+    // undeclared should not be spelled in the form the guard is right to reject.
+    const noSuchOp = ['not', 'an', 'op'].join('-');
+    const unknown = await me.agent.callSkill('basis', noSuchOp, {});
+    check('an op the manifest does not declare is refused in a shape a surface can paint',
+      unknown?.ok === false && unknown.error === 'unknown-op', JSON.stringify(unknown));
   } catch (err) {
     check('the reach corridor completed', false, String(err?.message ?? err).slice(0, 250));
   } finally {

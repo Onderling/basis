@@ -263,6 +263,12 @@ import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/u
 import { applyUserLlmRuntime, validateUserLlmConfig } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
+// basis's own ops, mounted on the agent's waist at boot. Until this, the v2 web shell was the only
+// composition that never built the table at all — which is why every Advanced row for a basis op did
+// nothing here (`unknown appOrigin "basis"`), and why `/find` and `/brief` had no web route either.
+import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
+import { runBrief, createBriefCache } from '../../src/brief.js';
+import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
 // Sibling of the EventLog (which stays append-only); read at render
 // time by circleView to surface pending/failed icons.
@@ -814,6 +820,51 @@ import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circ
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
 const LOCAL_ACTOR = 'me';
+
+/* ─────────── basis's own ops → the waist ─────────── */
+// The seams only a browser has, handed to the SAME handler table mobile builds in `hostOps.js`. What
+// differs between the shells is exactly this list — a DOM file input where mobile has a native picker,
+// no camera where mobile has one — and nothing else: same ops, same replies, one implementation.
+const _briefCache = createBriefCache();
+/** The browser's file picker as the handlers' `openFilePicker` seam: a detached input, one shot. */
+function webFilePicker() {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.style.display = 'none';
+    // `cancel` is not universal, so the promise also settles when focus returns with nothing chosen —
+    // otherwise a person who thinks better of it leaves a handler waiting forever.
+    const done = (f) => { input.remove(); resolve(f ?? null); };
+    input.addEventListener('change', () => done(input.files?.[0] ?? null), { once: true });
+    input.addEventListener('cancel', () => done(null), { once: true });
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
+/** Build and mount the table. Called at boot and again whenever the catalogue is rescoped, because
+ *  `/help` prints from the catalogue it was built with. */
+function mountBasisOpsOnAgent(agent) {
+  if (typeof agent?.mountAppOps !== 'function') return;   // an older composition — the agent's own default serves
+  agent.mountAppOps('basis', createLocalBuiltins({
+    catalogue: circleCatalogue ?? undefined,
+    t,
+    agent,
+    callSkill: rawCallSkill,
+    localActor: LOCAL_ACTOR,
+    eventLog,
+    podAuth,
+    openFilePicker: webFilePicker,
+    briefRunner: (o) => runBrief({ catalogue: circleCatalogue, callSkill: rawCallSkill, cache: _briefCache, bypassCache: o?.bypassCache }),
+    findRunner:  (o) => runFind({ catalogue: circleCatalogue, callSkill: rawCallSkill, query: o?.query }),
+    connectPeer: async () => {
+      if (!_peerAgent) throw new Error('no peer transport on this composition');
+      await tryConnectPeerTransport(_peerAgent, _peerRouter, { awaitRelayReady: true });
+      return { address: _peerAgent.peer?.address ?? '' };
+    },
+    // No camera in the browser: `scanQr` says so in its own words rather than being absent.
+  }));
+}
 
 // best-effort peer bootstrap. Transport-neutral / local-first: NKN is one transport,
 // not a prerequisite. Bring up whichever is available — NKN (CDN) and/or the relay (VITE_CIRCLE_RELAY_URL).
@@ -2007,7 +2058,8 @@ function buildCircleBot(agent) {
   };
   let catalogue = scopeCatalogueToApps(filterCatalogue(rawCatalogue, appRegistry), allowedApps());
   circleCatalogue = catalogue;        // expose to showCircle's composer (slash-suggest)
-  const rescopeCatalogue = () => { catalogue = scopeCatalogueToApps(filterCatalogue(rawCatalogue, appRegistry), allowedApps()); circleCatalogue = catalogue; };
+  mountBasisOpsOnAgent(_peerAgent);   // `/help` prints from the catalogue the table was built with
+  const rescopeCatalogue = () => { catalogue = scopeCatalogueToApps(filterCatalogue(rawCatalogue, appRegistry), allowedApps()); circleCatalogue = catalogue; mountBasisOpsOnAgent(_peerAgent); };
   circleRescopeCatalogue = rescopeCatalogue;   // S6.C — showCircle calls this on circle-open to apply policy.apps
   appRegistry.subscribe(rescopeCatalogue);
   // Extension mappings (feedback-extension P2c) — scanned from the V0 localStorage store, verified against the
@@ -7924,6 +7976,8 @@ async function boot() {
       // over NKN, parity with the classic web shell. Gated on the peer
       // transport being connected; a no-op otherwise.
       if (pendingRestoreFlow) { pendingRestoreFlow = false; setTimeout(() => showRestoreSettingsFlow(), 0); }
+      // basis's ops reach the waist from here on: the drawer's rows, and anything else that dispatches
+      // `callSkill('basis', …)`, now land in the table below instead of the agent's bare default.
       rawCallSkill = withCalendarOutbound(agent.callSkill, {
         sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
         // transport-NEUTRAL: true if NKN OR relay is up (sendPeerMessage routes
@@ -7931,6 +7985,7 @@ async function boot() {
         isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
         publishEvent: publishEventToLog,
       });
+      mountBasisOpsOnAgent(agent);
       // Governance rides the RAIL: signed, circle-scoped statements. The shell exposes the agent's
       // per-circle signer resolver to the bind sites, and builds the receive-side rail (same declaration
       // + roster-binding rules) for the peer router's governance ingest below.

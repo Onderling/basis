@@ -199,6 +199,9 @@ import { buildHouseholdSubstrateStack }    from '../../../../household/src/lib/s
 import { wireHouseholdSubstrateMirror }    from '../../../../household/src/substrateMirror.js';
 import { buildHouseholdDataSource }        from '../../../../household/src/storage/persist.js';
 import { householdManifest }               from '../../../../household/manifest.js';
+import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
+import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
+import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -2714,6 +2717,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   const rosterReads = createRosterReadCache();
+  /* ─────────── basis's own ops on the waist (the `basis` appOrigin branch below) ─────────── */
+  // `selfAgent` is this factory's own return value, assigned just before it is returned. The default
+  // table needs the agent it runs on — `whoami` reads the identity, `transports` the relay, `muted` the
+  // sender authorization — and that object does not exist until the end, so the table is built on FIRST
+  // USE rather than here. A shell that mounts its own table never builds the default at all.
+  let selfAgent = null;
+  let mountedBasisOps = null;
+  let defaultBasisOps = null;
+  const basisOps = () => mountedBasisOps ?? (defaultBasisOps ??= createLocalBuiltins({
+    catalogue: mergeManifests([{ manifest: basisManifest }]),
+    // No localisation on a bare agent: a key IS the message, and a key is at least true. A shell that
+    // mounts its own table brings the real resolver with it.
+    t: typeof opts.t === 'function' ? opts.t : (k) => k,
+    agent: selfAgent,
+  }));
+
   const callSkill = async (appOrigin, opId, args) => {
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and
@@ -3243,6 +3262,34 @@ export async function createRealHouseholdAgent(opts = {}) {
         return data?.agent ?? { ok: false, error: `No agent matches "${String(args?.agentId ?? '')}"` };
       }
       return data;
+    }
+    if (appOrigin === 'basis') {
+      // basis's OWN ops on the waist, which is where every surface has always assumed they were.
+      //
+      // They are not agent skills and cannot be: they end in a file picker, a camera, a side panel, a
+      // pod login — the device's own affordances, which no peer may invoke and no headless agent has.
+      // So they lived in a `createLocalBuiltins` table that each shell mounted for itself, and the
+      // shells that did not mount one simply could not reach them. The Advanced drawer dispatches a
+      // tapped row with `callSkill(row.app, row.op)` on both platforms; for all 23 basis rows that
+      // call landed here and threw `unknown appOrigin "basis"`, while the form said "✓ Submitted".
+      //
+      // Two levels, so the promise holds everywhere and is honest where a seam is missing:
+      //   · EVERY composition gets the default table below — the handlers whose only dependency is
+      //     this agent (whoami · muted · transports · security-status · debug-dump · audit-tail …).
+      //   · a shell UPGRADES it with `mountAppOps('basis', table)`, passing the seams only it has (its
+      //     file picker, its scanner, its panels, its localisation). Same ops, richer seams.
+      // An op whose seam is absent answers "not available" in its own words — the handlers were
+      // written to degrade that way — rather than throwing at the boundary.
+      if (!basisManifest.operations.some((o) => o.id === opId)) {
+        return { ok: false, error: 'unknown-op', app: 'basis', op: opId };
+      }
+      const handler = basisOps()[opId];
+      if (typeof handler !== 'function') {
+        // Declared, and no handler on this composition. A structured refusal, never a throw: the
+        // caller is a surface painting a row, and a throw there is an app that looks broken.
+        return { ok: false, error: 'not-mounted', app: 'basis', op: opId };
+      }
+      return handler(args ?? {});
     }
     throw new Error(`realAgent: unknown appOrigin "${appOrigin}"`);
   };
@@ -4239,7 +4286,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   }
 
-  return {
+  const api = {
     // Part G — the REAL household app manifest (item/task vocab) is now the
     // catalogue source of truth for the household surface.  (The mock manifest
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)
@@ -4715,5 +4762,23 @@ export async function createRealHouseholdAgent(opts = {}) {
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
     // join wizard passes this on the redeem seam; the admin verifies it before recording.
     signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(deviceDerivationSeed, circleId, groupId, address),
+    /**
+     * Mount an app's LOCAL ops on this agent's waist — today `basis`, whose handlers end in the
+     * device's own affordances (a picker, a camera, a panel, a pod login) and so cannot be agent
+     * skills. A shell calls this after boot with its seam-rich `createLocalBuiltins` table; until it
+     * does, the default table above serves the ops that need nothing but the agent.
+     *
+     * Deliberately a REPLACE, not a merge: a half-mounted table is the shape that produces "some rows
+     * work", which is harder to see than none working.
+     *
+     * @param {string} appOrigin  'basis' (the only local app today)
+     * @param {Record<string, Function>} ops  opId → handler, e.g. `createLocalBuiltins({…})`
+     */
+    mountAppOps: (appOrigin, ops) => {
+      if (appOrigin !== 'basis') throw new Error(`mountAppOps: "${appOrigin}" is not a local app`);
+      mountedBasisOps = ops && typeof ops === 'object' ? ops : null;
+    },
   };
+  selfAgent = api;
+  return api;
 }

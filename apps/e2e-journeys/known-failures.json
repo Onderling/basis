@@ -1,8 +1,5 @@
 {
   "J-circle (join → noticeboard → private chat)": {
     "the removed member receives nothing the circle posts afterwards": "F-022 / ledger L44 — the fan-out peer set is reconciled against the roster at circle-open; this composition has no webid↔address mapping at all, so it cannot demonstrate the fix"
-  },
-  "J-reach (the doors a person can see — the drawer and the typed command)": {
-    "tapping a drawer row dispatches it — callSkill(basis, …) reaches the handler": "F-024 — basis's own ops have NO waist route in the v2 shells. Both drawers dispatch a row with callSkill(row.app, row.op) = the AGENT's waist, which serves the composed apps only; basis's ops are the createLocalBuiltins table, and the v2 web shell never builds one (only mobile's legacy ChatScreen does). The agent answers 'unknown appOrigin \"basis\"' and the form still says '✓ Submitted'. All 23 drawer rows are affected on both shells. Every check above drives the same handlers through the table, so the handler side is proven and only the missing wiring is red."
   }
 }

@@ -9,15 +9,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet, ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
-import { makeCircleLists } from '@onderling/kring-host/circleLists';
-import { buildHouseholdDataSource } from '../../../../household/src/index.js';
+import { getCircleLists } from '../../core/circlePods.js';
 
 const typeLabel = (type) => t(`circle.container.type.${type}`);
 
-export default function CircleListsScreen({ circleId, onBack }) {
+export default function CircleListsScreen({ circleId, policy = null, onBack }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const svcRef = useRef(null);
@@ -34,11 +32,14 @@ export default function CircleListsScreen({ circleId, onBack }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      let dataSource;
-      try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-circle-lists-cache', asyncStorage: AsyncStorage }); }
-      catch { dataSource = undefined; }
+      // The SHARED assembly, not a store of this screen's own. It used to build `makeCircleLists` over
+      // `cc-circle-lists-cache` while every other caller — the share flow, and now the composer's "+" —
+      // went through `getCircleLists`, which uses `cc-circle-lists-state` and adds the sealed-pod path.
+      // One feature, two stores, on one device: a list made from the conversation did not appear on this
+      // screen and a list made here was invisible to everything else. Same class as the two block sets.
+      const svc = await getCircleLists(circleId, policy ?? null);
       if (!alive) return;
-      svcRef.current = makeCircleLists({ dataSource });
+      svcRef.current = svc;
       setReady(true);
     })();
     return () => { alive = false; };

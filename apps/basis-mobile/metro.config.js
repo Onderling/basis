@@ -41,6 +41,9 @@ const _cfg = withOnderlingPreset({
     path.resolve(repoRoot, 'apps/stoop'),
     path.resolve(repoRoot, 'apps/folio'),
     path.resolve(repoRoot, 'apps/calendar'),
+    // The composable LISTS feature's manifest (2026-09-01) — composeManifests.js imports it across the
+    // app boundary like the other four, so Metro must watch it or the bundle cannot resolve the path.
+    path.resolve(repoRoot, 'apps/lists'),
     // M6 — the feedback bot: basis's feedbackSurface/feedbackMount consume the
     // SPLIT onderling-feedback repo ('onderling-feedback/public', a link: dep) — watch
     // the sibling checkout so Metro resolves + hot-reloads across the repo boundary.

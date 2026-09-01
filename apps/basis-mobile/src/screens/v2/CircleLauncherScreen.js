@@ -166,6 +166,8 @@ import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
 import { cardForCreatedItem } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
+import { listsManifest } from '../../../../lists/manifest.js';
+import { getCircleLists } from '../../core/circlePods.js';
 import { makeOpAvailability } from '../../../../basis/src/v2/opAvailability.js';
 import { composerReplyToStream } from '../../../../basis/src/v2/composerReply.js';
 import { cardSummary } from '../../../../basis/src/v2/cardSummary.js';
@@ -482,6 +484,11 @@ export default function CircleLauncherScreen({
   const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  // The OPEN circle, readable from a closure that outlives a render — the mounted waist ops need "which
+  // circle am I in" at CALL time, and an effect that mounts once would otherwise hold whichever circle
+  // was open when it ran (none, at boot: every list op answered "open a circle first").
+  const selectedIdRef = useRef(null);
+  useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
   // M3 — sub-view within the launcher: 'list' | 'availability' | 'detail'
   // | 'settings' | 'override'.  `selected` carries the active circle for
   // detail/settings/override.
@@ -799,6 +806,49 @@ export default function CircleLauncherScreen({
   useEffect(() => {
     const agent = bundle?.agent;
     if (typeof agent?.mountAppOps !== 'function') return;   // older composition — the agent's default serves
+    // The composable LISTS on the waist — web parity (`listsOpsFor` in circleApp.js). The service is
+    // per-circle (its own store, its own seal strategy), so the shell mounts it; each op takes the
+    // circle it acts in, so one mount serves every circle.
+    const listsOps = () => {
+      const svcFor = async (circleId) => getCircleLists(circleId, null);
+      const circleOf = (args) => args?.circleId ?? selectedIdRef.current ?? null;
+      return {
+        createList: async (args) => {
+          const cid = circleOf(args); const text = String(args?.text ?? '').trim();
+          if (!cid || !text) return { ok: false, error: t('circle.lists.need_name') };
+          const made = await (await svcFor(cid)).createList(cid, text, 'me');
+          return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.made', { name: text }) };
+        },
+        addToList: async (args) => {
+          const cid = circleOf(args);
+          const text = String(args?.text ?? '').trim();
+          const listRef = String(args?.list ?? '').trim();
+          if (!cid || !text || !listRef) return { ok: false, error: t('circle.lists.need_list_and_text') };
+          const svc = await svcFor(cid);
+          // A person types the list's NAME, not its id — resolve either (web parity).
+          const containers = await svc.listContainers(cid);
+          const target = containers.find((c) => c.id === listRef)
+            ?? containers.find((c) => String(c.text ?? '').toLowerCase() === listRef.toLowerCase());
+          if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: listRef }) };
+          const kind = String(args?.kind ?? '').trim() || undefined;
+          const made = await svc.addItem(cid, target.id, text, 'me', kind ? { hint: kind } : undefined);
+          return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.added', { text, name: target.text ?? listRef }) };
+        },
+        listLists: async (args) => {
+          const cid = circleOf(args);
+          if (!cid) return { ok: false, error: t('circle.lists.no_circle') };
+          const containers = await (await svcFor(cid)).listContainers(cid);
+          return { ok: true, items: containers.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
+        },
+        markListItemDone: async (args) => {
+          const cid = circleOf(args); const itemId = String(args?.itemId ?? '').trim();
+          if (!cid || !itemId) return { ok: false, error: t('circle.lists.need_item') };
+          await (await svcFor(cid)).markDone(cid, itemId, 'me');
+          return { ok: true, message: t('circle.lists.done') };
+        },
+      };
+    };
+    try { agent.mountAppOps('lists', listsOps(), listsManifest); } catch { /* older composition */ }
     agent.mountAppOps('basis', buildMobileLocalBuiltins({
       agent,
       catalogue:  bundle?.catalogue,
@@ -1734,7 +1784,7 @@ export default function CircleLauncherScreen({
     );
   }
   if (selected && view === 'lists') {   // the composable lists/container UI (web≡mobile)
-    return <CircleListsScreen circleId={selected.id} onBack={() => setView('detail')} />;
+    return <CircleListsScreen circleId={selected.id} policy={selectedPolicy} onBack={() => setView('detail')} />;
   }
   if (selected && view === 'share') {   // objective L — the cross-circle share UI (web≡mobile)
     // Thread the signed-in member's WebID as the acting identity (initiator gate `by` + read subject

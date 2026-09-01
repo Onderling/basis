@@ -154,6 +154,12 @@ import { helpDeck } from '../../../../basis/src/v2/help/kaartjes.js';
 import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWizardModal.js';
 import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
+// basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
+// (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
+// `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
+// shell we ship can reach it.
+import { buildMobileLocalBuiltins } from '../../core/hostOps.js';
+import { openFilePicker as openMobileFilePicker } from '../../core/filePicker.js';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { buildCircleInviteUri } from '../../../../basis/src/v2/circleInvite.js';
 import { feedHouseholdRoster } from '../../../../basis/src/v2/householdRosterPairing.js';
@@ -759,6 +765,29 @@ export default function CircleLauncherScreen({
       await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason });
     } catch { /* best-effort */ }
   }, [selected, bundle, eventLog, policyStore]);
+  // basis's ops → the waist, with the seams this shell has. Web mounts the same handlers through its
+  // own picker and panels; what differs between the platforms is exactly this argument list.
+  //
+  // No thread seams: the v2 shell has no thread surface, so `help-with` refuses in its own words rather
+  // than opening a thread nothing paints — the same answer web gives.
+  useEffect(() => {
+    const agent = bundle?.agent;
+    if (typeof agent?.mountAppOps !== 'function') return;   // older composition — the agent's default serves
+    agent.mountAppOps('basis', buildMobileLocalBuiltins({
+      agent,
+      catalogue:  bundle?.catalogue,
+      callSkill:  bundle?.callSkill,
+      t,
+      eventLog,
+      podAuth,
+      sessionRef,
+      openFilePicker: openMobileFilePicker,
+      // The camera IS this platform's answer for `scanQr`; the modal's own parser decides what a code
+      // means. An invite routes into the join wizard, as a scan from anywhere else on this screen does.
+      openQrScanner: () => setJoinScanOpen(true),
+    }));
+  }, [bundle, eventLog, podAuth, sessionRef, t]);
+
   const overrideStore     = useMemo(() => makeMemberOverrideStoreRN(AsyncStorage), []);
   // Objective D — mirror the pref to the user's pod so other agents read it.
   // getPodWriter is a thunk: null while unsigned (→ local-only), a live

@@ -156,7 +156,12 @@ export function buildMobileLocalBuiltins({
   // to access getAuthenticatedFetch().
   sessionRef,
 }) {
-  const threadStore = buildThreadStoreAdapter({ threadStateRef, setThreadState });
+  // The thread seams are ChatScreen's: its ref, its reducer. Every OTHER composition that wants this
+  // table — the v2 launcher, which has no thread surface at all — passes none, and the thread-shaped
+  // ops (`help-with`, `/newthread`, `/dm`) then refuse in their own words ("no thread store") instead
+  // of throwing on `threadStateRef.current`. Refusing is the honest answer: a thread created into a
+  // store nothing paints would report success and show the person nothing.
+  const threadStore = threadStateRef ? buildThreadStoreAdapter({ threadStateRef, setThreadState }) : undefined;
 
   // Bundle G1 — runner + registry singletons scoped to this
   // build of the handler table.  /brief reads the cache across
@@ -170,6 +175,7 @@ export function buildMobileLocalBuiltins({
   // setActive shim for /newthread / /dm.  Mobile's setActiveThread is
   // a pure reducer; we update the ref + schedule a re-render.
   const setActive = (threadId) => {
+    if (!threadStateRef) return;
     const prev = threadStateRef.current;
     const next = setActiveThread(prev, threadId);
     if (next === prev) return;

@@ -1,5 +1,5 @@
 /**
- * basis-mobile v2 — Contacten roster.
+ * basis-mobile v2 — Contacten roster (feedback-extension, mobile parity).
  *
  * RN mirror of web's `renderContactsRoster` + add-a-bot. Reads the app-owned
  * PeerGraph (`bundle.peerGraph`) via the SHARED `listContacts`, and adds a bot via
@@ -13,10 +13,19 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { listContacts, mergeContacts, stoopContactToRow } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
+import { feedbackBotFromInput } from '../../../../basis/src/v2/feedbackBots.js';
 
 const FEEDBACK_ACTIVATION_URL = process.env.EXPO_PUBLIC_FEEDBACK_ACTIVATION_URL || null;
+// When a collector is configured, an invite uses the NO-LOGIN collector flow (raw stays local, the signed
+// summary reaches the collector) — parity with web's default. Otherwise the login/activation flow.
+const FEEDBACK_COLLECTOR_URL = process.env.EXPO_PUBLIC_FEEDBACK_COLLECTOR_URL || null;
 
-export default function ContactsScreen({ bundle, onOpen }) {
+// cluster J — an added feedback bot rendered as a roster row (a co-hosted agent, not a PeerGraph peer).
+function feedbackBotToRow(bot) {
+  return { contactId: bot.id, name: bot.name || bot.label, isBot: true, isFeedback: true, reachable: true, skillCount: 0, bot };
+}
+
+export default function ContactsScreen({ bundle, onOpen, feedbackStore = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const peerGraph = bundle?.peerGraph ?? null;
@@ -35,9 +44,10 @@ export default function ContactsScreen({ bundle, onOpen }) {
         (typeof callSkill === 'function' ? callSkill('stoop', 'listContacts', {}) : Promise.resolve(null)).catch(() => null),
       ]);
       const stoopRows = (Array.isArray(stoopRes?.contacts) ? stoopRes.contacts : []).map(stoopContactToRow).filter(Boolean);
-      setContacts(mergeContacts(peerRows, stoopRows));
+      const fbRows = feedbackStore ? (await feedbackStore.list().catch(() => [])).map(feedbackBotToRow) : [];
+      setContacts([...fbRows, ...mergeContacts(peerRows, stoopRows)]);
     } catch { setContacts([]); }
-  }, [peerGraph, callSkill]);
+  }, [peerGraph, callSkill, feedbackStore]);
 
   // Load on mount + whenever the graph changes (a bot added/discovered/removed).
   useEffect(() => {
@@ -53,19 +63,28 @@ export default function ContactsScreen({ bundle, onOpen }) {
     if (!input) return;
     setError(false);
     try {
-      await addBotToGraph({
-        input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
-        // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one
-        // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
-        addContact: callSkill ? (payload) => callSkill('stoop', 'addContactFromQr', { payload }) : undefined,
-      });
+      // cluster J — a feedback invite link/QR adds the co-hosted feedback bot to its own registry; anything
+      // else is a PeerGraph peer/bot. Same precedence as web's addBotFromInput.
+      // Prefer the no-login collector flow when a collector is configured (web parity); else activation.
+      const fb = feedbackStore
+        ? feedbackBotFromInput(input, FEEDBACK_COLLECTOR_URL ? { collectorUrl: FEEDBACK_COLLECTOR_URL } : { activationUrl: FEEDBACK_ACTIVATION_URL })
+        : null;
+      if (fb) { await feedbackStore.add(fb); }
+      else {
+        await addBotToGraph({
+          input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
+          // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one
+          // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
+          addContact: callSkill ? (payload) => callSkill('stoop', 'addContactFromQr', { payload }) : undefined,
+        });
+      }
       setAddText(''); setAddOpen(false);
       reload();
     } catch (err) {
       // A circle invite pasted here is the VERIFIED rung — point at the join flow instead of failing mutely.
       setError(err?.code === 'circle-invite' ? 'invite' : true);
     }
-  }, [addText, peerGraph, bundle, callSkill, reload]);
+  }, [addText, peerGraph, bundle, callSkill, reload, feedbackStore]);
 
   return (
     <View style={styles.wrap} testID="contacts-screen">

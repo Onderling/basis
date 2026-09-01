@@ -35,9 +35,11 @@ import {
   executeBulkDispatch, lastListingItems,
 } from '@onderling-app/basis';
 
+import { createFeedbackMount } from '../../../basis/src/feedback/feedbackMount.js';
 // presentLocalNotification is the shared local-notify helper (folded out of the
 // app's old v2/nativePush.js dup → @onderling/react-native/push · PushAdapter.presentLocal).
 import { presentLocalNotification } from '@onderling/react-native/push';
+import { feedbackContactItem } from '../../../basis/src/feedback/feedbackSurface.js';
 import { autoRefreshStalePanels } from '../core/panelAutoRefresh.js';
 import { buildNavModels }  from '../core/navModel.js';
 import { dlog }            from '../core/devLog.js';
@@ -173,6 +175,15 @@ const MSG_ID_PREFIX = Math.random().toString(36).slice(2, 8);
 let nextMessageId = 1;
 const mkId = () => `m${MSG_ID_PREFIX}${nextMessageId++}`;
 
+// M6 — the feedback bot's LLM endpoint on mobile (Expo public env; the device can't run Ollama).
+// Unset → the bot still enters mode + the deterministic intent fast-path works, but the LLM
+// clean/review step needs a reachable route. Mirrors web's VITE_FEEDBACK_LLM_BASEURL.
+const FEEDBACK_LLM_BASEURL = process.env.EXPO_PUBLIC_FEEDBACK_LLM_BASEURL || undefined;
+const FEEDBACK_LLM_MODEL = process.env.EXPO_PUBLIC_FEEDBACK_LLM_MODEL || undefined;
+// M6 — feedback real-pod ACTIVATION (parity with web's VITE_FEEDBACK_ACTIVATION_URL / _PROJECT_ID).
+// Unset → `/feedback <code>` has no activation service, so the bare-demo mount path is used.
+const FEEDBACK_ACTIVATION_URL = process.env.EXPO_PUBLIC_FEEDBACK_ACTIVATION_URL || null;
+const FEEDBACK_PROJECT_ID = process.env.EXPO_PUBLIC_FEEDBACK_PROJECT_ID || 'basis';
 
 // ε.1 — fallback inbox builder used only when App.js didn't pass one
 // (e.g. older standalone test mounts).  Production wiring goes through
@@ -257,6 +268,7 @@ export default function ChatScreen({
   // toggles `logsPanelOpen` via the `openLogsPanel` callback when
   // the user types a bare /logs.
   const eventLogRef = useRef(null);
+  const feedbackMountRef = useRef(null);   // M6 — lazy feedback mount (created on first /feedback)
   if (!eventLogRef.current) {
     // M1 — App.js owns the EventLog (so boot-time agent events + this
     // screen's inbound peer events share one log).  Fall back to a fresh
@@ -936,6 +948,29 @@ export default function ChatScreen({
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd?.({ animated: false }));
   }, [activeThreadId]);
 
+  // Verify-summary push nudge (parity with web main.js) — on app FOREGROUND, self-poll the /control/
+  // container via the feedback mount and fire a LOCAL notification (expo) for any unverified round.
+  // No-op until the feedback mount + its verify pods exist (mirrors web pre-activation). AsyncStorage-deduped.
+  useEffect(() => {
+    const checkNudge = async () => {
+      const mount = feedbackMountRef.current;
+      if (!mount || activeThreadId == null) return;
+      try {
+        const raw = await AsyncStorage.getItem('fp.nudged');
+        const seen = new Set(raw ? JSON.parse(raw) : []);
+        const nudged = await mount.nudge(activeThreadId, {
+          alreadyNudged: (r) => seen.has(r),
+          notify: ({ round, message }) => presentLocalNotification({
+            title: t('circle.feedback.nudge_title'), body: message || t('circle.feedback.nudge_body'), data: { round },
+          }),
+        });
+        if (nudged?.length) { nudged.forEach((r) => seen.add(r)); await AsyncStorage.setItem('fp.nudged', JSON.stringify([...seen])); }
+      } catch { /* best-effort; a nudge must never break the screen */ }
+    };
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') checkNudge(); });
+    checkNudge();
+    return () => sub.remove();
+  }, [activeThreadId]);
 
   /**
    * Run a dispatch through the pipeline + append a user/bot bubble pair
@@ -1042,7 +1077,13 @@ export default function ChatScreen({
           // hook after substrate writes succeed.
           const reply = await runDispatch(scopedDispatch, wrappedBundleCallSkill);
           replyForRefresh = reply;
-          const forRender = reply;
+          // M6 — surface the feedback assistant as a distinct 'agent' contact atop /contacts (mirrors web).
+          const forRender = (dispatch.opId === 'listContacts' && !reply.error && Array.isArray(reply.items))
+            ? { ...reply, items: [feedbackContactItem({
+                label:     t('feedback.contactLabel', { defaultValue: 'Feedback assistant' }),
+                openLabel: t('feedback.openChat',     { defaultValue: 'Open chat' }),
+              }), ...reply.items] }
+            : reply;
           rendered = renderReply(forRender, {
             t,
             appOrigin:         dispatch.appOrigin,
@@ -1221,6 +1262,47 @@ export default function ChatScreen({
       return;
     }
 
+    // M6 — feedback bot (parity with web main.js). `/feedback` enters mode; free text while a
+    // thread is active routes to the co-hosted bot; the mount echoes the user + renders the bot's
+    // reply through the SAME setThreadState/updateMessages path the DM branch above uses.
+    const fbAppendUser = (tid, x) => setThreadState((prev) => updateMessages(prev, tid, (msgs) => [
+      ...msgs, { id: mkId(), role: 'user', text: x },
+    ]));
+    const fbAppendBot = (tid, x) => setThreadState((prev) => updateMessages(prev, tid, (msgs) => [
+      ...msgs, { id: mkId(), role: 'bot', pending: false, rendered: {
+        kind: 'text', messageId: null, threadId: tid, lifecycleState: 'closed', text: x,
+      } },
+    ]));
+    // Real-pod ACTIVATION branch (`/feedback <code>`, parity with web main.js): own-pod-first verify
+    // pods from the RN pod session. A bare `/feedback` (no code) falls through to the demo mount below.
+    const fbCode = String(text).trim().match(/^\/feedback\s+(\S+)$/);
+    if (fbCode && FEEDBACK_ACTIVATION_URL) {
+      try {
+        const { activateMobileFeedback } = await import('../v2/feedbackActivation.js');
+        const pods = await activateMobileFeedback({ session: sessionRef.current, activationUrl: FEEDBACK_ACTIVATION_URL, projectId: FEEDBACK_PROJECT_ID, code: fbCode[1] });
+        feedbackMountRef.current = createFeedbackMount({
+          llmBaseURL: FEEDBACK_LLM_BASEURL,
+        llmModel: FEEDBACK_LLM_MODEL, pod: pods.ownPod, centralPod: pods.centralPod, controlStore: pods.controlStore,
+          appendUserBubble: fbAppendUser, appendBotBubble: fbAppendBot,
+        });
+        fbAppendUser(currentThreadId, String(text).trim());
+        await feedbackMountRef.current.open(currentThreadId);
+      } catch (e) {
+        fbAppendBot(currentThreadId, e?.message === 'not-logged-in'
+          ? t('feedback.login_first', { defaultValue: 'Log eerst in op je pod om mee te doen.' })
+          : t('feedback.activation_failed', { error: e?.message ?? String(e), defaultValue: 'Activatie mislukt.' }));
+      }
+      return;
+    }
+    if (!feedbackMountRef.current) {
+      feedbackMountRef.current = createFeedbackMount({
+        llmBaseURL: FEEDBACK_LLM_BASEURL,
+        llmModel: FEEDBACK_LLM_MODEL,
+        appendUserBubble: fbAppendUser,
+        appendBotBubble: fbAppendBot,
+      });
+    }
+    if (await feedbackMountRef.current.tryHandle(text, currentThreadId)) return;
 
     // Multi-field follow-ups complete through the inline form bubble's
     // Submit button, NOT the text input.  If the user typed into the
@@ -1303,6 +1385,20 @@ export default function ChatScreen({
     // friendly "not wired" bubble).  Mirrors web's onButtonTap short-
     // circuits in apps/basis/web/main.js. -followup-1
     // forwards item.embed so saveBase64File can run on phone.
+    // M6 — the feedback 'agent' contact's action: enter feedback mode (not a peer DM).
+    if (opId === 'openFeedback') {
+      if (!feedbackMountRef.current) {
+        feedbackMountRef.current = createFeedbackMount({
+          llmBaseURL: FEEDBACK_LLM_BASEURL,
+        llmModel: FEEDBACK_LLM_MODEL,
+          appendUserBubble: (tid, x) => setThreadState((prev) => updateMessages(prev, tid, (msgs) => [...msgs, { id: mkId(), role: 'user', text: x }])),
+          appendBotBubble:  (tid, x) => setThreadState((prev) => updateMessages(prev, tid, (msgs) => [...msgs, { id: mkId(), role: 'bot', pending: false, rendered: { kind: 'text', messageId: null, threadId: tid, lifecycleState: 'closed', text: x } }])),
+        });
+      }
+      await feedbackMountRef.current.open(currentThreadId);
+      return;
+    }
+
     const intercept = interceptButtonTap({ opId, itemId, buttonLabel, t, embed, peerAddr });
     if (intercept.handled) {
       applyButtonSpecial(intercept, { originMessageId, sourceThreadId: currentThreadId });

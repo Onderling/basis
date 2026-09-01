@@ -1647,7 +1647,7 @@ export default function CircleLauncherScreen({
     }
     return (
       <WithTabBar active="contacten" onSelect={onTab}>
-        <ContactsScreen bundle={bundle} onOpen={(contact) => setContactThread(contact)} />
+        <ContactsScreen bundle={bundle} feedbackStore={feedbackStore} onOpen={(contact) => setContactThread(contact)} />
       </WithTabBar>
     );
   }

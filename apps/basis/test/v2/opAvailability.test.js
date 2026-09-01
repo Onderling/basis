@@ -25,17 +25,38 @@ describe('opAvailability', () => {
     expect(a.of('embed')).toEqual({ state: 'available', reason: null });
   });
 
-  it('THE ATTACH BUG: an op the circle does not compose is hidden, with a reason', () => {
-    // The menu offered `embed` while the catalogue could not resolve it, so the tap threw and the
-    // person was told the app did not understand them.
+  it('AN APP the circle does not compose is hidden, with a reason', () => {
+    // The menu offered an op while the catalogue could not resolve it, so the tap threw and the person
+    // was told the app did not understand them.
+    const a = makeOpAvailability({ manifestsByOrigin, catalogue: catalogueWith('embed') });
+    expect(a.of('addTask')).toEqual({ state: 'hidden', reason: UNAVAILABLE.NOT_COMPOSED });
+  });
+
+  it('…but THE DEVICE is not an app the circle composes — basis ops answer here regardless', () => {
+    // The circle catalogue deliberately excludes basis, so the bot's language model cannot pick `/me`
+    // out of a hundred ops. Asking composition of a DEVICE op read that scope as an answer to a
+    // question it was never asked: the + menu's card and appointment came back "not in this circle",
+    // the menu was left with nothing usable, and it rendered nothing at all.
     const a = makeOpAvailability({ manifestsByOrigin, catalogue: catalogueWith('addTask') });
-    expect(a.of('embed')).toEqual({ state: 'hidden', reason: UNAVAILABLE.NOT_COMPOSED });
+    expect(a.of('embed')).toEqual({ state: 'available', reason: null });
+    expect(a.of('embed-time')).toEqual({ state: 'available', reason: null });
+  });
+
+  it('a device op is still refusable — the feature gate applies to it as to anything else', () => {
+    // Exempt from COMPOSITION, not from the rest: `houseOnly` is a basis op behind a circle feature,
+    // and a circle with that feature off must not offer it. (The capability gate is exercised by the
+    // matrix cases below, which cover both origins.)
+    const off = makeOpAvailability({
+      manifestsByOrigin, catalogue: catalogueWith('addTask'),
+      policy: { features: { houseRules: false } },
+    });
+    expect(off.of('houseOnly').reason).toBe(UNAVAILABLE.FEATURE_OFF);
   });
 
   it('gives the app a sentence to say instead of a shrug', () => {
-    const a = makeOpAvailability({ manifestsByOrigin, catalogue: catalogueWith('addTask') });
-    expect(a.keyFor('embed')).toBe('circle.op.not_in_this_circle');
-    expect(a.keyFor('embed'), 'never the generic "I did not understand"').not.toBe('circle.bot.unknown');
+    const a = makeOpAvailability({ manifestsByOrigin, catalogue: catalogueWith('embed') });
+    expect(a.keyFor('addTask')).toBe('circle.op.not_in_this_circle');
+    expect(a.keyFor('addTask'), 'never the generic "I did not understand"').not.toBe('circle.bot.unknown');
   });
 
   it('hides an op whose feature the circle has switched off', () => {
@@ -75,12 +96,12 @@ describe('opAvailability', () => {
 
   it('DENY-WINS: the first gate that refuses decides, and hidden beats greyed', () => {
     // Not composed AND not permitted → the structural refusal wins, because a person cannot fix their
-    // capability to make an app appear.
+    // capability to make an app appear. (An APP op — the device is exempt from this rung.)
     const a = makeOpAvailability({
-      manifestsByOrigin, catalogue: catalogueWith('addTask'),
-      capabilityMatrix: [{ app: 'basis', atom: 'add', treatment: 'grey' }],
+      manifestsByOrigin, catalogue: catalogueWith('embed'),
+      capabilityMatrix: [{ app: 'tasks', atom: 'add', treatment: 'grey' }],
     });
-    expect(a.of('embed')).toEqual({ state: 'hidden', reason: UNAVAILABLE.NOT_COMPOSED });
+    expect(a.of('addTask')).toEqual({ state: 'hidden', reason: UNAVAILABLE.NOT_COMPOSED });
   });
 
   it('makes no claim about composition when given no catalogue', () => {

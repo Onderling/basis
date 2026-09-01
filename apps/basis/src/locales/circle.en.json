@@ -5896,5 +5896,23 @@
       "text": "A decision opened",
       "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
     }
+  },
+  "card": {
+    "appointment": {
+      "text": "📅 {{title}}",
+      "doc": "Caption on a message carrying an appointment card — what a person reads if the card cannot be painted."
+    },
+    "item": {
+      "text": "🔗 {{title}}",
+      "doc": "Caption on a message carrying a shared item card."
+    },
+    "file": {
+      "text": "📎 {{title}}",
+      "doc": "Caption on a message carrying a file card."
+    },
+    "photo": {
+      "text": "📷 {{title}}",
+      "doc": "Caption on a message carrying a photo card."
+    }
   }
 }

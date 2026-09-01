@@ -268,6 +268,7 @@ import { EventLog } from '../../src/eventLog.js';
 // nothing here (`unknown appOrigin "basis"`), and why `/find` and `/brief` had no web route either.
 import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
+import { composerReplyToStream } from '../../src/v2/composerReply.js';
 import { runBrief, createBriefCache } from '../../src/brief.js';
 import { runFind } from '../../src/find.js';
 // δ.2 — per-message delivery state for optimistic circle chat sends.
@@ -6200,9 +6201,66 @@ function showCircle(id, circle, policy) {
   // required params through the SAME form machinery (beginFormFollowUp → buildFormSpec)
   // a typed command uses (e.g. /embed-time → title · when). The FILE entry never
   // reaches here — it routes through the media pipeline (onAttach/onAttachMedia).
+  /**
+   * A + menu tap. The entry compiles to `{opId, args}` and goes through the WAIST, like every other
+   * door — it used to go to the circle bot's dispatch, which resolves against the circle catalogue and
+   * therefore could not find a device op at all ("I couldn't turn that into an action", which is the
+   * app blaming a person for its own routing). An op that declares required params opens its form
+   * first; the form dispatches through the same call.
+   */
   async function attachCommandDispatch(entry) {
     if (!entry || !entry.opId) return;
-    if (circleDispatchReady) await circleDispatchReady({ opId: entry.opId, args: {} });
+    const required = (Array.isArray(entry.params) ? entry.params : []).filter((p) => p?.required);
+    if (required.length > 0) { openAttachEntryForm(entry); return; }
+    await runComposerOp(entry.opId, {});
+  }
+
+  /** The op's own form, in the docked page panel — the same one the Advanced drawer opens. */
+  function openAttachEntryForm(entry) {
+    const declared = basisManifest.operations.find((o) => o.id === entry.opId) ?? { id: entry.opId, params: entry.params };
+    const op = {
+      ...declared,
+      surfaces: { ...(declared.surfaces ?? {}), page: { kind: 'side-panel', title: entry.label ? t(entry.label) : entry.opId } },
+    };
+    openPagePanel({
+      container: ensurePagePanel(), doc: document, op, appOrigin: 'basis',
+      // The form dispatches; this is where its reply becomes a card or a note, exactly as a no-arg tap does.
+      callSkill: async (app, opId, args) => {
+        const reply = await rawCallSkill(app, opId, args);
+        showComposerReply(reply);
+        return reply;
+      },
+      onClose: () => {}, onDispatched: () => {}, t,
+    });
+  }
+
+  /** Run a device op for this conversation and put whatever it answered where it belongs. */
+  async function runComposerOp(opId, args) {
+    let reply = null;
+    try { reply = await rawCallSkill('basis', opId, args ?? {}); }
+    catch (err) { reply = { ok: false, error: String(err?.message ?? err) }; }
+    showComposerReply(reply);
+    return reply;
+  }
+
+  /**
+   * The ONE place a device op's reply lands in the conversation (`composerReplyToStream` decides
+   * which of the two it is): a CARD is a message the circle sees — appended and fanned out, the same
+   * path a photo takes — and a NOTE is local, for the person who asked.
+   */
+  function showComposerReply(reply) {
+    const out = composerReplyToStream(reply, { t });
+    if (!out) return;
+    // A note is the bot's local answer to the person who asked — `botBubble` defaults it to scope
+    // 'self', which is exactly right: `/whoami` carries a session id and nobody else's business.
+    if (out.kind === 'note') { _circleRender?.botBubble(out.text); return; }
+    const msgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
+    const ts = Date.now();
+    eventLog.append(circleChatMessageEvent({
+      msgId, ts, circleId: id, actor: LOCAL_ACTOR, text: out.text, scope: 'circle', card: out.card,
+    }));
+    rerender();
+    broadcastFanOut({ msgId, text: out.text, ts, card: out.card });
   }
 
   // Sealed media (2026-07-11): open the full-size image by unsealing the blob through THIS
@@ -6583,15 +6641,10 @@ function showCircle(id, circle, policy) {
         // rule the manifest declared. This is what `lint-typed-commands-reachable`'s list of 24 was about.
         const typed = circleComposerCommands()?.parse(line);
         if (typed && typed.appOrigin === 'basis') {
-          try {
-            const r = await rawCallSkill('basis', typed.opId, typed.args ?? {});
-            const said = typeof r?.message === 'string' ? r.message
-              : typeof r?.error === 'string' ? r.error
-              : r == null ? '' : JSON.stringify(r);
-            if (said) circleNote(said);
-          } catch (err) {
-            circleNote(String(err?.message ?? err));
-          }
+          // The same runner the + menu taps, so a card typed (`/embed-time --title=… --when=…`) and a
+          // card tapped land identically. This used to print `reply.message` and nothing else, which
+          // rendered an op that answers with a CARD as silence.
+          await runComposerOp(typed.opId, typed.args ?? {});
           return;
         }
         const shareCmd = line.match(/^\/shareitem\s+(\S+)\s+(?:to\s+)?(\S+)\s*$/i);

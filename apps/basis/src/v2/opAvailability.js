@@ -70,6 +70,13 @@ export const UNAVAILABLE_KEYS = Object.freeze({
 const AVAILABLE = Object.freeze({ state: 'available', reason: null });
 
 /**
+ * The app id that is not an app: basis is the DEVICE, present wherever the person is. Named once here
+ * because two places must agree about it — this rung and the composer's typed door, which reaches the
+ * same conclusion by carrying the device's own commands alongside whatever the place offers.
+ */
+const DEVICE_ORIGIN = 'basis';
+
+/**
  * @param {object} a
  * @param {{opsById?: Map<string, object>}|null} [a.catalogue]  the circle's RESOLVED dispatch catalogue —
  *   the same object `resolveDispatch` resolves against, so this cannot answer differently from a tap.
@@ -103,8 +110,16 @@ export function makeOpAvailability({
     // an op the menu offers and dispatch cannot find is now impossible rather than merely unlikely.
     // A caller with no catalogue is not making a claim about composition, so this rung is skipped —
     // never silently answered "yes", which is how the attach menu came to offer dead entries.
+    //
+    // THE DEVICE IS NOT AN APP THE CIRCLE COMPOSES. basis's ops are this device's own — attach a
+    // photo, put an appointment in the conversation, see who is blocked — and they are equally true in
+    // every circle and in none. The circle catalogue deliberately excludes basis (so the bot's language
+    // model cannot pick `/me` out of a hundred ops), and asking composition of a device op read that
+    // scope as an answer to a question it was never asked: the + menu's card and appointment entries
+    // came back NOT_COMPOSED and the menu, left with nothing usable, rendered nothing at all. The two
+    // rungs below still apply — a device op can be switched off by a feature or refused by capability.
     const ops = catalogue?.opsById;
-    if (ops && typeof ops.has === 'function' && !ops.has(opId)) {
+    if (appOrigin !== DEVICE_ORIGIN && ops && typeof ops.has === 'function' && !ops.has(opId)) {
       return { state: 'hidden', reason: UNAVAILABLE.NOT_COMPOSED };
     }
 

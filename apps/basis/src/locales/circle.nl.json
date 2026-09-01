@@ -5896,5 +5896,23 @@
       "text": "Er is een besluit geopend",
       "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
     }
+  },
+  "card": {
+    "appointment": {
+      "text": "📅 {{title}}",
+      "doc": "Onderschrift bij een bericht met een afspraakkaart — wat je leest als de kaart niet getekend kan worden."
+    },
+    "item": {
+      "text": "🔗 {{title}}",
+      "doc": "Onderschrift bij een bericht met een gedeelde-itemkaart."
+    },
+    "file": {
+      "text": "📎 {{title}}",
+      "doc": "Onderschrift bij een bericht met een bestandskaart."
+    },
+    "photo": {
+      "text": "📷 {{title}}",
+      "doc": "Onderschrift bij een bericht met een fotokaart."
+    }
   }
 }

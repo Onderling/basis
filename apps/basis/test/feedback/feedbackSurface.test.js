@@ -10,7 +10,7 @@ import { InMemoryCentralPod } from 'onderling-feedback/public';
 import { randomBytes } from 'node:crypto';
 import { InternalBus, AgentIdentity } from '@onderling/core';
 import { generateParticipantIdentity, IdentityRoster, makeContributionVerifier } from 'onderling-feedback/public';
-import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem, signerForIdentity, chunkBubble } from '../../src/feedback/feedbackSurface.js';
+import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem, signerForIdentity } from '../../src/feedback/feedbackSurface.js';
 
 let mock;
 beforeAll(async () => { mock = await startMockLlm(); });
@@ -299,26 +299,6 @@ test('feedback threads stay isolated', async () => {
     await surface.handle('verstuur alles', tid);
   }
   expect(new Set(pod.list().map((c) => c.participant))).toEqual(new Set(['cc:x', 'cc:y']));
-});
-
-test('chunkBubble — short text is not chunked; long text splits at a boundary and round-trips', () => {
-  expect(chunkBubble('kort bericht')).toEqual({ head: 'kort bericht', rest: '' });
-
-  const long = `${'Dit is een lange samenvatting. '.repeat(20)}Einde.`;
-  const { head, rest } = chunkBubble(long, 120);
-  expect(head.length).toBeLessThanOrEqual(120);
-  expect(rest).not.toBe('');
-  // no content lost (modulo the trimmed boundary whitespace)
-  expect((head + ' ' + rest).replace(/\s+/g, ' ').trim()).toBe(long.replace(/\s+/g, ' ').trim());
-  // preferred a sentence boundary (head ends on a period, not mid-word)
-  expect(head.endsWith('.')).toBe(true);
-});
-
-test('chunkBubble — a hard cut when there is no boundary in-window', () => {
-  const noSpaces = 'x'.repeat(500);
-  const { head, rest } = chunkBubble(noSpaces, 200);
-  expect(head.length).toBe(200);
-  expect(rest.length).toBe(300);
 });
 
 test('feedbackContactItem — distinct agent contact (id matches bot address, openFeedback action)', () => {

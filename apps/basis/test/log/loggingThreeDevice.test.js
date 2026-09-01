@@ -16,8 +16,8 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { log, dumpLogs, clearLogs, formatLogs, configureLog, REDACTED } from '@onderling/logger';
-import { buildReportEnvelope } from '../../src/feedback/bugReport.js';
-import { createBugReportSink } from '../../src/feedback/bugReportSink.js';
+import { buildReportEnvelope } from '../../src/log/bugReport.js';
+import { createBugReportSink } from '../../src/log/bugReportSink.js';
 
 /** Realistic identifiers — an NKN peer address is `label.<64 hex>`, so it is long AND high-entropy. */
 const BRAM_ADDR = 'bram-phone.9f3c1a77b2e45d8091ac6be2130f47da55c8e91b0d3a72f6c4519e8ab7d206fe';

@@ -14,6 +14,7 @@
  */
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
+import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio } from '../../core/nearbyAllowsStore.js';
 import { pushContactReply } from '../../core/contactReplyInbox.js';
@@ -183,7 +184,7 @@ import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircl
 import { createFeedbackMount } from '../../../../basis/src/feedback/feedbackMount.js';
 // Rich circle feedback (parity with web's invite-circle): the co-hosted bot's review renders as editable
 // CARDS + its long bubbles chunk, instead of flattened text. Shared surface + shared RN card component.
-import { createFeedbackSurface, signerForIdentity, chunkBubble } from '../../../../basis/src/feedback/feedbackSurface.js';
+import { createFeedbackSurface, signerForIdentity } from '../../../../basis/src/feedback/feedbackSurface.js';
 import { makeNoLoginFeedbackPods } from '../../../../basis/src/feedback/noLoginPods.js';
 import { FeedbackReviewCards } from '../../rn/FeedbackBubbles.js';
 import CircleMandatePicker from './CircleMandatePicker.js';

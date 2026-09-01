@@ -7,8 +7,8 @@
 // path → {ok:false, reason:'no-target'} without throwing; (e) a THROWING send is caught → {ok:false}.
 
 import { test, expect } from 'vitest';
-import { buildReportEnvelope } from '../src/feedback/bugReport.js';
-import { createBugReportSink } from '../src/feedback/bugReportSink.js';
+import { buildReportEnvelope } from '../../src/log/bugReport.js';
+import { createBugReportSink } from '../../src/log/bugReportSink.js';
 
 // A realistic envelope built the way the surface builds it — from logger records that ALSO carry smuggled
 // identity fields (which buildReportEnvelope drops by construction).

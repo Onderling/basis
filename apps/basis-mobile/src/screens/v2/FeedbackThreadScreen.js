@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { createFeedbackSurface, signerForIdentity, chunkBubble } from '../../../../basis/src/feedback/feedbackSurface.js';
-import { createBugReportSink } from '../../../../basis/src/feedback/bugReportSink.js';
+import { createBugReportSink } from '../../../../basis/src/log/bugReportSink.js';
 import { FeedbackReviewCards, FeedbackReportPanel } from '../../rn/FeedbackBubbles.js';
 import { makeNoLoginFeedbackPods } from '../../../../basis/src/feedback/noLoginPods.js';
 import { createFeedbackHistoryStore } from '../../../../basis/src/feedback/feedbackHistory.js';

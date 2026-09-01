@@ -28,7 +28,7 @@ import {
 // Per-circle privacy state — the discrete indicator model (§10c). Pure; the shell renders from it.
 import { circlePrivacyState } from './circlePrivacyState.js';
 // The anonymous bug-report packager (shared, pure). Carries NO identity — see bugReport.js.
-import { buildReportEnvelope } from './bugReport.js';
+import { buildReportEnvelope } from '../log/bugReport.js';
 // REUSE the restore wizard's mnemonic validation (word-count / 12-or-24) rather than reimplementing it — the
 // same helpers the web/RN restore wizards use. No mnemonic/crypto logic lives here: the reveal/restore is done
 // by the host skills (revealOwnerPhrase / restoreOwnerPhrase) reached through the injected `callSkill`.

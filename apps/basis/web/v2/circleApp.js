@@ -252,7 +252,7 @@ import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 import { createFeedbackSurface, signerForIdentity } from '../../src/feedback/feedbackSurface.js';
 import { privacyBadge } from '../../src/feedback/circlePrivacyState.js';   // shared per-circle privacy badge (§10c)
-import { createBugReportSink } from '../../src/feedback/bugReportSink.js';
+import { createBugReportSink } from '../../src/log/bugReportSink.js';
 import { makeNoLoginFeedbackPods } from '../../src/feedback/noLoginPods.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 import { buildFeedbackVerifyPods, getOrCreateRecoveryHash } from '../../src/feedback/feedbackPod.js';

@@ -52,7 +52,7 @@ import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '.
 import { renderReviewCards } from './contactThread.js';
 // Long bot bubbles (e.g. a big verify-summary) chunk to a preview + "Show more" — shared with mobile so the
 // truncation is identical across surfaces.
-import { chunkBubble } from '../../src/feedback/feedbackSurface.js';
+import { chunkBubble } from '../../src/v2/chunkBubble.js';
 // D / Surface 2 — the ⋯ overflow roster is PROJECTED from manifest.actions via
 // the shared selector (platform + feature gated), NOT a hardcoded MORE_ITEMS list.
 import { circleActions } from '../../src/v2/actionProjection.js';

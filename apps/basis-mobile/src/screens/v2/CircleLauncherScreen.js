@@ -109,6 +109,10 @@ import { basisManifest } from '../../../../basis/src/index.js';
 // Which ops the DEVICE declares — the gate on the typed door's general case, read from the one contract
 // rather than from a list kept beside it.
 const basisDeclaresOp = (opId) => basisManifest.operations.some((o) => o.id === opId);
+// The composer's "+" entries, projected from the manifest exactly as web projects them. What differs
+// between the shells is which seams are wired (a native picker here, a file input there) — never which
+// entries exist, which is why this reads the same projector rather than a mobile list.
+const BASIS_ATTACH_MENU = renderAttachments(basisManifest).attachMenu;
 // S6.B/C — open-screen surface + per-circle gate (shared with web).
 import { isAppSurfaceEnabled } from '../../../../basis/src/v2/appFeature.js';
 // the capability gate + the affordance matrix (web≡mobile, shared core).
@@ -161,6 +165,11 @@ import QrScannerModal from '../../rn/QrScannerModal.js';
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
 // shell we ship can reach it.
+import OpPageModal from './OpPageModal.js';
+import { renderAttachments } from '@onderling/app-manifest';
+import { makeOpAvailability } from '../../../../basis/src/v2/opAvailability.js';
+import { composerReplyToStream } from '../../../../basis/src/v2/composerReply.js';
+import { cardSummary } from '../../../../basis/src/v2/cardSummary.js';
 import { buildMobileLocalBuiltins } from '../../core/hostOps.js';
 import { openFilePicker as openMobileFilePicker } from '../../core/filePicker.js';
 import { QrCodeView } from '@onderling/react-native/qr/view';
@@ -2654,6 +2663,23 @@ function CircleDetail({
     return deliveryStateMapRef.current.get(msgId);
   }, [deliveryTick]);
   const [composerText, setComposerText] = useState('');
+  // The "+" — mobile had no attach affordance at all, so a phone could not put a photo or an
+  // appointment in a conversation by any route. Same projected entries as web, narrowed the same way.
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachForm, setAttachForm] = useState(null);   // the entry whose params must be filled first
+  const attachEntries = useMemo(() => {
+    const av = makeOpAvailability({
+      catalogue: catalogue ?? null,
+      manifestsByOrigin,
+      policy: policy ?? null,
+    });
+    return BASIS_ATTACH_MENU
+      .filter((e) => av.of(e.opId).state !== 'hidden')
+      // An entry whose dispatch path is not wired is NOT painted (Frits: never offer what does not
+      // work). The file entry rides the sealed-media pipeline, which a circle with no media
+      // composition does not have — so it is absent here rather than offered and refused on tap.
+      .filter((e) => (e.via === 'media' ? !!circleMedia : true));
+  }, [catalogue, manifestsByOrigin, policy, circleMedia]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   const [pendingFollowUp, setPendingFollowUp] = useState(null);
   const [pendingForm, setPendingForm] = useState(null);   // 2+-field needsForm → inline form (parity with web)
@@ -2857,16 +2883,32 @@ function CircleDetail({
 
   // append a circle chat bubble to the local eventLog (optimistic). Returns {msgId, ts}
   // so the caller can fan out the same id (receiver-side dedup suppresses any mirrored echo).
-  const appendCircleMessage = useCallback(({ actor, text, buttons, scope, embeds, review, provenance, consent }) => {
+  const appendCircleMessage = useCallback(({ actor, text, buttons, scope, embeds, card, review, provenance, consent }) => {
     if (!eventLog?.append || !circle?.id) return null;
     const msgId = `circle-${circle.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const ts    = Date.now();
     // `review` (Stage-1 feedback cards) is private by construction → scope 'self' (never fanned out).
     // `provenance`/`consent` (Task #13 help Q&A) light the transparency badge + the dashed-rust consent card.
-    eventLog.append(circleChatMessageEvent({ msgId, ts, circleId: circle.id, actor, text, buttons, scope: review ? 'self' : scope, embeds, review, provenance, consent }));
+    // `card` — one embed card riding the message (a photo, an appointment, an item, a file).
+    eventLog.append(circleChatMessageEvent({ msgId, ts, circleId: circle.id, actor, text, buttons, scope: review ? 'self' : scope, embeds, card, review, provenance, consent }));
     setStreamTick((n) => n + 1);
     return { msgId, ts };
   }, [eventLog, circle?.id]);
+
+  /**
+   * Run a device op for this conversation and put what it answered where it belongs — the mobile twin
+   * of web's `runComposerOp`. The DECISION (card or note) is the shared `composerReplyToStream`; only
+   * the painting differs. A card is a message the circle sees, so it is appended AND fanned out.
+   */
+  const runComposerOp = useCallback(async (opId, args) => {
+    const reply = await onCircleControl?.(opId, args ?? {});
+    const out = composerReplyToStream(reply, { t });
+    if (!out) return reply;
+    if (out.kind === 'note') { appendCircleMessage({ actor: 'bot', text: out.text }); return reply; }
+    const sent = appendCircleMessage({ actor: 'me', text: out.text, scope: 'circle', card: out.card });
+    if (sent) broadcastFanOut({ msgId: sent.msgId, text: out.text, ts: sent.ts, card: out.card });
+    return reply;
+  }, [onCircleControl, appendCircleMessage, broadcastFanOut, t]);
 
   // The fallback offer speaks HERE while this circle is open (web parity: the chat makes the offer, at the
   // moment the person is confused about why nobody replied). `scope: 'self'` — a local bubble, never
@@ -4295,7 +4337,56 @@ function CircleDetail({
             ))}
           </View>
         ) : null}
+        {/* An entry that needs input opens the op's OWN form — the same shared sheet the Advanced
+            drawer opens, built from the op's declared params. Its dispatch goes through the same
+            runner, so a card filled in here lands exactly where a no-input tap's card lands. */}
+        {attachForm ? (
+          <OpPageModal
+            visible
+            appOrigin="basis"
+            op={basisManifest.operations.find((o) => o.id === attachForm.opId) ?? { id: attachForm.opId, params: attachForm.params }}
+            callSkill={async (_app, opId, args) => runComposerOp(opId, args)}
+            onClose={() => setAttachForm(null)}
+            onDispatched={() => setAttachForm(null)}
+          />
+        ) : null}
+        {/* The "+" menu — the projected entries, in the composer, exactly as web paints them. Rendered
+            ABOVE the row so it opens upward like the web dropdown; absent entirely when this circle
+            offers nothing that works. */}
+        {attachOpen && attachEntries.length > 0 ? (
+          <View style={styles.attachMenu} testID="circle-attach-menu">
+            {attachEntries.map((e) => (
+              <Pressable
+                key={e.opId}
+                style={styles.attachItem}
+                testID={`circle-attach-${e.opId}`}
+                accessibilityRole="button"
+                onPress={() => {
+                  setAttachOpen(false);
+                  const required = (Array.isArray(e.params) ? e.params : []).filter((p) => p?.required);
+                  // An entry that needs input opens the op's OWN form (the shared page sheet the
+                  // Advanced drawer uses); one that needs none dispatches straight away.
+                  if (required.length > 0) setAttachForm(e);
+                  else runComposerOp(e.opId, {});
+                }}
+              >
+                <Text style={styles.attachItemText}>{t(e.label) === e.label ? e.label : t(e.label)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <View style={styles.composer} testID="circle-detail-composer">
+          {attachEntries.length > 0 ? (
+            <Pressable
+              style={styles.composerAttach}
+              accessibilityRole="button"
+              accessibilityLabel={t('circle.view.attach')}
+              testID="circle-detail-composer-attach"
+              onPress={() => setAttachOpen((v) => !v)}
+            >
+              <Text style={styles.composerAttachText}>+</Text>
+            </Pressable>
+          ) : null}
           <TextInput
             style={styles.composerInput}
             value={composerText}
@@ -4513,6 +4604,20 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
               </Pressable>
             ) : null}
           </>
+        );
+      })()}
+      {/* A card riding this message — an appointment, a shared item, a file, a photo. Web paints this
+          through the shared dom adapter, which RN cannot use; both shells read the SAME `cardSummary`
+          so a card cannot say different things on the two platforms. The message's own text is the
+          caption, so a card that fails to summarise still leaves a readable line. */}
+      {(() => {
+        const summary = cardSummary(payload.card);
+        if (!summary) return null;
+        return (
+          <View style={styles.bubbleCard} testID={`circle-card-${summary.kind}-${row.id}`}>
+            <Text style={styles.bubbleCardTitle}>{summary.icon} {summary.title}</Text>
+            {summary.detail ? <Text style={styles.bubbleCardDetail}>{summary.detail}</Text> : null}
+          </View>
         );
       })()}
       {/* Per-answer transparency badge (web parity, site .msg .src) — how a BOT
@@ -5465,6 +5570,16 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   bubbleEmbedText:  { fontSize: 12, color: theme.color.ink },
   dayDivider:       { alignSelf: 'center', fontSize: 11, color: theme.color.inkSoft, fontStyle: 'italic', paddingVertical: 8 },
   composer:         { flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 8, paddingBottom: 4, borderTopWidth: 1, borderTopColor: theme.color.line, marginTop: 4 },
+  // The "+" affordance and its menu — the composer's attach control (web parity: `circle-view__attach`).
+  composerAttach:     { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: theme.color.line, alignItems: 'center', justifyContent: 'center' },
+  composerAttachText: { fontSize: 20, lineHeight: 22, color: theme.color.ink },
+  attachMenu:         { borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, backgroundColor: theme.color.paper, paddingVertical: 4, marginBottom: 4 },
+  attachItem:         { paddingVertical: 10, paddingHorizontal: 14 },
+  attachItemText:     { fontSize: 14, color: theme.color.ink },
+  // A card riding a message — the shared `cardSummary` reading, painted.
+  bubbleCard:         { marginTop: 6, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, padding: 8, backgroundColor: theme.color.card },
+  bubbleCardTitle:    { fontSize: 14, fontWeight: '600', color: theme.color.ink },
+  bubbleCardDetail:   { fontSize: 12, color: theme.color.inkSoft, marginTop: 2 },
   // Bulletin restyle — composer input on the card fill with a soft placeholder (web parity).
   composerInput:    { flex: 1, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: theme.color.line, borderRadius: 22, backgroundColor: theme.color.card, fontSize: 14, color: theme.color.ink },
   composerSend:     { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.color.accent, alignItems: 'center', justifyContent: 'center' },

@@ -344,8 +344,9 @@ hardcoded `LIST_SCREENS` map is **retired**; `openCircleScreenPanel` reads its c
 `CircleLauncherScreen.js` via `circleTabsMobile`/`circleActionsMobile`) — the duplicated `TABS`/action literals
 are gone, and each shell only *filters* the identical roster by an action's `platforms` + `requires` gate.
 A tested generic side-panel (`openPagePanel`) is the live renderer for simple `surfaces.page` ops on **web**
-(e.g. the docked `set-relay` panel); the RN sibling that maps `surfaces.page` to native nav screens is still
-pending (mobile has the per-op page *header* projection but not the generic side-panel yet).
+(e.g. the docked `set-relay` panel); its RN sibling is `OpPageModal` (`apps/basis-mobile/src/screens/v2/`),
+which paints the same `surfaces.page` op over the same `buildFormSpec` — so an argument-taking op is a form
+on both shells, and neither depends on a chat route to run it.
 Still bespoke **by design**: the settings-hub panels (my-data, advisor) and the **circleFolio browser** (a
 separate surface KIND, parked). The compose/trigger loop (open-screen button ↔ `dispatchReady`) is wired in
 **web**; mobile now shares the projected nav chrome but keeps its own screen renderers.

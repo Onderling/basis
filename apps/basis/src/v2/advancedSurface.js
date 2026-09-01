@@ -16,6 +16,25 @@
 import { renderCoverage } from '@onderling/app-manifest';
 
 /**
+ * The shelves, in the order a person reads them: who I am, then this device, then the people and the
+ * connections between them, then the machinery. `other` last, because an op with no declared shelf is
+ * one nobody has decided about yet — the drawer should not open on the undecided.
+ *
+ * Ordering lives HERE and not in the shells for the same reason the shelf names do: two shells that each
+ * sort get to disagree. It also has to happen at all — the rows arrive in manifest declaration order, so
+ * an unsorted list repeats "Identity" three times and reads as noise with headings in it rather than as
+ * shelves. (Found by walking the drawer in a browser, 2026-09-01; the unit test had checked that every
+ * row carries a shelf, which was true, and not that a shelf appears once, which was not.)
+ */
+export const ADVANCED_SHELVES = Object.freeze([
+  'overview', 'identity', 'device', 'people', 'connectivity', 'diagnostics', 'help', 'other',
+]);
+const shelfRank = (g) => {
+  const i = ADVANCED_SHELVES.indexOf(g);
+  return i < 0 ? ADVANCED_SHELVES.length : i;
+};
+
+/**
  * The surface-less op rows.
  *
  * @param {object} a
@@ -81,7 +100,10 @@ export function advancedOpRows({ manifests = [] } = {}) {
         /** How a shell lets the person run it: `run` (no input) · `form` (its params, as a page). */
         via: required.length === 0 ? 'run' : 'form',
       };
-    });
+    })
+    // Grouped, so each shelf appears ONCE. Stable within a shelf: declaration order is the manifest
+    // author's order, and re-sorting rows inside a shelf would throw that away for nothing.
+    .sort((a, b) => shelfRank(a.group) - shelfRank(b.group));
 }
 
 /**

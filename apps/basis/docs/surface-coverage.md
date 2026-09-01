@@ -9,10 +9,10 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `embed` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
 |  | `embed-file` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
 |  | `embed-time` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
-|  | `logs` | list | ✅ | ✅ | · | · | ✅ | · |  |
+|  | `logs` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `scanQr` | list | ✅ | ✅ | · | · | · | · |  |
-|  | `find` | list | ✅ | ✅ | · | · | ✅ | · |  |
-|  | `brief` | list | ✅ | ✅ | · | · | ✅ | · |  |
+|  | `find` | list | ✅ | ✅ | · | · | · | · |  |
+|  | `brief` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `signin` | add | · | ✅ | · | · | ✅ | · |  |
 |  | `whoami` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `me` | list | ✅ | ✅ | · | · | ✅ | · |  |
@@ -255,7 +255,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 250 ops | | 231 | 121 | 34 | 3 | 151 | 71 | |
+| **totals** | 250 ops | | 231 | 121 | 34 | 3 | 148 | 71 | |
 
 ### Flows
 

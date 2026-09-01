@@ -959,6 +959,10 @@
       "doc": "The page form: close without dispatching."
     },
     "group": {
+      "overview": {
+        "text": "Overzicht",
+        "doc": "Een plank in de lade Geavanceerd; de op geeft zelf aan op welke plank hij hoort."
+      },
       "identity": {
         "text": "Identiteit",
         "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
@@ -5891,20 +5895,6 @@
     "decisionOpened": {
       "text": "Er is een besluit geopend",
       "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
-    }
-  },
-  "page": {
-    "find": {
-      "text": "Zoeken",
-      "doc": "The label of the find op's own page (surfaces.page.labelKey), painted by both shells."
-    },
-    "brief": {
-      "text": "Briefing",
-      "doc": "The label of the brief op's own page (surfaces.page.labelKey), painted by both shells."
-    },
-    "logs": {
-      "text": "Gebeurtenissen",
-      "doc": "The label of the logs op's own page (surfaces.page.labelKey), painted by both shells."
     }
   }
 }

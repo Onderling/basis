@@ -13,7 +13,7 @@
  * were equally shut.
  */
 import { describe, it, expect } from 'vitest';
-import { advancedOpRows } from '../../src/v2/advancedSurface.js';
+import { advancedOpRows, ADVANCED_SHELVES } from '../../src/v2/advancedSurface.js';
 import { basisManifest } from '../../manifest.js';
 
 const rows = advancedOpRows({ manifests: [basisManifest] });
@@ -66,6 +66,18 @@ describe('the Advanced surface reaches every op with no declared screen', () => 
     const groups = new Set(rows.map((r) => r.group));
     expect(groups.has('other'), 'nothing should be falling through to the catch-all today').toBe(false);
     expect(groups.size, 'a handful of shelves, not one per op').toBeLessThanOrEqual(8);
+  });
+
+  it('paints each shelf ONCE — the rows arrive grouped, not in declaration order', () => {
+    // The shells paint a heading when the group CHANGES from the previous row, which is the cheap and
+    // right way to do it — provided the rows are grouped. Unsorted, that same code painted "Identity"
+    // three times and "This device" twice: eight shelves rendered as twelve headings, which reads as
+    // noise with headings in it. Found by walking the drawer in a browser rather than by this file,
+    // which had asked whether every row HAS a shelf (true) and not whether a shelf appears once.
+    const headings = rows.filter((r, i) => i === 0 || rows[i - 1].group !== r.group).map((r) => r.group);
+    expect(headings, 'a shelf heading appears once').toEqual([...new Set(headings)]);
+    // And in the declared reading order, so neither shell has to sort and they cannot disagree.
+    expect(headings).toEqual(ADVANCED_SHELVES.filter((g) => headings.includes(g)));
   });
 
   it('groups the ops a person came looking for apart from the ones they did not', () => {

@@ -224,11 +224,10 @@ export const basisManifest = {
         { name: 'mute',  kind: 'string', required: false },
         { name: 'limit', kind: 'number', required: false },
       ],
+      group: 'overview',
       surfaces: {
         slash: { command: '/logs', body: 'flags' },
         chat:  { reply: 'list', hint: 'recent events; --app= / --type= / --mute=app:type' },
-        // "What happened while I was away" is a member question, not only an operator one.
-        page:  { kind: 'side-panel', title: 'Events', labelKey: 'circle.page.logs' },
       },
     },
 
@@ -266,13 +265,10 @@ export const basisManifest = {
       params: [
         { name: 'query', kind: 'string', required: true },
       ],
+      group: 'overview',
       surfaces: {
         slash: { command: '/find' },
         chat:  { reply: 'find', hint: 'search across all apps cached items' },
-        // A door of its own: search is a member act, not a diagnostic, and the drawer is the place
-        // things go when they have nowhere better. Both shells project this — web docks the panel,
-        // mobile opens `OpPageModal` — over the op's own declared params.
-        page:  { kind: 'side-panel', title: 'Search', labelKey: 'circle.page.find' },
       },
     },
 
@@ -289,10 +285,10 @@ export const basisManifest = {
       params: [
         { name: 'refresh', kind: 'boolean', required: false },
       ],
+      group: 'overview',
       surfaces: {
         slash: { command: '/brief', body: 'flags' },
         chat:  { reply: 'brief', hint: 'morning summary across all apps' },
-        page:  { kind: 'side-panel', title: 'Brief', labelKey: 'circle.page.brief' },
       },
     },
 

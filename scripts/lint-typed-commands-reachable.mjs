@@ -31,12 +31,14 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
 /**
  * Handlers that exist and cannot be typed, pending L70. Dated so the list reads as debt, not design.
- * A DECLARED SCREEN COUNTS AS A DOOR (2026-09-01). The guard originally knew one kind — a typed command
- * in `CIRCLE_BUILTIN_COMMANDS` — because when it was written that was the only kind basis's ops had. An
- * op that declares `surfaces.ui` or `surfaces.page` is reached by tapping it, on both shells, through
- * the page projection; asking such an op to ALSO be typeable would be asking for a second door and
- * calling its absence a defect. So `find`, `brief` and `logs` leave the list by gaining a page, not by
- * being excused — which is the shrink this guard asks for, arriving in a shape it had not anticipated.
+ * A ROUTED SCREEN COUNTS AS A DOOR (2026-09-01, corrected the same day by a walk). An op that declares
+ * `surfaces.ui`/`surfaces.page` AND is routed by a shell is reached by tapping it, and asking it to ALSO
+ * be typeable would be calling a second door's absence a defect. ROUTED is the load-bearing word: a page
+ * nothing paints is not a door, and declaring one is worse than declaring nothing, because
+ * `advancedOpRows` drops declared-page ops from the Advanced drawer — the only painter of a generic page
+ * form on either shell. `find`/`brief`/`logs` were declared into that gap and vanished from the app
+ * entirely; the browser walk found them missing. Hence `routedInAShell`: a declaration alone can no
+ * longer quiet this guard, which is the property that let it be quieted wrongly in the first place.
  *
  * SHRINK THIS by giving a command a door (add it to `CIRCLE_BUILTIN_COMMANDS` and wire both composers,
  * or declare `surfaces.ui`/`surfaces.page` on the op) or by deleting the handler. A new entry needs a
@@ -47,6 +49,10 @@ const UNREACHED = new Set([
   'embed', 'embed-file', 'embed-time', 'send-file', 'scanQr',
   // Still meaningful, no door since chat was folded into the circle view (2026-07) — the L70 set.
   'audit-tail', 'debug-dump', 'help', 'help-with',
+  // Reachable ONLY through the Advanced drawer's generic param form (2026-09-01). Each deserves a door
+  // of its own — search is a member act, the brief is a daily one, the event list answers "what happened
+  // while I was away" — and each needs a shell to paint it, which is UI work, not a manifest line.
+  'find', 'brief', 'logs',
   'lookup-peer', 'me', 'mute', 'muted', 'unmute', 'peer-connect', 'publish-peer', 'rotate-identity',
   'signin', 'signout', 'test-peer', 'whoami',
 ]);
@@ -70,9 +76,25 @@ const circleSet = new Set(
 );
 
 /**
- * Does this op declare a door of its own? Read off the manifest SOURCE rather than imported, so the
- * guard stays a cheap text check like its siblings and cannot be broken by an import cycle. A `page` or
- * a `ui` block inside the op's `surfaces` is a screen both shells project — tapping it is reaching it.
+ * Do the shells actually ROUTE this op — is there code that opens its screen? A declared surface is a
+ * claim; this is the check that the claim was honoured. Cheap text search over the two shells' own
+ * sources, in the spirit of the rest of this guard.
+ */
+const shellSrc = [
+  'apps/basis/web/v2/circleApp.js',
+  'apps/basis/web/v2/circleSettings.js',
+  'apps/basis/web/v2/circleProfile.js',
+  'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js',
+  'apps/basis-mobile/src/screens/v2/CircleSettingsScreen.js',
+  'apps/basis-mobile/src/core/wizardRegistry.js',
+].map(read).join('\n');
+const routedInAShell = (opId) => new RegExp(`['\`"]${opId}['\`"]`).test(shellSrc);
+
+/**
+ * Does this op have a door of its own? Read off the manifest SOURCE rather than imported, so the guard
+ * stays a cheap text check like its siblings and cannot be broken by an import cycle — but a declared
+ * `page`/`ui` only counts when a shell routes it, or the declaration becomes a way to silence the guard
+ * while REMOVING the op from the drawer that was painting it. That is not a hypothetical; see above.
  */
 const manifestSrc = read('apps/basis/manifest.js');
 function hasOwnDoor(opId) {
@@ -83,7 +105,8 @@ function hasOwnDoor(opId) {
   // The op's own literal: from its id to the end of its surfaces block, bounded by the next op's id.
   const nextId = manifestSrc.indexOf("id:    '", at + 10);
   const body = manifestSrc.slice(at, nextId > 0 ? nextId : manifestSrc.length);
-  return /\bpage:\s*\{/.test(body) || /\bui:\s*\{/.test(body);
+  const declares = /\bpage:\s*\{/.test(body) || /\bui:\s*\{/.test(body);
+  return declares && routedInAShell(opId);
 }
 
 const problems = [];

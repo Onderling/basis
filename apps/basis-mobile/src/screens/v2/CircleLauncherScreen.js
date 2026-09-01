@@ -2896,14 +2896,17 @@ function CircleDetail({
    * the painting differs. A card is a message the circle sees, so it is appended AND fanned out.
    */
   const runComposerOp = useCallback(async (opId, args, appOrigin = 'basis') => {
+    // `rawCallSkill` — the app-TARGETED 3-arg waist. `callSkill` in this scope is the circle's
+    // RESOLVING 2-arg form, which reads (opId, args): handing it (app, op, args) shifts the arguments
+    // and the call goes nowhere, silently. The same trap `broadcastCircleFanOut` documents.
     const reply = appOrigin === 'basis'
       ? await onCircleControl?.(opId, args ?? {})
-      : await callSkill?.(appOrigin, opId, args ?? {});
+      : await rawCallSkill?.(appOrigin, opId, args ?? {});
     // A CREATOR answers `{ok, itemId}`; if it declares how its card is read, read it, so the thing
     // appears in the conversation it was made in and not only in its own tab.
     const declared = manifestsByOrigin?.[appOrigin]?.operations?.find((o) => o.id === opId) ?? null;
     const card = await cardForCreatedItem({
-      reply, op: declared, appOrigin, callSkill, localActor: 'me',
+      reply, op: declared, appOrigin, callSkill: rawCallSkill, localActor: 'me',
     });
     const out = composerReplyToStream(card ?? reply, { t });
     if (!out) return reply;
@@ -2917,7 +2920,7 @@ function CircleDetail({
     });
     if (sent) broadcastFanOut({ msgId: sent.msgId, text: out.text, ts: sent.ts, card: out.card });
     return reply;
-  }, [onCircleControl, callSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t]);
+  }, [onCircleControl, rawCallSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t]);
 
   // The fallback offer speaks HERE while this circle is open (web parity: the chat makes the offer, at the
   // moment the person is confused about why nobody replied). `scope: 'self'` — a local bubble, never

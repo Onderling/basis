@@ -411,8 +411,14 @@ function PersonaPanel({
 }
 
 function WithTabBar({ active, onSelect, children }) {
+  // The tab frame paints the app's GROUND. It used to be a bare `flex: 1` View, which is transparent,
+  // so any screen inside it that themed its text but not its background showed the platform's default
+  // white — themed (light) ink on white, unreadable, and glaring beside an otherwise dark app. The
+  // Advanced tab was where that showed; the frame is where it belongs, because a screen should not have
+  // to remember to paint the ground it did not choose to stand on.
+  const theme = useTheme();
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.color.paper }}>
       <View style={{ flex: 1 }}>{children}</View>
       <CircleTabBar active={active} onSelect={onSelect} />
     </View>

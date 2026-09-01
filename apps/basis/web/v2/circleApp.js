@@ -4181,6 +4181,7 @@ async function showAdvanced() {
     input.style.cssText = 'width:9rem;';
     const save = document.createElement('button');
     save.type = 'button';
+    save.className = 'cc-btn cc-btn--quiet';
     save.textContent = t('circle.advanced.save');
     save.addEventListener('click', async () => {
       let value; try { value = JSON.parse(input.value); } catch { value = input.value; }
@@ -4232,6 +4233,7 @@ async function showAdvanced() {
     if (o.runnable) {
       const run = document.createElement('button');
       run.type = 'button';
+      run.className = 'cc-btn cc-btn--quiet';
       run.textContent = t('circle.advanced.run');
       run.addEventListener('click', async () => {
         run.disabled = true;
@@ -4245,6 +4247,7 @@ async function showAdvanced() {
       // built from the op's params (mobile paints the same form as a sheet). The slash stays a hint.
       const open = document.createElement('button');
       open.type = 'button';
+      open.className = 'cc-btn cc-btn--quiet';
       open.textContent = t('circle.advanced.open');
       open.addEventListener('click', () => {
         const manifest = circleManifestsByOrigin?.[o.app];

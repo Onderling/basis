@@ -54,7 +54,7 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
   };
 
   return (
-    <ScrollView testID="circle-advanced-screen" contentContainerStyle={styles.wrap}>
+    <ScrollView testID="circle-advanced-screen" style={styles.screen} contentContainerStyle={styles.wrap}>
       <Text style={styles.title}>{t('circle.advanced.title')}</Text>
 
       <Text style={styles.section}>{t('circle.advanced.params_title')}</Text>
@@ -128,7 +128,12 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
 }
 
 const makeStyles = (theme) => StyleSheet.create({
-  wrap:     { padding: 16, paddingBottom: 48 },
+  // The screen paints its OWN ground. Every colour here came from the theme except this one, which was
+  // simply absent — so on a dark device the themed (light) ink landed on the platform's default white
+  // and the whole tab read as washed out beside an otherwise black app. A screen that themes its text
+  // and not its background is not half-themed; it is unreadable in exactly one mode.
+  screen:   { flex: 1, backgroundColor: theme.color.paper },
+  wrap:     { padding: 16, paddingBottom: 48, backgroundColor: theme.color.paper },
   title:    { fontSize: 20, fontWeight: '700', color: theme.color.ink, marginBottom: 12 },
   section:  { fontSize: 14, fontWeight: '700', color: theme.color.ink, marginTop: 18, marginBottom: 4 },
   hint:     { fontSize: 12, color: theme.color.inkSoft },

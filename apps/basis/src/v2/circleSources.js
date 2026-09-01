@@ -108,7 +108,23 @@ export function makeResolvingCallSkill(rawCallSkill, origins = DEFAULT_CIRCLE_OR
   // `catalogue` may be a live GETTER (so a later rescope — app toggle / policy.apps
   // — is honoured) or a static object. Resolved per call.
   const getCatalogue = typeof catalogue === 'function' ? catalogue : () => catalogue;
-  return async (opId, args) => {
+  return async (opId, args, third) => {
+    // ⚠ THE ARITY TRAP, made loud. This resolver takes (opId, args); the app-TARGETED waist takes
+    // (appOrigin, opId, args). They share a name in most scopes and differ only in arity, so a caller
+    // that reaches for the wrong one shifts its arguments: `'tasks'` is read as the op id, `'addTask'`
+    // as the args, no origin declares an op called `tasks`, and the call resolves to NOTHING — silently,
+    // because "no origin has it" is a legitimate answer here. It has cost two separate afternoons: a "+"
+    // menu entry that opened, submitted, closed and did nothing, and a fan-out that never fanned.
+    //
+    // A third argument can only mean the caller thought this was the targeted one. Say so, once, loudly,
+    // instead of returning null and letting them look for the bug downstream.
+    if (third !== undefined) {
+      throw new TypeError(
+        `resolving callSkill takes (opId, args) — it was called with three arguments, which is the `
+        + `APP-TARGETED signature (appOrigin, opId, args). Called as ("${String(opId)}", "${String(args)}", …): `
+        + 'use the raw/targeted callSkill for an app-targeted call, or drop the origin for a resolving one.',
+      );
+    }
     if (typeof rawCallSkill !== 'function') return null;
     // A broken catalogue getter (e.g. one closing over an out-of-scope var) must NOT take
     // down resolution — that silently turned every circle-source call into a throw the

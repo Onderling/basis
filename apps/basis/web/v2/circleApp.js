@@ -4819,7 +4819,10 @@ function openListsPanel(circleId) {
             draw();
           },
           onRowAction: async (op, node) => {
-            if (op === 'markComplete') await svc.markDone(circleId, node.id);
+            // THROUGH THE WAIST — the same op the "+" and a typed command dispatch. The panel used to
+            // call the service directly, so "screen ≡ chat ≡ +" was a claim rather than a fact: three
+            // doors into one feature, only two of which went through the contract.
+            if (op === 'markComplete') await rawCallSkill('lists', 'markListItemDone', { circleId, itemId: node.id });
             else if (op === 'removeItem') await svc.remove(circleId, node.id);
             draw();
           },
@@ -4851,7 +4854,9 @@ function openListsPanel(circleId) {
           e.preventDefault();
           const v = addInput.value.trim(); const target = pendingAddTo; const hint = pendingHint;
           pendingAddTo = null; pendingHint = null;
-          if (v && target) await svc.addItem(circleId, target, v, undefined, hint ? { hint } : undefined);
+          if (v && target) {
+            await rawCallSkill('lists', 'addToList', { circleId, list: target, text: v, ...(hint ? { kind: hint } : {}) });
+          }
           draw();
         });
         body.appendChild(addForm);
@@ -4887,7 +4892,9 @@ function openListsPanel(circleId) {
     const submit = async (kind) => {
       const v = input.value.trim();
       if (!v) return;
-      if (kind === 'board') await svc.createBoard(circleId, v); else await svc.createList(circleId, v);
+      // A board is a container with no default child; the op takes the kind so both go one way.
+      if (kind === 'board') await svc.createBoard(circleId, v);
+      else await rawCallSkill('lists', 'createList', { circleId, text: v });
       input.value = ''; draw();
     };
     form.addEventListener('submit', (e) => { e.preventDefault(); submit('list'); });

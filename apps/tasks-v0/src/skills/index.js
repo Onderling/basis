@@ -46,7 +46,7 @@ import { computeStatus, effectiveStatus, unmetDeps, detectCycle } from '../dag.j
 import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
-import { validateCanonical } from '@onderling/item-types';
+import { validateCanonical, LISTS_TYPES } from '@onderling/item-types';
 import { saveCircleConfig, loadCircleConfig, KIND_DEFAULTS } from '../Circle.js';
 import { tasksManifest } from '../../manifest.js';
 import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
@@ -292,7 +292,12 @@ async function listOpenCore(circle, a, ctx) {
   if (a.type)          filter.type          = a.type;
   if (a.requiredSkill) filter.requiredSkill = a.requiredSkill;
   if ('assignee' in a) filter.assignee      = a.assignee;
-  const open   = await circle.itemStore.listOpen(filter);
+  const all    = await circle.itemStore.listOpen(filter);
+  // An unfiltered read returns everything the circle's one store holds, which is RIGHT — a task, a
+  // message and a list entry are siblings there. What is wrong is showing them all as tasks: a shopping
+  // list and its entries are not chores, and they have a surface of their own. Only an explicit `type`
+  // asks for them; the general listing skips the lists vocabulary.
+  const open   = a.type ? all : all.filter((it) => !LISTS_TYPES.includes(it?.type));
   const closed = await circle.itemStore.listClosed();
   // 41.18 follow-up — every item carries:
   //   status   — lifecycle ∪ DAG (effectiveStatus)

@@ -53,11 +53,24 @@ export const listsManifest = {
       // adding to the same list both land rather than one overwriting the other.
       resolves:  [{ field: 'text', policy: 'content' }],
       params: [
-        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 } },
+        // WHICH LIST — a PICKER, not a typed-in name. `pickerSource` is the app's one way of saying "this
+        // param names a thing that already exists": the form draws a chooser over `listLists`, and the
+        // chat asks "which one?" and offers the same candidates as buttons (`clarifyTargets`). One
+        // declaration, both doors — which is what "+ = inline, text = textual" means in practice, rather
+        // than a second flow per surface.
+        {
+          name: 'list', kind: 'string', required: true, schema: { minLength: 1 },
+          pickerSource: { listOp: 'listLists', appOrigin: 'lists' },
+        },
         { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
-        // WHICH KIND of child — the container's `accepts` policy decides what is allowed and what the
-        // default is (`resolveAddInContainer`), so this is the answer to the picker's question, not a
-        // free-text type. Absent → the container's default child (a plain `list-item`).
+        // WHICH KIND of child. The container's `accepts` policy decides what is allowed and what the
+        // default is (`resolveAddInContainer` / `addKinds`), so this is the answer to the picker's
+        // question and not a free-text type. Absent → the container's default child.
+        //
+        // Its candidates depend on WHICH LIST was picked, and `pickerSource` names an op, not an op with
+        // an argument bound from a sibling field — so the picker cannot be declared here yet. The
+        // shells' own type picker (the Lists panel's, already built) is what asks it today; extending
+        // the form contract to a dependent picker is the honest next step and is on the work list.
         { name: 'kind', kind: 'string', required: false },
       ],
       surfaces: {

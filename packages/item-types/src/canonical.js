@@ -108,6 +108,18 @@ export const LEGACY_ALIASES = Object.freeze({
  *
  * @param {ReturnType<typeof import('./registry.js').createRegistry>} registry
  */
+/**
+ * The composable lists' nouns, named once.
+ *
+ * They live in the circle's one store like everything else — a list entry and a task are siblings there,
+ * and that is the point of one store. What they are NOT is tasks: a listing that computes task status
+ * over "everything in the store" must skip them, or a shopping list and its entries show up among the
+ * chores. That is what happened the day lists moved onto the circle's own store, and it is a PROJECTION
+ * question, not a storage one — which types a given surface shows is that surface's decision, and this
+ * names the set so each surface can decide it out loud instead of guessing per type.
+ */
+export const LISTS_TYPES = Object.freeze(['list', 'list-item', 'board']);
+
 export function registerCanonicalTypes(registry) {
   for (const [name, schema] of Object.entries(CANONICAL_TYPES)) {
     const aliases = LEGACY_ALIASES[name];

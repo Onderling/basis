@@ -15,7 +15,7 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';
 
 const typeLabel = (type) => t(`circle.container.type.${type}`);
 
-export default function CircleListsScreen({ circleId, storeFor, onBack }) {
+export default function CircleListsScreen({ circleId, storeFor, callSkill, onBack }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const svcRef = useRef(null);
@@ -55,8 +55,10 @@ export default function CircleListsScreen({ circleId, storeFor, onBack }) {
   const createContainer = useCallback(async (kind) => {
     const v = newName.trim();
     if (!v || !svcRef.current) return;
+    // THROUGH THE WAIST — the same op the "+" and a typed command dispatch (web parity). Reads stay on
+    // the service: they are this screen's own projection. Writes are the contract's.
     if (kind === 'board') await svcRef.current.createBoard(circleId, v);
-    else await svcRef.current.createList(circleId, v);
+    else await callSkill?.('lists', 'createList', { circleId, text: v });
     setNewName('');
     reloadContainers();
   }, [newName, circleId, reloadContainers]);
@@ -81,14 +83,14 @@ export default function CircleListsScreen({ circleId, storeFor, onBack }) {
     const v = addText.trim(); const target = pendingAdd; const hint = pendingHint;
     setPendingAdd(null); setPendingHint(null); setAddText('');
     if (v && target && svcRef.current && openList) {
-      await svcRef.current.addItem(circleId, target, v, undefined, hint ? { hint } : undefined);
+      await callSkill?.('lists', 'addToList', { circleId, list: target, text: v, ...(hint ? { kind: hint } : {}) });
       reloadTree(openList.id);
     }
   }, [addText, pendingAdd, pendingHint, circleId, openList, reloadTree]);
 
   const onRowAction = useCallback(async (op, node) => {
     if (!svcRef.current || !openList) return;
-    if (op === 'markComplete') await svcRef.current.markDone(circleId, node.id);
+    if (op === 'markComplete') await callSkill?.('lists', 'markListItemDone', { circleId, itemId: node.id });
     else if (op === 'removeItem') await svcRef.current.remove(circleId, node.id);
     reloadTree(openList.id);
   }, [circleId, openList, reloadTree]);

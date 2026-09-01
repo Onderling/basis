@@ -1753,7 +1753,14 @@ export default function CircleLauncherScreen({
     );
   }
   if (selected && view === 'lists') {   // the composable lists/container UI (web≡mobile)
-    return <CircleListsScreen circleId={selected.id} storeFor={(cid) => bundle?.agent?.circleStoreFor?.(cid)} onBack={() => setView('detail')} />;
+    return (
+      <CircleListsScreen
+        circleId={selected.id}
+        storeFor={(cid) => bundle?.agent?.circleStoreFor?.(cid)}
+        callSkill={bundle?.callSkill}
+        onBack={() => setView('detail')}
+      />
+    );
   }
   if (selected && view === 'share') {   // objective L — the cross-circle share UI (web≡mobile)
     // Thread the signed-in member's WebID as the acting identity (initiator gate `by` + read subject

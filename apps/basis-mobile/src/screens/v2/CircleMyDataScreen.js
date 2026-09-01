@@ -46,7 +46,7 @@ import { enableNativePush, disableNativePush, getNativePushState } from '../../v
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
-export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer, agent = null,
+export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer, agent = null,
   onOpenConnectionPoints, eventLog = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
@@ -70,6 +70,9 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
   // Re-read tick for the history-mirror row (the flip is live on the agent; the row re-reads it).
   const [, setHistoryTick] = useState(0);
   const [podStatus, setPodStatus] = useState({});
+  // The pod session as the `whoami` op reports it — `ok:false` means this build has no pod session
+  // capability at all, which is what used to be read off the presence of a `podAuth` prop.
+  const [session, setSession] = useState(null);
   // cluster J — pod sign-in entry (the v2 UI had none; sign-in was stranded in the hidden ChatScreen).
   const [issuer, setIssuer] = useState('https://login.inrupt.com');
   const [signingIn, setSigningIn] = useState(false);
@@ -186,13 +189,19 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
-    const [loc, status, priv, met, profProps] = await Promise.all([
+    const [loc, status, priv, met, profProps, session] = await Promise.all([
       callSkill('stoop', 'getDataLocation', {}).catch(() => null),
       callSkill('stoop', 'podSignInStatus', {}).catch(() => null),
       callSkill('stoop', 'getPrivacyNotice', { lang: lang() }).catch(() => null),
       callSkill('stoop', 'getMetrics', {}).catch(() => null),
       callSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null),
+      // The live pod session, through the waist. `whoami` reports it from the same podAuth this screen
+      // used to read directly — one implementation, and the op is the only thing that knows the
+      // substrate. It survives access-token expiry the way the raw read did, because the op falls back
+      // to the raw session info itself.
+      callSkill('basis', 'whoami', {}).catch(() => null),
     ]);
+    setSession(session ?? null);
     setDataLocation(loc ?? {});
     setPodStatus(status ?? {});
     setPrivacy(Array.isArray(priv?.sections) ? priv.sections : []);
@@ -217,10 +226,19 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
 
   useEffect(() => { load(); }, [load]);
 
+  // Both acts go through the waist: the op owns podAuth, the screen owns the button. `signin` reports a
+  // refusal as `{ok:false,error}` rather than throwing, so raise it as an error here and the retry below
+  // keeps working on the message the way it always did.
+  const runSignIn = useCallback(async () => {
+    const r = await callSkill('basis', 'signin', issuer.trim() ? { issuer: issuer.trim() } : {});
+    if (r && r.ok === false) throw new Error(r.error ?? 'sign-in failed');
+    return r;
+  }, [callSkill, issuer]);
+
   const doSignIn = useCallback(async () => {
-    if (!podAuth?.startSignIn) return;
+    if (typeof callSkill !== 'function') return;
     setSignInErr(''); setSigningIn(true);
-    try { await podAuth.startSignIn({ issuer: issuer.trim() || undefined }); }
+    try { await runSignIn(); }
     catch (e) {
       // DCR/discovery race: the client_id (re)registers async on mount + after a stale-client purge; a tap
       // during that window throws CLIENT_ID_PENDING/DISCOVERY_PENDING ("registration not yet complete").
@@ -228,24 +246,24 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
       const msg = e?.message ?? String(e);
       if (['CLIENT_ID_PENDING', 'DISCOVERY_PENDING', 'REQUEST_PENDING'].includes(e?.code) || /not yet complete/i.test(msg)) {
         await new Promise((r) => setTimeout(r, 1500));
-        try { await podAuth.startSignIn({ issuer: issuer.trim() || undefined }); }
+        try { await runSignIn(); }
         catch (e2) { setSignInErr(e2?.message ?? String(e2)); }
       } else { setSignInErr(msg); }
     }
     finally { setSigningIn(false); }
     load().catch(() => {});   // refresh pod status separately — its failure must not look like a sign-in error
-  }, [podAuth, issuer, load]);
+  }, [callSkill, runSignIn, load]);
   const doSignOut = useCallback(async () => {
-    if (!podAuth?.signOut) return;
-    try { await podAuth.signOut(); await load(); } catch { /* best-effort */ }
-  }, [podAuth, load]);
+    if (typeof callSkill !== 'function') return;
+    try { await callSkill('basis', 'signout', {}); await load(); } catch { /* best-effort */ }
+  }, [callSkill, load]);
 
-  // Status from the actual session (podAuth), not just the stoop skill: getRawSessionInfo().webId is set
+  // Status from the actual session, not just the stoop skill: `whoami` reports a webid whenever a session
   // whenever a session exists — including after the short access token expires (still refreshable) — so the
   // "Me" screen doesn't lag back to "Local only" the way isAuthenticated()-based podSignInStatus does.
-  const rawSession = podAuth?.getRawSessionInfo?.() ?? null;
-  const podSignedIn = podStatus.signedIn || !!rawSession?.webId;
-  const podWebid = podStatus.webid || rawSession?.webId || '';
+  const podCapable = session?.ok !== false;
+  const podSignedIn = podStatus.signedIn || !!session?.webid;
+  const podWebid = podStatus.webid || session?.webid || '';
   const relay = [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ');
   const usage = Object.entries(metrics || {});
 
@@ -327,7 +345,7 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         </Text>
 
         {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
-        {podAuth && !podSignedIn && (
+        {podCapable && !podSignedIn && (
           <View style={styles.signin}>
             <TextInput
               style={styles.signinInput}
@@ -345,7 +363,7 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
             {signInErr ? <Text style={styles.signinErr}>{signInErr}</Text> : null}
           </View>
         )}
-        {podAuth && podSignedIn && (
+        {podCapable && podSignedIn && (
           <Pressable style={[styles.action, styles.actionMuted]} onPress={doSignOut} testID="mydata-pod-signout">
             <Text style={styles.actionMutedLabel}>{t('circle.mydata.pod_signout')}</Text>
           </Pressable>

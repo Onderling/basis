@@ -277,18 +277,29 @@ async function signinFlow(args, { podAuth, externalFlow, t }) {
  * a hint to use /signin.
  */
 async function whoami(_args, { podAuth, t }) {
+  // Two readers, one answer. The chat face reads `message`; a SCREEN reads `signedIn`/`webid`, because
+  // parsing a sentence to find out whether you are signed in is how a shell ends up calling podAuth
+  // itself — which is what this op exists to stop. Both come out of the same call, so they cannot
+  // disagree.
   if (!podAuth || typeof podAuth.getCurrentSession !== 'function') {
-    return { message: t('whoami.unavailable') };
+    return { ok: false, signedIn: false, webid: null, message: t('whoami.unavailable') };
   }
   const sess = podAuth.getCurrentSession();
-  if (sess) return { message: t('whoami.signed_in', { webid: sess.webid }) };
+  if (sess) {
+    return {
+      ok: true,
+      signedIn: sess.isLoggedIn !== false,
+      webid: sess.webid ?? null,
+      message: t('whoami.signed_in', { webid: sess.webid }),
+    };
+  }
   // v0.7.P3c diagnostic — surface the RAW session state when the
   // logged-in gate fails.  Helps diagnose SolidCommunity / NSS
   // edge cases where handleRedirect returns but isLoggedIn stays
   // false (CORS, ID-token mismatch, redirect-URL drift, etc).
   if (typeof podAuth.getRawSessionInfo === 'function') {
     const raw = podAuth.getRawSessionInfo();
-    if (!raw.sessionExists) return { message: t('whoami.not_signed_in') };
+    if (!raw.sessionExists) return { ok: true, signedIn: false, webid: null, message: t('whoami.not_signed_in') };
     const lines = ['Not signed in.  Diagnostic state:'];
     lines.push(`  sessionExists: ${raw.sessionExists}`);
     lines.push(`  isLoggedIn:    ${raw.isLoggedIn}`);
@@ -298,9 +309,9 @@ async function whoami(_args, { podAuth, t }) {
     lines.push('If you JUST returned from the issuer + this says isLoggedIn:');
     lines.push('false: the redirect-back round-trip didn\'t complete.');
     lines.push('Check DevTools console for [podAuth] errors; retry /signin.');
-    return { message: lines.join('\n') };
+    return { ok: true, signedIn: false, webid: raw.webId ?? null, message: lines.join('\n') };
   }
-  return { message: t('whoami.not_signed_in') };
+  return { ok: true, signedIn: false, webid: null, message: t('whoami.not_signed_in') };
 }
 
 /**

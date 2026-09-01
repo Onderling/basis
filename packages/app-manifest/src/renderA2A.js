@@ -37,6 +37,13 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'household.grantSurface',
   'household.revokeSurface',
   'household.listSurfaceGrants',
+  // The pod session (2026-09-01). Signing in navigates a browser to an identity provider and signing out
+  // ends the session every other grant is read under — neither is a thing to do TO someone from
+  // somewhere else. Withheld here rather than merely omitted from the connection manifest list, because
+  // omission is a convention and this is a refusal: `checkInbound` turns them down before a token is
+  // read, whatever the caller presents.
+  'basis.signin',
+  'basis.signout',
 ]));
 
 /**

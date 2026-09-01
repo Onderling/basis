@@ -316,8 +316,12 @@ export const basisManifest = {
         { name: 'issuer', kind: 'string', required: false },
       ],
       surfaces: {
+        // No CHAT surface, deliberately (2026-09-01). Signing in navigates the browser to an issuer;
+        // that is an act a person takes, not one a model proposes on their behalf, and a tool the LLM
+        // can call is a tool it can call unprompted. The panel reaches it through the waist like any
+        // other op — the door is the screen, not the sentence. `deleteFromPod` in folio's manifest is
+        // the same shape for the same reason.
         slash: { command: '/signin', body: 'flags' },
-        chat:  { reply: 'text', hint: 'sign in to your Solid pod' },
       },
     },
 
@@ -765,8 +769,8 @@ export const basisManifest = {
       verb:  'remove',
       params: [],
       surfaces: {
+        // No CHAT surface — see `signin`. Ending a session is the person's act.
         slash: { command: '/signout' },
-        chat:  { reply: 'text', hint: 'sign out of your pod' },
       },
     },
 

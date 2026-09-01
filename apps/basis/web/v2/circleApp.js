@@ -3259,7 +3259,7 @@ async function showFeedbackThread(bot) {
     ft.activated = true;
     const activationUrl = bot.activationUrl || FEEDBACK_ACTIVATION_URL;
     try {
-      const session = podAuth.getCurrentSession?.();
+      const session = await rawCallSkill('basis', 'whoami', {}).catch(() => null);
       if (session?.webid && activationUrl) {
         const pods = await buildFeedbackVerifyPods({ session, activationUrl, projectId: bot.projectId, code: bot.code, recoveryHash: await getOrCreateRecoveryHash(), podRef: bot.podRef });
         if (pods.podRef && pods.podRef !== bot.podRef) { try { await feedbackBotStore.add({ ...bot, podRef: pods.podRef }); } catch { /* persist best-effort */ } }
@@ -4224,9 +4224,11 @@ async function showMyData() {
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = [];
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
-  const onSignIn = () => Promise.resolve(
-    podAuth.startSignIn({ issuer: podAuth.DEFAULT_ISSUER_ID, redirectUrl: window.location.href }),
-  ).catch((e) => globalThis.alert?.(e?.message ?? 'sign-in failed'));
+  // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
+  // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
+  // same capability, and the manifest stops describing what the buttons do.
+  const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
+    .catch((e) => globalThis.alert?.(e?.message ?? 'sign-in failed'));
   // launch the existing backup/restore wizards in a modal overlay; reveal
   // the recovery phrase via the stoop `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
@@ -4397,9 +4399,10 @@ async function showMyData() {
     .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true }));
   dataLocation = loc ?? {};
   podStatus = status ?? {};
-  // Prefer the real Solid session over the (aspirational) stoop op.
-  const sess = podAuth.getCurrentSession?.();
-  if (sess?.isLoggedIn && sess.webid) {
+  // Prefer the real Solid session over the (aspirational) stoop op — read through the waist, so the
+  // panel and the `whoami` op can never disagree about whether you are signed in.
+  const sess = await rawCallSkill('basis', 'whoami', {}).catch(() => null);
+  if (sess?.signedIn && sess.webid) {
     podStatus = { signedIn: true, webid: sess.webid };
     if (circleRealPodRouting?.podRoot) dataLocation = { ...dataLocation, podRoot: circleRealPodRouting.podRoot };
   }
@@ -7717,7 +7720,8 @@ async function boot() {
     circleOwnerWebId  = podSession?.webid ?? null;
     if (typeof window !== 'undefined') {
       window.onderlingPodSession = podSession ?? null;            // debug / e2e seam
-      window.onderlingPodSignIn = (issuer) => podAuth.startSignIn({ issuer, redirectUrl: window.location.href });
+      // The e2e seam goes through the waist too, so what a test drives is what a person drives.
+      window.onderlingPodSignIn = (issuer) => rawCallSkill('basis', 'signin', issuer ? { issuer } : {});
     }
   } catch { /* not signed in → pseudo-pod */ }
 

@@ -40,7 +40,6 @@ export default function SettingsWizardModal({
   // Bundle I (2026-05-27) — pod + relay surfaces on mobile.  When
   // these are absent (older callers), the corresponding section is
   // hidden so the modal degrades gracefully.
-  podAuth,                       // { startSignIn, getCurrentSession, getRawSessionInfo, ... }
   agent,                         // { relay: { url, status, address, connect, disconnect }, vault }
   onSignOut,                     // () => Promise<void> — tears down podAuth session
 }) {
@@ -83,20 +82,31 @@ export default function SettingsWizardModal({
   }, [callSkill, state.holiday]);
 
   // ── Pod sign-in state + handlers ───────────────────────────────
-  const [podSession, setPodSession] = useState(null);  // { webid } | null
+  const [podSession, setPodSession] = useState(null);  // the `whoami` reply when signed in, else null
+  const [podCapable, setPodCapable] = useState(false);  // does this build have a pod session at all
   const [podBusy, setPodBusy]       = useState(false);
   const [podError, setPodError]     = useState(null);
   const [pickerIssuer, setPickerIssuer] = useState(KNOWN_ISSUERS[0].id);
   const [customIssuer, setCustomIssuer] = useState('');
 
+  // Through the waist: `whoami` reports the session, and the op is the only thing that knows podAuth.
+  // `ok:false` means this build has no pod-session capability, which is what the presence of a `podAuth`
+  // prop used to stand for.
   useEffect(() => {
-    if (!visible || !podAuth?.getCurrentSession) return;
-    try { setPodSession(podAuth.getCurrentSession() ?? null); }
-    catch { setPodSession(null); }
-  }, [visible, podAuth]);
+    if (!visible || typeof callSkill !== 'function') return;
+    let live = true;
+    callSkill('basis', 'whoami', {})
+      .then((r) => {
+        if (!live) return;
+        setPodCapable(r?.ok !== false);
+        setPodSession(r?.signedIn && r.webid ? r : null);
+      })
+      .catch(() => { if (live) setPodSession(null); });
+    return () => { live = false; };
+  }, [visible, callSkill]);
 
   const onPodSignIn = useCallback(async () => {
-    if (!podAuth?.startSignIn) return;
+    if (typeof callSkill !== 'function') return;
     setPodBusy(true);
     setPodError(null);
     try {
@@ -106,16 +116,16 @@ export default function SettingsWizardModal({
       if (!issuer) {
         setPodError('Please enter an issuer URL.');
       } else {
-        const result = await podAuth.startSignIn({ issuer });
+        const result = await callSkill('basis', 'signin', { issuer });
         if (result?.error) setPodError(String(result.error));
-        else setPodSession(podAuth.getCurrentSession?.() ?? null);
+        else setPodSession(await callSkill('basis', 'whoami', {}).catch(() => null));
       }
     } catch (err) {
       setPodError(err?.message ?? String(err));
     } finally {
       setPodBusy(false);
     }
-  }, [podAuth, pickerIssuer, customIssuer]);
+  }, [callSkill, pickerIssuer, customIssuer]);
 
   const onPodSignOut = useCallback(async () => {
     if (podBusy) return;
@@ -249,7 +259,7 @@ export default function SettingsWizardModal({
                   <ErrorBanner message={state.loadError} />
 
                   {/* ── Pod sign-in section ─────────────────────────── */}
-                  {podAuth ? (
+                  {podCapable ? (
                     <View style={styles.section} testID="settings-pod-section">
                       <Text style={styles.sectionHeader}>Solid pod</Text>
                       {podSession?.webid ? (

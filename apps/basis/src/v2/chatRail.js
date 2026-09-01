@@ -6,9 +6,9 @@
  * shape, id = msgId, NON-silent so the conversation shows it — with the signed statement attached at
  * `payload.statement`. One entry serves both roles: what you see, and the proof of who said it.
  *
- *   send:    whitelist the wire payload (msgId, ts, text, scope, the media pointer through the wire
+ *   send:    whitelist the wire payload (msgId, ts, text, scope, the embed card through the wire
  *            projection) → sign with the per-circle key (chained: parent + deps) → append the render
- *            entry locally (keeping LOCAL presentation fields — the full media embed, actor 'me') →
+ *            entry locally (keeping LOCAL presentation fields — the full embed card, actor 'me') →
  *            hand the STATEMENT to the fan.
  *   ingest:  verify (signature + declared kind + the key↔ref roster binding — which is also the
  *            EVICTION gate: a removed member has no roster row, so their statements stop landing) →
@@ -25,7 +25,7 @@
  */
 import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
 import { entryKindRegistryFromManifests, toEventLogItem, kindWakes } from '@onderling/item-store';
-import { mediaForCircleWire } from '@onderling/kring-host/circleBroadcast';
+import { cardForCircleWire } from '@onderling/kring-host/circleBroadcast';
 import { chatManifest, CHAT_LANE } from './chatManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
 
@@ -84,10 +84,10 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
 
   /**
    * SEND — sign the whitelisted wire payload, append the render entry locally (LOCAL presentation
-   * fields kept: the full media embed, the caller's actor label), return `{entry, statement}` for the
+   * fields kept: the full embed card, the caller's actor label), return `{entry, statement}` for the
    * fan. Returns null when no circle signer resolves.
    */
-  async function appendMessage(circleId, { msgId, ts, text, actor, scope, media, embeds, buttons } = {}) {
+  async function appendMessage(circleId, { msgId, ts, text, actor, scope, card, embeds, buttons } = {}) {
     if (typeof msgId !== 'string' || !msgId) return null;
     let identity = null;
     try { identity = await circleIdentityFor(circleId); } catch { identity = null; }
@@ -101,15 +101,15 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
       ...(embeds?.length ? { embeds } : {}),
       authorRef: myRef,
     };
-    const wireMedia = mediaForCircleWire(media);
-    if (wireMedia) wire.media = wireMedia;
+    const wireCard = cardForCircleWire(card);
+    if (wireCard) wire.card = wireCard;
     const bodies = storedStatements(circleId).map((s) => s.body);
     const parent = authorHead(bodies, identity.pubKey);
     const deps = frontier(bodies).filter((h) => h !== parent);
     const statement = signSpine(identity, { kind: 'message', circleId, subject: msgId, payload: wire, parent, deps });
-    // The LOCAL render entry keeps the caller's presentation fields (full media embed incl. sender-local
+    // The LOCAL render entry keeps the caller's presentation fields (full embed card incl. sender-local
     // bookkeeping, the local actor label) — only the WIRE copy is whitelisted, and it rides the signature.
-    const rendered = toEventLogItem({ msgId, ts: at, circleId, actor: actor ?? myRef, text, scope, media, embeds, buttons });
+    const rendered = toEventLogItem({ msgId, ts: at, circleId, actor: actor ?? myRef, text, scope, card, embeds, buttons });
     const entry = eventLog.append({ ...rendered, payload: { ...rendered.payload, statement } });
     return { entry, statement };
   }
@@ -136,8 +136,8 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
       ...(p.embeds?.length ? { embeds: p.embeds } : {}),
       authorRef: myRef,
     };
-    const wireMedia = mediaForCircleWire(p.media);
-    if (wireMedia) wire.media = wireMedia;
+    const wireCard = cardForCircleWire(p.card);
+    if (wireCard) wire.card = wireCard;
     const bodies = storedStatements(circleId).map((s) => s.body);
     const parent = authorHead(bodies, identity.pubKey);
     const deps = frontier(bodies).filter((h) => h !== parent);
@@ -202,7 +202,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
       actor: ref, senderDisplay: ref,
       text: typeof p.text === 'string' ? p.text : '',
       ...(p.scope ? { scope: p.scope } : {}),
-      ...(p.media ? { media: p.media } : {}),
+      ...(p.card ? { card: p.card } : {}),
       ...(p.embeds?.length ? { embeds: p.embeds } : {}),
     });
     const entry = eventLog.append({ ...rendered, payload: { ...rendered.payload, statement } });

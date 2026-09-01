@@ -4247,11 +4247,12 @@ export function buildSkills({
       const open = await store.listOpen({ type: 'circle-chat-message' });
       if (open.some((i) => i?.source?.msgId === msgId)) return { deduped: true };
 
-      // media — optional media-card pointer+snapshot riding the envelope
-      // (forward-additive; shape-guarded, anything else is dropped). Persisted
-      // so this peer's rehydrate + catch-up serves keep the chip.
-      const media = (payload.media && typeof payload.media === 'object' && !Array.isArray(payload.media))
-        ? payload.media : null;
+      // The embed CARD riding the envelope — a photo, an appointment, a shared item, a file.
+      // Shape-guarded only (stoop stays incurious about which variants exist; the SENDER's
+      // per-variant whitelist is the boundary that decides what may travel). Persisted so this
+      // peer's rehydrate + catch-up serves keep the card.
+      const card = (payload.card && typeof payload.card === 'object' && !Array.isArray(payload.card))
+        ? payload.card : null;
 
       const [item] = await store.addItems([{
         type:       'circle-chat-message',
@@ -4265,7 +4266,7 @@ export function buildSkills({
           fromWebid: payload.fromWebid ?? null,
           fromPubKey,
           ...(fromPeerAddr ? { fromPeerAddr } : {}),
-          ...(media ? { media } : {}),
+          ...(card ? { card } : {}),
         },
       }], {
         actor: payload.fromActor ?? payload.fromWebid ?? (fromPubKey ? `pubkey:${fromPubKey.slice(0, 12)}` : 'remote'),

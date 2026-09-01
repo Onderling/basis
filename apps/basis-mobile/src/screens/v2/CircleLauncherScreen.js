@@ -2840,15 +2840,15 @@ function CircleDetail({
   // δ.2 — fan-out helper used by both the initial send and the
   // tap-to-retry handler for failed bubbles.  Re-fires with the
   // SAME msgId so receiver-side dedup suppresses duplicates.
-  const broadcastFanOut = useCallback(({ msgId, text, ts, media }) => {
+  const broadcastFanOut = useCallback(({ msgId, text, ts, card }) => {
     // Shared fan-out (Phase 2). RAW 3-arg callSkill (app-targeted at stoop) — the 2-arg resolving one
     // arg-shifts (op→'stoop') and never delivers. The helper marks δ.2 delivery state; onChange = the
-    // RN rerender tick. `media` rides through like on web — the helper's wire whitelist projects it —
+    // RN rerender tick. The `card` rides through like on web — the helper's wire whitelist projects it —
     // so a media-carrying message fans with its embed instead of arriving as bare text. `signStatement`
     // is the chat lane's cutover hook (web parity): the appended entry is signed in place and the
     // SIGNED statement fans; no rail/circle key yet → the legacy plain envelope, honestly.
     broadcastCircleFanOut({
-      rawCallSkill, circleId: circle?.id, msgId, text, ts, media,
+      rawCallSkill, circleId: circle?.id, msgId, text, ts, card,
       deliveryStateMap: deliveryStateMapRef.current,
       onChange: () => setDeliveryTick((n) => n + 1),
       signStatement: signChatStatement,
@@ -3838,7 +3838,7 @@ function CircleDetail({
     const ts   = evt?.ts ?? Date.now();
     if (typeof text !== 'string' || !text) return;
     // Web parity: a retry re-fans the ORIGINAL message including its media embed, not a text-only copy.
-    broadcastFanOut({ msgId, text, ts, media: evt?.payload?.media });
+    broadcastFanOut({ msgId, text, ts, card: evt?.payload?.card });
   }, [eventLog, broadcastFanOut]);
 
   // Proof-of-Location: the passive placeholder row was removed 2026-06-25 (parked feature, /

@@ -15,9 +15,9 @@ import { toEventLogItem } from '@onderling/item-store';
  * Build the optimistic circle chat-message event for the local (append-only) EventLog. The same `msgId`
  * is later passed to `broadcastCircleFanOut`, so receiver-side dedup suppresses any mirrored echo.
  *
- * @param {{msgId:string, ts:number, circleId:string, actor:string, text:string, buttons?:Array, scope?:string, embeds?:Array, media?:object, provenance?:(string|{llmUsed?:boolean}), consent?:*}} a
+ * @param {{msgId:string, ts:number, circleId:string, actor:string, text:string, buttons?:Array, scope?:string, embeds?:Array, card?:object, provenance?:(string|{llmUsed?:boolean}), consent?:*}} a
  */
-export function circleChatMessageEvent({ msgId, ts, circleId, actor, text, buttons, scope, embeds, media, review, provenance, consent }) {
+export function circleChatMessageEvent({ msgId, ts, circleId, actor, text, buttons, scope, embeds, card, review, provenance, consent }) {
   // Delegate to the ONE canonical Envelope→render-event projection
   // (connectivity Phase 2 collapse). This builder is now the optimistic-local
   // caller of `toEventLogItem`: it passes the LOCAL-ONLY presentation fields
@@ -27,34 +27,54 @@ export function circleChatMessageEvent({ msgId, ts, circleId, actor, text, butto
   //   whole circle (a data property; the badge is one presentation of it). See messageScope.js.
   //   `embeds` ([{type,ref,title?}]) — cross-object references this message carries (a bot
   //   reply pointing at the task/event it just acted on); rendered as "See also" chips.
-  //   `media` — a sealed media-card embed (mediaEmbed.js shape: {kind:'media-card',
-  //   pointer:{type:'media',ref}, snapshot, ...}); the bubble renders it as the photo chip.
+  //   `card` — ONE embed card riding this message: a photo (`media-card`), an appointment
+  //   (`time-card`), a shared item (`item-card`), a file (`file-card`). The bubble renders whichever
+  //   variant it is through the same shared card renderer. It was called `media` while a photo was the
+  //   only kind that could ride a message, and the name then did real damage: `mediaForCircleWire`
+  //   returned null for every other variant, so a card put on it rendered locally and was SILENTLY
+  //   dropped at the fan-out — the receiving device saw a message with no card and nothing said so.
   //   `review` — a structured Stage-1 feedback review ({intro, points, labels}); rendered as
   //   editable per-point cards. Private by construction (scope 'self'), never fans out.
   //   `provenance` / `consent` — bot-bubble presentation markers; local-only, never fanned out.
-  return toEventLogItem({ msgId, ts, circleId, actor, text, buttons, scope, embeds, media, review, provenance, consent });
+  return toEventLogItem({ msgId, ts, circleId, actor, text, buttons, scope, embeds, card, review, provenance, consent });
 }
 
 /**
- * Project a media-card embed onto its WIRE shape — the explicit whitelist of what may
- * leave this device on the circle fan-out envelope. Everything the peer's chip needs
- * (the pointer + the canonical media-item snapshot with its SEALED manifest line) is
- * kept; anything else — sender-local bookkeeping (`stored`), device paths, cached
- * data-URLs, whatever a future caller straps on — is dropped HERE, at the boundary
+ * The snapshot fields each card VARIANT may put on the wire. A whitelist per variant, not one union:
+ * the point of the list is that a caller cannot widen it by accident, and a union would let a photo's
+ * fields ride an appointment. Absent stays absent; anything not named here is dropped at the boundary
  * (the stoop Phase-39 lesson: local-only fields must never ride a fan-out).
- *
- * The kept payload is circle-safe by construction: `pointer.ref`/`itemRef` are opaque
- * URNs, `snapshot.source` is blob-gateway's manifest line (opaque `blob://` bucket key +
- * `enc` sealing metadata whose `keyRef` POINTS at the circle key the peers already hold;
- * the inline `thumb` is a SEALED envelope, never plaintext).
- *
- * Returns `null` for anything that isn't a media-card-shaped object (the fan-out then
- * simply omits the field — legacy wire shape, byte-identical).
  */
-export function mediaForCircleWire(embed) {
+const CARD_SNAPSHOT_FIELDS = Object.freeze({
+  // A photo: the canonical `media` item fields (@onderling/item-types) + the manifest line (below).
+  'media-card': ['type', 'id', 'createdAt', 'createdBy', 'mime', 'width', 'height', 'caption'],
+  // An appointment, as `createTimeEmbed` builds it from the calendar's own snapshot.
+  'time-card':  ['type', 'id', 'title', 'startAt', 'endAt', 'timezone', 'location', 'fields'],
+  // A shared existing item (a task, a post) — the card the receiver renders and can act on.
+  'item-card':  ['type', 'id', 'title', 'status', 'assignee', 'dueAt', 'fields'],
+  // A file, by reference. The bytes are not here; `source` carries the sealed manifest line.
+  'file-card':  ['type', 'id', 'name', 'mime', 'size', 'createdAt', 'createdBy'],
+});
+
+/**
+ * Project an embed card onto its WIRE shape — the explicit whitelist of what may leave this device on
+ * the circle fan-out envelope. Everything the peer's chip needs is kept; sender-local bookkeeping
+ * (`stored`), device paths, cached data-URLs, whatever a future caller straps on, is dropped HERE.
+ *
+ * The kept payload is circle-safe by construction: `pointer.ref`/`itemRef` are opaque URNs,
+ * `snapshot.source` is blob-gateway's manifest line (opaque `blob://` bucket key + `enc` sealing
+ * metadata whose `keyRef` POINTS at the circle key the peers already hold; the inline `thumb` is a
+ * SEALED envelope, never plaintext).
+ *
+ * Returns `null` for an unknown variant — fail closed, and the fan-out then omits the field. That is
+ * the right default and it had a cost worth remembering: while this function knew only `media-card`,
+ * an appointment card rendered on the sender's screen and never reached anybody else, silently.
+ */
+export function cardForCircleWire(embed) {
   if (!embed || typeof embed !== 'object' || Array.isArray(embed)) return null;
-  if (embed.kind !== 'media-card') return null;
-  const out = { kind: 'media-card' };
+  const fields = CARD_SNAPSHOT_FIELDS[embed.kind];
+  if (!fields) return null;
+  const out = { kind: embed.kind };
   if (typeof embed.appOrigin === 'string') out.appOrigin = embed.appOrigin;
   if (embed.itemRef && typeof embed.itemRef === 'object') {
     out.itemRef = pickFields(embed.itemRef, ['app', 'type', 'id']);
@@ -63,10 +83,7 @@ export function mediaForCircleWire(embed) {
     out.pointer = pickFields(embed.pointer, ['type', 'ref']);
   }
   if (embed.snapshot && typeof embed.snapshot === 'object') {
-    // The canonical `media` item fields (@onderling/item-types) + the manifest line.
-    const snap = pickFields(embed.snapshot, [
-      'type', 'id', 'createdAt', 'createdBy', 'mime', 'width', 'height', 'caption',
-    ]);
+    const snap = pickFields(embed.snapshot, fields);
     if (embed.snapshot.source && typeof embed.snapshot.source === 'object') {
       snap.source = pickFields(embed.snapshot.source, ['type', 'ref', 'enc']);
     }
@@ -97,10 +114,10 @@ function pickFields(src, names) {
  * @param {string} a.msgId
  * @param {string} a.text
  * @param {number} a.ts
- * @param {object} [a.media]        optional media-card embed riding the message; projected
- *                                  through `mediaForCircleWire` (whitelist) before it touches
- *                                  the wire. Absent → the envelope is byte-identical to the
- *                                  pre-media shape (forward-additive; legacy receivers ignore).
+ * @param {object} [a.card]         optional embed card riding the message (photo · appointment · item ·
+ *                                  file). The RAIL projects it through `cardForCircleWire` (the
+ *                                  per-variant whitelist) when it signs the statement; this function
+ *                                  only carries it so callers pass one thing, not two.
  * @param {{set:(id:string, state:string|null)=>void}} a.deliveryStateMap
  * @param {()=>void} [a.onChange]   rerender hook fired on each state transition
  * @returns {Promise<void>}
@@ -130,7 +147,7 @@ export function classifyFanOut(r) {
   return 'undeliverable';                         // all permanent
 }
 
-export function broadcastCircleFanOut({ rawCallSkill, circleId, msgId, text, ts, media, deliveryStateMap, onChange, signStatement = null }) {
+export function broadcastCircleFanOut({ rawCallSkill, circleId, msgId, text, ts, card, deliveryStateMap, onChange, signStatement = null }) {
   if (typeof rawCallSkill !== 'function') return Promise.resolve();
   const mark = (state) => { deliveryStateMap.set(msgId, state); onChange?.(); };
   mark('pending');

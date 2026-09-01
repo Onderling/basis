@@ -54,28 +54,52 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
     });
   });
 
-  /* ── media fan-out — optional media field, forward-additive ── */
+  /* ── the embed card riding a message — any variant, not only a photo ── */
 
-  it('lands an envelope media-card on payload.media (the receiver chip path)', async () => {
+  it('lands an envelope card on payload.card (the receiver chip path)', async () => {
     const eventLog = fakeEventLog();
     const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
-    const media = {
+    const card = {
       kind: 'media-card', pointer: { type: 'media', ref: 'urn:dec:item:m9' },
       snapshot: { type: 'media', id: 'm9', source: { type: 'blob', ref: 'blob://k', enc: { sealed: true, thumb: 'fp1:sealed' } } },
     };
-    const r = await inbox.ingestChatMessage(envelope({ media }), { source: 'receiver', fromPeerAddr: 'nkn-anne' });
+    const r = await inbox.ingestChatMessage(envelope({ card }), { source: 'receiver', fromPeerAddr: 'nkn-anne' });
     expect(r).toEqual({ result: 'inserted' });
-    expect(eventLog.events[0].payload.media).toEqual(media);
-    // The rest of the payload is unchanged by the media ride-along.
+    expect(eventLog.events[0].payload.card).toEqual(card);
+    // The rest of the payload is unchanged by the card ride-along.
     expect(eventLog.events[0].payload.text).toBe('Hoi circle!');
     expect(eventLog.events[0].payload.kind).toBe('chat-message');
   });
 
-  it('an envelope WITHOUT media appends a payload with NO media key (legacy render pin)', async () => {
+  it('accepts EVERY card variant, not only a photo — the receiver does not police the kinds', async () => {
+    // The drop this pins: the gate used to insist on `media-card`, so an appointment that survived the
+    // sender's per-variant whitelist was discarded here, on arrival, with nothing said. Which kinds may
+    // travel is the SENDER's boundary to decide (`cardForCircleWire`); the receiver's job is to accept
+    // a card-shaped thing and let the renderer paint whichever variant it is.
+    const eventLog = fakeEventLog();
+    const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
+    const appointment = {
+      kind: 'time-card', appOrigin: 'calendar',
+      itemRef: { app: 'calendar', type: 'calendar-event', id: 'evt-2' },
+      snapshot: { id: 'evt-2', type: 'calendar-event', title: 'Koffie', startAt: '2026-09-02T09:00:00.000Z' },
+    };
+    await inbox.ingestChatMessage(envelope({ card: appointment, msgId: 'm-time' }), { source: 'receiver' });
+    expect(eventLog.events[0].payload.card).toEqual(appointment);
+  });
+
+  it('a NON-card object on the envelope is dropped, and the message still lands', async () => {
+    const eventLog = fakeEventLog();
+    const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
+    await inbox.ingestChatMessage(envelope({ card: { kind: 'not-a-thing' }, msgId: 'm-junk' }), { source: 'receiver' });
+    expect(eventLog.events[0].payload).not.toHaveProperty('card');
+    expect(eventLog.events[0].payload.text).toBe('Hoi circle!');
+  });
+
+  it('an envelope WITHOUT a card appends a payload with NO card key (render pin)', async () => {
     const eventLog = fakeEventLog();
     const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
     await inbox.ingestChatMessage(envelope(), { source: 'receiver' });
-    expect(eventLog.events[0].payload).not.toHaveProperty('media');
+    expect(eventLog.events[0].payload).not.toHaveProperty('card');
   });
 
   it('drops a malformed media field but keeps the MESSAGE (text still lands)', async () => {

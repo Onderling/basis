@@ -10,9 +10,9 @@ import { dirname, join } from 'node:path';
 //    no resolveRef, no receipts, a SECOND dedup domain that could double-render against catch-up.
 //    Nothing ever reached it; it is deleted, and this test fails if a screen grows an inbox again.
 //
-// 2. The media fan is a WEB ≡ MOBILE agreement. Both shells call the SAME shared fan helper; web
-//    threads the message's `media` embed through and mobile silently dropped it, so a media message
-//    fanned from mobile would arrive as bare text. Both sides must thread `media` — this reads both
+// 2. The card fan is a WEB ≡ MOBILE agreement. Both shells call the SAME shared fan helper; web
+//    threads the message's `card` embed through and mobile silently dropped it, so a message with a card
+//    fanned from mobile would arrive as bare text. Both sides must thread `card` — this reads both
 //    sources and holds them to it (pin the agreement, not either value).
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,7 +23,7 @@ const launcher   = read('../src/screens/v2/CircleLauncherScreen.js');
 const appJs      = read('../App.js');
 const webShell   = read('../../basis/web/v2/circleApp.js');
 
-describe('circle chat — one inbox, media-fan parity (web ≡ mobile)', () => {
+describe('circle chat — one inbox, card-fan parity (web ≡ mobile)', () => {
   it('no screen constructs its own chat inbox — the App.js singleton is the only one', () => {
     expect(chatScreen).not.toMatch(/createChatMessageInbox\s*\(/);
     expect(launcher).not.toMatch(/createChatMessageInbox\s*\(/);
@@ -44,15 +44,15 @@ describe('circle chat — one inbox, media-fan parity (web ≡ mobile)', () => {
     }
   });
 
-  it('BOTH shells thread `media` through the shared circle fan helper', () => {
-    // The agreement: the shared broadcastCircleFanOut receives the media embed on both platforms.
+  it('BOTH shells thread `card` through the shared circle fan helper', () => {
+    // The agreement: the shared broadcastCircleFanOut receives the embed card on both platforms.
     const mobileFan = launcher.slice(launcher.indexOf('broadcastCircleFanOut({'));
-    expect(mobileFan.slice(0, 300)).toMatch(/\bmedia\b/);
+    expect(mobileFan.slice(0, 300)).toMatch(/\bcard\b/);
     const webFanIdx = webShell.indexOf('broadcastCircleFanOut({');
     expect(webFanIdx).toBeGreaterThan(-1);
-    expect(webShell.slice(webFanIdx, webFanIdx + 300)).toMatch(/\bmedia\b/);
-    // And the mobile retry re-fans the ORIGINAL media, exactly like web's retry.
-    expect(launcher).toMatch(/broadcastFanOut\(\{\s*msgId,\s*text,\s*ts,\s*media/);
-    expect(webShell).toMatch(/broadcastFanOut\(\{\s*msgId,\s*text,\s*ts,\s*media/);
+    expect(webShell.slice(webFanIdx, webFanIdx + 300)).toMatch(/\bcard\b/);
+    // And the mobile retry re-fans the ORIGINAL card, exactly like web's retry.
+    expect(launcher).toMatch(/broadcastFanOut\(\{\s*msgId,\s*text,\s*ts,\s*card/);
+    expect(webShell).toMatch(/broadcastFanOut\(\{\s*msgId,\s*text,\s*ts,\s*card/);
   });
 });

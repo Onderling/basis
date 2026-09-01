@@ -5940,10 +5940,10 @@ function showCircle(id, circle, policy) {
     // Local append keeps the FULL embed (incl. `stored`); the fan-out's wire copy is
     // whitelist-projected inside broadcastCircleFanOut.
     eventLog.append(circleChatMessageEvent({
-      msgId, ts, circleId: id, actor: LOCAL_ACTOR, text, scope: 'circle', media: embed,
+      msgId, ts, circleId: id, actor: LOCAL_ACTOR, text, scope: 'circle', card: embed,
     }));
     rerender();
-    broadcastFanOut({ msgId, text, ts, media: embed });
+    broadcastFanOut({ msgId, text, ts, card: embed });
   }
   let noticeboardPosts = [];
   let noticeboardIntent = 'ask';
@@ -6259,12 +6259,12 @@ function showCircle(id, circle, policy) {
   // msgId on retry so receiver-side dedup suppresses any duplicate
   // delivery (the EventLog already idempotents on id).
   // `media` (optional) — the media-card embed; kring-host whitelists it onto the wire.
-  function broadcastFanOut({ msgId, text, ts, media }) {
+  function broadcastFanOut({ msgId, text, ts, card }) {
     // Shared fan-out (Phase 2); onChange = web's rerender. `signStatement` is the chat lane's cutover
     // hook: the already-appended entry is signed in place and the SIGNED statement fans (receivers
     // verify at their rail); without a rail/circle key the legacy plain envelope goes, honestly.
     broadcastCircleFanOut({
-      rawCallSkill, circleId: id, msgId, text, ts, media, deliveryStateMap, onChange: rerender,
+      rawCallSkill, circleId: id, msgId, text, ts, card, deliveryStateMap, onChange: rerender,
       signStatement: (cid, mid) => _peerAgent?.chatRail?.signEntry?.(cid, mid) ?? null,
     });
   }
@@ -6472,7 +6472,7 @@ function showCircle(id, circle, policy) {
         const text = evt?.payload?.text;
         const ts   = evt?.ts ?? Date.now();
         if (typeof text !== 'string' || !text) return;
-        broadcastFanOut({ msgId, text, ts, media: evt?.payload?.media });
+        broadcastFanOut({ msgId, text, ts, card: evt?.payload?.card });
       },
       onViewMode: (mode) => {
         if (mode !== 'chat' && mode !== 'screen') return;
@@ -6789,7 +6789,7 @@ function showCircle(id, circle, policy) {
         const evt = eventLog.query({ excludeMuted: true }).find((e) => e.id === retryId);
         const text = evt?.payload?.text;
         if (typeof text !== 'string' || !text) return;
-        broadcastFanOut({ msgId: retryId, text, ts: evt?.ts ?? Date.now(), media: evt?.payload?.media });
+        broadcastFanOut({ msgId: retryId, text, ts: evt?.ts ?? Date.now(), card: evt?.payload?.card });
       },
     }),
     // Profile-update propagation — the PULL half: re-read this circle's roster rows (the same op

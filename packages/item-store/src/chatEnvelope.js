@@ -10,7 +10,7 @@
  *      — built by hand in `kring-host/circleChatMessageEvent` (optimistic local append),
  *        `basis chatMessageInbox` (received append), and `basis circleChatRehydrate` (legacy insert).
  *   2. the peer fan-out WIRE envelope
- *        `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
+ *        `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, card? }`
  *      — built by hand in `stoop broadcastCircleMessage`.
  *   3. the durable itemStore item's `source` (persisted by `stoop broadcastCircleMessage`/`ingestCircleMessage`),
  *      later RESHAPED back to the wire/inbox shape by hand in `stoop getMessagesSince`
@@ -27,7 +27,7 @@
  *     author   = the sender ("fromActor" / "fromWebid")
  *     kind     = the message subtype (circle chat → 'circle-chat-message')
  *     body     = the text
- *     extras   = everything else a projection may carry (media, senderDisplay,
+ *     extras   = everything else a projection may carry (card, senderDisplay,
  *                fromWebid/fromPubKey/fromPeerAddr, and the LOCAL-ONLY
  *                presentation fields buttons/scope/embeds/review/provenance/
  *                consent that must NEVER ride the wire).
@@ -47,7 +47,7 @@ export const CIRCLE_CHAT_KIND = 'circle-chat-message';
 /**
  * `fromItem` — project a durable itemStore `circle-chat-message` item onto the
  * WIRE/inbox chat envelope shape that `chatMessageInbox.ingestChatMessage`
- * consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, media? }`.
+ * consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, card? }`.
  *
  * This replaces the two hand-maintained reshapers that read a stored item's
  * `source` and re-emit the envelope — `stoop getMessagesSince`'s `.map(...)`
@@ -65,7 +65,7 @@ export const CIRCLE_CHAT_KIND = 'circle-chat-message';
  *
  * @param {{id?:string, text?:string, source?:object}} item
  * @param {{groupId?:string|null, lenient?:boolean}} [opts]
- * @returns {{subtype:string, circleId:string, msgId:string, ts:number, text:string, fromActor:(string|null), media?:object} | null}
+ * @returns {{subtype:string, circleId:string, msgId:string, ts:number, text:string, fromActor:(string|null), card?:object} | null}
  */
 export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = false } = {}) {
   const src = item?.source && typeof item.source === 'object' ? item.source : null;
@@ -77,7 +77,7 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
     const ts       = src.ts;
     const text     = item?.text ?? '';
     const fromActor = src.fromActor ?? src.fromWebid ?? null;
-    const media = isMediaObject(src.media) ? src.media : null;
+    const card = isCardObject(src.card) ? src.card : null;
     return {
       subtype: CIRCLE_CHAT_KIND,
       circleId,
@@ -85,7 +85,7 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
       ts,
       text,
       fromActor,
-      ...(media ? { media } : {}),
+      ...(card ? { card } : {}),
     };
   }
 
@@ -97,7 +97,7 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
   if (typeof msgId    !== 'string' || !msgId)    return null;
   if (typeof circleId !== 'string' || !circleId) return null;
   if (typeof text     !== 'string' || !text)     return null;
-  const media = isMediaObject(src.media) ? src.media : null;
+  const card = isCardObject(src.card) ? src.card : null;
   return {
     subtype: CIRCLE_CHAT_KIND,
     circleId,
@@ -105,7 +105,7 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
     ts,
     text,
     fromActor: src.fromActor ?? src.fromWebid ?? null,
-    ...(media ? { media } : {}),
+    ...(card ? { card } : {}),
   };
 }
 
@@ -118,7 +118,7 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
  *     the LOCAL-ONLY presentation fields (buttons/scope/embeds/review/
  *     provenance/consent) and NO `senderDisplay`;
  *   - the received append (`basis chatMessageInbox`) — passes `senderDisplay`
- *     + an already-guarded `media`;
+ *     + an already-guarded `card`;
  *   - the rehydrate legacy append (`basis circleChatRehydrate`) — passes only
  *     `senderDisplay`.
  *
@@ -139,14 +139,14 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
  * @param {Array}  [a.buttons]
  * @param {string} [a.scope]
  * @param {Array}  [a.embeds]
- * @param {object} [a.media]
+ * @param {object} [a.card]
  * @param {object} [a.review]
  * @param {(string|object)} [a.provenance]
  * @param {*}      [a.consent]
  */
 export function toEventLogItem({
   msgId, ts, circleId, actor, text,
-  senderDisplay, buttons, scope, embeds, media, review, provenance, consent,
+  senderDisplay, buttons, scope, embeds, card, review, provenance, consent,
 }) {
   return {
     id: msgId, ts, app: 'circle', type: 'chat-message', actor,
@@ -160,7 +160,7 @@ export function toEventLogItem({
       ...(buttons?.length ? { buttons } : {}),
       ...(scope ? { scope } : {}),
       ...(embeds?.length ? { embeds } : {}),
-      ...(media ? { media } : {}),
+      ...(card ? { card } : {}),
       ...(review ? { review } : {}),
       ...(provenance != null ? { provenance } : {}),
       ...(consent != null ? { consent } : {}),
@@ -187,7 +187,7 @@ export function fromEventLogItem(evt) {
   if (p.buttons?.length) out.buttons = p.buttons;
   if (p.scope) out.scope = p.scope;
   if (p.embeds?.length) out.embeds = p.embeds;
-  if (p.media) out.media = p.media;
+  if (p.card) out.card = p.card;
   if (p.review) out.review = p.review;
   if (p.provenance != null) out.provenance = p.provenance;
   if (p.consent != null) out.consent = p.consent;
@@ -198,14 +198,14 @@ export function fromEventLogItem(evt) {
  * `toWire` — project the canonical fields onto the peer fan-out WIRE
  * envelope that `stoop broadcastCircleMessage` sends over the reliable
  * transport:
- *   `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
+ *   `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, card? }`
  *
- * The media wire-allowlist (`kring-host mediaForCircleWire`) runs UPSTREAM
+ * The card wire-allowlist (`kring-host cardForCircleWire`) runs UPSTREAM
  * inside `broadcastCircleFanOut` before the pointer reaches this projection,
- * so `media` here is already the whitelisted, circle-safe shape (sender-local
+ * so `card` here is already the whitelisted, circle-safe shape (sender-local
  * fields such as `stored` / device paths already dropped). This projector
  * only re-emits it; it never re-admits a raw embed. Absent → byte-identical
- * to the pre-media wire shape (legacy receivers ignore an unknown field
+ * to the pre-card wire shape (legacy receivers ignore an unknown field
  * either way).
  *
  * @param {object} a
@@ -215,13 +215,13 @@ export function fromEventLogItem(evt) {
  * @param {string} a.text
  * @param {(string|null)} a.fromActor
  * @param {(string|null)} a.fromWebid
- * @param {object} [a.media]  already wire-whitelisted
+ * @param {object} [a.card]  already wire-whitelisted
  */
-export function toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid, media }) {
+export function toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid, card }) {
   return {
     type: 'p2p-chat', subtype: CIRCLE_CHAT_KIND,
     circleId, msgId, ts, text, fromActor, fromWebid,
-    ...(media && typeof media === 'object' && !Array.isArray(media) ? { media } : {}),
+    ...(card && typeof card === 'object' && !Array.isArray(card) ? { card } : {}),
   };
 }
 
@@ -237,7 +237,7 @@ export function toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid
  *
  * It is the byte-for-byte sibling of `toWireEnvelope` with `text` replaced by
  * `ref`: same `{ type, subtype, circleId, msgId, ts, fromActor, fromWebid,
- * media? }` frame, no `text` field. `ref` is an opaque string (a pod row
+ * card? }` frame, no `text` field. `ref` is an opaque string (a pod row
  * pointer); this projector neither interprets nor resolves it.
  *
  * NOTE (honest degrade): the live send path degrades pod-signal to a
@@ -252,15 +252,15 @@ export function toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid
  * @param {string} a.ref                  opaque pod-row pointer (replaces the body)
  * @param {(string|null)} a.fromActor
  * @param {(string|null)} a.fromWebid
- * @param {object} [a.media]              already wire-whitelisted (unchanged from toWireEnvelope)
+ * @param {object} [a.card]               already wire-whitelisted (unchanged from toWireEnvelope)
  */
-export function toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, media, subtype }) {
+export function toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, card, subtype }) {
   return {
     // `subtype` rides through so a ref points its RESOLVER at the right receive path: a signed-statement
     // row's ref routes to the chat rail (verify-then-render), the legacy kind to the legacy inbox.
     type: 'p2p-chat', subtype: subtype ?? CIRCLE_CHAT_KIND,
     circleId, msgId, ts, ref, fromActor, fromWebid,
-    ...(media && typeof media === 'object' && !Array.isArray(media) ? { media } : {}),
+    ...(card && typeof card === 'object' && !Array.isArray(card) ? { card } : {}),
   };
 }
 
@@ -271,7 +271,7 @@ export function toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWeb
  * ref-shaped wire envelope (missing `ref`).
  *
  * @param {object} env
- * @returns {{circleId:string, msgId:string, ts:number, ref:string, fromActor:(string|null), fromWebid:(string|null), media?:object} | null}
+ * @returns {{circleId:string, msgId:string, ts:number, ref:string, fromActor:(string|null), fromWebid:(string|null), card?:object} | null}
  */
 export function fromWireRefEnvelope(env) {
   if (!env || typeof env !== 'object') return null;
@@ -284,7 +284,7 @@ export function fromWireRefEnvelope(env) {
     fromActor: env.fromActor ?? null,
     fromWebid: env.fromWebid ?? null,
   };
-  if (isMediaObject(env.media)) out.media = env.media;
+  if (isCardObject(env.card)) out.card = env.card;
   return out;
 }
 
@@ -298,7 +298,7 @@ export function isRefEnvelope(env) {
   return !!env && typeof env === 'object' && typeof env.ref === 'string' && env.ref.length > 0;
 }
 
-/** A media-card-shaped object (never an array, never a primitive). */
-function isMediaObject(m) {
+/** A card-shaped object (never an array, never a primitive). */
+function isCardObject(m) {
   return !!m && typeof m === 'object' && !Array.isArray(m);
 }

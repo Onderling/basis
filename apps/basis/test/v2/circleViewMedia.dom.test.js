@@ -69,12 +69,12 @@ function mount() {
   return el;
 }
 
-/** A chat-message row carrying the media embed on its payload — the exact shape
- *  circleApp's circleAttachMedia appends (circleChatMessageEvent + payload.media). */
+/** A chat-message row carrying the embed CARD on its payload — the exact shape
+ *  circleApp's circleAttachMedia appends (circleChatMessageEvent + payload.card). */
 function mediaRow(embed, { id = 'm-1', text = '📷 photo.jpg' } = {}) {
   return {
     id, ts: Date.now(), app: 'circle', type: 'chat-message', actor: ACTOR, circleId: CIRCLE.id,
-    event: { id, type: 'chat-message', payload: { circleId: CIRCLE.id, kind: 'chat-message', text, scope: 'circle', media: embed } },
+    event: { id, type: 'chat-message', payload: { circleId: CIRCLE.id, kind: 'chat-message', text, scope: 'circle', card: embed } },
   };
 }
 
@@ -133,7 +133,7 @@ describe('circle composer — the attach affordance', () => {
   });
 });
 
-describe('the live path — pick → sealed upload → payload.media → chip → gated full image', () => {
+describe('the live path — pick → sealed upload → payload.card → chip → gated full image', () => {
   it('walks the wiring end-to-end with the dev bucket + a real group-key strategy', async () => {
     const bucket = makeDevMediaBucket();
     const comp = await createCircleMediaGateway({

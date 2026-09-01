@@ -146,23 +146,23 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
     });
   });
 
-  it('carries a stored source.media onto the envelope — absent stays absent (media P1)', async () => {
+  it('carries a stored source.card onto the envelope — absent stays absent', async () => {
     const inboxCalls = [];
     const inbox = {
       ingestChatMessage: vi.fn(async (env, opts) => { inboxCalls.push({ env, opts }); return { result: 'inserted' }; }),
     };
-    const media = {
+    const card = {
       kind: 'media-card', pointer: { type: 'media', ref: 'urn:dec:item:mr' },
       snapshot: { type: 'media', id: 'mr', source: { type: 'blob', ref: 'blob://kr', enc: { sealed: true } } },
     };
     const callSkill = vi.fn(async () => ({ items: [
       item({ msgId: 'plain', text: 'hoi', ts: 1 }),
-      item({ msgId: 'photo', text: '📷 photo.jpg', ts: 2, source: { media } }),
+      item({ msgId: 'photo', text: '📷 photo.jpg', ts: 2, source: { card } }),
     ] }));
     const r = await rehydrateCircleChatsFromStoop({ callSkill, inbox, logger: silentLogger });
     expect(r.rehydrated).toBe(2);
-    expect(inboxCalls[0].env).not.toHaveProperty('media');   // legacy item → legacy envelope
-    expect(inboxCalls[1].env.media).toEqual(media);          // chip survives the reload
+    expect(inboxCalls[0].env).not.toHaveProperty('card');    // a plain message → no card key
+    expect(inboxCalls[1].env.card).toEqual(card);            // the card survives the reload
   });
 
   it('counts inbox-deduped items as skipped (not rehydrated)', async () => {

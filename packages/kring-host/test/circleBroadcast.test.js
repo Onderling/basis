@@ -6,7 +6,7 @@
 // unconfirmed message is `maybe-received`.
 
 import { describe, it, expect, vi } from 'vitest';
-import { circleChatMessageEvent, broadcastCircleFanOut, classifyFanOut, mediaForCircleWire } from '../src/circleBroadcast.js';
+import { circleChatMessageEvent, broadcastCircleFanOut, classifyFanOut, cardForCircleWire } from '../src/circleBroadcast.js';
 
 const mapOf = () => {
   const m = new Map();
@@ -25,14 +25,14 @@ describe('circleChatMessageEvent', () => {
     expect(withBtns.payload.buttons).toEqual([{ id: 'a', label: 'A' }]);
     expect(circleChatMessageEvent({ msgId: 'm', ts: 1, circleId: 'c', actor: 'bot', text: 't', buttons: [] }).payload).not.toHaveProperty('buttons');
   });
-  it('includes media only when present (media P1 — the local chip payload)', () => {
+  it('includes the embed card only when present (the local chip payload)', () => {
     const embed = { kind: 'media-card', pointer: { type: 'media', ref: 'urn:dec:item:x' }, snapshot: { type: 'media', id: 'x' }, stored: false };
-    expect(circleChatMessageEvent({ msgId: 'm', ts: 1, circleId: 'c', actor: 'me', text: 't', media: embed }).payload.media).toBe(embed);
-    expect(circleChatMessageEvent({ msgId: 'm', ts: 1, circleId: 'c', actor: 'me', text: 't' }).payload).not.toHaveProperty('media');
+    expect(circleChatMessageEvent({ msgId: 'm', ts: 1, circleId: 'c', actor: 'me', text: 't', card: embed }).payload.card).toBe(embed);
+    expect(circleChatMessageEvent({ msgId: 'm', ts: 1, circleId: 'c', actor: 'me', text: 't' }).payload).not.toHaveProperty('card');
   });
 });
 
-describe('mediaForCircleWire — the wire-boundary whitelist (media P1 fan-out)', () => {
+describe('cardForCircleWire — the wire-boundary whitelist, per card variant', () => {
   const fullEmbed = () => ({
     kind:      'media-card',
     appOrigin: 'basis',
@@ -48,7 +48,7 @@ describe('mediaForCircleWire — the wire-boundary whitelist (media P1 fan-out)'
   });
 
   it('keeps exactly what the peer chip needs — pointer, itemRef, snapshot (incl. the sealed manifest line), issuedBy', () => {
-    const wire = mediaForCircleWire(fullEmbed());
+    const wire = cardForCircleWire(fullEmbed());
     expect(wire).toEqual({
       kind:      'media-card',
       appOrigin: 'basis',
@@ -74,7 +74,7 @@ describe('mediaForCircleWire — the wire-boundary whitelist (media P1 fan-out)'
     embed.itemRef.devicePath = 'file:///tmp/photo.jpg';
     embed.snapshot.localFile = '/home/me/Pictures/photo.jpg';
     embed.snapshot.source.bucketCreds = 'AKIA-secret';
-    const wire = mediaForCircleWire(embed);
+    const wire = cardForCircleWire(embed);
     const json = JSON.stringify(wire);
     expect(json).not.toContain('localPath');
     expect(json).not.toContain('/data/user/0');
@@ -87,13 +87,44 @@ describe('mediaForCircleWire — the wire-boundary whitelist (media P1 fan-out)'
     expect(json).not.toContain('AKIA-secret');
   });
 
-  it('absent fields stay absent (never null-filled) and non-media-card input maps to null', () => {
-    const minimal = mediaForCircleWire({ kind: 'media-card' });
+  it('absent fields stay absent (never null-filled), and an UNKNOWN variant maps to null', () => {
+    const minimal = cardForCircleWire({ kind: 'media-card' });
     expect(minimal).toEqual({ kind: 'media-card' });
-    expect(mediaForCircleWire(null)).toBeNull();
-    expect(mediaForCircleWire('📷')).toBeNull();
-    expect(mediaForCircleWire([])).toBeNull();
-    expect(mediaForCircleWire({ kind: 'file-card', path: '/tmp/x' })).toBeNull();
+    expect(cardForCircleWire(null)).toBeNull();
+    expect(cardForCircleWire('📷')).toBeNull();
+    expect(cardForCircleWire([])).toBeNull();
+    expect(cardForCircleWire({ kind: 'something-new' }), 'fail closed on a variant nobody declared').toBeNull();
+  });
+
+  it('carries the OTHER card variants — an appointment reaches the peer, which it did not before', () => {
+    // The bug this test exists for: while the whitelist knew only `media-card`, an appointment card
+    // rendered on the sender's screen and was dropped here, silently, so the second device saw a
+    // message with no card and nothing said so. One variant per line, each with its own field list.
+    const time = cardForCircleWire({
+      kind: 'time-card', appOrigin: 'calendar',
+      itemRef: { app: 'calendar', type: 'calendar-event', id: 'evt-1' },
+      snapshot: { id: 'evt-1', type: 'calendar-event', title: 'Koffie', startAt: '2026-09-02T09:00:00.000Z', endAt: '2026-09-02T10:00:00.000Z', timezone: 'UTC', location: 'Westend' },
+      issuedBy: 'me',
+      localDraft: 'never leaves',            // a local-only strap-on, dropped like any other
+    });
+    expect(time.kind).toBe('time-card');
+    expect(time.snapshot).toEqual({
+      id: 'evt-1', type: 'calendar-event', title: 'Koffie',
+      startAt: '2026-09-02T09:00:00.000Z', endAt: '2026-09-02T10:00:00.000Z', timezone: 'UTC', location: 'Westend',
+    });
+    expect(JSON.stringify(time)).not.toContain('never leaves');
+
+    const item = cardForCircleWire({
+      kind: 'item-card', appOrigin: 'tasks',
+      itemRef: { app: 'tasks', type: 'task', id: 't-9' },
+      snapshot: { id: 't-9', type: 'task', title: 'Afwas', status: 'open', assignee: 'me', devicePath: '/tmp/x' },
+    });
+    expect(item.snapshot).toEqual({ id: 't-9', type: 'task', title: 'Afwas', status: 'open', assignee: 'me' });
+
+    const file = cardForCircleWire({
+      kind: 'file-card', snapshot: { id: 'f-1', type: 'file', name: 'plan.pdf', mime: 'application/pdf', size: 12, secretPath: '/home/me' },
+    });
+    expect(file.snapshot).toEqual({ id: 'f-1', type: 'file', name: 'plan.pdf', mime: 'application/pdf', size: 12 });
   });
 });
 

@@ -963,15 +963,17 @@ function renderBubble(row, {
     }
   }
 
-  // media — a message carrying a sealed media-card embed (payload.media, set by the
-  // host's attach path) renders the chip via the EXISTING shared domAdapter branch.
-  // `media.opener` opens the line's sealed inline thumbnail; no opener (or a wrong key)
-  // → the chip's mime/dims placeholder. Best-effort: a chip failure never eats the bubble.
-  const mediaEmbed = row.event?.payload?.media;
-  if (mediaEmbed && mediaEmbed.kind === 'media-card') {
+  // A message carrying an embed CARD (`payload.card`) renders it through the shared domAdapter
+  // branch, which already knows every variant: a photo (`media-card`), an appointment (`time-card`),
+  // a shared item (`item-card`), a file (`file-card`). This used to test `kind === 'media-card'`
+  // explicitly, so the other three rendered as nothing — the adapter could paint them all along.
+  // `media.opener` opens a photo's sealed inline thumbnail; no opener (or a wrong key) → the chip's
+  // placeholder. Best-effort: a chip failure never eats the bubble.
+  const cardEmbed = row.event?.payload?.card;
+  if (cardEmbed && typeof cardEmbed.kind === 'string' && cardEmbed.kind.endsWith('-card')) {
     try {
       el.appendChild(renderToDom(
-        { kind: 'embed-card', embed: mediaEmbed, messageId: row.id, lifecycleState: 'live' },
+        { kind: 'embed-card', embed: cardEmbed, messageId: row.id, lifecycleState: 'live' },
         { doc: document, media: media ?? {}, t: tr },
       ));
     } catch { /* placeholder-less failure — the text line stands */ }

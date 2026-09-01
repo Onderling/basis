@@ -132,9 +132,9 @@ export function createChatMessageInbox({
         logger.warn?.('[circle-chat] pod ref resolved to nothing usable — skipping', envelope.msgId, source);
         return { result: 'deferred', reason: 'ref-unresolved' };
       }
-      // The pod row is authoritative for the body; carry the wire ref's `media`
-      // through when the row omitted it (media rides the wire envelope too).
-      envelope = (resolved.media || !envelope.media) ? resolved : { ...resolved, media: envelope.media };
+      // The pod row is authoritative for the body; carry the wire ref's `card`
+      // through when the row omitted it (the card rides the wire envelope too).
+      envelope = (resolved.card || !envelope.card) ? resolved : { ...resolved, card: envelope.card };
     }
 
     if (!isValidChatEnvelope(envelope)) {
@@ -199,19 +199,22 @@ export function createChatMessageInbox({
       ? resolveActorFn(envelope, fromPeerAddr)
       : envelope.fromActor) ?? fromPeerAddr ?? null);
 
-    // media — optional media-card embed riding the envelope (forward
-    // additive; the sender's wire whitelist already stripped local-only
-    // fields). Shape-guarded: anything that isn't a media-card object is
-    // dropped, the MESSAGE still lands (text renders as before). Absent →
-    // the appended event is byte-identical to the pre-media shape.
-    const media = (envelope.media && typeof envelope.media === 'object'
-      && !Array.isArray(envelope.media) && envelope.media.kind === 'media-card')
-      ? envelope.media : null;
+    // The embed CARD riding the envelope (the sender's wire whitelist already stripped local-only
+    // fields). Shape-guarded: anything that is not a card object is dropped and the MESSAGE still
+    // lands, text as before. Any `*-card` variant is accepted — a photo, an appointment, an item, a
+    // file — because the receiver has no business deciding which kinds may exist; the SENDER's
+    // per-variant whitelist is the boundary that matters. This used to insist on `media-card`
+    // specifically, which was a second silent drop behind the first: an appointment that survived the
+    // sender's whitelist would have been discarded here, on arrival, with nothing said.
+    const card = (envelope.card && typeof envelope.card === 'object'
+      && !Array.isArray(envelope.card) && typeof envelope.card.kind === 'string'
+      && envelope.card.kind.endsWith('-card'))
+      ? envelope.card : null;
 
     // Connectivity Phase 2 — the received append is a projection of the ONE
     // canonical chat Envelope. `toEventLogItem` (kring-host's optimistic append
     // uses the same projector) reproduces this exact shape: the received path
-    // passes `senderDisplay` + the already-guarded `media`, so the event is
+    // passes `senderDisplay` + the already-guarded `card`, so the event is
     // byte-identical to what this inbox emitted by hand before.
     eventLog.append(toEventLogItem({
       msgId:    envelope.msgId,
@@ -235,7 +238,7 @@ export function createChatMessageInbox({
       // never fanned out at all, and a wire field would be the sender asserting its own reach — which the
       // enforceability test says is worth nothing. Arrival is the evidence; the badge states exactly it.
       scope: 'circle',
-      ...(media ? { media } : {}),
+      ...(card ? { card } : {}),
     }));
     logger.info?.('[circle-chat] received', envelope.msgId, 'circle=' + envelope.circleId, 'source=' + source);
     if (typeof onStored === 'function') {

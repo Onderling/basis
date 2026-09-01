@@ -6,14 +6,14 @@
  *
  *   SENDER  circleMediaGateway (group sealer) → createMediaEmbed (sealed upload, sealed inline thumb) →
  *           `chatRail.appendMessage` keeps the FULL embed on the LOCAL render entry and projects the
- *           WIRE copy through `mediaForCircleWire` into the SIGNED statement payload
+ *           WIRE copy through `cardForCircleWire` into the SIGNED statement payload
  *   WIRE    the statement is what fans (or lands in a pod row) — nothing else crosses the boundary
  *   PEER    `chatRail.ingest` verifies, derives the render entry FROM THE VERIFIED BODY →
- *           buildCircleStream row → renderCircleView's payload.media branch → chip, thumbnail OPENED
+ *           buildCircleStream row → renderCircleView's payload.card branch → chip, thumbnail OPENED
  *           with the receiving shell's circle opener (same group key)
  *
  * Plus the pins:
- *   • a message WITHOUT media renders exactly as today (no chip),
+ *   • a message WITHOUT a card renders exactly as today (no chip),
  *   • a wrong circle key degrades to the placeholder (sealed stays sealed), never a crash,
  *   • nothing local-only (sender bookkeeping / plaintext bytes) survives into the signed payload.
  *
@@ -95,7 +95,7 @@ async function senderSide(strategy, { text = '📷 photo.jpg', withMedia = true 
     expect(embed.ok).not.toBe(false);
   }
   const { statement } = await rail.appendMessage(CIRCLE.id, {
-    msgId: 'circle-g1-1', ts: 1735_000_000_000, text, actor: SENDER, ...(embed ? { media: embed } : {}),
+    msgId: 'circle-g1-1', ts: 1735_000_000_000, text, actor: SENDER, ...(embed ? { card: embed } : {}),
   });
   return { embed, cid, statement, wire: statement.body.payload };
 }
@@ -118,15 +118,15 @@ describe('media over the signed lane — sender seals, the statement carries the
     const { embed, cid, statement, wire } = await senderSide(strategy);
 
     /* ── the SIGNED wire copy: whitelisted, sealed, nothing local-only ── */
-    expect(wire.media.kind).toBe('media-card');
-    expect(wire.media.pointer).toEqual(embed.pointer);
-    expect(wire.media.snapshot.source).toEqual(embed.snapshot.source);   // the manifest line, unchanged
-    expect(wire.media).not.toHaveProperty('stored');                     // sender-local bookkeeping stripped
+    expect(wire.card.kind).toBe('media-card');
+    expect(wire.card.pointer).toEqual(embed.pointer);
+    expect(wire.card.snapshot.source).toEqual(embed.snapshot.source);   // the manifest line, unchanged
+    expect(wire.card).not.toHaveProperty('stored');                     // sender-local bookkeeping stripped
     const wireJson = JSON.stringify(wire);
     expect(wireJson).not.toContain(b64(fullBytes()));    // no plaintext image bytes
     expect(wireJson).not.toContain(b64(thumbBytes()));   // no plaintext thumb bytes
-    expect(isSealed(wire.media.snapshot.source.enc.thumb)).toBe(true);   // the inline thumb is a sealed envelope
-    expect(wire.media.snapshot.source.enc.keyRef).toBe('urn:circle:g1:content-key');   // a POINTER, not a key
+    expect(isSealed(wire.card.snapshot.source.enc.thumb)).toBe(true);   // the inline thumb is a sealed envelope
+    expect(wire.card.snapshot.source.enc.keyRef).toBe('urn:circle:g1:content-key');   // a POINTER, not a key
 
     /* ── receiver: verify at the rail, land the render entry FROM THE VERIFIED BODY ── */
     const recv = await receiverFor(cid);
@@ -134,7 +134,7 @@ describe('media over the signed lane — sender seals, the statement carries the
     expect(res.ok).toBe(true);
     const events = recv.eventLog.query({});
     expect(events).toHaveLength(1);
-    expect(events[0].payload.media).toEqual(wire.media);   // the chip payload landed
+    expect(events[0].payload.card).toEqual(wire.card);   // the chip payload landed
 
     /* ── render on the RECEIVING shell: same circle key → the thumb opens ── */
     const rows = buildCircleStream({ events, circles: [CIRCLE], circleId: CIRCLE.id });

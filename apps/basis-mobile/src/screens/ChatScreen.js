@@ -642,8 +642,17 @@ export default function ChatScreen({
       'calendar-invite':       makeHandleCalendarInvite({
         callSkill, addMainBubble, publishEvent,
       }),
+      // A peer-wire file lands in THAT SENDER's contact thread (decided 2026-09-02): persisted through
+      // the shared channel (the thread is the received copy's durable home) and pushed live to an open
+      // ContactThreadScreen through the same inbox every DM reply rides. It used to go to addMainBubble
+      // → this screen's main thread — which v2 mounts but permanently hides.
       'file-share':            makeHandleFileShare({
-        addMainBubble, publishEvent,
+        deliverToThread: ({ fromAddr, file, messageId, ts }) => {
+          contactChannel?.persistInbound?.({ contactId: fromAddr, fromAddr, text: '', messageId, ts, file })
+            ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
+          pushContactReply({ fromAddr, threadId: fromAddr, text: '', file });
+        },
+        publishEvent,
       }),
       // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us; persist it into the
       // per-user "shared with me" store (the launcher's Mij inbox lists + opens it with this device's own

@@ -8,7 +8,7 @@
  * platform glue (React state); the channel contract is shared web≡mobile.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
@@ -32,6 +32,28 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
 
   // A thread may open WITH its first lines — the ask that was answered and the answer (Nearby).
   const [messages, setMessages] = useState(() => (Array.isArray(contact?.seed) ? contact.seed : []));
+  // Rehydrate the DURABLE thread on open (web parity — showContactThread does the same): without it a
+  // received file existed in the store and the screen opened empty. BOTH keys, because an unsolicited
+  // inbound (a peer-wire file, a first DM) persists under the sender's ADDRESS while turns echo the
+  // contactId — for a saved contact those differ.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (typeof channel?.rehydrate !== 'function') return;
+      try {
+        const a = await channel.rehydrate(contactId);
+        const b = (peerAddr && peerAddr !== contactId) ? await channel.rehydrate(peerAddr) : [];
+        const durable = [...a, ...b].sort((x, y) => (x.ts ?? 0) - (y.ts ?? 0));
+        if (!alive || durable.length === 0) return;
+        setMessages((prev) => (prev.length ? prev : durable.map((m) => ({
+          id: mkId(), origin: m.origin, text: m.text ?? '',
+          ...(m.buttons ? { buttons: m.buttons } : {}),
+          ...(m.file ? { file: m.file } : {}),
+        }))));
+      } catch { /* best-effort — an empty thread is the honest fallback */ }
+    })();
+    return () => { alive = false; };
+  }, [channel, contactId, peerAddr]);
   // Rung 4 (nearby threads): "share how to reach me" + the other side's ask-back bar.
   const room = bundle?.nearbyRoom ?? null;
   const [pendingReach, setPendingReach] = useState(() => room?.pendingReachFrom?.(peerAddr) ?? null);
@@ -60,7 +82,10 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
     return subscribeContactReplies((reply) => {
       const forThis = (reply.threadId && reply.threadId === contactId) || reply.fromAddr === peerAddr;
       if (!forThis) return;
-      setMessages((prev) => [...prev, { id: mkId(), origin: 'bot', text: reply.text ?? '', buttons: reply.buttons }]);
+      setMessages((prev) => [...prev, {
+        id: mkId(), origin: 'bot', text: reply.text ?? '', buttons: reply.buttons,
+        ...(reply.file ? { file: reply.file } : {}),
+      }]);
     });
   }, [contactId, peerAddr]);
 
@@ -120,9 +145,26 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
         {messages.map((m) => (
           <View key={m.id} style={[styles.msg, m.origin === 'user' ? styles.msgUser : styles.msgBot]}>
             <View style={[styles.bubble, m.origin === 'user' ? styles.bubbleUser : styles.bubbleBot]}>
-              <Text style={m.origin === 'user' ? styles.bubbleUserText : styles.bubbleBotText} testID={`contact-msg-${m.origin}`}>
-                {m.text}
-              </Text>
+              {/* A received peer-wire file rides the turn — an image shows itself, every file gets
+                  its name and size. web≡mobile with contactThread.js's file bubble. */}
+              {m.file?.mime?.startsWith?.('image/') && m.file?.dataB64 ? (
+                <Image
+                  source={{ uri: `data:${m.file.mime};base64,${m.file.dataB64}` }}
+                  style={styles.fileImage}
+                  resizeMode="cover"
+                  testID={`contact-file-image-${m.id}`}
+                />
+              ) : null}
+              {m.file ? (
+                <Text style={styles.fileMeta} testID={`contact-file-meta-${m.id}`}>
+                  {`📎 ${m.file.name ?? ''}${Number.isFinite(m.file.size) ? ` · ${(m.file.size / 1024).toFixed(0)} KB` : ''}`}
+                </Text>
+              ) : null}
+              {m.text ? (
+                <Text style={m.origin === 'user' ? styles.bubbleUserText : styles.bubbleBotText} testID={`contact-msg-${m.origin}`}>
+                  {m.text}
+                </Text>
+              ) : null}
             </View>
           </View>
         ))}
@@ -230,6 +272,8 @@ const makeStyles = (theme) => StyleSheet.create({
   bubbleBot: { backgroundColor: theme.color.white, borderWidth: 1, borderColor: theme.color.line },
   bubbleUserText: { color: theme.color.white, fontSize: 14, lineHeight: 20 },
   bubbleBotText: { color: theme.color.ink, fontSize: 14, lineHeight: 20 },
+  fileImage: { width: 220, height: 160, borderRadius: 8, marginBottom: 6 },
+  fileMeta:  { fontSize: 12, opacity: 0.8, marginBottom: 2 },
   sending: { fontSize: 12, color: theme.color.inkSoft, fontStyle: 'italic', paddingHorizontal: 4 },
   skills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   suggest: { borderTopWidth: 1, borderTopColor: theme.color.line, paddingVertical: 4 },

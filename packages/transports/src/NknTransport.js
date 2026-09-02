@@ -44,6 +44,15 @@ export function nknAddressFromChatPubKey(to) {
  * slow connects: transient send retries, a soft warning, and a hard timeout with seedless retry.
  */
 export class NknTransport extends Transport {
+  /**
+   * NKN's own ceiling, declared where it is a fact of THIS transport rather than hardcoded by callers:
+   * nkn-sdk-js MaxClientMessageSize ≈ 65 528 bytes, and an over-size message is dropped SILENTLY
+   * (measured 2026-05-23: a 117 KB /send-file "sent" and never arrived). 60 KB leaves framing room
+   * under that. The peer façade reads this to chunk anything bigger — basis's old 32 KB cap was this
+   * number, hardcoded one layer too high.
+   */
+  get maxEnvelopeBytes() { return 60 * 1024; }
+
   #client    = null;
   #nknLib    = null;
   #opts;

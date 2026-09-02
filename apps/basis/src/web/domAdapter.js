@@ -880,11 +880,28 @@ function renderFileCard(rendered, state, ctx) {
 
   appendEmbedHeader(wrap, embed, ctx, doc);
 
+  // A photo that arrived over the PEER wire shows itself. The bytes are inline on the snapshot
+  // (peer-sealed transport, chunked by the façade when big) — distinct from the media-card, whose
+  // image sits sealed in the circle's store behind an opener. The caption says which this is.
+  const isInlineImage = typeof snap.mime === 'string' && snap.mime.startsWith('image/')
+    && typeof snap.dataB64 === 'string' && snap.dataB64.length > 0;
+  if (isInlineImage) {
+    const img = doc.createElement('img');
+    img.className = 'cc-file-card-preview';
+    img.src = `data:${snap.mime};base64,${snap.dataB64}`;
+    img.alt = snap.name ?? '';
+    wrap.appendChild(img);
+    const note = doc.createElement('div');
+    note.className = 'cc-file-card-note';
+    note.textContent = ctx.t ? ctx.t('sendFile.sent_to_you') : 'sent to you directly';
+    wrap.appendChild(note);
+  }
+
   const body = doc.createElement('div');
   body.className = 'cc-file-card-body';
   const icon = doc.createElement('span');
   icon.className = 'cc-file-icon';
-  icon.textContent = '📄';
+  icon.textContent = isInlineImage ? '🖼️' : '📄';
   body.appendChild(icon);
 
   const meta = doc.createElement('div');

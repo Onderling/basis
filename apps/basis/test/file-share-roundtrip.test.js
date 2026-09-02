@@ -206,23 +206,31 @@ describe('file-share end-to-end round-trip', () => {
     await bob.shutdown();
   });
 
-  it('oversize file (128KB) is dropped silently by the NKN-shaped hub — confirms why MAX_INLINE matters', async () => {
+  it('oversize file (128KB) now ARRIVES — the façade chunks it under the NKN ceiling it used to die on', async () => {
+    // This test used to document the trap (Frits 2026-05-23): sendTo resolved, the hub silently
+    // dropped the over-size message, the bytes never arrived. NknTransport now DECLARES its ~64 KB
+    // ceiling and the peer façade chunks anything bigger (peerChunking.js), so the same 128 KB file
+    // arrives whole — and the hub's drop-sink, which used to prove the loss, now proves that no
+    // single wire message ever exceeded what real NKN can carry.
     const dropped = [];
     const { alice, bob, received } = await makeTwoAgents({ droppedSink: dropped });
     const bytes = new Uint8Array(128 * 1024);
     for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 3) % 256;
     const payload = makeFileSharePayload(bytes, { name: 'big.bin' });
-    // Sender's sendTo STILL resolves — this is the trap that bit
-    // Frits 2026-05-23.  The bytes never arrive.
-    await alice.peer.sendTo(bob.peer.address, payload);
+    const res = await alice.peer.sendTo(bob.peer.address, payload);
+    expect(res?.chunked).toBe(true);
+    expect(res.chunks).toBeGreaterThan(1);
 
-    // Give the hub time it would have taken if it WERE going to deliver.
-    await new Promise((r) => setTimeout(r, 200));
-    const arrived = received.bob.some((r) => r.payload?.file?.name === 'big.bin');
-    expect(arrived).toBe(false);
-    // The hub's drop-sink shows the over-size message.
-    expect(dropped.length).toBeGreaterThan(0);
-    expect(dropped[0].size).toBeGreaterThan(MAX_NKN_PAYLOAD);
+    const start = Date.now();
+    while (Date.now() - start < 4000
+      && !received.bob.some((r) => r.payload?.file?.name === 'big.bin')) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    const whole = received.bob.find((r) => r.payload?.file?.name === 'big.bin');
+    expect(whole, 'the reassembled file reaches the app').toBeTruthy();
+    expect(whole.payload.file.size).toBe(128 * 1024);
+    // Nothing on the wire was ever big enough for real NKN to drop.
+    expect(dropped).toEqual([]);
 
     await alice.shutdown();
     await bob.shutdown();

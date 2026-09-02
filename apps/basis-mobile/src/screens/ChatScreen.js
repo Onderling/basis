@@ -2543,13 +2543,27 @@ function EmbedCardBubble({ msg, rendered, onButtonTap, manifestsByOrigin }) {
     if (typeof snap.location === 'string') detailLines.push(snap.location);
   }
 
+  // A photo that arrived over the PEER wire shows itself — the bytes ride inline on the snapshot
+  // (peer-sealed transport, façade-chunked when big), unlike the media-card whose image sits sealed
+  // in the circle's store. web≡mobile with domAdapter's file-card preview.
+  const isInlineImage = isFile && typeof snap.mime === 'string' && snap.mime.startsWith('image/')
+    && typeof snap.dataB64 === 'string' && snap.dataB64.length > 0;
+
   return (
     <View
       style={[styles.bubble, styles.bubbleBot, styles.bubbleEmbedCard]}
       testID={`bubble-bot-embed-${msg.id}`}
     >
+      {isInlineImage && (
+        <Image
+          source={{ uri: `data:${snap.mime};base64,${snap.dataB64}` }}
+          style={styles.embedImagePreview}
+          resizeMode="cover"
+          testID={`bubble-embed-image-${msg.id}`}
+        />
+      )}
       <Text style={styles.embedTitle}>
-        {isFile ? '📄 ' : isTime ? '📅 ' : ''}{titleText}
+        {isInlineImage ? '🖼️ ' : isFile ? '📄 ' : isTime ? '📅 ' : ''}{titleText}
       </Text>
       {detailLines.length > 0 && (
         <Text style={styles.embedDetails}>{detailLines.join(' · ')}</Text>
@@ -2751,6 +2765,7 @@ const styles = StyleSheet.create({
   // embed-card (time-card + file-card).
   bubbleEmbedCard: { paddingVertical: 8, paddingHorizontal: 10, borderLeftWidth: 3, borderLeftColor: '#1e88e5' },
   embedTitle:      { fontSize: 15, fontWeight: '600', color: '#222' },
+  embedImagePreview: { width: '100%', height: 180, borderRadius: 8, marginBottom: 6 },
   embedDetails:    { fontSize: 12, color: '#666', marginTop: 2 },
   // Media mobile twin (2026-07) — the media-card chip.
   mediaThumb:       { borderRadius: 6, backgroundColor: '#eee' },

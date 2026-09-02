@@ -383,19 +383,17 @@ async function sendFile(args, {
     return { ok: false, error: t('sendFile.pick_failed', { error: err.message ?? String(err) }) };
   }
 
-  // 32KB cap on inline base64.  Why 32KB and not the obvious 64KB
-  // (nkn-sdk-js MaxClientMessageSize ≈ 65528 bytes)?  Base64 inflates
-  // by 4/3 (32KB raw → 44KB encoded) + JSON envelope wrapping +
-  // Ed25519 sig (~88 bytes) + nacl.box overhead.  32KB raw keeps the
-  // wire payload comfortably below 64KB.
+  // The size question moved DOWN a layer (the three-layer split, 2026-09-02): the transport declares
+  // its envelope ceiling (`maxEnvelopeBytes` — NKN's silent ~64 KB drop is declared ON NknTransport
+  // now, not hardcoded here), and the peer façade chunks anything bigger automatically, sealed and
+  // held like any other envelope (`peerChunking.js`). The 32 KB cap that lived here WAS that NKN
+  // number, applied one layer too high — it made every /send-file deliver by refusing almost all of
+  // them (a 117 KB file, Frits 2026-05-23).
   //
-  // Reported by Frits 2026-05-23 (manual H-1 follow-up): a 117KB
-  // file went through /send-file but never arrived at the receiver
-  // because the 512KB code-side cap was 2.5x over NKN's silent
-  // drop threshold.  Larger-file flow (chunked transfer OR pod-URL
-  // hand-off) is the next slice; for now we hard-cap at 32KB so
-  // every successful /send-file actually delivers.
-  const MAX_INLINE = 32 * 1024;
+  // What remains HERE is the door's own question: is this a thing the peer wire should carry at all?
+  // A phone photo (a few MB, ~a hundred control-sized chunks) — yes. A video — no: that is the blob
+  // gate's job, and a cap is honest about it rather than letting a 500 MB send grind the wire.
+  const MAX_INLINE = 8 * 1024 * 1024;
   if (file.size > MAX_INLINE) {
     return { ok: false, error: t('sendFile.too_large', { size: file.size, max: MAX_INLINE }) };
   }

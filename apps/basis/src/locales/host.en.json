@@ -435,6 +435,10 @@
     "send_failed": {
       "text": "Send failed: {{error}}",
       "doc": "NKN send error."
+    },
+    "sent_to_you": {
+      "text": "Sent to you directly — not in the circle’s store.",
+      "doc": "Caption under an inline photo preview on a peer-wire file-card."
     }
   },
   "sendto": {

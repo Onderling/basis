@@ -89,6 +89,7 @@ import {
   PASSKEY_ERRORS,
 } from './passkey.js';
 import { loadAuditLog }       from './auditLog.js';
+import { chunkPayloadForRoute, makeChunkReassembler } from './peerChunking.js';
 
 /**
  * @typedef {object} CreateSecureAgentOpts
@@ -1184,6 +1185,18 @@ export async function createSecureAgent(opts = {}) {
   // can pass onPeerMessage to connect() OR set it via setPeerMessageHandler().
   let onPeerMessageFn = (typeof opts.onPeerMessage === 'function')
     ? opts.onPeerMessage : null;
+  // The receiving half of façade chunking (peerChunking.js): reassembles a chunked payload and hands
+  // the whole to the SAME onPeerMessage fan, so the app cannot tell a chunked arrival from a plain one.
+  const reassembleChunk = makeChunkReassembler({
+    onPayload: (whole, env) => {
+      if (typeof onPeerMessageFn !== 'function') return;
+      try {
+        onPeerMessageFn({ from: env._from, payload: whole, ts: env._ts ?? Date.now() });
+      } catch (err) {
+        if (typeof console !== 'undefined') console.error('[secure-agent] onPeerMessage threw', err);
+      }
+    },
+  });
 
   /**
    * Wire a transport's receive-handler.  Shared by connectPeer (NKN)
@@ -1357,6 +1370,10 @@ export async function createSecureAgent(opts = {}) {
       } catch (err) {
         console.warn('[secure-agent] reciprocal-HI bookkeeping failed', err);
       }
+      // Façade-level reassembly: a bulk-chunk envelope is buffered here — it already passed every
+      // gate above (mute, circle-block, rate limit) as an ordinary envelope — and on the final chunk
+      // the ORIGINAL payload is handed to the app as if it had arrived whole. Apps never see chunks.
+      if (reassembleChunk(env)) return;
       if (typeof onPeerMessageFn === 'function') {
         try {
           onPeerMessageFn({
@@ -2143,6 +2160,19 @@ export async function createSecureAgent(opts = {}) {
       subtype: payload?.subtype ?? payload?.type ?? null,
       size:    JSON.stringify(payload ?? {}).length,
     });
+    // A payload the ROUTE cannot carry in one envelope is chunked here, automatically — each chunk is
+    // an ordinary envelope through the same sendOneWay, so it is sealed, signed and size-checked like
+    // any other; the receiving façade reassembles before the app sees it. The transport only DECLARES
+    // its limit (`maxEnvelopeBytes` — NKN's silent ~64 KB ceiling, the relay's 256 KB); callers never
+    // opt in, which is why the kernel's opt-in fileSharing sat uncalled for its whole life.
+    const parts = chunkPayloadForRoute(payload, tx?.maxEnvelopeBytes);
+    if (parts) {
+      const sendOpts = speakAs ? { from: speakAs } : {};
+      for (const part of parts) {
+        await tx.sendOneWay(wireAddr, part, sendOpts);   // sequential: ordered, and backpressure-honest
+      }
+      return { chunked: true, chunks: parts.length, transferId: parts[0].transferId };
+    }
     return tx.sendOneWay(wireAddr, payload, speakAs ? { from: speakAs } : {});
   }
 

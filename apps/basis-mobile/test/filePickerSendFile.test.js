@@ -86,12 +86,27 @@ describe('Bundle F P4 — /send-file with mobile picker', () => {
     expect(typeof r.error).toBe('string');
   });
 
-  it('rejects files exceeding the 32KB inline cap', async () => {
-    const huge = 'A'.repeat(50 * 1024);
+  it('a 50KB file passes the door now — the façade chunks per route; only the photo-vs-video cap remains', async () => {
+    // The 32 KB cap was NKN's ceiling hardcoded one layer too high; the transport declares it and
+    // the peer façade chunks (peerChunking.js). The door keeps only its own question: photo yes,
+    // video no (8 MB).
     const h = buildHarness({
       openFilePicker: async () => ({
         name: 'big.bin', type: 'application/octet-stream',
-        size: huge.length, dataB64: 'AA==',
+        size: 50 * 1024, dataB64: 'A'.repeat(68 * 1024),
+      }),
+    });
+    const r = await h.handlers['send-file']({ peer: 'app.peer-addr' });
+    expect(r?.error).toBeUndefined();
+    expect(h.peerCalls.length).toBe(1);
+    expect(h.peerCalls[0].msg?.file?.size).toBe(50 * 1024);
+  });
+
+  it('rejects what the peer wire should not carry at all (over the 8MB photo-vs-video cap)', async () => {
+    const h = buildHarness({
+      openFilePicker: async () => ({
+        name: 'film.mp4', type: 'video/mp4',
+        size: 9 * 1024 * 1024, dataB64: 'AA==',
       }),
     });
     const r = await h.handlers['send-file']({ peer: 'app.peer-addr' });

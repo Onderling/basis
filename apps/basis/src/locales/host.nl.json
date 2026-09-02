@@ -435,6 +435,10 @@
     "send_failed": {
       "text": "Versturen mislukt: {{error}}",
       "doc": "Defensive."
+    },
+    "sent_to_you": {
+      "text": "Direct naar jou gestuurd — niet in de opslag van de kring.",
+      "doc": "Caption under an inline photo preview on a peer-wire file-card."
     }
   },
   "sendto": {

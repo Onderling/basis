@@ -47,6 +47,17 @@ describe('makeHandleFileShare', () => {
     }));
   });
 
+  it('makes the sender a known peer (the first-DM rule), and a graph failure hurts nothing', () => {
+    const d = deps({ notePeer: vi.fn() });
+    const handle = makeHandleFileShare(d);
+    handle('peer-A', { file: { id: 'f3', name: 'a.jpg', mime: 'image/jpeg', size: 5, dataB64: 'AA==' } });
+    expect(d.notePeer).toHaveBeenCalledWith('peer-A');
+
+    const broken = deps({ notePeer: vi.fn(() => { throw new Error('graph down'); }) });
+    makeHandleFileShare(broken)('peer-A', { file: { id: 'f4', name: 'b.jpg', mime: 'image/jpeg', size: 5, dataB64: 'AA==' } });
+    expect(broken.deliverToThread).toHaveBeenCalled();   // the thread still gets the file
+  });
+
   it('a broken thread sink never eats the notification', () => {
     const d = deps({ deliverToThread: vi.fn(() => { throw new Error('store down'); }) });
     const handle = makeHandleFileShare(d);

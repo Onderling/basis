@@ -362,7 +362,8 @@ import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
-import { sealItem, isCanonicalPosture, createCircleStores, memoryDataSource } from '@onderling/item-store';
+import { sealItem, isCanonicalPosture, memoryDataSource } from '@onderling/item-store';
+import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import {
   shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
   shareErrorStatusKey,
@@ -435,18 +436,9 @@ function getContactDmStore() {
       try {
         let dataSource;
         try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', storeName: 'items' }); }
-        catch { dataSource = memoryDataSource(); }
-        const store = createCircleStores({ dataSource: dataSource || memoryDataSource() }).getStore('dm');
-        return {
-          addItems: async (drafts, ctx = {}) => {
-            const out = [];
-            for (const d of drafts) {
-              out.push(await store.put({ type: d.type, text: d.text, source: d.source }, { by: ctx.actor ?? LOCAL_ACTOR }));
-            }
-            return out;
-          },
-          listOpen: async () => store.list(),
-        };
+        catch { dataSource = null; }
+        // The shared wrapper (web ≡ mobile): one constructor for the durable DM home, both shells.
+        return createContactDmStore({ dataSource, localActor: LOCAL_ACTOR });
       } catch (err) {
         if (typeof console !== 'undefined') console.warn('[circleApp] contact-DM store unavailable:', err?.message ?? err);
         return null;   // channel falls back to ephemeral
@@ -8488,6 +8480,8 @@ async function boot() {
             deliverToThread: ({ fromAddr, file, messageId }) => {
               onContactReply({ fromAddr, text: '', file, messageId });
             },
+            // A first file makes the sender a contact row (the graph otherwise only learns at send time).
+            notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
           }),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user

@@ -652,6 +652,8 @@ export default function ChatScreen({
             ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
           pushContactReply({ fromAddr, threadId: fromAddr, text: '', file });
         },
+        // A first file makes the sender a contact row (the graph otherwise only learns at send time).
+        notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
         publishEvent,
       }),
       // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us; persist it into the

@@ -17,7 +17,7 @@
  *       closed thread's arrival still leaves a visible trace.
  */
 export function makeHandleFileShare({
-  deliverToThread, publishEvent, logger = console,
+  deliverToThread, publishEvent, notePeer, logger = console,
 } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleFileShare: deliverToThread required');
 
@@ -27,6 +27,10 @@ export function makeHandleFileShare({
       logger.warn?.('[peer] file-share missing fields', payload);
       return;
     }
+    // Receiving a direct file makes the sender a KNOWN PEER (the classic first-DM rule): without this
+    // the turn persisted into a thread no list could reach — the peer graph learns peers at SEND time,
+    // so a receiver who never dialled this sender had no contact row to open the thread from.
+    try { notePeer?.(fromAddr); } catch { /* a row is a convenience; the thread persists regardless */ }
     try {
       deliverToThread({
         fromAddr,

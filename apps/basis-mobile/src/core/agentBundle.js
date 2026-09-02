@@ -36,6 +36,8 @@ import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 // Shared contact/bot exposed-skill registry (feedback-extension) — web≡mobile core.
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
+import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
+import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';
 // Calendar cross-peer fan-out — wrap the bundle callSkill so a successful calendar
 // op fans its invite/RSVP envelopes out over the peer transport (web parity).
 import { withCalendarOutbound } from '../../../basis/src/core/handlers/calendarOutbound.js';
@@ -676,11 +678,32 @@ export async function bootAgentBundle(opts = {}) {
   };
   const contactSkills = createContactSkillRegistry({ peerGraph, sendTask: sendContactTask });
   contactSkills.start().catch(() => { /* discovery is best-effort — never blocks boot */ });
+  // The durable DM home (web parity — the G18 fix's storage half was web-only until 2026-09-02, so a
+  // received peer-wire FILE persisted into nothing here and the thread opened empty). Same shared
+  // wrapper, same db name, AsyncStorage-backed; no storage seam → ephemeral, exactly as before.
+  let _dmStorePromise = null;
+  const getContactDmStore = () => {
+    if (!_dmStorePromise) {
+      _dmStorePromise = (async () => {
+        try {
+          let dataSource = null;
+          if (opts.asyncStorage) {
+            try { dataSource = await buildHouseholdDataSource({ dbName: 'cc-contact-dm-state', asyncStorage: opts.asyncStorage }); }
+            catch { dataSource = null; }
+          }
+          return createContactDmStore({ dataSource, localActor: 'me' });
+        } catch { return null; }   // channel falls back to ephemeral
+      })();
+    }
+    return _dmStorePromise;
+  };
   const contactChannel = createContactThreadChannel({
     sendToPeer: (addr, payload) =>
       (typeof agent.sendPeerMessage === 'function'
         ? agent.sendPeerMessage(addr, payload)
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
+    itemStore:  () => getContactDmStore(),
+    localActor: 'me',
   });
   const coreAgent = agent.sa?.agent ?? null;   // discoverA2A's hello/native-upgrade target
 

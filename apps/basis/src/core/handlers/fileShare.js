@@ -1,23 +1,25 @@
 /**
- * Inbound file-share handler. Bundle H Phase 2 — lifted from
- * `apps/basis/web/main.js:547`.
+ * Inbound file-share handler — a peer sent this device a file over the sealed wire.
  *
- * Renders a file-card embed in the host's main thread with the
- * file's metadata (name, mime, size).  Bytes (base64) stay inside
- * the embed so [Download] / [Save to my pod] can act on them later.
- * No substrate write — folio's `saveToMyPod` happens only on
- * explicit user action.
+ * It lands in the SENDER'S CONTACT THREAD (decided with Frits 2026-09-02): a DM-shaped thing belongs
+ * in the DM surface, and every sender has one by construction — completing the HI puts them in the
+ * peer graph, which is a contact row, which is a thread. It used to land in `addMainBubble` →
+ * ChatScreen's main thread, which mobile v2 mounts but permanently hides ("No '← chat' route reveals
+ * it") — the card painted faithfully into a room no user could enter, found the day a real photo
+ * finally crossed the wire.
  *
- * @param {object} args
- * @param {(bubble: object) => void}                args.addMainBubble
- * @param {(event: object) => void}                 [args.publishEvent]
- * @param {{info?, warn?, error?}}                  [args.logger]
- * @returns {(fromAddr: string, payload: object) => void}
+ * Two seams, both injected (this module owns no store and no UI):
+ *   deliverToThread({ fromAddr, file, messageId, ts })
+ *     — persist the turn into the sender's durable DM thread AND surface it live if that thread is
+ *       open. The shells wire it to `contactThreadChannel.persistInbound` + their own live append.
+ *   publishEvent(event)
+ *     — the notification line on the event log ("📎 file shared: …"), unchanged: the log is how a
+ *       closed thread's arrival still leaves a visible trace.
  */
 export function makeHandleFileShare({
-  addMainBubble, publishEvent, logger = console,
+  deliverToThread, publishEvent, logger = console,
 } = {}) {
-  if (typeof addMainBubble !== 'function') throw new Error('makeHandleFileShare: addMainBubble required');
+  if (typeof deliverToThread !== 'function') throw new Error('makeHandleFileShare: deliverToThread required');
 
   return function handleFileShare(fromAddr, payload) {
     const f = payload?.file;
@@ -25,27 +27,23 @@ export function makeHandleFileShare({
       logger.warn?.('[peer] file-share missing fields', payload);
       return;
     }
-    addMainBubble({
-      kind:           'embed-card',
-      messageId:      `file-share-${f.id}`,
-      threadId:       null,
-      lifecycleState: 'live',
-      embed: {
-        kind:      'file-card',
-        appOrigin: 'folio',
-        itemRef:   { app: 'folio', type: 'file', id: f.id },
-        snapshot:  {
+    try {
+      deliverToThread({
+        fromAddr,
+        file: {
           id:      f.id,
-          type:    'file',
           name:    f.name,
           mime:    f.mime ?? 'application/octet-stream',
-          bytes:   f.size,
+          size:    f.size,
           dataB64: f.dataB64,
-          local:   false,
         },
-        issuedBy: fromAddr,
-      },
-    });
+        // The sender's file id doubles as the dedup nonce, so a relay-replayed share never lands twice.
+        messageId: `file-share-${f.id}`,
+        ts: typeof payload?.sentAt === 'number' ? payload.sentAt : Date.now(),
+      });
+    } catch (err) {
+      logger.warn?.('[peer] file-share delivery failed', err?.message ?? err);
+    }
     publishEvent?.({
       app:     'folio',
       type:    'notification',

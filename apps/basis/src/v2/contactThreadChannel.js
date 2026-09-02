@@ -152,7 +152,7 @@ export function createContactThreadChannel({
    * @param {number}  [turn.ts]
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
-  function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts } = {}) {
+  function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file } = {}) {
     const envelope = {
       id:     messageId ?? mkId(),
       kind:   subtypes.in,
@@ -164,6 +164,8 @@ export function createContactThreadChannel({
         peerAddr:  fromAddr,
         replyTo,
         ...(Array.isArray(buttons) ? { buttons } : {}),
+        // A received peer-wire file (photo, document) — the thread is its durable home.
+        ...(file && typeof file === 'object' ? { file } : {}),
       },
     };
     return core.persistInbound(envelope, { to: fromAddr });

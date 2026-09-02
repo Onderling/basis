@@ -109,6 +109,10 @@ export function createAddressedDeliver({
         peerAddr:     to ?? null,
         replyTo:      ex.replyTo ?? null,
         ...(Array.isArray(ex.buttons) ? { buttons: ex.buttons } : {}),
+        // A DM'd FILE (a peer-wire photo, a document) is part of the turn: the thread is its durable
+        // home, exactly as any messenger keeps a received photo in the conversation. `{id, name, mime,
+        // size, dataB64}` — bytes inline, because this store IS where the received copy lives.
+        ...(ex.file && typeof ex.file === 'object' ? { file: ex.file } : {}),
         sentAt:       typeof envelope?.ts === 'number' ? envelope.ts : Date.now(),
         nonce:        envelope?.id ?? null,
       },
@@ -182,6 +186,7 @@ export function chatTurnsFromItems(items, { threadKey } = {}) {
       ts:        typeof s.sentAt === 'number' ? s.sentAt : (it.addedAt ?? 0),
       ...(s.replyTo ? { replyTo: s.replyTo } : {}),
       ...(Array.isArray(s.buttons) ? { buttons: s.buttons } : {}),
+      ...(s.file && typeof s.file === 'object' ? { file: s.file } : {}),
     });
   }
   out.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));

@@ -1,21 +1,22 @@
 /**
- * file-share handler coverage.
+ * file-share handler coverage — a received peer-wire file lands in the SENDER's contact thread
+ * (decided 2026-09-02; it used to paint into a main thread mobile v2 permanently hides).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { makeHandleFileShare } from '../../src/core/handlers/fileShare.js';
 
 function deps(overrides = {}) {
   return {
-    addMainBubble: vi.fn(),
-    publishEvent:  vi.fn(),
-    logger:        { info: () => {}, warn: () => {}, error: () => {} },
+    deliverToThread: vi.fn(),
+    publishEvent:    vi.fn(),
+    logger:          { info: () => {}, warn: () => {}, error: () => {} },
     ...overrides,
   };
 }
 
 describe('makeHandleFileShare', () => {
-  it('throws when addMainBubble missing', () => {
-    expect(() => makeHandleFileShare({})).toThrow(/addMainBubble required/);
+  it('throws when deliverToThread missing', () => {
+    expect(() => makeHandleFileShare({})).toThrow(/deliverToThread required/);
   });
 
   it('drops envelopes missing file fields', () => {
@@ -24,23 +25,34 @@ describe('makeHandleFileShare', () => {
     handle('peer-A', null);
     handle('peer-A', { file: { id: 'f1' } });
     handle('peer-A', { file: { id: 'f1', name: 'a.txt' } });
-    expect(d.addMainBubble).not.toHaveBeenCalled();
+    expect(d.deliverToThread).not.toHaveBeenCalled();
   });
 
-  it('renders a file-card embed + publishes a notification', () => {
+  it("delivers the file into the SENDER's thread + publishes a notification", () => {
     const d = deps();
     const handle = makeHandleFileShare(d);
     handle('peer-A', {
+      sentAt: 1234,
       file: { id: 'f1', name: 'recipe.md', mime: 'text/markdown', size: 1024, dataB64: 'aGVsbG8=' },
     });
-    expect(d.addMainBubble).toHaveBeenCalledTimes(1);
-    const bubble = d.addMainBubble.mock.calls[0][0];
-    expect(bubble.kind).toBe('embed-card');
-    expect(bubble.embed.kind).toBe('file-card');
-    expect(bubble.embed.snapshot.name).toBe('recipe.md');
-    expect(bubble.embed.snapshot.dataB64).toBe('aGVsbG8=');
+    expect(d.deliverToThread).toHaveBeenCalledTimes(1);
+    const turn = d.deliverToThread.mock.calls[0][0];
+    expect(turn.fromAddr).toBe('peer-A');
+    expect(turn.file).toEqual({ id: 'f1', name: 'recipe.md', mime: 'text/markdown', size: 1024, dataB64: 'aGVsbG8=' });
+    // The sender's file id is the dedup nonce — a relay-replayed share must not land twice.
+    expect(turn.messageId).toBe('file-share-f1');
+    expect(turn.ts).toBe(1234);
     expect(d.publishEvent).toHaveBeenCalledWith(expect.objectContaining({
       app: 'folio', type: 'notification',
     }));
+  });
+
+  it('a broken thread sink never eats the notification', () => {
+    const d = deps({ deliverToThread: vi.fn(() => { throw new Error('store down'); }) });
+    const handle = makeHandleFileShare(d);
+    handle('peer-A', {
+      file: { id: 'f2', name: 'foto.jpg', mime: 'image/jpeg', size: 9, dataB64: 'aGVsbG8=' },
+    });
+    expect(d.publishEvent).toHaveBeenCalled();
   });
 });

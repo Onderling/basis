@@ -3118,9 +3118,19 @@ async function showContactThread(contactId) {
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
   if (thread.messages.length === 0 && typeof circleContactChannel?.rehydrate === 'function') {
     try {
+      // BOTH keys: turns echo the contactId, but an unsolicited inbound (a peer-wire file, a first
+      // DM) persists under the sender's ADDRESS — for a saved stoop contact those differ, and reading
+      // one key showed a thread that forgot its files.
       const durable = await circleContactChannel.rehydrate(contactId);
-      if (durable.length) {
-        thread.messages = durable.map((m) => ({ origin: m.origin, text: m.text, ...(m.buttons ? { buttons: m.buttons } : {}) }));
+      const byAddr = (peerAddr && peerAddr !== contactId)
+        ? await circleContactChannel.rehydrate(peerAddr) : [];
+      const merged = [...durable, ...byAddr].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+      if (merged.length) {
+        thread.messages = merged.map((m) => ({
+          origin: m.origin, text: m.text,
+          ...(m.buttons ? { buttons: m.buttons } : {}),
+          ...(m.file ? { file: m.file } : {}),
+        }));
       }
     } catch { /* best-effort — a rehydrate failure just shows an empty thread */ }
   }
@@ -3385,15 +3395,16 @@ function replyTextFromResult(res) {
 // the contactId for a native peer); appends the other party's bubble and
 // re-renders if that thread is on screen. For a brand-new thread (someone DMs you
 // first), resolves their display name from the merged directory, best-effort.
-function onContactReply({ fromAddr, threadId, text, buttons, messageId, replyTo }) {
+function onContactReply({ fromAddr, threadId, text, buttons, messageId, replyTo, file }) {
   const contactId = (threadId && contactThreads.has(threadId)) ? threadId : fromAddr;
   let thread = contactThreads.get(contactId);
   const isNew = !thread;
   if (isNew) { thread = { name: contactId, peerAddr: fromAddr, messages: [] }; contactThreads.set(contactId, thread); }
-  thread.messages.push({ origin: 'bot', text, buttons });
+  // `file` — a received peer-wire file (photo, document) rides the turn; the thread is its durable home.
+  thread.messages.push({ origin: 'bot', text, buttons, ...(file ? { file } : {}) });
   // Phase 2 (C3 / the G18 fix): persist the inbound turn so the thread is durable
   // in BOTH directions (dedup on messageId is shared with sendTurn's outbound).
-  try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo }); }
+  try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, file }); }
   catch { /* best-effort — durability never blocks the live render */ }
   if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
   // Resolve a friendlier name for an unsolicited inbound thread (fire-and-forget).
@@ -8469,15 +8480,13 @@ async function boot() {
           }),
           'calendar-rsvp':           makeHandleCalendarRsvp({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
           'calendar-cancel':         makeHandleCalendarCancel({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
-          // a peer shared a file → announce it in the circle with a [Download] button (bytes ride in the
-          // embed; we stash them so the tap can save). Classic parity (handleFileShare).
+          // a peer shared a file → it lands in THAT SENDER's contact thread (durable + live via the
+          // same onContactReply glue every DM turn uses). It used to drop a bot bubble into whatever
+          // circle happened to be open — a file from a person, announced by nobody's bot, in a room
+          // the sender may not even be in.
           'file-share':              makeHandleFileShare({
-            addMainBubble: (bubble) => {
-              const f = bubble?.embed?.snapshot;
-              if (!f?.id || !f?.name || !f?.dataB64) return;
-              _fileShareInbox.set(f.id, f);
-              _circleRender?.botBubble(t('circle.fileShare.received', { name: f.name }),
-                { buttons: [{ action: `file-dl:${f.id}`, label: t('circle.fileShare.download') }] });
+            deliverToThread: ({ fromAddr, file, messageId }) => {
+              onContactReply({ fromAddr, text: '', file, messageId });
             },
             publishEvent: publishEventToLog,
           }),

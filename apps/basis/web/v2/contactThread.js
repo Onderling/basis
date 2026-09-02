@@ -120,6 +120,33 @@ export function renderContactThread(container, {
     const bubble = document.createElement('div');
     bubble.className = 'cc-cthread__bubble';
     bubble.textContent = m.text ?? '';
+    // A received peer-wire FILE rides the turn ({id, name, mime, size, dataB64} — the thread is its
+    // durable home). An image shows itself; everything gets its name, size and a native download —
+    // a data: href needs no store round-trip because the bytes ARE here.
+    if (m.file && typeof m.file === 'object') {
+      bubble.classList.add('cc-cthread__bubble--file');
+      const f = m.file;
+      if (typeof f.mime === 'string' && f.mime.startsWith('image/') && f.dataB64) {
+        const img = document.createElement('img');
+        img.className = 'cc-cthread__file-preview';
+        img.src = `data:${f.mime};base64,${f.dataB64}`;
+        img.alt = f.name ?? '';
+        bubble.appendChild(img);
+      }
+      const meta = document.createElement('div');
+      meta.className = 'cc-cthread__file-meta';
+      const kb = Number.isFinite(f.size) ? ` · ${(f.size / 1024).toFixed(0)} KB` : '';
+      meta.textContent = `📎 ${f.name ?? '(file)'}${kb}`;
+      bubble.appendChild(meta);
+      if (f.dataB64) {
+        const dl = document.createElement('a');
+        dl.className = 'cc-cthread__file-download';
+        dl.href = `data:${f.mime ?? 'application/octet-stream'};base64,${f.dataB64}`;
+        dl.download = f.name ?? 'file';
+        dl.textContent = tr('circle.fileShare.download');
+        bubble.appendChild(dl);
+      }
+    }
     row.appendChild(bubble);
     if (Array.isArray(m.buttons) && m.buttons.length) {
       const btnRow = document.createElement('div');

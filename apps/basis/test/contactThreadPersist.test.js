@@ -90,6 +90,26 @@ describe('contactThreadChannel — durable DM (G18 fix)', () => {
     expect(turns[1].buttons).toEqual([{ id: 'ok', label: 'Ok' }]);
   });
 
+  it('a received FILE rides the turn: persists with the bytes, rehydrates whole (the peer-wire photo)', async () => {
+    // The receive door decided 2026-09-02: a peer-wire file lands in the sender's contact thread, and
+    // the thread is the durable home of the received copy — like any messenger keeps a photo in the
+    // conversation. The file survives the round-trip untouched, beside ordinary text turns.
+    const store = memItemStore();
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: store });
+    const file = { id: 'f1', name: 'foto.jpg', mime: 'image/jpeg', size: 277431, dataB64: '/9j/4AAQfake' };
+    await ch.persistInbound({ contactId: 'peer-addr-1', fromAddr: 'peer-addr-1', text: '', messageId: 'file-share-f1', file });
+    await ch.persistInbound({ contactId: 'peer-addr-1', fromAddr: 'peer-addr-1', text: 'mooi he', messageId: 'm-2' });
+
+    const turns = await ch.rehydrate('peer-addr-1');
+    expect(turns).toHaveLength(2);
+    expect(turns[0].file).toEqual(file);
+    expect(turns[0].origin).toBe('bot');
+    expect(turns[1].file).toBeUndefined();
+    // …and the file-share dedup nonce holds: a relay-replayed share never lands twice.
+    await ch.persistInbound({ contactId: 'peer-addr-1', fromAddr: 'peer-addr-1', text: '', messageId: 'file-share-f1', file });
+    expect(await ch.rehydrate('peer-addr-1')).toHaveLength(2);
+  });
+
   it('rehydrate isolates by contact (one thread never leaks into another)', async () => {
     const store = memItemStore();
     const ch = createContactThreadChannel({ sendToPeer: () => {}, itemStore: store });

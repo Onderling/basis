@@ -1574,3 +1574,8 @@ button[type="submit"] {
 /* A peer-wire photo previews inline on its file-card (sent to you, not the circle's store). */
 .cc-file-card-preview { max-width: 100%; max-height: 260px; border-radius: 8px; display: block; margin: 4px 0; }
 .cc-file-card-note { font-size: 0.78em; opacity: 0.7; margin-bottom: 4px; }
+
+/* A received peer-wire file in a contact thread: the image shows itself; every file gets meta + download. */
+.cc-cthread__file-preview { max-width: 100%; max-height: 260px; border-radius: 8px; display: block; margin: 4px 0; }
+.cc-cthread__file-meta { font-size: 0.85em; margin-top: 4px; }
+.cc-cthread__file-download { font-size: 0.85em; }

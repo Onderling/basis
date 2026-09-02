@@ -1038,6 +1038,15 @@ export async function createSecureAgent(opts = {}) {
     const out = new Set([addr]);
     try {
       const pubKey = peerIdentityOf.get(addr) ?? agent.security?.getPeerKey?.(addr) ?? null;
+      // The CANONICAL address belongs to the set too. `peerAliases` deliberately holds only the
+      // per-circle aliases (registerPeerAddress skips `address === pubKey`), so resolving an ALIAS
+      // used to return {alias, …other aliases} and silently omit the one address most sends target.
+      // The cost was one-directional and real: presence arriving from a per-circle address — which is
+      // where circle members' presence always arrives from — reinstated every alias but left the
+      // canonical written off, and never flushed holds queued under it. A peer could talk to you all
+      // day and stay "unreachable". (Found on the A33: /send-file kept answering peer-unreachable
+      // while the phone's circle chat was landing.) Same alias-shaped hole the mute fan had.
+      if (pubKey) out.add(pubKey);
       for (const alias of (pubKey ? peerAliases.get(pubKey) ?? [] : [])) out.add(alias);
     } catch { /* the direct address is still correct */ }
     return out;

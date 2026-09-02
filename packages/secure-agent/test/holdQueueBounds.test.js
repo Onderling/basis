@@ -138,6 +138,27 @@ describe('hold queue — giving up on a dead address', () => {
     await a.shutdown();
   }, 15_000);
 
+  it('presence from a PER-CIRCLE alias reinstates the peer\'s CANONICAL address too', async () => {
+    // The one-directional hole found on the A33 (2026-09-02): circle members' presence arrives from
+    // their per-circle address, sends target their canonical one. `addressesOfIdentity(alias)` used to
+    // collect the OTHER aliases and omit the canonical — so a peer could talk to you all day from a
+    // circle and stay written off for direct sends, and holds queued under the canonical never flushed.
+    const a = await agent({ holdMaxDeliveryFailures: 1 });
+    const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);
+    await a.addSecureTransport('relay', relay);
+
+    const CANONICAL = 'canonical-peer-key-000000000000000000000000';
+    const ALIAS = 'their-circle-address-00000000000000000000000';
+    a.registerPeerAddress(ALIAS, CANONICAL);
+
+    await a.peer.sendTo(CANONICAL, { msgId: 'c1' }, HOLD);         // fails once → written off
+    expect(a.holdStats().givenUpOn).toBe(1);
+
+    await a.presenceSignal(ALIAS);                                 // they speak — from their circle address
+    expect(a.holdStats().givenUpOn, 'the canonical is reinstated by alias presence').toBe(0);
+    await a.shutdown();
+  }, 15_000);
+
   it('a presence signal reinstates a peer we had given up on', async () => {
     const a = await agent({ holdMaxDeliveryFailures: 1 });
     const relay = new BlackHoleTransport(new InternalBus(), a.identity.pubKey);

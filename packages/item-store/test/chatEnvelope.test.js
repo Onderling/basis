@@ -20,7 +20,7 @@ import {
 // ── The three shapes, reproduced inline as golden fixtures ────────────────
 // Each mirrors exactly what the former hand-copy emitted.
 
-function goldenOptimisticEvent({ msgId, ts, circleId, actor, text, buttons, scope, embeds, media, review, provenance, consent }) {
+function goldenOptimisticEvent({ msgId, ts, circleId, actor, text, buttons, scope, embeds, card, review, provenance, consent }) {
   return {
     id: msgId, ts, app: 'circle', type: 'chat-message', actor,
     payload: {
@@ -28,7 +28,7 @@ function goldenOptimisticEvent({ msgId, ts, circleId, actor, text, buttons, scop
       ...(buttons?.length ? { buttons } : {}),
       ...(scope ? { scope } : {}),
       ...(embeds?.length ? { embeds } : {}),
-      ...(media ? { media } : {}),
+      ...(card ? { card } : {}),
       ...(review ? { review } : {}),
       ...(provenance != null ? { provenance } : {}),
       ...(consent != null ? { consent } : {}),
@@ -36,26 +36,26 @@ function goldenOptimisticEvent({ msgId, ts, circleId, actor, text, buttons, scop
   };
 }
 
-function goldenReceivedEvent({ msgId, ts, circleId, actor, text, media }) {
+function goldenReceivedEvent({ msgId, ts, circleId, actor, text, card }) {
   return {
     id: msgId, ts, app: 'circle', type: 'chat-message', actor,
     payload: {
       circleId, text, kind: 'chat-message',
       senderDisplay: actor,
-      ...(media ? { media } : {}),
+      ...(card ? { card } : {}),
     },
   };
 }
 
-function goldenWire({ circleId, msgId, ts, text, fromActor, fromWebid, media }) {
+function goldenWire({ circleId, msgId, ts, text, fromActor, fromWebid, card }) {
   return {
     type: 'p2p-chat', subtype: 'circle-chat-message',
     circleId, msgId, ts, text, fromActor, fromWebid,
-    ...(media ? { media } : {}),
+    ...(card ? { card } : {}),
   };
 }
 
-const MEDIA = {
+const CARD = {
   kind: 'media-card', pointer: { type: 'media', ref: 'urn:dec:item:m' },
   snapshot: { type: 'media', id: 'm', source: { type: 'blob', ref: 'blob://k', enc: { sealed: true } } },
 };
@@ -65,7 +65,7 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
     const a = {
       msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi',
       buttons: [{ id: 'a', label: 'A' }], scope: 'circle', embeds: [{ type: 'task', ref: 'r' }],
-      media: MEDIA, review: { intro: 'x', points: [] }, provenance: { llmUsed: true }, consent: { ok: 1 },
+      card: CARD, review: { intro: 'x', points: [] }, provenance: { llmUsed: true }, consent: { ok: 1 },
     };
     expect(toEventLogItem(a)).toEqual(goldenOptimisticEvent(a));
     // key ORDER pinned (serialized) — the payload optional block must not reorder
@@ -77,7 +77,7 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
     const out = toEventLogItem(a);
     expect(out).toEqual({ id: 'm', ts: 1, app: 'circle', type: 'chat-message', actor: 'me', payload: { circleId: 'c', text: 'hi', kind: 'chat-message' } });
     expect(out.payload).not.toHaveProperty('senderDisplay');
-    expect(out.payload).not.toHaveProperty('media');
+    expect(out.payload).not.toHaveProperty('card');
   });
 
   it('empty buttons / falsy scope stay absent (never null-filled)', () => {
@@ -86,8 +86,8 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
     expect(out.payload).not.toHaveProperty('scope');
   });
 
-  it('received: senderDisplay present + media, byte-identical', () => {
-    const a = { msgId: 'm2', ts: 9, circleId: 'c2', actor: 'bob', text: 'yo', senderDisplay: 'bob', media: MEDIA };
+  it('received: senderDisplay present + card, byte-identical', () => {
+    const a = { msgId: 'm2', ts: 9, circleId: 'c2', actor: 'bob', text: 'yo', senderDisplay: 'bob', card: CARD };
     expect(toEventLogItem(a)).toEqual(goldenReceivedEvent({ ...a }));
     expect(JSON.stringify(toEventLogItem(a))).toBe(JSON.stringify(goldenReceivedEvent({ ...a })));
   });
@@ -97,7 +97,7 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
     expect(out.payload).toHaveProperty('senderDisplay', null);
   });
 
-  it('rehydrate legacy: senderDisplay present, no media', () => {
+  it('rehydrate legacy: senderDisplay present, no card', () => {
     const a = { msgId: 'm3', ts: 3, circleId: 'c3', actor: 'ann', text: 'hoi', senderDisplay: 'ann' };
     expect(toEventLogItem(a)).toEqual({
       id: 'm3', ts: 3, app: 'circle', type: 'chat-message', actor: 'ann',
@@ -108,9 +108,9 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
 
 describe('toEventLogItem ↔ fromEventLogItem round-trip', () => {
   it('recovers the transferable fields (senderDisplay is a render echo, dropped)', () => {
-    const env = { msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', media: MEDIA, scope: 'circle' };
+    const env = { msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', card: CARD, scope: 'circle' };
     const back = fromEventLogItem(toEventLogItem(env));
-    expect(back).toEqual({ msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', media: MEDIA, scope: 'circle' });
+    expect(back).toEqual({ msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', card: CARD, scope: 'circle' });
   });
   it('round-trips a bare message', () => {
     const env = { msgId: 'x', ts: 1, circleId: 'c', actor: 'a', text: 't' };
@@ -121,18 +121,18 @@ describe('toEventLogItem ↔ fromEventLogItem round-trip', () => {
 describe('chatEnvelopeFromStoreItem (fromItem) — store item → wire/inbox envelope', () => {
   const storeItem = (source, extra = {}) => ({ id: source.msgId ?? 'auto', text: 'hoi', source, ...extra });
 
-  it('lenient (getMessagesSince): full envelope with media', () => {
-    const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', media: MEDIA });
+  it('lenient (getMessagesSince): full envelope with card', () => {
+    const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', card: CARD });
     expect(chatEnvelopeFromStoreItem(it, { groupId: 'g1', lenient: true })).toEqual({
-      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA,
+      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', card: CARD,
     });
   });
 
-  it('lenient: fromActor falls back to fromWebid; media absent stays absent', () => {
+  it('lenient: fromActor falls back to fromWebid; card absent stays absent', () => {
     const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromWebid: 'https://id/bob' });
     const env = chatEnvelopeFromStoreItem(it, { groupId: 'g1', lenient: true });
     expect(env.fromActor).toBe('https://id/bob');
-    expect(env).not.toHaveProperty('media');
+    expect(env).not.toHaveProperty('card');
   });
 
   it('lenient: msgId falls back to item.id, circleId falls back to groupId, text to empty', () => {
@@ -141,9 +141,9 @@ describe('chatEnvelopeFromStoreItem (fromItem) — store item → wire/inbox env
   });
 
   it('strict (rehydrate): valid item → envelope', () => {
-    const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', media: MEDIA });
+    const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', card: CARD });
     expect(chatEnvelopeFromStoreItem(it)).toEqual({
-      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA,
+      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', card: CARD,
     });
   });
 
@@ -161,30 +161,30 @@ describe('chatEnvelopeFromStoreItem (fromItem) — store item → wire/inbox env
     expect(Number.isFinite(env.ts)).toBe(true);
   });
 
-  it('media guard: an array in source.media is rejected (uniform !Array guard)', () => {
-    const env = chatEnvelopeFromStoreItem({ text: 'hoi', source: { msgId: 'a', circleId: 'g', ts: 1, media: [1, 2] } });
-    expect(env).not.toHaveProperty('media');
+  it('card guard: an array in source.card is rejected (uniform !Array guard)', () => {
+    const env = chatEnvelopeFromStoreItem({ text: 'hoi', source: { msgId: 'a', circleId: 'g', ts: 1, card: [1, 2] } });
+    expect(env).not.toHaveProperty('card');
   });
 });
 
 describe('toWireEnvelope (toWire) — canonical → fan-out wire', () => {
-  it('byte-identical to the former broadcastCircleMessage literal (with media)', () => {
-    const a = { circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'https://id/me', media: MEDIA };
+  it('byte-identical to the former broadcastCircleMessage literal (with card)', () => {
+    const a = { circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'https://id/me', card: CARD };
     expect(toWireEnvelope(a)).toEqual(goldenWire(a));
     expect(JSON.stringify(toWireEnvelope(a))).toBe(JSON.stringify(goldenWire(a)));
   });
 
-  it('no media → legacy wire shape (no media key)', () => {
-    const a = { circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'me', media: null };
+  it('no card → legacy wire shape (no card key)', () => {
+    const a = { circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'me', card: null };
     const wire = toWireEnvelope(a);
-    expect(wire).not.toHaveProperty('media');
+    expect(wire).not.toHaveProperty('card');
     expect(wire).toEqual({ type: 'p2p-chat', subtype: 'circle-chat-message', circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'me' });
   });
 
-  it('local-only fields never ride the wire: only text + whitelisted media transfer', () => {
-    // A media pointer is the ONLY structured extra allowed on the wire; the
+  it('local-only fields never ride the wire: only text + whitelisted card transfer', () => {
+    // A card pointer is the ONLY structured extra allowed on the wire; the
     // render-only fields (review/provenance/consent/buttons) have no path here.
-    const wire = toWireEnvelope({ circleId: 'c', msgId: 'm', ts: 1, text: 't', fromActor: 'a', fromWebid: 'a', media: MEDIA });
+    const wire = toWireEnvelope({ circleId: 'c', msgId: 'm', ts: 1, text: 't', fromActor: 'a', fromWebid: 'a', card: CARD });
     const json = JSON.stringify(wire);
     expect(json).not.toContain('review');
     expect(json).not.toContain('provenance');
@@ -194,11 +194,11 @@ describe('toWireEnvelope (toWire) — canonical → fan-out wire', () => {
 });
 
 describe('store item → wire round-trip (fromItem then toWire)', () => {
-  it('a persisted item projects back to a wire envelope carrying the same core fields + media', () => {
-    const item = { id: 'a', text: 'hoi', source: { circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', media: MEDIA } };
+  it('a persisted item projects back to a wire envelope carrying the same core fields + card', () => {
+    const item = { id: 'a', text: 'hoi', source: { circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', card: CARD } };
     const env = chatEnvelopeFromStoreItem(item, { groupId: 'g1', lenient: true });
-    const wire = toWireEnvelope({ circleId: env.circleId, msgId: env.msgId, ts: env.ts, text: env.text, fromActor: env.fromActor, fromWebid: env.fromActor, media: env.media });
-    expect(wire).toMatchObject({ type: 'p2p-chat', subtype: 'circle-chat-message', circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA });
+    const wire = toWireEnvelope({ circleId: env.circleId, msgId: env.msgId, ts: env.ts, text: env.text, fromActor: env.fromActor, fromWebid: env.fromActor, card: env.card });
+    expect(wire).toMatchObject({ type: 'p2p-chat', subtype: 'circle-chat-message', circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', card: CARD });
   });
 });
 
@@ -213,11 +213,11 @@ describe('store item → wire round-trip (fromItem then toWire)', () => {
  * until Phase 3 wires the real pod write.
  * ─────────────────────────────────────────────────────────────────────── */
 
-function goldenRefWire({ circleId, msgId, ts, ref, fromActor, fromWebid, media }) {
+function goldenRefWire({ circleId, msgId, ts, ref, fromActor, fromWebid, card }) {
   return {
     type: 'p2p-chat', subtype: 'circle-chat-message',
     circleId, msgId, ts, ref, fromActor, fromWebid,
-    ...(media ? { media } : {}),
+    ...(card ? { card } : {}),
   };
 }
 
@@ -232,11 +232,11 @@ describe('toWireRefEnvelope — the pod-signal ref projection', () => {
     expect(wire.subtype).toBe(CIRCLE_CHAT_KIND);
   });
 
-  it('carries a whitelisted media pointer when present (absent → no media key)', () => {
-    expect(toWireRefEnvelope({ ...a, media: MEDIA })).toEqual(goldenRefWire({ ...a, media: MEDIA }));
-    expect(toWireRefEnvelope(a)).not.toHaveProperty('media');
-    // a non-object media is dropped (same guard as toWireEnvelope)
-    expect(toWireRefEnvelope({ ...a, media: ['x'] })).not.toHaveProperty('media');
+  it('carries a whitelisted card pointer when present (absent → no card key)', () => {
+    expect(toWireRefEnvelope({ ...a, card: CARD })).toEqual(goldenRefWire({ ...a, card: CARD }));
+    expect(toWireRefEnvelope(a)).not.toHaveProperty('card');
+    // a non-object card is dropped (same guard as toWireEnvelope)
+    expect(toWireRefEnvelope({ ...a, card: ['x'] })).not.toHaveProperty('card');
   });
 
   it('the ref body never leaks the text: the wire JSON contains the pointer, not content', () => {
@@ -247,11 +247,11 @@ describe('toWireRefEnvelope — the pod-signal ref projection', () => {
 
 describe('toWireRefEnvelope ↔ fromWireRefEnvelope round-trip', () => {
   it('recovers the canonical ref fields byte-for-byte', () => {
-    const a = { circleId: 'g1', msgId: 'm1', ts: 100, ref: 'urn:pod:g1:row:42', fromActor: 'bob', fromWebid: 'bob', media: MEDIA };
+    const a = { circleId: 'g1', msgId: 'm1', ts: 100, ref: 'urn:pod:g1:row:42', fromActor: 'bob', fromWebid: 'bob', card: CARD };
     expect(fromWireRefEnvelope(toWireRefEnvelope(a))).toEqual(a);
   });
 
-  it('without media, the round-trip omits the media key', () => {
+  it('without card, the round-trip omits the card key', () => {
     const a = { circleId: 'g1', msgId: 'm1', ts: 100, ref: 'r', fromActor: 'bob', fromWebid: 'bob' };
     expect(fromWireRefEnvelope(toWireRefEnvelope(a))).toEqual(a);
   });

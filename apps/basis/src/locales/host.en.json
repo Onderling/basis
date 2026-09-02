@@ -439,6 +439,14 @@
     "sent_to_you": {
       "text": "Sent to you directly — not in the circle’s store.",
       "doc": "Caption under an inline photo preview on a peer-wire file-card."
+    },
+    "held": {
+      "text": "📥 {{name}} is HELD for {{peer}} — they are offline; it flushes when they reappear.",
+      "doc": "A /send-file that was queued for an offline peer (hold-forward), not delivered yet."
+    },
+    "not_delivered": {
+      "text": "Not delivered to {{peer}} ({{reason}}).",
+      "doc": "A /send-file the façade gave up on (peer unreachable past the give-up count)."
     }
   },
   "sendto": {

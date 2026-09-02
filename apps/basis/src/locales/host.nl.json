@@ -439,6 +439,14 @@
     "sent_to_you": {
       "text": "Direct naar jou gestuurd — niet in de opslag van de kring.",
       "doc": "Caption under an inline photo preview on a peer-wire file-card."
+    },
+    "held": {
+      "text": "📥 {{name}} staat KLAAR voor {{peer}} — die is offline; het vertrekt zodra die er weer is.",
+      "doc": "A /send-file that was queued for an offline peer (hold-forward), not delivered yet."
+    },
+    "not_delivered": {
+      "text": "Niet afgeleverd bij {{peer}} ({{reason}}).",
+      "doc": "A /send-file the façade gave up on (peer unreachable past the give-up count)."
     }
   },
   "sendto": {

@@ -424,7 +424,7 @@ async function sendFile(args, {
   }
 
   try {
-    await agent.sendPeerMessage(peerAddr, {
+    const res = await agent.sendPeerMessage(peerAddr, {
       type:    'p2p-chat',
       subtype: 'file-share',
       file: {
@@ -436,6 +436,15 @@ async function sendFile(args, {
       },
       sentAt: Date.now(),
     });
+    // Say what actually happened, not what was attempted. The façade's hold-forward answer
+    // distinguishes delivered / held-for-later / given-up; reporting "sent" for all three is the
+    // 2026-05-23 lesson repeating one layer up (sender-side OK, receiver never told otherwise).
+    if (res && res.held === true) {
+      return { message: t('sendFile.held', { name: file.name, peer: peerAddr }) };
+    }
+    if (res && res.held === false && res.delivered === false) {
+      return { ok: false, error: t('sendFile.not_delivered', { peer: peerAddr, reason: res.reason ?? 'unknown' }) };
+    }
     return { message: t('sendFile.sent', { name: file.name, size: file.size, peer: peerAddr }) };
   } catch (err) {
     return { ok: false, error: t('sendFile.send_failed', { error: err.message ?? String(err) }) };

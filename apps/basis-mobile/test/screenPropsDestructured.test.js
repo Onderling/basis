@@ -110,7 +110,7 @@ describe('the two props from the 2026-07-30 breakage in particular', () => {
     expect(propsDeclaredBy('CircleLauncherScreen', launcher).has('circlesRevision')).toBe(true);
     // It has to be a DEPENDENCY of the load effect, not merely accepted — otherwise the counter changes
     // and nothing reloads, which is the same invisible failure one level up.
-    expect(launcher).toMatch(/\[load, callSkill, circlesRevision\]/);
+    expect(launcher).toMatch(/\[load, resolveSkill, circlesRevision\]/);   // the resolver's new name (the arity rename)
   });
 
   it('ChatScreen destructures onCirclesChanged, the other half of that wire', () => {

@@ -537,7 +537,7 @@ async function shareItemIntoCircle({ itemId, fromCircleId, toCircleId, by, recip
   if ((!Array.isArray(who) || who.length === 0) && !recipient) {
     // Resolve the target circle's member WebIDs (reuses the existing stoop roster op).
     try {
-      const members = normalizeCircleMembers(await resolveCallSkill('listGroupMembers', { groupId: toCircleId }));
+      const members = normalizeCircleMembers(await resolveSkill('listGroupMembers', { groupId: toCircleId }));
       who = members.map((m) => m.webid ?? m.id).filter(Boolean);
     } catch { who = undefined; }
   }
@@ -652,7 +652,7 @@ async function recipientSealKeyFor(circleId, webId) {
   } catch { /* fall through to the stoop roster */ }
   // 2. stoop listGroupMembers — the redemption roster carries each joiner's sealingPublicKey.
   try {
-    const res = await resolveCallSkill('listGroupMembers', { groupId: circleId });
+    const res = await resolveSkill('listGroupMembers', { groupId: circleId });
     return recipientSealKeyFromMembers(res, webId);
   } catch { return null; }
 }
@@ -1305,7 +1305,10 @@ const connectionManifestSources = () => CONNECTION_MANIFESTS;
 /** The circles a connection can be granted sight of — the same list the rest of the shell renders. */
 const circleListForConnections = () => circlesCache.filter(Boolean).map((c) => ({ id: c.id, name: c.name ?? c.label ?? c.id }));
 let sources = {};
-let resolveCallSkill = null; // (opId, args) => Promise<object|null>
+// The 2-arg RESOLVING waist — named apart from the targeted 3-arg `rawCallSkill` on purpose: the two
+// shared the name `callSkill` in most scopes, differing only in arity, and a caller picking the wrong
+// one arg-shifted silently. Three separate afternoons went to that.
+let resolveSkill = null; // (opId, args) => Promise<object|null>
 // Capture the boot URL params ONCE at module load — the Solid-OIDC redirect handler
 // (`podAuth.handleRedirect`) strips `?code=…&state=…` on load (it treats `code` as an OIDC auth
 // code), which would wipe a feedback invite's `?projectId&code` before we read it. Snapshot first.
@@ -2420,7 +2423,7 @@ function buildCircleBot(agent) {
   async function appendFindExtras(reply) {
     const { offeringMatches, hopCard } = await buildFindExtras({
       query: reply?.payload?.query, groups: reply?.payload?.groups,
-      circleId: getActiveCircle(), callSkill: resolveCallSkill, t,
+      circleId: getActiveCircle(), callSkill: resolveSkill, t,
     });
     if (offeringMatches.length) {
       const lines = offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n');
@@ -2629,7 +2632,7 @@ function buildCircleBot(agent) {
       retrieve: makeCircleRetriever({
         embedder: CIRCLE_EMBED_BASEURL ? resolveCircleRagEmbedder : undefined,
         loadItems: (ctx) => loadCircleItems({
-          callSkill: resolveCallSkill,
+          callSkill: resolveSkill,
           circleId: ctx?.circleId ?? getActiveCircle(),
         }),
         // Semantic cosine floor: weak/near-noise hybrid matches are dropped
@@ -3857,9 +3860,9 @@ async function showMyThings() {
     files, t, onBack: showLauncher,
   });
   rerender();
-  if (resolveCallSkill) {
+  if (resolveSkill) {
     try {
-      const res = await resolveCallSkill('listFiles', {});
+      const res = await resolveSkill('listFiles', {});
       files = myThingsFromListFiles(res, null);
       rerender();
     } catch { /* keep empty */ }
@@ -3871,8 +3874,8 @@ async function showMyThings() {
 async function showHop() {
   hideCircleTabBar(tabBarEl);
   let hopMode = { global: false };
-  if (resolveCallSkill) {
-    try { hopMode = normalizeHopMode(await resolveCallSkill('getHopMode', {})); } catch { /* default */ }
+  if (resolveSkill) {
+    try { hopMode = normalizeHopMode(await resolveSkill('getHopMode', {})); } catch { /* default */ }
   }
   const rerender = () => renderCircleHop(rootEl, {
     hopMode,
@@ -3880,9 +3883,9 @@ async function showHop() {
     onToggleGlobal: async (v) => {
       hopMode = { global: v };
       rerender();
-      if (resolveCallSkill) {
+      if (resolveSkill) {
         try {
-          const r = await resolveCallSkill('setHopMode', { global: v });
+          const r = await resolveSkill('setHopMode', { global: v });
           if (r && !r.error) { hopMode = normalizeHopMode(r); rerender(); }
         } catch { /* keep optimistic */ }
       }
@@ -4029,7 +4032,11 @@ async function _showActiveScreen() {
     blocks = await materializeScreen({
       screen,
       hostOps: {
-        callSkill: resolveCallSkill ?? rawCallSkill,
+        // The TARGETED 3-arg waist — materializers call `callSkill('calendar', 'listEvents', …)`.
+        // This read `resolveSkill ?? rawCallSkill`, i.e. it PREFERRED the 2-arg resolver whenever the
+        // bot had booted (always): 'calendar' arg-shifted into the opId and the agenda materialised
+        // empty. The same bug sat in mobile's sibling; both found by the §3 rename.
+        callSkill: rawCallSkill,
         eventLog, circles: circlesCache,
       },
       // mutedCircleIds wires in α.5 (per-user mute UI).
@@ -6966,7 +6973,7 @@ function showCircle(id, circle, policy) {
         circleId: id,
         // policy + actionFrequency feed the quickActions block. The block
         // materializers call `callSkill(appOrigin, opId, args)` (3-arg), so this
-        // MUST be the raw 3-arg dispatch — the 2-arg `resolveCallSkill` resolver
+        // MUST be the raw 3-arg dispatch — the 2-arg `resolveSkill` resolver
         // would mis-read the appOrigin as the opId (#16: this also un-breaks the
         // tasks/agenda screen blocks, which had the same latent bug). `stoopCall`
         // keeps the 3-arg contract and scopes the noticeboard block to THIS circle
@@ -7147,9 +7154,9 @@ function showFolio(id) {
   }
 
   function load() {
-    if (!resolveCallSkill) return;
+    if (!resolveSkill) return;
     const args = sourceMode === 'pod' ? { source: 'pod' } : {};
-    resolveCallSkill('listFiles', args)
+    resolveSkill('listFiles', args)
       .then((res) => {
         lastListResult = res;
         needsPod = sourceMode === 'pod' && !!res?.needsPod;
@@ -7523,9 +7530,9 @@ async function showViewAs(id) {
     onBack: () => showDetail(id),
   });
   rerender();
-  if (resolveCallSkill) {
+  if (resolveSkill) {
     try {
-      members = normalizeCircleMembers(await resolveCallSkill('listGroupMembers', { groupId: id }));
+      members = normalizeCircleMembers(await resolveSkill('listGroupMembers', { groupId: id }));
       if (getActiveCircle() === id) rerender();
     } catch { /* keep empty */ }
   }
@@ -8217,8 +8224,8 @@ async function boot() {
       // never appeared even though createGroupV2 + listMyCircles worked. Use the module-level
       // `circleCatalogue` (null until buildCircleBot sets it; makeResolvingCallSkill tolerates
       // a null catalogue by trying all origins).
-      resolveCallSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalogue);
-      sources = circleSourcesFromAgent({ callSkill: resolveCallSkill, helpCircleName: () => helpCircleSpec(t).name });
+      resolveSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalogue);
+      sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name });
       // Phase 5 — build the circle composer's bot + feedback now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
       // register a peer-router with the circle-chat-message

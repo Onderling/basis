@@ -12,7 +12,9 @@ import { useTheme } from './themeContext.js';
 import { normalizeHopMode } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 
-export default function CircleHopScreen({ callSkill, onBack }) {
+// `resolveSkill` — the 2-arg RESOLVING waist (opId, args); this screen's ops live wherever the
+// composition put them. The targeted 3-arg waist is a different prop name everywhere (rawCallSkill).
+export default function CircleHopScreen({ resolveSkill, onBack }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [hopMode, setHopMode] = useState({ global: false });
@@ -20,23 +22,23 @@ export default function CircleHopScreen({ callSkill, onBack }) {
   useEffect(() => {
     let live = true;
     (async () => {
-      if (!callSkill) return;
+      if (!resolveSkill) return;
       try {
-        const r = await callSkill('getHopMode', {});
+        const r = await resolveSkill('getHopMode', {});
         if (live && r) setHopMode(normalizeHopMode(r));
       } catch { /* keep default */ }
     })();
     return () => { live = false; };
-  }, [callSkill]);
+  }, [resolveSkill]);
 
   const onToggle = useCallback(async (v) => {
     setHopMode({ global: v });   // optimistic
-    if (!callSkill) return;
+    if (!resolveSkill) return;
     try {
-      const r = await callSkill('setHopMode', { global: v });
+      const r = await resolveSkill('setHopMode', { global: v });
       if (r && !r.error) setHopMode(normalizeHopMode(r));
     } catch { /* leave optimistic value */ }
-  }, [callSkill]);
+  }, [resolveSkill]);
 
   return (
     <View style={styles.page} testID="circle-hop">

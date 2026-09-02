@@ -1118,7 +1118,11 @@ export default function CircleLauncherScreen({
       try {
         const blocks = await materializeScreen({
           screen,
-          hostOps: { callSkill, eventLog, circles, fetchImpl: getCirclePodFetch() || undefined },
+          // The TARGETED 3-arg waist: materializers call `callSkill('calendar', 'listEvents', …)`.
+          // This site held the 2-arg resolver — the arity trap's third catch (#16 fixed the recipe
+          // path and this sibling kept the wrong one): 'calendar' arg-shifted into the opId and the
+          // agenda materialised empty. Found by the rename that makes the two waists unmistakable.
+          hostOps: { callSkill: bundle?.callSkill, eventLog, circles, fetchImpl: getCirclePodFetch() || undefined },
         });
         if (!alive) return;
         setScreenViewBlocks(blocks);
@@ -1137,9 +1141,11 @@ export default function CircleLauncherScreen({
       }
     })();
     return () => { alive = false; };
-  }, [view, screensSubMode, viewingScreenId, screensBook, callSkill, eventLog, circles, screenBlocksCache]);
+  }, [view, screensSubMode, viewingScreenId, screensBook, bundle, eventLog, circles, screenBlocksCache]);
 
-  const callSkill = useMemo(
+  // `resolveSkill`, not `callSkill`: the 2-arg RESOLVING waist. The targeted 3-arg one lives on
+  // `bundle.callSkill`; giving them one name is the arity trap (it has now bitten three times).
+  const resolveSkill = useMemo(
     // Pass a catalogue getter so the resolver skips origins that don't declare the op
     // (no probe-storm). Lazy → read at dispatch time. The launcher-level resolver uses
     // the RAW merged catalogue (`bundle.catalogue`); per-circle app scoping happens in
@@ -1151,8 +1157,8 @@ export default function CircleLauncherScreen({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const sources = callSkill
-        ? circleSourcesFromAgent({ callSkill, helpCircleName: () => helpCircleSpec(t).name })
+      const sources = resolveSkill
+        ? circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name })
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);
@@ -1165,7 +1171,7 @@ export default function CircleLauncherScreen({
     } finally {
       setLoading(false);
     }
-  }, [callSkill, bundle]);
+  }, [resolveSkill, bundle]);
 
   // Task #13 — the two first-run flags (help-circle provisioned · onboarding done), over AsyncStorage IO.
   // The SAME shared store the web shell uses; passed down to CircleDetail so onboarding persists identically.
@@ -1235,7 +1241,7 @@ export default function CircleLauncherScreen({
     let tries = 0;
     const tick = async () => {
       const n = await load();
-      if (!cancelled && n === 0 && callSkill && (tries += 1) < 5) {
+      if (!cancelled && n === 0 && resolveSkill && (tries += 1) < 5) {
         setTimeout(() => { if (!cancelled) tick(); }, 1200);
       }
     };
@@ -1243,7 +1249,7 @@ export default function CircleLauncherScreen({
     return () => { cancelled = true; };
     // `circlesRevision` re-runs this when a circle arrives from elsewhere — the retry-while-empty loop is
     // exactly the right shape for it, since a just-joined circle may take a beat to reach the store.
-  }, [load, callSkill, circlesRevision]);
+  }, [load, resolveSkill, circlesRevision]);
 
   // refresh per-circle pending proposal counts whenever the
   // circle list changes.  countPending is async per circle; we tolerate
@@ -1298,11 +1304,11 @@ export default function CircleLauncherScreen({
   // any read failure.  Refreshed when `selected` changes.
   const [myListTasks, setMyListTasks] = useState([]);
   useEffect(() => {
-    if (!selected?.id || !callSkill) { setMyListTasks([]); return; }
+    if (!selected?.id || !resolveSkill) { setMyListTasks([]); return; }
     let alive = true;
     (async () => {
       try {
-        const res = await callSkill('getMyTasks', {});
+        const res = await resolveSkill('getMyTasks', {});
         const items = Array.isArray(res?.items) ? res.items
           : Array.isArray(res?.tasks) ? res.tasks
           : Array.isArray(res) ? res : [];
@@ -1314,7 +1320,7 @@ export default function CircleLauncherScreen({
       }
     })();
     return () => { alive = false; };
-  }, [selected, callSkill]);
+  }, [selected, resolveSkill]);
 
   const openCircle = useCallback(async (c) => {
     setActiveCircle(c.id);
@@ -1333,12 +1339,12 @@ export default function CircleLauncherScreen({
     // OBJ-2 — pair this circle's members as no-pod household-sync peers (web parity). Both devices do
     // this on open → they become mutual sync peers, so writes fan out. Best-effort; never blocks open.
     feedHouseholdRoster({ agent: bundle?.agent, circleId: c.id }).catch(() => {});
-    if (!callSkill) return;
+    if (!resolveSkill) return;
     try {
-      const got = await loadCircleItems({ callSkill, circleId: c.id });
+      const got = await loadCircleItems({ callSkill: resolveSkill, circleId: c.id });
       setSelected((cur) => { if (cur && cur.id === c.id) setItems(got); return cur; });
     } catch { /* keep empty */ }
-  }, [callSkill, bundle]);
+  }, [resolveSkill, bundle]);
 
   const closeCircle = () => { setActiveCircle(null); setSelected(null); setItems([]); setView('list'); };
 
@@ -1847,7 +1853,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'hop') {
     // Hopping lives under the Mij tab (personal settings).
-    return <CircleHopScreen callSkill={callSkill} onBack={() => setView('availability')} />;
+    return <CircleHopScreen resolveSkill={resolveSkill} onBack={() => setView('availability')} />;
   }
   if (view === 'points') {
     // Connection points (Nearby step I). The store is hydrated + migrated by the host component below.
@@ -1992,7 +1998,7 @@ export default function CircleLauncherScreen({
         registerCircleBotSink={registerCircleBotSink}
         onAcceptFallback={onAcceptFallback}
         items={items}
-        callSkill={callSkill}
+        resolveSkill={resolveSkill}
         rawCallSkill={bundle?.callSkill}
         // One function, not the whole bundle (this file's style, stated in CircleDetail's props): the
         // removed-from-a-circle line reads the verified membership statements to name WHO removed you.
@@ -2035,8 +2041,8 @@ export default function CircleLauncherScreen({
           const p = await policyStore.get(selected.id);
           setViewAsPolicy(p?.revealPolicy ?? 'pairwise');
           let mem = [];
-          if (callSkill) {
-            try { mem = normalizeCircleMembers(await callSkill('listGroupMembers', { groupId: selected.id })); } catch { /* keep empty */ }
+          if (resolveSkill) {
+            try { mem = normalizeCircleMembers(await resolveSkill('listGroupMembers', { groupId: selected.id })); } catch { /* keep empty */ }
           }
           setViewAsMembers(mem);
           setView('viewas');
@@ -2051,9 +2057,9 @@ export default function CircleLauncherScreen({
         onFiles={async () => {
           let fs = [];
           let raw = null;
-          if (callSkill) {
+          if (resolveSkill) {
             try {
-              raw = await callSkill('listFiles', {});
+              raw = await resolveSkill('listFiles', {});
               fs = circleFilesFromListFiles(raw, selected.id);
             } catch { /* keep empty */ }
           }
@@ -2477,7 +2483,7 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
-  circle, items, callSkill, rawCallSkill, catalogue: rawCatalogue, policy, override = null, myListTasks = [],
+  circle, items, resolveSkill, rawCallSkill, catalogue: rawCatalogue, policy, override = null, myListTasks = [],
   deliveryStateMap = null,
   registerCircleBotSink = null,
   onAcceptFallback = null,
@@ -2837,7 +2843,7 @@ function CircleDetail({
       }
     })();
     return () => { alive = false; };
-  }, [recipeStore, circle?.id, callSkill, eventLog, circles, policy, screenReloadTick,
+  }, [recipeStore, circle?.id, resolveSkill, eventLog, circles, policy, screenReloadTick,
     tabMembers, mandateViewer]);
 
   // Chat ↔ Screen pill state (v2 §4 "De mode switch").
@@ -3586,7 +3592,7 @@ function CircleDetail({
               return embedder.embed(texts);
             }
           : undefined,
-        loadItems: (ctx) => loadCircleItems({ callSkill, circleId: ctx?.circleId ?? circle?.id }),
+        loadItems: (ctx) => loadCircleItems({ callSkill: resolveSkill, circleId: ctx?.circleId ?? circle?.id }),
         // Persistence seam (vectorStore) — web parity. Threaded end-to-end into
         // PodSearch, which persists vectors under
         // private/state/search-index/circle-rag/<id>/ (never sharing/). Wires the
@@ -3617,7 +3623,7 @@ function CircleDetail({
     onNoMatch: (_text, _ctx, opts) => { appendCircleMessage({ actor: 'bot', text: (opts && opts.reply) || t('circle.bot.unknown') }); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { appendCircleMessage({ actor: 'bot', text: t('circle.bot.basic_mode') }); },
-  }), [catalogue, clarify, circle?.id, callSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk]);
+  }), [catalogue, clarify, circle?.id, resolveSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk]);
 
   // ── Task #13 — onboarding-as-bot-chat + standing help Q&A (thin twin of web circleApp.js) ──────────
   // The confidential-route-aware help LLM binding (parity with web's circleHelpLlm): ready() reflects

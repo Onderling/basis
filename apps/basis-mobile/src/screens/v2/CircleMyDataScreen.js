@@ -46,7 +46,7 @@ import { enableNativePush, disableNativePush, getNativePushState } from '../../v
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
-export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer, agent = null,
+export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
   onOpenConnectionPoints, eventLog = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
@@ -105,26 +105,29 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   useEffect(() => { relayStore.get().then(setRelayInput).catch(() => {}); }, [relayStore]);
   const saveRelay = useCallback(async () => {
     try {
+      // ONE implementation of "set the relay" — the launcher's `set-relay` op (it surfaces save
+      // errors, echoes the register, reads the STORED value back, and live-reconnects). This screen
+      // used to hand-roll a second save beside it that swallowed write errors and reported the INPUT
+      // as saved: twice on the A33 the note said "Connected via …" while nothing had persisted (once
+      // it even connected to a port only the register still remembered). A door reports what the one
+      // implementation did, or it reports fiction.
+      if (typeof onSetRelay === 'function') {
+        setRelayNote(t('circle.mydata.relay_saving'));
+        const r = await onSetRelay(relayInput.trim() ? { url: relayInput.trim() } : { clear: true });
+        if (typeof r?.effective === 'string') setRelayInput(r.effective);
+        setRelayNote(r && r.ok !== false && !r.error
+          ? t('circle.mydata.relay_saved', { url: r.effective || t('circle.mydata.relay_off') })
+          : t('circle.mydata.relay_error', { msg: r?.error || '' }));
+        return;
+      }
+      // Older hosts without the op seam: the legacy write path (cache + register echo), reload applies.
       const saved = await relayStore.set(relayInput);
-      // The bare key is only the PRE-BOOT CACHE (the transport connects before the agent exists); the
-      // register is the authority. Writing one and not the other is how this setting reverted on the
-      // next app open — the launcher's own relay op already wrote both, so the two doors disagreed
-      // about what the user had chosen. Same value, both homes, idempotent.
       callSkill?.('params', 'set-param', { key: 'relay.url', value: saved ?? '' })
         ?.catch?.(() => { /* the cache stands */ });
       setRelayInput(saved);
-      // Live reconnect when the host wired it (bundle.reconnectPeer); otherwise it applies on next app open.
-      if (typeof onReconnectPeer === 'function') {
-        setRelayNote(t('circle.mydata.relay_saving'));
-        const r = await onReconnectPeer();
-        setRelayNote(r && r.ok
-          ? t('circle.mydata.relay_saved', { url: r.effective || t('circle.mydata.relay_off') })
-          : t('circle.mydata.relay_error', { msg: (r && r.error) || '' }));
-      } else {
-        setRelayNote(t('circle.mydata.relay_saved_reload', { url: saved || t('circle.mydata.relay_off') }));
-      }
+      setRelayNote(t('circle.mydata.relay_saved_reload', { url: saved || t('circle.mydata.relay_off') }));
     } catch (e) { setRelayNote(t('circle.mydata.relay_error', { msg: e?.message ?? '' })); }
-  }, [callSkill, relayStore, relayInput, onReconnectPeer]);
+  }, [callSkill, relayStore, relayInput, onSetRelay]);
 
   // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
   // the device knows, which circles ride each, and what removing one would cost.

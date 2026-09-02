@@ -275,6 +275,7 @@ import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
 import CircleProfileScreen from './CircleProfileScreen.js';
+import CircleBlockedScreen from './CircleBlockedScreen.js';
 import CircleAdvancedScreen from './CircleAdvancedScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
@@ -1516,6 +1517,7 @@ export default function CircleLauncherScreen({
       if (selected && view === 'rulesconsent') { setView('rules'); return true; }
       // Hop screen lives under the Mij tab.
       if (view === 'hop') { setView('availability'); return true; }
+      if (view === 'blocked') { setView('profile'); return true; }
       // S2/S5 — Mij sub-views.
       if (view === 'mydata') { setView('profile'); return true; }
       if (view === 'advanced') { setView('profile'); return true; }
@@ -1641,11 +1643,20 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
         />
+      </WithTabBar>
+    );
+  }
+  // The BLOCKED list — sub-view of Mij (web parity: showBlocked). The device-wide block set with
+  // its only undo, in a place a person can find without being any circle's admin.
+  if (view === 'blocked') {
+    return (
+      <WithTabBar active="mij" onSelect={onTab}>
+        <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('profile')} />
       </WithTabBar>
     );
   }
@@ -1679,7 +1690,7 @@ export default function CircleLauncherScreen({
   if (view === 'mydata') {
     return (
       <WithTabBar active="mij" onSelect={onTab}>
-        <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer} onOpenConnectionPoints={() => setView('points')} />
+        <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer} onOpenConnectionPoints={() => setView('points')} />
       </WithTabBar>
     );
   }

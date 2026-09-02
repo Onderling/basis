@@ -68,7 +68,10 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
       // (rules / membership) which aren't noticeboard posts.
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
       const mapped = items.map((it) => ({
-        id: it.id, text: it.text ?? it.label ?? '', type: it.type ?? it.intent ?? 'ask',
+        // The INTENT, not the item type — a canonical post's type is 'post', which printed the raw
+        // locale key as its badge on both shells (web≡mobile with circleApp's projection).
+        id: it.id, text: it.text ?? it.label ?? '',
+        type: it.intent ?? it.kind ?? (['ask', 'offer', 'lend'].includes(it.type) ? it.type : 'ask'),
         addedBy: it.addedBy, mine: !!(who && it.addedBy === who),
         // S5 — inline-image metadata (thumbnail travels; full bytes on demand).
         attachments: Array.isArray(it.attachments) ? it.attachments

@@ -6084,7 +6084,11 @@ function showCircle(id, circle, policy) {
       noticeboardPosts = items.map((it) => ({
         id:           it.id,
         text:         it.text ?? it.label ?? '',
-        type:         it.type ?? it.intent ?? 'ask',
+        // The INTENT, not the item type: a canonical post's `type` is 'post', which is not a badge —
+        // both shells printed the raw key `circle.noticeboard.intent.post` for every such row (walked
+        // 2026-09-02). The intent field wins; a type is honoured only when it IS one of the intents.
+        type:         it.intent ?? it.kind
+                        ?? (['ask', 'offer', 'lend'].includes(it.type) ? it.type : 'ask'),
         addedBy:      it.addedBy,
         addedByLabel: shortWebid(it.addedBy),
         mine:         !!(myWebid && it.addedBy === myWebid),

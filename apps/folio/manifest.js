@@ -262,7 +262,7 @@ export const folioManifest = {
      * manifest.  The destructive ops above deliberately carry NO chat. */
 
     {
-      id:    'readNote', verb: 'list',
+      id:    'readNote', group: 'data', verb: 'list',
       params: [{ name: 'path', kind: 'string', required: true }],
       runtime: 'browser',
       surfaces: {
@@ -274,7 +274,7 @@ export const folioManifest = {
       },
     },
     {
-      id:    'shareFolder', verb: 'add',
+      id:    'shareFolder', group: 'compose', verb: 'add',
       params: [
         { name: 'folder', kind: 'string', required: true },
         { name: 'with',   kind: 'webid',  required: true },
@@ -297,7 +297,10 @@ export const folioManifest = {
       appliesTo: { type: 'file' },
       params: [{ name: 'path', kind: 'string', required: true }],
       runtime: 'browser',
-      surfaces: { chat: { hint: 'snapshot a folio file for embedding' } },
+      // Substrate, not a door: the card machinery reads this back (`cardSnapshotSkill`) whenever a
+      // composer embeds one — no person ever taps "snapshot". `internal` takes it out of coverage and
+      // out of the Advanced drawer. Internal ≠ unused; it is called on every embed.
+      surfaces: { internal: true },
     },
     /**
      * `[Download]` button on file-cards.  appliesTo:{type:'file'}
@@ -346,7 +349,7 @@ export const folioManifest = {
      * current sharing.  Mirrors `bin/folio status`.
      */
     {
-      id:    'folioStatus', verb: 'list',
+      id:    'folioStatus', group: 'data', verb: 'list',
       params: [],
       runtime: 'browser',
       surfaces: {
@@ -360,7 +363,7 @@ export const folioManifest = {
      * buttons (Download / Save to my pod) via appliesTo:{type:'file'}.
      */
     {
-      id:    'listFiles', verb: 'list',
+      id:    'listFiles', group: 'data', verb: 'list',
       params: [],
       runtime: 'browser',
       surfaces: {
@@ -379,7 +382,7 @@ export const folioManifest = {
      * result when semantic was asked for but unavailable.
      */
     {
-      id:    'searchNotes', verb: 'list',
+      id:    'searchNotes', group: 'data', verb: 'list',
       params: [
         { name: 'query', kind: 'string', required: true },
         { name: 'mode',  kind: 'string', required: false },   // 'lexical' | 'semantic' | 'hybrid'

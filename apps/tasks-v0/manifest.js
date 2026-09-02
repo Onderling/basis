@@ -244,12 +244,13 @@ export const tasksManifest = {
       params: [
         { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY },
       ],
-      surfaces: {
-        chat: { hint: 'Snapshot a task for embedding in chat.' },
-      },
+      // Substrate, not a door: the card machinery reads this back (`cardSnapshotSkill`) whenever a
+      // composer embeds one — no person ever taps "snapshot". `internal` takes it out of coverage and
+      // out of the Advanced drawer. Internal ≠ unused; it is called on every embed.
+      surfaces: { internal: true },
     },
     {
-      id:        'removeTask',
+      id:        'removeTask', group: 'compose',
       verb:      'remove',
       appliesTo: { type: 'task' },
       params: [
@@ -301,7 +302,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'reassignTask',
+      id:        'reassignTask', group: 'admin',
       verb:      'reassign',
       appliesTo: { type: 'task' },
       params: [
@@ -391,7 +392,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'listOpen',
+      id:        'listOpen', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params: [
@@ -441,7 +442,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'listClaimable',
+      id:        'listClaimable', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params: [
@@ -461,7 +462,7 @@ export const tasksManifest = {
      * the already-declared task atoms (`list` / `reassign`).
      */
     {
-      id:        'listClaimConflicts',
+      id:        'listClaimConflicts', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -470,7 +471,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'resolveClaim',
+      id:        'resolveClaim', group: 'admin',
       verb:      'reassign',
       appliesTo: { type: 'task' },
       params: [
@@ -493,7 +494,7 @@ export const tasksManifest = {
      * `src/skills/workspace.js` (registered via buildWorkspaceSkills).
      */
     {
-      id:        'listAwaitingApproval',
+      id:        'listAwaitingApproval', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -513,7 +514,7 @@ export const tasksManifest = {
      * hint mirrors the JSDoc on workspace.js's defineSkill body.
      */
     {
-      id:        'listMyMasteredTasks',
+      id:        'listMyMasteredTasks', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -524,7 +525,7 @@ export const tasksManifest = {
     {
       // The pending-claims approvals list — data source for the `pending-claims` view. Rows carry
       // `status:'pending-confirmation'`, so the confirmClaim button surfaces on each (its appliesTo).
-      id:        'listMyPendingClaims',
+      id:        'listMyPendingClaims', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -559,7 +560,7 @@ export const tasksManifest = {
      *                                 belongs ON the section).
      */
     {
-      id:        'listMyInbox',
+      id:        'listMyInbox', group: 'data',
       verb:      'list',
       appliesTo: { type: 'inbox-item' },
       params: [
@@ -706,7 +707,7 @@ export const tasksManifest = {
      * `dag` view (no per-item buttons in V0 — itemActions[] is empty).
      */
     {
-      id:        'getDagTree',
+      id:        'getDagTree', group: 'data',
       verb:      'tree',
       appliesTo: { type: 'task' },
       params: [
@@ -817,7 +818,7 @@ export const tasksManifest = {
      * suggested next ops (invite a member, add the first task).
      */
     {
-      id:    'provisionMyCircle', verb: 'add',
+      id:    'provisionMyCircle', group: 'admin', verb: 'add',
       params: [
         { name: 'name', kind: 'string', required: true },
         { name: 'kind', kind: 'enum',
@@ -835,7 +836,7 @@ export const tasksManifest = {
      * (a product-semantic alias, not drift).
      */
     {
-      id:    'myInbox', verb: 'list',
+      id:    'myInbox', group: 'overview', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/inbox' },
@@ -847,7 +848,7 @@ export const tasksManifest = {
      * tasks-v0's per-member availability hints.
      */
     {
-      id:    'getMyAvailability', verb: 'list',
+      id:    'getMyAvailability', group: 'overview', verb: 'list',
       params: [
         { name: 'week', kind: 'string', required: false },
       ],
@@ -857,7 +858,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'setMyAvailability', verb: 'submit',
+      id:    'setMyAvailability', group: 'compose', verb: 'submit',
       params: [
         { name: 'cellKey', kind: 'string', required: true },
       ],
@@ -867,7 +868,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'setAvailabilityOptIn', verb: 'submit',
+      id:    'setAvailabilityOptIn', group: 'compose', verb: 'submit',
       params: [
         { name: 'on', kind: 'enum', of: ['on', 'off'], required: true },
       ],
@@ -883,7 +884,7 @@ export const tasksManifest = {
      * buttons dispatch all three args.
      */
     {
-      id:    'suggestSchedule', verb: 'list',
+      id:    'suggestSchedule', group: 'data', verb: 'list',
       appliesTo: { type: 'schedule-slot' },
       params: [
         { name: 'lookahead-days', kind: 'number', required: false },
@@ -910,7 +911,7 @@ export const tasksManifest = {
      * per-circle counters (open / overdue / mine / awaitingApproval).
      */
     {
-      id:    'getMyCircles', verb: 'list',
+      id:    'getMyCircles', group: 'data', verb: 'list',
       appliesTo: { type: 'circle' },
       params: [],
       surfaces: {
@@ -928,7 +929,7 @@ export const tasksManifest = {
      * getMyCircles).
      */
     {
-      id:    'listMyTasksAcrossCircles', verb: 'list',
+      id:    'listMyTasksAcrossCircles', group: 'overview', verb: 'list',
       appliesTo: { type: 'task' },
       params: [],
       surfaces: {
@@ -942,7 +943,7 @@ export const tasksManifest = {
      * from opts.tasksCircleConfig.circleId by realAgent.
      */
     {
-      id:    'getCircleConfig', verb: 'list',
+      id:    'getCircleConfig', group: 'admin', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/circle-info' },
@@ -954,7 +955,7 @@ export const tasksManifest = {
      * member.  Derived from getCircleConfig (realAgent unpacks members[]).
      */
     {
-      id:    'listCircleMembers', verb: 'list',
+      id:    'listCircleMembers', group: 'data', verb: 'list',
       appliesTo: { type: 'member' },
       params: [],
       surfaces: {
@@ -963,7 +964,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'pauseCircle', verb: 'submit',
+      id:    'pauseCircle', group: 'admin', verb: 'submit',
       params: [],
       surfaces: {
         slash: { command: '/pause-circle' },
@@ -971,7 +972,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'unpauseCircle', verb: 'submit',
+      id:    'unpauseCircle', group: 'admin', verb: 'submit',
       params: [],
       surfaces: {
         slash: { command: '/unpause-circle' },
@@ -984,7 +985,7 @@ export const tasksManifest = {
      * joins the circle that issued the token.
      */
     {
-      id:    'issueInvite', verb: 'add',
+      id:    'issueInvite', group: 'admin', verb: 'add',
       params: [
         { name: 'role',      kind: 'enum',   of: ['member', 'admin'], required: false },
         { name: 'ttl-hours', kind: 'number', required: false },
@@ -995,7 +996,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'redeemInvite', verb: 'add',
+      id:    'redeemInvite', group: 'admin', verb: 'add',
       params: [
         { name: 'invite',      kind: 'string', required: true },
         { name: 'displayName', kind: 'string', required: false },
@@ -1050,7 +1051,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'forceSpawnSubtask', verb: 'add',
+      id:    'forceSpawnSubtask', group: 'compose', verb: 'add',
       // Admin-only escape hatch — no row button (admins use the slash).
       params: [
         { name: 'parentTaskId',     kind: 'string', required: true },

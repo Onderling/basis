@@ -81,7 +81,7 @@ export const householdManifest = {
   operations: [
     // ── ops (byte-equal to V0_TOOL_CATALOGUE) ────────────────────
     {
-      id:   'addItem',
+      id:   'addItem', group: 'compose',
       verb: 'add',
       params: [
         { name: 'type', kind: 'enum',   of: LIST_TYPES, required: true },
@@ -101,7 +101,7 @@ export const householdManifest = {
       },
     },
     {
-      id:   'listOpen',
+      id:   'listOpen', group: 'data',
       verb: 'list',
       params: [
         { name: 'type', kind: 'enum', of: LIST_TYPES, required: true },
@@ -173,7 +173,7 @@ export const householdManifest = {
       },
     },
     {
-      id:   'help',
+      id:   'help', group: 'help',
       verb: 'help',                              // F-SP1-e: non-canonical
       params: [],
       surfaces: {
@@ -194,7 +194,7 @@ export const householdManifest = {
 
     // ── ops (tasks + contacts; co-equal to the list ops) ───────
     {
-      id:        'addTask',
+      id:        'addTask', group: 'compose',
       verb:      'add',
       appliesTo: { type: 'task' },
       params: [
@@ -216,7 +216,7 @@ export const householdManifest = {
       },
     },
     {
-      id:        'listTasks',
+      id:        'listTasks', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params: [],
@@ -257,7 +257,7 @@ export const householdManifest = {
       },
     },
     {
-      id:        'reassign',
+      id:        'reassign', group: 'admin',
       verb:      'reassign',
       appliesTo: { type: 'task' },
       // DECLARATION LAYER (#34) — reassigning writes `assignee`, part of the CLAIM cluster (first-wins).
@@ -273,7 +273,7 @@ export const householdManifest = {
       },
     },
     {
-      id:        'registerName',
+      id:        'registerName', group: 'compose',
       verb:      'register',                                   // F-SP1-e
       appliesTo: { type: 'contact' },
       params: [
@@ -294,7 +294,7 @@ export const householdManifest = {
       },
     },
     {
-      id:   'revokeDevice',
+      id:   'revokeDevice', group: 'device',
       verb: 'revoke-device',
       // The device-revocation CEREMONY (the eviction machinery pointed inward): phrase-proven on a
       // SURVIVING device; tombstones the delegation and retires the device's per-circle addresses
@@ -307,7 +307,7 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'enrollDevice',
+      id:   'enrollDevice', group: 'device',
       verb: 'enroll-device',
       // The add-a-device CEREMONY (a host identity act, like restoreOwnerPhrase): restores the
       // owner root from the phrase — typed on THIS, the NEW device — and writes this install's
@@ -323,7 +323,7 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'buildEnrollOffer',
+      id:   'buildEnrollOffer', group: 'device',
       verb: 'get',
       // The add-a-device OFFER (`onderling-enroll://`) shown on the EXISTING device as a QR/copy
       // string: relay hint + per-circle {id, handle, this device's per-circle address} — the
@@ -336,7 +336,7 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'revealOwnerPhrase',
+      id:   'revealOwnerPhrase', group: 'device',
       verb: 'reveal-owner-phrase',
       // Shows the owner recovery phrase to the person already holding the device. Takes nothing:
       // possession of an unlocked device IS the authority, and asking for a secret to reveal a
@@ -347,7 +347,7 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'restoreOwnerPhrase',
+      id:   'restoreOwnerPhrase', group: 'device',
       verb: 'restore-owner-phrase',
       // The other direction: adopt an owner root from a phrase typed on THIS device. Distinct from
       // enrollDevice, which also writes a delegation blob for a device joining an existing account.
@@ -357,7 +357,7 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'grantSurface',
+      id:   'grantSurface', group: 'admin',
       verb: 'grant-surface',
       // CONNECTIONS — a thing that is not this device (a screen, a bot, an always-on companion)
       // acting as you within limits you ticked. `ops` is the boundary: the pick IS the grant, and
@@ -378,7 +378,7 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'revokeSurface',
+      id:   'revokeSurface', group: 'admin',
       verb: 'revoke-surface',
       // Unpairing. Revoke-wins: the grant stops working regardless of what the other side still holds.
       params: [
@@ -387,7 +387,7 @@ export const householdManifest = {
       surfaces: {},
     },
     {
-      id:   'listSurfaceGrants',
+      id:   'listSurfaceGrants', group: 'admin',
       verb: 'list-surface-grants',
       // What is currently connected, and what each may do — the read behind the connections list.
       params: [],

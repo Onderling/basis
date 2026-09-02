@@ -44,6 +44,11 @@ export function renderCoverage(manifestOrList) {
     const app = m.appId ?? m.app ?? m.id ?? '';
     for (const op of (Array.isArray(m.operations) ? m.operations : [])) {
       const s = op.surfaces ?? {};
+      // `surfaces.internal` — substrate ops (the card machinery's snapshot calls): no person invokes
+      // them, so they belong on no surface and in no coverage row. Skipping them HERE is what also
+      // removes them from the Advanced drawer, whose row source is this matrix's complement — internal
+      // is a declaration, precise on purpose: internal ≠ unused (the machinery calls these daily).
+      if (s.internal === true) continue;
       const row = { app, op: op.id, verb: op.verb ?? '' };
       for (const surf of SURFACES) row[surf.key] = !!surf.detect(s, op);
       const verbs = s.slash && s.slash.match && Array.isArray(s.slash.match.verbs) ? s.slash.match.verbs : [];

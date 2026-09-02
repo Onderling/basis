@@ -990,6 +990,18 @@
       "other": {
         "text": "Other",
         "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "data": {
+        "text": "Data & lists",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "admin": {
+        "text": "Administration",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
+      },
+      "compose": {
+        "text": "Create & send",
+        "doc": "A shelf heading in the Advanced drawer; the op declares which shelf it is on."
       }
     }
   },

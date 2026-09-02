@@ -23,6 +23,14 @@
 export const listsManifest = {
   app:       'lists',
   itemTypes: ['list', 'list-item', 'board'],
+
+  // The capability surface (`(atom × noun)` pairs the per-circle matrix gates at `callSkill`):
+  // creating/listing lists, and adding/completing their entries. `board` is stored structure the list
+  // ops manage — no op names it directly, so it carries no atoms yet.
+  nouns: {
+    list:        { atoms: ['add', 'list'] },
+    'list-item': { atoms: ['add', 'complete'] },
+  },
   verbs:     [],
   operations: [
     {
@@ -80,7 +88,7 @@ export const listsManifest = {
       },
     },
     {
-      id:       'listLists',
+      id:       'listLists', group: 'data',
       verb:     'list',
       requires: ['lists'],
       params:   [],

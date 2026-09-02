@@ -36,7 +36,7 @@ export const calendarManifest = {
      * (comma-separated webids), notes.
      */
     {
-      id:    'addEvent',
+      id:    'addEvent', group: 'compose',
       verb:  'add',
       appliesTo: { type: 'calendar-event' },
       // v0.7.-followup 2026-05-23 (3rd pass): renamed startsAt →
@@ -70,7 +70,7 @@ export const calendarManifest = {
      * Optional `days` flag (default 7).
      */
     {
-      id:    'listEvents',
+      id:    'listEvents', group: 'data',
       verb:  'list',
       appliesTo: { type: 'calendar-event' },
       params: [
@@ -188,16 +188,17 @@ export const calendarManifest = {
           // /cancelappt → form with event picker.
           pickerSource: { listOp: 'listEvents' } },
       ],
-      surfaces: {
-        chat: { hint: 'snapshot a calendar event for embedding' },
-      },
+      // Substrate, not a door: the card machinery reads this back (`cardSnapshotSkill`) whenever a
+      // composer embeds one — no person ever taps "snapshot". `internal` takes it out of coverage and
+      // out of the Advanced drawer. Internal ≠ unused; it is called on every embed.
+      surfaces: { internal: true },
     },
 
     /**
      * `briefSummary` — contributor.
      */
     {
-      id:    'briefSummary',
+      id:    'briefSummary', group: 'data',
       verb:  'list',
       params: [],
       surfaces: {
@@ -210,7 +211,7 @@ export const calendarManifest = {
      * location.
      */
     {
-      id:    'searchEvents',
+      id:    'searchEvents', group: 'data',
       verb:  'list',
       params: [
         { name: 'query', kind: 'string', required: true },
@@ -227,7 +228,7 @@ export const calendarManifest = {
      * received writes.
      */
     {
-      id:    'podStatus',
+      id:    'podStatus', group: 'data',
       verb:  'list',
       params: [],
       surfaces: {
@@ -244,7 +245,7 @@ export const calendarManifest = {
      * makes the same feed externally reachable.
      */
     {
-      id:    'getIcsFeed',
+      id:    'getIcsFeed', group: 'data',
       verb:  'list',
       params: [],
       surfaces: {

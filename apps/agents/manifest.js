@@ -61,7 +61,7 @@ export const agentsManifest = {
 
   operations: [
     {
-      id:        'listAgents',
+      id:        'listAgents', group: 'data',
       verb:      'list',
       appliesTo: { type: 'agent' },
       params:    [],
@@ -75,7 +75,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'viewAgent',
+      id:        'viewAgent', group: 'data',
       verb:      'list',
       appliesTo: { type: 'agent' },
       params: [
@@ -103,7 +103,7 @@ export const agentsManifest = {
      * own circle.
      */
     {
-      id:        'setAgentSkillExposure',
+      id:        'setAgentSkillExposure', group: 'admin',
       verb:      'update',
       appliesTo: { type: 'agent' },
       params: [
@@ -124,7 +124,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'getAgentSkillExposure',
+      id:        'getAgentSkillExposure', group: 'data',
       verb:      'list',
       appliesTo: { type: 'agent' },
       params: [
@@ -179,7 +179,7 @@ export const agentsManifest = {
     /* Property layer — curate a coarse property ONCE on a profile (place/ageBand/…), readable by any app
      * (cross-app reuse). setProfileProperty writes an OWN value; getProfileProperties reads the map. */
     {
-      id:        'setProfileProperty',
+      id:        'setProfileProperty', group: 'compose',
       verb:      'update',
       appliesTo: { type: 'agent' },
       params: [
@@ -190,7 +190,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Set a coarse property (e.g. place) on a profile — curated once, reusable across apps.' } },
     },
     {
-      id:        'getProfileProperties',
+      id:        'getProfileProperties', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -203,7 +203,7 @@ export const agentsManifest = {
      * string, so it has its own set/get. Curated once, governed by the same per-persona disclosure; the
      * on-device matcher reads them via getProfileDrivers. */
     {
-      id:        'setProfileDriver',
+      id:        'setProfileDriver', group: 'compose',
       verb:      'update',
       appliesTo: { type: 'agent' },
       params: [
@@ -216,7 +216,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Set a personal driver (goal/hobby/…) on a profile: a phrase + comma-separated tags.' } },
     },
     {
-      id:        'getProfileDrivers',
+      id:        'getProfileDrivers', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -228,7 +228,7 @@ export const agentsManifest = {
      * restored device knows its circles + the handle it used. The join wizard writes through this on a
      * successful join; the wrapped-key ref is written later (group-key event) and is optional. */
     {
-      id:        'setProfileCircleMembership',
+      id:        'setProfileCircleMembership', group: 'compose',
       verb:      'update',
       appliesTo: { type: 'agent' },
       params: [
@@ -243,7 +243,7 @@ export const agentsManifest = {
     /* Personas — persist what a persona SHARES per context (circle/project). The general per-persona version
      * of the feedback charter consent; the "About me" surface + join wizard write through these. */
     {
-      id:        'setProfileDisclosure',
+      id:        'setProfileDisclosure', group: 'compose',
       verb:      'update',
       appliesTo: { type: 'agent' },
       params: [
@@ -256,7 +256,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Choose whether a persona shares a property in a given circle/context.' } },
     },
     {
-      id:        'getProfileDisclosure',
+      id:        'getProfileDisclosure', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -265,7 +265,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Read a persona\'s per-context disclosure policy.' } },
     },
     {
-      id:        'getPersonaView',
+      id:        'getPersonaView', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -274,7 +274,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'The "About me" view — a persona\'s properties + per-context sharing in one call.' } },
     },
     {
-      id:        'getPersonaRelease',
+      id:        'getPersonaRelease', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -318,7 +318,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'grantAgent',
+      id:        'grantAgent', group: 'admin',
       verb:      'update',
       appliesTo: { type: 'agent' },
       params: [
@@ -359,7 +359,7 @@ export const agentsManifest = {
      * PolicyEngine (`requiredRole` + cap-token verify) — no second gate.
      */
     {
-      id:        'grantRole',
+      id:        'grantRole', group: 'admin',
       verb:      'update',
       appliesTo: { type: 'agent' },
       params: [
@@ -386,7 +386,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'revokeGrant',
+      id:        'revokeGrant', group: 'admin',
       verb:      'revoke',
       appliesTo: { type: 'agent' },
       params: [
@@ -439,7 +439,7 @@ export const agentsManifest = {
      * trust/curation is designed separately — here it is a data source.
      */
     {
-      id:        'listCatalogue',
+      id:        'listCatalogue', group: 'data',
       verb:      'list',
       appliesTo: { type: 'catalogue-entry' },
       params:    [],
@@ -502,7 +502,7 @@ export const agentsManifest = {
      * "revoke the misbehaving agent → restore what it touched".
      */
     {
-      id:        'listDataVersions',
+      id:        'listDataVersions', group: 'data',
       verb:      'list',
       appliesTo: { type: 'data-version' },
       params: [

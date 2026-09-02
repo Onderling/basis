@@ -55,7 +55,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `claimTask` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | claim, pak, neem, i'll take, i'll do, ik pak, ik doe, ik neem |
 |  | `confirmClaim` | confirm | ✅ | ✅ | ✅ | · | ✅ | ✅ | confirm, bevestig, keur, keur goed, ken toe |
 |  | `completeTask` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | klaar met, done with, done, complete, completed, finished, klaar, voltooid, gedaan |
-|  | `getTaskSnapshot` | list | ✅ | · | · | · | · | · |  |
 |  | `removeTask` | remove | ✅ | · | · | · | · | · |  |
 |  | `attachTaskGrant` | update | ✅ | · | · | · | ✅ | · |  |
 |  | `reassignTask` | reassign | ✅ | · | · | · | · | · |  |
@@ -205,7 +204,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `verifyPodState` | read | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `readNote` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `shareFolder` | add | ✅ | ✅ | ✅ | · | ✅ | · | share, deel |
-|  | `getFileSnapshot` | list | ✅ | · | · | · | · | · |  |
 |  | `downloadFile` | list | ✅ | · | ✅ | · | ✅ | ✅ | download, haal, haal op, download bestand |
 |  | `saveToMyPod` | add | ✅ | · | ✅ | · | ✅ | ✅ | save, bewaar, save to my pod, opslaan, bewaar in mijn pod |
 |  | `folioStatus` | list | ✅ | ✅ | · | · | · | · |  |
@@ -217,7 +215,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `rsvpDecline` | reject | ✅ | ✅ | ✅ | · | ✅ | ✅ | decline, decline invite, no, wijs af, nee, ik kom niet |
 |  | `rsvpTentative` | submit | ✅ | ✅ | ✅ | · | ✅ | ✅ | tentative, maybe, misschien, onder voorbehoud |
 |  | `cancelEvent` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | cancel event, cancel appointment, cancel, annuleer afspraak, annuleer, zeg af |
-|  | `getEventSnapshot` | list | ✅ | · | · | · | · | · |  |
 |  | `briefSummary` | list | ✅ | · | · | · | · | · |  |
 |  | `searchEvents` | list | ✅ | · | · | · | · | · |  |
 |  | `podStatus` | list | ✅ | ✅ | · | · | · | · |  |
@@ -252,7 +249,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 247 ops | | 228 | 120 | 33 | 3 | 146 | 71 | |
+| **totals** | 244 ops | | 225 | 120 | 33 | 3 | 146 | 71 | |
 
 ### Flows
 
@@ -265,6 +262,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (214/247): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:reassign, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, tasks:getTaskSnapshot, tasks:removeTask …
-- **missing inline** (176/247): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase …
-- **missing chat** (19/247): basis:signin, basis:signout, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch
+- **missing gate** (211/244): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:reassign, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, tasks:removeTask, tasks:attachTaskGrant …
+- **missing inline** (173/244): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase …
+- **missing chat** (19/244): basis:signin, basis:signout, household:revokeDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch

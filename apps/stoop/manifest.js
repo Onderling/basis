@@ -134,7 +134,7 @@ export const stoopManifest = {
   operations: [
     // ── Post + browse ───────────────────────────────────────────────
     {
-      id:   'postRequest',
+      id:   'postRequest', group: 'compose',
       // `circleScoped` — the op acts on the ACTIVE circle's items: a write gets the circle injected (and
       // its `text` sealed for a sealed circle), a list is filtered to it. Declared here, derived
       // everywhere (`circleStoopScope.js`); an op that acts on an item without saying so fails a guard.
@@ -195,7 +195,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'listOpen',
+      id:   'listOpen', group: 'data',
       circleScoped: true,
       verb: 'list',
       // listOpen spans the three noticeboard types — no appliesTo.type
@@ -232,7 +232,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'listMyRequests',
+      id:   'listMyRequests', group: 'data',
       circleScoped: true,
       verb: 'list',
       params: [],
@@ -331,7 +331,7 @@ export const stoopManifest = {
 
     // ── Lend lifecycle ──────────────────────────────────────────────
     {
-      id:        'assignLend',
+      id:        'assignLend', group: 'admin',
       circleScoped: true,
       verb:      'reassign',  // canonical — assigns the borrower.
       appliesTo: { type: 'offer', kind: 'lend' },
@@ -422,7 +422,7 @@ export const stoopManifest = {
     },
     // ── Profile / reveals ───────────────────────────────────────────
     {
-      id:   'setMyOfferings',
+      id:   'setMyOfferings', group: 'compose',
       verb: 'set',  // F-SP1-e: non-canonical.  This is a profile
                     // mutation — not add/remove/list of an item.
                     // Resolved 2026-05-21 (owner): kept as one
@@ -448,7 +448,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'setPeerReveal',
+      id:   'setPeerReveal', group: 'compose',
       verb: 'set',  // F-SP1-e: non-canonical — local-only reveal flag.
       // Part G dissolve (2026-06-17) — `/reveal` was a COLLISION: the real
       // op is `setPeerReveal`; the former mock declared `revealPeer` (a
@@ -479,7 +479,7 @@ export const stoopManifest = {
 
     // ── Groups ──────────────────────────────────────────────────────
     {
-      id:   'leaveGroup',
+      id:   'leaveGroup', group: 'admin',
       circleScoped: false,
       verb: 'remove',  // canonical — leaving is a removal of self.
       appliesTo: { type: 'group-leave' },
@@ -505,7 +505,7 @@ export const stoopManifest = {
 
     // ── Read-only graph walk ────────────────────────────────────────
     {
-      id:   'getItemTree',
+      id:   'getItemTree', group: 'data',
       circleScoped: false,
       verb: 'tree',  // F-SP1-e: non-canonical.  `list` doesn't fit
                      // (this returns a tree, not a flat list);
@@ -585,7 +585,7 @@ export const stoopManifest = {
      * id is load-bearing and stays as a thin alias of listOpen.
      */
     {
-      id:   'listFeed',
+      id:   'listFeed', group: 'data',
       circleScoped: true, verb: 'list',
       appliesTo: { type: 'post' },
       params: [],
@@ -603,7 +603,7 @@ export const stoopManifest = {
      * `getStoopProfile`, so the op id stays.
      */
     {
-      id:   'getStoopProfile', verb: 'list',
+      id:   'getStoopProfile', group: 'data', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/stoop-profile' },
@@ -632,7 +632,7 @@ export const stoopManifest = {
     // setHolidayMode / getHolidayMode are real skills; the realAgent
     // adapter translates the chat-shell {on:'on'|'off'} enum → boolean.
     {
-      id:   'setHolidayMode', verb: 'submit',
+      id:   'setHolidayMode', group: 'compose', verb: 'submit',
       params: [
         { name: 'on', kind: 'enum', of: ['on', 'off'], required: true },
       ],
@@ -642,7 +642,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'getHolidayMode', verb: 'list',
+      id:   'getHolidayMode', group: 'data', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/holiday-status' },
@@ -655,7 +655,7 @@ export const stoopManifest = {
     // translates EN→NL trust ('known'→'bekend', 'trusted'→'vertrouwd')
     // + `min-trust`→`minTrust` at the boundary.
     {
-      id:   'listContacts', verb: 'list',
+      id:   'listContacts', group: 'data', verb: 'list',
       appliesTo: { type: 'contact' },
       params: [
         { name: 'min-trust', kind: 'enum', of: ['known', 'trusted'], required: false },
@@ -667,7 +667,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'addContact', verb: 'add',
+      id:   'addContact', group: 'compose', verb: 'add',
       params: [
         { name: 'webid', kind: 'webid',  required: true },
         { name: 'name',  kind: 'string', required: false },
@@ -690,7 +690,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'setContactTrust', verb: 'submit',
+      id:   'setContactTrust', group: 'admin', verb: 'submit',
       appliesTo: { type: 'contact' },
       params: [
         { name: 'webid', kind: 'webid', required: true },
@@ -702,7 +702,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'getContactShareQr', verb: 'list',
+      id:   'getContactShareQr', group: 'data', verb: 'list',
       params: [
         { name: 'trust', kind: 'enum', of: ['known', 'trusted'], required: false },
       ],
@@ -784,7 +784,7 @@ export const stoopManifest = {
     // V0: single-circle info per agent instance.  realAgent.js
     // auto-injects the configured groupId + synthesizes getCurrentGroup.
     {
-      id:   'getCurrentGroup', verb: 'list',
+      id:   'getCurrentGroup', group: 'data', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/groups' },
@@ -792,7 +792,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'listGroupMembers', verb: 'list',
+      id:   'listGroupMembers', group: 'data', verb: 'list',
       appliesTo: { type: 'member' },
       params: [
         // Internal (the rails' binding verifiers): fold the roster from the TRAIL + display cache
@@ -806,7 +806,7 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'getGroupRules', verb: 'list',
+      id:   'getGroupRules', group: 'data', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/group-rules' },

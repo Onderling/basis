@@ -4,6 +4,13 @@
 import { describe, it, expect } from 'vitest';
 import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.js';
 import { basisManifest } from '../../manifest.js';
+import stoopManifest from '../../../stoop/manifest.js';
+import { tasksManifest } from '../../../tasks-v0/manifest.js';
+import { folioManifest } from '../../../folio/manifest.js';
+import { calendarManifest } from '../../../calendar/manifest.js';
+import { householdManifest } from '../../../household/manifest.js';
+import { listsManifest } from '../../../lists/manifest.js';
+import { agentsManifest } from '../../../agents/manifest.js';
 
 const MANIFEST = {
   appId: 'demo',
@@ -24,6 +31,27 @@ const MANIFEST = {
 };
 
 describe('advancedOpRows', () => {
+  it("the composed apps' long tail is SHELVED: 0 rows in `other`, and the snapshots are not rows", () => {
+    // The 94-row sort (2026-09-02). `other` is where an op lands when nobody has decided about it —
+    // the drawer of last resort must not open on the undecided, so the count is pinned at zero and
+    // PRINTED on failure: the row names are the work list, not a mystery number.
+    const manifests = [stoopManifest, tasksManifest, folioManifest, calendarManifest,
+      householdManifest, listsManifest, agentsManifest];
+    const rows = advancedOpRows({ manifests });
+    const other = rows.filter((r) => r.group === 'other');
+    expect(other.map((r) => `${r.app}:${r.op}`).join(' '), `\n${other.length} undecided op(s) on the Other shelf`).toBe('');
+    // The three snapshot ops are substrate (`surfaces.internal`): callable, never listed.
+    const names = new Set(rows.map((r) => `${r.app}:${r.op}`));
+    for (const gone of ['tasks:getTaskSnapshot', 'folio:getFileSnapshot', 'calendar:getEventSnapshot']) {
+      expect(names.has(gone), `${gone} must not be a drawer row`).toBe(false);
+    }
+    // …and every declared shelf is one the ordering knows, or the sort quietly dumps it at the end.
+    for (const r of rows) {
+      expect(['overview', 'identity', 'device', 'people', 'connectivity', 'diagnostics', 'help',
+        'data', 'admin', 'compose']).toContain(r.group);
+    }
+  });
+
   it('lists exactly the ops WITHOUT a screen surface; run-vs-chat splits on required params', () => {
     const rows = advancedOpRows({ manifests: [MANIFEST] });
     expect(rows.map((r) => r.op)).toEqual(['bare', 'needsArgs']);

@@ -27,7 +27,13 @@ import { renderCoverage } from '@onderling/app-manifest';
  * row carries a shelf, which was true, and not that a shelf appears once, which was not.)
  */
 export const ADVANCED_SHELVES = Object.freeze([
-  'overview', 'identity', 'device', 'people', 'connectivity', 'diagnostics', 'help', 'other',
+  // …then what the composed apps shelve their long tail on (the 94-row sort, 2026-09-02): the reads
+  // (`data` — each is really the content of a tab; "which tab shows this" is per-app design work), the
+  // authority ops (`admin` — invites, roles, grants, revokes, pause, config), and the writes
+  // (`compose` — what a person creates). `other` stays last and should read ~0: an op landing there is
+  // one nobody has decided about yet, and the drawer's test counts it.
+  'overview', 'identity', 'device', 'people', 'connectivity', 'diagnostics', 'help',
+  'data', 'admin', 'compose', 'other',
 ]);
 const shelfRank = (g) => {
   const i = ADVANCED_SHELVES.indexOf(g);

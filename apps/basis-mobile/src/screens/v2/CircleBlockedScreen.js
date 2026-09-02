@@ -18,7 +18,7 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 
 export default function CircleBlockedScreen({ callSkill, circles = [], onBack }) {
-  const { theme } = useTheme();
+  const theme = useTheme();
   const styles = makeStyles(theme);
   const [rows, setRows] = useState(null);   // null = loading
 

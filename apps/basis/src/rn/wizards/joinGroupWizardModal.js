@@ -15,7 +15,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 import {
   initialState, decodeInvite, fetchGroupRules,
   handleSuggestions, isValidHandle,
-  finalSubmit, loadPersonas, setPersona, isJoinDirty,
+  finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, isJoinDirty,
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
 } from '../../core/wizards/joinGroupState.js';
@@ -81,6 +81,9 @@ export default function JoinGroupWizardModal({
     const { result, state: after } = await finalSubmit({
       state: next, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
       onJoined,
+      // This modal renders a state SNAPSHOT, so without this the second (long) wait would keep
+      // showing the first one's line until the whole submit returned.
+      onStage: (stage) => setState((s) => ({ ...s, submitStage: stage })),
     });
     setState({ ...after });
     if (result && typeof onDispatched === 'function') {
@@ -272,7 +275,7 @@ export default function JoinGroupWizardModal({
                     only the second meant the two failures that bothered to type themselves — the admin
                     being offline, and a handle already taken — showed nothing at all (J-NP2, 2026-07-30). */}
                 <ErrorBanner message={state.submitErrorKey ? t(state.submitErrorKey) : state.submitError} />
-                <Submitting visible={state.submitting} label={t('circle.join.wizard.submitting')} />
+                <Submitting visible={state.submitting} label={t(joinSubmitLabelKey(state))} />
               </Body>
             )}
           </ScrollView>

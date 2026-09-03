@@ -712,8 +712,12 @@ export function initialState() {
 export async function finalSubmit({
   state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink,
   dialEndpoint = null, activeEndpointUrl = null, onJoined = null,
+  // Called when the chain moves to a new stage, so a wizard that renders from a state SNAPSHOT can
+  // repaint mid-submit. Cosmetic by contract: the stage is on `state` either way.
+  onStage = null,
 }) {
   state.submitting    = true;
+  state.submitStage   = 'redeeming';
   state.submitError   = null;
   state.submitErrorKey = null;
   state.handleRejected = false;
@@ -728,7 +732,9 @@ export async function finalSubmit({
     if (result && Array.isArray(state.capabilityOptOuts) && state.capabilityOptOuts.length) {
       result.capabilityOptOuts = [...state.capabilityOptOuts];
     }
-    state.submitting = false;
+    // `submitting` stays TRUE across the reachability work below: the wizard is still open and the
+    // person is still waiting on it, so hiding the status there left them looking at a finished-looking
+    // form that did not close. What changes is WHAT it says — see the stage set below.
     // A joined circle is not yet a REACHABLE one (found on hardware 2026-07-30).
     //
     // Before anyone can message a new member, their device must register its per-circle address for the
@@ -744,6 +750,14 @@ export async function finalSubmit({
     // `finalSubmit` directly -- this is the one choke point the UI and the programmatic path share.
     // Best-effort and after the fact: the join has already succeeded, and failing it here would turn a
     // completed join into a reported failure.
+    // The membership is REAL from here on; what follows is reachability + bookkeeping. Say which of the
+    // two the person is waiting on. On a phone the redeem answered in about a second and the wizard then
+    // sat on one undifferentiated "Joining…" for ~40 s while `makeCircleReachable` registered this
+    // device's address across every circle it is in and re-read the roster — work that grows with how
+    // many circles you have and says nothing about whether the join worked. The stage lives here, where
+    // the chain is; both wizards render it (`joinSubmitLabelKey`), neither decides it.
+    state.submitStage = 'connecting';
+    if (typeof onStage === 'function') { try { onStage(state.submitStage); } catch { /* cosmetic */ } }
     if (result && result.groupId && typeof onJoined === 'function') {
       try { await onJoined({ circleId: result.groupId }); }
       catch { /* reachability is repaired on the next circles load either way */ }
@@ -755,6 +769,8 @@ export async function finalSubmit({
     // are present — an address-less record is invalid (the registry setter requires both). Best-effort AFTER
     // success: a failure just means the restored-device circle list won't include this one; the join already
     // succeeded. The wrapped-key ref is written later (group-key event) and is optional in the record.
+    state.submitting = false;
+    state.submitStage = null;
     if (result && result.groupId && state.handle && typeof circleAddressFor === 'function') {
       try {
         const address = circleAddressFor(result.groupId);
@@ -813,6 +829,7 @@ export async function finalSubmit({
         : 'join-failed';
     }
     state.submitting = false;
+    state.submitStage = null;
     return { state };
   }
 }
@@ -999,4 +1016,19 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
   throw new Error(
     `This invite is not a membership code (kind: ${inv?.kind ?? 'none'}) — ask for a new invite link.`,
   );
+}
+
+/**
+ * Which line the wizard shows while a join is in flight. Two stages, because they are two different
+ * waits: `redeeming` is the join itself, `connecting` is the reachability work that follows a join
+ * that has ALREADY succeeded (registering this device's per-circle address, binding the roster's).
+ * The second is the long one and used to be invisible — see `finalSubmit`.
+ *
+ * @param {object} state  the join wizard state
+ * @returns {string} a locale key
+ */
+export function joinSubmitLabelKey(state) {
+  return state?.submitStage === 'connecting'
+    ? 'circle.join.wizard.submitting_connecting'
+    : 'circle.join.wizard.submitting';
 }

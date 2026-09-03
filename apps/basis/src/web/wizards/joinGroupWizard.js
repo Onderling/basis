@@ -41,6 +41,7 @@ import {
   initialState,
   fetchGroupRules,
   finalSubmit,
+  joinSubmitLabelKey,
   buildJoinConsent,
   setConsentDecline,
   loadPersonas,
@@ -124,6 +125,7 @@ export function renderJoinGroupWizard(opts) {
       rerender(); // show submitting state
       const { result } = await finalSubmit({
         state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
+        onStage: () => rerender(),   // the second wait is the long one — repaint when it starts
       });
       if (result) {
         if (typeof onDispatched === 'function') {
@@ -520,7 +522,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
   if (state.submitting) {
     const status = doc.createElement('div');
     status.className = 'cc-wizard-submitting';
-    status.textContent = t('circle.join.wizard.submitting');
+    status.textContent = t(joinSubmitLabelKey(state));
     wrap.appendChild(status);
   }
 

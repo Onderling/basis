@@ -177,7 +177,11 @@
       },
       "submitting": {
         "text": "Bezig met deelnemen…",
-        "doc": "Join wizard — submit-in-progress status."
+        "doc": "Join wizard — submit-in-progress status (the redeem itself)."
+      },
+      "submitting_connecting": {
+        "text": "Je doet mee — je wordt verbonden met de kring…",
+        "doc": "Join wizard — the post-join reachability work, after the membership is already real."
       },
       "invite_error": {
         "text": "Uitnodigingsfout",

@@ -150,19 +150,24 @@ describe('shareOutOfCircle — notify', () => {
     expect(await listSharedResolved({ resolveService, enforcementFor, circleId: 'B', recipient: 'did:eve' })).toHaveLength(0);
   });
 
-  it('is the DEFAULT: a policy with no shareOutOfCircle set behaves as notify (canonical grant)', async () => {
+  it('is NOT the default any more: a policy with no shareOutOfCircle set is REFUSED (prohibit) — decided 2026-09-03', async () => {
+    // The `notify` default was flagged in circlePolicy.js as a product decision never taken. Taken on
+    // 2026-09-03 (Frits): OFF for the alpha — the one core circle event with no end-to-end journey stays
+    // gated until it has one. `notify`/`silent` still work when an admin sets them (the tests above).
     const { svc, resolveService, enforcementFor, keyStore } = world();
     const dave = fakeNetworkIdentity();
     const src = await svc.createList('A', 'x', 'alice');
     const r = await shareItemToPublishedKey({
-      resolveService, enforcementFor, policyOf: () => ({}),   // no shareOutOfCircle ⇒ default notify
+      resolveService, enforcementFor, policyOf: () => ({}),   // no shareOutOfCircle ⇒ default prohibit
       itemId: src.id, fromCircleId: 'A', toCircleId: 'B', by: 'alice',
       recipient: 'did:dave', recipientNetworkKey: dave.publicKey,
     });
-    expect(r.ok).toBe(true);
-    const daveSealing = sealingKeyPairFromNetworkKey(dave.secretKey);
-    expect(unwrapGroupKey(keyStore.current(), daveSealing.privateKey)).toBeTruthy();
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('share-prohibited');
+    // …and nothing was granted: refused BEFORE any store touch, so no key resource was ever written.
+    expect(keyStore.current()).toBeFalsy();
   });
+
 });
 
 describe('shareOutOfCircle — silent (privacy COPY)', () => {

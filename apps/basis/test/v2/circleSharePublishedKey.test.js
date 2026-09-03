@@ -68,7 +68,7 @@ function memKeyStore(initial = null) {
 
 const POD = 'https://pod.example/';
 const uriFor = sharedRefResourceUri(makeResourceUriResolver({ podUri: POD }));
-const canonicalPolicyOf = () => ({ sharePosture: 'canonical' });
+const canonicalPolicyOf = () => ({ sharePosture: 'canonical', shareOutOfCircle: 'notify' /* these tests exercise a PERMITTED share; the default is now prohibit */});
 
 // Build the enforcement through the ONE SHARED builder both shells call — real createCanonicalShare over a
 // fake ACP surface + memKeyStore, the origin roster's sealing keys resolved from the control agent's members.

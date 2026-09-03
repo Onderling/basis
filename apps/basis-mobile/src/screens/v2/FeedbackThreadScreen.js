@@ -23,6 +23,7 @@ import { useTheme } from './themeContext.js';
 import { createFeedbackSurface, signerForIdentity, chunkBubble } from '../../../../basis/src/feedback/feedbackSurface.js';
 import { createBugReportSink } from '../../../../basis/src/log/bugReportSink.js';
 import { FeedbackReviewCards, FeedbackReportPanel } from '../../rn/FeedbackBubbles.js';
+import { loadFeedbackPackage } from '../../../../basis/src/feedback/feedbackPackage.js';
 import { makeNoLoginFeedbackPods } from '../../../../basis/src/feedback/noLoginPods.js';
 import { createFeedbackHistoryStore } from '../../../../basis/src/feedback/feedbackHistory.js';
 import { privacyBadge } from '../../../../basis/src/feedback/circlePrivacyState.js';   // shared privacy badge (§10c, invariant #3)
@@ -170,6 +171,8 @@ export default function FeedbackThreadScreen({ session, bot, store, onBack, iden
     if (!threadId) return undefined;
     let cancelled = false;
     (async () => {
+      // The feedback package is a sibling repo, loaded lazily here — absent, this screen says so.
+      try { await loadFeedbackPackage(); } catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
       try {
         // NO-LOGIN collector flow (invite-circle parity, web ≡ mobile): raw stays in the OWN in-memory pod,
         // the round-approved SUMMARY goes to the companion collector, signed with this device's agent
@@ -212,6 +215,8 @@ export default function FeedbackThreadScreen({ session, bot, store, onBack, iden
     // `_changeFbLang` also keeps history). Only the transient inline-edit state resets.
     setEditing(null);
     (async () => {
+      // The feedback package is a sibling repo, loaded lazily here — absent, this screen says so.
+      try { await loadFeedbackPackage(); } catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
       setBusy(true);
       try {
         const surface = createFeedbackSurface({

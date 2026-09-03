@@ -205,6 +205,7 @@ import { createFeedbackMount } from '../../../../basis/src/feedback/feedbackMoun
 // Rich circle feedback (parity with web's invite-circle): the co-hosted bot's review renders as editable
 // CARDS + its long bubbles chunk, instead of flattened text. Shared surface + shared RN card component.
 import { createFeedbackSurface, signerForIdentity } from '../../../../basis/src/feedback/feedbackSurface.js';
+import { loadFeedbackPackage } from '../../../../basis/src/feedback/feedbackPackage.js';
 import { makeNoLoginFeedbackPods } from '../../../../basis/src/feedback/noLoginPods.js';
 import { FeedbackReviewCards } from '../../rn/FeedbackBubbles.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
@@ -3069,6 +3070,7 @@ function CircleDetail({
   // Switch the circle feedback bot's language: rebuild the surface in newLang REUSING the cached pods (Stage-1
   // survives), re-greet, and re-offer the other langs. Routed here from an `fp-lang:<code>` bubble-button tap.
   const switchCircleFeedbackLang = useCallback(async (circleId, newLang) => {
+    try { await loadFeedbackPackage(); } catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
     const ref = feedbackMountRef.current;
     if (!ref || ref.circleId !== circleId || ref.lang === newLang || !FEEDBACK_LANGS.includes(newLang)) return;
     try { ref.mount.surface.stop(circleId); } catch { /* best-effort */ }
@@ -3903,6 +3905,7 @@ function CircleDetail({
     // error we log and fall through to the regular fan-out path below.
     try {
       if (feedbackMountRef.current?.circleId !== circle.id) {
+        await loadFeedbackPackage();   // sibling package, lazy; a failure lands in this try and falls through to plain chat
         const pods = makeNoLoginFeedbackPods({
           collectorUrl: FEEDBACK_COLLECTOR_URL,
           participantKey: coreIdentity?.pubKey,

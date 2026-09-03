@@ -29,7 +29,7 @@ const INTENTS = ['ask', 'offer', 'lend'];
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, onReplied = null }) {
+export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, onReplied = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [posts, setPosts] = useState([]);
@@ -180,11 +180,11 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
     // The reply starts a 1:1 conversation with the poster: persisted into their contact thread, and
     // the launcher opens that thread so the answer that comes back has a place to land (web parity).
     let r = null;
-    try { r = await replyToPost({ callSkill, contactChannel, itemId: post.id, body }); } catch { /* */ }
+    try { r = await replyToPost({ callSkill, contactChannel, notePeer, itemId: post.id, body }); } catch { /* */ }
     setReplyingTo(null); setReplyText('');
     reload();
     if (r?.ok && r.toPubKey) { try { onReplied?.(r); } catch { /* opening the thread is a courtesy */ } }
-  }, [replyText, callSkill, contactChannel, onReplied, reload]);
+  }, [replyText, callSkill, contactChannel, notePeer, onReplied, reload]);
 
   const submitAssign = useCallback(async (post) => {
     const borrowerWebid = assignText.trim();

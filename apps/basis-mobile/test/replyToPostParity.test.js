@@ -28,10 +28,17 @@ describe('reply-to-post surface parity', () => {
   });
 
   it('both reply doors go through the shared replyToPost helper (no raw respondToItem call)', () => {
-    expect(webApp).toMatch(/replyToPost\(\{ callSkill: stoopCall, contactChannel: circleContactChannel/);
-    expect(mobileBoard).toMatch(/replyToPost\(\{ callSkill, contactChannel, itemId: post\.id, body \}\)/);
+    // Matched piecewise, not as one line: the call spans lines on web and reformatting it is not drift.
+    expect(webApp).toMatch(/replyToPost\(\{[\s\S]{0,240}callSkill: stoopCall[\s\S]{0,240}contactChannel: circleContactChannel/);
+    expect(mobileBoard).toMatch(/replyToPost\(\{[\s\S]{0,120}callSkill, contactChannel[\s\S]{0,120}itemId: post\.id, body/);
     expect(webApp).not.toMatch(/stoopCall\('stoop', 'respondToItem'/);
     expect(mobileBoard).not.toMatch(/callSkill\('stoop', 'respondToItem'/);
+  });
+
+  it('both reply doors make the poster a contact row (the first-DM rule)', () => {
+    // Walked on the A33: without this the thread a reply starts is unreachable once you navigate away.
+    expect(webApp).toMatch(/replyToPost\(\{[\s\S]{0,320}notePeer:/);
+    expect(mobileBoard).toMatch(/replyToPost\(\{[\s\S]{0,160}notePeer/);
   });
 
   it('both thread renderers paint the reply-to-post marker from the one locale key', () => {

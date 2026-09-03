@@ -95,6 +95,13 @@ export default defineConfig({
         test: {
           name: 'parallel',
           include: ['test/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+          // 62 files in THIS project boot a real agent or relay too (measured 2026-09-03), and under load
+          // vitest's 5s default fails them at their boot line — a red that carries no information and passes
+          // alone (one different file per full run; eleven false reds in one loaded run on 09-03). Same
+          // reasoning as boot-serial below: nothing loses the ability to fail, because every wait is bounded
+          // by its own `until(..., {timeout})` budget. What this buys is that a red run MEANS something.
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
           exclude: [
             'test-browser/**', 'node_modules/**',
             ...optionalExcludes,

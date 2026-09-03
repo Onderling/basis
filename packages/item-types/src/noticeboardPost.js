@@ -51,6 +51,10 @@ export function isNoticeboardPost(item) {
     // the only writers of `source.msgId`; the other circle broadcasts put theirs on the
     // wire `extras`, never on a stored item).
     if (typeof src.msgId === 'string' && src.msgId) return false;
+    // a 1:1 chat turn (a reply to a post travels as one) — chat-p2p keys it by its wire nonce and the
+    // thread it answers; it is a conversation, never a post, and it showed on the replier's own board
+    // as a question with a "withdraw" chip until browser story 4 caught it (2026-09-03).
+    if (typeof src.nonce === 'string' && src.nonce && typeof src.threadId === 'string' && src.threadId) return false;
   }
   return true;
 }

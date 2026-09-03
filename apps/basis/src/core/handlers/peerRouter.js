@@ -45,9 +45,14 @@ export function makePeerRouter({
   logger     = console,
 } = {}) {
   return function onPeerMessage(env) {
-    const { from, payload } = env ?? {};
-    logger.info?.('[peer] received from', from, payload);
+    const { from, payload: rawPayload } = env ?? {};
+    logger.info?.('[peer] received from', from, rawPayload);
 
+    // A chat turn rides the A2A message shape — `{ type:'message', parts:[{ type:'DataPart', data }] }`
+    // with the subtype INSIDE the part (chat-p2p's `buildChatWire`). Dispatch on that inner payload, so
+    // a reply to a noticeboard post reaches its handler; the flat shape every other subtype uses is
+    // untouched. Found by browser story 4: "[peer] unhandled subtype undefined" for every reply.
+    const payload = unwrapDataPart(rawPayload);
     const subtype = payload?.subtype;
     const h = (subtype && typeof handlers[subtype] === 'function')
       ? handlers[subtype]
@@ -62,6 +67,13 @@ export function makePeerRouter({
     }
     logger.debug?.('[peer] unhandled subtype', subtype, 'from', from);
   };
+}
+
+function unwrapDataPart(payload) {
+  if (!payload || typeof payload !== 'object' || payload.subtype) return payload;
+  if (payload.type !== 'message' || !Array.isArray(payload.parts)) return payload;
+  const part = payload.parts.find((p) => p?.type === 'DataPart' && p.data && typeof p.data === 'object');
+  return part?.data?.subtype ? part.data : payload;
 }
 
 function _runSafe(handler, from, payload, label, logger) {

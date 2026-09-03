@@ -108,6 +108,44 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
     const bSurface = await surface(B.page, [{ id: 'p1', type: 'post', label: 'boormachine' }]);
     log('story 4 · what a post OFFERS the reader', 'OBSERVED',
       (bSurface?.rows ?? []).map((r) => `${r.type ?? '?'}:[${r.actions.map((a) => a.opId).join(',') || 'nothing'}]`).join(' · ') || 'no rows');
+
+    // B answers the ask the way a person does: the "respond" chip on the post, then the prompt. The
+    // reply is a 1:1 conversation with the asker, so it must land in a CONTACT THREAD on both sides —
+    // B's opens right away; A finds it under Contacten. Until 2026-09-03 web dropped the reply outright.
+    const replyText = 'Ik heb er een, kom maar langs!';
+    const chip = B.page.locator('.cc-noticeboard__chip[data-action="respond"]').first();
+    const hasChip = await chip.count();
+    log('story 4 · can the reader answer the post?', hasChip ? 'PASS' : 'FINDING', hasChip ? 'a respond chip is on the post' : 'no respond chip');
+    expect(hasChip, 'a post from someone else must offer a reply').toBeGreaterThan(0);
+    B.page.once('dialog', (d) => d.accept(replyText));
+    await chip.click();
+    await B.page.waitForTimeout(6000);
+    const bThread = await B.page.evaluate(() => document.querySelector('.cc-cthread__log')?.innerText ?? '');
+    const bOpened = bThread.includes(replyText);
+    log('story 4 · the reply opens a thread with the asker on the REPLIER\'s side', bOpened ? 'PASS' : 'FINDING',
+      bOpened ? `thread shows "${replyText}"${/prikbord/i.test(bThread) ? ' + the reply-to-post marker' : ' (no marker)'}` : `no thread opened — screen: ${(await B.page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').slice(0, 160)}`);
+
+    // A: the reply has to be findable — Contacten, then the replier's row, then the thread.
+    await gotoCircles(A.page);
+    const contactsTab = A.page.locator('[data-tab="contacten"]');
+    if (await contactsTab.count()) { await contactsTab.first().click(); await A.page.waitForTimeout(2000); }
+    const rows = A.page.locator('.cc-contacts__row');
+    const nRows = await rows.count();
+    let aThread = '';
+    for (let i = 0; i < nRows && !aThread.includes(replyText); i += 1) {
+      await rows.nth(i).click();
+      await A.page.waitForTimeout(2500);
+      aThread = await A.page.evaluate(() => document.querySelector('.cc-cthread__log')?.innerText ?? '');
+      if (!aThread.includes(replyText)) {
+        const back = A.page.locator('.cc-cthread__back, .circle-view__back');
+        if (await back.count()) { await back.first().click(); await A.page.waitForTimeout(1200); }
+      }
+    }
+    const aLanded = aThread.includes(replyText);
+    log('story 4 · the ASKER finds the reply in a contact thread', aLanded ? 'PASS' : 'FINDING',
+      aLanded ? `found under Contacten (${nRows} row(s))${/prikbord/i.test(aThread) ? ' + the reply-to-post marker' : ' (no marker)'}` : `${nRows} contact row(s), none holds the reply`);
+    expect(bOpened, "the reply must open the asker's thread on the replier's side").toBe(true);
+    expect(aLanded, 'the asker must find the reply in a contact thread').toBe(true);
   } finally { await teardown(peers); }
 });
 

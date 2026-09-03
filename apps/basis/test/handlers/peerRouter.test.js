@@ -71,3 +71,26 @@ describe('makePeerRouter', () => {
     expect(() => router({ from: 'p', payload: { subtype: 'mystery' } })).not.toThrow();
   });
 });
+
+// A chat turn rides the A2A message shape with its subtype INSIDE the DataPart (chat-p2p's wire);
+// the router dispatches on that inner payload. Browser story 4 found every reply to a noticeboard
+// post logged as "unhandled subtype undefined" (2026-09-03).
+import { makePeerRouter as makeRouterForParts } from '../../src/core/handlers/peerRouter.js';
+describe('makePeerRouter — A2A DataPart unwrap', () => {
+  const quiet = { info() {}, debug() {}, error() {} };
+  it('dispatches a {type:message, parts:[DataPart]} envelope on the part\'s subtype, handing over the part data', () => {
+    const seen = [];
+    const route = makeRouterForParts({ handlers: { 'chat-message': (from, p) => seen.push([from, p]) }, logger: quiet });
+    const data = { type: 'stoop-chat', subtype: 'chat-message', threadId: 'post-1', body: 'hoi', nonce: 'n1' };
+    route({ from: 'peer-B', payload: { type: 'message', parts: [{ type: 'DataPart', data }] } });
+    expect(seen).toEqual([['peer-B', data]]);
+  });
+  it('leaves a flat payload and a part without a subtype alone', () => {
+    const seen = [];
+    const route = makeRouterForParts({ handlers: { x: (from, p) => seen.push(p) }, defaultHandler: (from, p) => seen.push(['default', p]), logger: quiet });
+    route({ from: 'a', payload: { subtype: 'x', v: 1 } });
+    const raw = { type: 'message', parts: [{ type: 'DataPart', data: { hello: 1 } }] };
+    route({ from: 'a', payload: raw });
+    expect(seen).toEqual([{ subtype: 'x', v: 1 }, ['default', raw]]);
+  });
+});

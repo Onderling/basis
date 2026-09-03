@@ -6402,6 +6402,9 @@ function showCircle(id, circle, policy) {
   }
 
   async function noticeboardAction({ action, post }) {
+    // Opened AFTER the board reload below — the reload repaints the circle view, and a thread opened
+    // before it was painted over the instant it appeared (browser story 4 found it).
+    let openThreadWith = null;
     try {
       if (action === 'respond') {
         const body = (globalThis.prompt?.(t('circle.noticeboard.respond_prompt')) || '').trim();
@@ -6409,7 +6412,7 @@ function showCircle(id, circle, policy) {
         // The reply starts a 1:1 conversation with the poster: it is persisted into their contact
         // thread and that thread opens, so the answer that comes back has a place to land.
         const r = await replyToPost({ callSkill: stoopCall, contactChannel: circleContactChannel, itemId: post.id, body });
-        if (r.ok && r.toPubKey) await showContactThread(r.toPubKey);
+        if (r.ok && r.toPubKey) openThreadWith = r.toPubKey;
       } else if (action === 'cancel') {
         await stoopCall('stoop', 'cancelRequest', { requestId: post.id });
       } else if (action === 'report') {
@@ -6436,6 +6439,7 @@ function showCircle(id, circle, policy) {
       }
     } catch { /* best-effort; the reload reflects the real state */ }
     await loadNoticeboard();
+    if (openThreadWith) await showContactThread(openThreadWith);
   }
 
   // δ.2 — fan-out helper.  Used by both the initial send AND the

@@ -404,7 +404,7 @@ async function sendFile(args, {
   // What remains HERE is the door's own question: is this a thing the peer wire should carry at all?
   // A phone photo (a few MB, ~a hundred control-sized chunks) — yes. A video — no: that is the blob
   // gate's job, and a cap is honest about it rather than letting a 500 MB send grind the wire.
-  const MAX_INLINE = SEND_FILE_MAX_BYTES.value;
+  const MAX_INLINE = SEND_FILE_MAX_BYTES;   // param() returns the resolved value itself
   if (file.size > MAX_INLINE) {
     return { ok: false, error: t('sendFile.too_large', { size: file.size, max: MAX_INLINE }) };
   }

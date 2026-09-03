@@ -15,6 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { outOfCircleShareOffered } from '../../../../basis/src/v2/circleShare.js';
 import { loadShareableItems, loadSharedRows, shareOut, shareToRecipient, stopSharing, pickableCircles, pickableRecipients, outOfCircleLinkWarning } from '../../core/circleShareScreen.js';
 
 export default function CircleShareScreen({ circleId, policy, by, recipient, circles, contacts, onBack }) {
@@ -116,9 +117,11 @@ export default function CircleShareScreen({ circleId, policy, by, recipient, cir
                     >
                       <Text style={styles.primaryText}>{t('circle.share.share_action')}</Text>
                     </Pressable>
-                    {/* objective L · Phase 2 — OUT-OF-CIRCLE person share, alongside the share-to-circle path.
-                        Enabled once a target circle is picked (the pointer sink); selecting a contact grants
-                        them the canonical item in place via shareItemToPublishedKey. */}
+                    {/* OUT-OF-CIRCLE person share, alongside the share-to-circle path — offered only when the
+                        circle's `shareOutOfCircle` policy offers it (the SHARED predicate; the op refuses on the
+                        same axis). Enabled once a target circle is picked (the pointer sink); selecting a contact
+                        grants them the canonical item in place via shareItemToPublishedKey. */}
+                    {outOfCircleShareOffered(policy) ? (<>
                     <Text style={styles.pickLabel}>{t('circle.share.to_person_heading')}</Text>
                     {/* D7 — the out-of-circle LINK warning, BEFORE the pick (web parity). Granting by
                         published network key is a deliberate 1:1 link both sides can see; the rule for when
@@ -140,6 +143,7 @@ export default function CircleShareScreen({ circleId, policy, by, recipient, cir
                         {r.trustLevel ? <Text style={styles.pickOptionId} numberOfLines={1}>{t(`circle.share.trust.${r.trustLevel}`)}</Text> : null}
                       </Pressable>
                     ))}
+                    </>) : null}
                   </>
                 )}
               </View>

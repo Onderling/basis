@@ -8,6 +8,8 @@
  *   • it gates a missing/same-circle target and a keyless recipient WITHOUT touching the wrapper.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   shareToRecipient, pickableRecipients as screenPickable,
 } from '../src/core/circleShareScreen.js';
@@ -61,5 +63,19 @@ describe('circle share screen — out-of-circle recipient (web≡mobile)', () =>
     expect(s.ok).toBe(true);
     expect(shareItemToPublishedKey).toHaveBeenCalledTimes(1);
     expect(shareItemToPublishedKey.mock.calls[0][0]).toMatchObject({ itemId: 'i1', fromCircleId: 'A', toCircleId: undefined, recipient: 'did:dave' });
+  });
+});
+
+
+describe('the person-share affordance is gated by ONE shared predicate on both shells (web≡mobile)', () => {
+  const src = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  it("mobile's share screen paints the out-of-circle block only when `outOfCircleShareOffered(policy)`", () => {
+    const s = src('../src/screens/v2/CircleShareScreen.js');
+    expect(s).toMatch(/import \{ outOfCircleShareOffered \} from '.*basis\/src\/v2\/circleShare\.js'/);
+    expect(s).toContain('outOfCircleShareOffered(policy)');
+  });
+  it("web's /sharewith door asks the same predicate before opening the picker", () => {
+    const s = src('../../basis/web/v2/circleApp.js');
+    expect(s).toContain('outOfCircleShareOffered(await _circlePolicy(id))');
   });
 });

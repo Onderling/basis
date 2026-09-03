@@ -46,3 +46,18 @@ describe('replyToPost', () => {
     expect(await replyToPost({ callSkill, contactChannel: null, itemId: 'p', body: 'x' })).toEqual({ ok: true, toPubKey: 'poster-A' });
   });
 });
+
+describe('replyToPost — the poster is a PERSON, not the address their post carried', () => {
+  it('resolves the identity before opening, noting and persisting the thread', async () => {
+    const callSkill = vi.fn(async () => ({ ok: true, toPubKey: 'nkn-addr', itemId: 'c1' }));
+    const notePeer = vi.fn();
+    const contactChannel = { persistOutbound: vi.fn(async () => ({ itemId: 'x' })) };
+    const identityOf = (a) => (a === 'nkn-addr' ? 'peer-addr' : a);
+    const r = await replyToPost({ callSkill, contactChannel, notePeer, identityOf, itemId: 'p1', body: 'ja' });
+    expect(r).toEqual({ ok: true, toPubKey: 'peer-addr' });
+    expect(notePeer).toHaveBeenCalledWith('peer-addr');
+    expect(contactChannel.persistOutbound).toHaveBeenCalledWith(expect.objectContaining({
+      contactId: 'peer-addr', peerAddr: 'peer-addr',
+    }));
+  });
+});

@@ -1210,3 +1210,37 @@ chose, and you can choose yourself* — but it is now a description of behaviour
    chat key by design, so a direct message is the one act that is not per-circle-scoped. Anyone
    relying on per-circle unlinkability should know that messaging someone directly steps outside
    it. (Noticed 2026-08-18 while answering how a DM from a circle relates to a direct contact.)
+
+---
+
+## 2026-09-03 — A thread is keyed by IDENTITY, and one person may not present as several (Frits)
+
+**Status:** settled and built (both shells).
+
+A person reaches you from whichever address the route used — their canonical one, or the per-circle
+address a circle gives them. Every surface that names a PERSON — a DM thread, a contact row, the
+sender of a circle message — used to key on the address the message happened to arrive at. So the same
+member of the same circle, answering twice over two routes, became two contact rows, two threads, and
+two apparent people. Found on a phone, replying twice to the same noticeboard post.
+
+**The rule.** Threads and senders are keyed by identity. And the reason is not tidiness:
+
+> If you look like one person from your data, we are not going to let you artificially look like
+> multiple people. If someone really wants to hide their shared id behind different personas, then
+> those personas need different webIDs too.
+
+Presenting one person as several is a misrepresentation the app should not manufacture, so the app
+resolves the addresses it *already knows* belong together and shows one person. The legitimate need
+behind "I want to be two people here" is met at the identity layer — a separate webid, a separate
+person in the data — not by letting one identity fragment itself across transport addresses.
+
+**What this does NOT change.** Per-circle unlinkability is untouched. The linkage lives exactly where
+it already lived: device-local, in the secure agent's own alias map (`sa.resolver`), never derived on
+the wire and never read from a shareable MemberMap — *"the RESOLUTION of an address to a person is not
+portable"*. Other people's devices, and relays, learn nothing new. What changed is only that a surface
+on THIS device may now ask this device what it already knows.
+
+**How it is built.** `realAgent.identityOfAddress(addr)` exposes the existing resolver; the inbound DM
+doors take it as a seam and emit the person alongside the route; the circle stream indexes every
+identifier a member can prove (`circleAddressSetOf` + pubKey + stableId) rather than the first address
+recorded. An unresolvable address still keys on itself — a stranger is a stranger, not an error.

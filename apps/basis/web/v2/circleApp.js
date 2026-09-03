@@ -30,6 +30,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   scopeStoopCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
+  noticeboardIntentOf,
   basisManifest, AppRegistry, filterCatalogue } from '../../src/index.js';
 // S4 pod foundation — per-circle sealed storage producer. The pod-client + in-memory
 // pseudo-pod machinery is web-layer (kept out of the shared src so it stays portable);
@@ -3129,7 +3130,7 @@ async function showContactThread(contactId) {
   //
   // ALWAYS, not only when the in-memory thread is empty. One live turn used to suppress the whole
   // rehydrate, so a thread that had just received a message showed that message and hid its history —
-  // and a reply you had just SENT to a post opened a thread without it (walked on the A33). Turns
+  // and a reply you had just SENT to a post opened a thread without it (walked on a phone). Turns
   // carry the message id they were persisted under, so what is already on screen is merged, not
   // duplicated; a turn with no id (an older live push) is kept as it is.
   if (typeof circleContactChannel?.rehydrate === 'function') {
@@ -3425,8 +3426,12 @@ function replyTextFromResult(res) {
 // the contactId for a native peer); appends the other party's bubble and
 // re-renders if that thread is on screen. For a brand-new thread (someone DMs you
 // first), resolves their display name from the merged directory, best-effort.
-function onContactReply({ fromAddr, threadId, text, buttons, messageId, replyTo, ts, file }) {
-  const contactId = (threadId && contactThreads.has(threadId)) ? threadId : fromAddr;
+function onContactReply({ contactId: keyedBy, fromAddr, threadId, text, buttons, messageId, replyTo, ts, file }) {
+  // The PERSON, when the caller resolved one (Frits 2026-09-03: threads are keyed by identity, so the
+  // same peer arriving over a second route joins the thread you already have with them). A bot reply
+  // still routes by its echoed threadId; an unresolved sender still falls back to their address.
+  const contactId = keyedBy
+    ?? ((threadId && contactThreads.has(threadId)) ? threadId : fromAddr);
   let thread = contactThreads.get(contactId);
   const isNew = !thread;
   if (isNew) { thread = { name: contactId, peerAddr: fromAddr, messages: [] }; contactThreads.set(contactId, thread); }
@@ -6128,8 +6133,10 @@ function showCircle(id, circle, policy) {
         // The INTENT, not the item type: a canonical post's `type` is 'post', which is not a badge —
         // both shells printed the raw key `circle.noticeboard.intent.post` for every such row (walked
         // 2026-09-02). The intent field wins; a type is honoured only when it IS one of the intents.
-        type:         it.intent ?? it.kind
-                        ?? (['ask', 'offer', 'lend'].includes(it.type) ? it.type : 'ask'),
+        // The BADGE names an intent; a stored post carries a canonical {type, kind}. One shared
+        // translator does the conversion (web ≡ mobile) — reading `kind` straight into the badge is
+        // what printed `CIRCLE.NOTICEBOARD.INTENT.BORROW` on both shells.
+        type:         noticeboardIntentOf(it),
         addedBy:      it.addedBy,
         addedByLabel: shortWebid(it.addedBy),
         mine:         !!(myWebid && it.addedBy === myWebid),
@@ -6425,6 +6432,7 @@ function showCircle(id, circle, policy) {
         const r = await replyToPost({
           callSkill: stoopCall, contactChannel: circleContactChannel, itemId: post.id, body,
           notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() }),
+          identityOf: (addr) => _peerAgent?.identityOfAddress?.(addr) ?? addr,
         });
         if (r.ok && r.toPubKey) openThreadWith = r.toPubKey;
       } else if (action === 'cancel') {
@@ -8531,9 +8539,10 @@ async function boot() {
           // circle happened to be open — a file from a person, announced by nobody's bot, in a room
           // the sender may not even be in.
           'file-share':              makeHandleFileShare({
-            deliverToThread: ({ fromAddr, file, messageId }) => {
-              onContactReply({ fromAddr, text: '', file, messageId });
+            deliverToThread: ({ contactId, fromAddr, file, messageId }) => {
+              onContactReply({ contactId, fromAddr, text: '', file, messageId });
             },
+            identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
@@ -8542,10 +8551,11 @@ async function boot() {
           // thread (the same glue), marked with the post it answers. Before this the subtype had no
           // router entry here, so a reply to a post was silently dropped on web.
           'chat-message':            makeHandleThreadedChat({
-            deliverToThread: ({ fromAddr, text, messageId, ts, replyTo }) => {
-              onContactReply({ fromAddr, text, messageId, ts, replyTo });
+            deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) => {
+              onContactReply({ contactId, fromAddr, text, messageId, ts, replyTo });
             },
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
+            identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
           }),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user
           // "shared with me" store; the surface opens each with this device's own network-derived sealing key.

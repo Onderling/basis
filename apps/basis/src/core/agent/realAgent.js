@@ -4753,6 +4753,28 @@ export async function createRealHouseholdAgent(opts = {}) {
     registerPeerAddress: (address, pubKey, addrOpts) =>
       sa.registerPeerAddress?.(address, pubKey, addrOpts) ?? false,
     forgetPeerAddress:   (address) => sa.forgetPeerAddress?.(address) ?? false,
+    /**
+     * WHO is at this address — the person's canonical identity key, or the address itself when this
+     * device has never been told they are the same peer.
+     *
+     * The linkage already exists and deliberately lives ONE layer down, device-local (`sa.resolver`,
+     * "the one place that LINKS a person's per-circle addresses back to one person"): per-circle
+     * unlinkability means that fact is nobody else's to see, so it is never derived on the wire or from
+     * a shareable MemberMap. This is only the pass-through that lets a surface ask.
+     *
+     * Surfaces that name a PERSON — a DM thread, a contact row — key on this rather than on the address
+     * a message happened to arrive at. Decided by Frits 2026-09-03: threads are keyed by identity, and
+     * someone who is one person in the data does not get to appear as several. A genuinely separate
+     * persona is a separate webid, not a second address for the same one.
+     *
+     * @param {string} address
+     * @returns {string} the canonical identity key, or `address` unchanged
+     */
+    identityOfAddress: (address) => {
+      if (typeof address !== 'string' || !address) return address;
+      try { return sa.resolver?.pubKeyForAddr?.(address) || address; }
+      catch { return address; }
+    },
     // Decision 1 step 3 — feed the roster authorize. Called from `bindCircleAddressKeysFor`, i.e.
     // from the same read of the same rows that binds each member's address to their key: the two
     // facts are one fact, and reading them twice is how the two drift. Returns how many distinct

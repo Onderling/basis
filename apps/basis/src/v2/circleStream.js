@@ -12,6 +12,7 @@
  */
 
 import { taskRowProvenance } from './streamActions.js';
+import { circleAddressSetOf } from './circleAddressKeys.js';
 import { isSilentEntry } from '../eventLog.js';
 import { membershipNoticeRows } from './membershipNotices.js';
 import { governanceNoticeRows } from './governanceNotices.js';
@@ -255,10 +256,18 @@ export function chatRows(opts = {}) {
 export const BOT_ACTOR = 'bot';
 
 export function stampSenderLabels(rows, { members = [], viewerId = null, policy = 'pairwise' } = {}) {
+  // ONE member, EVERY identifier they can speak under — not just the address recorded first. A member
+  // may hold several proven per-circle addresses (`circleAddressSetOf` exists for exactly the consumers
+  // that must accept "the member's address" rather than "the first one on the row"), and their canonical
+  // key still reaches them. Indexing only the primary made the same person show as `unknown_sender` the
+  // moment they spoke from another of their own addresses — the circle-side face of the two-threads bug
+  // walked on a phone. Threads and senders are keyed by IDENTITY (Frits 2026-09-03).
   const byKey = new Map();
   for (const m of members) {
     if (!m || typeof m !== 'object') continue;
-    for (const k of [m.id, m.webid, m.circleAddress]) if (k != null) byKey.set(k, m);
+    for (const k of [m.id, m.webid, m.pubKey, m.stableId, ...circleAddressSetOf(m)]) {
+      if (k != null) byKey.set(k, m);
+    }
   }
   return (rows || []).map((row) => {
     const actor = row?.actor ?? null;

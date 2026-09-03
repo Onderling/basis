@@ -11,14 +11,21 @@
  * The wire dedup nonce doubles as the message id, so a relay-replayed reply never lands twice, and
  * `replyTo` carries the post id so the thread can say WHICH post this answers.
  *
- * Two seams, both injected (this module owns no store and no UI):
- *   deliverToThread({ fromAddr, text, messageId, ts, replyTo })
+ * Three seams, all injected (this module owns no store and no UI):
+ *   identityOf(fromAddr) → the PERSON at that address
+ *     — a peer reaches you from whichever address the route used (their canonical one, a per-circle
+ *       one), and a thread is a conversation with a person, not with an address. Walked on a phone:
+ *       the same member of the same circle answered twice over two routes and became two contact rows
+ *       and two threads. Decided by Frits 2026-09-03 — threads are keyed by IDENTITY, and someone who
+ *       is one person in the data does not get to appear as several; a separate persona is a separate
+ *       webid. Unresolvable (a stranger this device knows nothing about) falls back to the address.
+ *   deliverToThread({ contactId, fromAddr, text, messageId, ts, replyTo })
  *     — persist the turn into the sender's durable DM thread AND surface it live if that thread is
  *       open. The shells wire it to `contactThreadChannel.persistInbound` + their own live append.
  *   notePeer(fromAddr)
  *     — make the replier a contact row (the graph otherwise only learns peers at send time).
  */
-export function makeHandleThreadedChat({ deliverToThread, notePeer, logger = console } = {}) {
+export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, logger = console } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleThreadedChat: deliverToThread required');
 
   return function handleThreadedChat(fromAddr, payload) {
@@ -28,10 +35,12 @@ export function makeHandleThreadedChat({ deliverToThread, notePeer, logger = con
       logger.debug?.('[peer] chat-message without body from', String(fromAddr).slice(0, 16) + '…');
       return;
     }
-    try { notePeer?.(fromAddr); } catch { /* a row is a convenience; the thread persists regardless */ }
+    const contactId = contactIdFor(identityOf, fromAddr);
+    try { notePeer?.(contactId); } catch { /* a row is a convenience; the thread persists regardless */ }
     const nonce = typeof payload.nonce === 'string' && payload.nonce ? payload.nonce : null;
     try {
       deliverToThread({
+        contactId,
         fromAddr,
         text:      body,
         messageId: nonce ? `chat-${nonce}` : undefined,
@@ -43,4 +52,14 @@ export function makeHandleThreadedChat({ deliverToThread, notePeer, logger = con
       logger.warn?.('[peer] threaded chat delivery failed', err?.message ?? err);
     }
   };
+}
+
+/**
+ * Which thread an inbound turn lands in: the PERSON at `addr`, or `addr` itself when this device
+ * cannot say who that is. Shared with the file-share handler so both doors key a thread the same way.
+ */
+export function contactIdFor(identityOf, addr) {
+  if (typeof identityOf !== 'function') return addr;
+  try { const id = identityOf(addr); return (typeof id === 'string' && id) ? id : addr; }
+  catch { return addr; }
 }

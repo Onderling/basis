@@ -8,16 +8,21 @@
  * it") — the card painted faithfully into a room no user could enter, found the day a real photo
  * finally crossed the wire.
  *
- * Two seams, both injected (this module owns no store and no UI):
- *   deliverToThread({ fromAddr, file, messageId, ts })
+ * Three seams, all injected (this module owns no store and no UI):
+ *   identityOf(fromAddr) → the PERSON at that address, so a file from someone you already have a
+ *     thread with lands IN it rather than opening a second one keyed by the route it arrived on
+ *     (Frits 2026-09-03: threads are keyed by identity). Unresolvable falls back to the address.
+ *   deliverToThread({ contactId, fromAddr, file, messageId, ts })
  *     — persist the turn into the sender's durable DM thread AND surface it live if that thread is
  *       open. The shells wire it to `contactThreadChannel.persistInbound` + their own live append.
  *   publishEvent(event)
  *     — the notification line on the event log ("📎 file shared: …"), unchanged: the log is how a
  *       closed thread's arrival still leaves a visible trace.
  */
+import { contactIdFor } from './threadedChat.js';
+
 export function makeHandleFileShare({
-  deliverToThread, publishEvent, notePeer, logger = console,
+  deliverToThread, publishEvent, notePeer, identityOf, logger = console,
 } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleFileShare: deliverToThread required');
 
@@ -30,9 +35,11 @@ export function makeHandleFileShare({
     // Receiving a direct file makes the sender a KNOWN PEER (the classic first-DM rule): without this
     // the turn persisted into a thread no list could reach — the peer graph learns peers at SEND time,
     // so a receiver who never dialled this sender had no contact row to open the thread from.
-    try { notePeer?.(fromAddr); } catch { /* a row is a convenience; the thread persists regardless */ }
+    const contactId = contactIdFor(identityOf, fromAddr);
+    try { notePeer?.(contactId); } catch { /* a row is a convenience; the thread persists regardless */ }
     try {
       deliverToThread({
+        contactId,
         fromAddr,
         file: {
           id:      f.id,

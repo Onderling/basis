@@ -44,3 +44,27 @@ describe('sender labels', () => {
     expect(mine.senderSelf).toBe(true);
   });
 });
+
+describe('one member, every address they can speak from (Frits 2026-09-03: keyed by identity)', () => {
+  // A member may hold several PROVEN per-circle addresses, and their canonical key still reaches them.
+  // Indexing only the address recorded first made the same person read as `unknown_sender` the moment
+  // they spoke from another of their own — the circle-side face of the two-threads bug walked on a phone.
+  const member = {
+    id: 'webid:anna', webid: 'webid:anna', handle: 'anna', pubKey: 'key-anna', stableId: 'stable-anna',
+    circleAddress: 'circle-addr-1', circleAddresses: ['circle-addr-1', 'circle-addr-2'],
+  };
+  const stampAnna = (actor) =>
+    stampSenderLabels([{ actor, text: 'hoi' }], { members: [member], viewerId: ME, policy: 'open' })[0];
+
+  it('labels her the same however she reaches the circle', () => {
+    for (const actor of ['webid:anna', 'circle-addr-1', 'circle-addr-2', 'key-anna', 'stable-anna']) {
+      const row = stampAnna(actor);
+      expect(row.senderLabelKey, `${actor} did not resolve to a member`).toBe(null);
+      expect(row.senderLabel).toBe(stampAnna('webid:anna').senderLabel);
+    }
+  });
+
+  it('still says unknown for someone the roster cannot place', () => {
+    expect(stampAnna('addr-of-a-stranger').senderLabelKey).toBe('circle.chat.unknown_sender');
+  });
+});

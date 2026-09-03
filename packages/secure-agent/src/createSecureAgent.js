@@ -2177,10 +2177,24 @@ export async function createSecureAgent(opts = {}) {
     const parts = chunkPayloadForRoute(payload, tx?.maxEnvelopeBytes);
     if (parts) {
       const sendOpts = speakAs ? { from: speakAs } : {};
+      // The transfer is the UNIT of the answer, not the chunk: the reassembler refuses a gap, so a
+      // partly-delivered transfer is nothing to the receiver. Every part is still sent even when the
+      // first is held — a held transfer must flush COMPLETE when the peer returns — and the verdicts
+      // are folded: held if any part is held, undelivered if any part was refused, delivered only
+      // when all of them went. Without this fold the chunked path answered `{chunked}` alone and
+      // every caller reading `held`/`delivered` (the /send-file door) read undefined and said "sent"
+      // — the 2026-05-23 "sender-side OK, receiver never told" bug, reopened one layer down by the
+      // chunker itself and caught on a device walk (2026-09-03).
+      let held = false, undelivered = false, reason = null;
       for (const part of parts) {
-        await tx.sendOneWay(wireAddr, part, sendOpts);   // sequential: ordered, and backpressure-honest
+        const r = await tx.sendOneWay(wireAddr, part, sendOpts);   // sequential: ordered, and backpressure-honest
+        if (r && r.held === true) { held = true; reason = reason ?? r.reason ?? null; }
+        else if (r && r.delivered === false) { undelivered = true; reason = reason ?? r.reason ?? null; }
       }
-      return { chunked: true, chunks: parts.length, transferId: parts[0].transferId };
+      const verdict = { chunked: true, chunks: parts.length, transferId: parts[0].transferId };
+      if (held)        return { ...verdict, held: true,  delivered: false, ...(reason ? { reason } : {}) };
+      if (undelivered) return { ...verdict, held: false, delivered: false, ...(reason ? { reason } : {}) };
+      return { ...verdict, held: false, delivered: true };
     }
     return tx.sendOneWay(wireAddr, payload, speakAs ? { from: speakAs } : {});
   }

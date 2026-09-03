@@ -114,6 +114,53 @@ describe('over two real secure agents (the façade path, sealed end to end)', ()
     expect(wireChunks.at(-1).final).toBe(true);
   });
 
+  it('a chunked send REPORTS the delivery verdict — it never claims "sent" for a held transfer', async () => {
+    // The 2026-05-23 lesson, one layer down: the non-chunked path returns sendOneWay's
+    // {held, delivered, reason} and /send-file reads it to say what really happened. The chunked
+    // path awaited each chunk and threw the answer away, so EVERY chunked send fell through to
+    // "sent" — including one whose chunks the transport held. Found on a device walk (2026-09-03):
+    // the phone never got the photo and the sender said "sent" four times.
+    // NB the peer must be ROUTABLE — an unknown address is held above the chunker (already honest);
+    // this pins the case where the route resolves and the TRANSPORT holds.
+    const bus = new InternalBus();
+    const receiver = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false, onPeerMessage: () => {} });
+    const sender = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false });
+    const txTx = new TinyLimitTransport(bus, sender.identity.pubKey);
+    await receiver.addSecureTransport('relay', new TinyLimitTransport(bus, receiver.identity.pubKey));
+    await sender.addSecureTransport('relay', txTx);
+    // warm the route (the HI handshake) so the send reaches the chunker rather than the hold queue
+    await sender.peer.sendTo(receiver.identity.pubKey, { subtype: 'plain', text: 'hi' });
+
+    const held = { held: true, delivered: false, msgId: 'm', pending: 1, reason: 'peer-offline' };
+    vi.spyOn(txTx, 'sendOneWay').mockResolvedValue(held);
+
+    const res = await sender.peer.sendTo(receiver.identity.pubKey, {
+      type: 'p2p-chat', subtype: 'file-share', file: { name: 'foto.jpg', dataB64: 'a'.repeat(80_000) },
+    });
+
+    expect(res?.chunked, 'still says HOW it travelled').toBe(true);
+    expect(res.chunks, 'and how many parts').toBeGreaterThan(1);
+    // …and now also WHETHER it arrived — the whole point.
+    expect(res.held, 'a held transfer reports held').toBe(true);
+    expect(res.delivered).toBe(false);
+    expect(res.reason).toBe('peer-offline');
+  });
+
+  it('a chunked send whose parts all land reports delivered', async () => {
+    const bus = new InternalBus();
+    const receiver = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false, onPeerMessage: () => {} });
+    const sender = await createSecureAgent({ vault: new VaultMemory(), warnOnInsecure: false });
+    await receiver.addSecureTransport('relay', new TinyLimitTransport(bus, receiver.identity.pubKey));
+    await sender.addSecureTransport('relay', new TinyLimitTransport(bus, sender.identity.pubKey));
+
+    const res = await sender.peer.sendTo(receiver.identity.pubKey, {
+      type: 'p2p-chat', subtype: 'file-share', file: { name: 'foto.jpg', dataB64: 'a'.repeat(80_000) },
+    });
+    expect(res?.chunked).toBe(true);
+    expect(res.delivered, 'a transfer whose every chunk went out is delivered').toBe(true);
+    expect(res.held).toBe(false);
+  });
+
   it('a small payload still travels as ONE envelope — no chunk tax on ordinary traffic', async () => {
     const bus = new InternalBus();
     const received = [];

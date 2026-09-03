@@ -48,6 +48,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
         setMessages((prev) => (prev.length ? prev : durable.map((m) => ({
           id: mkId(), origin: m.origin, text: m.text ?? '',
           ...(m.buttons ? { buttons: m.buttons } : {}),
+          ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
         }))));
       } catch { /* best-effort — an empty thread is the honest fallback */ }
@@ -84,6 +85,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
       if (!forThis) return;
       setMessages((prev) => [...prev, {
         id: mkId(), origin: 'bot', text: reply.text ?? '', buttons: reply.buttons,
+        ...(reply.replyTo ? { replyTo: reply.replyTo } : {}),
         ...(reply.file ? { file: reply.file } : {}),
       }]);
     });
@@ -145,6 +147,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
         {messages.map((m) => (
           <View key={m.id} style={[styles.msg, m.origin === 'user' ? styles.msgUser : styles.msgBot]}>
             <View style={[styles.bubble, m.origin === 'user' ? styles.bubbleUser : styles.bubbleBot]}>
+              {/* A turn that answers a NOTICEBOARD POST says so — it lands here from a person the reader
+                  may never have spoken to. web≡mobile with contactThread.js's reply marker. */}
+              {m.replyTo ? (
+                <Text style={styles.replyRef} testID={`contact-reply-ref-${m.id}`}>{t('circle.contacts.reply_to_post')}</Text>
+              ) : null}
               {/* A received peer-wire file rides the turn — an image shows itself, every file gets
                   its name and size. web≡mobile with contactThread.js's file bubble. */}
               {m.file?.mime?.startsWith?.('image/') && m.file?.dataB64 ? (
@@ -274,6 +281,7 @@ const makeStyles = (theme) => StyleSheet.create({
   bubbleBotText: { color: theme.color.ink, fontSize: 14, lineHeight: 20 },
   fileImage: { width: 220, height: 160, borderRadius: 8, marginBottom: 6 },
   fileMeta:  { fontSize: 12, opacity: 0.8, marginBottom: 2 },
+  replyRef:  { fontSize: 11, opacity: 0.7, marginBottom: 2 },
   sending: { fontSize: 12, color: theme.color.inkSoft, fontStyle: 'italic', paddingHorizontal: 4 },
   skills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   suggest: { borderTopWidth: 1, borderTopColor: theme.color.line, paddingVertical: 4 },

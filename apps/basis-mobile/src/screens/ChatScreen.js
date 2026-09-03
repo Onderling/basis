@@ -116,6 +116,7 @@ import { makeHandleHelpWithAccepted, makeHandleHelpWithResponse }
 import { makeHandleCalendarInvite }
                                from '../../../basis/src/core/handlers/calendarInvite.js';
 import { makeHandleFileShare } from '../../../basis/src/core/handlers/fileShare.js';
+import { makeHandleThreadedChat } from '../../../basis/src/core/handlers/threadedChat.js';
 // SILENT out-of-circle delivery — inbound `shared-copy` handler: lands a relayed sealed COPY into the per-user
 // "shared with me" store (the launcher lists + opens it). Shared core (web≡mobile), same as circleApp.js.
 import { makeHandleSharedCopy } from '../../../basis/src/core/handlers/sharedCopyReceive.js';
@@ -655,6 +656,17 @@ export default function ChatScreen({
         // A first file makes the sender a contact row (the graph otherwise only learns at send time).
         notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
         publishEvent,
+      }),
+      // A peer answered one of OUR noticeboard posts → the reply lands in THAT REPLIER's contact thread
+      // (same channel + inbox as a file), marked with the post it answers. web≡mobile: the SAME shared
+      // handler circleApp.js registers. It used to fall through to the default handler → the hidden main thread.
+      'chat-message':          makeHandleThreadedChat({
+        deliverToThread: ({ fromAddr, text, messageId, ts, replyTo }) => {
+          contactChannel?.persistInbound?.({ contactId: fromAddr, fromAddr, text, messageId, ts, replyTo })
+            ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
+          pushContactReply({ fromAddr, threadId: fromAddr, text, replyTo });
+        },
+        notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
       }),
       // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us; persist it into the
       // per-user "shared with me" store (the launcher's Mij inbox lists + opens it with this device's own

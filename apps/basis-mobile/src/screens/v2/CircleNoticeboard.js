@@ -17,6 +17,7 @@ import { pickAndEncodeImage } from '../../v2/attachmentPicker.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { enrichEmbedsWithTitles } from '../../../../basis/src/v2/embedResolve.js';
 import { isNoticeboardPost } from '../../../../basis/src/v2/circleStoopScope.js';
+import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
 import { annotateResonantPosts } from '../../../../basis/src/core/handlers/driverMatchNotify.js';
 import { getCirclePodFetch } from '../../core/circlePods.js';
 // Sealed media (2026-07-11): Uint8Array → base64 data-URL for the full-image viewer (reuse the
@@ -28,7 +29,7 @@ const INTENTS = ['ask', 'offer', 'lend'];
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null }) {
+export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, onReplied = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [posts, setPosts] = useState([]);
@@ -176,10 +177,14 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
   const submitReply = useCallback(async (post) => {
     const body = replyText.trim();
     if (!body) { setReplyingTo(null); return; }
-    try { await callSkill('stoop', 'respondToItem', { itemId: post.id, body }); } catch { /* */ }
+    // The reply starts a 1:1 conversation with the poster: persisted into their contact thread, and
+    // the launcher opens that thread so the answer that comes back has a place to land (web parity).
+    let r = null;
+    try { r = await replyToPost({ callSkill, contactChannel, itemId: post.id, body }); } catch { /* */ }
     setReplyingTo(null); setReplyText('');
     reload();
-  }, [replyText, callSkill, reload]);
+    if (r?.ok && r.toPubKey) { try { onReplied?.(r); } catch { /* opening the thread is a courtesy */ } }
+  }, [replyText, callSkill, contactChannel, onReplied, reload]);
 
   const submitAssign = useCallback(async (post) => {
     const borrowerWebid = assignText.trim();

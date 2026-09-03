@@ -2047,6 +2047,8 @@ export default function CircleLauncherScreen({
         onGovernance={() => setView('governance')}
         onReportMember={(m) => { const ref = m?.webid || m?.id; if (ref) fileCircleReportMobile('member', ref, m?.handle || m?.realName || ref); }}
         onReportPost={(post) => { if (post?.id) fileCircleReportMobile('post', post.id, (post.text || '').slice(0, 48)); }}
+        contactChannel={bundle?.contactChannel ?? null}
+        onOpenContact={(c) => setContactThread(c)}
         onReportMessage={(row) => { if (row?.id) fileCircleReportMobile('message', row.id, (row?.event?.payload?.text || '').slice(0, 48)); }}
         onMine={() => setView('override')}
         onViewAs={async () => {
@@ -2519,6 +2521,8 @@ function CircleDetail({
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost, onReportMessage,
+  // A reply to a post persists into (and opens) the poster's contact thread — the launcher owns both.
+  contactChannel = null, onOpenContact = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -4119,6 +4123,8 @@ function CircleDetail({
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
           <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
+            contactChannel={contactChannel}
+            onReplied={({ toPubKey }) => onOpenContact?.({ contactId: toPubKey, peerAddr: toPubKey, name: toPubKey })}
             onPeerMuted={() => setMembersReloadTick((n) => n + 1)}
             onReportPost={onReportPost}
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />

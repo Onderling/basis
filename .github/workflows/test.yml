@@ -99,6 +99,10 @@ jobs:
           - { label: stoop,             dir: apps/stoop,                 args: '' }
           - { label: tasks-v0,          dir: apps/tasks-v0,              args: '' }
           - { label: item-store,        dir: packages/item-store,        args: '' }
+          # The type dictionary. Absent from this matrix until 2026-09-03, which is how three container
+          # types shipped without the `dec:` IRI every other canonical type carries: the suite that says
+          # so had been red for days with nobody running it.
+          - { label: item-types,        dir: packages/item-types,        args: '' }
           - { label: circles,           dir: packages/circles,           args: '' }
           - { label: pod-client,        dir: packages/pod-client,        args: '' }
           - { label: relay,             dir: packages/relay,             args: '' }

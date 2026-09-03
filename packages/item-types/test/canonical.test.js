@@ -37,9 +37,14 @@ function baseItem(type, extra = {}) {
 }
 
 describe('Canonical types — registration via default registry', () => {
-  it('the default registry has all 17 canonical types', () => {
+  // The LIST is asserted, not a count: a count goes stale silently the day a type is added, and this
+  // one did — three container types (`board`, `list`, `list-item`) landed and shipped for two days with
+  // no `dec:` IRI, which the IRI test below would have caught if anything ran this suite.
+  it('the default registry holds exactly the canonical types, and CANONICAL_TYPES agrees', () => {
+    expect(list().sort()).toEqual(Object.keys(CANONICAL_TYPES).sort());
     expect(list().sort()).toEqual([
       'announcement',
+      'board',
       'calendar-event',
       'chat-message',
       'chat-thread',
@@ -47,6 +52,8 @@ describe('Canonical types — registration via default registry', () => {
       'claim',
       'contact',
       'inbox-item',
+      'list',
+      'list-item',
       'media',
       'neighbourhood-job',
       'note',
@@ -70,11 +77,11 @@ describe('Canonical types — registration via default registry', () => {
   it('registerCanonicalTypes works on a fresh registry too', () => {
     const r = createRegistry();
     registerCanonicalTypes(r);
-    expect(r.list()).toHaveLength(17);
+    expect(r.list().sort()).toEqual(list().sort());
   });
 
   it('CANONICAL_TYPES exports the schema map', () => {
-    expect(Object.keys(CANONICAL_TYPES)).toHaveLength(17);
+    expect(Object.keys(CANONICAL_TYPES).length).toBe(list().length);
     expect(CANONICAL_TYPES.task).toBeTruthy();
     expect(CANONICAL_TYPES.note).toBeTruthy();
   });

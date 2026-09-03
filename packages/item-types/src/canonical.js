@@ -5,6 +5,7 @@
  * on the same registry (or a fresh one via `createRegistry()`).
  */
 
+import { NAMESPACE }                from './baseSchema.js';
 import { TASK_SCHEMA }              from './types/task.js';
 import { NOTE_SCHEMA }              from './types/note.js';
 import { CHAT_MESSAGE_SCHEMA }      from './types/chat-message.js';
@@ -35,16 +36,19 @@ import { INBOX_ITEM_SCHEMA }        from './types/inbox-item.js';
 /* ── The composable containers (2026-09-01, lifted from `kring-host/circleLists.js`) ─────────────── */
 /** A list: a named container of entries. */
 const LIST_SCHEMA = Object.freeze({
+  iri: `${NAMESPACE}List`,
   type: 'object', properties: { type: { const: 'list' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
 });
 /** An entry in a container — and itself a container, which is what makes the nesting composable. */
 const LIST_ITEM_SCHEMA = Object.freeze({
+  iri: `${NAMESPACE}ListItem`,
   type: 'object',
   properties: { type: { const: 'list-item' }, text: { type: 'string', minLength: 1 }, completedAt: { type: ['number', 'null'] } },
   required: ['type', 'text'],
 });
 /** A board: a HETEROGENEOUS container with NO default child type, so "+ add" is a genuine choice. */
 const BOARD_SCHEMA = Object.freeze({
+  iri: `${NAMESPACE}Board`,
   type: 'object', properties: { type: { const: 'board' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
 });
 

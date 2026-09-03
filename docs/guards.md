@@ -39,7 +39,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |
 | `unreached-exports` | — | a substrate symbol that nothing reaches is a LIABILITY, not an asset |
 
-## Named design guards (`G-*`, in fitness tests) · 9
+## Named design guards (`G-*`, in fitness tests) · 10
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -49,6 +49,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | — | a circle owns ONE store: a list entry is an item in the circle's `CircleItemStore`, so it rides | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | an entry added on A arrives on B | `apps/basis/test/appListFanTwoDevice.test.js` |
 | — | sa.audit and the agent trail read their AUDIT retention window from ONE shared table | `apps/basis/test/auditRetentionAgreement.test.js` |
+| — | one item of EVERY canonical type, written to a circle store on one device, arrives in the | `apps/basis/test/perTypeSyncMatrix.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
 | — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |
 | G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |

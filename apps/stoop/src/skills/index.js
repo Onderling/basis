@@ -1330,6 +1330,11 @@ export function buildSkills({
     return _buildScopedSkills({ getBundle, dataLocationConfig });
   }
 
+  // Request ids being ingested RIGHT NOW (`ingestRemotePost`). The stored-row check there reads the
+  // store and then writes, and two landings of the same post can interleave between the two — this
+  // makes the claim before the await, so only the first writes. Per skills instance, like the store.
+  const _ingestInFlight = new Set();
+
   // OfferingMatch's #group is private; Agent.js passes the configured
   // groupId through here so list-shaped skills can scope reveal lookups.
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
@@ -3249,7 +3254,19 @@ export function buildSkills({
         muteKeys: [payload.fromStableId, payload.from, payload.fromActor],
       });
       if (verdict) return verdict;
-      // Dedupe — same O(N) check as substrate-mirror.
+      // Dedupe — same O(N) check as substrate-mirror, PLUS the in-flight set below it.
+      //
+      // The list read and the write are not one step, so two ingests of the same post that overlap
+      // both read a store without it and both write: one post, two rows, ULIDs one apart. That became
+      // reachable when the post carry moved onto the circle store (2026-08-30) and the landed snapshot
+      // could arrive twice in a beat — a re-push on circle-open lands the same row again. Seen on the
+      // web board, which showed every post twice while the phone showed each once.
+      //
+      // Claiming the id before the await closes it: within this agent, whoever gets there first writes,
+      // and the loser is `deduped` exactly as if the row had already been on disk.
+      if (_ingestInFlight.has(requestId)) return { deduped: true };
+      _ingestInFlight.add(requestId);
+      try {
       const open = await store.listOpen();
       if (open.some(i => i?.source?.requestId === requestId)) return { deduped: true };
 
@@ -3287,6 +3304,7 @@ export function buildSkills({
         actor: payload.from ?? (fromPubKey ? `pubkey:${fromPubKey.slice(0, 12)}` : 'broadcast'),
       });
       return { ok: true, itemId: item.id, _sync: simulateSync() };
+      } finally { _ingestInFlight.delete(requestId); }
     }, {
       description: 'Ingest a remote post envelope into the local feed (mirrors substrate-mirror logic).',
       visibility:  'authenticated',

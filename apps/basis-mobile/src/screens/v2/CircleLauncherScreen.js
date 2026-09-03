@@ -4131,6 +4131,9 @@ function CircleDetail({
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}
+            members={tabMembers}
+            viewerId={mandateViewer?.viewerWebid ?? null}
+            revealPolicy={policy?.revealPolicy ?? 'pairwise'}
             onReplied={({ toPubKey }) => onOpenContact?.({ contactId: toPubKey, peerAddr: toPubKey, name: toPubKey })}
             onPeerMuted={() => setMembersReloadTick((n) => n + 1)}
             onReportPost={onReportPost}

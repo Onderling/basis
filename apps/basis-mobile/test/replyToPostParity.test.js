@@ -51,6 +51,14 @@ describe('reply-to-post surface parity', () => {
     expect(mobileBoard).toMatch(/replyToPost\(\{[\s\S]{0,160}notePeer/);
   });
 
+  it('both boards name the poster through the shared roster resolution', () => {
+    // The tab showed a shortened raw address (web) or nothing at all (mobile) while the screen-mode
+    // noticeboard block beside it stamped the roster label. Same resolution on both now.
+    expect(webApp).toMatch(/addedByLabel: memberLabelFor\(/);
+    expect(mobileBoard).toMatch(/addedByLabel: memberLabelFor\(/);
+    expect(mobileBoard).toMatch(/nb-author-/);   // …and mobile actually paints it
+  });
+
   it('both thread renderers paint the reply-to-post marker from the one locale key', () => {
     expect(webThread).toMatch(/circle\.contacts\.reply_to_post/);
     expect(mobileThread).toMatch(/circle\.contacts\.reply_to_post/);

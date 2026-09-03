@@ -18,6 +18,7 @@ import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '.
 import { enrichEmbedsWithTitles } from '../../../../basis/src/v2/embedResolve.js';
 import { isNoticeboardPost } from '../../../../basis/src/v2/circleStoopScope.js';
 import { NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
+import { memberLabelFor } from '../../../../basis/src/v2/circleStream.js';
 import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
 import { annotateResonantPosts } from '../../../../basis/src/core/handlers/driverMatchNotify.js';
 import { getCirclePodFetch } from '../../core/circlePods.js';
@@ -30,7 +31,11 @@ const INTENTS = NOTICEBOARD_INTENTS;
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null }) {
+export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
+  // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
+  // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
+  // still loading) → no byline rather than a wire address.
+  members = null, viewerId = null, revealPolicy = 'pairwise' }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [posts, setPosts] = useState([]);
@@ -75,6 +80,7 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
         id: it.id, text: it.text ?? it.label ?? '',
         type: noticeboardIntentOf(it),   // the shared canonical→badge translator (web ≡ mobile)
         addedBy: it.addedBy, mine: !!(who && it.addedBy === who),
+        addedByLabel: memberLabelFor(it.addedBy, { members: members ?? [], viewerId, policy: revealPolicy }),
         // S5 — inline-image metadata (thumbnail travels; full bytes on demand).
         attachments: Array.isArray(it.attachments) ? it.attachments
           : (Array.isArray(it.source?.attachments) ? it.source.attachments : []),
@@ -101,7 +107,7 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
       // ANNOTATED posts so the resonance flag survives the embed re-set.
       enrichEmbeds(annotated);
     } catch { setPosts([]); }
-  }, [callSkill, myWebid, enrichEmbeds]);
+  }, [callSkill, myWebid, enrichEmbeds, members, viewerId, revealPolicy]);
 
   useEffect(() => { reload(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -244,6 +250,11 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
             <Text style={styles.badgeText}>{t(`circle.noticeboard.intent.${p.type || 'ask'}`)}</Text>
           </View>
           <Text style={styles.postText2}>{p.text}</Text>
+          {/* Who posted it. web≡mobile with circleNoticeboard.js's meta line — this tab showed no
+              author at all, so a board of asks was a board of anonymous asks. */}
+          {p.addedByLabel ? (
+            <Text style={styles.postMeta} testID={`nb-author-${p.id}`}>{p.addedByLabel}</Text>
+          ) : null}
           {embedChipsOf(p).length > 0 && (
             <View style={styles.embeds}>
               <Text style={styles.embedsLabel}>{t('circle.embed.see_also')}</Text>
@@ -342,6 +353,7 @@ const makeStyles = (theme) => StyleSheet.create({
   badge_ask: { backgroundColor: '#fdeede' },
   badge_offer: { backgroundColor: '#e6f0e9' },
   badge_lend: { backgroundColor: '#e8eef6' },
+  postMeta:  { fontSize: 12, opacity: 0.7, marginTop: 2 },
   badgeText: { fontSize: 11, fontWeight: '700', color: theme.color.ink, textTransform: 'uppercase' },
   postText2: { fontSize: 14, color: theme.color.ink, lineHeight: 20 },
   // embeds[] — cross-object reference chips.

@@ -18,6 +18,19 @@ describe('replyToPost', () => {
     expect(r).toEqual({ ok: true, toPubKey: 'poster-A' });
   });
 
+  it('makes the poster a contact row (the first-DM rule), and a graph failure hurts nothing', async () => {
+    const callSkill = vi.fn(async () => ({ ok: true, toPubKey: 'poster-A', itemId: 'c1' }));
+    const notePeer = vi.fn();
+    await replyToPost({ callSkill, notePeer, itemId: 'p', body: 'x' });
+    expect(notePeer).toHaveBeenCalledWith('poster-A');
+
+    const broken = vi.fn(() => { throw new Error('graph down'); });
+    const contactChannel = { persistOutbound: vi.fn(async () => ({ itemId: 'x' })) };
+    expect(await replyToPost({ callSkill, notePeer: broken, contactChannel, itemId: 'p', body: 'x' }))
+      .toEqual({ ok: true, toPubKey: 'poster-A' });
+    expect(contactChannel.persistOutbound).toHaveBeenCalled();   // the turn still persists
+  });
+
   it('persists nothing when the op refuses', async () => {
     const callSkill = vi.fn(async () => ({ error: 'not-found' }));
     const contactChannel = { persistOutbound: vi.fn() };

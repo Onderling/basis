@@ -3126,7 +3126,13 @@ async function showContactThread(contactId) {
 
   // Phase 2 (C3 / the G18 fix): rehydrate the DURABLE thread on open so a reload
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
-  if (thread.messages.length === 0 && typeof circleContactChannel?.rehydrate === 'function') {
+  //
+  // ALWAYS, not only when the in-memory thread is empty. One live turn used to suppress the whole
+  // rehydrate, so a thread that had just received a message showed that message and hid its history —
+  // and a reply you had just SENT to a post opened a thread without it (walked on the A33). Turns
+  // carry the message id they were persisted under, so what is already on screen is merged, not
+  // duplicated; a turn with no id (an older live push) is kept as it is.
+  if (typeof circleContactChannel?.rehydrate === 'function') {
     try {
       // BOTH keys: turns echo the contactId, but an unsolicited inbound (a peer-wire file, a first
       // DM) persists under the sender's ADDRESS — for a saved stoop contact those differ, and reading
@@ -3136,12 +3142,14 @@ async function showContactThread(contactId) {
         ? await circleContactChannel.rehydrate(peerAddr) : [];
       const merged = [...durable, ...byAddr].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
       if (merged.length) {
+        const seen = new Set(merged.map((m) => m.messageId).filter(Boolean));
+        const notYetDurable = thread.messages.filter((m) => !m.messageId || !seen.has(m.messageId));
         thread.messages = merged.map((m) => ({
-          origin: m.origin, text: m.text,
+          origin: m.origin, text: m.text, messageId: m.messageId,
           ...(m.buttons ? { buttons: m.buttons } : {}),
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
-        }));
+        })).concat(notYetDurable);
       }
     } catch { /* best-effort — a rehydrate failure just shows an empty thread */ }
   }
@@ -3210,12 +3218,15 @@ async function showContactThread(contactId) {
         if (skills.some((s) => s.id === skillId)) { await runSkill(skillId, rest ? { text: rest } : {}); return; }
       }
       error = false;
-      thread.messages.push({ origin: 'user', text });
-      busy = true; rerender();
+      busy = true;
       try {
-        const { sent } = circleContactChannel.sendTurn({
+        // The id the turn is PERSISTED under rides the bubble, so reopening the thread merges the
+        // durable copy onto this one instead of showing the message twice.
+        const { messageId, sent } = circleContactChannel.sendTurn({
           peerAddr: thread.peerAddr, threadId: contactId, text,
         });
+        thread.messages.push({ origin: 'user', text, messageId });
+        rerender();
         await sent;
       } catch {
         error = true;
@@ -3420,7 +3431,7 @@ function onContactReply({ fromAddr, threadId, text, buttons, messageId, replyTo,
   const isNew = !thread;
   if (isNew) { thread = { name: contactId, peerAddr: fromAddr, messages: [] }; contactThreads.set(contactId, thread); }
   // `file` — a received peer-wire file (photo, document) rides the turn; the thread is its durable home.
-  thread.messages.push({ origin: 'bot', text, buttons, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}) });
+  thread.messages.push({ origin: 'bot', text, buttons, messageId, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}) });
   // Phase 2 (C3 / the G18 fix): persist the inbound turn so the thread is durable
   // in BOTH directions (dedup on messageId is shared with sendTurn's outbound).
   try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, ts, file }); }
@@ -6411,7 +6422,10 @@ function showCircle(id, circle, policy) {
         if (!body) return;
         // The reply starts a 1:1 conversation with the poster: it is persisted into their contact
         // thread and that thread opens, so the answer that comes back has a place to land.
-        const r = await replyToPost({ callSkill: stoopCall, contactChannel: circleContactChannel, itemId: post.id, body });
+        const r = await replyToPost({
+          callSkill: stoopCall, contactChannel: circleContactChannel, itemId: post.id, body,
+          notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() }),
+        });
         if (r.ok && r.toPubKey) openThreadWith = r.toPubKey;
       } else if (action === 'cancel') {
         await stoopCall('stoop', 'cancelRequest', { requestId: post.id });

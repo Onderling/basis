@@ -62,6 +62,20 @@ function sealPromiseUnmet(policy, enforcement) {
  * @param {string} code  the `error` field of a failed share result
  * @returns {string} a locale key — a complete sentence for known codes, the generic template otherwise
  */
+/**
+ * Is out-of-circle sharing OFFERED in this circle? The one place a shell asks before it paints the
+ * person-share affordance — web's `/sharewith` door and mobile's share screen both read this, so the two
+ * cannot drift. It is the UI half of one axis: the op itself refuses `share-prohibited` on the same
+ * `shareOutOfCircle` policy (see the governance block in `shareItemToPublishedKey`), which is the real
+ * gate; this only keeps the affordance honest. Off by default since 2026-09-03 (Frits): an alpha with
+ * people you know does not need to share out of a circle, and it is the one core event without an
+ * end-to-end journey — an admin turns it on per circle in settings, and the default is revisited at the
+ * beta together with that journey.
+ */
+export function outOfCircleShareOffered(policy) {
+  return normalizeCirclePolicy(policy).shareOutOfCircle !== 'prohibit';
+}
+
 export function shareErrorStatusKey(code) {
   const known = new Set([
     'seal-unavailable', 'sharing-closed', 'sharing-admin-only', 'share-prohibited',

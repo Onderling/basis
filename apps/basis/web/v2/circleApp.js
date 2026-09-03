@@ -367,6 +367,7 @@ import { sealItem, isCanonicalPosture, memoryDataSource } from '@onderling/item-
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import { createAttachmentBlobStore } from '../../src/v2/attachmentBlobStore.js';
 import {
+  outOfCircleShareOffered,
   shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
   shareErrorStatusKey,
 } from '../../src/v2/circleShare.js';
@@ -6783,6 +6784,12 @@ function showCircle(id, circle, policy) {
         const shareWithCmd = line.match(/^\/sharewith\s+(\S+)\s+(?:to\s+)?(\S+)\s*$/i);
         if (shareWithCmd) {
           const [, itemId, toCircleId] = shareWithCmd;
+          // Offered only when the circle's policy offers it — the same shared predicate mobile's share
+          // screen paints by; the op would refuse anyway, this just says so before opening a picker.
+          if (!outOfCircleShareOffered(await _circlePolicy(id))) {
+            circleNote(t(shareErrorStatusKey('share-prohibited'), { error: 'share-prohibited' }));
+            return;
+          }
           await openRecipientPicker({
             itemId, fromCircleId: id, toCircleId,
             onResult: (r, recip) => circleNote(

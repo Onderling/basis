@@ -15,6 +15,8 @@
  * shells call — no shell fork (invariant #1/#2).
  */
 import { describe, it, expect, vi } from 'vitest';
+import { outOfCircleShareOffered } from '../../src/v2/circleShare.js';
+import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import nacl from 'tweetnacl';
 import {
   generateKeypair, generateGroupKey, unwrapGroupKey, recipientStrategy, groupKeyStrategy, isSealed,
@@ -284,5 +286,19 @@ describe('shareItemToPublishedKey — includeHistory (pre-grant history withheld
     const daveSealing = sealingKeyPairFromNetworkKey(dave.secretKey);
     const versions = readableGroupKeys(w.keyStore.current(), daveSealing.privateKey).map((k) => k.version).sort();
     expect(versions).toEqual([1, 2]);   // opted in ⇒ both the current AND the retained pre-grant version
+  });
+});
+
+
+describe('out-of-circle sharing is OFF by default and the shells ask ONE shared predicate', () => {
+  it('the default policy prohibits it — decided 2026-09-03 for the alpha', () => {
+    expect(normalizeCirclePolicy({}).shareOutOfCircle).toBe('prohibit');
+    expect(outOfCircleShareOffered({})).toBe(false);
+    expect(outOfCircleShareOffered(undefined)).toBe(false);
+  });
+  it('an admin who turns the axis on per circle gets the affordance back', () => {
+    expect(outOfCircleShareOffered({ shareOutOfCircle: 'notify' })).toBe(true);
+    expect(outOfCircleShareOffered({ shareOutOfCircle: 'silent' })).toBe(true);
+    expect(outOfCircleShareOffered({ shareOutOfCircle: 'prohibit' })).toBe(false);
   });
 });

@@ -180,7 +180,7 @@ export const DEFAULT_CIRCLE_POLICY = {
   // works (backward-compatible with the shipped unconditional canonical grant) AND the circle/admins are
   // told it happened. 'prohibit' would break the shipped op by default; 'silent' would hide out-of-circle
   // sharing from admins by default (surprising, less transparent). Revisit with product.
-  shareOutOfCircle: 'notify',
+  shareOutOfCircle: 'prohibit',   // DECIDED 2026-09-03 (Frits): OFF for the alpha — see outOfCircleShareOffered (circleShare.js); an admin turns it on per circle; revisited at the beta
   // Notify TARGET (only consulted when shareOutOfCircle === 'notify'). Default 'admins' — the quieter
   // option: ping the admins rather than land a post on the (shared) board. See CIRCLE_POLICY_ENUMS.
   notifyOutOfCircle: 'admins',

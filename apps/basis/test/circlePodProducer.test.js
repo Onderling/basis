@@ -2,7 +2,7 @@
  * Per-circle pod producer (S4 structural slice) — drives the REAL sealing substrate
  * over an in-memory @onderling/pseudo-pod (no OIDC, no CSS, runs in CI). Proves a p2
  * circle gets a real per-circle control agent that bootstraps + seals to its own
- * pod, a p0 circle gets only a sealing identity (no control agent), and two circles
+ * pod, a p0 circle gets neither (no control agent, no sealing identity — it never seals), and two circles
  * never share a sealing key. This is the in-browser counterpart of the CSS real-pod
  * verify (circleSealing.css.test.js).
  */

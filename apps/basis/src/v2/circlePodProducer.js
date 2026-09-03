@@ -75,11 +75,14 @@ export async function createCirclePodProducer({
   }
 
   // Sealed (p2/p3): a per-circle sealing identity (two circles never share one).
-  // NB: the sealing keygen uses node:crypto x25519, which the basis BROWSER
-  // bundle stubs out by design (browser-safe sealing — an async WebCrypto/@noble port
-  // of `packages/pod-client/src/sealing/envelope.js` — is the next S4 gate). This whole
-  // branch therefore runs today in Node/CI (proven by circlePodProducer.test.js) and
-  // over a real Node pod, but NOT yet in the browser; the host calls this best-effort.
+  // The sealing keygen is tweetnacl (`nacl.box.keyPair`) + @noble hashes — pure JS, no
+  // node:crypto — so this branch is browser- and React-Native-safe: both shells inject the
+  // same `generateKeypair` from @onderling/pod-client, and the real sealer pair runs under
+  // happy-dom in mediaEmbed.test.js. The producer itself is proven in Node
+  // (circlePodProducer.test.js) and composed live by the web media gateway; no browser-env
+  // test covers the PRODUCER yet — that is the honest remaining gap, not the crypto.
+  // (An earlier comment here said the keygen was node:crypto and "not yet in the browser";
+  // that was true once and had gone stale — it misled a trace on 2026-09-02.)
   const sealingIdentity = createCircleSealingIdentity({ circleId, store: vault });
   const selfKey = await sealingIdentity.ensure();   // {publicKey, privateKey}
   if (typeof generateKeypair !== 'function' || typeof makePodClient !== 'function') {

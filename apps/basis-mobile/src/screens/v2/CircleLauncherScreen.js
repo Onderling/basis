@@ -2049,9 +2049,10 @@ export default function CircleLauncherScreen({
         onReportPost={(post) => { if (post?.id) fileCircleReportMobile('post', post.id, (post.text || '').slice(0, 48)); }}
         contactChannel={bundle?.contactChannel ?? null}
         notePeer={(addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })}
+        identityOf={(addr) => bundle?.agent?.identityOfAddress?.(addr) ?? addr}
         // …and GO there. A contact thread only paints under the contacts view (the circle-detail
         // branch renders instead while one is open), so setting the thread alone left the replier
-        // looking at the noticeboard with nothing to show for their reply (walked on the A33).
+        // looking at the noticeboard with nothing to show for their reply (walked on a phone).
         onOpenContact={(c) => { setContactThread(c); setView('contacten'); }}
         onReportMessage={(row) => { if (row?.id) fileCircleReportMobile('message', row.id, (row?.event?.payload?.text || '').slice(0, 48)); }}
         onMine={() => setView('override')}
@@ -2526,7 +2527,7 @@ function CircleDetail({
   onboardingFlags = null, onCreateCircle = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost, onReportMessage,
   // A reply to a post persists into (and opens) the poster's contact thread — the launcher owns both.
-  contactChannel = null, notePeer = null, onOpenContact = null,
+  contactChannel = null, notePeer = null, identityOf = null, onOpenContact = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -4129,6 +4130,7 @@ function CircleDetail({
           <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
             contactChannel={contactChannel}
             notePeer={notePeer}
+            identityOf={identityOf}
             onReplied={({ toPubKey }) => onOpenContact?.({ contactId: toPubKey, peerAddr: toPubKey, name: toPubKey })}
             onPeerMuted={() => setMembersReloadTick((n) => n + 1)}
             onReportPost={onReportPost}

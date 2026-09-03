@@ -17,6 +17,7 @@ import { pickAndEncodeImage } from '../../v2/attachmentPicker.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { enrichEmbedsWithTitles } from '../../../../basis/src/v2/embedResolve.js';
 import { isNoticeboardPost } from '../../../../basis/src/v2/circleStoopScope.js';
+import { NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
 import { annotateResonantPosts } from '../../../../basis/src/core/handlers/driverMatchNotify.js';
 import { getCirclePodFetch } from '../../core/circlePods.js';
@@ -24,12 +25,12 @@ import { getCirclePodFetch } from '../../core/circlePods.js';
 // RN media-card helper — no second encoder).
 import { bytesToStdB64 } from '../../core/mediaCardModel.js';
 
-const INTENTS = ['ask', 'offer', 'lend'];
+const INTENTS = NOTICEBOARD_INTENTS;
 
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, onReplied = null }) {
+export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [posts, setPosts] = useState([]);
@@ -72,7 +73,7 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
         // The INTENT, not the item type — a canonical post's type is 'post', which printed the raw
         // locale key as its badge on both shells (web≡mobile with circleApp's projection).
         id: it.id, text: it.text ?? it.label ?? '',
-        type: it.intent ?? it.kind ?? (['ask', 'offer', 'lend'].includes(it.type) ? it.type : 'ask'),
+        type: noticeboardIntentOf(it),   // the shared canonical→badge translator (web ≡ mobile)
         addedBy: it.addedBy, mine: !!(who && it.addedBy === who),
         // S5 — inline-image metadata (thumbnail travels; full bytes on demand).
         attachments: Array.isArray(it.attachments) ? it.attachments
@@ -180,11 +181,11 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
     // The reply starts a 1:1 conversation with the poster: persisted into their contact thread, and
     // the launcher opens that thread so the answer that comes back has a place to land (web parity).
     let r = null;
-    try { r = await replyToPost({ callSkill, contactChannel, notePeer, itemId: post.id, body }); } catch { /* */ }
+    try { r = await replyToPost({ callSkill, contactChannel, notePeer, identityOf, itemId: post.id, body }); } catch { /* */ }
     setReplyingTo(null); setReplyText('');
     reload();
     if (r?.ok && r.toPubKey) { try { onReplied?.(r); } catch { /* opening the thread is a courtesy */ } }
-  }, [replyText, callSkill, contactChannel, notePeer, onReplied, reload]);
+  }, [replyText, callSkill, contactChannel, notePeer, identityOf, onReplied, reload]);
 
   const submitAssign = useCallback(async (post) => {
     const borrowerWebid = assignText.trim();

@@ -35,8 +35,18 @@ describe('reply-to-post surface parity', () => {
     expect(mobileBoard).not.toMatch(/callSkill\('stoop', 'respondToItem'/);
   });
 
+  it('both shells key an inbound turn on the PERSON, not the address it arrived at', () => {
+    // Frits 2026-09-03. A shell that stops passing the resolver silently goes back to one thread per
+    // route — which is what the phone walk found, and what looks like two people who are one.
+    for (const src of [webApp, mobileApp]) {
+      expect(src).toMatch(/'chat-message':[\s\S]{0,900}identityOf:/);
+      expect(src).toMatch(/'file-share':[\s\S]{0,900}identityOf:/);
+      expect(src).toMatch(/identityOfAddress/);
+    }
+  });
+
   it('both reply doors make the poster a contact row (the first-DM rule)', () => {
-    // Walked on the A33: without this the thread a reply starts is unreachable once you navigate away.
+    // Walked on a phone: without this the thread a reply starts is unreachable once you navigate away.
     expect(webApp).toMatch(/replyToPost\(\{[\s\S]{0,320}notePeer:/);
     expect(mobileBoard).toMatch(/replyToPost\(\{[\s\S]{0,160}notePeer/);
   });

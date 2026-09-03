@@ -648,11 +648,12 @@ export default function ChatScreen({
       // ContactThreadScreen through the same inbox every DM reply rides. It used to go to addMainBubble
       // → this screen's main thread — which v2 mounts but permanently hides.
       'file-share':            makeHandleFileShare({
-        deliverToThread: ({ fromAddr, file, messageId, ts }) => {
-          contactChannel?.persistInbound?.({ contactId: fromAddr, fromAddr, text: '', messageId, ts, file })
+        deliverToThread: ({ contactId, fromAddr, file, messageId, ts }) => {
+          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file })
             ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
-          pushContactReply({ fromAddr, threadId: fromAddr, text: '', file });
+          pushContactReply({ fromAddr, threadId: contactId, text: '', file });
         },
+        identityOf: (addr) => agent?.identityOfAddress?.(addr) ?? addr,
         // A first file makes the sender a contact row (the graph otherwise only learns at send time).
         notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
         publishEvent,
@@ -661,12 +662,13 @@ export default function ChatScreen({
       // (same channel + inbox as a file), marked with the post it answers. web≡mobile: the SAME shared
       // handler circleApp.js registers. It used to fall through to the default handler → the hidden main thread.
       'chat-message':          makeHandleThreadedChat({
-        deliverToThread: ({ fromAddr, text, messageId, ts, replyTo }) => {
-          contactChannel?.persistInbound?.({ contactId: fromAddr, fromAddr, text, messageId, ts, replyTo })
+        deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) => {
+          contactChannel?.persistInbound?.({ contactId, fromAddr, text, messageId, ts, replyTo })
             ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
-          pushContactReply({ fromAddr, threadId: fromAddr, text, replyTo });
+          pushContactReply({ fromAddr, threadId: contactId, text, replyTo });
         },
         notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
+        identityOf: (addr) => agent?.identityOfAddress?.(addr) ?? addr,
       }),
       // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us; persist it into the
       // per-user "shared with me" store (the launcher's Mij inbox lists + opens it with this device's own

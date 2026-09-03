@@ -22,6 +22,17 @@ import { buildEmbed }        from '../embed.js';
 import { openExternalFlow }  from '../externalFlow.js';
 // Media Phase 1 (2026-07) — sealed media path for picked images (chat → blob-gateway).
 import { createMediaEmbed, hasMediaGateway, isImageMime } from './handlers/mediaEmbed.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// The door's own size question, declared rather than hardcoded (the parameters convention: a tunable
+// constant goes through the register). The VALUE is unchanged — this is the cap that has always applied
+// to /send-file. Its scope is deliberately still device+internal: whether a circle may set its own
+// ceiling, and whether full-size photos ride at all, is an open product decision, and widening the scope
+// here would pre-empt it.
+const SEND_FILE_MAX_BYTES = param({
+  key: 'sendFile.maxInlineBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 * 1024 * 1024,
+});
+
 
 // lazy chrono import for createTimeEmbed's
 // natural-language fallback.  Lazy because the parseDate module
@@ -393,7 +404,7 @@ async function sendFile(args, {
   // What remains HERE is the door's own question: is this a thing the peer wire should carry at all?
   // A phone photo (a few MB, ~a hundred control-sized chunks) — yes. A video — no: that is the blob
   // gate's job, and a cap is honest about it rather than letting a 500 MB send grind the wire.
-  const MAX_INLINE = 8 * 1024 * 1024;
+  const MAX_INLINE = SEND_FILE_MAX_BYTES.value;
   if (file.size > MAX_INLINE) {
     return { ok: false, error: t('sendFile.too_large', { size: file.size, max: MAX_INLINE }) };
   }

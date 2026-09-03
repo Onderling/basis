@@ -7,7 +7,7 @@
  *
  * `mapSourceCode(code, { uri, cause })` translates raw `.code` strings
  * thrown by `@onderling/core`'s storage layer (`SolidPodSource`,
- * `PodStorageConvention`, `reference-manifest`, external stores) into the
+ * the pod-storage convention helpers, retired 2026-09-03) into the
  * appropriate typed subclass.  Unknown codes fall back to the base
  * `PodClientError` with the raw code preserved.
  */

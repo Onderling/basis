@@ -7,10 +7,14 @@
  * `eventLog.hydrate(...)` → late-bind a DEBOUNCED save via `eventLog.setPersist(...)`. Order matters:
  * hydrate BEFORE setPersist, so hydration never echoes into storage.
  *
- * The snapshot is the whole event array as one value (the log's own `persist` contract). At today's
- * volume — a 14-day chat window + the compact system lanes (membership is exempt from pruning but bounded
- * by churn) — that is small; the flat-snapshot shape gets revisited with the chat lane (the named trigger:
- * chat volume), not gold-plated now. Saving is BEST-EFFORT: a failing storage medium degrades the app to
+ * The snapshot is the whole event array as one value (the log's own `persist` contract), and that shape
+ * has a CEILING worth knowing: on Android this value is one AsyncStorage row, read back through a ~2 MB
+ * cursor window, and a read past it returns EMPTY rather than throwing — the next save then writes that
+ * emptiness back. Chat is `record` retention (it never drops and never compacts, because the entry IS the
+ * record), so the log grows for the life of a circle and walks toward that ceiling on its own. Bytes are
+ * already kept out (see `attachmentBlobStore`); the flat-snapshot shape itself is the remaining half, and
+ * the trigger this comment used to defer to — chat volume — has effectively arrived.
+ * (Before 2026-09-03 this said "a 14-day chat window", which was never true of `record` retention.) Saving is BEST-EFFORT: a failing storage medium degrades the app to
  * the old in-memory behaviour (logged loudly once), it never breaks an append.
  */
 

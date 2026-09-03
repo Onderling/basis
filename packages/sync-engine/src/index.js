@@ -4,7 +4,7 @@
  * Post-Phase 5.1 (2026-05-04): the V0 `SyncEngine` + `IngestQueueSource` +
  * `LocalFolderSource` + `InMemoryBackend` + `storageConvention` were
  * deleted as a parallel implementation of `core.DataSource` /
- * `core.PodStorageConvention`. The substrate now ships only the
+ * the retired `core.PodStorageConvention` (2026-09-03). The substrate now ships only the
  * Folio-lifted `SyncEngine` (formerly `BidirectionalSyncEngine`) +
  * the lifted helpers (`PathMap`, `scanLocal`, `scanPod`, `diff`,
  * adapters).  The Folio-lifted `versions.js` — the LAST legacy version

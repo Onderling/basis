@@ -202,9 +202,6 @@ export {
   handleSessionOpen, handleSessionMessage, handleSessionClose,
   registerSessionSkills,
 }                                                         from './protocol/session.js';
-export {
-  sendFile, bulkTransferSend, handleBulkChunk,
-}                                                         from './protocol/fileSharing.js';
 export { LiveSyncSkill }                                  from './protocol/LiveSyncSkill.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────

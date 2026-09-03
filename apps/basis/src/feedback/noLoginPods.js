@@ -5,7 +5,7 @@
 // shared control store (also the collector). No Solid login — the participant signs with their agent
 // identity and the collector is the authenticated server-side writer. Both shells (web `attachFeedbackProject`
 // and mobile `FeedbackThreadScreen`) build the same pods here so the mechanism can't drift between them.
-import { InMemoryCentralPod } from 'onderling-feedback/public';
+import { getFeedbackPackage } from './feedbackPackage.js';
 import { makeHttpCollectorPod } from './httpCollectorPod.js';
 import { makeHttpRoundControl } from './httpRoundControl.js';
 import { makePersistentOwnPod } from './persistentPod.js';
@@ -21,6 +21,8 @@ import { makePersistentOwnPod } from './persistentPod.js';
  * @returns {{ ownPod:(object|Promise<object>), centralPod:(object|null), controlStore:(object|null) }}
  */
 export function makeNoLoginFeedbackPods({ collectorUrl = null, participantKey, storage, podKey } = {}) {
+  // The package is loaded at the feedback door (see feedbackPackage.js); this factory only reads it.
+  const { InMemoryCentralPod } = getFeedbackPackage();
   // Persistent own-pod when a storage adapter is supplied (a Promise — the surface resolves it); else in-memory
   // (unchanged behaviour, e.g. tests / no-storage shells).
   const ownPod = storage && podKey

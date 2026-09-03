@@ -6,7 +6,7 @@
 // write IS the consent.
 
 // Single sanctioned import point into feedback (F1 boundary — the package `./public` barrel).
-import { makeCssCentralPod, PodRoundControl } from 'onderling-feedback/public';
+import { loadFeedbackPackage } from './feedbackPackage.js';
 
 /** POST the activation service → the participant's container URI (podRef). */
 export async function activateParticipant({ activationUrl, projectId, code, recoveryHash, webId, fetchImpl = fetch }) {
@@ -23,6 +23,7 @@ export async function activateParticipant({ activationUrl, projectId, code, reco
 
 /** Activate, then build a flat CssCentralPod over the browser session's authenticated fetch. */
 export async function buildFeedbackPod({ session, activationUrl, projectId, code, recoveryHash, fetchImpl }) {
+  const { makeCssCentralPod } = await loadFeedbackPackage();
   if (!session?.webid || typeof session.fetch !== 'function') throw new Error('buildFeedbackPod: a logged-in session {webid, fetch} is required');
   const podRef = await activateParticipant({ activationUrl, projectId, code, recoveryHash, webId: session.webid, fetchImpl });
   return makeCssCentralPod({ podBase: podRef, authedFetch: session.fetch, flat: true });
@@ -70,6 +71,7 @@ export async function discoverPodRoot(webId, fetchImpl = fetch) {
  * @returns {Promise<{ownPod, centralPod, controlStore}>}
  */
 export async function buildFeedbackVerifyPods({ session, activationUrl, projectId, code, recoveryHash, fetchImpl, ownPodBase, podRef: existingPodRef } = {}) {
+  const { makeCssCentralPod, PodRoundControl } = await loadFeedbackPackage();
   if (!session?.webid || typeof session.fetch !== 'function') throw new Error('buildFeedbackVerifyPods: a logged-in session {webid, fetch} is required');
   // skip activation when we already hold the participant's container (re-open / reload) — the cohort code
   // is single-use, so re-activating would fail. Returns podRef so the caller can persist + reuse it.

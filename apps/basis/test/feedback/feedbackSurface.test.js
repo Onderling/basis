@@ -10,10 +10,11 @@ import { InMemoryCentralPod } from 'onderling-feedback/public';
 import { randomBytes } from 'node:crypto';
 import { InternalBus, AgentIdentity } from '@onderling/core';
 import { generateParticipantIdentity, IdentityRoster, makeContributionVerifier } from 'onderling-feedback/public';
+import { loadFeedbackPackage } from '../../src/feedback/feedbackPackage.js';
 import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem, signerForIdentity } from '../../src/feedback/feedbackSurface.js';
 
 let mock;
-beforeAll(async () => { mock = await startMockLlm(); });
+beforeAll(async () => { await loadFeedbackPackage(); mock = await startMockLlm(); });
 afterAll(async () => { await mock.close(); });
 
 const cfg = (extra = {}) => ({

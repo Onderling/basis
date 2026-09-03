@@ -2,8 +2,11 @@
  * makeNoLoginFeedbackPods — the SHARED (web ≡ mobile) no-login pod set for the invite-circle / collector
  * feedback flow. Both shells build their pods here so the mechanism can't drift between them.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { makeNoLoginFeedbackPods } from '../../src/feedback/noLoginPods.js';
+import { loadFeedbackPackage } from '../../src/feedback/feedbackPackage.js';
+
+beforeAll(() => loadFeedbackPackage());
 
 describe('makeNoLoginFeedbackPods', () => {
   it('without a collector: own in-memory pod only, no central route', () => {

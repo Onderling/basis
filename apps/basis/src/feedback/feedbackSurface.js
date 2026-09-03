@@ -13,10 +13,7 @@
 import { InternalBus } from '@onderling/core';
 // Single sanctioned import point into feedback (F1 boundary — the package `./public` barrel;
 // relative until the F3 physical carve makes it a published-package specifier).
-import {
-  InternalBusBridge, connectFeedbackParticipant, BasisBot, InMemoryCentralPod,
-  validateProjectConfig, exampleProjectConfig, applyLlmRoute, assertCleanRouteSafe,
-} from 'onderling-feedback/public';
+import { getFeedbackPackage } from './feedbackPackage.js';
 // Privacy-first logging (web ≡ mobile). PII-safe by construction — we log event CODES + scalar counts here,
 // never message text, points, or identities. A dump handle is exposed so a bug report / debug can read it.
 import { log, dumpLogs, formatLogs } from '@onderling/logger';
@@ -107,7 +104,6 @@ const ACCESS_STRINGS = {
 // Re-export so the app can create + CACHE the participant's own pod outside the surface — a language
 // switch rebuilds the surface (fresh /help in the new language) while REUSING the same pods, so the
 // participant's local Stage-1 contributions survive the switch (mirrors mobile FeedbackThreadScreen).
-export { InMemoryCentralPod };
 
 /**
  * @param {object} a
@@ -138,6 +134,9 @@ export { InMemoryCentralPod };
  *                                surface the same via chrome using the exposed `backup()`/`restore()` methods.
  */
 export function createFeedbackSurface({ config, projectId, lang, pod, centralPod, controlStore, bus, identity, identityFor, llmBaseURL, llmModel, emit, verify, reportButton, sendReport, app, version, callSkill, accessButton } = {}) {
+  // Loaded at the feedback door (feedbackPackage.js); a surface is only ever built behind an awaited load.
+  const { InternalBusBridge, connectFeedbackParticipant, BasisBot, InMemoryCentralPod,
+          validateProjectConfig, exampleProjectConfig, applyLlmRoute, assertCleanRouteSafe } = getFeedbackPackage();
   if (typeof emit !== 'function') throw new Error('createFeedbackSurface: emit(reply) is required');
   // Injected ANONYMOUS bug-report sink. Default is a safe async no-op: the real target (a bot+relay+dev
   // pod) is wired by the host when available; without it the send affordance degrades to "copy the notes".

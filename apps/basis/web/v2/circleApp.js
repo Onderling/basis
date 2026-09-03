@@ -254,6 +254,7 @@ import { createFeedbackSurface, signerForIdentity } from '../../src/feedback/fee
 import { privacyBadge } from '../../src/feedback/circlePrivacyState.js';   // shared per-circle privacy badge (§10c)
 import { createBugReportSink } from '../../src/log/bugReportSink.js';
 import { makeNoLoginFeedbackPods } from '../../src/feedback/noLoginPods.js';
+import { loadFeedbackPackage } from '../../src/feedback/feedbackPackage.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 import { buildFeedbackVerifyPods, getOrCreateRecoveryHash } from '../../src/feedback/feedbackPod.js';
 import { feedbackBotFromInput, createFeedbackBotStore } from '../../src/v2/feedbackBots.js';
@@ -2987,6 +2988,10 @@ function emitFeedbackLangOptions(groupId, currentLang) {
 // Switch the bot's language for an open feedback circle: rebuild the surface in the new language reusing the
 // SAME pods (Stage-1 stays), re-greet (fresh /help in the new language), then re-offer the other languages.
 async function switchFeedbackLang(groupId, newLang) {
+  // The feedback package is a sibling repo, loaded lazily at this door — absent, the feature says so
+  // and the circle carries on (see feedbackPackage.js).
+  try { await loadFeedbackPackage(); }
+  catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
   const st = feedbackFlowState.get(groupId);
   if (!st || !LANG_INFO[newLang] || st.lang === newLang) return;
   try { feedbackCircleSurfaces.get(groupId)?.stop?.(groupId); } catch { /* best-effort */ }
@@ -3003,6 +3008,10 @@ async function switchFeedbackLang(groupId, newLang) {
 // after a reload (the old in-memory one is gone). `code` is optional invite metadata (not needed to build
 // the circle). Returns the groupId (or undefined on failure).
 async function attachFeedbackProject({ projectId, code = null, open = true } = {}) {
+  // The feedback package is a sibling repo, loaded lazily at this door — absent, the feature says so
+  // and the circle carries on (see feedbackPackage.js).
+  try { await loadFeedbackPackage(); }
+  catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
   if (!projectId) return;
   if (!rawCallSkill) return;   // agent not booted yet — re-checked after buildCircleBot binds it
 
@@ -3303,6 +3312,10 @@ function _buildFbSurface(botId, pods) {
 // The participant switches the bot's language: rebuild the bot in that language (reusing the activated pods —
 // no re-activation) and re-start the thread, so text + cards + chrome all localise. Persisted per-bot.
 async function _changeFbLang(botId, lg) {
+  // The feedback package is a sibling repo, loaded lazily at this door — absent, the feature says so
+  // and the circle carries on (see feedbackPackage.js).
+  try { await loadFeedbackPackage(); }
+  catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
   const ft = _fbThreads.get(botId);
   if (!ft || (lg !== 'nl' && lg !== 'en') || lg === ft.botLang) return;
   ft.botLang = lg;
@@ -3322,6 +3335,10 @@ async function _changeFbLang(botId, lg) {
   finally { ft.busy = false; _renderFbThread(botId); }
 }
 async function showFeedbackThread(bot) {
+  // The feedback package is a sibling repo, loaded lazily at this door — absent, the feature says so
+  // and the circle carries on (see feedbackPackage.js).
+  try { await loadFeedbackPackage(); }
+  catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
   hideCircleTabBar(tabBarEl);
   const botId = bot.id;
   if (!_fbThreads.has(botId)) {

@@ -10,9 +10,10 @@ import { InMemoryCentralPod } from 'onderling-feedback/public';
 import { log, clearLogs } from '@onderling/logger';
 import { buildReportEnvelope } from '../src/log/bugReport.js';
 import { createFeedbackSurface } from '../src/feedback/feedbackSurface.js';
+import { loadFeedbackPackage } from '../src/feedback/feedbackPackage.js';
 
 let mock;
-beforeAll(async () => { mock = await startMockLlm(); });
+beforeAll(async () => { await loadFeedbackPackage(); mock = await startMockLlm(); });
 afterAll(async () => { await mock.close(); });
 
 const cfg = (extra = {}) => ({

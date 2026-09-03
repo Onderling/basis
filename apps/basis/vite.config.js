@@ -228,6 +228,13 @@ export default defineConfig({
     emptyOutDir: true,
     target:      'es2022',
     rollupOptions: {
+      // `onderling-feedback` is a SIBLING repo behind a filesystem link: present on a machine with both
+      // checkouts, absent on a clean clone and in CI. It is reached only through the lazy door in
+      // `src/feedback/feedbackPackage.js`, so when it cannot be resolved the build leaves that one import
+      // external instead of failing — the feedback feature then reports itself unavailable at runtime.
+      // When it IS present it bundles exactly as before. (The one code blocker for a web-first go-live,
+      // found 2026-09-03; the permanent fix is the published package + the inverted dependency.)
+      external: (() => { try { createRequire(import.meta.url).resolve('onderling-feedback/public'); return []; } catch { return ['onderling-feedback/public']; } })(),
       // The v2 circle app is the only build target (the classic shell was removed 2026-06-29 once the
       // browser suite migrated to v2; its DM/feedback/calendar/etc. flows all have v2 equivalents).
       input: { main: 'web/index.html' },

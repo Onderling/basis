@@ -51,6 +51,7 @@ export const DEFAULT_CONTACT_SUBTYPES = { out: 'contact-msg', in: 'contact-reply
  * @returns {{
  *   sendTurn: (turn: object) => { messageId: string, sent: Promise<any> },
  *   persistInbound: (turn: object) => Promise<{ itemId: string|null }>,
+ *   persistOutbound: (turn: object) => Promise<{ itemId: string|null }>,
  *   rehydrate: (contactId: string) => Promise<Array<object>>,
  *   replyHandler: (onReply: (reply: object) => void) => ((fromAddr: string, payload: object) => void),
  *   messageHandler: (onMessage: (msg: object) => void) => ((fromAddr: string, payload: object) => void),
@@ -175,6 +176,32 @@ export function createContactThreadChannel({
   }
 
   /**
+   * Persist an OUTBOUND turn that already went out by another path — a reply to a
+   * noticeboard post travels through the chat op, and this records our side of it in
+   * the poster's thread so the conversation it starts is visible here too. No send.
+   *
+   * @param {object} turn
+   * @param {string}  turn.contactId    the LOCAL thread group id (== the contact).
+   * @param {string}  [turn.peerAddr]   the recipient's peer address.
+   * @param {string}  [turn.text]
+   * @param {string}  [turn.messageId]  dedup key (else generated).
+   * @param {string}  [turn.replyTo]    what this answers (a post id).
+   * @param {number}  [turn.ts]
+   * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
+   */
+  function persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts } = {}) {
+    const envelope = {
+      id:     messageId ?? mkId(),
+      kind:   subtypes.out,
+      ts:     typeof ts === 'number' ? ts : now(),
+      author: localActor ?? null,
+      body:   text ?? '',
+      extras: { threadId: contactId, threadKey: contactId, peerAddr, replyTo },
+    };
+    return core.persistOutbound(envelope, { to: peerAddr ?? contactId });
+  }
+
+  /**
    * Rehydrate a contact's durable thread from the itemStore — the ordered turns
    * (`{ origin:'user'|'bot', text, … }`) the contact-thread UI renders. Empty
    * when no itemStore is wired (ephemeral mode) or the thread has no history.
@@ -235,5 +262,5 @@ export function createContactThreadChannel({
     };
   }
 
-  return { sendTurn, persistInbound, rehydrate, replyHandler, messageHandler, subtypes };
+  return { sendTurn, persistInbound, persistOutbound, rehydrate, replyHandler, messageHandler, subtypes };
 }

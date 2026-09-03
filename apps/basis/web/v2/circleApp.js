@@ -213,6 +213,8 @@ import { enrichEmbedsWithTitles } from '../../src/v2/embedResolve.js';
 // Calendar INBOUND ingest — receive invite/RSVP/cancel envelopes from peers.
 import { makeHandleCalendarInvite } from '../../src/core/handlers/calendarInvite.js';
 import { makeHandleFileShare }      from '../../src/core/handlers/fileShare.js';
+import { makeHandleThreadedChat }   from '../../src/core/handlers/threadedChat.js';
+import { replyToPost }              from '../../src/v2/replyToPost.js';
 import { makeHandleCalendarRsvp }   from '../../src/core/handlers/calendarRsvp.js';
 import { makeHandleCirclePost }     from '../../src/core/handlers/circlePost.js';
 import { landedNoticeboardHandler } from '../../src/v2/noticeboardCarry.js';
@@ -3137,6 +3139,7 @@ async function showContactThread(contactId) {
         thread.messages = merged.map((m) => ({
           origin: m.origin, text: m.text,
           ...(m.buttons ? { buttons: m.buttons } : {}),
+          ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
         }));
       }
@@ -3411,16 +3414,16 @@ function replyTextFromResult(res) {
 // the contactId for a native peer); appends the other party's bubble and
 // re-renders if that thread is on screen. For a brand-new thread (someone DMs you
 // first), resolves their display name from the merged directory, best-effort.
-function onContactReply({ fromAddr, threadId, text, buttons, messageId, replyTo, file }) {
+function onContactReply({ fromAddr, threadId, text, buttons, messageId, replyTo, ts, file }) {
   const contactId = (threadId && contactThreads.has(threadId)) ? threadId : fromAddr;
   let thread = contactThreads.get(contactId);
   const isNew = !thread;
   if (isNew) { thread = { name: contactId, peerAddr: fromAddr, messages: [] }; contactThreads.set(contactId, thread); }
   // `file` — a received peer-wire file (photo, document) rides the turn; the thread is its durable home.
-  thread.messages.push({ origin: 'bot', text, buttons, ...(file ? { file } : {}) });
+  thread.messages.push({ origin: 'bot', text, buttons, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}) });
   // Phase 2 (C3 / the G18 fix): persist the inbound turn so the thread is durable
   // in BOTH directions (dedup on messageId is shared with sendTurn's outbound).
-  try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, file }); }
+  try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, ts, file }); }
   catch { /* best-effort — durability never blocks the live render */ }
   if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
   // Resolve a friendlier name for an unsolicited inbound thread (fire-and-forget).
@@ -6403,7 +6406,10 @@ function showCircle(id, circle, policy) {
       if (action === 'respond') {
         const body = (globalThis.prompt?.(t('circle.noticeboard.respond_prompt')) || '').trim();
         if (!body) return;
-        await stoopCall('stoop', 'respondToItem', { itemId: post.id, body });
+        // The reply starts a 1:1 conversation with the poster: it is persisted into their contact
+        // thread and that thread opens, so the answer that comes back has a place to land.
+        const r = await replyToPost({ callSkill: stoopCall, contactChannel: circleContactChannel, itemId: post.id, body });
+        if (r.ok && r.toPubKey) await showContactThread(r.toPubKey);
       } else if (action === 'cancel') {
         await stoopCall('stoop', 'cancelRequest', { requestId: post.id });
       } else if (action === 'report') {
@@ -8513,6 +8519,15 @@ async function boot() {
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
+          }),
+          // a peer answered one of OUR noticeboard posts → the reply lands in THAT REPLIER's contact
+          // thread (the same glue), marked with the post it answers. Before this the subtype had no
+          // router entry here, so a reply to a post was silently dropped on web.
+          'chat-message':            makeHandleThreadedChat({
+            deliverToThread: ({ fromAddr, text, messageId, ts, replyTo }) => {
+              onContactReply({ fromAddr, text, messageId, ts, replyTo });
+            },
+            notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
           }),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user
           // "shared with me" store; the surface opens each with this device's own network-derived sealing key.

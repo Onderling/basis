@@ -120,6 +120,14 @@ export function renderContactThread(container, {
     const bubble = document.createElement('div');
     bubble.className = 'cc-cthread__bubble';
     bubble.textContent = m.text ?? '';
+    // A turn that answers a NOTICEBOARD POST says so — a reply lands here from a person the reader
+    // may have never spoken to, and without the marker it reads as a message out of nowhere.
+    if (m.replyTo) {
+      const ref = document.createElement('div');
+      ref.className = 'cc-cthread__reply-ref';
+      ref.textContent = tr('circle.contacts.reply_to_post');
+      bubble.prepend(ref);
+    }
     // A received peer-wire FILE rides the turn ({id, name, mime, size, dataB64} — the thread is its
     // durable home). An image shows itself; everything gets its name, size and a native download —
     // a data: href needs no store round-trip because the bytes ARE here.

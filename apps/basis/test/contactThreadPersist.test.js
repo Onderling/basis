@@ -229,3 +229,23 @@ describe('contactThreadChannel — durable DM (G18 fix)', () => {
     expect(onReply).toHaveBeenCalledWith(expect.objectContaining({ fromAddr: 'bot-addr', text: 'live' }));
   });
 });
+
+describe('persistOutbound — our side of a reply that went out by another path', () => {
+  // A reply to a noticeboard post travels through the chat op, not through `sendTurn`; the poster's
+  // thread still has to show it, marked with the post it answers (decided 2026-09-03).
+  it('persists an outbound turn (no send) that rehydrates as OUR turn with its replyTo', async () => {
+    const store = memItemStore();
+    const sendToPeer = vi.fn(async () => ({}));
+    const ch = createContactThreadChannel({ sendToPeer, itemStore: store, localActor: 'me' });
+    const r = await ch.persistOutbound({ contactId: 'poster-A', peerAddr: 'poster-A', text: 'ik kan helpen', replyTo: 'post-1', messageId: 'post-reply-1' });
+    expect(r.itemId).toBeTruthy();
+    expect(sendToPeer).not.toHaveBeenCalled();
+    const turns = await ch.rehydrate('poster-A');
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toMatchObject({ origin: 'user', text: 'ik kan helpen', replyTo: 'post-1', messageId: 'post-reply-1' });
+    // dedup on the message id — a second persist of the same reply is a no-op
+    const again = await ch.persistOutbound({ contactId: 'poster-A', peerAddr: 'poster-A', text: 'ik kan helpen', replyTo: 'post-1', messageId: 'post-reply-1' });
+    expect(again.deduped).toBe(true);
+    expect(await ch.rehydrate('poster-A')).toHaveLength(1);
+  });
+});

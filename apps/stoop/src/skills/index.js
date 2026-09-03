@@ -1168,7 +1168,9 @@ async function respondToItemCore(scope, a, ctx) {
     try { updateInterest(bundle.interestProfile, post.text); } catch {}
   }
 
-  return { ok: true, threadId: a.itemId, itemId: r.itemId };
+  // `toPubKey` names the poster so the shell can open (and persist into) the contact thread the
+  // reply starts — the answer to a post is a 1:1 conversation with its author.
+  return { ok: true, threadId: a.itemId, itemId: r.itemId, toPubKey };
 }
 
 async function signOutOfPodCore(scope, a, ctx) {

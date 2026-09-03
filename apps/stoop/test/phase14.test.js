@@ -189,6 +189,8 @@ describe('Stoop V1 Phase 14 — respondToItem flow', () => {
     }, BOB);
     expect(r, 'respondToItem error').toMatchObject({ ok: true });
     expect(r.threadId).toBe(broadcastId);
+    // The op names the poster so the shell can open the contact thread the reply starts.
+    expect(r.toPubKey).toBe(anneId.pubKey);
 
     // Allow the OW envelope to dispatch on Anne's side.
     await new Promise(r => setTimeout(r, 30));

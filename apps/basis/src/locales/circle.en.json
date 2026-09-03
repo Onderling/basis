@@ -3998,6 +3998,10 @@
       "text": "Chat with {{name}}",
       "doc": "P5 — header of a contact DM thread."
     },
+    "reply_to_post": {
+      "text": "↩ reply to a noticeboard post",
+      "doc": "Marker above a DM turn that answers (or is) a reply to a noticeboard post."
+    },
     "composer": {
       "text": "Message {{name}}…",
       "doc": "P5 — placeholder of the DM-thread composer."

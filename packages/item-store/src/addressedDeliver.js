@@ -47,7 +47,7 @@ export const DM_ITEM_TYPE = 'chat-message';
 /**
  * Build the one addressed-send core shared by the 1:1 DM paths: send an Envelope
  * to ONE peer via the injected `send`, then (optionally) persist + dedup the
- * turn. Returns `{ deliver, persistInbound, seenNonces }`. Transport-agnostic —
+ * turn. Returns `{ deliver, persistInbound, persistOutbound, seenNonces }`. Transport-agnostic —
  * the send and the wire/item projections are injected, so item-store imports no
  * transport and each caller keeps its exact wire shape + subtype.
  *
@@ -198,7 +198,17 @@ export function createAddressedDeliver({
     return persistTurn(envelope, { to: peer, direction: 'in' });
   }
 
-  return { deliver, persistInbound, seenNonces, attachBytes };
+  /**
+   * Persist an OUTBOUND turn that was already sent by ANOTHER path (a reply to a
+   * noticeboard post goes out through the chat op, not through `deliver`). No send.
+   * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
+   */
+  async function persistOutbound(envelope, { to } = {}) {
+    const peer = to ?? envelope?.extras?.peerAddr ?? null;
+    return persistTurn(envelope, { to: peer, direction: 'out' });
+  }
+
+  return { deliver, persistInbound, persistOutbound, seenNonces, attachBytes };
 }
 
 /**

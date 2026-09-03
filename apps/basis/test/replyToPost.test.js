@@ -1,0 +1,35 @@
+/**
+ * replyToPost — the one path both shells take to answer a noticeboard post: the op sends, and OUR
+ * side of the exchange is persisted into the poster's contact thread so the conversation the reply
+ * starts is visible on the replier's device too (decided 2026-09-03).
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { replyToPost } from '../src/v2/replyToPost.js';
+
+describe('replyToPost', () => {
+  it('sends through the op, persists the outbound turn into the poster thread, and names the poster', async () => {
+    const callSkill = vi.fn(async () => ({ ok: true, threadId: 'post-1', itemId: 'chat-item-9', toPubKey: 'poster-A' }));
+    const contactChannel = { persistOutbound: vi.fn(async () => ({ itemId: 'x' })) };
+    const r = await replyToPost({ callSkill, contactChannel, itemId: 'post-1', body: 'ik kan helpen' });
+    expect(callSkill).toHaveBeenCalledWith('stoop', 'respondToItem', { itemId: 'post-1', body: 'ik kan helpen' });
+    expect(contactChannel.persistOutbound).toHaveBeenCalledWith(expect.objectContaining({
+      contactId: 'poster-A', peerAddr: 'poster-A', text: 'ik kan helpen', replyTo: 'post-1', messageId: 'post-reply-chat-item-9',
+    }));
+    expect(r).toEqual({ ok: true, toPubKey: 'poster-A' });
+  });
+
+  it('persists nothing when the op refuses', async () => {
+    const callSkill = vi.fn(async () => ({ error: 'not-found' }));
+    const contactChannel = { persistOutbound: vi.fn() };
+    const r = await replyToPost({ callSkill, contactChannel, itemId: 'post-1', body: 'x' });
+    expect(r).toEqual({ ok: false, error: 'not-found' });
+    expect(contactChannel.persistOutbound).not.toHaveBeenCalled();
+  });
+
+  it('still reports the send when the local copy cannot be written or no channel is wired', async () => {
+    const callSkill = vi.fn(async () => ({ ok: true, toPubKey: 'poster-A' }));
+    const contactChannel = { persistOutbound: vi.fn(async () => { throw new Error('store down'); }) };
+    expect(await replyToPost({ callSkill, contactChannel, itemId: 'p', body: 'x' })).toEqual({ ok: true, toPubKey: 'poster-A' });
+    expect(await replyToPost({ callSkill, contactChannel: null, itemId: 'p', body: 'x' })).toEqual({ ok: true, toPubKey: 'poster-A' });
+  });
+});

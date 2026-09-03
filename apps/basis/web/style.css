@@ -1578,4 +1578,5 @@ button[type="submit"] {
 /* A received peer-wire file in a contact thread: the image shows itself; every file gets meta + download. */
 .cc-cthread__file-preview { max-width: 100%; max-height: 260px; border-radius: 8px; display: block; margin: 4px 0; }
 .cc-cthread__file-meta { font-size: 0.85em; margin-top: 4px; }
+.cc-cthread__reply-ref { font-size: 0.8em; opacity: 0.7; margin-bottom: 2px; }
 .cc-cthread__file-download { font-size: 0.85em; }

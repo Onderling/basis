@@ -124,6 +124,9 @@ export {
   projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows, mutedActorSet,
   // C15 — per-circle chat projection (excludes the silent system lane).
   buildCircleChat,
+  // Who a row is FROM, through the reveal ladder — for surfaces that carry the author on the row
+  // (the noticeboard tab) rather than as a stream actor.
+  memberLabelFor,
 } from './v2/circleStream.js';
 export { agentActivityRows } from './v2/agentActivity.js';
 export { advancedOpRows, advancedParamRows } from './v2/advancedSurface.js';

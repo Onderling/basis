@@ -7,7 +7,7 @@
  * the sentence underneath matters most.
  */
 import { describe, it, expect } from 'vitest';
-import { stampSenderLabels, BOT_ACTOR } from '../../src/v2/circleStream.js';
+import { stampSenderLabels, memberLabelFor, BOT_ACTOR } from '../../src/v2/circleStream.js';
 
 const ME = 'webid:me';
 const THEM = 'webid:them';
@@ -66,5 +66,23 @@ describe('one member, every address they can speak from (Frits 2026-09-03: keyed
 
   it('still says unknown for someone the roster cannot place', () => {
     expect(stampAnna('addr-of-a-stranger').senderLabelKey).toBe('circle.chat.unknown_sender');
+  });
+});
+
+describe('memberLabelFor — the same resolution, for surfaces that carry the author on the ROW', () => {
+  // The noticeboard TAB showed a shortened raw address at every post while the screen-mode noticeboard
+  // block beside it had been stamping the roster label all along. One resolution, one reveal ladder.
+  const anna = { id: 'webid:anna', webid: 'webid:anna', handle: 'anna', circleAddress: 'addr-1', circleAddresses: ['addr-1', 'addr-2'] };
+  const label = (actor) => memberLabelFor(actor, { members: [anna], viewerId: ME, policy: 'open' });
+
+  it('answers the roster label for every address the member can prove', () => {
+    expect(label('webid:anna')).toBe('@anna');
+    expect(label('addr-2')).toBe('@anna');
+  });
+
+  it('answers null for someone the roster cannot place — the caller keeps its own fallback', () => {
+    expect(label('addr-of-a-stranger')).toBe(null);
+    expect(label(null)).toBe(null);
+    expect(memberLabelFor('webid:anna', {})).toBe(null);   // no roster yet: no byline, never a wire name
   });
 });

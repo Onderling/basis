@@ -31,6 +31,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   circleStoreMode,
   isNoticeboardPost,
   noticeboardIntentOf,
+  memberLabelFor,
   basisManifest, AppRegistry, filterCatalogue } from '../../src/index.js';
 // S4 pod foundation — per-circle sealed storage producer. The pod-client + in-memory
 // pseudo-pod machinery is web-layer (kept out of the shared src so it stays portable);
@@ -6138,7 +6139,15 @@ function showCircle(id, circle, policy) {
         // what printed `CIRCLE.NOTICEBOARD.INTENT.BORROW` on both shells.
         type:         noticeboardIntentOf(it),
         addedBy:      it.addedBy,
-        addedByLabel: shortWebid(it.addedBy),
+        // The roster label, through the same reveal ladder the conversation and the screen-mode
+        // noticeboard block use — this tab showed a shortened raw address at every post while the
+        // block beside it had been stamping the handle all along. A poster the roster cannot place
+        // still falls back to the short form: a stranger is a stranger, not an error.
+        addedByLabel: memberLabelFor(it.addedBy, {
+          members:  circleRoster ?? [],
+          viewerId: myWebid ?? null,
+          policy:   policy?.revealPolicy ?? 'pairwise',
+        }) ?? shortWebid(it.addedBy),
         mine:         !!(myWebid && it.addedBy === myWebid),
         // carry inline-image metadata (thumbnail travels; full bytes on demand).
         attachments:  Array.isArray(it.attachments) ? it.attachments

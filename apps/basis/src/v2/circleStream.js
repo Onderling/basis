@@ -255,6 +255,46 @@ export function chatRows(opts = {}) {
  */
 export const BOT_ACTOR = 'bot';
 
+/**
+ * ONE member, EVERY identifier they can speak under — not just the address recorded first. A member
+ * may hold several proven per-circle addresses (`circleAddressSetOf` exists for exactly the consumers
+ * that must accept "the member's address" rather than "the first one on the row"), and their canonical
+ * key still reaches them. Indexing only the primary made the same person show as `unknown_sender` the
+ * moment they spoke from another of their own addresses — the circle-side face of the two-threads bug
+ * walked on a phone. Threads and senders are keyed by IDENTITY (Frits 2026-09-03).
+ *
+ * @param {object[]} members  roster rows
+ * @returns {Map<string, object>} every identifier → the member it belongs to
+ */
+export function memberIndex(members = []) {
+  const byKey = new Map();
+  for (const m of Array.isArray(members) ? members : []) {
+    if (!m || typeof m !== 'object') continue;
+    for (const k of [m.id, m.webid, m.pubKey, m.stableId, ...circleAddressSetOf(m)]) {
+      if (k != null) byKey.set(k, m);
+    }
+  }
+  return byKey;
+}
+
+/**
+ * The reveal-gated label for whoever `actor` is, or `null` when the roster cannot place them.
+ *
+ * The same resolution `stampSenderLabels` uses, exposed for the surfaces that carry an author on the
+ * ROW rather than as a stream actor — the noticeboard tab, which showed a shortened raw address at
+ * every post while the screen-mode noticeboard block beside it (`circleRecipeBlocks`) had been
+ * stamping the roster label all along. One resolution, one reveal ladder, both surfaces.
+ *
+ * @param {string|null} actor
+ * @param {{members?: object[], viewerId?: string|null, policy?: 'open'|'pairwise'}} [opts]
+ * @returns {string|null}
+ */
+export function memberLabelFor(actor, { members = [], viewerId = null, policy = 'pairwise' } = {}) {
+  if (actor == null) return null;
+  const member = memberIndex(members).get(actor);
+  return member ? revealedMemberLabel(member, { viewerId, policy }).primary : null;
+}
+
 export function stampSenderLabels(rows, { members = [], viewerId = null, policy = 'pairwise' } = {}) {
   // ONE member, EVERY identifier they can speak under — not just the address recorded first. A member
   // may hold several proven per-circle addresses (`circleAddressSetOf` exists for exactly the consumers
@@ -262,13 +302,7 @@ export function stampSenderLabels(rows, { members = [], viewerId = null, policy 
   // key still reaches them. Indexing only the primary made the same person show as `unknown_sender` the
   // moment they spoke from another of their own addresses — the circle-side face of the two-threads bug
   // walked on a phone. Threads and senders are keyed by IDENTITY (Frits 2026-09-03).
-  const byKey = new Map();
-  for (const m of members) {
-    if (!m || typeof m !== 'object') continue;
-    for (const k of [m.id, m.webid, m.pubKey, m.stableId, ...circleAddressSetOf(m)]) {
-      if (k != null) byKey.set(k, m);
-    }
-  }
+  const byKey = memberIndex(members);
   return (rows || []).map((row) => {
     const actor = row?.actor ?? null;
     const self = viewerId != null && actor === viewerId;

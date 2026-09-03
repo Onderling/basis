@@ -26,6 +26,38 @@
 /** The canonical types a noticeboard post can be — what the board shows and what the circle carries as a post. */
 export const NOTICEBOARD_POST_TYPES = Object.freeze(['request', 'offer', 'announcement']);
 
+/**
+ * The BOARD's own vocabulary: the three words a person picks between when posting, and the three the
+ * badge on a post can say. Distinct from the canonical `{type, kind}` a post is STORED as — stoop
+ * translates one into the other on the way in (`STOOP_TYPE_MAPPING`), and `noticeboardIntentOf`
+ * translates back on the way out.
+ *
+ * It lives here, with the other board vocabulary, because both shells need it and neither may import
+ * an app. Each shell used to carry its own copy of the list AND its own copy of the reverse mapping.
+ */
+export const NOTICEBOARD_INTENTS = Object.freeze(['ask', 'offer', 'lend']);
+
+/**
+ * Which intent a stored post shows as — always one of `NOTICEBOARD_INTENTS`, never a raw stored value.
+ *
+ * The shells' copies read `item.intent ?? item.kind ?? …`, so a post stored the canonical way handed
+ * the badge its KIND — and `borrow` is a kind, not an intent, so the board printed the untranslated
+ * locale key `CIRCLE.NOTICEBOARD.INTENT.BORROW` at every asker (walked on a phone, both shells).
+ * The two vocabularies are not interchangeable and this is the one place that converts between them;
+ * stoop's forward map and this reverse are pinned to each other by a round-trip test.
+ */
+export function noticeboardIntentOf(item) {
+  const declared = item?.intent;
+  if (NOTICEBOARD_INTENTS.includes(declared)) return declared;
+  const type = item?.type;
+  // A lend is an OFFER with a return attached — the only intent the type alone cannot name.
+  if (type === 'offer')   return item?.kind === 'lend' ? 'lend' : 'offer';
+  if (type === 'request') return 'ask';
+  // A row that stored the board word itself (older writes, and the shells' own optimistic rows).
+  if (NOTICEBOARD_INTENTS.includes(type)) return type;
+  return 'ask';
+}
+
 export const SYSTEM_STOOP_TYPES = new Set([
   'group-rules', 'membership-code', 'membership-redemption', 'circle-chat-message',
 ]);

@@ -11,7 +11,7 @@
  */
 
 import { createRegistry }           from './src/registry.js';
-export { SYSTEM_STOOP_TYPES, NOTICEBOARD_POST_TYPES, isNoticeboardPost, isNoticeboardPostType } from './src/noticeboardPost.js'
+export { SYSTEM_STOOP_TYPES, NOTICEBOARD_POST_TYPES, NOTICEBOARD_INTENTS, noticeboardIntentOf, isNoticeboardPost, isNoticeboardPostType } from './src/noticeboardPost.js'
 // The composable lists' nouns — siblings in the store, but not tasks, so a task listing skips them.
 export { LISTS_TYPES } from './src/canonical.js';;
 import { registerCanonicalTypes }   from './src/canonical.js';

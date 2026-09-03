@@ -16,8 +16,9 @@
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 import { buildAttachControl } from './attachControl.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { NOTICEBOARD_INTENTS } from '../../src/v2/circleStoopScope.js';
 
-const INTENTS = ['ask', 'offer', 'lend'];
+const INTENTS = NOTICEBOARD_INTENTS;
 
 export function renderCircleNoticeboard(container, {
   posts = [],

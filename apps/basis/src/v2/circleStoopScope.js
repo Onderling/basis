@@ -59,7 +59,7 @@ export const SCOPED_LIST_OPS = DERIVED.lists;
 // home) — stoop needed it too (`/brief` counted chat lines as circle requests for a month because
 // it could not import an app) and both apps already depend on that package. Re-exported here so
 // every basis call site keeps its import path.
-export { SYSTEM_STOOP_TYPES, isNoticeboardPost } from '@onderling/item-types';
+export { SYSTEM_STOOP_TYPES, isNoticeboardPost, NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 
 /**
  * Keep `item` for `circleId` — lenient: an item carrying NO circle hint is kept

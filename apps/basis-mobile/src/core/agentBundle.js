@@ -37,6 +37,7 @@ import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
+import { createAttachmentBlobStoreRN } from './attachmentBlobStoreRN.js';
 import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';
 // Calendar cross-peer fan-out — wrap the bundle callSkill so a successful calendar
 // op fans its invite/RSVP envelopes out over the peer transport (web parity).
@@ -697,7 +698,11 @@ export async function bootAgentBundle(opts = {}) {
     }
     return _dmStorePromise;
   };
+  // A received file's BYTES go to the FILESYSTEM (2026-09-03), never into the DM thread's
+  // AsyncStorage snapshot. Per-key AsyncStorage would not help: one photo is still one oversized row.
+  const contactAttachmentBlobs = createAttachmentBlobStoreRN();
   const contactChannel = createContactThreadChannel({
+    blobStore: contactAttachmentBlobs,
     sendToPeer: (addr, payload) =>
       (typeof agent.sendPeerMessage === 'function'
         ? agent.sendPeerMessage(addr, payload)

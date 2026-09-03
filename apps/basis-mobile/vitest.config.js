@@ -43,6 +43,9 @@ export default defineConfig({
       // (breaks "same selector, no fork" identity + risks singleton divergence). Alias it to the real
       // workspace `apps/basis` so both import styles dedupe to ONE tree — and its `@onderling/*` deps resolve
       // from `apps/basis/node_modules` (complete) with vite transforming its src (JSON handled). (2026-08-07)
+      // `expo-file-system` — same trap as async-storage above: the real entry is unparseable by vite in
+      // node, so any module importing it fails to COLLECT even when the test injects its own fs.
+      'expo-file-system': path.resolve(__dirname, 'test/stubs/expoFileSystem.js'),
       '@onderling-app/basis': path.resolve(__dirname, '../basis'),
     },
   },

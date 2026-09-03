@@ -65,6 +65,7 @@ export function createContactThreadChannel({
   itemStore = null,
   localActor = null,
   localStableId = null,
+  blobStore = null,
 } = {}) {
   const mkId = typeof genId === 'function'
     ? genId
@@ -77,6 +78,8 @@ export function createContactThreadChannel({
   // contact payload so existing receivers/bots are byte-unaffected; the
   // Envelope's `kind` carries the caller's configured `subtypes.out`.
   const core = createAddressedDeliver({
+    // The bytes of a received file go HERE, not into the thread's snapshot item.
+    blobStore,
     send:    (addr, payload) => sendToPeer(addr, payload),
     toWire:  (env) => buildContactWire(env),
     itemStore,
@@ -185,7 +188,9 @@ export function createContactThreadChannel({
     if (!store || typeof store.listOpen !== 'function') return [];
     let items = [];
     try { items = await store.listOpen({}); } catch { return []; }
-    return chatTurnsFromItems(items, { threadKey: contactId });
+    // Re-attach each file's bytes from the blob store, so a renderer reading `turn.file.dataB64`
+    // is unchanged by the fact that the item never held them.
+    return core.attachBytes(chatTurnsFromItems(items, { threadKey: contactId }));
   }
 
   /**

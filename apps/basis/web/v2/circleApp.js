@@ -364,6 +364,7 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composa
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
 import { sealItem, isCanonicalPosture, memoryDataSource } from '@onderling/item-store';
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
+import { createAttachmentBlobStore } from '../../src/v2/attachmentBlobStore.js';
 import {
   shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
   shareErrorStatusKey,
@@ -2159,7 +2160,12 @@ function buildCircleBot(agent) {
   // RoutingStrategy (mdns > rendezvous > relay > nkn), so a DM turn reaches the
   // bot over whichever transport is live. Inbound replies are routed by
   // `channel.replyHandler` registered in the peer router (below).
+  // A received file's BYTES go to IndexedDB under the file id (2026-09-03), never into the DM
+  // thread's snapshot item. A snapshot store holds one serialised value; a photo inside it is what
+  // takes the whole thread down on a device with a per-row read ceiling.
+  const circleAttachmentBlobs = createAttachmentBlobStore();
   circleContactChannel = createContactThreadChannel({
+    blobStore: circleAttachmentBlobs,
     sendToPeer: (addr, payload) =>
       (typeof agent.sendPeerMessage === 'function'
         ? agent.sendPeerMessage(addr, payload)

@@ -79,6 +79,7 @@ export function createAddressedDeliver({
   localActor = null,
   localStableId = null,
   seenNonces = new Set(),
+  blobStore = null,
 } = {}) {
   if (typeof send !== 'function') {
     throw new Error('createAddressedDeliver: `send` (addressed send fn) is required');
@@ -110,9 +111,12 @@ export function createAddressedDeliver({
         replyTo:      ex.replyTo ?? null,
         ...(Array.isArray(ex.buttons) ? { buttons: ex.buttons } : {}),
         // A DM'd FILE (a peer-wire photo, a document) is part of the turn: the thread is its durable
-        // home, exactly as any messenger keeps a received photo in the conversation. `{id, name, mime,
-        // size, dataB64}` — bytes inline, because this store IS where the received copy lives.
-        ...(ex.file && typeof ex.file === 'object' ? { file: ex.file } : {}),
+        // home. The item carries the DESCRIPTION — `{id, name, mime, size}` — and never the bytes.
+        // Bytes in here would be bytes in a SNAPSHOT: this store is persisted as one serialised value
+        // per device, and on Android that value is a single row behind a ~2 MB read window whose failure
+        // returns an EMPTY map that the next save writes back over the row. One photo would take the whole
+        // thread store with it. The bytes go to `blobStore` under the file id (see `stripBytes`).
+        ...(ex.file && typeof ex.file === 'object' ? { file: stripBytes(ex.file) } : {}),
         sentAt:       typeof envelope?.ts === 'number' ? envelope.ts : Date.now(),
         nonce:        envelope?.id ?? null,
       },
@@ -120,10 +124,44 @@ export function createAddressedDeliver({
   }
   const projectItem = typeof toItem === 'function' ? toItem : defaultToItem;
 
+  /** The description of a file, without its payload — what a snapshot store may hold. */
+  function stripBytes(file) {
+    const { dataB64, ...rest } = file ?? {};
+    return rest;
+  }
+
+  /**
+   * Hand a turn's bytes to the blob store before the item is written, keyed by the file id. Best-effort
+   * by design: if it throws, the turn is still persisted — a thread that shows a file card whose bytes
+   * are missing is honest and recoverable; a thread that lost the message is not. With no blobStore
+   * wired the bytes are simply dropped rather than persisted inline, because inline is the failure this
+   * seam exists to prevent.
+   */
+  async function stashBytes(envelope) {
+    const file = envelope?.extras?.file;
+    if (!file || typeof file !== 'object' || typeof file.dataB64 !== 'string' || !file.id) return;
+    if (!blobStore || typeof blobStore.put !== 'function') return;
+    try { await blobStore.put(file.id, file.dataB64); } catch { /* the turn still lands */ }
+  }
+
+  /** Re-attach bytes to projected turns (the read side's inverse of `stashBytes`). */
+  async function attachBytes(turns) {
+    if (!blobStore || typeof blobStore.get !== 'function') return turns;
+    for (const t of turns) {
+      if (!t?.file?.id || typeof t.file.dataB64 === 'string') continue;
+      try {
+        const b64 = await blobStore.get(t.file.id);
+        if (typeof b64 === 'string' && b64) t.file = { ...t.file, dataB64: b64 };
+      } catch { /* the card renders from its description alone */ }
+    }
+    return turns;
+  }
+
   /** Persist one turn (out or in) as a durable item, dedup on the msg id. */
   async function persistTurn(envelope, { to, direction }) {
     const store = await resolveStore();
     if (!store) return { itemId: null };
+    await stashBytes(envelope);       // bytes out first, so the draft below can only carry the description
     // Project the item FIRST — a falsy draft means "send-only, don't persist"
     // (so a send-only subtype never touches the dedup set either). The
     // projection may be async (a caller may write attachment bytes inside it);
@@ -160,7 +198,7 @@ export function createAddressedDeliver({
     return persistTurn(envelope, { to: peer, direction: 'in' });
   }
 
-  return { deliver, persistInbound, seenNonces };
+  return { deliver, persistInbound, seenNonces, attachBytes };
 }
 
 /**

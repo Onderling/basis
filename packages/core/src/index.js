@@ -180,6 +180,10 @@ export { TunnelSessions }              from './skills/tunnelSessions.js';
 export { generateTunnelKey,
          sealTunnelOW,
          openTunnelOW }                from './security/tunnelSeal.js';
+export {
+  ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
+  signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
+} from './identity/ceremonyCommitment.js';   // who may retire a device address: the owner root, at a ceremony
 export { encode as b64encode,
          decode as b64decode }         from './crypto/b64.js';
 

@@ -76,6 +76,9 @@ export async function recordCircleAddress(
     circleAddress:      a.circleAddress,
     circleAddressProof: a.circleAddressProof,
     personaProperties:  a.personaProperties,
+    // the declared ceremony commitment (core ceremonyCommitment.js) rides with its circle-key signature
+    ceremonyCommitment:      a.ceremonyCommitment,
+    ceremonyCommitmentProof: a.ceremonyCommitmentProof,
   }, a.groupId);
   if (!proven) return { ok: false, reason: 'unproven-address' };
   // The member's RELEASE rides the (proof-verified) address, carried under the same roster-level
@@ -117,9 +120,10 @@ export async function recordCircleAddress(
       // released name would never land on a device that already had the address.
       const releaseChanged = !!releasedProps
         && JSON.stringify(src.personaProperties ?? null) !== JSON.stringify(releasedProps);
+      const commitmentNew = !!proven.ceremonyCommitment && !src.ceremonyCommitment;
       if (src.circleAddress === proven.circleAddress
         && src.circleAddressProof === proven.circleAddressProof
-        && !releaseChanged) { unchanged += 1; continue; }
+        && !releaseChanged && !commitmentNew) { unchanged += 1; continue; }
       const kept = demote([
         { address: src.circleAddress, proof: src.circleAddressProof },
         ...(Array.isArray(src.circleAddresses) ? src.circleAddresses : []),
@@ -132,6 +136,10 @@ export async function recordCircleAddress(
         // phrase-derived per-circle key, so this pins exactly the key class ceremony statements
         // (address-revoke) must be signed with. First-write-wins; never overwritten.
         ...(src.ceremonyAddress ? {} : { ceremonyAddress: src.circleAddress }),
+        // THE CEREMONY COMMITMENT: who may retire this member's addresses — their owner root, at a
+        // ceremony (core `ceremonyCommitment.js`). Declared and circle-key-signed in the announcement,
+        // verified before this point. First-write-wins: a member's root does not change.
+        ...((!src.ceremonyCommitment && proven.ceremonyCommitment) ? { ceremonyCommitment: proven.ceremonyCommitment } : {}),
         // …the previously proven addresses SURVIVE beside the new primary (the set — task above).
         ...((kept.length || src.circleAddresses) ? { circleAddresses: kept } : {}),
         // A row learned from an intro carries no key at all; without one
@@ -145,7 +153,8 @@ export async function recordCircleAddress(
       };
     } else if (src.confirmedBy === webid && src.channel === 'peer') {
       if (src.confirmedByCircleAddress === proven.circleAddress
-        && src.confirmedByCircleAddressProof === proven.circleAddressProof) { unchanged += 1; continue; }
+        && src.confirmedByCircleAddressProof === proven.circleAddressProof
+        && !(proven.ceremonyCommitment && !src.confirmedByCeremonyCommitment)) { unchanged += 1; continue; }
       const kept = demote([
         { address: src.confirmedByCircleAddress, proof: src.confirmedByCircleAddressProof },
         ...(Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : []),
@@ -155,6 +164,7 @@ export async function recordCircleAddress(
         confirmedByCircleAddressProof: proven.circleAddressProof,
         // Same capture for the admin-as-recorded-on-the-joiner-side shape (custody D1).
         ...(src.confirmedByCeremonyAddress ? {} : { confirmedByCeremonyAddress: src.confirmedByCircleAddress }),
+        ...((!src.confirmedByCeremonyCommitment && proven.ceremonyCommitment) ? { confirmedByCeremonyCommitment: proven.ceremonyCommitment } : {}),
         ...((kept.length || src.confirmedByCircleAddresses) ? { confirmedByCircleAddresses: kept } : {}),
       };
     }
@@ -179,6 +189,7 @@ export async function recordCircleAddress(
         signingPublicKey:   webid,
         circleAddress:      proven.circleAddress,
         circleAddressProof: proven.circleAddressProof,
+        ...(proven.ceremonyCommitment ? { ceremonyCommitment: proven.ceremonyCommitment } : {}),
         channel:            'announce',
         announcedAt:        Date.now(),
         ...(releasedProps ? { personaProperties: releasedProps } : {}),

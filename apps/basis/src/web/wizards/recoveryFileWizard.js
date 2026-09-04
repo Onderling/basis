@@ -73,7 +73,7 @@ export function renderRecoveryImportWizard({ container, doc, callSkill, onClose,
     }
     const body = mkBody(doc, t('circle.wizard.recovery.import_title'), t('circle.wizard.recovery.import_intro'));
     const input = doc.createElement('input'); input.type = 'file'; input.accept = '.json,application/json';
-    input.className = 'cc-wizard-file';
+    input.className = 'cc-wizard-input';
     input.addEventListener('change', () => {
       const f = input.files?.[0]; if (!f) return;
       const reader = new FileReader();

@@ -1768,6 +1768,15 @@ const circleSealStrategies = new Map();   // circleId → resolved {seal,open} c
 // sealed circle stays readable with NO pod, and a removed member — never sent the rotation event — cannot open
 // post-removal content. Shared with mobile by construction (the same store module + handler).
 const circleKeyEventStore = createKeyEventStore();
+// The history sidecar's per-circle snapshot (the replace ceremony's absorbed group keys), refreshed from
+// the agent whenever a circle's seal strategy is (re)built; the strategy reads it lazily.
+const circleHistoryKeys = new Map();
+async function refreshCircleHistoryKeys(circleId) {
+  try {
+    const chain = await _peerAgent?.historyKeyChainFor?.(circleId);
+    if (Array.isArray(chain)) circleHistoryKeys.set(circleId, chain);
+  } catch { /* an empty sidecar changes nothing */ }
+}
 // The ONE way a key-event enters the store (emit side via the sink's recordLocal, receive side via the
 // peer router). Recording also drops the circle's cached seal strategy: a key-event means the key state
 // MOVED (typically a rotation), and a stale cached strategy would keep sealing NEW content under the OLD
@@ -1792,6 +1801,7 @@ async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
   let strat = null;
   try {
+    await refreshCircleHistoryKeys(circleId);
     const prod = await ensureCirclePod(circleId, policy);
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
@@ -1804,6 +1814,9 @@ async function getCircleSealStrategy(circleId, policy) {
       if (strat && idKey?.privateKey) {
         strat = wrapStrategyWithKeyEventFold(strat, {
           listEvents: () => circleKeyEventStore.list(circleId), groupId: circleId, privateKey: idKey.privateKey,
+          // …and the history sidecar (the replace ceremony's absorbed keys), read lazily. Sync by contract:
+          // the shell keeps a per-circle snapshot the agent refreshes after a ceremony.
+          extraChain: () => circleHistoryKeys.get(circleId) ?? null,
         });
       }
     }
@@ -4421,6 +4434,8 @@ async function showMyData() {
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
   // so the tombstone shows.
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
+  // The replace ceremony (plan B1): retire every other device in one act, after a restore.
+  const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
   // reflects reality; toggling subscribes/unsubscribes + tells stoop.
@@ -4503,7 +4518,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, devices, onRevokeDevice, notifications, onToggleNotifications,
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -5197,10 +5212,17 @@ function showEnrollDeviceFlow() {
 }
 
 function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
-  // DEVICE REVOCATION (the ceremony, as its declared flow): runs on THIS — a surviving — device;
-  // the phrase is the extra proof. The deviceId rides in prefilled (the My-data device row that
-  // opened this); the one pause paints only the phrase. The fold does the enforcement everywhere.
-  const FLOW = householdManifest.flows.find((f) => f.id === 'revoke-device');
+  return showDeviceCeremonyFlow({ flowId: 'revoke-device', keyPrefix: 'revoke', deviceId, onClosed });
+}
+/** The replace ceremony (plan B1): after a restore, retire every other device in one act. */
+function showReplaceDeviceFlow({ onClosed } = {}) {
+  return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
+}
+function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) {
+  // THE DEVICE CEREMONIES, as their declared flows: revoke ONE device (the My-data device row that
+  // opened this names it) or REPLACE — retire every other device. Both run on THIS device; the phrase
+  // is the proof; the one pause paints only the phrase. The fold does the enforcement everywhere.
+  const FLOW = householdManifest.flows.find((f) => f.id === flowId);
   const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
   const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => rawCallSkill('household', opId, args) });
   const { card, close } = _restoreOverlay();
@@ -5211,12 +5233,12 @@ function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
     const view = renderFlow(FLOW, inst, { ops: OPS });
     card.innerHTML = '';
     const h = document.createElement('h3');
-    h.textContent = t('circle.revoke.title');
+    h.textContent = t(`circle.${keyPrefix}.title`);
     card.appendChild(h);
 
     if (view.status === 'awaiting-input' && view.form) {
       const p = document.createElement('p');
-      p.textContent = t('circle.revoke.body');
+      p.textContent = t(`circle.${keyPrefix}.body`);
       card.appendChild(p);
       const input = document.createElement('textarea');
       input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false;
@@ -5225,9 +5247,9 @@ function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
       card.appendChild(input);
       const go = document.createElement('button');
       go.type = 'button';
-      go.textContent = t('circle.revoke.submit');
+      go.textContent = t(`circle.${keyPrefix}.submit`);
       go.addEventListener('click', () => {
-        runner.resume(FLOW, inst, { input: { mnemonic: input.value, deviceId } })
+        runner.resume(FLOW, inst, { input: { mnemonic: input.value, ...(deviceId ? { deviceId } : {}) } })
           .then((r) => { inst = r; paint(); }).catch(() => done());
       });
       card.appendChild(go);
@@ -5243,17 +5265,17 @@ function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
     const outcome = inst?.steps?.ceremony?.outcome;
     const msg = document.createElement('p');
     msg.textContent = outcome === 'ok'
-      ? t('circle.revoke.done')
+      ? t(`circle.${keyPrefix}.done`)
       : (outcome === 'wrong-phrase' || outcome === 'invalid-phrase')
         ? t('circle.enroll.invalid_phrase')
-        : (inst?.steps?.ceremony?.out?.error ?? t('circle.revoke.failed'));
+        : (inst?.steps?.ceremony?.out?.error ?? t(`circle.${keyPrefix}.failed`));
     card.appendChild(msg);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = outcome === 'ok' ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
       if (outcome === 'ok') return done();
-      close(); showRevokeDeviceFlow(deviceId, { onClosed });
+      close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed });
     });
     card.appendChild(btn);
     if (outcome !== 'ok') {

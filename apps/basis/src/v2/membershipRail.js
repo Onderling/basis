@@ -8,6 +8,7 @@
  * the pull-all catch-up. `deriveRoster` folds the rail's VERIFIED bodies (author resolved to ref) as the
  * AUTHORITATIVE membership — the wall-clock exit path retires with this rider.
  */
+import { verifyCeremonyReveal } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { membershipManifest, MEMBERSHIP_LANE } from './membershipManifest.js';
@@ -75,12 +76,13 @@ export function rosterBindingVerifier(callSkill) {
 
 /** Build the membership rail over the device log. Mirrors `makeGovernanceRail`. */
 /**
- * The membership lane's binding — rosterBindingVerifier's semantics plus the CEREMONY rule
- * (custody D1): an `address-revoke` binds ONLY when signed by the row's `ceremonyAddress` — the
- * phrase-derived per-circle key no single device can mint once the custody cutover lands. A row
- * without one (the post-cutover join window, before the member's next ceremony re-binds) falls
- * back to the interim any-attested rule — the arc's named, shrinking window. Spineless roster
- * reads, like the base verifier (no recursion, no breaker).
+ * The membership lane's binding — rosterBindingVerifier's semantics plus the CEREMONY rule: an
+ * `address-revoke` binds ONLY by its ROOT REVEAL — the owner root's public key plus the root's signature
+ * over this statement's facts — verified against the row's `ceremonyCommitment` (core
+ * ceremonyCommitment.js). The root exists only inside a ceremony, so no device, stolen or not, can mint
+ * one; the author key is simply whichever device ran the ceremony. A row with no commitment cannot be
+ * revoked by statement at all — deny, never the any-attested rule. Spineless roster reads, like the base
+ * verifier (no recursion, no breaker).
  */
 export function membershipBindingVerifier(callSkill, { circleIdentityFor = null, memoMs = SPINELESS_MEMO_MS } = {}) {
   // Spineless read → no recursion → no breaker (see rosterBindingVerifier above).
@@ -93,8 +95,17 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
     promise.catch(() => memo.delete(circleId));
     return promise;
   };
-  return async ({ author, ref, circleId, kind }) => {
+  return async ({ author, ref, circleId, kind, payload, subject }) => {
     try {
+      // THE CEREMONY RULE, first and without a self-binding shortcut: even my own device's revoke must
+      // carry the root's reveal, or my local fold would accept what every other member refuses.
+      if (kind === 'address-revoke') {
+        const r = await spinelessRoster(circleId);
+        const row = (Array.isArray(r?.members) ? r.members : []).find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
+        return !!row && verifyCeremonyReveal(payload?.reveal, {
+          circleId, kind, subject, authorRef: ref, commitment: row.ceremonyCommitment,
+        });
+      }
       // SELF-BINDING — a device can always verify its OWN key, with no roster involved. This is the
       // only way out of a genuine circularity: the roster of a brand-new circle is empty, so the
       // creator's own first statement could not bind, so the roster stayed empty. Proving "I signed
@@ -115,9 +126,6 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;
-      if (kind === 'address-revoke' && typeof row.ceremonyAddress === 'string' && row.ceremonyAddress) {
-        return author === row.ceremonyAddress;
-      }
       return row.circleAddress === author
         || (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author));
     } catch { return false; }

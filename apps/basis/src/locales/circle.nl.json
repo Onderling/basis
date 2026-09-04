@@ -4617,6 +4617,7 @@
     "enroll_device": "Apparaat toevoegen",
     "recovery_export": "Herstelbestand opslaan",
     "recovery_import": "Herstelbestand laden",
+    "replace_device": "Mijn andere apparaten intrekken",
     "devices": "Mijn apparaten",
     "connections": {
       "text": "Gekoppelde apparaten",
@@ -5530,6 +5531,14 @@
     "offer_code_label": "Code:",
     "offer_link_label": "Link:",
     "offer_share": "Deel de code"
+  },
+  "replace": {
+    "title": "Dit is nu mijn telefoon",
+    "ceremony": "Je andere apparaten worden ingetrokken",
+    "body": "Typ de herstelzin. Al je andere apparaten worden in al je kringen ingetrokken, en wat zij konden lezen komt mee naar dit apparaat. Gebruik dit na een kapotte of verloren telefoon.",
+    "submit": "Mijn andere apparaten intrekken",
+    "done": "Klaar. Je andere apparaten zijn overal ingetrokken; dit apparaat gaat verder.",
+    "failed": "Dat is niet gelukt."
   },
   "revoke": {
     "title": "Apparaat intrekken",

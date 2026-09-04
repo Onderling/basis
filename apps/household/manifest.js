@@ -307,6 +307,39 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'exportRecoveryFile', group: 'device',
+      verb: 'get',
+      // THE RECOVERY FILE, out: the registry (circles, devices, wrapped-key refs) sealed exactly as the pod
+      // mirror seals it — to the profile-derived key the phrase re-derives — so the phrase is the only
+      // secret. Reached from My data → "Save a recovery file" (both shells); no chat/slash surface.
+      params: [],
+      surfaces: {},
+    },
+    {
+      id:   'importRecoveryFile', group: 'device',
+      verb: 'import',
+      // THE RECOVERY FILE, in: opens the file with this device's key, upserts every entry through the
+      // registry handle, and runs the boot re-open loop. Refuses `not-your-file` / `unreadable-file`.
+      // Reached from My data → "Load a recovery file" after a phrase restore.
+      params: [
+        { name: 'file', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'replaceDevice', group: 'device',
+      verb: 'replace-device',
+      // THE REPLACE CEREMONY (one ceremony for both restore intents — a phone that broke, a phone that
+      // walked away): on THIS, the restored device, phrase-proven; retires every other device the
+      // registry lists (and the first device's profile-derived addresses) in every circle, absorbs the
+      // group-key history those devices could read, and rotates the key where this device is an admin.
+      params: [
+        { name: 'mnemonic', kind: 'secret', required: true },
+      ],
+      // CEREMONY-ONLY, like revokeDevice: reached through the replace-device flow.
+      surfaces: {},
+    },
+    {
       id:   'enrollDevice', group: 'device',
       verb: 'enroll-device',
       // The add-a-device CEREMONY (a host identity act, like restoreOwnerPhrase): restores the
@@ -416,6 +449,26 @@ export const householdManifest = {
       ],
       steps: [
         { id: 'ceremony', op: 'enrollDevice', labelKey: 'circle.enroll.ceremony' },
+      ],
+    },
+    {
+      id: 'replace-device',
+      kind: 'ceremony',
+      scope: 'device',
+      labelKey: 'circle.replace.title',
+      effects: [
+        { kind: 'write', target: 'registry' },
+        { kind: 'write', target: 'history-keys' },
+        { kind: 'send',  target: 'circle-address-revoke' },
+        { kind: 'send',  target: 'circle-key-rotate' },
+      ],
+      produces: [
+        { name: 'retiredDevices', kind: 'string',  from: '$steps.ceremony.retiredDevices' },
+        { name: 'circles',        kind: 'number',  from: '$steps.ceremony.circles' },
+        { name: 'historyKeys',    kind: 'number',  from: '$steps.ceremony.historyKeys' },
+      ],
+      steps: [
+        { id: 'ceremony', op: 'replaceDevice', labelKey: 'circle.replace.ceremony' },
       ],
     },
     {

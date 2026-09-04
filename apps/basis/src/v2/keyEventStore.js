@@ -114,7 +114,7 @@ export function openViaKeyEvents(env, { events, groupId, opener } = {}) {
  * @param {string} o.privateKey                    this device's per-circle sealing PRIVATE key.
  * @returns {{seal:Function, open:Function}}
  */
-export function wrapStrategyWithKeyEventFold(strat, { listEvents, groupId, privateKey } = {}) {
+export function wrapStrategyWithKeyEventFold(strat, { listEvents, groupId, privateKey, extraChain = null } = {}) {
   if (!strat || typeof listEvents !== 'function' || !privateKey) return strat;
   const opener = makeOpener(privateKey);
   return {
@@ -123,7 +123,18 @@ export function wrapStrategyWithKeyEventFold(strat, { listEvents, groupId, priva
       try { return strat.open(text); }
       catch (podErr) {
         try { return openViaKeyEvents(text, { events: listEvents(), groupId, opener }); }
-        catch { throw podErr; }   // neither reader opens it — surface the original (pod) denial
+        catch {
+          // THE HISTORY SIDECAR (the replace ceremony): group-key versions this person absorbed from a
+          // retired device's key — raw keys, held locally, read lazily so a ceremony that ran after this
+          // strategy was cached is still seen. Last resort; an empty sidecar changes nothing.
+          if (typeof extraChain === 'function') {
+            try {
+              const chain = extraChain();
+              if (Array.isArray(chain) && chain.length) return openAcrossKeyChain(text, chain);
+            } catch { /* fall through to the original denial */ }
+          }
+          throw podErr;   // no reader opens it — surface the original (pod) denial
+        }
       }
     },
   };

@@ -105,6 +105,10 @@ export function ownAnnouncementFor({ agent, circleId } = {}) {
     // The same signature the join and the redeem response already carry: signed by the key behind
     // the address, over a challenge bound to this circle (`signCircleLink`). No new primitive.
     signCircleAddress: (cid, address) => agent?.signCircleLink?.(cid, cid, address) ?? null,
+    // The ceremony commitment (who may retire this address: the owner root — core ceremonyCommitment.js),
+    // declared by this device and signed with this circle's key. Absent on a host that has no root pubkey.
+    ceremonyCommitmentFor: (cid) => agent?.ceremonyCommitmentFor?.(cid) ?? null,
+    signCeremonyCommitment: (cid, address, commitment) => agent?.signCeremonyCommitment?.(cid, address, commitment) ?? null,
   });
 }
 
@@ -166,6 +170,7 @@ export async function announceOwnCircleAddress({ agent, circleId, logger = conso
         memberWebid:        announcement.memberWebid,
         circleAddress:      announcement.circleAddress,
         circleAddressProof: announcement.circleAddressProof,
+        ...(announcement.ceremonyCommitment ? { ceremonyCommitment: announcement.ceremonyCommitment, ceremonyCommitmentProof: announcement.ceremonyCommitmentProof } : {}),
       });
     } catch (err) {
       logger?.warn?.('[circle-address] recording my own address failed', err?.message ?? err);
@@ -383,6 +388,7 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
           memberWebid:        one.memberWebid,
           circleAddress:      one.circleAddress,
           circleAddressProof: one.circleAddressProof,
+          ...(one.ceremonyCommitment ? { ceremonyCommitment: one.ceremonyCommitment, ceremonyCommitmentProof: one.ceremonyCommitmentProof } : {}),
           // The member's release rides along, completing the roster projection (a released name
           // reaches this device). Absent on a release-less announcement — carried only when present.
           ...(one.personaProperties ? { personaProperties: one.personaProperties } : {}),

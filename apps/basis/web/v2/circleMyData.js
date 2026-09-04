@@ -27,6 +27,8 @@ export function renderCircleMyData(container, {
   onViewMnemonic,
   onRestore,
   onEnroll,
+  onExportRecovery,
+  onImportRecovery,
   devices = [],
   onRevokeDevice,
   // CONNECTIONS (gekoppelde apparaten) — screens that are yours, somewhere else. Rows come from the
@@ -192,6 +194,9 @@ export function renderCircleMyData(container, {
     // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,
     // never on a device that already has authority).
     ['cc-mydata__enroll',   'circle.mydata.enroll_device',  onEnroll],
+    // The recovery file (plan A2): the circle list sealed to the phrase — the pod-less way back.
+    ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
+    ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
   ].filter(([, , fn]) => typeof fn === 'function');
   if (acts.length) {
     const keys = section(tr('circle.mydata.keys'));

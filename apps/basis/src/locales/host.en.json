@@ -1,4 +1,14 @@
 {
+  "common": {
+    "cancel": {
+      "text": "Cancel",
+      "doc": "Generic cancel-button label — rendered by both shells' wizards (moved from the mobile bundle 2026-09-04 when the web recovery-file wizard started using it)."
+    },
+    "done": {
+      "text": "Done",
+      "doc": "Final dismiss after wizard success — rendered by both shells' wizards (moved from the mobile bundle 2026-09-04)."
+    }
+  },
   "apps": {
     "heading": {
       "text": "Apps:",

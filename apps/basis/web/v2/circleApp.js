@@ -44,6 +44,7 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
 // (kept in src/ so web ≡ mobile by construction; the shell only composes it, no routing logic — invariant 1).
 import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
+import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
@@ -159,6 +160,7 @@ import {
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
 import { renderEncryptedBackupWizard } from '../../src/web/wizards/encryptedBackupWizard.js';
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
+import { renderRecoveryExportWizard, renderRecoveryImportWizard } from '../../src/web/wizards/recoveryFileWizard.js';
 // OBJ-2 membership — reuse the classic join wizard renderer in v2 via the same overlay adapter.
 import { renderJoinGroupWizard } from '../../src/web/wizards/joinGroupWizard.js';
 // web-push subscription orchestration (client half; server delivery is a
@@ -4411,6 +4413,9 @@ async function showMyData() {
   // the recovery phrase via the stoop `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
+  // The recovery file (plan A2): the circle list, sealed to the phrase — save it, or load it after a restore.
+  const onExportRecovery = () => mountMyDataWizard(renderRecoveryExportWizard);
+  const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => showMyData() });
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
   const onEnroll = () => showEnrollDeviceFlow();
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
@@ -4498,7 +4503,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, devices, onRevokeDevice, notifications, onToggleNotifications,
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -8101,6 +8106,19 @@ async function boot() {
           });
         } catch { return null; }
       },
+      // The owner's REGISTRY survives the device (plan A1): a persistent local backend, and when signed in
+      // a sealed mirror on the user's own pod under an opaque name. Same shape as the settings medium.
+      registryBackend: pickWebBackend('cc-agent-registry'),
+      provisionRegistryMedium: async (strategy) => {
+        try {
+          return await createRegistryPodMedium({
+            fetch:   circleAuthedFetch,
+            podRoot: circleRealPodRouting?.podRoot ?? null,
+            strategy,
+          });
+        } catch { return null; }
+      },
+      onRegistryKeyMismatch: () => { pendingRestoreFlow = true; },
       // The personal history mirror's pod backend — same shape as the settings medium: the shell
       // supplies the pod, realAgent supplies the seal-to-self strategy and gates on the
       // `history.mirror` switch (off by default). Not signed in → null → no mirror, honest degrade.

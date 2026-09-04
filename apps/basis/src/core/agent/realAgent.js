@@ -175,6 +175,7 @@ async function restoreOrGenerate(vault) {
 }
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
+import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device (plan A1/A2)
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
@@ -1117,15 +1118,39 @@ export async function createRealHouseholdAgent(opts = {}) {
   // no-op until then. Returns false when there is no record to attach to (the key facet needs a prior
   // {handle,address} join write) — so it is safe to call at every circle-open, best-effort.
   let upsertCircleKeyRef = async () => false;
+  // THE CARRIER (plan A1): the registry rides its OWN pseudo-pod — a persistent local backend the shell
+  // passes (`opts.registryBackend`; memory when absent, as before), and when signed in a cache-mode
+  // mirror to the owner's pod, sealed to self under an opaque name (`opts.provisionRegistryMedium`, the
+  // settings medium's sibling). `attach()` runs the probe gate BEFORE the self-registration below, which
+  // is a write: a fresh install must never overwrite the owner's pod copy with a one-device list.
+  let registryCarrierStatus = () => ({ mode: 'local', probe: null });
+  const registryPseudoPod = await (async () => {
+    try {
+      const strategy = typeof opts.provisionRegistryMedium === 'function' ? settingsSealStrategyForIdentity(chatId) : null;
+      const medium   = strategy ? await opts.provisionRegistryMedium(strategy) : null;
+      const carrier  = createRegistryCarrier({
+        backend: opts.registryBackend ?? null, deviceId: chatId.pubKey,
+        medium, name: medium ? registryPodName(chatId) : null,
+        onKeyMismatch: () => opts.onRegistryKeyMismatch?.(),
+        warn: (m) => { if (typeof console !== 'undefined') console.warn(m); },
+      });
+      await carrier.attach();
+      registryCarrierStatus = carrier.status;
+      return carrier.pseudoPod;
+    } catch (err) {
+      if (typeof console !== 'undefined') console.warn('[registry-carrier] unavailable — registry stays on the local substrate', err?.message ?? err);
+      return circleSubstrate.pseudoPod;
+    }
+  })();
   {
     const agentsRegistry =
       (await registerAgentBundle({
-        pseudoPod:   circleSubstrate.pseudoPod,
+        pseudoPod:   registryPseudoPod,
         podDeviceId: chatId.pubKey,
         agent:       chatAgent,
         opts: { capabilities: ['basis'], name: opts.agentsSelfName ?? 'basis (this device)' },
       }))
-      ?? createAgentRegistry({ pseudoPod: circleSubstrate.pseudoPod, deviceId: chatId.pubKey });
+      ?? createAgentRegistry({ pseudoPod: registryPseudoPod, deviceId: chatId.pubKey });
 
     // Expose the default profile's circle-membership map outward (see the outer `let`): the restore-and-open
     // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
@@ -1929,6 +1954,43 @@ export async function createRealHouseholdAgent(opts = {}) {
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'trusted' });   // retires a device's keys everywhere: owner-only, phrase-proven
+
+  /* ─── The RECOVERY FILE (plan A2): the pod-less carrier of the circle list ─────────────────────
+   * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),
+   * so the phrase is the only secret; import opens it with this device's key and upserts every entry
+   * through the registry handle, then runs the boot re-open loop. A file sealed by someone else's
+   * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
+  hostAgent.register('exportRecoveryFile', async () => {
+    try {
+      const strategy = settingsSealStrategyForIdentity(chatId);
+      if (!strategy) return [DataPart({ ok: false, error: 'no-identity' })];
+      if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
+      const { body } = await agentsRegistryRef.reload();
+      const circles = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {})).length;
+      return [DataPart({ ok: true, file: sealRecoveryFile({ strategy, body }), circles })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'export-failed' })]; }
+  }, { visibility: 'trusted' });   // the sealed circle list: owner-only
+
+  hostAgent.register('importRecoveryFile', async ({ parts }) => {
+    const file = String(parts?.[0]?.data?.file ?? '');
+    if (!file.trim()) return [DataPart({ ok: false, error: 'unreadable-file' })];
+    const strategy = settingsSealStrategyForIdentity(chatId);
+    if (!strategy) return [DataPart({ ok: false, error: 'no-identity' })];
+    if (!agentsRegistryRef?.register) return [DataPart({ ok: false, error: 'no-registry' })];
+    let body;
+    try { body = openRecoveryFile({ strategy, file }); }
+    catch (e) { return [DataPart({ ok: false, error: e?.code ?? 'unreadable-file' })]; }
+    try {
+      let agents = 0;
+      for (const entry of (Array.isArray(body?.agents) ? body.agents : [])) {
+        if (!entry?.agentId) continue;
+        await agentsRegistryRef.register(entry);
+        agents += 1;
+      }
+      const { reopened } = await reopenMemberCircles();
+      return [DataPart({ ok: true, agents, circles: reopened })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'import-failed' })]; }
+  }, { visibility: 'trusted' });   // writes the registry: owner-only
 
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
@@ -4533,6 +4595,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // shell can re-run it after a late registry import/restore without a full reload. Returns
     // `{ reopened: [circleId] }`. Idempotent + best-effort per circle.
     reopenMemberCircles,
+    registryCarrierStatus: () => registryCarrierStatus(),   // where the registry rides: local / cache, and the probe outcome
 
     // Transport-NEUTRAL reachability — true when ANY peer transport can carry a
     // message (NKN `.peer` OR the WebSocket `.relay`; sendPeerMessage already

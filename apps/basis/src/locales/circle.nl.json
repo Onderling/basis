@@ -4615,6 +4615,8 @@
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "enroll_device": "Apparaat toevoegen",
+    "recovery_export": "Herstelbestand opslaan",
+    "recovery_import": "Herstelbestand laden",
     "devices": "Mijn apparaten",
     "connections": {
       "text": "Gekoppelde apparaten",
@@ -5538,6 +5540,76 @@
     "failed": "Intrekken is mislukt."
   },
   "wizard": {
+    "recovery": {
+      "after_restore_hint": {
+        "text": "Je kringen zitten niet in de herstelzin. Meld je na het herladen aan bij je pod, of laad je herstelbestand onder Mijn gegevens, om ze terug te krijgen.",
+        "doc": "Recovery file (plan A2) — said on the phrase wizard's success step, where the person is looking."
+      },
+      "export_title": {
+        "text": "Je herstelbestand",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "export_intro": {
+        "text": "Dit bestand bevat de lijst van je kringen en apparaten, verzegeld met je herstelzin. Zonder de zin heeft niemand er iets aan. Bewaar het naast je herstelzin, niet in plaats daarvan.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "export_ready": {
+        "text": "Kringen in dit bestand:",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "download": {
+        "text": "Bestand opslaan",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "make": {
+        "text": "Bestand maken",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "sealing": {
+        "text": "Verzegelen…",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_title": {
+        "text": "Herstelbestand laden",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_intro": {
+        "text": "Herstel eerst je herstelzin en laad daarna het bestand dat je eerder opsloeg. Je kringen komen daarmee terug.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "pick": {
+        "text": "Kies bestand",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "load": {
+        "text": "Laden",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "loading": {
+        "text": "Laden…",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_done_title": {
+        "text": "Je kringen zijn terug",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_done": {
+        "text": "Herstelde kringen:",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_not_yours": {
+        "text": "Dit bestand is niet gemaakt met jouw herstelzin.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_unreadable": {
+        "text": "Dit is geen herstelbestand.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_failed": {
+        "text": "Het laden is niet gelukt. Probeer het opnieuw.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      }
+    },
     "create": {
       "name": {
         "text": "Naam *",

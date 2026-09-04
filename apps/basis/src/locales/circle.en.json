@@ -4615,6 +4615,8 @@
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "enroll_device": "Add a device",
+    "recovery_export": "Save a recovery file",
+    "recovery_import": "Load a recovery file",
     "devices": "My devices",
     "connections": {
       "text": "Connected devices",
@@ -5538,6 +5540,76 @@
     "failed": "Removing failed."
   },
   "wizard": {
+    "recovery": {
+      "after_restore_hint": {
+        "text": "Your circles are not in the phrase. After the reload, sign in to your pod or load your recovery file under My data to get them back.",
+        "doc": "Recovery file (plan A2) — said on the phrase wizard's success step, where the person is looking."
+      },
+      "export_title": {
+        "text": "Your recovery file",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "export_intro": {
+        "text": "This file holds the list of your circles and devices, sealed with your recovery phrase. Without the phrase it is useless to anyone. Keep it next to your phrase, not instead of it.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "export_ready": {
+        "text": "Circles in this file:",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "download": {
+        "text": "Save file",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "make": {
+        "text": "Make the file",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "sealing": {
+        "text": "Sealing…",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_title": {
+        "text": "Load a recovery file",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_intro": {
+        "text": "Restore your phrase first, then load the file you saved earlier. Your circles come back with it.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "pick": {
+        "text": "Choose file",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "load": {
+        "text": "Load",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "loading": {
+        "text": "Loading…",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_done_title": {
+        "text": "Your circles are back",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "import_done": {
+        "text": "Circles restored:",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_not_yours": {
+        "text": "This file was not made with your recovery phrase.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_unreadable": {
+        "text": "This is not a recovery file.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_failed": {
+        "text": "Loading the file did not work. Try again.",
+        "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      }
+    },
     "create": {
       "name": {
         "text": "Name *",

@@ -99,6 +99,11 @@ export function renderRestoreFromMnemonicWizard(opts) {
 
 function renderSuccessStep(container, doc, state, onClose) {
   const body = mkBody(doc, t('circle.wizard.restore.done_title'), t('circle.wizard.restore.done_intro'));
+  // The circle list does not ride the phrase: after the reload, My data → "Load a recovery file" (or the pod
+  // sign-in) brings it back. Said here, where the person is looking.
+  const hint = doc.createElement('p'); hint.className = 'cc-wizard-blurb';
+  hint.textContent = t('circle.wizard.recovery.after_restore_hint');
+  body.appendChild(hint);
   const newKey = doc.createElement('code');
   newKey.className = 'cc-wizard-code';
   newKey.textContent = state.successResult?.newPubKey ?? '(unknown)';

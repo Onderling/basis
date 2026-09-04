@@ -46,6 +46,9 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `revokeDevice` | revoke-device | · | · | · | · | · | · |  |
 |  | `exportRecoveryFile` | get | · | · | · | · | · | · |  |
 |  | `importRecoveryFile` | import | · | · | · | · | · | · |  |
+|  | `restoreStatus` | get | · | · | · | · | · | · |  |
+|  | `restoreSource` | import | · | · | · | · | · | · |  |
+|  | `restoreIntent` | set | · | · | · | · | · | · |  |
 |  | `replaceDevice` | replace-device | · | · | · | · | · | · |  |
 |  | `enrollDevice` | enroll-device | · | · | · | · | · | · |  |
 |  | `buildEnrollOffer` | get | · | · | · | · | · | · |  |
@@ -252,13 +255,14 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 247 ops | | 225 | 120 | 33 | 3 | 146 | 71 | |
+| **totals** | 250 ops | | 225 | 120 | 33 | 3 | 146 | 71 | |
 
 ### Flows
 
 | app | flow | kind | scope | steps | declared effects |
 |---|---|---|---|---|---|
 | **household** | `enroll-device` | ceremony | device | 1 | overwrite:owner-root, write:device-delegation, write:registry |
+|  | `restore-finish` | ceremony | device | 4 | write:registry, write:history-keys, send:circle-address-revoke, send:circle-key-rotate |
 |  | `replace-device` | ceremony | device | 1 | write:registry, write:history-keys, send:circle-address-revoke, send:circle-key-rotate |
 |  | `revoke-device` | ceremony | device | 1 | write:registry, send:circle-address-revoke |
 | **stoop** | `joinGroup` | wizard | device | 3 |  |
@@ -266,6 +270,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (214/247): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:reassign, household:revokeDevice, household:exportRecoveryFile, household:importRecoveryFile, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface …
-- **missing inline** (176/247): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:exportRecoveryFile, household:importRecoveryFile, household:replaceDevice, household:enrollDevice …
-- **missing chat** (22/247): basis:signin, basis:signout, household:revokeDevice, household:exportRecoveryFile, household:importRecoveryFile, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch
+- **missing gate** (217/250): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:reassign, household:revokeDevice, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase …
+- **missing inline** (179/250): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource …
+- **missing chat** (25/250): basis:signin, basis:signout, household:revokeDevice, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch

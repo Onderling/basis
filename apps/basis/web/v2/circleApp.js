@@ -5294,6 +5294,102 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
   runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => done());
 }
 
+function showRestoreFinishFlow() {
+  // THE RESTORE, END TO END (the restore-finish flow's painter): after the reload a phrase ceremony
+  // asks for, the flow says what came back, offers a recovery file when nothing did, asks whether anyone
+  // else could still use the old phone, and runs the replace ceremony for a broken or lost one. This
+  // painter paints renderFlow's view model with a bespoke form per pause; every branch ends on a screen
+  // that says what happened — quiet for a broken phone, plain for a lost one.
+  const FLOW = householdManifest.flows.find((f) => f.id === 'restore-finish');
+  const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
+  const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => rawCallSkill('household', opId, args) });
+  const { card, close } = _restoreOverlay();
+  let inst = null;
+  const finish = () => { close(); circleSealStrategies.clear(); };
+  const submit = (input) => runner.resume(FLOW, inst, { input }).then((r) => { inst = r; paint(); }).catch(() => finish());
+  const button = (label, onClick, primary = false) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+    if (primary) b.className = 'cc-wizard-btn cc-wizard-btn-primary';
+    b.style.cssText = 'margin:.4rem .6rem .2rem 0;';
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  const para = (text, cls = null) => { const p = document.createElement('p'); if (cls) p.className = cls; p.textContent = text; return p; };
+
+  const paint = () => {
+    const view = renderFlow(FLOW, inst, { ops: OPS });
+    card.innerHTML = '';
+    const h = document.createElement('h3'); h.textContent = t('circle.restore_finish.title'); card.appendChild(h);
+    const status = inst?.steps?.status?.out ?? {};
+
+    if (view.status === 'awaiting-input' && view.form) {
+      if (view.form.step === 'source') {
+        card.appendChild(para(t('circle.restore_finish.empty_title')));
+        card.appendChild(para(t('circle.restore_finish.empty_body'), 'muted'));
+        const input = document.createElement('input'); input.type = 'file'; input.accept = '.json,application/json';
+        input.className = 'cc-wizard-input';
+        let fileText = null;
+        input.addEventListener('change', () => {
+          const f = input.files?.[0]; if (!f) return;
+          const reader = new FileReader();
+          reader.onload = () => { fileText = String(reader.result ?? ''); };
+          reader.readAsText(f);
+        });
+        card.appendChild(input);
+        card.appendChild(button(t('circle.restore_finish.source_file'), () => { if (fileText) submit({ source: 'file', file: fileText }); }, true));
+        card.appendChild(button(t('circle.restore_finish.source_later'), () => submit({ source: 'later' })));
+        return;
+      }
+      if (view.form.step === 'intent') {
+        card.appendChild(para(t('circle.restore_finish.status_ready')));
+        card.appendChild(para(t(status.carrier === 'pod' ? 'circle.restore_finish.status_pod' : 'circle.restore_finish.status_local'), 'muted'));
+        card.appendChild(para(t('circle.restore_finish.intent_question')));
+        for (const intent of ['broken', 'lost', 'adding']) {
+          card.appendChild(button(t(`circle.restore_finish.intent_${intent}`), () => submit({ intent })));
+        }
+        card.appendChild(para(t('circle.restore_finish.intent_hint'), 'muted'));
+        return;
+      }
+      if (view.form.step === 'retire') {
+        card.appendChild(para(t('circle.restore_finish.phrase_body')));
+        const input = document.createElement('textarea');
+        input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false;
+        input.placeholder = t('circle.enroll.mnemonic_placeholder');
+        input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+        card.appendChild(input);
+        card.appendChild(button(t('circle.replace.submit'), () => submit({ mnemonic: input.value }), true));
+        card.appendChild(button(t('circle.confirm.cancel', { defaultValue: 'Annuleren' }), () => { runner.cancel(inst); finish(); }));
+        return;
+      }
+    }
+
+    // terminal: say what happened, by the branch that was walked
+    const produces = inst?.produces ?? {};
+    const retireOutcome = inst?.steps?.retire?.outcome;
+    const sourceOutcome = inst?.steps?.source?.outcome;
+    let msg;
+    if (sourceOutcome === 'later') msg = t('circle.restore_finish.later_title');
+    else if (sourceOutcome === 'not-your-file') msg = t('circle.restore_finish.err_not_yours');
+    else if (sourceOutcome === 'unreadable-file') msg = t('circle.restore_finish.err_unreadable');
+    else if (produces.intent === 'adding') msg = t('circle.restore_finish.done_adding');
+    else if (retireOutcome === 'ok') msg = produces.intent === 'lost' ? t('circle.restore_finish.done_loud') : t('circle.restore_finish.done_quiet');
+    else if (retireOutcome === 'wrong-phrase' || retireOutcome === 'invalid-phrase') msg = t('circle.enroll.invalid_phrase');
+    else msg = t('circle.restore_finish.err_failed');
+    card.appendChild(para(msg));
+    if (retireOutcome === 'ok' && produces.intent === 'lost' && Array.isArray(inst?.steps?.retire?.out?.retiredDevices) && inst.steps.retire.out.retiredDevices.length) {
+      card.appendChild(para(`${t('circle.restore_finish.done_devices')} ${inst.steps.retire.out.retiredDevices.length}`, 'muted'));
+    }
+    const retry = retireOutcome && retireOutcome !== 'ok';
+    card.appendChild(button(retry ? t('circle.enroll.retry') : t('common.close', { defaultValue: 'Sluiten' }), () => {
+      if (!retry) return finish();
+      close(); showRestoreFinishFlow();
+    }, true));
+    if (retry) card.appendChild(button(t('circle.confirm.cancel', { defaultValue: 'Annuleren' }), () => finish()));
+  };
+
+  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => finish());
+}
+
 function showRestoreSettingsFlow() {
   // THE FLOW PANEL (#63 shell painter): the restore-settings FLOW replaces the two hand-wired
   // #44 dialogs. The declaration lives on the params manifest; the runner executes through the
@@ -8270,6 +8366,8 @@ async function boot() {
       // over NKN, parity with the classic web shell. Gated on the peer
       // transport being connected; a no-op otherwise.
       if (pendingRestoreFlow) { pendingRestoreFlow = false; setTimeout(() => showRestoreSettingsFlow(), 0); }
+      // A phrase ceremony ran on this device and the restore-finish flow has not asked yet: ask once.
+      if (agent.restorePending?.()) setTimeout(() => showRestoreFinishFlow(), 0);
       // basis's ops reach the waist from here on: the drawer's rows, and anything else that dispatches
       // `callSkill('basis', …)`, now land in the table below instead of the agent's bare default.
       rawCallSkill = withCalendarOutbound(agent.callSkill, {

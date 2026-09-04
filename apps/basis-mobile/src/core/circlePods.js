@@ -235,9 +235,11 @@ export async function ensureCirclePod(circleId, policy) {
     ? createCirclePodSharing({ fetch: shaped.fetch, ownerWebId: shaped.webid })
     : undefined;
   try {
+    let sealingKeyPair = null;   // the device's per-circle sealing keypair (one key family — web parity)
+    try { sealingKeyPair = _keyEventWiring?.circleSealingKeyPairFor?.(circleId) ?? null; } catch { sealingKeyPair = null; }
     producer = await createCirclePodProducer({
       circleId, storagePosture: policy?.storagePosture ?? 'p0', vault: circleVault,
-      generateKeypair: podGenerateKeypair,
+      generateKeypair: podGenerateKeypair, sealingKeyPair,
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
       circleRootUri: routing ? routing.circleRootUri(circleId) : undefined,
       sharing,

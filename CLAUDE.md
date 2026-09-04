@@ -225,6 +225,12 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   it needs its own interaction model** (Frits, 2026-07-28): stoop and tasks do not, so they reduce to close
   to a manifest; **folio does** — basis is a poor file manager — so it keeps a surface of its own.
 - **Ship web first, then mobile** as separate steps/commits; don't bundle both platforms in one commit.
+- **Branch per feature; the trunk moves by MERGE.** `development` is the trunk (the repo default since
+  2026-09-04) and `live` will be the release branch: never commit straight onto either — `git switch -c
+  feat/<what>`, land it green, merge back. Enforced twice: `.githooks/pre-commit` refuses the commit (run
+  `git config core.hooksPath .githooks` once per clone), and `lint-branch-hygiene` fails when a protected
+  branch carries local commits that are not on its remote. Push to `live` only with guards + both suites
+  green.
 - **A device harness already exists — use it before hand-driving anything.** `apps/basis-mobile/e2e/` is a
   **Detox** suite (real emulator or attached phone). Hand-driving with `adb input tap` is a last resort; a
   whole afternoon went into its traps on 2026-07-30 while this suite sat unused.

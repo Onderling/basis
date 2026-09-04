@@ -1039,13 +1039,29 @@ artifact matters: the same registry can be sealed into a passphrase-protected fi
 registry snapshot), which is the pod-less carrier of the same fact. Both are built; neither is reached from
 a surface yet, which is exactly the kind of gap this section exists to state rather than imply.
 
+**Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding
+structure.** Apps address a **storage function** ("this circle's items", "my notes"), and a routing layer
+resolves it to a URI, consulting a per-pod mapping config where an explicit override wins. Two properties
+follow, and they pull in opposite directions on purpose. It means a person (or another app) may lay their
+pod out their own way without the apps knowing — the canonical layout is a *default*, not a requirement. And
+it means the physical names are ours to choose, which is what any scheme for hiding structure needs: a
+logical register that stays stable for interoperability, mapped onto physical names that need not be
+readable at all. One caveat: a second, deliberately pure resolver encodes the canonical layout without
+consulting the mapping, because an access-control grant's target must be computable synchronously — so a
+writer that goes through it reintroduces readable names, and any move to opaque naming has to account for
+both paths.
+
 **A sealed index is the answer to what a host can still see, and it is not adopted.** Sealing hides
 contents, not shape: a host still sees how many resources a container holds, how they are named, and when
 they change. The intended answer is a small queryable index stored as **one sealed blob** — the client
 decrypts that, queries it in memory, and fetches only the matching resources, with opaque ids on the host
 side and shards so you decrypt only what you need. The index exists and is tested; nothing consumes it,
 and adopting it is not a drop-in: it implies opaque resource naming across the storage layout, so it is a
-deliberate step rather than a switch. Until then, "sealed" means contents, and shape is a known leak.
+deliberate step rather than a switch. One layout leaks by construction and would have to move with it: a
+circle's sealed message rows are keyed `<circleId>/<paddedTs>-<msgId>` so that a lexicographic listing is
+also chronological — which hands the host the circle id and the timing of every message in clear, however
+well the bodies are sealed. Until this is adopted, "sealed" means contents; **shape is a known leak, and
+what would remain even afterwards is the size of each part.**
 
 **Sealed by default, keyed to people.** The sealing envelope encrypts every resource under a fresh
 content key, wrapped either to each recipient's public key (the writer needs only public keys; the host

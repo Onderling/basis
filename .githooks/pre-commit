@@ -1,0 +1,19 @@
+#!/bin/sh
+# Refuse a commit made straight onto a protected branch.
+#
+# The trunk (`development`) and the release branch (`live`) move by MERGE, never by a commit typed on them:
+# a feature gets its own branch, lands green, and merges back. This hook is the cheap half of that rule —
+# it catches the honest mistake. The binding half is server-side branch protection; a hook is a convention,
+# because anyone can pass --no-verify (and this one deliberately tells you how, for the rare real merge fix).
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+case "$branch" in
+  development|live|master|main)
+    if [ "$ALLOW_PROTECTED_COMMIT" = "1" ]; then exit 0; fi
+    echo "✖ refusing to commit directly on '$branch'." >&2
+    echo "  Branch first:  git switch -c feat/<what-you-are-doing>" >&2
+    echo "  Then merge it back when guards + suites are green." >&2
+    echo "  (Deliberate exception: ALLOW_PROTECTED_COMMIT=1 git commit …)" >&2
+    exit 1
+    ;;
+esac
+exit 0

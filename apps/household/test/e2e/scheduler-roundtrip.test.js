@@ -57,6 +57,10 @@ describe('Phase 4 e2e — Scheduler + HouseholdAgent', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
+    // Pin the clock to a MORNING: the fake timers start from the real time of day, and an evening run's
+    // one-hour advance crossed the 20:00 daily digest, which posted beside the nudge and made every
+    // count off by one (the "flake" of 2026-09-04 was the wall clock, not the scheduler).
+    vi.setSystemTime(new Date('2026-01-05T09:00:00Z'));
     store    = new InMemoryStore();
     bridge   = new MockBridge();
     // Build the agent with a placeholder; rebind the scheduler's

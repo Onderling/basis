@@ -180,7 +180,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
-import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
+import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
 import {
@@ -526,6 +526,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     return circleIdentities.get(circleId);
   };
   const circleAddressFor = (circleId) => deriveCircleAddress(deviceDerivationSeed, circleId);
+  // ONE sealing key family: this device's per-circle SEALING keypair is the ed2curve image of its per-circle
+  // address key — the same root, so it is phrase-derivable, one per device, and retired with the address.
+  // Every grant in the circle wraps to `sealingPublicKeyFromNetworkKey(address)`; this is the matching half.
+  const circleSealingKeyPairFor = (circleId) => sealingKeyPairFromNetworkKey(b64encode(deriveCircleSeed(deviceDerivationSeed, circleId)));
   // THE CEREMONY COMMITMENT (core ceremonyCommitment.js): who may retire this person's addresses in a
   // circle — their owner root, at a ceremony. Every device of the person can DECLARE it (the root's public
   // key is public: resident under root custody, carried on the delegation record under delegation custody)
@@ -4920,6 +4924,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     hostPolicyEngine: hostAgent.policyEngine ?? null,
     // Who may retire this device's addresses: the owner root, at a ceremony (core ceremonyCommitment.js).
     ceremonyCommitmentFor, signCeremonyCommitment,
+    circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)
     historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.

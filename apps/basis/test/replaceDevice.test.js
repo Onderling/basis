@@ -17,7 +17,7 @@ import {
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
-import { makeKeyPeerHandler, KEY_STATEMENT_BROADCAST } from '../src/v2/keyRail.js';
+import { makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../src/v2/keyRail.js';
 import { EventLog } from '../src/eventLog.js';
 import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
 
@@ -132,6 +132,15 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const events = (await A2.agent.keyRail.readVerifiedBodies(GROUP)).bodies.filter((b) => b.payload?.event?.version === v2);
     expect(events[0].payload.event.recipients).not.toContain(sealingPublicKeyFromNetworkKey(addrA));
     expect(events[0].payload.event.recipients).toContain(sealingPublicKeyFromNetworkKey(addrA2));
+
+    // …and the old phone is REALLY cut off: content sealed under the new version opens for Bram and not for
+    // the old phone, whose per-circle sealing key is not a recipient any more (one key family).
+    await projectKeyEventsIntoStore({ rail: A2.agent.keyRail, store: A2.keyEventStore, circleId: GROUP });
+    const after = `na de wissel ${Date.now().toString(36)}`;
+    const afterEnv = await postSealed({ admin: A2, members: [B, A], groupId: GROUP, text: after });
+    await until(() => B.sealedContent.length >= 2 && A.sealedContent.length >= 1);
+    expect(readSealed(B, afterEnv, GROUP), 'Bram reads what comes next').toBe(after);
+    expect(() => readSealed(A, afterEnv, GROUP), 'the old phone cannot').toThrow();
 
     // The wrong phrase is refused; running it again is harmless.
     const wrong = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' });

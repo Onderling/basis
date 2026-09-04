@@ -66,6 +66,7 @@ import {
 import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
 import nacl from 'tweetnacl';
+import { sealingPublicKeyFromNetworkKey as deriveSealingKeyFromAddress } from '@onderling/pod-client';   // one sealing key family: the join grant wraps to the proven address's image
 import { resolve as resolveMember } from '@onderling/identity-resolver';
 import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
 // The ONE release comparator (the disclosure home) — the roster gates its own writes on it so an
@@ -2627,6 +2628,7 @@ export function buildSkills({
       return redeemMembershipCodeCore({
         store, members, metrics, simulateSync, emitSpine,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
+        deriveSealingKey: deriveSealingKeyFromAddress,
         codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
       }, { a: dataArgs(parts), from });
     }, {
@@ -2659,6 +2661,7 @@ export function buildSkills({
       return verifyMembershipCodeForPeerCore({
         store, members, metrics, simulateSync, emitSpine,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
+        deriveSealingKey: deriveSealingKeyFromAddress,
         codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
         withHandleClaim, collectCircleHandles, findHandleCollision,
       }, { a: dataArgs(parts), from });

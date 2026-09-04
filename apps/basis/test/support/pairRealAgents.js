@@ -34,7 +34,7 @@
 
 import { InternalBus, InternalTransport } from '@onderling/core';
 import {
-  sealingPublicKeyFromNetworkKey,
+  sealingPublicKeyFromNetworkKey, makeOpener,
   establishKeyEvent, rotateKeyEvent, readKeyChain, currentGroupKey,
   sealForAudience,
   PodClient, generateKeypair as podGenerateKeypair,
@@ -511,6 +511,7 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
   }
 }
 
+
 /**
  * Create a circle via the real create-wizard op path (createGroupState.finalSubmit → stoop.createGroupV2).
  * The single-admin creator step, split out so ONE circle can then take MULTIPLE joiners (the sealed-circle
@@ -566,14 +567,17 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
 // emit/record the events (as it already stands in for the browser's connectPeerTransport wiring).
 
 /** A member's stable sealing PUBLIC key — derived from its published network key (deterministic, no trail dependency). */
-export function memberSealingPubKey(node) {
-  return sealingPublicKeyFromNetworkKey(node.pubKey);
+export function memberSealingPubKey(node, groupId) {
+  // ONE sealing key family: the ed2curve image of the member's per-circle ADDRESS key — what production
+  // wraps to (`recipientAddrsFromRoster` derives it from the roster's circleAddress) and, since 2026-09-04,
+  // what the producer opens with. A harness on the chat identity measured itself.
+  return sealingPublicKeyFromNetworkKey(node.agent.circleAddressFor(groupId));
 }
 
-/** A member's sealing OPENER: `(sealedText) => plaintext` bound to its sealing PRIVATE key, which never escapes
- *  the closure (the encapsulated `AgentIdentity.sharedCopyOpener` path the app uses for shared copies). */
-export function memberOpener(node) {
-  return openerForIdentity(node.agent.sa.agent.identity);
+/** A member's sealing OPENER for one circle: `(sealedText) => plaintext` bound to its per-circle sealing
+ *  PRIVATE key (the address key's image), which never escapes the closure. */
+export function memberOpener(node, groupId) {
+  return makeOpener(node.agent.circleSealingKeyPairFor(groupId).privateKey);
 }
 
 // Hold-forward on: a key-event/content send to an offline member is HELD (not lost), then flushed on reconnect.
@@ -596,7 +600,7 @@ async function emitAndFanKeyEvent(from, toNodes, groupId, event) {
  * that key-event to the members over the log/transport. The admin keeps its own copy in its key-event log.
  */
 export async function bootSealedCircle({ admin, members = [], groupId }) {
-  const recipients = [memberSealingPubKey(admin), ...members.map(memberSealingPubKey)];
+  const recipients = [memberSealingPubKey(admin, groupId), ...members.map((n) => memberSealingPubKey(n, groupId))];
   const { event } = establishKeyEvent({ groupId, recipients });
   await emitAndFanKeyEvent(admin, members, groupId, event);
   return { groupId, recipients };
@@ -607,7 +611,7 @@ export async function bootSealedCircle({ admin, members = [], groupId }) {
  * resolver, then fans the sealed envelope to `members`. Returns the tagged envelope (also recorded on receipt).
  */
 export async function postSealed({ admin, members = [], groupId, text }) {
-  const chain = readKeyChain(admin.keyEventStore.list(groupId), { groupId, opener: memberOpener(admin) });
+  const chain = readKeyChain(admin.keyEventStore.list(groupId), { groupId, opener: memberOpener(admin, groupId) });
   const groupKey = currentGroupKey(chain);
   if (!groupKey) throw new Error('postSealed: the admin holds no current group key to seal with');
   const env = sealForAudience(text, { groupKey }, { audience: 'circle' });
@@ -657,7 +661,7 @@ export async function sealCircleViaProducer({ admin, members = [], groupId }) {
     sendOptions: SEALED_SEND,
     resolveRecipientAddrs: (event) => {
       const recips = new Set(Array.isArray(event?.recipients) ? event.recipients : []);
-      return memberNodes.filter((n) => recips.has(memberSealingPubKey(n))).map((n) => n.pubKey);
+      return memberNodes.filter((n) => recips.has(memberSealingPubKey(n, groupId))).map((n) => n.pubKey);
     },
   });
 
@@ -671,9 +675,9 @@ export async function sealCircleViaProducer({ admin, members = [], groupId }) {
   // Seed the group key to the admin + each member under their network-derived sealing key, via the router
   // (the same addMember path a redeem drives). Each grant re-wraps the SAME v1 key to one more recipient +
   // emits a key-event through the sink (recorded locally; fanned to the members who are recipients so far).
-  await admin.circleControlAgentRouter.addMember({ webId: admin.pubKey, publicKey: memberSealingPubKey(admin), role: 'admin', groupId });
+  await admin.circleControlAgentRouter.addMember({ webId: admin.pubKey, publicKey: memberSealingPubKey(admin, groupId), role: 'admin', groupId });
   for (const n of memberNodes) {
-    await admin.circleControlAgentRouter.addMember({ webId: n.pubKey, publicKey: memberSealingPubKey(n), role: 'member', groupId });
+    await admin.circleControlAgentRouter.addMember({ webId: n.pubKey, publicKey: memberSealingPubKey(n, groupId), role: 'member', groupId });
   }
   return producer;
 }
@@ -683,7 +687,7 @@ export async function sealCircleViaProducer({ admin, members = [], groupId }) {
  * departed omitted → backward secrecy) and fans that rotation key-event to `keep` alone. Returns the new event.
  */
 export async function removeAndRotate({ admin, keep = [], groupId }) {
-  const recipients = [memberSealingPubKey(admin), ...keep.map(memberSealingPubKey)];
+  const recipients = [memberSealingPubKey(admin, groupId), ...keep.map((n) => memberSealingPubKey(n, groupId))];
   const { event } = rotateKeyEvent({ groupId, priorEvents: admin.keyEventStore.list(groupId), recipients });
   await emitAndFanKeyEvent(admin, keep, groupId, event);   // the removed member is NOT among the recipients of this fan
   return { event };
@@ -692,7 +696,7 @@ export async function removeAndRotate({ admin, keep = [], groupId }) {
 /** A member reads a sealed envelope across the versions it holds: the PRODUCTION none reader folds its
  *  per-circle key-event log (`keyEventStore`) into the key chain and opens by authenticated trial. */
 export function readSealed(node, env, groupId) {
-  return openViaKeyEvents(env, { events: node.keyEventStore.list(groupId), groupId, opener: memberOpener(node) });
+  return openViaKeyEvents(env, { events: node.keyEventStore.list(groupId), groupId, opener: memberOpener(node, groupId) });
 }
 
 /** Read a circle roster via the real listGroupMembers op. */

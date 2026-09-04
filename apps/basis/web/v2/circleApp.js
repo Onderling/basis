@@ -1954,8 +1954,11 @@ async function ensureCirclePod(circleId, policy) {
         event, await keyFanRoster(), { deriveSealingKey: podSealingPublicKeyFromNetworkKey },
       ),
     });
+    // The device's per-circle sealing keypair (the address key's image) — one key family, see the producer.
+    let sealingKeyPair = null;
+    try { sealingKeyPair = _peerAgent?.circleSealingKeyPairFor?.(circleId) ?? null; } catch { sealingKeyPair = null; }
     const producer = await createCirclePodProducer({
-      circleId, storagePosture, vault: circleVault, generateKeypair: podGenerateKeypair,
+      circleId, storagePosture, vault: circleVault, generateKeypair: podGenerateKeypair, sealingKeyPair,
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
       circleRootUri: routing ? routing.circleRootUri(circleId) : undefined,
       sharing, keyEventLog,

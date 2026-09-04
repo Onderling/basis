@@ -131,6 +131,13 @@ Composite ops (an op whose `steps` chain existing ops — the extension arc's li
 **linear sugar** over this: a composite compiles to a flow and executes on the same runner. There is
 exactly one pipeline engine.
 
+*Where this is going (direction, not yet built):* a flow's `effects` already exist to be **read aloud** —
+they are the consent surface, "this flow will: …". The next step is for ops and flows to carry a **neutral
+description** of their own, beside their params and effects, as a property of the declaration rather than
+prose in a shell. A declaration that can describe itself is one a model can explain to a particular person
+in their own words, and eventually one it can *compose* into a flow from what that person asked for —
+without any surface hard-coding the explanation. Descriptions are localised like every other string.
+
 That is the whole of the model. The rest of this document is what happens when it runs.
 
 ---
@@ -1012,6 +1019,33 @@ authority.*
 gate as a peer message — a pod (or whoever operates one) cannot originate circle truth. Pod-only
 circles never fan peer-to-peer at all: members read the statement rows back with a watermark and verify
 each on ingest.
+
+**A pod is optional, and the store beneath it is the same either way.** Every device carries a local
+Solid-shaped store — the *pseudo-pod* — addressed as `pseudo-pod://<device>/…`, and it runs in one of
+three modes per resource: **standalone** (device-local and canonical), **replication-ring** (every write
+fanned to peers), or **cache** (written locally at once, queued for write-through to a real pod, read
+falling through to the pod on a local miss, the queue draining when the pod is reachable again). Because
+the mode is per URI, one device can keep circle items on one mode while a single resource rides the pod.
+That is the whole of "with a pod" versus "without": not two code paths, one carrier setting. Apps address
+resources through `pod-routing` and never branch on which it is.
+
+**What actually rides the pod today, and what does not.** The parameter register and the personal history
+mirror are pod-backed when you are signed in, sealed to you, and local-only when you are not. The **owner's
+registry** — the single write-truth for your profiles, your enrolled devices' delegation records, and, per
+circle, the handle and address you use there plus a reference to your wrapped circle key — is **not**: it
+is device-local, and mirroring it is written on both sides but not composed. That is why a person whose
+only device is gone comes back as provably themselves with nothing to re-open, and why the recovery
+artifact matters: the same registry can be sealed into a passphrase-protected file (owner root plus a
+registry snapshot), which is the pod-less carrier of the same fact. Both are built; neither is reached from
+a surface yet, which is exactly the kind of gap this section exists to state rather than imply.
+
+**A sealed index is the answer to what a host can still see, and it is not adopted.** Sealing hides
+contents, not shape: a host still sees how many resources a container holds, how they are named, and when
+they change. The intended answer is a small queryable index stored as **one sealed blob** — the client
+decrypts that, queries it in memory, and fetches only the matching resources, with opaque ids on the host
+side and shards so you decrypt only what you need. The index exists and is tested; nothing consumes it,
+and adopting it is not a drop-in: it implies opaque resource naming across the storage layout, so it is a
+deliberate step rather than a switch. Until then, "sealed" means contents, and shape is a known leak.
 
 **Sealed by default, keyed to people.** The sealing envelope encrypts every resource under a fresh
 content key, wrapped either to each recipient's public key (the writer needs only public keys; the host

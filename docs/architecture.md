@@ -927,7 +927,8 @@ phrase is the authority, it is typed on the device that is *gaining* it, and it 
 the *list* of circles those keys belong to. That list lives in the owner's registry, which is a
 device-local store unless it is mirrored to a pod, so a person whose only device is gone comes back as
 provably themselves with nothing to re-open. The honest paths out are a registry that survives the device
-(mirrored to the owner's pod, sealed to them) or an offer from another device they still hold; a
+(mirrored to the owner's pod — sealed to the owner, which is the part that has to be built, since this
+resource carries no sealing of its own) or an offer from another device they still hold; a
 recovery screen that promises more than that is promising the wrong thing.
 
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
@@ -1033,7 +1034,10 @@ resources through `pod-routing` and never branch on which it is.
 mirror are pod-backed when you are signed in, sealed to you, and local-only when you are not. The **owner's
 registry** — the single write-truth for your profiles, your enrolled devices' delegation records, and, per
 circle, the handle and address you use there plus a reference to your wrapped circle key — is **not**: it
-is device-local, and mirroring it is written on both sides but not composed. That is why a person whose
+is device-local, and mirroring it is written on both sides but not composed — and it carries no sealing
+of its own, so composing the carrier without adding one would put every circle, handle and address on the
+pod in clear. The pattern to copy is the settings mirror's seal-to-self, keyed from the owner root so it
+opens on every one of that person's devices. That is why a person whose
 only device is gone comes back as provably themselves with nothing to re-open, and why the recovery
 artifact matters: the same registry can be sealed into a passphrase-protected file (owner root plus a
 registry snapshot), which is the pod-less carrier of the same fact. Both are built; neither is reached from

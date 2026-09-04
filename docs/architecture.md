@@ -131,12 +131,8 @@ Composite ops (an op whose `steps` chain existing ops — the extension arc's li
 **linear sugar** over this: a composite compiles to a flow and executes on the same runner. There is
 exactly one pipeline engine.
 
-*Where this is going (direction, not yet built):* a flow's `effects` already exist to be **read aloud** —
-they are the consent surface, "this flow will: …". The next step is for ops and flows to carry a **neutral
-description** of their own, beside their params and effects, as a property of the declaration rather than
-prose in a shell. A declaration that can describe itself is one a model can explain to a particular person
-in their own words, and eventually one it can *compose* into a flow from what that person asked for —
-without any surface hard-coding the explanation. Descriptions are localised like every other string.
+A flow's `effects` are readable as plain statements — they are the consent surface, "this flow will: …" —
+and every string in them is localised like any other.
 
 That is the whole of the model. The rest of this document is what happens when it runs.
 
@@ -914,14 +910,11 @@ phrase is the authority, it is typed on the device that is *gaining* it, and it 
   statements, delivery stops trying it, and sealed circles rotate their key to the surviving devices. The
   revocation is signed with the profile-derived per-circle key precisely so a stolen device cannot mint
   one — it can neither revoke you nor counter-revoke.
-- **Replace a device.** Restoring onto a new phone can mean two different things, and the difference is
-  not cosmetic. *Adding* gives the replacement its own keys, which is what lets you revoke the old one —
-  the right answer whenever the old device could be in someone else's hands. *Cloning* — restoring
-  without enrolling — re-derives the profile's own per-circle keys, so the replacement simply **is** that
-  device again: nothing to announce, nobody to ask, works offline. The cost is precisely the thing you
-  gave up: two devices holding one set of keys cannot be told apart, so neither can be revoked without
-  revoking the other. A phone destroyed in your own hands is the clone case; a phone that walked away is
-  not.
+- **Replace a device.** Restoring onto a new phone is the *add* case: the replacement enrolls with its own
+  keys. Retiring the device it stands in for is the revocation ceremony above, which needs that device's
+  id — a fact that lives in the owner's registry, so it is only at hand where the registry is. A device is
+  never restored as a copy of another: two devices never share keys, so any one of them can be retired
+  without touching the others.
 
 **What a phrase alone cannot bring back.** It rebuilds every key, and therefore every identity — but not
 the *list* of circles those keys belong to. That list lives in the owner's registry, which is a
@@ -1027,8 +1020,9 @@ three modes per resource: **standalone** (device-local and canonical), **replica
 fanned to peers), or **cache** (written locally at once, queued for write-through to a real pod, read
 falling through to the pod on a local miss, the queue draining when the pod is reachable again). Because
 the mode is per URI, one device can keep circle items on one mode while a single resource rides the pod.
-That is the whole of "with a pod" versus "without": not two code paths, one carrier setting. Apps address
-resources through `pod-routing` and never branch on which it is.
+That is the whole of "with a pod" versus "without": not two code paths, one carrier setting. Resources
+are addressed through `pod-routing` where the app has adopted it; a few producers still build their
+`pseudo-pod://` root by hand, and the settings mirror does branch on being signed in.
 
 **What actually rides the pod today, and what does not.** The parameter register and the personal history
 mirror are pod-backed when you are signed in, sealed to you, and local-only when you are not. The **owner's
@@ -1037,7 +1031,9 @@ circle, the handle and address you use there plus a reference to your wrapped ci
 is device-local, and mirroring it is written on both sides but not composed — and it carries no sealing
 of its own, so composing the carrier without adding one would put every circle, handle and address on the
 pod in clear. The pattern to copy is the settings mirror's seal-to-self, keyed from the owner root so it
-opens on every one of that person's devices. That is why a person whose
+opens on every one of that person's devices — together with its restore gate, which probes the pod copy
+before the first flush so a fresh install without the phrase never overwrites the owner's sealed record
+with its own empty one. That is why a person whose
 only device is gone comes back as provably themselves with nothing to re-open, and why the recovery
 artifact matters: the same registry can be sealed into a passphrase-protected file (owner root plus a
 registry snapshot), which is the pod-less carrier of the same fact. Both are built; neither is reached from

@@ -45,7 +45,9 @@ export default function RestoreFromMnemonicWizardModal({
         >
           {state.successResult ? (
             <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-              <Body title="✓ Restored" intro="Your identity was restored from the mnemonic." />
+              <Body title="✓ Restored" intro="Your identity was restored from the mnemonic.">
+                <Text style={styles.count}>{t('circle.wizard.recovery.after_restore_hint')}</Text>
+              </Body>
               <Actions buttons={[{ label: t('common.done'), onPress: onClose, kind: 'primary' }]} />
             </ScrollView>
           ) : (

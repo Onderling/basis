@@ -39,6 +39,9 @@ import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.j
 import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
+import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { deviceDelegationsOf } from '@onderling/agent-registry';
@@ -393,6 +396,13 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
         </Pressable>
+        {/* The recovery file (plan A2): the circle list sealed to the phrase — save it, or load it after a restore. */}
+        <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
+          <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
+        </Pressable>
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
+        </Pressable>
       </Section>
 
       {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
@@ -698,6 +708,19 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
 
       <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
       <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
+      {(wizard === 'recovery-export' || wizard === 'recovery-import') && (
+        <RecoveryFileWizardModal
+          visible mode={wizard === 'recovery-export' ? 'export' : 'import'} callSkill={callSkill} t={t}
+          onClose={() => setWizard(null)} onDispatched={() => {}}
+          onSaveFile={async (text, name) => { await Share.share({ message: text, title: name }); }}
+          onPickFile={async () => {
+            const r = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true });
+            const asset = r?.assets?.[0];
+            if (r?.canceled || !asset?.uri) return null;
+            return { text: await FileSystem.readAsStringAsync(asset.uri), name: asset.name ?? null };
+          }}
+        />
+      )}
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
       <RevokeDeviceModal
         visible={!!revokeTarget}

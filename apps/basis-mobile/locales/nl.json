@@ -279,10 +279,6 @@
     }
   },
   "common": {
-    "cancel": {
-      "text": "Annuleren",
-      "doc": "Generieke annuleren-knop (slash-FAB modal)"
-    },
     "send": {
       "text": "Verzend",
       "doc": "Generieke verzendknop (slash-FAB modal)"
@@ -294,10 +290,6 @@
     "back": {
       "text": "← Terug",
       "doc": "Vorige-stap-knop in wizards"
-    },
-    "done": {
-      "text": "Klaar",
-      "doc": "Definitieve sluit-knop na wizard-succes"
     }
   },
   "wizards": {

@@ -145,6 +145,9 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * @param {object}  [opts.chatVault]           secure-agent chat-side vault (e.g. VaultMemory in tests, VaultAsyncStorage on RN)
  * @param {object}  [opts.hostVault]           host-side vault (defaults inside factory to makeBrowserVault)
  * @param {object}  [opts.asyncStorage]        when provided AND chatVault/hostVault are NOT, synthesises two VaultAsyncStorage instances (cc-chat-id: + cc-host-id: prefixes). RN runtime path; vitest can pass a mock AsyncStorage to exercise it.
+ * @param {object}  [opts.registryBackend]      the registry's persistent local StorageBackend (plan A1)
+ * @param {function}[opts.provisionRegistryMedium] `(strategy) => medium|null` — the registry's sealed pod mirror (plan A1)
+ * @param {function}[opts.onRegistryKeyMismatch] the pod's registry is sealed under a different key (the carrier held)
  * @param {function}[opts.provisionSettingsMedium] `(strategy) => medium|null` — the pod-backed self-sealed settings inner realAgent attaches to the parameter register on sign-in (RN parity with web circleApp)
  * @param {function}[opts.provisionHistoryMirror] `(strategy) => source|null` — the history mirror's sealed pod backend (realAgent gates on the history.mirror switch; RN parity with web circleApp)
  * @param {object}  [opts.secureAgentOpts]     forwarded to createRealHouseholdAgent → createSecureAgent
@@ -306,6 +309,10 @@ export async function bootAgentBundle(opts = {}) {
       // Settings pod-sync inner (RN parity): realAgent attaches this self-sealed pod medium to the parameter
       // register's settings store on sign-in. App.js passes circlePods' fetch/root; absent → local-only.
       provisionSettingsMedium: opts.provisionSettingsMedium,
+      // The registry carrier (plan A1, web parity): persistent local backend + sealed pod mirror.
+      registryBackend:         opts.registryBackend,
+      provisionRegistryMedium: opts.provisionRegistryMedium,
+      onRegistryKeyMismatch:   opts.onRegistryKeyMismatch,
       // The personal history mirror's pod backend (RN parity): realAgent gates on the history.mirror
       // switch (off by default) and seals with the same seal-to-self strategy. Absent → no mirror.
       provisionHistoryMirror: opts.provisionHistoryMirror,

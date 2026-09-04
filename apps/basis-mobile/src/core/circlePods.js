@@ -110,6 +110,17 @@ export function refreshCircleKeyEventsFromLane(rail, groupId) {
 // records locally and fans to nobody (single-device behaviour, unchanged).
 let _keyEventWiring = null;   // { sendPeer(addr,payload,opts), callSkill(origin,opId,args) }
 export function setCircleKeyEventWiring(wiring) { _keyEventWiring = wiring ?? null; }
+// The history sidecar's per-circle snapshot (the replace ceremony's absorbed group keys — web parity):
+// refreshed from the agent through the wiring's `historyKeyChainFor` whenever a seal strategy is (re)built.
+const circleHistoryKeys = new Map();
+async function refreshCircleHistoryKeys(circleId) {
+  try {
+    const chain = await _keyEventWiring?.historyKeyChainFor?.(circleId);
+    if (Array.isArray(chain)) circleHistoryKeys.set(circleId, chain);
+  } catch { /* an empty sidecar changes nothing */ }
+}
+/** After a replace ceremony: drop every cached strategy so the next open re-reads the sidecar. */
+export function forgetCircleSealStrategies() { circleSealStrategies.clear(); }
 
 /** The no-pod distribution sink for ONE circle — a membership change (notably a REMOVE → rotation) fans the
  * new versioned key AS a log key-event to the circle's REMAINING members over the SAME peer channel content
@@ -260,6 +271,7 @@ export async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
   let strat = null;
   try {
+    await refreshCircleHistoryKeys(circleId);
     const prod = await ensureCirclePod(circleId, policy);
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
@@ -269,6 +281,8 @@ export async function getCircleSealStrategy(circleId, policy) {
       if (strat && idKey?.privateKey) {
         strat = wrapStrategyWithKeyEventFold(strat, {
           listEvents: () => circleKeyEventStore.list(circleId), groupId: circleId, privateKey: idKey.privateKey,
+          // …and the history sidecar (the replace ceremony's absorbed keys), read lazily (web parity).
+          extraChain: () => circleHistoryKeys.get(circleId) ?? null,
         });
       }
     }

@@ -40,6 +40,7 @@ import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
+import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
@@ -403,6 +404,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
         </Pressable>
+        {/* The replace ceremony: after a restore, retire every other device in one act (plan B1). */}
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
+        </Pressable>
       </Section>
 
       {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
@@ -722,6 +727,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         />
       )}
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
+      <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
       <RevokeDeviceModal
         visible={!!revokeTarget}
         deviceId={revokeTarget}

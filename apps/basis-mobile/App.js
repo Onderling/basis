@@ -60,6 +60,8 @@ import { EventLog } from '../basis/src/eventLog.js';
 import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../basis/src/v2/circleChatRehydrate.js';
 import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
 import { createHistoryPodMedium } from '../basis/src/v2/historyMirror.js';
+import { createRegistryPodMedium } from '../basis/src/v2/registryCarrier.js';
+import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { wireEventLogPersistence, asyncStorageSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
@@ -510,6 +512,15 @@ export default function App() {
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,
             strategy,
           }),
+          // The owner's REGISTRY survives the device (plan A1, web parity): AsyncStorage locally, and a
+          // sealed mirror on the user's own pod under an opaque name when signed in.
+          registryBackend: createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }),
+          provisionRegistryMedium: async (strategy) => createRegistryPodMedium({
+            fetch:   getCirclePodFetch(),
+            podRoot: getActiveRealPodRouting()?.podRoot ?? null,
+            strategy,
+          }),
+          onRegistryKeyMismatch: () => setRestoreFlowPending(true),
           // The personal history mirror's pod backend (parity with web circleApp): same pod, same
           // seal-to-self strategy; realAgent gates on the history.mirror switch (off by default).
           provisionHistoryMirror: async (strategy) => createHistoryPodMedium({

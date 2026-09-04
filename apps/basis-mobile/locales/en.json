@@ -279,10 +279,6 @@
     }
   },
   "common": {
-    "cancel": {
-      "text": "Cancel",
-      "doc": "Generic cancel-button label (slash FAB modal)"
-    },
     "send": {
       "text": "Send",
       "doc": "Generic send-button label (slash FAB modal)"
@@ -294,10 +290,6 @@
     "back": {
       "text": "← Back",
       "doc": "Previous-step button in wizards"
-    },
-    "done": {
-      "text": "Done",
-      "doc": "Final dismiss after wizard success"
     }
   },
   "wizards": {

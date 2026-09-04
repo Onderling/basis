@@ -776,6 +776,10 @@ export async function bootAgentBundle(opts = {}) {
     // The KEY LANE's emit (web parity): the sink hands each key-event here to be signed, chained
     // and appended to the device log; the returned statement is what fans.
     keyEmit: (gid, event) => agent.keyEmit?.(gid, event) ?? null,
+    // ONE sealing key family: the producer opens with the device's per-circle address key's image.
+    circleSealingKeyPairFor: (gid) => agent.circleSealingKeyPairFor?.(gid) ?? null,
+    // The history sidecar (the replace ceremony's absorbed keys), read by the open path.
+    historyKeyChainFor: (gid) => agent.historyKeyChainFor?.(gid) ?? null,
   });
 
   // OBJ-2 membership — ONE shared peer-redeem pending-map + sender. ChatScreen wires the response

@@ -43,6 +43,8 @@ export const DEFAULT_PROFILE = 'default';
  * from this seed instead of the profile seed, so this device presents its own address in every
  * circle (the add-a-device model). Written only here, through the vault-at-rest layer.
  */
+/** The unsealed-vault note a phrase ceremony leaves for the next boot (see the restore-finish flow). */
+export const RESTORE_PENDING_KEY = 'restore-pending';
 export const DEVICE_DELEGATION_VAULT_KEY = 'device-delegation-seed';
 
 const _b64url = (bytes) => {
@@ -135,6 +137,9 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     });
     if (blob.label) blob.record = { ...blob.record, label: blob.label };
     await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+    // The note the NEXT boot reads: a restore happened here, finish it (the restore-finish flow asks what
+    // came back and what the person wants). Plain, device-local, cleared by that flow's first step.
+    if (markerVault) { try { await markerVault.set(RESTORE_PENDING_KEY, JSON.stringify({ at: new Date().toISOString() })); } catch { /* the flow can be started by hand */ } }
 
     // 4. THE CUTOVER (delegation custody only): the door's seed becomes the delegation; the
     //    marker names it + carries the root fingerprint the sealed vaults' sentinel was bound to.

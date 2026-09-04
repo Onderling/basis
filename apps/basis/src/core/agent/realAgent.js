@@ -178,7 +178,7 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
@@ -359,6 +359,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // reconstructed from the typed phrase. A pre-cutover install keeps today's root custody until
   // its next ceremony migrates it (the self-enroll migration).
   const custody = await readCustodyMode(ownerRootVault);
+  // A phrase ceremony ran on this device and has not been finished (the restore-finish flow). Read once
+  // at boot; the flow's first step clears it, so the shell asks exactly once.
+  let restorePendingAtBoot = false;
+  try { restorePendingAtBoot = !!(await ownerRootVault.get(RESTORE_PENDING_KEY)); } catch { restorePendingAtBoot = false; }
   let ownerRoot = null;
   let custodySeed = null;            // delegation mode: the key door's (delegation) seed
   if (custody.mode === 'delegation') {
@@ -2134,15 +2138,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'export-failed' })]; }
   }, { visibility: 'trusted' });   // the sealed circle list: owner-only
 
-  hostAgent.register('importRecoveryFile', async ({ parts }) => {
-    const file = String(parts?.[0]?.data?.file ?? '');
-    if (!file.trim()) return [DataPart({ ok: false, error: 'unreadable-file' })];
+  const importRecoveryFileText = async (file) => {
+    if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
     const strategy = settingsSealStrategyForIdentity(chatId);
-    if (!strategy) return [DataPart({ ok: false, error: 'no-identity' })];
-    if (!agentsRegistryRef?.register) return [DataPart({ ok: false, error: 'no-registry' })];
+    if (!strategy) return { ok: false, error: 'no-identity' };
+    if (!agentsRegistryRef?.register) return { ok: false, error: 'no-registry' };
     let body;
-    try { body = openRecoveryFile({ strategy, file }); }
-    catch (e) { return [DataPart({ ok: false, error: e?.code ?? 'unreadable-file' })]; }
+    try { body = openRecoveryFile({ strategy, file: String(file) }); }
+    catch (e) { return { ok: false, error: e?.code ?? 'unreadable-file' }; }
     try {
       let agents = 0;
       for (const entry of (Array.isArray(body?.agents) ? body.agents : [])) {
@@ -2151,9 +2154,53 @@ export async function createRealHouseholdAgent(opts = {}) {
         agents += 1;
       }
       const { reopened } = await reopenMemberCircles();
-      return [DataPart({ ok: true, agents, circles: reopened })];
-    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'import-failed' })]; }
-  }, { visibility: 'trusted' });   // writes the registry: owner-only
+      return { ok: true, agents, circles: reopened };
+    } catch (e) { return { ok: false, error: e?.message ?? 'import-failed' }; }
+  };
+  hostAgent.register('importRecoveryFile', async ({ parts }) => [DataPart(await importRecoveryFileText(parts?.[0]?.data?.file))],
+    { visibility: 'trusted' });   // writes the registry: owner-only
+
+  /* ─── The RESTORE-FINISH flow's ops: what came back, where from, and what the person wants ──────
+   * Declared as the `restore-finish` flow on the household manifest; the shells paint its pauses. */
+  hostAgent.register('restoreStatus', async () => {
+    // Asked once: clear the note the ceremony left, whatever happens next (My data has the doors).
+    try { await ownerRootVault.delete?.(RESTORE_PENDING_KEY); } catch { /* best-effort */ }
+    restorePendingAtBoot = false;
+    const memberships = await readSelfCircleMemberships().catch(() => ({}));
+    const circles = Object.keys(memberships).filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household');
+    const myDeviceId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
+    let otherDevices = [];
+    try {
+      const cur = await agentsRegistryRef?.lookup?.('default');
+      otherDevices = Object.entries(deviceDelegationsOf(cur))
+        .filter(([id, rec]) => id !== myDeviceId && rec?.revoked !== true)
+        .map(([id, rec]) => ({ deviceId: id, label: rec?.label ?? null }));
+    } catch { otherDevices = []; }
+    const carrier = registryCarrierStatus();
+    return [DataPart({
+      ok: true, outcome: circles.length ? 'ready' : 'empty',
+      circles: circles.length, circleIds: circles, otherDevices, otherDeviceCount: otherDevices.length,
+      carrier: carrier?.mode === 'cache' ? 'pod' : 'local', probe: carrier?.probe ?? null,
+    })];
+  }, { visibility: 'trusted' });
+
+  hostAgent.register('restoreSource', async ({ parts }) => {
+    const source = String(parts?.[0]?.data?.source ?? '');
+    if (source === 'later') return [DataPart({ ok: true, outcome: 'later', source })];
+    if (source !== 'file') return [DataPart({ ok: false, outcome: 'error', error: 'source-required' })];
+    const r = await importRecoveryFileText(parts?.[0]?.data?.file);
+    if (!r.ok) return [DataPart({ ok: false, outcome: r.error, error: r.error, source })];
+    return [DataPart({ ok: true, outcome: 'ok', source, agents: r.agents, circles: r.circles.length, circleIds: r.circles })];
+  }, { visibility: 'trusted' });
+
+  hostAgent.register('restoreIntent', async ({ parts }) => {
+    // The question: could anyone else still use the old device? Recorded on the plain marker vault so the
+    // done-screen (and a later look) can say which answer was given; it decides copy, never custody.
+    const intent = String(parts?.[0]?.data?.intent ?? '');
+    if (!['broken', 'lost', 'adding'].includes(intent)) return [DataPart({ ok: false, outcome: 'error', error: 'intent-required' })];
+    try { await ownerRootVault.set('restore-intent', JSON.stringify({ intent, at: new Date().toISOString() })); } catch { /* best-effort */ }
+    return [DataPart({ ok: true, outcome: intent, intent })];
+  }, { visibility: 'trusted' });
 
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
@@ -4926,6 +4973,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     ceremonyCommitmentFor, signCeremonyCommitment,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)
     historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
+    restorePending: () => restorePendingAtBoot,   // a phrase ceremony ran here and the restore-finish flow has not asked yet
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.
     circleAddressFor,

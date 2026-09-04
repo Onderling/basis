@@ -327,6 +327,35 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'restoreStatus', group: 'device',
+      verb: 'get',
+      // The restore-finish flow's first step: what came back after a phrase restore (circles from the
+      // pod or a file, other devices on the registry) — and it clears the note the ceremony left.
+      params: [],
+      surfaces: {},
+    },
+    {
+      id:   'restoreSource', group: 'device',
+      verb: 'import',
+      // When nothing came back: load a recovery file now, or later (the honest "your circles are not
+      // here" screen). Never "ask an admin" — that is the fallback of last resort, not an offered route.
+      params: [
+        { name: 'source', kind: 'enum', of: ['file', 'later'], required: true },
+        { name: 'file',   kind: 'string' },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'restoreIntent', group: 'device',
+      verb: 'set',
+      // The question: could anyone else still use the old device? Broken and lost run the same ceremony
+      // and differ in what the screen says; adding means the other devices keep working, nothing retires.
+      params: [
+        { name: 'intent', kind: 'enum', of: ['broken', 'lost', 'adding'], required: true },
+      ],
+      surfaces: {},
+    },
+    {
       id:   'replaceDevice', group: 'device',
       verb: 'replace-device',
       // THE REPLACE CEREMONY (one ceremony for both restore intents — a phone that broke, a phone that
@@ -449,6 +478,38 @@ export const householdManifest = {
       ],
       steps: [
         { id: 'ceremony', op: 'enrollDevice', labelKey: 'circle.enroll.ceremony' },
+      ],
+    },
+    {
+      id: 'restore-finish',
+      kind: 'ceremony',
+      scope: 'device',
+      labelKey: 'circle.restore_finish.title',
+      // THE RESTORE, END TO END, after the reload a phrase ceremony asks for: what came back → (nothing:
+      // a file, or later) → the question → the replace ceremony for a broken or lost phone. Every branch
+      // ends on a screen that says what happened; a quiet one for a broken phone, a plain one for a lost one.
+      effects: [
+        { kind: 'write', target: 'registry' },
+        { kind: 'write', target: 'history-keys' },
+        { kind: 'send',  target: 'circle-address-revoke' },
+        { kind: 'send',  target: 'circle-key-rotate' },
+      ],
+      produces: [
+        { name: 'circles',        kind: 'number', from: '$steps.status.circles' },
+        { name: 'otherDevices',   kind: 'number', from: '$steps.status.otherDeviceCount' },
+        { name: 'source',         kind: 'string', from: '$steps.source.source' },
+        { name: 'intent',         kind: 'string', from: '$steps.intent.intent' },
+        { name: 'retiredDevices', kind: 'string', from: '$steps.retire.retiredDevices' },
+        { name: 'retiredIn',      kind: 'number', from: '$steps.retire.circles' },
+      ],
+      steps: [
+        { id: 'status', op: 'restoreStatus', labelKey: 'circle.restore_finish.step_status',
+          next: { ready: 'intent', empty: 'source' } },
+        { id: 'source', op: 'restoreSource', labelKey: 'circle.restore_finish.step_source',
+          next: { ok: 'intent', later: null, 'not-your-file': null, 'unreadable-file': null, error: null } },
+        { id: 'intent', op: 'restoreIntent', labelKey: 'circle.restore_finish.step_intent',
+          next: { broken: 'retire', lost: 'retire', adding: null, error: null } },
+        { id: 'retire', op: 'replaceDevice', labelKey: 'circle.replace.ceremony' },
       ],
     },
     {

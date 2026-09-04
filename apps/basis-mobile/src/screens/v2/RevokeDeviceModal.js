@@ -11,10 +11,15 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 
-const FLOW = householdManifest.flows.find((f) => f.id === 'revoke-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
-export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClose }) {
+/**
+ * One modal for both device ceremonies (they share a shape — the phrase is the proof, one step, one
+ * outcome): `flowId: 'revoke-device'` retires ONE device named by `deviceId`; `flowId: 'replace-device'`
+ * retires every other device (the restore wizard's "this is my phone now"). `keyPrefix` picks the copy.
+ */
+export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClose, flowId = 'revoke-device', keyPrefix = 'revoke' }) {
+  const FLOW = householdManifest.flows.find((f) => f.id === flowId);
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [inst, setInst] = useState(null);
@@ -30,7 +35,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
       .then((r) => { if (alive) { setInst(r); setPhrase(''); } })
       .catch(() => { if (alive) onClose?.(); });
     return () => { alive = false; runnerRef.current = null; };
-  }, [visible, callSkill, deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, callSkill, deviceId, flowId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!visible) return null;
   const view = inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
@@ -40,7 +45,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
   const submit = () => {
     const runner = runnerRef.current;
     if (!runner || !inst) return;
-    runner.resume(FLOW, inst, { input: { mnemonic: phrase, deviceId } })
+    runner.resume(FLOW, inst, { input: { mnemonic: phrase, ...(deviceId ? { deviceId } : {}) } })
       .then((r) => setInst(r))
       .catch(() => finish());
   };
@@ -49,10 +54,10 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
     <Modal visible transparent animationType="fade" onRequestClose={finish}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.title}>{t('circle.revoke.title')}</Text>
+          <Text style={styles.title}>{t(`circle.${keyPrefix}.title`)}</Text>
           {view?.status === 'awaiting-input' ? (
             <View>
-              <Text style={styles.body}>{t('circle.revoke.body')}</Text>
+              <Text style={styles.body}>{t(`circle.${keyPrefix}.body`)}</Text>
               <TextInput
                 style={styles.input}
                 placeholder={t('circle.enroll.mnemonic_placeholder')}
@@ -63,7 +68,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
               />
               <View style={styles.row}>
                 <Pressable style={styles.button} onPress={submit} testID="revoke-submit">
-                  <Text style={styles.buttonText}>{t('circle.revoke.submit')}</Text>
+                  <Text style={styles.buttonText}>{t(`circle.${keyPrefix}.submit`)}</Text>
                 </Pressable>
                 <Pressable style={styles.cancel} onPress={() => { runnerRef.current?.cancel(inst); finish(); }}>
                   <Text style={styles.cancelText}>{t('circle.confirm.cancel', { defaultValue: 'Annuleren' })}</Text>
@@ -74,10 +79,10 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
             <View>
               <Text style={styles.body}>
                 {outcome === 'ok'
-                  ? t('circle.revoke.done')
+                  ? t(`circle.${keyPrefix}.done`)
                   : (outcome === 'wrong-phrase' || outcome === 'invalid-phrase')
                     ? t('circle.enroll.invalid_phrase')
-                    : (inst?.steps?.ceremony?.out?.error ?? t('circle.revoke.failed'))}
+                    : (inst?.steps?.ceremony?.out?.error ?? t(`circle.${keyPrefix}.failed`))}
               </Text>
               <View style={styles.row}>
                 {outcome !== 'ok' ? (

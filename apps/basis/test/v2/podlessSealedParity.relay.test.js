@@ -9,6 +9,8 @@
  * The claim is the v1 gate again, on the wire people will actually use: a device enrolled by
  * phrase + offer, no pod anywhere, OPENS content sealed before it existed.
  */
+import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
+import { makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../src/v2/keyRail.js';
 import { describe, it, expect, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { startJourneyRelay } from '../support/testRelay.js';
@@ -84,9 +86,26 @@ describe('pod-less sealed parity over the RELAY — the marquee walk', () => {
     expect(report?.ok, JSON.stringify(consumed)).toBe(true);
     expect(report.steps).toContain('seed-requested');
 
-    // The gate, on the wire: chain arrives over the relay; the envelope opens on the new device.
+    // The replayed chain arrives over the relay — sealed to the sibling's key, which the tablet does not hold
+    // (one key family: per device). The gate: the admin's device wraps the group key to the tablet's own
+    // address key on its announcement (production: the announce handler's `grantSealedAudience`; the harness
+    // performs the shell's act), the re-issued key-event crosses the relay, and the envelope opens there.
     const chainArrived = await until(() => (A2.keyEventStore.list(CIRCLE).length > 0 ? true : null), { timeout: 20000, step: 100 });
     expect(chainArrived, 'the key chain never reached the enrolled device over the relay').toBe(true);
-    expect(await readSealed(A2, env, CIRCLE), 'the enrolled device opens pre-existing sealed content over the relay').toBe('sealed before the tablet existed');
+    expect(() => readSealed(A2, env, CIRCLE), "sealed to the sibling's key, not the tablet's").toThrow();
+    // The admin's device wraps the group key to the tablet's own address key — production does this in the
+    // announce handler (`grantSealedAudience`) and fans the re-issued key-event to the tablet's per-circle
+    // ADDRESS; the harness fans by webid, which two devices of one person share, so it performs the shell's
+    // act explicitly: grant, then land the admin's key statements at the tablet's rail.
+    await B.circleControlAgentRouter.grantRecipient({ groupId: CIRCLE, publicKey: sealingPublicKeyFromNetworkKey(A2.agent.circleAddressFor(CIRCLE)) });
+    const onKeyA2 = makeKeyPeerHandler({ rail: A2.agent.keyRail });
+    for (const stmt of B.agent.keyRail.storedStatements(CIRCLE)) {
+      await onKeyA2('B', { subtype: KEY_STATEMENT_BROADCAST, circleId: CIRCLE, event: stmt });
+    }
+    await projectKeyEventsIntoStore({ rail: A2.agent.keyRail, store: A2.keyEventStore, circleId: CIRCLE });
+    const opened = await until(() => {
+      try { return readSealed(A2, env, CIRCLE) === 'sealed before the tablet existed' ? true : null; } catch { return null; }
+    }, { timeout: 20000, step: 100 });
+    expect(opened, 'the enrolled device opens pre-existing sealed content over the relay once granted').toBe(true);
   }, 180_000);
 });

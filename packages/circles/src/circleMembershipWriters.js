@@ -46,6 +46,17 @@ import { hasHumanRules } from './circleRulesDoc.js';
  * monotonic integers, so acceptance of a then-current version stays valid after a rules change.
  * A circle WITHOUT a rules doc admits exactly as before. The joiner does not control this device.
  */
+/** ONE sealing key family: a member's group key is wrapped to the ed2curve image of their PROVEN per-circle
+ *  address. A joiner-supplied key still wins when present; otherwise it is derived from the verified address
+ *  (an unproven address grants nothing — deny-by-default holds here too). */
+function sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey) {
+  if (typeof a?.sealingPublicKey === 'string' && a.sealingPublicKey) return a.sealingPublicKey;
+  if (verifiedCircleAddress && typeof deriveSealingKey === 'function') {
+    try { return deriveSealingKey(verifiedCircleAddress); } catch { return null; }
+  }
+  return null;
+}
+
 async function rulesAcceptanceRefusal(store, groupId, rulesAccepted) {
   let latest = null;
   try {
@@ -67,7 +78,7 @@ async function rulesAcceptanceRefusal(store, groupId, rulesAccepted) {
 
 export async function redeemMembershipCode({
   store, members, metrics, simulateSync, grantKey, emitSpine,
-  codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
+  codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink, deriveSealingKey = null,
 }, { a, from } = {}) {
   if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
   if (typeof a.code    !== 'string' || !a.code)    return { error: 'code required' };
@@ -183,7 +194,7 @@ export async function redeemMembershipCode({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: from, sealingPublicKey: a.sealingPublicKey, groupId: a.groupId, metrics });
+  await grantKey({ webId: from, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics });
   // ALSO record this JOIN on the circle's membership spine — the durable, per-author SIGNED log the roster
   // folds deterministically (identical on every device, no wall-clock). This is a same-device redeem, so the
   // acting device IS the joiner: the injected emitter signs `join` with the joiner's own identity (author =
@@ -218,7 +229,7 @@ export async function redeemMembershipCode({
 export async function verifyMembershipCodeForPeer({
   store, members, metrics, simulateSync, grantKey, emitSpine,
   codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
-  withHandleClaim, collectCircleHandles, findHandleCollision,
+  withHandleClaim, collectCircleHandles, findHandleCollision, deriveSealingKey = null,
 }, { a, from } = {}) {
   if (typeof a.groupId !== 'string' || !a.groupId)
     return { error: 'groupId required' };
@@ -288,7 +299,7 @@ export async function verifyMembershipCodeForPeer({
         });
       } catch { /* best-effort, exactly as on the first redeem */ }
     }
-    await grantKey({ webId: a.requesterWebid, sealingPublicKey: a.sealingPublicKey, groupId: a.groupId, metrics });
+    await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics });
     return {
       redemptionId: limit.already.id,
       codeId:       valid.id,
@@ -364,7 +375,7 @@ export async function verifyMembershipCodeForPeer({
     }
     catch { /* roster upsert is best-effort — never block the redeem */ }
   }
-  await grantKey({ webId: a.requesterWebid, sealingPublicKey: a.sealingPublicKey, groupId: a.groupId, metrics });
+  await grantKey({ webId: a.requesterWebid, sealingPublicKey: sealingKeyFor(a, verifiedCircleAddress, deriveSealingKey), groupId: a.groupId, metrics });
   // ALSO record this JOIN on the circle's membership spine (as `redeemMembershipCode` does). This is the
   // ADMIN's device confirming a REMOTE joiner, who is not here to sign — so the ADMIN signs `join` with their
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority

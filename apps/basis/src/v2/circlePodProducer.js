@@ -58,6 +58,7 @@ export async function createCirclePodProducer({
   sharing,
   bootstrap = true,
   keyEventLog = null,
+  sealingKeyPair = null,
   controllerKeyPrefix = 'cc.circle-controller-key',
   groupKeyPrefix = 'cc.circle-groupkey',
 } = {}) {
@@ -83,7 +84,18 @@ export async function createCirclePodProducer({
   // test covers the PRODUCER yet — that is the honest remaining gap, not the crypto.
   // (An earlier comment here said the keygen was node:crypto and "not yet in the browser";
   // that was true once and had gone stale — it misled a trace on 2026-09-02.)
-  const sealingIdentity = createCircleSealingIdentity({ circleId, store: vault });
+  // ONE sealing key family (2026-09-04): the device's sealing keypair is the ed2curve image of its
+  // per-circle ADDRESS key, handed in by the agent (`circleSealingKeyPairFor`). Every grant in the
+  // circle already wraps to `sealingPublicKeyFromNetworkKey(address)`; opening with anything else
+  // meant a member's own group key was wrapped to a key it did not hold. The random per-circle vault
+  // identity remains only for a host with no agent (the producer's own tests).
+  const sealingIdentity = (sealingKeyPair?.publicKey && sealingKeyPair?.privateKey)
+    ? {
+      ensure: async () => sealingKeyPair,
+      publicKey: async () => sealingKeyPair.publicKey,
+      rosterEntry: async (webId, role = 'member') => ({ webId: String(webId), publicKey: sealingKeyPair.publicKey, role }),
+    }
+    : createCircleSealingIdentity({ circleId, store: vault });
   const selfKey = await sealingIdentity.ensure();   // {publicKey, privateKey}
   if (typeof generateKeypair !== 'function' || typeof makePodClient !== 'function') {
     throw new Error('createCirclePodProducer: a sealed (p2/p3) circle needs generateKeypair + makePodClient');

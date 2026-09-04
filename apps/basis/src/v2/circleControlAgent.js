@@ -80,6 +80,13 @@ export function createCircleControlAgent({
     addMember:    (m) => agent.addMember(m),
     removeMember: (m) => agent.removeMember(m),
     members:      () => agent.members(),
+    // Device-grained audience surgery (the custody arc): a member's DEVICE joins or leaves the group key's
+    // audience without a roster change. Both were routed to by the announce handler and the revoke
+    // ceremony since August and reached nothing — this wrapper never exposed them (found 2026-09-04 when the
+    // sealed-parity gate moved to one key family). The inner agent emits the re-issue / rotation through
+    // the key-event sink like any membership change.
+    grantRecipient:  (a) => agent.grantRecipient(a),
+    revokeRecipient: (a) => agent.revokeRecipient(a),
 
     /**
      * Resolve the circle's CONTENT seal/open strategy once the caller's group key

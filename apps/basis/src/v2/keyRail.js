@@ -181,9 +181,27 @@ export async function keyEventsFromRail(rail, circleId) {
     };
     walk('');
   }
-  return laneBodies
-    .filter((b) => !forkParentsByAuthor.has(b.author) || keptOfDisputed.has(b.hash))
-    .map((b) => b.payload.event);
+  // CHAIN ORDER, not arrival order. The fold collapses same-version re-issues LAST-WINS, so the order this
+  // returns decides which re-issue is current. A device that catches up receives statements in whatever
+  // order the peer stored them — newest-first, as it happens — so ordering by arrival let an OLDER
+  // re-issue (fewer recipients) clobber the newer one on every catch-up (found 2026-09-04: an enrolled
+  // device was granted, received the grant, and still held the pre-grant version). Each author's
+  // statements chain by parent hash; their depth in that chain is the order the author meant.
+  const kept = laneBodies.filter((b) => !forkParentsByAuthor.has(b.author) || keptOfDisputed.has(b.hash));
+  const byHash = new Map(kept.map((b) => [b.hash, b]));
+  const depth = new Map();
+  const depthOf = (b) => {
+    if (depth.has(b.hash)) return depth.get(b.hash);
+    depth.set(b.hash, 0);   // cycle guard
+    const parent = b.parentHash ? byHash.get(b.parentHash) : null;
+    const d = parent ? depthOf(parent) + 1 : 0;
+    depth.set(b.hash, d);
+    return d;
+  };
+  return kept
+    .map((b, i) => ({ b, i, d: depthOf(b) }))
+    .sort((x, y) => (x.d - y.d) || (x.i - y.i))
+    .map(({ b }) => b.payload.event);
 }
 
 /**

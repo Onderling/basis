@@ -72,10 +72,11 @@ describe('the restore door and the boot door are the SAME keystore', () => {
       // ONE seed behind the door — since the custody cutover that is the DELEGATION seed (the
       // restore ceremony enrolled this install; the root is never persisted anywhere).
       expect(keystore.store.size).toBe(1);
-      // The owner-root vault carries only the NON-SECRET custody marker (mode + deviceId +
-      // fingerprint tag) — never a seed or a phrase.
-      const rootKeys = [...newPhone.store.keys()].filter((k) => k.startsWith('cc-owner-root:'));
-      expect(rootKeys).toEqual(['cc-owner-root:custody-mode']);
+      // The owner-root vault carries only NON-SECRET notes: the custody marker (mode + deviceId +
+      // fingerprint tag) and the restore-pending note the next boot's restore-finish flow reads —
+      // never a seed or a phrase.
+      const rootKeys = [...newPhone.store.keys()].filter((k) => k.startsWith('cc-owner-root:')).sort();
+      expect(rootKeys).toEqual(['cc-owner-root:custody-mode', 'cc-owner-root:restore-pending']);
 
       const b2 = await bootAgentBundle({ asyncStorage: newPhone, secureStore: keystore });
       expect(b2.agent.sa.agent.identity.pubKey).toBe(before);                // …and the boot found it there

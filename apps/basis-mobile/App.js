@@ -27,6 +27,7 @@ import { ThemeProvider } from './src/screens/v2/themeContext.js';
 import ChatScreen from './src/screens/ChatScreen.js';
 import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
 import RestoreFlowModal from './src/screens/v2/RestoreFlowModal.js';
+import RestoreFinishModal from './src/screens/v2/RestoreFinishModal.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
@@ -116,6 +117,8 @@ export default function App() {
   // The restore-settings flow's pending flag — raised by the boot hooks, consumed by the modal
   // once the bundle is live (React state ordering makes the gate race-free by construction).
   const [restoreFlowPending, setRestoreFlowPending] = useState(false);
+  // A phrase ceremony ran on this device and the restore-finish flow has not asked yet (web parity).
+  const [restoreFinishPending, setRestoreFinishPending] = useState(false);
   const [bootError, setBootError] = useState(null);
   // CREATE-side mnemonic display. States:
   //  - 'pending'   — not probed yet (or skipped while bundle still booting).
@@ -597,6 +600,7 @@ export default function App() {
         // web ≡ mobile: same attach as circleApp.js — the roster feed fills the membrane's index.
         if (b?.agent) b.agent._circleGroupsIndex = circleGroupsIndexRef.current;
         setBundle(b);
+        if (b?.agent?.restorePending?.()) setRestoreFinishPending(true);   // ask once, after the reload the ceremony asked for
         maybeAttachStoopPod();   // S4 — bundle up → attach stoop's item store if already signed in
         // Mark the first-boot seed as done so the next launch skips it.
         // Fire-and-forget; failures are non-fatal (next launch re-seeds,
@@ -764,6 +768,11 @@ export default function App() {
           callSkill={bundle?.callSkill}
           onClose={() => setRestoreFlowPending(false)}
           onPhrase={startRestore}
+        />
+        <RestoreFinishModal
+          visible={restoreFinishPending && !!bundle}
+          callSkill={bundle?.callSkill}
+          onClose={() => setRestoreFinishPending(false)}
         />
       </View>
       </ThemeProvider>

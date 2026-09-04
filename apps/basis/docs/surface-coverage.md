@@ -44,11 +44,11 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `reassign` | reassign | ✅ | · | · | · | · | · |  |
 |  | `registerName` | register | ✅ | ✅ | ✅ | · | ✅ | · | register, registreer, naam |
 |  | `revokeDevice` | revoke-device | · | · | · | · | · | · |  |
-|  | `exportRecoveryFile` | get | · | · | · | · | · | · |  |
-|  | `importRecoveryFile` | import | · | · | · | · | · | · |  |
-|  | `restoreStatus` | get | · | · | · | · | · | · |  |
-|  | `restoreSource` | import | · | · | · | · | · | · |  |
-|  | `restoreIntent` | set | · | · | · | · | · | · |  |
+|  | `exportRecoveryFile` | export-recovery-file | · | · | · | · | · | · |  |
+|  | `importRecoveryFile` | import-recovery-file | · | · | · | · | · | · |  |
+|  | `restoreStatus` | restore-status | · | · | · | · | · | · |  |
+|  | `restoreSource` | restore-source | · | · | · | · | · | · |  |
+|  | `restoreIntent` | restore-intent | · | · | · | · | · | · |  |
 |  | `replaceDevice` | replace-device | · | · | · | · | · | · |  |
 |  | `enrollDevice` | enroll-device | · | · | · | · | · | · |  |
 |  | `buildEnrollOffer` | get | · | · | · | · | · | · |  |

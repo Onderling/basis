@@ -52,6 +52,7 @@ export const householdManifest = {
   domainVerbs: [
     'help', 'register',
     'enroll-device', 'revoke-device', 'reveal-owner-phrase', 'restore-owner-phrase',
+    'replace-device', 'export-recovery-file', 'import-recovery-file', 'restore-status', 'restore-source', 'restore-intent',
     'grant-surface', 'revoke-surface', 'list-surface-grants',
   ],
 
@@ -308,7 +309,7 @@ export const householdManifest = {
     },
     {
       id:   'exportRecoveryFile', group: 'device',
-      verb: 'get',
+      verb: 'export-recovery-file',
       // THE RECOVERY FILE, out: the registry (circles, devices, wrapped-key refs) sealed exactly as the pod
       // mirror seals it — to the profile-derived key the phrase re-derives — so the phrase is the only
       // secret. Reached from My data → "Save a recovery file" (both shells); no chat/slash surface.
@@ -317,7 +318,7 @@ export const householdManifest = {
     },
     {
       id:   'importRecoveryFile', group: 'device',
-      verb: 'import',
+      verb: 'import-recovery-file',
       // THE RECOVERY FILE, in: opens the file with this device's key, upserts every entry through the
       // registry handle, and runs the boot re-open loop. Refuses `not-your-file` / `unreadable-file`.
       // Reached from My data → "Load a recovery file" after a phrase restore.
@@ -328,7 +329,7 @@ export const householdManifest = {
     },
     {
       id:   'restoreStatus', group: 'device',
-      verb: 'get',
+      verb: 'restore-status',
       // The restore-finish flow's first step: what came back after a phrase restore (circles from the
       // pod or a file, other devices on the registry) — and it clears the note the ceremony left.
       params: [],
@@ -336,7 +337,7 @@ export const householdManifest = {
     },
     {
       id:   'restoreSource', group: 'device',
-      verb: 'import',
+      verb: 'restore-source',
       // When nothing came back: load a recovery file now, or later (the honest "your circles are not
       // here" screen). Never "ask an admin" — that is the fallback of last resort, not an offered route.
       params: [
@@ -347,7 +348,7 @@ export const householdManifest = {
     },
     {
       id:   'restoreIntent', group: 'device',
-      verb: 'set',
+      verb: 'restore-intent',
       // The question: could anyone else still use the old device? Broken and lost run the same ceremony
       // and differ in what the screen says; adding means the other devices keep working, nothing retires.
       params: [

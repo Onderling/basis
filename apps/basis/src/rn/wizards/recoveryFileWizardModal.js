@@ -1,6 +1,6 @@
 /**
  * **Platform: RN.** Mobile parity for src/web/wizards/recoveryFileWizard.js — the two recovery-file
- * doors (plan A2) in one modal, `mode: 'export' | 'import'`. Picking and saving the file are handed in
+ * doors in one modal, `mode: 'export' | 'import'`. Picking and saving the file are handed in
  * by the screen (`onPickFile`, `onSaveFile`) so this module stays free of expo modules.
  * Shares src/core/wizards/recoveryFileState.js with web.
  */

@@ -179,7 +179,7 @@ async function restoreOrGenerate(vault) {
 }
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
-import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device (plan A1/A2)
+import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
@@ -1150,7 +1150,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // no-op until then. Returns false when there is no record to attach to (the key facet needs a prior
   // {handle,address} join write) — so it is safe to call at every circle-open, best-effort.
   let upsertCircleKeyRef = async () => false;
-  // THE CARRIER (plan A1): the registry rides its OWN pseudo-pod — a persistent local backend the shell
+  // THE CARRIER: the registry rides its OWN pseudo-pod — a persistent local backend the shell
   // passes (`opts.registryBackend`; memory when absent, as before), and when signed in a cache-mode
   // mirror to the owner's pod, sealed to self under an opaque name (`opts.provisionRegistryMedium`, the
   // settings medium's sibling). `attach()` runs the probe gate BEFORE the self-registration below, which
@@ -2114,7 +2114,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'trusted' });   // retires a device's keys everywhere: owner-only, phrase-proven
 
-  /* ─── The RECOVERY FILE (plan A2): the pod-less carrier of the circle list ─────────────────────
+  /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),
    * so the phrase is the only secret; import opens it with this device's key and upserts every entry
    * through the registry handle, then runs the boot re-open loop. A file sealed by someone else's

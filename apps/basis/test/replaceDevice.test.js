@@ -1,5 +1,5 @@
 /**
- * THE REPLACE CEREMONY — journeys 1 and 2 (plan B1) on real agents over one bus.
+ * THE REPLACE CEREMONY — journeys 1 and 2 on real agents over one bus.
  *
  *   Anna (A) admins a SEALED no-pod circle with Bram (B). Her phone is gone; the new phone (A2) is
  *   enrolled with her phrase and announces itself. She runs the replace ceremony on A2.
@@ -87,7 +87,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     for (const node of [A, B, A2]) {
       await node.agent.callSkill('stoop', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...mine });
     }
-    // The new phone knows its circle (the registry came back: A1/A2 — modelled by the membership record).
+    // The new phone knows its circle (the registry came back from the pod or the recovery file — modelled by the membership record).
     await A2.agent.callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId: GROUP, handle: 'anna', address: addrA2 });
     // …and holds the circle's key chain STATEMENTS (the key lane's catch-up brings them on re-open; the
     // harness performs that act explicitly by ingesting A's statements at A2's rail — it cannot OPEN them:

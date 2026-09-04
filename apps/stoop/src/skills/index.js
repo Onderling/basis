@@ -4447,10 +4447,9 @@ export function buildSkills({
               await members.addMember({
                 webid: from,
                 circleAddresses: [...set],
-                // The ceremony key is phrase-derived — one per person per circle, identical on
-                // every device — so carrying it when this device has none adds a fact, not a claim.
-                ...(!mine?.ceremonyAddress && typeof m.ceremonyAddress === 'string' && m.ceremonyAddress
-                  ? { ceremonyAddress: m.ceremonyAddress } : {}),
+                // The ceremony commitment is one per person per circle (a commitment to the owner root —
+                // core ceremonyCommitment.js), identical on every device, so carrying it when this device
+                // has none adds a fact, not a claim.
                 ...(!mine?.ceremonyCommitment && typeof m.ceremonyCommitment === 'string' && m.ceremonyCommitment
                   ? { ceremonyCommitment: m.ceremonyCommitment } : {}),
               });

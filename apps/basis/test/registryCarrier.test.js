@@ -1,5 +1,5 @@
 /**
- * The registry carrier — the owner's registry survives the device (plan A1).
+ * The registry carrier — the owner's registry survives the device.
  *
  * Real primitives: the real sealed pod data source over an in-memory pod, the real seal-to-self strategy
  * from a real identity, the real pseudo-pod in cache mode, the real agent registry composed over it.

@@ -397,14 +397,14 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
         </Pressable>
-        {/* The recovery file (plan A2): the circle list sealed to the phrase — save it, or load it after a restore. */}
+        {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
         <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
           <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
         </Pressable>
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
         </Pressable>
-        {/* The replace ceremony: after a restore, retire every other device in one act (plan B1). */}
+        {/* The replace ceremony: after a restore, retire every other device in one act. */}
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
         </Pressable>

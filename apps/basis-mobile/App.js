@@ -512,7 +512,7 @@ export default function App() {
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,
             strategy,
           }),
-          // The owner's REGISTRY survives the device (plan A1, web parity): AsyncStorage locally, and a
+          // The owner's REGISTRY survives the device (web parity): AsyncStorage locally, and a
           // sealed mirror on the user's own pod under an opaque name when signed in.
           registryBackend: createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }),
           provisionRegistryMedium: async (strategy) => createRegistryPodMedium({

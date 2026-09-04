@@ -119,7 +119,6 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
             ...(typeof m.pubKey === 'string' && m.pubKey ? { pubKey: m.pubKey } : {}),
             ...(typeof m.circleAddress === 'string' && m.circleAddress ? { circleAddress: m.circleAddress } : {}),
             ...(Array.isArray(m.circleAddresses) && m.circleAddresses.length ? { circleAddresses: m.circleAddresses } : {}),
-            ...(typeof m.ceremonyAddress === 'string' && m.ceremonyAddress ? { ceremonyAddress: m.ceremonyAddress } : {}),
             ...(typeof m.ceremonyCommitment === 'string' && m.ceremonyCommitment ? { ceremonyCommitment: m.ceremonyCommitment } : {}),
           }));
       } catch { memberRows = []; }

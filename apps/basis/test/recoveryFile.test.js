@@ -1,5 +1,5 @@
 /**
- * The RECOVERY FILE (plan A2) — the pod-less carrier of the circle list, through the real agent.
+ * The RECOVERY FILE — the pod-less carrier of the circle list, through the real agent.
  *
  *   JOURNEY 4 (file branch) — Anna, no pod: she saved a recovery file; her phone is gone; on the new
  *   phone she restores her phrase and loads the file. Her circles come back, with the wrapped-key ref.

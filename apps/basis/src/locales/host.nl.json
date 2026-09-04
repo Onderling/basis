@@ -1,14 +1,4 @@
 {
-  "common": {
-    "cancel": {
-      "text": "Annuleren",
-      "doc": "Generic cancel-button label — rendered by both shells' wizards (moved from the mobile bundle 2026-09-04 when the web recovery-file wizard started using it)."
-    },
-    "done": {
-      "text": "Klaar",
-      "doc": "Final dismiss after wizard success — rendered by both shells' wizards (moved from the mobile bundle 2026-09-04)."
-    }
-  },
   "apps": {
     "heading": {
       "text": "Apps:",
@@ -624,6 +614,14 @@
     }
   },
   "common": {
+    "cancel": {
+      "text": "Annuleren",
+      "doc": "Generic cancel-button label — rendered by both shells' wizards (moved from the mobile bundle 2026-09-04 when the web recovery-file wizard started using it)."
+    },
+    "done": {
+      "text": "Klaar",
+      "doc": "Final dismiss after wizard success — rendered by both shells' wizards (moved from the mobile bundle 2026-09-04)."
+    },
     "consequences": {
       "text": "Gevolgen als je dit kiest",
       "doc": "N2 — ⓘ tooltip/aria label on a radio option that reveals its consequence."

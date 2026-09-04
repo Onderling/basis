@@ -43,6 +43,7 @@
 //
 // The residual trust is therefore the same trust the roster already places in whoever admitted the
 // member, and no more. Recorded in `plans/DECISIONS-FOR-REVIEW.md` (2026-08-02).
+import { verifyCeremonyCommitmentDeclaration } from './ceremonyCommitment.js';
 import { signCircleLink, signCircleLinkFromSeed, verifyCircleLink } from './circleLink.js';
 import { deriveCircleAddress } from './circleAddress.js';
 
@@ -74,6 +75,7 @@ export const CIRCLE_ADDRESS_ANNOUNCE_KIND = 'circle-address-announce';
  */
 export function circleAddressAnnouncement({
   circleId, memberWebid, circleAddress, circleAddressProof, personaProperties,
+  ceremonyCommitment, ceremonyCommitmentProof,
 } = {}) {
   const s = (v) => (typeof v === 'string' ? v : '');
   const out = {
@@ -82,6 +84,13 @@ export function circleAddressAnnouncement({
     circleAddress:      s(circleAddress),
     circleAddressProof: s(circleAddressProof),
   };
+  // The member's CEREMONY COMMITMENT for this circle (who may retire this address: the owner root — see
+  // ceremonyCommitment.js), declared by the device and signed with the circle key the address proves, so a
+  // relaying carrier cannot substitute it. Optional on the wire; verified when present.
+  if (typeof ceremonyCommitment === 'string' && ceremonyCommitment && typeof ceremonyCommitmentProof === 'string' && ceremonyCommitmentProof) {
+    out.ceremonyCommitment = ceremonyCommitment;
+    out.ceremonyCommitmentProof = ceremonyCommitmentProof;
+  }
   // Only a non-empty plain object rides — never an array, never junk, and absent when empty so the
   // wire shape is byte-identical to a release-less announcement (conservation).
   if (personaProperties && typeof personaProperties === 'object' && !Array.isArray(personaProperties)
@@ -105,7 +114,7 @@ export function circleAddressAnnouncement({
  * @returns {{circleId, memberWebid, circleAddress, circleAddressProof}|null}
  */
 export function ownCircleAddressAnnouncement({
-  circleId, memberWebid, circleAddressFor, signCircleAddress,
+  circleId, memberWebid, circleAddressFor, signCircleAddress, ceremonyCommitmentFor = null, signCeremonyCommitment = null,
 } = {}) {
   if (typeof circleAddressFor !== 'function' || typeof signCircleAddress !== 'function') return null;
   if (typeof circleId !== 'string' || !circleId) return null;
@@ -115,7 +124,19 @@ export function ownCircleAddressAnnouncement({
     if (typeof circleAddress !== 'string' || !circleAddress) return null;
     const circleAddressProof = signCircleAddress(circleId, circleAddress);
     if (typeof circleAddressProof !== 'string' || !circleAddressProof) return null;
-    return circleAddressAnnouncement({ circleId, memberWebid, circleAddress, circleAddressProof });
+    // The ceremony commitment rides when the host can declare one (it knows its owner root's public key)
+    // and sign the declaration with this circle's key. A host that cannot announces the address alone.
+    let commitment = null; let commitmentProof = null;
+    if (typeof ceremonyCommitmentFor === 'function' && typeof signCeremonyCommitment === 'function') {
+      try {
+        commitment = ceremonyCommitmentFor(circleId) ?? null;
+        commitmentProof = commitment ? signCeremonyCommitment(circleId, circleAddress, commitment) : null;
+      } catch { commitment = null; commitmentProof = null; }
+    }
+    return circleAddressAnnouncement({
+      circleId, memberWebid, circleAddress, circleAddressProof,
+      ...(commitment && commitmentProof ? { ceremonyCommitment: commitment, ceremonyCommitmentProof: commitmentProof } : {}),
+    });
   } catch {
     return null;   // no signable address → announce nothing, exactly as `ownProvenCircleAddress` does
   }
@@ -170,7 +191,13 @@ export function verifyCircleAddressAnnouncement(announcement, expectedCircleId =
     address: a.circleAddress,
     proof:   a.circleAddressProof,
   });
-  return proven ? a : null;
+  if (!proven) return null;
+  // A declared commitment must be signed by the very key the address proves; a bad one voids the whole
+  // announcement rather than being silently dropped (a forged commitment is an attack, not noise).
+  if (a.ceremonyCommitment && !verifyCeremonyCommitmentDeclaration({
+    circleId: a.circleId, circleAddress: a.circleAddress, commitment: a.ceremonyCommitment, proof: a.ceremonyCommitmentProof,
+  })) return null;
+  return a;
 }
 
 /**

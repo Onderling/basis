@@ -28,7 +28,11 @@ import {
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
+  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode,
 } from '@onderling/core';
+import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
+import { keyEventsFromRail } from '../../v2/keyRail.js';
+import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
@@ -430,6 +434,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   // root is the one repair that keeps the person reachable at their roster addresses.
   const chatVaultBacking = opts.chatVault ?? makeBrowserVault('cc-chat-id:');
   const chatVault = await sealedVault(chatVaultBacking);
+  // THE HISTORY KEYS (the replace ceremony's re-wrap, held locally): group-key versions this person is
+  // entitled to that were wrapped to a RETIRED device's derivable sealing key. The ceremony unwraps them
+  // with the old device's re-derived key and keeps the raw keys here, sealed at rest under this device's
+  // own key, so sealed history opens on the replacement with nobody else online. Keys wrapped only to a
+  // retired device's random vault key are not recoverable this way — an admin re-grant is the route.
+  const historyKeysVault = await sealedVault(opts.historyKeysVault ?? makeBrowserVault('cc-history-keys:'));
+  const historyKeyChainFor = async (circleId) => {
+    try { const raw = await historyKeysVault.get(`chain:${circleId}`); return raw ? JSON.parse(raw) : []; }
+    catch { return []; }
+  };
+  const absorbHistoryKeys = async (circleId, chain) => {
+    if (!Array.isArray(chain) || !chain.length) return 0;
+    const cur = await historyKeyChainFor(circleId);
+    const byVersion = new Map(cur.map((k) => [k.version, k]));
+    let added = 0;
+    for (const k of chain) { if (!byVersion.has(k.version)) { byVersion.set(k.version, k); added += 1; } }
+    if (added) await historyKeysVault.set(`chain:${circleId}`, JSON.stringify([...byVersion.values()].sort((a, b) => b.version - a.version)));
+    return added;
+  };
   // The default profile's seed — the source for both the chat identity AND per-circle addresses
   // (step 5B/C). Kept so the returned agent can expose circleAddressFor(circleId).
   const defaultProfileSeed = ownerRoot ? ownerRoot.deriveAgentSeed('default') : null;
@@ -503,6 +526,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     return circleIdentities.get(circleId);
   };
   const circleAddressFor = (circleId) => deriveCircleAddress(deviceDerivationSeed, circleId);
+  // THE CEREMONY COMMITMENT (core ceremonyCommitment.js): who may retire this person's addresses in a
+  // circle — their owner root, at a ceremony. Every device of the person can DECLARE it (the root's public
+  // key is public: resident under root custody, carried on the delegation record under delegation custody)
+  // and none can USE it. Declared in every announcement, signed with the circle key the address proves.
+  const rootPubKeyB64 = ownerRoot ? b64encode(ownerRoot.derivedPubKey()) : (enrolledDevice?.record?.by ?? null);
+  if (!rootPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
+  const ceremonyCommitmentFor = (circleId) => (rootPubKeyB64 ? ceremonyCommitment(rootPubKeyB64, circleId) : null);
+  const signCeremonyCommitment = (circleId, address, commitment) =>
+    signCeremonyCommitmentFromSeed(deriveCircleSeed(deviceDerivationSeed, circleId), { circleId, circleAddress: address, commitment });
 
   // A caller's own `policyEngine` opts, pulled out BEFORE the spread so its `isRevoked` can be
   // unioned into this factory's rather than replacing it (see the composition below). `false` is
@@ -1686,6 +1718,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         memberWebid: chatId.pubKey,
         circleAddressFor,
         signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
+        ceremonyCommitmentFor, signCeremonyCommitment,
       }),
     }),
     onBatch: makeRosterSeedReceiver({
@@ -1815,6 +1848,161 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'enroll-failed' })]; }
   }, { visibility: 'trusted' });   // overwrites the owner root + enrolls: owner-only
 
+  /* ─── The ceremony primitives shared by revokeDevice and replaceDevice ───────────────────────
+   * `verifyOwnerPhrase` — the typed phrase is THIS owner's (root custody compares fingerprints; delegation
+   * custody re-derives this device's delegation seed). `retireAddresses` — per circle, the self-subject
+   * `address-revoke` with the ROOT REVEAL (core ceremonyCommitment.js), fanned to every member, plus the
+   * producer-side key rotation when this device holds the circle's producer. `tombstoneDevice` — the
+   * registry record flipped (or minted already revoked) and the grants floor closed. */
+  const verifyOwnerPhrase = (mnemonic) => {
+    let root;
+    try { root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim()); }
+    catch { return { ok: false, outcome: 'invalid-phrase' }; }
+    if (ownerRoot) {
+      if (root.fingerprint() !== ownerRoot.fingerprint()) return { ok: false, outcome: 'wrong-phrase' };
+    } else {
+      const rederived = deriveDeviceSeed(root.deriveAgentSeed('default'), custody.deviceId);
+      const held = custodySeed;
+      const same = held instanceof Uint8Array && rederived.length === held.length && rederived.every((v, i) => v === held[i]);
+      if (!same) return { ok: false, outcome: 'wrong-phrase' };
+    }
+    return { ok: true, root };
+  };
+  const retireAddresses = async ({ root, addressFor, circleIds }) => {
+    const revokedIn = [];
+    for (const circleId of circleIds) {
+      if (typeof membershipEmit !== 'function') break;
+      const address = addressFor(circleId);
+      if (!address || address === circleAddressFor(circleId)) continue;   // never retire the address this device presents
+      const reveal = signCeremonyReveal(root.secret, { circleId, kind: 'address-revoke', subject: address, authorRef: chatId.pubKey });
+      const stmt = await membershipEmit({
+        kind: 'address-revoke', circleId, subject: address,
+        payload: { by: chatId.pubKey, reveal }, actor: chatId.pubKey,
+      }).catch(() => null);
+      if (stmt) revokedIn.push({ circleId, address });
+      try {
+        await opts.stoopControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
+      } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
+    }
+    return revokedIn;
+  };
+  const bounded = (p, ms = 3000) => Promise.race([p, new Promise((res) => { setTimeout(res, ms); })]);
+  const tombstoneDevices = async ({ root, deviceIds }) => {
+    const known = {};
+    try {
+      const cur = await bounded(agentsRegistryRef?.lookup?.('default'));
+      if (!cur) return known;
+      let props = cur.properties ?? {};
+      for (const deviceId of deviceIds) {
+        const rec = deviceDelegationOf(cur, deviceId);
+        known[deviceId] = !!rec;
+        if (!rec) {
+          const revokedSeed = deriveDeviceSeed(root.deriveAgentSeed('default'), deviceId);
+          const minted = signDeviceDelegation(root.secret, { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed) });
+          props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true });
+        } else if (rec.revoked !== true) {
+          props = registrySetDeviceDelegation(props, deviceId, { revoked: true });
+        }
+      }
+      if (!grantsFloorClosedOf(cur)) props = closeGrantsFloor(props, { closedAt: new Date().toISOString() });
+      if (props !== (cur.properties ?? {})) await bounded(agentsRegistryRef.register({ ...cur, properties: props }));
+    } catch { /* tombstones are best-effort bookkeeping — the statements are the enforcement */ }
+    return known;
+  };
+
+  hostAgent.register('replaceDevice', async ({ parts }) => {
+    // THE REPLACE CEREMONY (one ceremony for both restore intents): this — the NEW — device, restored
+    // with the phrase and holding the registry again, retires every other device the registry lists,
+    // plus the unenrolled first device's profile-derived address, in every circle it belongs to. Before
+    // each retirement it unwraps the group-key chain with the retired device's re-derived sealing key and
+    // keeps the raw keys in the history sidecar, so sealed history opens here with nobody else online.
+    // Where this device is an admin, the circle's group key is then rotated to the survivors (this device
+    // included) through the key lane, so a walked-away phone cannot read what comes next. The wizard's
+    // question (broken or stolen) decides what the screen says, never what this ceremony does.
+    const check = verifyOwnerPhrase(parts?.[0]?.data?.mnemonic);
+    if (!check.ok) return [DataPart({ ok: false, outcome: check.outcome, error: check.outcome })];
+    const { root } = check;
+    const profileSeed = root.deriveAgentSeed('default');
+    const myDeviceId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
+    try {
+      // The retired derivation roots: every other device on the registry, and the profile seed itself when
+      // this device does not derive from it (the unenrolled first device's addresses).
+      const retired = [];
+      try {
+        const cur = await bounded(agentsRegistryRef?.lookup?.('default'));
+        for (const [deviceId, rec] of Object.entries(deviceDelegationsOf(cur))) {
+          if (deviceId === myDeviceId || rec?.revoked === true) continue;
+          retired.push({ deviceId, seed: deriveDeviceSeed(profileSeed, deviceId) });
+        }
+      } catch { /* no registry → only the profile address can be retired */ }
+      const mineIsProfile = deviceDerivationSeed.length === profileSeed.length && deviceDerivationSeed.every((v, i) => v === profileSeed[i]);
+      if (!mineIsProfile) retired.push({ deviceId: null, seed: profileSeed });
+
+      const circleIds = Object.keys(await readSelfCircleMemberships().catch(() => ({})))
+        .concat(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []);
+      const circles = [...new Set(circleIds)];
+      let historyKeys = 0;
+      // 1. absorb: what the retired devices could open with a DERIVABLE key, this device now holds. Two
+      //    key families derive from the phrase: a device's per-circle address key, and the profile's chat
+      //    identity (one per person). A group key wrapped only to an old device's random per-circle vault
+      //    key is not derivable — that one needs an admin's re-grant.
+      for (const { seed } of retired) {
+        for (const circleId of circles) {
+          try {
+            const events = await keyEventsFromRail(keyRail, circleId);
+            if (!events.length) continue;
+            const openers = [];
+            try { openers.push((await circleIdentity(seed, circleId, new VaultMemory())).sharedCopyOpener(deviceSharedCopyOpener)); } catch { /* no address key */ }
+            try { openers.push((await AgentIdentity.fromSeed(profileSeed, new VaultMemory())).sharedCopyOpener(deviceSharedCopyOpener)); } catch { /* no profile key */ }
+            for (const opener of openers) {
+              historyKeys += await absorbHistoryKeys(circleId, readKeyChain(events, { groupId: circleId, opener }));
+            }
+          } catch { /* a circle with no chain, or a key this seed never held — nothing to absorb */ }
+        }
+      }
+      // 2. rotate where this device is an admin — BEFORE the retirement: a statement's binding is re-read
+      //    against the roster, so the chain the old address established must be folded while that address
+      //    still binds. The next version goes to the survivors, this device included, never to a retired key.
+      const rotated = [];
+      const retiredSealingFor = (circleId) => new Set(retired.map(({ seed }) => sealingPublicKeyFromNetworkKey(deriveCircleAddress(seed, circleId))));
+      for (const circleId of circles) {
+        try {
+          const roster = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+          const me = (Array.isArray(roster?.members) ? roster.members : []).find((m) => (m.webid ?? m.addr ?? m.ref) === chatId.pubKey);
+          if (me?.role !== 'admin' || typeof keyEmit !== 'function') continue;
+          const events = await keyEventsFromRail(keyRail, circleId);
+          const fold = foldKeyEvents(events, { groupId: circleId });
+          if (!fold?.recipients?.length) continue;
+          const gone = retiredSealingFor(circleId);
+          const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
+          const recipients = fold.recipients.filter((r) => !gone.has(r));
+          if (!recipients.includes(mine)) recipients.push(mine);
+          const { event, groupKey } = rotateKeyEvent({ groupId: circleId, priorEvents: events, recipients });
+          const statement = await keyEmit(circleId, event);
+          if (!statement) continue;
+          await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
+          await callSkill('stoop', 'broadcastCircleKeyStatement', {
+            groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
+          }).catch(() => {});
+          rotated.push({ circleId, version: event.version });
+        } catch { /* rotation is best-effort per circle — the retirement statements are the enforcement */ }
+      }
+      // 3. retire: the root-revealed address-revoke, per circle, per retired root
+      const retiredAddresses = [];
+      for (const { seed } of retired) {
+        retiredAddresses.push(...await retireAddresses({ root, circleIds: circles, addressFor: (cid) => deriveCircleAddress(seed, cid) }));
+      }
+      // 4. tombstone the registry records
+      const known = await tombstoneDevices({ root, deviceIds: retired.map((r) => r.deviceId).filter(Boolean) });
+      return [DataPart({
+        ok: true, outcome: 'ok',
+        retiredDevices: retired.map((r) => r.deviceId).filter(Boolean),
+        profileAddressRetired: !mineIsProfile,
+        retiredIn: retiredAddresses, circles: retiredAddresses.length, historyKeys, rotated, known,
+      })];
+    } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'replace-failed' })]; }
+  }, { visibility: 'trusted' });   // retires every other device of this person: owner-only, phrase-proven
+
   hostAgent.register('revokeDevice', async ({ parts }) => {
     // The DEVICE-REVOCATION CEREMONY ("evict my device" — the eviction machinery pointed inward):
     // runs on a SURVIVING device with the phrase as the extra proof (the loss-takeover rule). Three
@@ -1887,36 +2075,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...Object.keys(await readSelfCircleMemberships().catch(() => ({}))),
         ...(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []),
       ]);
-      const revokedIn = [];
-      const profileSeed = root.deriveAgentSeed('default');
-      for (const circleId of circleIds) {
-        if (typeof membershipEmit !== 'function') break;
-        const address = deriveCircleAddress(revokedSeed, circleId);
-        // Signed with the CEREMONY key (custody D1): the phrase-derived per-circle identity — the
-        // key class the strict binding demands, and the one a stolen device cannot mint once the
-        // custody cutover lands. The phrase is in hand here; the identity lives only in memory.
-        const ceremonySigner = {
-          identity: await circleIdentity(profileSeed, circleId, new VaultMemory()),
-          ref: chatId.pubKey,
-        };
-        const stmt = await membershipEmit({
-          kind: 'address-revoke', circleId, subject: address,
-          payload: { by: chatId.pubKey }, actor: chatId.pubKey, signer: ceremonySigner,
-        }).catch(() => null);
-        if (stmt) revokedIn.push({ circleId, address });
-        // KEY ROTATION (custody): a SEALED circle whose producer lives on this device rotates
-        // its group key away from the revoked device's sealing key — derived from the revoked
-        // address itself (the ed2curve bridge), so no key distribution is needed. 'ban' policy:
-        // the stolen-device default — history re-seals so nothing pod-fetchable remains for the
-        // island. Best-effort per circle: an unsealed circle (or a producer elsewhere) no-ops.
-        try {
-          await opts.stoopControlAgent?.revokeRecipient?.({
-            groupId: circleId,
-            publicKey: sealingPublicKeyFromNetworkKey(address),
-            policy: 'ban',
-          });
-        } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
-      }
+      const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
       // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
       // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
       // key to its own delegation-derived one, write the delegation blob (pre-signed record
@@ -4759,6 +4918,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Diagnostic (step 2.4a) — the enforcement gate on the host skills' agent. Non-null proves
     // the PolicyEngine attached (vs the try/catch having silently swallowed it).
     hostPolicyEngine: hostAgent.policyEngine ?? null,
+    // Who may retire this device's addresses: the owner root, at a ceremony (core ceremonyCommitment.js).
+    ceremonyCommitmentFor, signCeremonyCommitment,
+    historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.
     circleAddressFor,

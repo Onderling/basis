@@ -4617,6 +4617,7 @@
     "enroll_device": "Add a device",
     "recovery_export": "Save a recovery file",
     "recovery_import": "Load a recovery file",
+    "replace_device": "Retire my other devices",
     "devices": "My devices",
     "connections": {
       "text": "Connected devices",
@@ -5530,6 +5531,14 @@
     "offer_code_label": "Code:",
     "offer_link_label": "Link:",
     "offer_share": "Share the code"
+  },
+  "replace": {
+    "title": "This is my phone now",
+    "ceremony": "Retiring your other devices",
+    "body": "Type the recovery phrase. Every other device of yours is retired in all your circles, and what they could read comes along to this one. Use this after a phone broke or went missing.",
+    "submit": "Retire my other devices",
+    "done": "Done. Your other devices are retired everywhere; this one carries on.",
+    "failed": "That did not work."
   },
   "revoke": {
     "title": "Remove a device",

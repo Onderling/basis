@@ -88,10 +88,8 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const mine = ownAnnouncementFor({ agent: A2.agent, circleId: GROUP });
     for (const ann of [own, mine]) {
       for (const node of [A, B]) {
-        const r = await node.agent.callSkill('stoop', 'recordCircleAddressAnnouncement', {
-          groupId: GROUP, memberWebid: A.pubKey,
-          circleAddress: ann.circleAddress, circleAddressProof: ann.circleAddressProof,
-        });
+        // The whole announcement — it carries the CEREMONY COMMITMENT the revocation binds against.
+        const r = await node.agent.callSkill('stoop', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...ann });
         expect(r?.ok).toBe(true);
       }
     }
@@ -138,9 +136,11 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
       const row = await rowFor(B, A.pubKey);
       return row && !(row.circleAddresses ?? []).includes(addrA2) ? row : null;
     }, { timeout: 15000, step: 100 });
-    // the MEMBER stays, on both ends
+    // the MEMBER stays, on both ends — and B really retired the address (a null from `until` must not pass)
     expect(await rowFor(A, A.pubKey)).toBeTruthy();
-    expect(await rowFor(B, A.pubKey)).toBeTruthy();
+    const bRowAfter = await rowFor(B, A.pubKey);
+    expect(bRowAfter).toBeTruthy();
+    expect(bRowAfter.circleAddresses ?? [], 'B retired the revoked address').not.toContain(addrA2);
 
     // idempotent: revoking again is still ok (the tombstone already stands)
     const again = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });

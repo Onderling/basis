@@ -172,24 +172,34 @@ describe('the membership rider — statements on the device log, roster folds th
     expect(webids(catoView)).toEqual(['webid:admin', 'webid:cato']);
   });
 
-  it('THE CEREMONY BINDING (custody): address-revoke binds ONLY to the ceremonyAddress', async () => {
+  it('THE CEREMONY BINDING: address-revoke binds ONLY by a root reveal against the row\'s commitment', async () => {
     const { membershipBindingVerifier } = await import('../../src/v2/membershipRail.js');
+    const { Bootstrap, ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal } = await import('@onderling/core');
+    const root = Bootstrap.create().bootstrap;
+    const other = Bootstrap.create().bootstrap;
+    const commitment = ceremonyCommitment(rootPubKeyB64Of(root.secret), 'g1');
     const row = {
-      webid: 'webid:bea', circleAddress: 'dev-2-addr', ceremonyAddress: 'join-addr',
+      webid: 'webid:bea', circleAddress: 'dev-2-addr', ceremonyCommitment: commitment,
       circleAddresses: ['dev-2-addr', 'join-addr', 'dev-3-addr'],
     };
     const verify = membershipBindingVerifier(async () => ({ members: [row] }));
-    const args = { ref: 'webid:bea', circleId: 'g1' };
-    // the ceremony key signs a revoke → binds; an ordinary attested device key → refused
-    expect(await verify({ ...args, kind: 'address-revoke', author: 'join-addr' })).toBe(true);
-    expect(await verify({ ...args, kind: 'address-revoke', author: 'dev-2-addr' })).toBe(false);
-    expect(await verify({ ...args, kind: 'address-revoke', author: 'dev-3-addr' })).toBe(false);
+    const args = { ref: 'webid:bea', circleId: 'g1', kind: 'address-revoke', subject: 'dev-3-addr' };
+    const reveal = signCeremonyReveal(root.secret, { circleId: 'g1', kind: 'address-revoke', subject: 'dev-3-addr', authorRef: 'webid:bea' });
+    // the owner's root signed it → binds, whichever device key authored the statement
+    expect(await verify({ ...args, author: 'brand-new-device-addr', payload: { reveal } })).toBe(true);
+    // no reveal (a stolen device's own circle key, however well attested) → refused
+    expect(await verify({ ...args, author: 'dev-2-addr', payload: {} })).toBe(false);
+    // a reveal replayed onto ANOTHER subject → refused (the signature covers the subject)
+    expect(await verify({ ...args, subject: 'dev-2-addr', author: 'dev-3-addr', payload: { reveal } })).toBe(false);
+    // someone else's root → refused (hashes to a different commitment)
+    const foreign = signCeremonyReveal(other.secret, { circleId: 'g1', kind: 'address-revoke', subject: 'dev-3-addr', authorRef: 'webid:bea' });
+    expect(await verify({ ...args, author: 'dev-2-addr', payload: { reveal: foreign } })).toBe(false);
     // every other kind keeps the any-attested rule
-    expect(await verify({ ...args, kind: 'evict', author: 'dev-3-addr' })).toBe(true);
-    // no ceremonyAddress on the row (the post-cutover join window) → the interim rule stands
+    expect(await verify({ ref: 'webid:bea', circleId: 'g1', kind: 'evict', author: 'dev-3-addr' })).toBe(true);
+    // a row WITHOUT a commitment cannot be revoked by statement at all — deny, never the interim rule
     const bare = membershipBindingVerifier(async () => ({
       members: [{ webid: 'webid:bea', circleAddress: 'dev-2-addr', circleAddresses: ['dev-2-addr'] }],
     }));
-    expect(await bare({ ...args, kind: 'address-revoke', author: 'dev-2-addr' })).toBe(true);
+    expect(await bare({ ...args, author: 'dev-2-addr', payload: { reveal } })).toBe(false);
   });
 });

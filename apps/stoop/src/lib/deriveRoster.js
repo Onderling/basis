@@ -151,6 +151,9 @@ export function deriveRoster({
         // primary IS join-time; a patched row carries the captured field (`recordCircleAddress`).
         // First-non-null-wins in the upsert keeps it stable across trail rows.
         ceremonyAddress: src.ceremonyAddress ?? circleAddress,
+        // THE CEREMONY COMMITMENT (core ceremonyCommitment.js): who may retire this member's addresses — their
+        // owner root, at a ceremony. Declared in the member's announcement, circle-key-signed, pinned first-write.
+        ceremonyCommitment: typeof src.ceremonyCommitment === 'string' && src.ceremonyCommitment ? src.ceremonyCommitment : undefined,
         // The proof that came with the address. Carried onto the row so a member can RELAY this
         // member's announcement to someone who was not present when it was proven — the receiver
         // re-verifies it themselves, so relaying grants the relayer no authority
@@ -183,6 +186,7 @@ export function deriveRoster({
         circleAddressProof: confirmedByCircleAddressProof,
         // Same ceremony-address pin for the admin-as-seen-by-the-joiner shape (custody D1).
         ceremonyAddress: src.confirmedByCeremonyAddress ?? confirmedByCircleAddress,
+        ceremonyCommitment: typeof src.confirmedByCeremonyCommitment === 'string' && src.confirmedByCeremonyCommitment ? src.confirmedByCeremonyCommitment : undefined,
         // …and the admin's SIGNING key, which is `confirmedBy` itself: a basis circle binds
         // webid === the member's chat signing address (the same identity the redeem response was
         // authenticated under, and the same fact the address ladder's webid rung already relies on).

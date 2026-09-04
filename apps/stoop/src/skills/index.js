@@ -61,6 +61,7 @@ import {
   defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
+  verifyCeremonyReveal,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
@@ -1033,14 +1034,18 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // phrase-derived key — custody D1) may author them, so a stolen device's key cannot revoke.
     const rowHolds = (address, extras, author) => address === author
       || (Array.isArray(extras) && extras.some((p) => p?.address === author && typeof p?.proof === 'string' && p.proof));
+    // CEREMONY statements (address-revoke) bind by their ROOT REVEAL against the row's ceremony commitment
+    // (core ceremonyCommitment.js): only the owner root — present only inside a ceremony, never on a
+    // device — can sign one. The author key is whichever device ran the ceremony; it need not be on the row.
     const isCeremonyKind = body.kind === 'address-revoke';
+    const revealBinds = (commitment) => !!commitment && verifyCeremonyReveal(body.payload?.reveal, {
+      circleId: body.circleId, kind: body.kind, subject: body.subject, authorRef: claimed, commitment,
+    });
     for (const it of forGroup) {
       const src = it?.source ?? {};
       if (isCeremonyKind) {
-        if ((src.ceremonyAddress ?? src.circleAddress) === body.author
-          && src.redeemedBy === claimed) return { ...body, author: claimed };
-        if ((src.confirmedByCeremonyAddress ?? src.confirmedByCircleAddress) === body.author
-          && src.confirmedBy === claimed) return { ...body, author: claimed };
+        if (src.redeemedBy === claimed && revealBinds(src.ceremonyCommitment)) return { ...body, author: claimed };
+        if (src.confirmedBy === claimed && revealBinds(src.confirmedByCeremonyCommitment)) return { ...body, author: claimed };
         continue;
       }
       if (rowHolds(src.circleAddress, src.circleAddresses, body.author)
@@ -4446,6 +4451,8 @@ export function buildSkills({
                 // every device — so carrying it when this device has none adds a fact, not a claim.
                 ...(!mine?.ceremonyAddress && typeof m.ceremonyAddress === 'string' && m.ceremonyAddress
                   ? { ceremonyAddress: m.ceremonyAddress } : {}),
+                ...(!mine?.ceremonyCommitment && typeof m.ceremonyCommitment === 'string' && m.ceremonyCommitment
+                  ? { ceremonyCommitment: m.ceremonyCommitment } : {}),
               });
             } else {
               const { role: _role, ...displayOnly } = m;

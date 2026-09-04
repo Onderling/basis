@@ -29,6 +29,7 @@ export function renderCircleMyData(container, {
   onEnroll,
   onExportRecovery,
   onImportRecovery,
+  onReplaceDevice,
   devices = [],
   onRevokeDevice,
   // CONNECTIONS (gekoppelde apparaten) — screens that are yours, somewhere else. Rows come from the
@@ -197,6 +198,8 @@ export function renderCircleMyData(container, {
     // The recovery file (plan A2): the circle list sealed to the phrase — the pod-less way back.
     ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
     ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
+    // The replace ceremony (plan B1): after a restore, retire every other device in one act.
+    ['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice],
   ].filter(([, , fn]) => typeof fn === 'function');
   if (acts.length) {
     const keys = section(tr('circle.mydata.keys'));

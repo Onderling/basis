@@ -878,8 +878,11 @@ the two differ by design:
   check that matches an author against a member reads that set rather than a single field;
 - an **unenrolled** first device derives from the profile's seed, so device and profile identity collapse —
   correctly, since there is only one;
-- and the **custody ceremony** (revoking a device) signs with the profile-derived per-circle key
-  specifically, because a stolen device must not be able to mint a revocation.
+- and the **custody ceremony** (revoking a device) is authorised by the owner root itself: a member's
+  roster row carries a per-circle *commitment* to the root, declared in every address announcement and
+  signed with the circle key the address proves, and a revocation carries the root's public key plus the
+  root's signature over exactly that circle, subject and member. The root exists only inside a ceremony,
+  reconstructed from the phrase, so no device — stolen or not — holds anything that can revoke a sibling.
 
 Two consequences worth stating rather than discovering. Unlinkability is **between circles, not between
 your own devices within one circle** — co-members can see how many devices you run, which is the price of
@@ -908,13 +911,15 @@ phrase is the authority, it is typed on the device that is *gaining* it, and it 
 - **Revoke a device.** Run on a device you still hold, with the phrase as the second proof. It tombstones
   the device's delegation and, per circle, retires that device's address: senders stop accepting its
   statements, delivery stops trying it, and sealed circles rotate their key to the surviving devices. The
-  revocation is signed with the profile-derived per-circle key precisely so a stolen device cannot mint
-  one — it can neither revoke you nor counter-revoke.
+  revocation binds only by the root's reveal against the row's commitment, so a stolen device can neither
+  revoke you nor counter-revoke — it holds no root.
 - **Replace a device.** Restoring onto a new phone is the *add* case: the replacement enrolls with its own
-  keys. Retiring the device it stands in for is the revocation ceremony above, which needs that device's
-  id — a fact that lives in the owner's registry, so it is only at hand where the registry is. A device is
-  never restored as a copy of another: two devices never share keys, so any one of them can be retired
-  without touching the others.
+  keys, and then one ceremony on it, with the phrase, retires every other device the registry lists — the
+  registry that came back from the pod or the recovery file. Before retiring, the ceremony unwraps the
+  circle keys those devices could open with keys the phrase derives and keeps them locally, so sealed
+  history opens on the replacement with nobody else online; where this device is an admin it rotates the
+  circle key to the survivors first. A device is never restored as a copy of another: two devices never
+  share keys, so any one of them can be retired without touching the others.
 
 **What a phrase alone cannot bring back.** It rebuilds every key, and therefore every identity — but not
 the *list* of circles those keys belong to. That list lives in the owner's registry, which is a

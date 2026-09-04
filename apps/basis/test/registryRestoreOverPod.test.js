@@ -1,5 +1,5 @@
 /**
- * JOURNEYS 5 and 6 at the composition level (plan A1): the REAL agent factory, the registry riding its
+ * JOURNEYS 5 and 6 at the composition level: the REAL agent factory, the registry riding its
  * carrier, a wipe modelled as a fresh local backend under the same identity.
  *
  *   5 — Anna is signed in; her phone is wiped; the new phone, with her phrase, finds its circles by itself.

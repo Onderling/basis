@@ -1,5 +1,5 @@
 /**
- * recoveryFile — state helpers for the two recovery-file doors (plan A2), shared by the web wizard and
+ * recoveryFile — state helpers for the two recovery-file doors, shared by the web wizard and
  * the RN modal. Zero DOM, zero RN: value transforms + async submits over callSkill.
  *
  * Export: `household.exportRecoveryFile` → the sealed file text (the registry, sealed to the owner's

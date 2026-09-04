@@ -131,11 +131,6 @@ export async function recordCircleAddress(
       next = {
         circleAddress:      proven.circleAddress,
         circleAddressProof: proven.circleAddressProof,
-        // THE CEREMONY ADDRESS (custody D1): the JOIN-TIME address, captured immutably the FIRST
-        // time a patch would demote it — in the pre-cutover world the join address IS the
-        // phrase-derived per-circle key, so this pins exactly the key class ceremony statements
-        // (address-revoke) must be signed with. First-write-wins; never overwritten.
-        ...(src.ceremonyAddress ? {} : { ceremonyAddress: src.circleAddress }),
         // THE CEREMONY COMMITMENT: who may retire this member's addresses — their owner root, at a
         // ceremony (core `ceremonyCommitment.js`). Declared and circle-key-signed in the announcement,
         // verified before this point. First-write-wins: a member's root does not change.
@@ -162,8 +157,6 @@ export async function recordCircleAddress(
       next = {
         confirmedByCircleAddress:      proven.circleAddress,
         confirmedByCircleAddressProof: proven.circleAddressProof,
-        // Same capture for the admin-as-recorded-on-the-joiner-side shape (custody D1).
-        ...(src.confirmedByCeremonyAddress ? {} : { confirmedByCeremonyAddress: src.confirmedByCircleAddress }),
         ...((!src.confirmedByCeremonyCommitment && proven.ceremonyCommitment) ? { confirmedByCeremonyCommitment: proven.ceremonyCommitment } : {}),
         ...((kept.length || src.confirmedByCircleAddresses) ? { confirmedByCircleAddresses: kept } : {}),
       };

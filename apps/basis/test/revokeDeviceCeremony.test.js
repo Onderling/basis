@@ -169,7 +169,7 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     // ── THE WAR-PROOF (custody): the stolen device CANNOT counter-revoke. The enrolled second
     //    device's circle key is delegation-derived, NOT the ceremony key; it forges an
     //    address-revoke against the owner's real address and fans it to B; B's strict binding
-    //    refuses it: only the row's ceremonyAddress (the phrase-derived join-time key) may
+    //    refuses it: only a statement carrying the owner root's reveal, bound to the row's ceremony commitment, may
     //    author a revocation. ──
     const aRowB = await rowFor(B, A.pubKey);
     const survivor = aRowB.circleAddress;

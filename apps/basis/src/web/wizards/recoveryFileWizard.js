@@ -1,7 +1,7 @@
 /**
  * **Platform: web** (DOM-dependent). RN parallel: src/rn/wizards/recoveryFileWizardModal.js.
  *
- * The two recovery-file doors (plan A2): export (one step — the file is sealed to the owner's key, so
+ * The two recovery-file doors: export (one step — the file is sealed to the owner's key, so
  * there is no passphrase to type) and import (choose a file → the circles come back). State in
  * src/core/wizards/recoveryFileState.js, shared with mobile.
  */

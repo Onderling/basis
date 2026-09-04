@@ -4426,7 +4426,7 @@ async function showMyData() {
   // the recovery phrase via the stoop `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
-  // The recovery file (plan A2): the circle list, sealed to the phrase — save it, or load it after a restore.
+  // The recovery file: the circle list, sealed to the phrase — save it, or load it after a restore.
   const onExportRecovery = () => mountMyDataWizard(renderRecoveryExportWizard);
   const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => showMyData() });
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
@@ -4434,7 +4434,7 @@ async function showMyData() {
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
   // so the tombstone shows.
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
-  // The replace ceremony (plan B1): retire every other device in one act, after a restore.
+  // The replace ceremony: retire every other device in one act, after a restore.
   const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
@@ -5214,7 +5214,7 @@ function showEnrollDeviceFlow() {
 function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
   return showDeviceCeremonyFlow({ flowId: 'revoke-device', keyPrefix: 'revoke', deviceId, onClosed });
 }
-/** The replace ceremony (plan B1): after a restore, retire every other device in one act. */
+/** The replace ceremony: after a restore, retire every other device in one act. */
 function showReplaceDeviceFlow({ onClosed } = {}) {
   return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
 }
@@ -8128,7 +8128,7 @@ async function boot() {
           });
         } catch { return null; }
       },
-      // The owner's REGISTRY survives the device (plan A1): a persistent local backend, and when signed in
+      // The owner's REGISTRY survives the device: a persistent local backend, and when signed in
       // a sealed mirror on the user's own pod under an opaque name. Same shape as the settings medium.
       registryBackend: pickWebBackend('cc-agent-registry'),
       provisionRegistryMedium: async (strategy) => {

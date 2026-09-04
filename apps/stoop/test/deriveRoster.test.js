@@ -154,24 +154,17 @@ describe('deriveRoster', () => {
       expect(b.circleAddresses, 'both proven addresses, primary first').toEqual([addrOf(1), addrOf(2)]);
     });
 
-    it('the CEREMONY ADDRESS pins to the join-time key — un-patched and patched rows alike', () => {
-      // un-patched: the primary IS join-time
-      const fresh = deriveRoster({
+    it('the CEREMONY COMMITMENT rides the row (who may retire this member: their owner root)', () => {
+      const commitment = 'c0ffee'.padEnd(64, '0');
+      const roster = deriveRoster({
+        redemptions: [redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1), ceremonyCommitment: commitment })],
+      });
+      expect(roster.find((m) => m.webid === 'B').ceremonyCommitment).toBe(commitment);
+      // absent on the trail → absent on the row (a row without one cannot be revoked by statement — deny)
+      const bare = deriveRoster({
         redemptions: [redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) })],
       });
-      expect(fresh.find((m) => m.webid === 'B').ceremonyAddress).toBe(addrOf(1));
-      // patched (the announce demoted the join address): the captured field wins over the new primary
-      const patched = deriveRoster({
-        redemptions: [redemption({
-          redeemedBy: 'B',
-          circleAddress: addrOf(2), circleAddressProof: proofOf(2),
-          ceremonyAddress: addrOf(1),
-          circleAddresses: [{ address: addrOf(1), proof: proofOf(1) }],
-        })],
-      });
-      const b = patched.find((m) => m.webid === 'B');
-      expect(b.circleAddress).toBe(addrOf(2));
-      expect(b.ceremonyAddress).toBe(addrOf(1));
+      expect(bare.find((m) => m.webid === 'B').ceremonyCommitment).toBeUndefined();
     });
 
     it('the patched row shape — primary + plural extras — folds to the full set', () => {

@@ -146,11 +146,6 @@ export function deriveRoster({
         // MemberMap's display fields still win where present — `upsert` never overwrites a set field.
         handle:            typeof src.peerDisplay === 'string' && src.peerDisplay ? src.peerDisplay : undefined,
         circleAddress,
-        // THE CEREMONY ADDRESS (custody D1): the join-time address, pinned immutably — the key
-        // class ceremony statements (address-revoke) must be signed with. An un-patched row's
-        // primary IS join-time; a patched row carries the captured field (`recordCircleAddress`).
-        // First-non-null-wins in the upsert keeps it stable across trail rows.
-        ceremonyAddress: src.ceremonyAddress ?? circleAddress,
         // THE CEREMONY COMMITMENT (core ceremonyCommitment.js): who may retire this member's addresses — their
         // owner root, at a ceremony. Declared in the member's announcement, circle-key-signed, pinned first-write.
         ceremonyCommitment: typeof src.ceremonyCommitment === 'string' && src.ceremonyCommitment ? src.ceremonyCommitment : undefined,
@@ -184,8 +179,6 @@ export function deriveRoster({
         // the per-user address fallback is off. Absent on a pre-2026-07-30 trail: the row is unchanged.
         circleAddress:      confirmedByCircleAddress,
         circleAddressProof: confirmedByCircleAddressProof,
-        // Same ceremony-address pin for the admin-as-seen-by-the-joiner shape (custody D1).
-        ceremonyAddress: src.confirmedByCeremonyAddress ?? confirmedByCircleAddress,
         ceremonyCommitment: typeof src.confirmedByCeremonyCommitment === 'string' && src.confirmedByCeremonyCommitment ? src.confirmedByCeremonyCommitment : undefined,
         // …and the admin's SIGNING key, which is `confirmedBy` itself: a basis circle binds
         // webid === the member's chat signing address (the same identity the redeem response was

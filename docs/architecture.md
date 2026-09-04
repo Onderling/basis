@@ -884,6 +884,45 @@ each one being separately revocable. And a device's addresses **change** when it
 at enrollment, which is why that ceremony ends with a per-circle re-announce that lands the new addresses
 in every roster's set.
 
+**One person, one name — many devices.** The thing that changes per device is the per-circle address;
+the **chat identity is derived from the profile on every device**, so it is the same on all of them. That
+single fact is what makes every other device operation possible: a member's roster row is keyed by that
+stable identity, so a second device — or a replacement one — is recognised as *the same member* and its
+new address joins that member's set, rather than arriving as a stranger who must be admitted again.
+Someone who wants to be two people is two profiles with two identities, deliberately; a person does not
+get to look like several by owning several devices, and the app will not manufacture that appearance.
+
+**Adding, replacing and revoking a device — one family of operations.** They share a shape: the recovery
+phrase is the authority, it is typed on the device that is *gaining* it, and it never travels.
+
+- **Add a device.** The phrase is entered on the new device, which mints its own delegation and derives
+  its own per-circle keys. It then needs one thing the phrase cannot give it: *which circles you are in*.
+  An existing device supplies that as an **enrollment offer** — a QR carrying a relay hint and, per
+  circle, the id, the handle you use there, and one existing device's per-circle address to announce to
+  and catch up from. The offer is public by design: it names facts every member of those circles already
+  holds, and holding it grants nothing, because enrolling still takes the phrase. The new device then
+  announces itself into each roster's address set, and both devices work.
+- **Revoke a device.** Run on a device you still hold, with the phrase as the second proof. It tombstones
+  the device's delegation and, per circle, retires that device's address: senders stop accepting its
+  statements, delivery stops trying it, and sealed circles rotate their key to the surviving devices. The
+  revocation is signed with the profile-derived per-circle key precisely so a stolen device cannot mint
+  one — it can neither revoke you nor counter-revoke.
+- **Replace a device.** Restoring onto a new phone can mean two different things, and the difference is
+  not cosmetic. *Adding* gives the replacement its own keys, which is what lets you revoke the old one —
+  the right answer whenever the old device could be in someone else's hands. *Cloning* — restoring
+  without enrolling — re-derives the profile's own per-circle keys, so the replacement simply **is** that
+  device again: nothing to announce, nobody to ask, works offline. The cost is precisely the thing you
+  gave up: two devices holding one set of keys cannot be told apart, so neither can be revoked without
+  revoking the other. A phone destroyed in your own hands is the clone case; a phone that walked away is
+  not.
+
+**What a phrase alone cannot bring back.** It rebuilds every key, and therefore every identity — but not
+the *list* of circles those keys belong to. That list lives in the owner's registry, which is a
+device-local store unless it is mirrored to a pod, so a person whose only device is gone comes back as
+provably themselves with nothing to re-open. The honest paths out are a registry that survives the device
+(mirrored to the owner's pod, sealed to them) or an offer from another device they still hold; a
+recovery screen that promises more than that is promising the wrong thing.
+
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,
 device-only — never a cloud keychain backup, because the phrase re-derives it anywhere and a synced copy

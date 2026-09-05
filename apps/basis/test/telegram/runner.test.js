@@ -12,7 +12,7 @@ import { createTelegramRunner } from '../../src/telegram/runner.js';
 
 const t = (k, p) => (p && typeof p === 'object' && Object.keys(p).length ? `${k}:${JSON.stringify(p)}` : k);
 
-async function boot({ allowedChatIds = ['42'], gate = null, interpret = null } = {}) {
+async function boot({ allowedChatIds = ['42'], gate = null, interpret = null, walkLog = null } = {}) {
   const bridge = new InMemoryBridge({ id: 'telegram' });
   const agent = createMockHouseholdAgent();
   const calls = [];
@@ -21,7 +21,7 @@ async function boot({ allowedChatIds = ['42'], gate = null, interpret = null } =
   const runner = createTelegramRunner({
     bridge, callSkill, catalogue,
     manifestsByOrigin: { household: mockHouseholdManifest },
-    allowedChatIds, t, gate, interpret, llm: interpret ? { invoke: async () => null } : null,
+    allowedChatIds, t, gate, interpret, llm: interpret ? { invoke: async () => null } : null, walkLog,
   });
   await runner.start();
   const say = async (text, chatId = '42') => {
@@ -104,6 +104,21 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     const { say, calls } = await boot({ interpret, gate: { evaluate: async () => ({ via: 'llm' }) } });
     await say('could you list what is open?');
     expect(calls.at(-1)).toMatchObject({ app: 'household', op: 'listOpen' });
+  });
+
+  it('the walk log gets one record per turn: what came in, the path, the dispatch, the replies, the time', async () => {
+    const log = [];
+    const gate = { evaluate: async (text) => (/^show my list$/i.test(text) ? { via: 'rule', command: { opId: 'listOpen', args: {}, appOrigin: 'household' } } : { via: 'llm' }) };
+    const { say } = await boot({ gate, walkLog: (e) => log.push(e) });
+    await say('/mine');
+    await say('show my list');
+    await say('what is the weather');
+    expect(log).toHaveLength(3);
+    expect(log[0]).toMatchObject({ chat: '42', text: '/mine', via: 'slash', route: 'ready', opId: 'listOpen' });
+    expect(log[0].replies?.length).toBeGreaterThan(0);
+    expect(typeof log[0].ms).toBe('number');
+    expect(log[1]).toMatchObject({ via: 'gate', opId: 'listOpen' });
+    expect(log[2]).toMatchObject({ via: 'llm-unavailable' });
   });
 
   it('a new command cancels a pending ask instead of being swallowed as its answer', async () => {

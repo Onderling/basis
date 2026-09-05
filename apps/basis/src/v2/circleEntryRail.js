@@ -49,6 +49,13 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     .query({})
     .filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body)
     .map((e) => e.payload);
+  /** The same, with each statement's POSITION on this device's log (`seq`, stamped at append/ingest, never by
+   *  a writer). A re-read hands it to the binding: a statement that landed here BEFORE a retirement landed
+   *  keeps binding to the address it was signed with — revocation cuts the future, not the past. */
+  const storedEntries = (circleId) => eventLog
+    .query({})
+    .filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body)
+    .map((e) => ({ statement: e.payload, atSeq: Number.isFinite(e.seq) ? e.seq : null }));
 
   const entryId = (stmt) => `${entryKind}:${stmt.body.hash}`;
 
@@ -148,14 +155,14 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   }
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */
-  async function bindingOk(author, ref, circleId, kind = null, payload = null, subject = null) {
+  async function bindingOk(author, ref, circleId, kind = null, payload = null, subject = null, atSeq = null) {
     try {
       const mine = await signerFor(circleId);
       const myId = mine?.identity ?? mine;
       if (myId?.pubKey === author) return (mine?.ref ?? myId.pubKey) === ref;
     } catch { /* fall through to the foreign resolver */ }
     if (typeof verifyBinding === 'function') {
-      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject })); } catch { return false; }
+      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload, subject, atSeq })); } catch { return false; }
     }
     return false;   // no resolver → only self-signed statements fold (honest single-device degrade)
   }
@@ -172,7 +179,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const events = [];
     const seenByAuthorParent = new Map();   // `${author}|${parent}` → Set(hash) — fork detection
     const disputedRefs = new Set();
-    for (const stmt of storedStatements(circleId)) {
+    for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
       const b = v.body;
@@ -181,7 +188,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (typeof ref !== 'string' || !ref) continue;
       const actor = b.payload.voter ?? b.payload.by ?? null;
       if (actor !== null && actor !== ref) continue;              // acting-as-someone-else → drop
-      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject))) continue;  // unverifiable binding → drop
+      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject, atSeq))) continue;  // unverifiable binding → drop
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);
@@ -190,7 +197,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       const { authorRef, ...payload } = b.payload;
       // `hash` + `parentHash` ride into the projection so a fold can order one AUTHOR's statements by
       // their own chain (a revote supersedes by ancestry, never by a writer-stamped wall clock).
-      events.push({ ...payload, kind: entryKind, event: b.kind, proposalId: b.subject, hash: b.hash, parentHash: b.parentHash ?? null });
+      events.push({ ...payload, kind: entryKind, event: b.kind, proposalId: b.subject, hash: b.hash, parentHash: b.parentHash ?? null, atSeq });
     }
     return { events, disputed: disputedRefs };
   }
@@ -205,7 +212,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const bodies = [];
     const seenByAuthorParent = new Map();
     const disputed = new Set();
-    for (const stmt of storedStatements(circleId)) {
+    for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
       const b = v.body;
@@ -214,14 +221,19 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (typeof ref !== 'string' || !ref) continue;
       // The read side verifies with the SAME kind-aware rule as ingest (decided 2026-08-20): what
       // the fold consumes must pass the gate the wire passed — a statement whose kind demands a
-      // stricter signer (membership's ceremony rule) is held to it on every re-read too.
-      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject))) continue;
+      // stricter signer (membership's ceremony rule) is held to it on every re-read too. The one
+      // thing a re-read knows that ingest did not: WHEN this statement landed here (`atSeq`), so an
+      // address retired since then still binds for what it signed before the retirement landed.
+      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload, b.subject, atSeq))) continue;
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);
       seenByAuthorParent.set(forkKey, set);
       if (set.size > 1) disputed.add(ref);
-      bodies.push({ ...b, author: ref });
+      // `authorKey` keeps the SIGNING key beside the resolved ref: a member's devices each chain from their
+      // own key, so a fold that detects forks must key them by the key, not by the member (two devices of
+      // one person are two chains, not one author equivocating).
+      bodies.push({ ...b, author: ref, authorKey: b.author, atSeq });
     }
     return { bodies, disputed };
   }

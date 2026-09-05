@@ -23,6 +23,7 @@
  * members keep sealing under it and the contested version is never adopted. Deny-wins, softly.
  */
 import { makeCircleEntryRail } from './circleEntryRail.js';
+import { addressBindsOnRow } from './membershipRail.js';
 import { KEY_LANE } from './keyManifest.js';
 
 export const KEY_RAIL_KINDS = ['key-establish', 'key-rotate'];
@@ -45,7 +46,7 @@ export const KEY_CATCHUP_SUBTYPES = Object.freeze({
  *   the circle's `rotateKey` decision-class; absent → the ratified default `any-admin`.
  */
 export function keyBindingVerifier(callSkill, { rotateClassFor = null } = {}) {
-  return async ({ author, ref, circleId, kind, payload }) => {
+  return async ({ author, ref, circleId, kind, payload, atSeq = null }) => {
     try {
       // THE FULL READ — spine folded. This asked for the roster `spineless: true` (trail + display
       // only), and that is the right rule for exactly one verifier: the MEMBERSHIP lane's own, where
@@ -63,9 +64,9 @@ export function keyBindingVerifier(callSkill, { rotateClassFor = null } = {}) {
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;
-      const keyBinds = row.circleAddress === author
-        || (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author));
-      if (!keyBinds) return false;
+      // A retired admin device's earlier key events stay verifiable (the chain the circle was sealed with
+      // must not vanish when the device that established it is revoked) — `addressBindsOnRow`.
+      if (!addressBindsOnRow(row, author, atSeq)) return false;
       // The authority rule — receiver-enforced, so a sender cannot pick a weaker one.
       if (kind === 'key-establish') {
         if (payload?.event?.version !== 1) return false;   // an establish IS version 1, by definition
@@ -150,14 +151,19 @@ export async function keyEventsFromRail(rail, circleId) {
   // parent's CHILDREN onward is contested; the parent itself and its ancestry are the agreed prefix.
   const forkParentsByAuthor = new Map();   // author → Set(shared parentHash)
   const seen = new Map();                  // `${author}|${parent}` → count
+  // Fork detection is per SIGNING KEY (`authorKey`), not per member: a member's devices each chain from
+  // their own key, and two chains starting from nothing are two devices, not one author forking. Keying by
+  // the member made every second device's establish look like a fork of the first's and discounted BOTH —
+  // hidden until a retired device's chain stopped being dropped (2026-09-05).
+  const keyOf = (b) => b.authorKey ?? b.author;
   for (const b of laneBodies) {
-    const k = `${b.author}|${b.parentHash ?? ''}`;
+    const k = `${keyOf(b)}|${b.parentHash ?? ''}`;
     const n = (seen.get(k) ?? 0) + 1;
     seen.set(k, n);
     if (n > 1) {
-      const set = forkParentsByAuthor.get(b.author) ?? new Set();
+      const set = forkParentsByAuthor.get(keyOf(b)) ?? new Set();
       set.add(b.parentHash ?? '');
-      forkParentsByAuthor.set(b.author, set);
+      forkParentsByAuthor.set(keyOf(b), set);
     }
   }
   // Walk each disputed author's own chain from its root; KEEP only what the walk reaches clean
@@ -168,7 +174,7 @@ export async function keyEventsFromRail(rail, circleId) {
   for (const [author, forkParents] of forkParentsByAuthor) {
     const byParent = new Map();            // parentHash → [bodies] (this author only)
     for (const b of laneBodies) {
-      if (b.author !== author) continue;
+      if (keyOf(b) !== author) continue;
       const p = b.parentHash ?? '';
       byParent.set(p, [...(byParent.get(p) ?? []), b]);
     }
@@ -187,7 +193,7 @@ export async function keyEventsFromRail(rail, circleId) {
   // re-issue (fewer recipients) clobber the newer one on every catch-up (found 2026-09-04: an enrolled
   // device was granted, received the grant, and still held the pre-grant version). Each author's
   // statements chain by parent hash; their depth in that chain is the order the author meant.
-  const kept = laneBodies.filter((b) => !forkParentsByAuthor.has(b.author) || keptOfDisputed.has(b.hash));
+  const kept = laneBodies.filter((b) => !forkParentsByAuthor.has(keyOf(b)) || keptOfDisputed.has(b.hash));
   const byHash = new Map(kept.map((b) => [b.hash, b]));
   const depth = new Map();
   const depthOf = (b) => {

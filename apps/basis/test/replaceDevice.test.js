@@ -17,7 +17,7 @@ import {
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
-import { makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../src/v2/keyRail.js';
+import { makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore, keyEventsFromRail } from '../src/v2/keyRail.js';
 import { EventLog } from '../src/eventLog.js';
 import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
 
@@ -141,6 +141,16 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     await until(() => B.sealedContent.length >= 2 && A.sealedContent.length >= 1);
     expect(readSealed(B, afterEnv, GROUP), 'Bram reads what comes next').toBe(after);
     expect(() => readSealed(A, afterEnv, GROUP), 'the old phone cannot').toThrow();
+
+    // The retired address keeps its PAST: the key chain the old phone established (v1) is still
+    // folded on both devices after its address was retired, because those statements landed on each log
+    // before the revocation did. Without this the circle's own chain vanished with the device.
+    for (const node of [A2, B]) {
+      const versions = (await keyEventsFromRail(node.agent.keyRail, GROUP)).map((e) => e.version);
+      expect(versions, `${node.label}: v1 by the retired device still folds`).toContain(1);
+    }
+    const bRowNow = await rowFor(B, A.pubKey);
+    expect(bRowNow.retiredAddresses?.map((r) => r.address), 'the roster row remembers the retired address').toContain(addrA);
 
     // The wrong phrase is refused; running it again is harmless.
     const wrong = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' });

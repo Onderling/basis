@@ -13,14 +13,14 @@
 // an otherwise-divergent `chat`/`common`/`reply`) are deliberately NOT here — sharing them would need a
 // nested merge or a key-path change, neither of which this shallow top-level-replacement mechanism does.
 
-import circleEn from './circle.en.json';
-import circleNl from './circle.nl.json';
-import consequenceEn from './consequence.en.json';
-import consequenceNl from './consequence.nl.json';
-import roleEn from './role.en.json';
-import roleNl from './role.nl.json';
-import hostEn from './host.en.json';
-import hostNl from './host.nl.json';
+import circleEn from './circle.en.json' with { type: 'json' };
+import circleNl from './circle.nl.json' with { type: 'json' };
+import consequenceEn from './consequence.en.json' with { type: 'json' };
+import consequenceNl from './consequence.nl.json' with { type: 'json' };
+import roleEn from './role.en.json' with { type: 'json' };
+import roleNl from './role.nl.json' with { type: 'json' };
+import hostEn from './host.en.json' with { type: 'json' };
+import hostNl from './host.nl.json' with { type: 'json' };
 
 /** The canonical `circle` block per language (union of the former web + mobile copies; 0 value conflicts). */
 export const sharedCircleLocale = { en: circleEn, nl: circleNl };

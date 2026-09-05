@@ -6077,5 +6077,39 @@
       "text": "Show less",
       "doc": "Long bubble — collapse back to the preview."
     }
+  },
+  "telegram": {
+    "not_paired": {
+      "text": "This chat isn't paired with the assistant yet. Your chat id is {{chatId}} — add it to the allowed chats on the machine that runs the assistant.",
+      "doc": "Telegram runner: a chat that is not on the allow-list. Names the chat id so the owner can allow it."
+    },
+    "unknown": {
+      "text": "I only understand commands here. Type /help to see what you can ask.",
+      "doc": "Telegram runner: free text with no LLM route wired — only slash commands work."
+    },
+    "needs_form": {
+      "text": "I need a bit more: {{fields}}. Reply with it and I'll carry on.",
+      "doc": "Telegram runner: a command is missing a required field; {{fields}} lists the field names."
+    },
+    "confirm": {
+      "text": "{{message}} Tap to confirm.",
+      "doc": "Telegram runner: a command that asks to confirm before it runs; {{message}} is the op's own warning."
+    },
+    "confirm_yes": {
+      "text": "Yes, do it",
+      "doc": "Telegram runner: the confirm button."
+    },
+    "confirm_no": {
+      "text": "No, leave it",
+      "doc": "Telegram runner: the cancel button."
+    },
+    "error": {
+      "text": "That didn't work: {{message}}",
+      "doc": "Telegram runner: a dispatch failed; {{message}} is the error text."
+    },
+    "empty_list": {
+      "text": "Nothing here yet.",
+      "doc": "Telegram runner: a list reply with no items."
+    }
   }
 }

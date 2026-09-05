@@ -1,5 +1,5 @@
-// Anonymous bug-report SINK — the injected `sendReport` for the feedback surface's "Report a problem"
-// panel (feedbackSurface.js `emitReportSend`). It DELIVERS the already-anonymous envelope
+// Anonymous bug-report SINK — the injected `sendReport` for a "Report a problem" door. (The panel that
+// used it rode the feedback surface, cut from basis 2026-09-05; the door returns as a basis affordance.) It DELIVERS the already-anonymous envelope
 // (buildReportEnvelope — see bugReport.js) over the host's existing relay/peer transport to a
 // config-driven dev "bug-report bot" address. Shared, pure glue: web ≡ mobile — each shell injects
 // `send` (its `agent.sendPeerMessage`) + the `target` address at boot; nothing platform-specific lives here.
@@ -17,7 +17,7 @@
 // not built here.
 
 /**
- * Build the injected `sendReport(envelope)` sink for `createFeedbackSurface`.
+ * Build the injected `sendReport(envelope)` sink for a report door.
  * @param {object} a
  * @param {(target:string, msg:object)=>Promise<any>} [a.send]  the host's fire-and-forget peer/relay send
  *                                                              (e.g. `agent.sendPeerMessage`)

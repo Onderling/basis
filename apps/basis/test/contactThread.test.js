@@ -51,22 +51,6 @@ describe('renderContactThread', () => {
     expect(onButtonTap).toHaveBeenCalledWith({ id: 'yes', label: 'Ja' }, msg);
   });
 
-  it('renders a Stage-1 review as per-point cards (curated + original chip) + routes card buttons', () => {
-    const onButtonTap = vi.fn();
-    const msg = { origin: 'bot', kind: 'review', intro: 'Dit zijn je punten\n\n1. cleaned', points: [{ id: 'p1', text: 'cleaned', raw: 'RAW orig' }] };
-    const el = renderContactThread(document.createElement('div'), { name: 'Bot', t, messages: [msg], onButtonTap });
-    expect(el.querySelector('.cc-cthread__card-text').textContent).toContain('cleaned');
-    expect(el.querySelector('.cc-cthread__card-orig-text').textContent).toContain('RAW orig');
-    expect(el.querySelector('.cc-cthread__review-intro').textContent).toBe('Dit zijn je punten');   // only the intro line
-    // clicking the curated text fires fp:edit (host pre-fills the composer)
-    el.querySelector('.cc-cthread__card-text').click();
-    expect(onButtonTap).toHaveBeenCalledWith({ id: 'fp:edit:p1' }, msg);
-    // per-card send + footer
-    const labels = [...el.querySelectorAll('.cc-cthread__card-btn')].map((b) => b.textContent);
-    expect(labels).toContain('circle.feedback.send_one');
-    expect(labels).toContain('circle.feedback.send_all');
-  });
-
   it('renders the language picker (langValue + onLangChange) + routes a tap', () => {
     const onLangChange = vi.fn();
     const el = renderContactThread(document.createElement('div'), { name: 'Bot', t, langValue: 'nl', onLangChange });

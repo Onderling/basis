@@ -237,14 +237,11 @@ link: `apps/basis/node_modules/@onderling/attribute-charter -> ../../../../packa
 **Tell:** `Cannot find module '@onderling/attribute-charter'` from a basis test/build → the symlink is missing
 (a fresh `pnpm install` after the lockfile picks it up also fixes it). Same pattern as the feedback-pipeline edge.
 
-- **Cross-repo `link:` dep `onderling-feedback` (post-split, 2026-07-16).** basis + basis-mobile consume
-  the SPLIT feedback repo via `"onderling-feedback": "link:../../../feedback"` (a sibling checkout at
-  `~/expotest/feedback`) — imports are `'onderling-feedback/public'` / `'onderling-feedback/testing'`. The
-  `node_modules/onderling-feedback` symlinks were **hand-materialized**; a fresh `pnpm install` should recreate them
-  from the dep entries, but if resolution breaks: `ln -sfn ../../../../feedback apps/<app>/node_modules/onderling-feedback`.
-  Metro watches `../feedback` (metro.config.js) so mobile hot-reload crosses the repo boundary. The e2e-journeys
-  import it by relative path (`../../../../feedback/...`) with a soft-skip when absent. Replaced by versioned deps
-  at the SDK publish swap.
+- **The `onderling-feedback` link dep is GONE (2026-09-05).** basis and basis-mobile no longer import the
+  sibling feedback repo: feedback is an external bot that reaches basis as a contact. The `link:` entries, the
+  Metro resolvers for `onderling-feedback/{public,testing}`, the `eld` watch folder/resolver and the Vite
+  external hack were all removed with it. If a build asks for `onderling-feedback` or `eld`, something re-imported
+  the bot's code into a shell — that is the drift, not a missing symlink.
 - **Mobile bundle 500s on the feedback chain — TWO missing Metro resolvers (fixed 2026-07-25).** Surfaced when
   actually bundling for a device. (1) `onderling-feedback/public` had NO hand-resolver (Metro exports-off), so the
   bundle failed immediately — added `resolveRequest` cases mapping `onderling-feedback/{public,testing}` to the
@@ -627,21 +624,9 @@ Error: std::system_error: open: <repo>/node_modules/eld: No such file or directo
 With watchman off `PATH` the same failure appears as a plain Node ENOENT carrying `path:` / `filename:` —
 which is the honest form of it.
 
-**Cause.** `apps/basis-mobile/package.json` has `"onderling-feedback": "link:../../../feedback"` (the
-split-out repo, and `metro.config.js` maps `onderling-feedback/public` + `/testing` deliberately). That repo
-declares `eld` among its OWN dependencies. Under this repo's flat/hoisted layout Metro resolves a linked
-package's deps at the **monorepo root**, where `eld` was never installed — the only copy is
-`~/expotest/feedback/node_modules/eld`.
-
-**Fix** — the single-package symlink this repo already prescribes; do NOT reinstall anything:
-
-```sh
-ln -s ../../feedback/node_modules/eld node_modules/eld
-```
-
-Then `expo start` serves. The other eight feedback deps look "missing at the root" too but resolve per-app
-(`@onderling/*` are workspace links, `zod` etc. come from the app's own tree) — only a plain npm dep that
-nothing else in the monorepo depends on falls through to the root lookup. Don't pre-emptively symlink them.
+**Cause (historical, until 2026-09-05).** basis-mobile linked the sibling feedback repo, whose own `eld` dependency
+Metro resolved at the monorepo root where it was never installed. The link is gone (feedback is an external
+bot); if `eld` is asked for again, a shell re-imported the bot's code — remove the import rather than symlinking.
 
 **Two traps inside the trap:**
 

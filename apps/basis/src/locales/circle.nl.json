@@ -3,72 +3,6 @@
     "text": "Jouw kringen",
     "doc": "Heading of the circle launcher (board 1B)."
   },
-  "feedback": {
-    "nudge_title": {
-      "text": "Feedback",
-      "doc": "Verify-summary push nudge — local notification title."
-    },
-    "nudge_body": {
-      "text": "Je hebt een samenvatting om te verifiëren.",
-      "doc": "Verify-summary push nudge — local notification body."
-    },
-    "login_first": {
-      "text": "Log eerst in op je pod om mee te doen.",
-      "doc": "Feedback activation — shown when /feedback <code> runs without a pod session."
-    },
-    "activation_failed": {
-      "text": "Activatie mislukt: {{error}}",
-      "doc": "Feedback activation — shown when buildFeedbackVerifyPods throws."
-    },
-    "edit_hint": {
-      "text": "Pas de tekst aan en verstuur",
-      "doc": "Stage-1 inline edit — composer placeholder while reworking a curated point (✏)."
-    },
-    "original": {
-      "text": "origineel",
-      "doc": "Stage-1 review card — label before the raw original."
-    },
-    "edited": {
-      "text": "(aangepast)",
-      "doc": "Stage-1 review card — tag on a point the user edited."
-    },
-    "send_one": {
-      "text": "Verstuur",
-      "doc": "Stage-1 review card — send this one point."
-    },
-    "send_all": {
-      "text": "Alles versturen",
-      "doc": "Stage-1 review — send all points."
-    },
-    "send_none": {
-      "text": "Niets versturen",
-      "doc": "Stage-1 review — send nothing."
-    },
-    "show_more": {
-      "text": "Meer tonen",
-      "doc": "Long bubble (e.g. verify-summary) — expand the preview to the full text."
-    },
-    "show_less": {
-      "text": "Minder tonen",
-      "doc": "Long bubble — collapse back to the preview."
-    },
-    "lang_name": {
-      "text": "Nederlands",
-      "doc": "The endonym of THIS locale's language — read in a target language to label its switch button (never translate; it's the language's own name)."
-    },
-    "switch_prompt": {
-      "text": "Verder in het Nederlands? Tik hieronder.",
-      "doc": "Circle feedback language-switch offer, shown IN this locale's language (read in the target language) so a speaker of it recognises the invite."
-    },
-    "save_edit": {
-      "text": "Opslaan",
-      "doc": "Stage-1 review card — save an inline edit."
-    },
-    "cancel_edit": {
-      "text": "Annuleer",
-      "doc": "Stage-1 review card — cancel an inline edit."
-    }
-  },
   "tab": {
     "screens": {
       "text": "Schermen",
@@ -6128,6 +6062,16 @@
     "done": {
       "text": "Klaar",
       "doc": "Row action on a list item: tick it off."
+    }
+  },
+  "bubble": {
+    "show_more": {
+      "text": "Meer tonen",
+      "doc": "Long bubble (e.g. verify-summary) — expand the preview to the full text."
+    },
+    "show_less": {
+      "text": "Minder tonen",
+      "doc": "Long bubble — collapse back to the preview."
     }
   }
 }

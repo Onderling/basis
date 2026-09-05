@@ -3,72 +3,6 @@
     "text": "Your circles",
     "doc": "Heading of the circle launcher (board 1B)."
   },
-  "feedback": {
-    "nudge_title": {
-      "text": "Feedback",
-      "doc": "Verify-summary push nudge — local notification title."
-    },
-    "nudge_body": {
-      "text": "You have a summary to verify.",
-      "doc": "Verify-summary push nudge — local notification body."
-    },
-    "login_first": {
-      "text": "Log in to your pod first to take part.",
-      "doc": "Feedback activation — shown when /feedback <code> runs without a pod session."
-    },
-    "activation_failed": {
-      "text": "Activation failed: {{error}}",
-      "doc": "Feedback activation — shown when buildFeedbackVerifyPods throws."
-    },
-    "edit_hint": {
-      "text": "Adjust the text and send",
-      "doc": "Stage-1 inline edit — composer placeholder while reworking a curated point (✏)."
-    },
-    "original": {
-      "text": "original",
-      "doc": "Stage-1 review card — label before the raw original."
-    },
-    "edited": {
-      "text": "(edited)",
-      "doc": "Stage-1 review card — tag on a point the user edited."
-    },
-    "send_one": {
-      "text": "Send",
-      "doc": "Stage-1 review card — send this one point."
-    },
-    "send_all": {
-      "text": "Send all",
-      "doc": "Stage-1 review — send all points."
-    },
-    "send_none": {
-      "text": "Send nothing",
-      "doc": "Stage-1 review — send nothing."
-    },
-    "show_more": {
-      "text": "Show more",
-      "doc": "Long bubble (e.g. verify-summary) — expand the preview to the full text."
-    },
-    "show_less": {
-      "text": "Show less",
-      "doc": "Long bubble — collapse back to the preview."
-    },
-    "lang_name": {
-      "text": "English",
-      "doc": "The endonym of THIS locale's language — read in a target language to label its switch button (never translate; it's the language's own name)."
-    },
-    "switch_prompt": {
-      "text": "Continue in English? Tap below.",
-      "doc": "Circle feedback language-switch offer, shown IN this locale's language (read in the target language) so a speaker of it recognises the invite."
-    },
-    "save_edit": {
-      "text": "Save",
-      "doc": "Stage-1 review card — save an inline edit."
-    },
-    "cancel_edit": {
-      "text": "Cancel",
-      "doc": "Stage-1 review card — cancel an inline edit."
-    }
-  },
   "tab": {
     "screens": {
       "text": "Screens",
@@ -6128,6 +6062,16 @@
     "done": {
       "text": "Done",
       "doc": "Row action on a list item: tick it off."
+    }
+  },
+  "bubble": {
+    "show_more": {
+      "text": "Show more",
+      "doc": "Long bubble (e.g. verify-summary) — expand the preview to the full text."
+    },
+    "show_less": {
+      "text": "Show less",
+      "doc": "Long bubble — collapse back to the preview."
     }
   }
 }

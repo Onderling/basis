@@ -23,8 +23,7 @@
  *   1. every DECLARED `@onderling*` dep (dependencies + devDependencies + peerDependencies) → symlink;
  *   2. every IMPORTED-but-undeclared `@onderling*` package found in `src/` + `test/` → symlink. Several
  *      packages import siblings they never declared; a hoisted tree hid that, symlinks expose it;
- *   3. `onderling-feedback` → the split-out repo beside this one, when a package declares it;
- *   4. for any package whose `node_modules/` this created, its declared THIRD-PARTY deps → the repo-root
+ *   3. for any package whose `node_modules/` this created, its declared THIRD-PARTY deps → the repo-root
  *      store. Creating the directory interrupts Node's walk-up, so packages that resolved fine from the
  *      root suddenly cannot (this is how `ws` disappears for `@onderling/relay`).
  *
@@ -107,7 +106,6 @@ function importedNames(home) {
 }
 
 const ws = workspaces();
-const feedback = resolve(ROOT, '..', 'feedback');
 
 for (const [, home] of ws) {
   const pkg = readJson(join(home, 'package.json'));
@@ -120,12 +118,10 @@ for (const [, home] of ws) {
     if (target && target !== home) link(home, name, target);
   }
 
-  if (declared['onderling-feedback'] && existsSync(feedback)) link(home, 'onderling-feedback', feedback);
-
   // Only when WE created the directory: restore the root-store resolution its existence now shadows.
   if (!hadNodeModules && existsSync(join(home, 'node_modules'))) {
     for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
-      if (name.startsWith('@onderling') || name === 'onderling-feedback') continue;
+      if (name.startsWith('@onderling')) continue;
       const src = join(ROOT, 'node_modules', ...name.split('/'));
       if (existsSync(src)) link(home, name, src);
     }

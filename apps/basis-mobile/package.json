@@ -80,9 +80,6 @@
     "@onderling/pod-client": "workspace:*",
     "@onderling/pseudo-pod": "workspace:*"
   },
-  "optionalDependencies": {
-    "onderling-feedback": "link:../../../feedback"
-  },
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@react-native/babel-preset": "0.76.9",

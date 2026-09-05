@@ -281,7 +281,6 @@
     "apps/basis/test/core/wizards/createGroupState.test.js:journey-id:J-CW1",
     "apps/basis/test/core/wizards/populateAdminAddresses.test.js:plan-label:B2 — ",
     "apps/basis/test/eventLog.test.js:journey-id:J-L10",
-    "apps/basis/test/feedback/feedbackSurface.test.js:plan-label:F2 — ",
     "apps/basis/test/fitness/appendMeansAppend.test.js:journey-id:J-L8",
     "apps/basis/test/fitness/appendMeansAppend.test.js:journey-id:J-L9",
     "apps/basis/test/fitness/joinWizardDialsInviteEndpoint.test.js:journey-id:J-CP1",

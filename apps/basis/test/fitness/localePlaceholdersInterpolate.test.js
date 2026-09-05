@@ -9,7 +9,7 @@
  *
  * Ten keys carried one, in both languages — seventeen placeholders each: the governance tally
  * (`{yes} of {need} needed · {of} members`), the shared-with-me rows, the agent-activity lines, an
- * inbound calendar invite, the feedback activation error, and `circle.boot_failed`, which is the
+ * inbound calendar invite and `circle.boot_failed`, which is the
  * sentence a person reads when the app could not start at all. None of them is exotic copy; they are
  * ordinary lines that nothing checked.
  *

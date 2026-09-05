@@ -1,8 +1,8 @@
 // @vitest-environment node
 // Per-circle privacy state (property-layer §10c) — the discrete indicator model.
 import { describe, it, expect } from 'vitest';
-import { charterFromConfig, emptyConsent, setConsentValue, toggleConsent } from '../src/feedback/charterConsent.js';
-import { circlePrivacyState } from '../src/feedback/circlePrivacyState.js';
+import { charterFromConfig, emptyConsent, setConsentValue, toggleConsent } from '../src/v2/charterConsent.js';
+import { circlePrivacyState } from '../src/v2/circlePrivacyState.js';
 
 const charter = charterFromConfig('circle-42', { attributes: [
   { key: 'place', purpose: 'circles' }, { key: 'ageBand', purpose: 'age' }, { key: 'role', purpose: 'role' },

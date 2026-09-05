@@ -64,11 +64,10 @@ export const basisManifest = {
     },
 
     /*
-     * NOTE (feedback-split F2, 2026-07-08): the `/feedback` + `/feedback-stop` ops were RETIRED here.
-     * Feedback is no longer a hardwired circle-composer slash command; it attaches through the
-     * added-agent path (the `fp-bot` contact — invite/QR → `feedbackBotStore` → its own thread),
-     * per `plans/design/DESIGN-feedback-surface-contract.md` §Registration. The manifest is the
-     * source of truth for surfaces (invariant #4); an op with no live surface no longer belongs here.
+     * Feedback is an EXTERNAL bot (its own repo, github.com/Onderling/feedback). It is not a slash
+     * command and basis carries none of its code: a bot reaches basis as a contact that exposes its
+     * skills, like any other bot. The manifest is the source of truth for surfaces (invariant #4);
+     * an op with no live surface does not belong here.
      */
 
     /**

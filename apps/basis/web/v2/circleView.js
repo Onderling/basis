@@ -48,9 +48,6 @@ import { buildAttachControl } from './attachControl.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { pickRowText } from '../../src/v2/rowText.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
-// Convergence — the invite-circle feedback review renders the SAME editable per-point cards as the
-// contact-thread flow (not a flattened text bubble). Shared renderer, one look across both surfaces.
-import { renderReviewCards } from './contactThread.js';
 // Long bot bubbles (e.g. a big verify-summary) chunk to a preview + "Show more" — shared with mobile so the
 // truncation is identical across surfaces.
 import { chunkBubble } from '../../src/v2/chunkBubble.js';
@@ -68,7 +65,6 @@ export function renderCircleView(container, {
   onAction,
   onEmbedButton = null,   // S6.A — tap an inline manifest button on a bot reply
   onEmbedOpen = null,     // tap a "See also" embed chip → open the item's screen
-  onReview = null,        // convergence — tap a feedback review card button (send/edit/cancel)
   onReportMessage = null, // §8 — report a message to the circle's admins (per-bubble affordance)
   more = null,
   composerPlaceholder = null,
@@ -361,7 +357,7 @@ export function renderCircleView(container, {
       body.appendChild(renderBubble(row, {
         tr, onAction,
         deliveryStateFor, localActor, onRetryDelivery,
-        onEmbedButton, onEmbedOpen, onReview,
+        onEmbedButton, onEmbedOpen,
         media,
         viewerWebid, viewerIsAdmin,
         onReportMessage,
@@ -865,8 +861,6 @@ function renderBubble(row, {
   onEmbedButton = null,
   // tap a "See also" embed chip → open the referenced item's screen.
   onEmbedOpen = null,
-  // convergence — a Stage-1 feedback review ({intro,points,labels}) renders as editable per-point cards.
-  onReview = null,
   // media — `{opener, openFull?}` for the sealed media-card chip (inline thumbnail +
   // the optional gated full-image "[View]" affordance).
   media = null,
@@ -932,10 +926,6 @@ function renderBubble(row, {
     el.appendChild(tag);
   }
 
-  // A Stage-1 feedback review renders as editable per-point CARDS (shared renderReviewCards), NOT the
-  // flattened text — the convergence with the contact-thread flow. The event still carries `text` (the
-  // intro) as a fallback for renderers that don't know `review`.
-  const reviewData = row.event?.payload?.review;
   // A row with no text of its own falls back to a label for its TYPE — and if no such label is declared,
   // to NOTHING. `tr` returns the key when it cannot resolve one, so this used to print
   // `circle.streamAction.<type>` at the person: a raw key in a chat bubble, which invariant 8 forbids and
@@ -946,29 +936,24 @@ function renderBubble(row, {
   const fullText = pickRowText(row) ?? (typeLabel === typeKey ? '' : typeLabel) ?? '';
   const text = document.createElement('div');
   text.className = 'circle-view__bubble-text';
-  if (reviewData) {
-    try { el.appendChild(renderReviewCards(reviewData, tr, (b) => { if (typeof onReview === 'function') onReview(b, row); })); }
-    catch { text.textContent = fullText; el.appendChild(text); }   // any render failure → the intro text still stands
-  } else {
-    // Chunk long BOT bubbles (verify-summary et al.) to a preview + a "Show more" toggle; short bubbles and
-    // non-bot lines render whole. Same chunkBubble the mobile shell uses → identical truncation.
-    const isBot = row.event?.actor === 'bot';
-    const { head, rest } = isBot ? chunkBubble(fullText) : { head: fullText, rest: '' };
-    if (rest === '') { text.textContent = fullText; el.appendChild(text); }
-    else {
-      let open = false;
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'circle-view__bubble-more';
-      const paint = () => {
-        text.textContent = open ? fullText : `${head}…`;
-        toggle.textContent = tr(open ? 'circle.feedback.show_less' : 'circle.feedback.show_more', { defaultValue: open ? 'Show less' : 'Show more' });
-      };
-      toggle.addEventListener('click', () => { open = !open; paint(); });
-      paint();
-      el.appendChild(text);
-      el.appendChild(toggle);
-    }
+  // Chunk long BOT bubbles (verify-summary et al.) to a preview + a "Show more" toggle; short bubbles and
+  // non-bot lines render whole. Same chunkBubble the mobile shell uses → identical truncation.
+  const isBot = row.event?.actor === 'bot';
+  const { head, rest } = isBot ? chunkBubble(fullText) : { head: fullText, rest: '' };
+  if (rest === '') { text.textContent = fullText; el.appendChild(text); }
+  else {
+    let open = false;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'circle-view__bubble-more';
+    const paint = () => {
+      text.textContent = open ? fullText : `${head}…`;
+      toggle.textContent = tr(open ? 'circle.bubble.show_less' : 'circle.bubble.show_more', { defaultValue: open ? 'Show less' : 'Show more' });
+    };
+    toggle.addEventListener('click', () => { open = !open; paint(); });
+    paint();
+    el.appendChild(text);
+    el.appendChild(toggle);
   }
 
   // A message carrying an embed CARD (`payload.card`) renders it through the shared domAdapter

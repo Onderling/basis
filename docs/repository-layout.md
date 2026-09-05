@@ -48,7 +48,6 @@ neither is the primitive one. The direction is that the separate apps **dissolve
 | **folio** (+ `-mobile`) | Markdown notes/files mirrored to and from a Solid pod. |
 | **calendar** | Appointments/events with cross-peer invite + RSVP over the mesh. |
 | **archive**, **import-bridge-v0**, **presence-v0** | Pod-content search (FTS5); external-document import; presence attestation — *presence is heading toward a **compatibility surface** for external "Proof-of-X" attestors, not a plain app.* |
-| **feedback-pipeline** | Local-LLM message clean/anonymize + dedup-summarize pipeline. *Architecturally a **deployment / hosting layer**, not a peer client app — it hosts a live Solid pod + HTTP services + a container stack; destined for its own repo.* |
 | **mesh-demo**, **sdk-smoke** | Not products — a mesh demo and a two-device SDK smoke harness. |
 
 Every app follows the [`app-readme-scheme.md`](./conventions/app-readme-scheme.md); its own `README.md` has the

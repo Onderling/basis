@@ -75,7 +75,7 @@ export async function initLocalisation({ lng = 'en', fallbackLng = 'en' } = {}) 
  *
  * @param {string} key
  * @param {object} [params]
- * @param {'en'|'nl'} [lng]  override the active language for ONE call (the feedback thread renders its chrome
+ * @param {'en'|'nl'} [lng]  override the active language for ONE call (a bot thread may render its chrome
  *                           in the BOT's chosen language, not the app locale)
  * @returns {string}
  */

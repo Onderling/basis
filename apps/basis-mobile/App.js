@@ -363,7 +363,7 @@ export default function App() {
 
   useEffect(() => {
     // Follow the device locale (English default, Dutch when the device is nl) so the app UI matches the
-    // feedback bot's language — Hermes has Intl, so no expo-localization dependency.
+    // a bot's language — Hermes has Intl, so no expo-localization dependency.
     let lng = 'en';
     try { if (String(Intl.DateTimeFormat().resolvedOptions().locale || '').toLowerCase().startsWith('nl')) lng = 'nl'; } catch { /* default en */ }
     initLocalisation({ lng }).then(() => setLocaleReady(true));

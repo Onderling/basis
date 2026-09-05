@@ -5,39 +5,9 @@
  */
 import { defineConfig } from 'vitest/config';
 import path from 'path';
-import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * `onderling-feedback` is an OPTIONAL sibling repo (`optionalDependencies`, a `link:` to a checkout
- * beside this one). Present on a developer machine that has both; absent on a clean clone and in CI.
- *
- * Nine suites here exercise the feedback surface and import that package at module scope, so without it
- * they fail to LOAD — which is what kept `apps/basis`, the largest suite in the repo (~5,500 tests), out
- * of CI entirely. Measured 2026-09-01 with the package hidden: 5,418 tests pass and exactly those nine
- * files fail. So the suite is CI-ready as it stands; only these nine need to stand down when their
- * dependency is not there.
- *
- * They are EXCLUDED rather than skipped-from-inside, because a static import of a missing module fails
- * before any `describe.skip` could run. And the exclusion is announced on stderr rather than applied
- * silently: a suite that quietly disappears is how coverage rots.
- */
-const FEEDBACK_SUITES = [
-  'test/bugReport.test.js',
-  'test/feedbackBots.test.js',
-  'test/feedback/**',
-];
-const hasFeedbackPackage = (() => {
-  try { createRequire(import.meta.url).resolve('onderling-feedback/public'); return true; }
-  catch { return false; }
-})();
-if (!hasFeedbackPackage) {
-  console.warn('[basis/vitest] onderling-feedback is not installed — skipping 9 feedback suites '
-    + `(${FEEDBACK_SUITES.join(', ')}). Everything else runs.`);
-}
-const optionalExcludes = hasFeedbackPackage ? [] : FEEDBACK_SUITES;
 
 export default defineConfig({
   resolve: {
@@ -79,7 +49,7 @@ export default defineConfig({
             'test/v2/circleChatReliableSend.integration.test.js',
             'test/reachabilityOracleAdoption.test.js',
           ],
-          exclude: ['test-browser/**', 'node_modules/**', ...optionalExcludes],
+          exclude: ['test-browser/**', 'node_modules/**'],
           fileParallelism: false,
           // Booting a real agent (vaults, identities, a transport) takes seconds, and these files run
           // while the parallel project loads the machine. vitest's 5s default then fails a test AT ITS
@@ -104,7 +74,6 @@ export default defineConfig({
           hookTimeout: 30_000,
           exclude: [
             'test-browser/**', 'node_modules/**',
-            ...optionalExcludes,
             'test/app*.test.js',
             'test/**/*.relay.*(repro.)test.js',
             'test/**/*RealReceive*.test.js',

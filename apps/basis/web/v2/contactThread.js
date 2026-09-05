@@ -44,7 +44,7 @@ export function renderContactThread(container, {
   onSkillTap,
   inputValue = '',   // pre-fill the composer (inline edit: ✏ a point → its text appears, editable)
   inputHint = '',    // optional placeholder override (e.g. "Editing point N")
-  langValue = null,        // when set (+ onLangChange), render an NL/EN picker in the header (feedback thread)
+  langValue = null,        // when set (+ onLangChange), render an NL/EN picker in the header (a bot thread's language)
   onLangChange = null,
   privacy = null,          // per-circle privacy indicator (§10c): { level:'quiet'|'sharing'|'risk', icon, label, pulse? }
   onPrivacyTap = null,     // tap the badge → the surface's why/change affordance (surface.showPrivacy)
@@ -111,9 +111,6 @@ export function renderContactThread(container, {
   const log = document.createElement('div');
   log.className = 'cc-cthread__log';
   for (const m of messages) {
-    // Stage-1 review → editable per-point cards (curated text + the original as a labelled chip + per-card
-    // send + a footer). Edit reuses the composer pre-fill via onButtonTap(fp:edit:<id>).
-    if (m.kind === 'review') { log.appendChild(renderReviewCards(m, tr, onButtonTap)); continue; }
     const row = document.createElement('div');
     row.className = `cc-cthread__msg cc-cthread__msg--${m.origin === 'user' ? 'user' : 'bot'}`;
     if (m.pending) row.classList.add('is-pending');
@@ -274,59 +271,3 @@ export function renderContactThread(container, {
   return container;
 }
 
-/** Stage-1 review block: a card per point (curated text + the original as a labelled chip + per-card send),
- *  with a footer. Tapping the text or ✏ fires onButtonTap(fp:edit:<id>) — the host pre-fills the composer.
- *  Exported so the circle (invite-circle feedback) renders the SAME cards instead of a flattened text bubble. */
-export function renderReviewCards(m, tr, onButtonTap) {
-  const tap = (id) => { if (typeof onButtonTap === 'function') onButtonTap({ id }, m); };
-  // prefer the labels the BOT shipped (in its own language); fall back to the app locale.
-  const L = (k) => (m.labels && m.labels[k]) || tr(`circle.feedback.${k}`);
-  const block = document.createElement('div');
-  block.className = 'cc-cthread__review';
-  if (m.intro) {
-    const intro = document.createElement('div');
-    intro.className = 'cc-cthread__review-intro';
-    intro.textContent = String(m.intro).split('\n\n')[0];
-    block.appendChild(intro);
-  }
-  for (const p of (Array.isArray(m.points) ? m.points : [])) {
-    const card = document.createElement('div');
-    card.className = 'cc-cthread__card';
-    const txt = document.createElement('div');
-    txt.className = 'cc-cthread__card-text';
-    txt.textContent = `${p.text}${p.edited ? ` ${L('edited')}` : ''}`;
-    txt.title = tr('circle.feedback.edit_hint');
-    txt.addEventListener('click', () => tap(`fp:edit:${p.id}`));
-    card.appendChild(txt);
-    if (p.raw && p.raw !== p.text) {
-      const orig = document.createElement('div');
-      orig.className = 'cc-cthread__card-orig';
-      const lbl = document.createElement('span'); lbl.className = 'cc-cthread__card-orig-label'; lbl.textContent = L('original');
-      const ot = document.createElement('span'); ot.className = 'cc-cthread__card-orig-text'; ot.textContent = p.raw;
-      orig.appendChild(lbl); orig.appendChild(ot);
-      card.appendChild(orig);
-    }
-    const btns = document.createElement('div');
-    btns.className = 'cc-cthread__card-btns';
-    const edit = document.createElement('button');
-    edit.type = 'button'; edit.className = 'cc-cthread__card-btn cc-cthread__card-btn--muted'; edit.textContent = '✏';
-    edit.addEventListener('click', () => tap(`fp:edit:${p.id}`));
-    const send = document.createElement('button');
-    send.type = 'button'; send.className = 'cc-cthread__card-btn'; send.textContent = L('send_one');
-    send.addEventListener('click', () => tap(`fp:consent:${p.id}`));
-    btns.appendChild(edit); btns.appendChild(send);
-    card.appendChild(btns);
-    block.appendChild(card);
-  }
-  const footer = document.createElement('div');
-  footer.className = 'cc-cthread__review-footer';
-  const all = document.createElement('button');
-  all.type = 'button'; all.className = 'cc-cthread__card-btn'; all.textContent = L('send_all');
-  all.addEventListener('click', () => tap('fp:consent:all'));
-  const none = document.createElement('button');
-  none.type = 'button'; none.className = 'cc-cthread__card-btn cc-cthread__card-btn--muted'; none.textContent = tr('circle.feedback.send_none');
-  none.addEventListener('click', () => tap('fp:cancel'));
-  footer.appendChild(all); footer.appendChild(none);
-  block.appendChild(footer);
-  return block;
-}

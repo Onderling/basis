@@ -190,7 +190,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     try {
       if (await continuePending(chatId, text)) return;
       if (text.startsWith('/') || tapToParse(text, threadId)) { await route(chatId, threadId, text); return; }
-      const r = await engine.handle(threadId, text, { chatId });
+      const r = await engine.ask(threadId, text, { chatId });
       note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
       note(chatId, { error: err?.message ?? String(err) });

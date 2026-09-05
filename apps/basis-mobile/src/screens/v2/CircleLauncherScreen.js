@@ -125,7 +125,8 @@ import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { resolveChatAi } from '../../../../basis/src/v2/chatAi.js';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import MultiFieldFormBubble from '../../rn/MultiFieldFormBubble.js';   // 2+-field inline form (parity with web)
-import { createCircleDispatch, addressesBot, stripBotTag } from '../../../../basis/src/v2/circleDispatch.js';
+import { addressesBot, stripBotTag } from '../../../../basis/src/v2/circleDispatch.js';
+import { createAssistantEngine } from '../../../../basis/src/v2/assistantEngine.js';
 import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
@@ -179,13 +180,10 @@ import { buildCircleInviteUri } from '../../../../basis/src/v2/circleInvite.js';
 import { feedHouseholdRoster } from '../../../../basis/src/v2/householdRosterPairing.js';
 // Conversation memory — recent circle turns woven into the bot's interpret context.
 import { recentCircleTurns } from '../../../../basis/src/v2/circleMemory.js';
-import { createTokenGate } from '../../../../basis/src/v2/tokenGate.js';
-import { makeCircleRetriever } from '../../../../basis/src/v2/circleRetriever.js';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { buildCircleEmbedProviders } from '../../../../basis/src/v2/circleEmbedProviders.js';
 import { resolveCircleEmbedder } from '../../../../basis/src/v2/embedPicker.js';
-import { circleGateRules } from '../../../../basis/src/v2/circleGate.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have
 // signed for it yet) is shared; the shell only paints the line and carries the button.
 import { caretakerNotice } from '../../../../basis/src/v2/caretakerNotice.js';
@@ -3475,11 +3473,16 @@ function CircleDetail({
   }, [userLlmDefault]);
   const hasEmbedProvider = !!(llmRuntime.embedProviders.local || llmRuntime.embedProviders.cloud);
 
-  const circleBot = useMemo(() => createCircleDispatch({
+  // The ONE assistant composition (assistantEngine.js, shared with web + the Telegram shell): the
+  // deterministic gate for the user's locale, retrieval over this circle's items (semantic when an embed
+  // route is configured, else lexical; ranking lives once in circleRetriever), the recent circle turns as
+  // memory, and the interpreter over the circle's policy + the member's default. This shell injects only
+  // its adapters: the circle policy, the live providers, loadItems, the vector store, and the sinks below.
+  const circleBot = useMemo(() => createAssistantEngine({
     catalogue,
+    lang: lang(),
     // Circle policy is authoritative (this circle's own llmTool); 'user' delegates to the member default.
-    // `apps` scopes the LLM's tool list to the relevant app origins (was never passed → all 105 tools).
-    // Per-circle (circle policy.apps) with the deployment env as fallback.
+    // `apps` scopes the LLM's tool list to the relevant app origins (per-circle policy.apps, env fallback).
     policy: { llmTool: circleLlmPolicy, ...(llmApps ? { apps: llmApps } : {}) },
     userDefault: { mode: llmRuntime.mode },
     llmProviders: llmRuntime.llmProviders,
@@ -3487,39 +3490,22 @@ function CircleDetail({
     // Conversation memory — the recent circle turns (latest via rowsRef), web parity.
     recentTurns: () => recentCircleTurns({ rows: rowsRef.current, limit: 6 }),
     botName: CIRCLE_BOT_NAME,
-    // Deterministic pre-LLM gate (manifest-derived via renderGate): "add X" / "done X" / "claim X"
-    // route to the task op WITHOUT the (unreliable) small-model tool pick; else falls to interpret.
-    // Gate built for the user's locale so trailing verbs ("kaas done"/"afwas klaar") match per-language.
-    // F-retrieve (web parity): `makeCircleRetriever` auto-tiers — tier-2 SEMANTIC
-    // when an embed route is configured (rides this circle's embed policy via
-    // `resolveEmbed`), else tier-1 LEXICAL; an embedder error falls back to lexical.
-    // Ranking lives once in circleRetriever; this shell injects the loadItems + embed adapters.
-    gate: createTokenGate({
-      rules: circleGateRules(lang()),
-      retrieve: makeCircleRetriever({
-        embed: hasEmbedProvider
-          ? async (texts) => {
-              const embedder = resolveCircleEmbedder({
-                circlePolicy: { llmTool: circleLlmPolicy },
-                userDefault:  { mode: llmRuntime.mode },
-                providers:    llmRuntime.embedProviders,
-              });
-              if (!embedder) throw new Error('no-embedder');   // → graceful tier-1 lexical fallback
-              return embedder.embed(texts);
-            }
-          : undefined,
-        loadItems: (ctx) => loadCircleItems({ callSkill: resolveSkill, circleId: ctx?.circleId ?? circle?.id }),
-        // Persistence seam (vectorStore) — web parity. Threaded end-to-end into
-        // PodSearch, which persists vectors under
-        // private/state/search-index/circle-rag/<id>/ (never sharing/). Wires the
-        // circle's available pseudo-pod StorageBackend; in-memory in the standalone
-        // posture (live-pod dependency documented at circleSearchVectorStore).
-        vectorStore: circleSearchVectorStore,
-        scope: 'circle-rag',
-      }),
-    }),
-    // A slash command is parsed to {opId,args}; the LLM already yields {opId,args}. Both then flow
-    // through the clarifying dispatch (unique → run; ambiguous → ask with buttons).
+    embed: hasEmbedProvider
+      ? async (texts) => {
+          const embedder = resolveCircleEmbedder({
+            circlePolicy: { llmTool: circleLlmPolicy },
+            userDefault:  { mode: llmRuntime.mode },
+            providers:    llmRuntime.embedProviders,
+          });
+          if (!embedder) throw new Error('no-embedder');   // → graceful tier-1 lexical fallback
+          return embedder.embed(texts);
+        }
+      : undefined,
+    loadItems: (ctx) => loadCircleItems({ callSkill: resolveSkill, circleId: ctx?.circleId ?? circle?.id }),
+    // Persistence seam (vectorStore) — PodSearch persists vectors under private/state/search-index/circle-rag/<id>/
+    // (never sharing/); the circle's available pseudo-pod StorageBackend, in-memory in the standalone posture.
+    vectorStore: circleSearchVectorStore,
+    retrieverScope: 'circle-rag',
     dispatch: (input) => {
       let cmd = input;
       if (typeof input === 'string') {

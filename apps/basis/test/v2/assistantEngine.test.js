@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { mergeManifests } from '../../src/manifestMerge.js';
 import { mockHouseholdManifest } from '../../src/core/agent/mockAgent.js';
-import { createAssistantEngine, loadAssistantItems } from '../../src/v2/assistantEngine.js';
+import { createAssistantEngine, loadAssistantItems, interpretSystemFor } from '../../src/v2/assistantEngine.js';
 
 const catalogue = mergeManifests([{ manifest: mockHouseholdManifest }]);
 const llm = { invoke: async () => null };
@@ -81,6 +81,16 @@ describe('createAssistantEngine', () => {
     await e.ask('c', 'iets');
     expect(seen[0]).toEqual(['you: hoi', 'assistant: hallo']);
   });
+  it('the interpreter is told the language and the local add-phrasings (walk 2: an English greeting, "kun je … toevoegen" read as show)', async () => {
+    const seen = [];
+    const interpret = async (text, o) => { seen.push(o.system); return null; };
+    const e = createAssistantEngine({ catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {} });
+    await e.ask('t', 'maii');
+    expect(seen[0]).toContain('Always reply in Dutch');
+    expect(seen[0]).toContain('voeg … toe');
+    expect(interpretSystemFor('en')).toContain('Always reply in English');
+  });
+
   it('loadAssistantItems shapes household open items for the retriever', async () => {
     const load = loadAssistantItems({ callSkill: async () => ({ items: [{ id: 9, type: 'shopping', label: 'Milk' }, { id: 10, text: '' }] }) });
     expect(await load()).toEqual([{ id: '9', type: 'shopping', text: 'Milk' }]);

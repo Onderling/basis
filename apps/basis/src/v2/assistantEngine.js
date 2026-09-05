@@ -22,6 +22,7 @@ import { createCircleDispatch } from './circleDispatch.js';
 import { createTokenGate } from './tokenGate.js';
 import { circleGateRules } from './circleGate.js';
 import { makeCircleRetriever } from './circleRetriever.js';
+import { DEFAULT_INTERPRET_SYSTEM } from './interpretCommand.js';
 
 export const ASSISTANT_MEMORY_TURNS = 6;
 
@@ -58,6 +59,12 @@ export function createAssistantEngine({
   if (typeof dispatch !== 'function') throw new TypeError('createAssistantEngine: dispatch required');
   const providers = llmProviders ?? (llm ? { local: llm } : null);
   const smart = Boolean(providers && typeof interpret === 'function');
+  // The interpreter speaks the member's language and knows the local phrasings for "add" — seen live:
+  // an English greeting answered a Dutch "Maii", and "kun je … toevoegen?" was read as "show the list".
+  const system = interpretSystemFor(lang);
+  const interpretIn = typeof interpret === 'function'
+    ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system })
+    : null;
   const retrieve = typeof loadItems === 'function'
     ? makeCircleRetriever({
       loadItems,
@@ -93,7 +100,7 @@ export function createAssistantEngine({
       policy: policy ?? { llmTool: smart ? 'local' : 'off' },
       ...(userDefault !== undefined ? { userDefault } : {}),
       llmProviders: smart ? providers : null,
-      interpret: smart ? interpret : async () => null,
+      interpret: smart ? interpretIn : async () => null,
       gate,
       botName,
       recentTurns: typeof recentTurnsIn === 'function' ? recentTurnsIn : () => linesFor(threadId),
@@ -117,6 +124,16 @@ export function createAssistantEngine({
     /** Retrieval on its own (tests, diagnostics). */
     retrieve: retrieve ? (text, ctx = {}) => retrieve(text, ctx) : null,
   };
+}
+
+const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
+/** The interpreter's system prompt for a language: the shared instruction plus the language and its add-phrasings. */
+export function interpretSystemFor(lang = 'nl') {
+  const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
+  const add = lang === 'nl'
+    ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named.'
+    : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
+  return `${DEFAULT_INTERPRET_SYSTEM}\nAlways reply in ${name}. ${add}`;
 }
 
 /**

@@ -106,7 +106,8 @@ export async function removeItem(store, { match }, { by } = {}) {
   if (hits.length === 0) return { ok: false, error: 'item not found' };
   if (hits.length > 1)   return { ok: false, ambiguous: hits };
   await removeItems(store, [{ id: hits[0].id }], { actor: by });
-  return { ok: true, removed: hits[0].id };
+  // The item too, so the reply can say WHAT was removed (the walk showed "✓ removed: " with nothing after it).
+  return { ok: true, removed: hits[0].id, item: hits[0] };
 }
 // addTask materialises through the canonical add (id, `addedBy`/`addedAt`, `master`, cycle check); a task
 // created pre-assigned is add + an authoritative reassign, so the assignee holds a REAL claim (cluster set)

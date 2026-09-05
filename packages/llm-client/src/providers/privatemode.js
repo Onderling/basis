@@ -21,8 +21,29 @@ import path from 'node:path';
 import { ollamaProvider } from './ollama.js';
 
 export const PRIVATEMODE_ENDPOINT = 'https://api.privatemode.ai';
-/** Fast, correct on Dutch tool picks (measured 2026-09-05: 1.9 s vs 5.3 s glm-5.3; kimi spent its budget reasoning). */
-export const PRIVATEMODE_DEFAULT_MODEL = 'gpt-oss-120b';
+/**
+ * Measured 2026-09-05 on a Dutch two-item request with native tool calling: kimi-k2.6 with thinking
+ * OFF answered in 2.1 s with both items; gpt-oss-120b (low reasoning) in 0.8 s but dropped one item;
+ * glm-5.3 returned nothing in 5.5 s. Kimi also leads the open models on the agentic indices. So the
+ * default is Kimi with thinking off; `gpt-oss-120b` is the fast fallback.
+ */
+export const PRIVATEMODE_DEFAULT_MODEL = 'kimi-k2.6';
+
+/**
+ * Privatemode has no unified reasoning switch — it is per model family (`chat_template_kwargs` for
+ * Kimi and Gemma, `reasoning_effort` for gpt-oss, nothing for GLM). A tool pick is a clear task:
+ * reasoning off/low keeps latency and tokens down.
+ * @param {string} model
+ * @param {'off'|'low'|'on'} [thinking='off']
+ */
+export function reasoningBodyFor(model, thinking = 'off') {
+  const m = String(model || '').toLowerCase();
+  if (thinking === 'on') return null;
+  if (/kimi/.test(m))   return { chat_template_kwargs: { thinking: false } };
+  if (/gemma/.test(m))  return { chat_template_kwargs: { enable_thinking: false } };
+  if (/gpt-oss/.test(m)) return { reasoning_effort: thinking === 'off' ? 'low' : thinking };
+  return null;
+}
 
 /**
  * Read the key from the environment or the key file. Returns null when neither exists.
@@ -70,14 +91,14 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
  * @param {string} [a.apiKey]         explicit key (else env/file via `readPrivatemodeKey`)
  * @param {Function} [a.auth]         SDK `auth` provider (rotating credential) — instead of a key
  * @param {string} [a.model]
- * @param {'low'|'medium'|'high'|null} [a.reasoningEffort='low']  gpt-oss reasoning budget; null → not sent
+ * @param {'off'|'low'|'on'} [a.thinking='off']  the model's reasoning: off (Kimi/Gemma switch, gpt-oss low), low, or on (model default)
  * @param {object} [a.client]         an injected SDK client (tests)
  * @param {object} [a.sdk]            an injected SDK module `{ PrivatemodeAI }` (tests / lazy load)
  * @param {number} [a.timeoutMs]
  * @param {object} [a.defaultOptions]
  * @returns {Promise<import('../types.js').LlmProvider>}
  */
-export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DEFAULT_MODEL, reasoningEffort = 'low', client = null, sdk = null, timeoutMs, defaultOptions } = {}) {
+export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DEFAULT_MODEL, thinking = 'off', client = null, sdk = null, timeoutMs, defaultOptions } = {}) {
   let c = client;
   if (!c) {
     const key = apiKey ?? (auth ? null : readPrivatemodeKey());
@@ -87,7 +108,7 @@ export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DE
     const { PrivatemodeAI } = sdk ?? await import('privatemode-ai');
     c = new PrivatemodeAI(auth ? { auth } : { apiKey: key });
   }
-  const extraBody = reasoningEffort && /gpt-oss/.test(model) ? { reasoning_effort: reasoningEffort } : null;
+  const extraBody = reasoningBodyFor(model, thinking);
   const base = ollamaProvider({
     baseUrl: PRIVATEMODE_ENDPOINT, model, timeoutMs, defaultOptions,
     fetchFn: privatemodeFetch(c, { extraBody }),

@@ -3,7 +3,7 @@
  * transport. Unit tests drive a fake SDK client; the live test runs only when a key is present.
  */
 import { describe, it, expect } from 'vitest';
-import { privatemodeProvider, privatemodeFetch, readPrivatemodeKey, PRIVATEMODE_DEFAULT_MODEL } from '../src/providers/privatemode.js';
+import { privatemodeProvider, privatemodeFetch, readPrivatemodeKey, reasoningBodyFor, PRIVATEMODE_DEFAULT_MODEL } from '../src/providers/privatemode.js';
 
 function fakeClient(reply) {
   const calls = [];
@@ -15,7 +15,7 @@ function fakeClient(reply) {
 const toolReply = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'addItem', arguments: '{"type":"shopping","text":"kaas"}' } }] } }] };
 
 describe('privatemodeProvider', () => {
-  it('sends an OpenAI chat body through the SDK, never streaming, with the reasoning budget for gpt-oss', async () => {
+  it('sends an OpenAI chat body through the SDK, never streaming, with the model family\'s thinking switch', async () => {
     const client = fakeClient(toolReply);
     const p = await privatemodeProvider({ client });
     const r = await p.invoke({ system: 'sys', messages: [{ role: 'user', content: 'zet kaas op de lijst' }], tools: [{ id: 'addItem', description: 'add', schema: { type: 'object', properties: {} } }] });
@@ -25,16 +25,20 @@ describe('privatemodeProvider', () => {
     const body = client.calls[0].body;
     expect(body.model).toBe(PRIVATEMODE_DEFAULT_MODEL);
     expect(body.stream).toBeUndefined();
-    expect(body.reasoning_effort).toBe('low');
+    expect(body.chat_template_kwargs).toEqual({ thinking: false });   // Kimi's switch
     expect(body.messages[0]).toEqual({ role: 'system', content: 'sys' });
     expect(body.tools?.[0]?.function?.name).toBe('addItem');
     expect(r.toolCall).toMatchObject({ id: 'addItem', args: { type: 'shopping', text: 'kaas' } });
   });
-  it('a non-gpt-oss model gets no reasoning field; an SDK error surfaces as a provider error with its status', async () => {
+  it('each family gets its own switch (gpt-oss low, GLM nothing, thinking on sends nothing); an SDK error surfaces with its status', async () => {
+    expect(reasoningBodyFor('gpt-oss-120b')).toEqual({ reasoning_effort: 'low' });
+    expect(reasoningBodyFor('glm-5.3')).toBeNull();
+    expect(reasoningBodyFor('kimi-k2.6', 'on')).toBeNull();
     const client = fakeClient({ choices: [{ message: { role: 'assistant', content: 'ok' } }] });
     const p = await privatemodeProvider({ client, model: 'glm-5.3' });
     await p.invoke({ system: 's', messages: [{ role: 'user', content: 'hoi' }] });
     expect(client.calls[0].body.reasoning_effort).toBeUndefined();
+    expect(client.calls[0].body.chat_template_kwargs).toBeUndefined();
     const bad = await privatemodeProvider({ client: fakeClient(Object.assign(new Error('unauthorized'), { status: 401 })) });
     await expect(bad.invoke({ system: 's', messages: [{ role: 'user', content: 'hoi' }] })).rejects.toMatchObject({ code: 'PROVIDER_ERROR', status: 401 });
   });

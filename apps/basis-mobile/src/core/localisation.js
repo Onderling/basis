@@ -113,7 +113,7 @@ export function setLang(lng) {
 export function lang() { return currentLang; }
 
 /** Translate a key.  Falls back to the key string if missing. `lng` overrides the current language for one
- *  call (the feedback thread renders its chrome in the BOT's chosen language, not the device locale). */
+ *  call (a bot thread may render its chrome in the BOT's chosen language, not the device locale). */
 export function t(key, params, lng) {
   const L = (lng === 'en' || lng === 'nl') ? lng : currentLang;
   // Resolve WITHIN a language before falling back to English — a language that has the plain key but

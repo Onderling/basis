@@ -29,17 +29,10 @@
 #
 # ⚠ ONE GAP LEFT (2026-09-01 — the first is closed):
 #
-#   1. ✅ CLOSED. `apps/basis` (~5,500 tests) and `apps/basis-mobile` (~780) now run here. What kept them
-#      out was never the suites: `onderling-feedback` is a sibling REPO reached by a `link:` and absent on
-#      a clean clone, and nine basis suites plus one mobile suite imported it at MODULE SCOPE, so they
-#      failed to load and took the run with them. Measured 2026-09-01 with the package hidden: 5,418 basis
-#      tests passed and exactly those nine files failed. So the fix was not "make basis buildable" but
-#      "let the optional part stand down": the link is an `optionalDependencies`, and each app's
-#      vitest config excludes those suites when it cannot resolve the package — printing to stderr which
-#      ones and why, because a suite that quietly disappears is how coverage rots.
-#      What is still true, and is NOT this file's problem: a production `vite build` of basis does need
-#      the sibling, because three source files import it statically. That blocks nobody today and its fix
-#      (a lazy import) rides the feedback work when it happens.
+#   1. ✅ CLOSED. `apps/basis` (~5,500 tests) and `apps/basis-mobile` (~780) run here. What kept them out
+#      was a sibling repo (`onderling-feedback`) reached by a `link:` that a clean clone does not have; since
+#      2026-09-05 basis carries none of the feedback bot's code (feedback is an external bot that reaches basis
+#      as a contact), so nothing optional is left to stand down and the whole suite runs everywhere.
 #
 #   2. ⚠ STILL A MANUAL STEP ON GITHUB: marking these jobs required in branch
 #      protection. Until that is done this file reports and does not gate.
@@ -118,13 +111,8 @@ jobs:
           # BleTransport/MdnsTransport". Measured 2026-08-24: 396 pass, 1 skip,
           # zero failures — the exemption outlived its reason by some margin.
           - { label: react-native,      dir: packages/react-native,      args: '' }
-          # basis + basis-mobile joined 2026-09-01. They are the LARGEST suites in the repo (~5,500 and
-          # ~780) and had been outside CI since it was written, for one reason: `onderling-feedback` is a
-          # sibling REPO reached by a `link:`, absent on a clean clone, and nine suites here imported it at
-          # module scope so they failed to LOAD. Measured with the package hidden: 5,418 of basis passed
-          # and exactly those nine failed. It is now an `optionalDependencies`, and each app's vitest
-          # config stands those suites down — loudly, on stderr — when it is not installed. So what runs
-          # here is the whole suite minus the part that needs a repo CI does not have.
+          # basis + basis-mobile joined 2026-09-01 (the largest suites in the repo, ~5,500 and ~780). Since
+          # 2026-09-05 they carry no optional sibling-repo suites: the whole suite runs here.
           - { label: basis,             dir: apps/basis,                 args: '' }
           - { label: basis-mobile,      dir: apps/basis-mobile,          args: '' }
     steps:

@@ -8,28 +8,9 @@
  */
 import { defineConfig } from 'vitest/config';
 import path from 'path';
-import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * `onderling-feedback` is an OPTIONAL sibling repo (`optionalDependencies`, a `link:` to a checkout
- * beside this one) — present on a machine that has both, absent on a clean clone and in CI. One suite
- * here imports it at module scope and so fails to LOAD without it, which is half of why this package was
- * never in CI. Excluded rather than skipped from inside, because a static import of a missing module
- * fails before any `describe.skip` could run — and announced rather than applied silently. The basis
- * config carries the same rule and the longer note.
- */
-const FEEDBACK_SUITES = ['test/feedbackActivation.test.js'];
-const hasFeedbackPackage = (() => {
-  try { createRequire(import.meta.url).resolve('onderling-feedback/public'); return true; }
-  catch { return false; }
-})();
-if (!hasFeedbackPackage) {
-  console.warn('[basis-mobile/vitest] onderling-feedback is not installed — skipping '
-    + `${FEEDBACK_SUITES.join(', ')}. Everything else runs.`);
-}
 
 export default defineConfig({
   resolve: {
@@ -51,8 +32,7 @@ export default defineConfig({
   },
   test: {
     include: ['test/**/*.test.js'],
-    exclude: ['**/node_modules/**', 'src/rn/**', 'src/screens/**',
-      ...(hasFeedbackPackage ? [] : FEEDBACK_SUITES)],
+    exclude: ['**/node_modules/**', 'src/rn/**', 'src/screens/**'],
     environment: 'node',
   },
 });

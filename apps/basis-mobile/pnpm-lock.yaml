@@ -217,10 +217,6 @@ importers:
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@26.1.2)(lightningcss@1.27.0)(terser@5.49.0)
-    optionalDependencies:
-      onderling-feedback:
-        specifier: link:../../../feedback
-        version: link:../../../feedback
 
 packages:
 
@@ -7020,8 +7016,6 @@ snapshots:
       chrono-node: 2.10.1
       i18next: 23.16.8
       qrcode: 1.5.4
-    optionalDependencies:
-      onderling-feedback: link:../../../feedback
 
   '@onderling/app-manifest@file:../../packages/app-manifest':
     dependencies:

@@ -51,4 +51,4 @@ test('#3 bare /complete-task lists options, never «couldn\'t find ""»', async 
 });
 
 // (F2, 2026-07-08) The `#4 feedback echoes` test was retired with the in-circle feedback mount. The user↔bot
-// echo now lives in the fp-bot contact thread (createFeedbackMount, covered by the feedbackMount vitest).
+// echo left basis with the feedback bot (an external bot since 2026-09-05).

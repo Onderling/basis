@@ -44,14 +44,6 @@ const _cfg = withOnderlingPreset({
     // The composable LISTS feature's manifest (2026-09-01) — composeManifests.js imports it across the
     // app boundary like the other four, so Metro must watch it or the bundle cannot resolve the path.
     path.resolve(repoRoot, 'apps/lists'),
-    // M6 — the feedback bot: basis's feedbackSurface/feedbackMount consume the
-    // SPLIT onderling-feedback repo ('onderling-feedback/public', a link: dep) — watch
-    // the sibling checkout so Metro resolves + hot-reloads across the repo boundary.
-    path.resolve(repoRoot, '../feedback'),
-    // The `eld` language detector (feedback pipeline's lang.js, resolved by the eld/<size>
-    // subpath resolver below) is hoisted to the ROOT node_modules and must be WATCHED or
-    // Metro can't SHA-1 it → "Failed to get the SHA-1" once onderling-feedback/public resolves.
-    path.resolve(repoRoot, 'node_modules/eld'),
     // Workspace packages the composed apps + secure-agent reach for.
     path.resolve(repoRoot, 'packages/vault'),
     path.resolve(repoRoot, 'packages/chat-p2p'),
@@ -185,18 +177,6 @@ const _cfg = withOnderlingPreset({
         };
       }
 
-      // 4. M6 — eld language detector (feedback pipeline's lang.js). Package `exports` subpaths
-      //    (eld/medium etc.); Metro has package-exports disabled, so map to the static entry.
-      const eldMatch = moduleName.match(/^eld\/(medium|small|large|extrasmall)$/);
-      if (eldMatch) {
-        return {
-          // eld is HOISTED to the monorepo root node_modules (not apps/feedback-pipeline's),
-          // so resolve there — the old path pointed at a non-existent nested install.
-          filePath: path.resolve(repoRoot, 'node_modules/eld/src/entries', `static.${eldMatch[1]}.js`),
-          type:     'sourceFile',
-        };
-      }
-
       // 4b. @onderling-app/agents subpaths (realAgent.js skill wiring). exports map: ./wireSkills →
       //     src/wireSkills.js, ./defaultCatalogue → src/defaultCatalogue.js, ./cores → src/cores.js,
       //     ./manifest → manifest.js. Package-exports disabled, so map directly.
@@ -244,15 +224,6 @@ const _presetResolve = _cfg.resolver.resolveRequest;
 _cfg.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === '@onderling/chat-agent/bridges/telegram') {
     return { filePath: path.resolve(__dirname, 'src/shims/telegramBridge.js'), type: 'sourceFile' };
-  }
-  // onderling-feedback (split repo, `link:` dep) — Metro has package-exports disabled, so the
-  // package's `./public` + `./testing` exports subpaths must be hand-resolved to the sibling
-  // checkout (~/expotest/feedback). Without this the whole mobile bundle 500s on feedbackSurface.
-  if (moduleName === 'onderling-feedback/public') {
-    return { filePath: path.resolve(repoRoot, '../feedback/src/public/index.js'), type: 'sourceFile' };
-  }
-  if (moduleName === 'onderling-feedback/testing') {
-    return { filePath: path.resolve(repoRoot, '../feedback/test/helpers/mock-llm.js'), type: 'sourceFile' };
   }
   // react-native-webrtc: optional rendezvous (direct WebRTC) — native module not in this dev
   // APK; the loader's try/catch can't suppress the native error on Hermes (redbox). Stub it so

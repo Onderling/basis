@@ -88,9 +88,6 @@
     "@onderling/logger": "workspace:*",
     "@onderling/sync-engine": "workspace:*"
   },
-  "optionalDependencies": {
-    "onderling-feedback": "link:../../../feedback"
-  },
   "devDependencies": {
     "@onderling/pseudo-pod": "workspace:*",
     "@onderling/versioning": "workspace:*",

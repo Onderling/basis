@@ -849,18 +849,6 @@
   background: transparent; border: 1px solid var(--accent); color: var(--accent-ink);
 }
 .cc-cthread__sending { font-size: 12px; color: var(--ink-soft); font-style: italic; padding: 2px 4px; }
-/* Stage-1 review cards (curated text + original chip + per-card send) */
-.cc-cthread__review { display: flex; flex-direction: column; gap: 8px; align-self: stretch; width: 100%; }
-.cc-cthread__review-intro { font-size: 13px; color: var(--ink-soft); line-height: 1.4; }
-.cc-cthread__card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.cc-cthread__card-text { font-size: 15px; line-height: 1.45; color: var(--ink); cursor: text; white-space: pre-wrap; word-break: break-word; }
-.cc-cthread__card-text:hover { text-decoration: underline dotted var(--ink-soft); }
-.cc-cthread__card-orig { display: flex; gap: 8px; align-items: baseline; border-top: 1px solid var(--line); padding-top: 8px; }
-.cc-cthread__card-orig-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); flex: 0 0 auto; }
-.cc-cthread__card-orig-text { font-size: 13px; font-style: italic; color: var(--ink-soft); line-height: 1.4; }
-.cc-cthread__card-btns, .cc-cthread__review-footer { display: flex; justify-content: flex-end; gap: 8px; }
-.cc-cthread__card-btn { cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 12px; background: var(--accent); border: 1px solid var(--accent); color: var(--accent-contrast); }
-.cc-cthread__card-btn--muted { background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
 .cc-cthread__skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .cc-cthread__skill {
   cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;

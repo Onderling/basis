@@ -134,7 +134,7 @@ import { parseCircleBuiltin } from '../../../../basis/src/v2/circleComposerBuilt
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 // The SHARED security-status report — the SAME handler web reaches (circleApp.js). Mobile's circle composer
 // classified `/security-status` (it's in CIRCLE_BUILTIN_COMMANDS) but had no branch, so it fell through to the
-// bot/feedback path — a web≡mobile drift (#18). This restores parity.
+// bot path — a web≡mobile drift (#18). This restores parity.
 import { securityStatus } from '../../../../basis/src/core/localBuiltins.js';
 // Task #13 — the onboarding + standing help-bot flow, all logic shared with web (circleApp.js). The mobile
 // shell wires the SAME thin seams: provision the help circle, drive onboarding as the bot's chat, and run
@@ -199,15 +199,6 @@ import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../..
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { resolveSealedThumbUri } from '../../core/mijHost.js';
 import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource } from '../../core/circlePods.js';
-// M6 — the feedback bot rides the SHARED mount (web uses the same one). tryHandle routes /feedback +
-// /feedback-stop + free text while active, before the circle bot; bubbles render via appendCircleMessage.
-import { createFeedbackMount } from '../../../../basis/src/feedback/feedbackMount.js';
-// Rich circle feedback (parity with web's invite-circle): the co-hosted bot's review renders as editable
-// CARDS + its long bubbles chunk, instead of flattened text. Shared surface + shared RN card component.
-import { createFeedbackSurface, signerForIdentity } from '../../../../basis/src/feedback/feedbackSurface.js';
-import { loadFeedbackPackage } from '../../../../basis/src/feedback/feedbackPackage.js';
-import { makeNoLoginFeedbackPods } from '../../../../basis/src/feedback/noLoginPods.js';
-import { FeedbackReviewCards } from '../../rn/FeedbackBubbles.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
 import { buildCircleLlmProviders } from '../../../../basis/src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDispatch.js';
@@ -268,8 +259,6 @@ import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
-import FeedbackThreadScreen from './FeedbackThreadScreen.js';
-import { createFeedbackBotStore } from '../../../../basis/src/v2/feedbackBots.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
 import { listContacts, mergeContacts, stoopContactToRow } from '../../../../basis/src/v2/contactsSource.js';
 import CircleNoticeboard from './CircleNoticeboard.js';
@@ -291,8 +280,8 @@ import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 
-// B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL
-// + the feedback mobile EXPO_PUBLIC_FEEDBACK_LLM_BASEURL pattern. Unset → no provider → the LLM branch
+// B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
+// Unset → no provider → the LLM branch
 // stays inert (slash commands + plain circle chat still work).
 const CIRCLE_LLM_BASEURL = process.env.EXPO_PUBLIC_CIRCLE_LLM_BASEURL || null;
 const CIRCLE_LLM_MODEL   = process.env.EXPO_PUBLIC_CIRCLE_LLM_MODEL || undefined;
@@ -306,14 +295,6 @@ const CIRCLE_LLM_TIMEOUT_MS = Number(process.env.EXPO_PUBLIC_CIRCLE_LLM_TIMEOUT_
 const CIRCLE_EMBED_BASEURL = process.env.EXPO_PUBLIC_CIRCLE_EMBED_BASEURL || CIRCLE_LLM_BASEURL;
 const CIRCLE_EMBED_MODEL   = process.env.EXPO_PUBLIC_CIRCLE_EMBED_MODEL || undefined;
 const CIRCLE_BOT_NAME    = process.env.EXPO_PUBLIC_CIRCLE_BOT_NAME || 'assistant';
-// M6 — feedback bot's LLM route (cleans/anonymizes participant input). Unset → in-memory demo mode.
-const FEEDBACK_LLM_BASEURL = process.env.EXPO_PUBLIC_FEEDBACK_LLM_BASEURL || undefined;
-// The companion collector for the no-login circle feedback session (raw stays local; the round-approved,
-// device-signed summary is released here). Unset → own-pod-only (no central route / verify rounds).
-const FEEDBACK_COLLECTOR_URL = process.env.EXPO_PUBLIC_FEEDBACK_COLLECTOR_URL || undefined;
-// Languages the circle feedback bot offers (only those with a full locale + pipeline string file). Labels/prompts
-// come from the locale files read IN each target language (see emitFeedbackLangOptions) — no hardcoded strings.
-const FEEDBACK_LANGS = String(process.env.EXPO_PUBLIC_FEEDBACK_LANGS || 'nl,en').split(',').map((s) => s.trim()).filter(Boolean);
 // Default circle posture (off|local|cloud|user); 'user' = each member's personal default decides.
 const CIRCLE_LLM_POLICY  = process.env.EXPO_PUBLIC_CIRCLE_LLM_POLICY || 'user';
 // Scope the LLM's tool list to these app origins (comma-list, e.g. "household,tasks"). Unset → the bot
@@ -460,7 +441,7 @@ export default function CircleLauncherScreen({
   // Bumped by App.js when a circle is joined/created from another surface. The launcher loads its list on
   // mount and after its OWN wizards; both screens stay mounted, so nothing else told it.
   circlesRevision = 0,
-  // cluster J — the OidcSessionRN ref (App.js:187), needed to activate the feedback verify pods.
+  // cluster J — the OidcSessionRN ref (App.js:187), the Solid session the pod writer authenticates with.
   sessionRef = null,
   // cluster J — podAuth (lifted from the hidden ChatScreen) so the "Me" screen can drive pod sign-in.
   podAuth = null,
@@ -601,11 +582,6 @@ export default function CircleLauncherScreen({
   }, [bundle, loadCircleTransport]);
   // the contact (bot/peer) whose DM thread is open under the Contacten tab.
   const [contactThread, setContactThread] = useState(null);
-  // cluster J — persisted registry of added feedback bots (AsyncStorage), shared with the Contacten roster
-  // + the dedicated feedback thread. Created once.
-  const feedbackStoreRef = useRef(null);
-  if (!feedbackStoreRef.current) feedbackStoreRef.current = createFeedbackBotStore(AsyncStorage);
-  const feedbackStore = feedbackStoreRef.current;
   const [viewAsPolicy, setViewAsPolicy] = useState('pairwise');
   const [viewAsMembers, setViewAsMembers] = useState([]);
   const [folioFiles, setFolioFiles] = useState([]);
@@ -1708,25 +1684,6 @@ export default function CircleLauncherScreen({
   // Contacten: the bot/peer roster + a 1:1 DM thread (mobile parity with web).
   if (view === 'contacten') {
     if (contactThread) {
-      // cluster J — a feedback bot is a co-hosted agent, not a PeerGraph peer: open the dedicated feedback
-      // thread (activates the verify pods) instead of the peer-DM thread.
-      if (contactThread.isFeedback) {
-        return (
-          <WithTabBar active="contacten" onSelect={onTab}>
-            <FeedbackThreadScreen
-              session={sessionRef?.current ?? null}
-              bot={contactThread.bot}
-              store={feedbackStore}
-              onBack={() => setContactThread(null)}
-              identity={bundle?.coreAgent?.identity ?? null}
-              // Anonymous bug-report send: the SAME peer/relay transport the bundle uses everywhere else.
-              sendPeer={(a, p) => bundle?.agent?.sendPeerMessage?.(a, p)}
-              // "Secure your access" reveal/restore reaches the household recovery-phrase skills via callSkill.
-              callSkill={(o, op, a) => bundle?.callSkill?.(o, op, a)}
-            />
-          </WithTabBar>
-        );
-      }
       return (
         <WithTabBar active="contacten" onSelect={onTab}>
           <ContactThreadScreen
@@ -1739,7 +1696,7 @@ export default function CircleLauncherScreen({
     }
     return (
       <WithTabBar active="contacten" onSelect={onTab}>
-        <ContactsScreen bundle={bundle} feedbackStore={feedbackStore} onOpen={(contact) => setContactThread(contact)} />
+        <ContactsScreen bundle={bundle} onOpen={(contact) => setContactThread(contact)} />
       </WithTabBar>
     );
   }
@@ -2688,8 +2645,6 @@ function CircleDetail({
   // bubble render reads through `deliveryStateFor`) to force re-renders
   // when state flips.  The map itself isn't deps-tracked.
   const deliveryStateMapRef = useRef(null);
-  const feedbackMountRef = useRef(null);   // M6 — lazy feedback mount (created on first circle send)
-  const feedbackEditRef = useRef(null);    // the review-point id whose text is prefilled in the composer (✏)
   const [expandedBubbles, setExpandedBubbles] = useState(() => new Set());   // bot bubbles whose long text is fully shown
   const toggleBubble = useCallback((id) => setExpandedBubbles((prev) => {
     const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
@@ -2946,7 +2901,6 @@ function CircleDetail({
     }
     const msgId = `circle-${circle.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const ts    = Date.now();
-    // `review` (Stage-1 feedback cards) is private by construction → scope 'self' (never fanned out).
     // `provenance`/`consent` (Task #13 help Q&A) light the transparency badge + the dashed-rust consent card.
     // `card` — one embed card riding the message (a photo, an appointment, an item, a file).
     eventLog.append(circleChatMessageEvent({ msgId, ts, circleId: circle.id, actor, text, buttons, scope: review ? 'self' : scope, embeds, card, review, provenance, consent }));
@@ -3038,56 +2992,6 @@ function CircleDetail({
     catch { /* the reload reflects the real state; an unsigned notice returns on a later open */ }
     setMembersReloadTick((n) => n + 1);
   }, [circle?.id, rawCallSkill]);
-
-  // Build the co-hosted feedback surface + mount for a circle in a given language, over the given (cached) pods.
-  // Factored out so a language switch can REBUILD reusing the same pods (local Stage-1 survives). Rich emit sink:
-  // kind:'review' → editable cards · kind:'report' → a chunked text bubble · else text + buttons.
-  const buildFeedbackMount = useCallback((circ, pods, lg) => {
-    const surface = createFeedbackSurface({
-      projectId: circ.id,
-      lang: lg,
-      llmBaseURL: FEEDBACK_LLM_BASEURL,
-      pod: pods.ownPod,
-      ...(pods.centralPod ? { centralPod: pods.centralPod, controlStore: pods.controlStore, verify: true } : {}),
-      identityFor: () => signerForIdentity(coreIdentity),
-      emit: ({ kind, text: btext, buttons, points, labels, logText }) => {
-        if (kind === 'review' && Array.isArray(points)) appendCircleMessage({ actor: 'bot', review: { intro: btext, points, labels } });
-        else if (kind === 'report') appendCircleMessage({ actor: 'bot', text: `${btext}\n\n${logText || ''}`.trimEnd() });
-        else appendCircleMessage({ actor: 'bot', text: btext, buttons });
-      },
-    });
-    return createFeedbackMount({
-      surface,
-      appendUserBubble: (_tid, txt) => appendCircleMessage({ actor: 'me', text: txt }),
-      appendBotBubble:  () => {},   // unused: the pre-built surface owns its emit above
-    });
-  }, [appendCircleMessage, coreIdentity]);
-
-  // Offer the OTHER languages as tappable bubble-buttons (web-circle parity). Prompt + label are read from the
-  // locale files IN each TARGET language (t(key, {}, l)) — a speaker of that language recognises the invite; NO
-  // hardcoded strings (unlike the web's LANG_INFO constant).
-  const emitFeedbackLangOptions = useCallback((currentLang) => {
-    const others = FEEDBACK_LANGS.filter((l) => l !== currentLang);
-    if (!others.length) return;
-    appendCircleMessage({
-      actor: 'bot',
-      text: `🌐 ${others.map((l) => t('circle.feedback.switch_prompt', {}, l)).join('  ·  ')}`,
-      buttons: others.map((l) => ({ id: `fp-lang:${l}`, label: t('circle.feedback.lang_name', {}, l) })),
-    });
-  }, [appendCircleMessage]);
-
-  // Switch the circle feedback bot's language: rebuild the surface in newLang REUSING the cached pods (Stage-1
-  // survives), re-greet, and re-offer the other langs. Routed here from an `fp-lang:<code>` bubble-button tap.
-  const switchCircleFeedbackLang = useCallback(async (circleId, newLang) => {
-    try { await loadFeedbackPackage(); } catch (err) { console.warn('[feedback]', err?.message ?? err); return; }
-    const ref = feedbackMountRef.current;
-    if (!ref || ref.circleId !== circleId || ref.lang === newLang || !FEEDBACK_LANGS.includes(newLang)) return;
-    try { ref.mount.surface.stop(circleId); } catch { /* best-effort */ }
-    const mount = buildFeedbackMount({ id: circleId }, ref.pods, newLang);
-    feedbackMountRef.current = { circleId, mount, pods: ref.pods, lang: newLang };
-    try { await mount.open(circleId); } catch { /* a greeting error surfaces via emit */ }
-    emitFeedbackLangOptions(newLang);
-  }, [buildFeedbackMount, emitFeedbackLangOptions]);
 
   // Entrust (mandate) — the open picker's gathered inputs (null = closed), plus my
   // owner-visibility signals (WebID + admin role in THIS circle). The signals gate
@@ -3493,16 +3397,6 @@ function CircleDetail({
     // Task #13 — an onboarding option (onboarding:*) or help affordance (help:topic:* / help:consent:*)
     // routes to the shared onboarding/help handlers before anything else.
     if (typeof button?.id === 'string' && task13ButtonRef.current?.(button.id)) return;
-    // Feedback language switch (fp-lang:<code>) → rebuild the surface in that language (reusing the pods).
-    if (typeof button?.id === 'string' && button.id.startsWith('fp-lang:')) {
-      switchCircleFeedbackLang(circle?.id, button.id.slice('fp-lang:'.length));
-      return;
-    }
-    // Feedback control ids (review-card sends, verify buttons, etc.) route to the co-hosted feedback surface.
-    if (typeof button?.id === 'string' && /^fp:/.test(button.id)) {
-      feedbackMountRef.current?.mount?.surface?.handle(button.id, circle?.id).catch(() => {});
-      return;
-    }
     if (button?.screen) { setScreenPanel({ screen: button.screen }); return; }
     if (button?.opId) {
       // A DEVICE op (an item's "share here") goes through the composer runner — web parity. The circle
@@ -3525,7 +3419,7 @@ function CircleDetail({
       return;
     }
     if (button?.id) clarify.pick(button.id, { id: circle?.id });
-  }, [clarify, circle?.id, catalogue, runCircleCommandResolved, runComposerOp, switchCircleFeedbackLang, onAcceptFallback, acknowledgeCaretakerNotice]);
+  }, [clarify, circle?.id, catalogue, runCircleCommandResolved, runComposerOp, onAcceptFallback, acknowledgeCaretakerNotice]);
 
   // B (two-level LLM policy) — the member's PERSONAL default, consulted when the circle policy is
   // 'user'. Persisted via AsyncStorage; seeded from the configured route until a settings UI lands
@@ -3799,8 +3693,7 @@ function CircleDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [circle?.id, maybeStartOnboarding]);
 
-  // circle chat send: the feedback bot gets first refusal (it owns the turn only
-  // for /feedback, /feedback-stop, and free text while active); otherwise echo + route to the circle bot.
+  // circle chat send: echo + route to the circle bot.
   const sendCircleChat = useCallback(async () => {
     const text = composerText.trim();
     if (!text || !eventLog?.append || !circle?.id) return;
@@ -3866,17 +3759,8 @@ function CircleDetail({
       return;
     }
     setComposerText('');
-    // Feedback review-card edit: the ✏ prefilled the composer with a point's text; this send is the EDIT.
-    // Route it as an `fp:edit:<id>:<text>` control to the feedback surface (its dispatcher re-curates + shows
-    // the updated card), echoing the edited line locally. Mirrors web's composer-prefill edit.
-    if (feedbackEditRef.current && feedbackMountRef.current?.mount?.surface) {
-      const pid = feedbackEditRef.current; feedbackEditRef.current = null;
-      appendCircleMessage({ actor: 'me', text });
-      feedbackMountRef.current.mount.surface.handle(`fp:edit:${pid}:${text}`, circle.id).catch(() => {});
-      return;
-    }
     // Conversational follow-up: the bot asked for a missing field (needsForm); THIS message is the answer.
-    // Append it, complete the pending dispatch, and run it — don't route to feedback or re-interpret.
+    // Append it, complete the pending dispatch, and run it — don't re-interpret it.
     if (pendingFollowUp) {
       const pending = pendingFollowUp;
       setPendingFollowUp(null);
@@ -3901,36 +3785,6 @@ function CircleDetail({
       const r = await Promise.resolve(circleBot.handle(line, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts, history })).catch(() => null);
       noteBotTurn(r, text);
       return;
-    }
-    // M6 — lazy shared feedback mount; its appendUserBubble/appendBotBubble render into the circle. Text
-    // bubbles (incl. the bot's button labels); interactive M12 chips on mobile are a follow-up.
-    // The co-hosted feedback bot runs a REAL no-login session bound to THIS circle: the circle IS the feedback
-    // project (projectId = circle.id, so a PM/admin opens verify rounds for it). Raw stays in the device's OWN
-    // pod (persisted in AsyncStorage → survives reload); the round-approved summary is SIGNED with the device
-    // agent identity and released to the companion collector. Rich emit sink: kind:'review' → editable CARDS,
-    // kind:'report' → a chunked text bubble (web parity), else text + buttons. Rebuilt when the active circle
-    // changes so pods/projectId/identity can't leak across circles.
-    // NON-FATAL to the circle: a feedback build/route failure must NEVER break normal circle chat — on any
-    // error we log and fall through to the regular fan-out path below.
-    try {
-      if (feedbackMountRef.current?.circleId !== circle.id) {
-        await loadFeedbackPackage();   // sibling package, lazy; a failure lands in this try and falls through to plain chat
-        const pods = makeNoLoginFeedbackPods({
-          collectorUrl: FEEDBACK_COLLECTOR_URL,
-          participantKey: coreIdentity?.pubKey,
-          storage: AsyncStorage,
-          podKey: `fp.ownpod.${circle.id}`,
-        });
-        const lg = lang();   // device language as the starting bot language; switchable via the fp-lang buttons
-        feedbackMountRef.current = { circleId: circle.id, mount: buildFeedbackMount(circle, pods, lg), pods, lang: lg };
-      }
-      const startedFeedback = /^\/feedback(\s|$)/i.test(text);
-      if (await feedbackMountRef.current.mount.tryHandle(text, circle.id)) {
-        if (startedFeedback) emitFeedbackLangOptions(feedbackMountRef.current.lang);   // offer the other langs
-        return;   // feedback owned the turn
-      }
-    } catch (e) {
-      console.warn('[circle] feedback mount unavailable (chat continues):', e?.message ?? e);
     }
     // Task #13 — /help (+/hulp) opens the deterministic set-topic chips (no assistant needed).
     if (/^\/(help|hulp)\b/i.test(text)) { appendCircleMessage({ actor: 'me', text }); postHelpTopicChips(); return; }
@@ -3959,7 +3813,7 @@ function CircleDetail({
       // so a newly-created task appears there without a manual reload.
       if (activeTab === 'tasks') setTasksReloadTick((n) => n + 1);
     }).catch(() => {});
-  }, [composerText, eventLog, circle?.id, appendCircleMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, buildFeedbackMount, emitFeedbackLangOptions, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, composerCommands, t]);
+  }, [composerText, eventLog, circle?.id, appendCircleMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, composerCommands, t]);
 
   // δ.2 — tap-to-retry on the failed icon.  Looks up the original
   // text from the eventLog so we don't have to remember it elsewhere.
@@ -4279,9 +4133,6 @@ function CircleDetail({
             localActor: 'me',
             onRetryDelivery,
             onBubbleButton,
-            // Feedback review-card ✏ → prefill the composer with the point's text (web parity); the next send
-            // becomes an `fp:edit:<id>:<text>` turn (see sendCircleChat). feedbackLang labels the card buttons.
-            onFeedbackEdit: (p) => { feedbackEditRef.current = p.id; setComposerText(p.text || ''); },
             // Long BOT bubbles (e.g. a verify-summary) chunk to a preview + Show more/less instead of the 4-line cap.
             isBubbleExpanded: (id) => expandedBubbles.has(id),
             onToggleBubble: toggleBubble,
@@ -4600,25 +4451,6 @@ function renderBubblesWithDayDividers(rows, t, deliveryOpts = null, styles) {
 
 function renderBubble(row, t, deliveryOpts = null, styles) {
   const payload = row.event?.payload ?? {};
-  // Rich feedback: a Stage-1 review renders as editable CARDS (shared component), NOT a flattened text bubble
-  // — parity with the web invite-circle circle. Card actions route through the same `onBubbleButton` as other
-  // bot chips (send/send-all/cancel → fp:consent:*/fp:cancel); ✏ prefills the composer via onFeedbackEdit.
-  const review = payload.review;
-  if (review && Array.isArray(review.points)) {
-    const onBtn = typeof deliveryOpts?.onBubbleButton === 'function' ? deliveryOpts.onBubbleButton : null;
-    return (
-      <View key={row.id} style={styles.bubble} testID={`circle-bubble-${row.id}`}>
-        <FeedbackReviewCards
-          intro={review.intro} points={review.points} labels={review.labels} botLang={deliveryOpts?.feedbackLang}
-          editing={null}
-          onEditPoint={(p) => deliveryOpts?.onFeedbackEdit?.(p)}
-          onSend={(pid) => onBtn?.({ id: `fp:consent:${pid}` })}
-          onSendAll={() => onBtn?.({ id: 'fp:consent:all' })}
-          onSendNone={() => onBtn?.({ id: 'fp:cancel' })}
-        />
-      </View>
-    );
-  }
   // The SHARED reader — `payload.body` is not always text: on a lane-statement entry it is the
   // statement's own body, and handing React an object takes the whole screen down. Web read this with a
   // string check and mobile did not, which is the divergence that made a crash here and nothing there.
@@ -4701,7 +4533,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
             </Text>
             {chunked ? (
               <Pressable onPress={() => deliveryOpts?.onToggleBubble?.(row.id)} hitSlop={6} testID={`circle-more-${row.id}`}>
-                <Text style={styles.bubbleMore}>{expanded ? t('circle.feedback.show_less') : t('circle.feedback.show_more')}</Text>
+                <Text style={styles.bubbleMore}>{expanded ? t('circle.bubble.show_less') : t('circle.bubble.show_more')}</Text>
               </Pressable>
             ) : null}
           </>

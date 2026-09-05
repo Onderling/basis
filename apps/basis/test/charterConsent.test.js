@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   charterFromConfig, consentItems, emptyConsent, setConsentValue, toggleConsent,
   consentRelease, consentWarning,
-} from '../src/feedback/charterConsent.js';
+} from '../src/v2/charterConsent.js';
 
 const cfgCharter = { version: 1, attributes: [
   { key: 'place', purpose: 'which circles are represented' },

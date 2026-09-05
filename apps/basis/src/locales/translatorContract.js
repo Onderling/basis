@@ -57,10 +57,10 @@ export const TRANSLATOR_CONTRACT = Object.freeze([
   { name: 'plural: other, nl', key: 'circle.nearby.count', params: { count: 2 }, lang: 'nl', expect: '2 apparaten' },
 
   // ── 5 · a key that merely ENDS in _one is not a plural form ──
-  //   `circle.feedback.send_one` is a real key ("Send"), not the singular of a `send`. Asking for it
+  //   `circle.screens.filter_one` is a real key ("1 circle"), not the singular of a plural form. Asking for it
   //   directly must return it; the trap is a future `send` called with a count silently picking it up.
   { name: 'a key ending in _one is a key, not a plural form',
-    key: 'circle.feedback.send_one', lang: 'en', expect: 'Send' },
+    key: 'circle.screens.filter_one', lang: 'en', expect: "1 circle" },
 
   // ── 6 · a key nobody has translated comes back verbatim, so the gap is visible ──
   { name: 'an unknown key returns itself', key: 'circle.nope.not_a_key', lang: 'en',
@@ -73,7 +73,7 @@ export const TRANSLATOR_CONTRACT = Object.freeze([
     params: { defaultValue: 'should not win' }, lang: 'en', expect: 'Nearby' },
 
   // ── 8 · the third argument overrides the ambient language for one call ──
-  //   (the feedback thread renders its chrome in the BOT's language, not the app's)
+  //   (a bot thread may render its chrome in the BOT's language, not the app's)
   { name: 'the per-call language override wins over the ambient one',
     key: 'circle.nearbyScreen.title', lang: 'nl', expect: 'In de buurt' },
 ]);

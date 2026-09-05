@@ -14,6 +14,8 @@ export const DEFAULT_INTERPRET_SYSTEM =
   + '- If you only need ONE detail to choose the right tool or argument, reply with a SHORT clarifying '
   + 'question to the member (e.g. "Which list — shopping or tasks?").\n'
   + '- If it is ordinary chat or a greeting, reply briefly and naturally.\n'
+  + 'A reply of yours DOES NOTHING: only a tool call adds, completes or shows anything. Never claim that '
+  + 'something was added or done, and never write a confirmation line (no ✓) — call the tool instead.\n'
   + 'Always address the MEMBER directly in plain language. NEVER describe your own tool-calling decision — '
   + 'do not say things like "no tool call needed" or "this is a general question"; the member must never '
   + 'see that. When in doubt between acting and asking, ASK a short question rather than guessing a tool.';
@@ -98,7 +100,17 @@ export async function interpretToCommand(text, { catalogue, llm, system, options
   // bot can CONVERSE instead of dead-ending on "couldn't turn that into an action". `{reply}` carries
   // no opId, so dispatch treats it as a spoken reply rather than a command. null = nothing usable.
   const reply = result && typeof result.replyText === 'string' ? result.replyText.trim() : '';
+  // A reply that LOOKS like an act ("✓ added to shopping: …") is a fabrication — the model copied the shape
+  // of an earlier confirmation instead of calling the tool (seen live 2026-09-05: two items "added" that
+  // never landed). Drop it; the caller's no-match path answers honestly.
+  if (reply && looksLikeConfirmation(reply)) return null;
   return reply ? { reply } : null;
+}
+
+/** A reply shaped like a system confirmation — a check mark, or "added/done/marked …" as the first words. */
+export function looksLikeConfirmation(text) {
+  const t = String(text ?? '').trim();
+  return /^[✓✔☑]/.test(t) || /^(added|toegevoegd|marked complete|afgevinkt|done|gedaan|removed|verwijderd)\b/i.test(t);
 }
 
 /** Append a compact RAG-context block to the (LLM-facing) system prompt. No-op without context. */

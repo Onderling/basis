@@ -611,6 +611,14 @@
     "record_no_fields": {
       "text": "(geen velden)",
       "doc": "Record panel whose snapshot carries no fields."
+    },
+    "followup_prompt": {
+      "text": "Wat is je {{param}}?",
+      "doc": "Generic follow-up ask when a command misses one required field; {{param}} is the field name. The shared follow-up helper picks this key."
+    },
+    "form_title": {
+      "text": "Nog een paar gegevens voor {{opId}}",
+      "doc": "Title of the multi-field follow-up form; {{opId}} names the command."
     }
   },
   "common": {

@@ -24,6 +24,14 @@ describe('createAssistantEngine', () => {
     expect(seen[1].context).toEqual([]);
     expect(dispatched).toHaveLength(2);
   });
+  it('three voices: you, assistant, system — an op result is never the assistant speaking', () => {
+    const e = createAssistantEngine({ catalogue, dispatch: () => {} });
+    e.remember('t', 'you', 'zet kaas op de lijst');
+    e.remember('t', 'system', '✓ added to shopping: kaas');
+    e.remember('t', 'assistant', 'Nog iets?');
+    expect(e.recentTurns('t')).toEqual(['you: zet kaas op de lijst', 'system: ✓ added to shopping: kaas', 'assistant: Nog iets?']);
+  });
+
   it('memory is bounded to the last N turns', () => {
     const e = createAssistantEngine({ catalogue, dispatch: () => {}, memoryTurns: 3 });
     for (let i = 0; i < 5; i += 1) e.remember('t', 'you', `turn ${i}`);

@@ -69,11 +69,12 @@ const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
   householdPersistDb: { path: path.join(dataDir, 'household-items.json') },
   seedDemoData: false,
+  seedHousehold: false,   // no demo "Milk" on a real person's list
 });
 const householdManifest = agent.manifest;
 const sources = [{ manifest: householdManifest }, { manifest: listsManifest }];
 const catalogue = mergeManifests(sources);
-const manifestsByOrigin = Object.fromEntries(sources.map((s) => [s.manifest.appId ?? s.manifest.name, s.manifest]));
+const manifestsByOrigin = Object.fromEntries(sources.map((s) => [s.manifest.app, s.manifest]));
 
 // The confidential route: with a Privatemode key on this machine the assistant understands free text
 // (the SDK attests the enclave and encrypts end-to-end here); without one it runs in basic mode —
@@ -92,7 +93,7 @@ const walkLogFile = values['walk-log']
   ? values['walk-log'].replace(/(\.jsonl)?$/, `-${stamp}$1`)
   : path.join(dataDir, `walk-log-${stamp}.jsonl`);
 const walkLog = (entry) => appendFileSync(walkLogFile, JSON.stringify(entry) + '\n');
-walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'telegram', lang: values.lang, apps: sources.map((s) => s.manifest.appId ?? s.manifest.name),
+walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'telegram', lang: values.lang, apps: sources.map((s) => s.manifest.app),
   commands: catalogue.commandMenu?.length ?? 0, llm: llm ? { provider: 'privatemode', model: llmModel } : null, door: allowedChatIds === '*' ? 'open' : 'allow-list' });
 const runner = createTelegramRunner({
   bridge, catalogue, manifestsByOrigin, allowedChatIds, t,

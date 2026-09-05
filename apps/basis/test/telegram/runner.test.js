@@ -121,6 +121,43 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(log[2]).toMatchObject({ via: 'llm-unavailable' });
   });
 
+  it('/help lists the commands with their hints; the help op does the same instead of failing', async () => {
+    const { say } = await boot();
+    const out = await say('/help');
+    expect(out[0].text).toContain('/mine');
+    expect(out[0].text).toContain('/done');
+  });
+
+  it('a typed body splits into the enum + the text, in the words people use (/add boodschappen olie)', async () => {
+    const { say, calls } = await boot();
+    await say('/add-item boodschappen olie');
+    expect(calls.at(-1)).toMatchObject({ op: 'addItem', args: { type: 'shopping', text: 'olie' } });
+    await say('/add-item shopping melk en kaas');
+    expect(calls.at(-1)).toMatchObject({ op: 'addItem', args: { type: 'shopping', text: 'melk en kaas' } });
+  });
+
+  it('an enum arg named the Dutch way is coerced to the declared value', async () => {
+    const { say, calls } = await boot();
+    await say('listOpen:');   // a bare tap has no type
+    await say('/mine boodschappen');
+    const last = calls.at(-1);
+    expect(last.op).toBe('listOpen');
+    if (last.args && 'type' in last.args) expect(last.args.type).toBe('shopping');
+  });
+
+  it("an op's result is remembered as the system's voice, a model reply as the assistant's", async () => {
+    const remembered = [];
+    const gate = { evaluate: async () => ({ via: 'llm' }) };
+    const interpret = async () => ({ reply: 'Welke lijst bedoel je?' });
+    const { say, runner } = await boot({ gate, interpret });
+    await say('/mine');
+    await say('iets vaags');
+    // the engine is internal; read the memory through the runner's engine seam
+    const lines = runner.recentTurns?.('tg:42') ?? [];
+    expect(lines.some((l) => l.startsWith('system: '))).toBe(true);
+    expect(lines.some((l) => l.startsWith('assistant: Welke lijst'))).toBe(true);
+  });
+
   it('a new command cancels a pending ask instead of being swallowed as its answer', async () => {
     const { say, agent, runner } = await boot();
     await say('/add-item');

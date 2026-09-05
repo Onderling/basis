@@ -44,6 +44,14 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
     // (English + common Dutch); generic "add X to the list" (no type word) returns null → falls through
     // to the unchanged addTask rule. Types mirror the household manifest's addItem enum.
     { name: 'household:addItem(typed-list)', test: HH_ADD_TYPED, command: householdTypedListAdd },
+    // An UNTYPED add ("voeg melk toe", "add milk to the list", "zet kaas erbij") is a household list item
+    // whose LIST is unknown → addItem WITHOUT a type, so the shell asks "which list?" (a needsForm on `type`)
+    // instead of the July default that made every bare add a task (ledger L90, 2026-09-05). A task is still
+    // reachable by saying so ("add task …", "taak: …") — that falls through to the tasks rule.
+    { name: 'household:addItem(untyped-asks)', test: HH_ADD_UNTYPED, command: householdUntypedAdd },
+    // "kaas is gekocht" · "de afwas is gedaan" · "milk is bought" — a statement that an item is done; the model
+    // asked "do you want me to …?" instead (eval 2026-09-05). Deterministic: markComplete by name.
+    { name: 'household:markComplete(stated-done)', test: HH_STATED_DONE, command: householdStatedDone },
     // Household READ rules (prepended). The tasks-derived gate skips read phrasing ("show the shopping
     // list", "what tasks do we have") → the LLM, which (small models) mis-picks markComplete and dumps a
     // confusing "which one to complete?" clarify ON A READ (the markComplete-on-read bug, 2026-06-25).
@@ -68,10 +76,40 @@ const HH_LIST_ALIASES = {
   repair: 'repair', repairs: 'repair', reparatie: 'repair', reparaties: 'repair',
   schedule: 'schedule', schedules: 'schedule', agenda: 'schedule',
 };
+/** "stokbrood, melk en eieren" → three items; a single item stays one ("brood en eieren" is a deliberate pair only
+ *  when written without a comma list — the same rule as a person reading it). */
+export function splitItems(text) {
+  const s = String(text ?? '').trim();
+  if (!/,/.test(s)) return [s];
+  return s.split(/\s*,\s*|\s+(?:en|and)\s+/i).map((x) => x.trim()).filter(Boolean);
+}
+
 /** A household list named the way people say it ("boodschappen", "klusjes", "groceries") → the addItem enum value, or null. */
 export function householdListType(word) {
   const w = String(word ?? '').trim().toLowerCase().replace(/(?:lijstje|lijst|list)$/, '');
   return HH_LIST_ALIASES[w] ?? HH_LIST_ALIASES[String(word ?? '').trim().toLowerCase()] ?? null;
+}
+// "<item> is gekocht/gedaan/klaar/af" · "<item> is bought/done" — a statement, not a command.
+const HH_STATED_DONE = /^(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:is|zijn|are)\s+(?:al\s+|already\s+)?(gekocht|gehaald|gedaan|klaar|af|binnen|bought|done|finished)[.!]?$/i;
+function householdStatedDone(text) {
+  const m = HH_STATED_DONE.exec(String(text || '').trim());
+  if (!m) return null;
+  const item = m[1].trim();
+  return item ? { opId: 'markComplete', args: { match: item } } : null;
+}
+// "add <item>" · "voeg <item> toe" · "zet <item> erbij" · "add <item> to the list" — no list named.
+const HH_ADD_UNTYPED =
+  /^(?:add|voeg|zet|doe|noteer)\s+(.+?)(?:\s+(?:toe|erbij|op\s+de\s+lijst|op\s+het\s+lijstje|to\s+the\s+list|on\s+the\s+list))?\s*$/i;
+function householdUntypedAdd(text, ctx) {
+  // With a conversation under way the MODEL decides — it has the recent turns ("doe broccoli erbij" after a
+  // shopping-list exchange means shopping); the memory-less gate would only ask what the model already knows.
+  if (Number(ctx?.memoryTurns) > 0) return null;
+  const m = HH_ADD_UNTYPED.exec(String(text || '').trim());
+  if (!m) return null;
+  const item = m[1].trim().replace(/^(?:a|an|the|een|de|het)\s+/i, '');
+  if (!item) return null;
+  if (/^(?:task|taak|klus)\b/i.test(item)) return null;   // "add task …" is a task — the tasks rule takes it
+  return { opId: 'addItem', args: { text: item } };        // no type → the shell asks which list
 }
 // "add <item> to [the] <type> [list]" · "noteer <item> op de <type>lijst" · "voeg <item> toe aan de <type>"
 const HH_ADD_TYPED =
@@ -89,7 +127,8 @@ function householdTypedListAdd(text) {
   const item = m[1].trim();
   const type = HH_LIST_ALIASES[m[2].toLowerCase()];
   if (!item || !type) return null;   // no known list type → generic add (addTask) takes it
-  return { opId: 'addItem', args: { type, text: item } };
+  const items = splitItems(item);
+  return { opId: 'addItem', args: { type, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addItem', args: { type, text: t } })) } : {}) };
 }
 
 // Read intent (EN + common NL); leading verb so a mutate phrase ("add"/"done"/"complete") never matches.

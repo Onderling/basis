@@ -176,7 +176,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
         if (p.kind === 'multi') p.values = {};
         pending.set(chatId, { kind: 'form', p });
         const fields = p.kind === 'single' ? p.missingParam : p.fields.map((f) => f.name).join(', ');
-        return say(chatId, `${t('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`);
+        // An enum field asks with BUTTONS: the declared values, named the way people say them.
+        const op = catalogue.opsById?.get?.(r.opId)?.op;
+        const askName = p.kind === 'single' ? p.missingParam : p.fields[0].name;
+        const enumP = (op?.params ?? []).find((q) => q?.name === askName && q.kind === 'enum' && Array.isArray(q.of));
+        const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: t(`circle.telegram.list_${v}`) })) : undefined;
+        return say(chatId, `${t('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`, buttons);
       }
       case 'needsConfirm': {
         pending.set(chatId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });

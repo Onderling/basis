@@ -118,9 +118,9 @@ export function createAssistantEngine({
     remember,
     recentTurns: linesFor,
     /** A circle door: the raw line; the engine decides whether the bot was addressed (`ctx.id` = the thread). */
-    handle: (text, ctx = {}) => engineFor(ctx?.id).handle(text, ctx),
+    handle: (text, ctx = {}) => engineFor(ctx?.id).handle(text, { ...ctx, memoryTurns: (typeof recentTurnsIn === 'function' ? recentTurnsIn() : linesFor(ctx?.id)).length }),
     /** A private door (Telegram, a DM): every line is for the bot — tagged here so the engine treats it so. */
-    ask: (threadId, text, ctx = {}) => engineFor(threadId).handle(`@${botName} ${text}`, { id: threadId, ...ctx }),
+    ask: (threadId, text, ctx = {}) => engineFor(threadId).handle(`@${botName} ${text}`, { id: threadId, ...ctx, memoryTurns: (typeof recentTurnsIn === 'function' ? recentTurnsIn() : linesFor(threadId)).length }),
     /** Retrieval on its own (tests, diagnostics). */
     retrieve: retrieve ? (text, ctx = {}) => retrieve(text, ctx) : null,
   };

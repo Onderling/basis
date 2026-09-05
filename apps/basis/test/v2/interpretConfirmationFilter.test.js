@@ -14,6 +14,17 @@ describe('looksLikeConfirmation', () => {
   });
 });
 
+describe('interpretToCommand — several calls in one turn', () => {
+  it('carries the second and later tool calls as `more`', async () => {
+    const llm = { invoke: async () => ({ toolCall: { id: 'addItem', args: { type: 'shopping', text: 'stokbrood' } }, toolCalls: [
+      { id: 'addItem', args: { type: 'shopping', text: 'stokbrood' } }, { id: 'addItem', args: { type: 'shopping', text: 'braadlappen' } }, { id: 'addItem', args: { type: 'shopping', text: 'geurkazen' } },
+    ], replyText: null }) };
+    const r = await interpretToCommand('stokbrood, braadlappen en geurkazen', { catalogue, llm });
+    expect(r.opId).toBe('addItem');
+    expect(r.more.map((m) => m.args.text)).toEqual(['braadlappen', 'geurkazen']);
+  });
+});
+
 describe('interpretToCommand', () => {
   it('drops a fabricated confirmation instead of surfacing it as a reply', async () => {
     const llm = { invoke: async () => ({ toolCall: null, replyText: '✓ added to shopping: braadlappen' }) };

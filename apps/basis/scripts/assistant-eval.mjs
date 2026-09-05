@@ -82,12 +82,18 @@ process.exit(rate >= Number(values.min) ? 0 : 1);
 
 function judge(expect, got, n) {
   if (!expect) return { ok: true, why: '' };
+  if (Array.isArray(expect.anyOf)) {
+    const verdicts = expect.anyOf.map((e) => judge(e, got, n));
+    const hit = verdicts.find((v) => v.ok);
+    return hit ?? { ok: false, why: verdicts.map((v) => v.why).join(' / ') };
+  }
   if (expect.op) {
     if (!got?.op) return { ok: false, why: 'no tool call' };
     if (got.op !== expect.op) return { ok: false, why: 'wrong tool' };
     for (const [k, v] of Object.entries(expect.args ?? {})) {
       const g = got.args?.[k];
-      if (v instanceof RegExp ? !v.test(String(g ?? '')) : String(g ?? '').toLowerCase() !== String(v).toLowerCase()) return { ok: false, why: `arg ${k}=${JSON.stringify(g)}` };
+      const re = v instanceof RegExp ? new RegExp(v.source, v.flags.includes('i') ? v.flags : `${v.flags}i`) : null;   // args compare case-insensitively
+      if (re ? !re.test(String(g ?? '')) : String(g ?? '').toLowerCase() !== String(v).toLowerCase()) return { ok: false, why: `arg ${k}=${JSON.stringify(g)}` };
     }
     if (expect.count && n < expect.count) return { ok: false, why: `${n} call(s), wanted ${expect.count}` };
     return { ok: true, why: '' };
@@ -103,6 +109,7 @@ function judge(expect, got, n) {
 }
 function describe(x) {
   if (!x) return 'nothing';
+  if (x.anyOf) return x.anyOf.map(describe).join(' | ');
   if (x.op) return `${x.op}(${Object.entries(x.args ?? {}).map(([k, v]) => `${k}=${v instanceof RegExp ? v : JSON.stringify(v)}`).join(', ')})`;
   return `reply:${String(x.reply).slice(0, 40)}`;
 }

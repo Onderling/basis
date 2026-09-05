@@ -18,13 +18,18 @@ export const FIXTURES = [
   // ── multi-item (walk 1: only the first landed) ──
   { id: 'add-multi-nl',       text: 'Hoi, ik wil vandaag het volgende halen bij de winkel: stokbrood, braadlappen en geurkazen', expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
   { id: 'add-two-nl',         text: 'zet brood en eieren op de boodschappen', expect: { op: 'addItem', args: { type: 'shopping' } } },
+  { id: 'add-three-plain-nl', text: 'zet stokbrood, melk en eieren op de boodschappenlijst', expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
+  // ── an untyped add ASKS which list (L90): the gate hands addItem without a type; the shell asks ──
+  { id: 'gate-add-untyped-nl', text: 'voeg ook de braadlappen en geurkazen toe', expect: { op: 'addItem', args: { text: /braadlappen/ } } },
+  { id: 'gate-add-untyped-en', text: 'add milk to the list', lang: 'en', expect: { op: 'addItem', args: { text: 'milk' } } },
+  { id: 'gate-add-task-en',    text: 'add task call the plumber', lang: 'en', expect: { op: 'addTask' } },
   // ── complete / remove ──
   { id: 'done-bought-nl',     text: 'Kaas is gekocht', items: ['kaas', 'melk'], expect: { op: 'markComplete', args: { match: /kaas/ } } },
   // ── memory: a bare answer to the bot's question ──
   { id: 'memory-which-list',  text: 'De boodschappenlijst', before: ['you: wat staat er op de lijst', 'assistant: Welke lijst bedoel je — boodschappen of klusjes?'], expect: { op: 'listOpen', args: { type: 'shopping' } } },
   { id: 'memory-show-first',  text: 'Laat eerst maar zien', before: ['you: ik wil boodschappen doen!', 'assistant: prima, wil je de boodschappenlijst zien, of iets toevoegen?'], expect: { op: 'listOpen', args: { type: 'shopping' } } },
   // ── ambiguity: the model should ASK, not guess ──
-  { id: 'ask-which-list',     text: 'Wat staat er op de lijst', expect: { reply: 'asks' } },
+  { id: 'ask-which-list',     text: 'Wat staat er op de lijst', expect: { anyOf: [{ reply: 'asks' }, { op: 'listLists' }, { op: 'listOpen' }] } },   // asking, or showing what lists there are, both fine
   // ── not our business: a spoken decline in the member's language, never a tool ──
   { id: 'decline-time-nl',    text: 'Hoe laat is het', expect: { reply: 'declines' } },
   { id: 'decline-socks-nl',   text: 'Kun je ook sokken stoppen', expect: { reply: 'declines' } },

@@ -28,7 +28,8 @@ export function createTokenGate({ rules = [], retrieve, maxContext = 5 } = {}) {
         if (!ruleMatches(rule, trimmed, ctx)) continue;
         if (typeof rule.command === 'function') {
           const cmd = rule.command(trimmed, ctx);
-          if (cmd && cmd.opId) return { via: 'rule', command: { opId: cmd.opId, args: cmd.args || {} }, rule: rule.name };
+          // The whole command rides through — `more` (several items in one line) and `appOrigin` included.
+          if (cmd && cmd.opId) return { via: 'rule', command: { opId: cmd.opId, args: cmd.args || {}, ...(Array.isArray(cmd.more) ? { more: cmd.more } : {}) }, rule: rule.name };
           continue;                                   // matched but couldn't build a command → fall through
         }
         return { via: 'skip', reason: rule.reason || rule.name || 'rule' };

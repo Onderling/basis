@@ -75,8 +75,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       if (!items.length) { await say(chatId, rendered.text ?? t('circle.telegram.empty_list')); return; }
       const lines = items.map((it, i) => `${i + 1}. ${it.label}`);
       const buttons = [];
+      // A button names the ITEM, not its row number ("Done: melk", not "Done 1") — read from a phone, the
+      // number was a puzzle (walk 2). Long labels are cut; the row number stays as a tiebreaker.
       items.forEach((it, i) => {
-        for (const b of (it.buttons ?? [])) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label} ${i + 1}` : b.label });
+        const name = String(it.label ?? '').trim();
+        const short = name.length > 18 ? `${name.slice(0, 17)}…` : name;
+        for (const b of (it.buttons ?? [])) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
       });
       await say(chatId, lines.join('\n'), buttons);
       return;

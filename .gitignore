@@ -104,3 +104,7 @@ _archive/
 
 # integration-test output logs (run-integration.mjs --provision writes the full vitest output here)
 .integration-logs/
+
+# The Telegram shell's data dir (identity vault + passphrase + items) — never in git
+.basis-telegram/
+.feedback-bot/

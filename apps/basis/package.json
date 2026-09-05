@@ -50,7 +50,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "coverage": "node scripts/surface-coverage.mjs"
+    "coverage": "node scripts/surface-coverage.mjs",
+    "telegram": "node bin/telegram-runner.mjs"
   },
   "dependencies": {
     "@inrupt/solid-client": "^3.0.0",

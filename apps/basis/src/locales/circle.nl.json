@@ -6077,5 +6077,39 @@
       "text": "Minder tonen",
       "doc": "Long bubble — collapse back to the preview."
     }
+  },
+  "telegram": {
+    "not_paired": {
+      "text": "Deze chat is nog niet gekoppeld aan de assistent. Je chat-id is {{chatId}} — voeg die toe aan de toegestane chats op de machine waar de assistent draait.",
+      "doc": "Telegram runner: a chat that is not on the allow-list. Names the chat id so the owner can allow it."
+    },
+    "unknown": {
+      "text": "Hier begrijp ik alleen opdrachten. Typ /help om te zien wat je kunt vragen.",
+      "doc": "Telegram runner: free text with no LLM route wired — only slash commands work."
+    },
+    "needs_form": {
+      "text": "Ik heb nog iets nodig: {{fields}}. Antwoord daarmee en ik ga verder.",
+      "doc": "Telegram runner: a command is missing a required field; {{fields}} lists the field names."
+    },
+    "confirm": {
+      "text": "{{message}} Tik om te bevestigen.",
+      "doc": "Telegram runner: a command that asks to confirm before it runs; {{message}} is the op's own warning."
+    },
+    "confirm_yes": {
+      "text": "Ja, doe maar",
+      "doc": "Telegram runner: the confirm button."
+    },
+    "confirm_no": {
+      "text": "Nee, laat maar",
+      "doc": "Telegram runner: the cancel button."
+    },
+    "error": {
+      "text": "Dat lukte niet: {{message}}",
+      "doc": "Telegram runner: a dispatch failed; {{message}} is the error text."
+    },
+    "empty_list": {
+      "text": "Nog niets.",
+      "doc": "Telegram runner: a list reply with no items."
+    }
   }
 }

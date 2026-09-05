@@ -6110,6 +6110,22 @@
     "empty_list": {
       "text": "Nothing here yet.",
       "doc": "Telegram runner: a list reply with no items."
+    },
+    "list_shopping": {
+      "text": "shopping",
+      "doc": "Telegram runner: the \"shopping\" household list as a button label when the assistant asks which list."
+    },
+    "list_errand": {
+      "text": "errands",
+      "doc": "Telegram runner: the \"errand\" household list as a button label when the assistant asks which list."
+    },
+    "list_repair": {
+      "text": "repairs",
+      "doc": "Telegram runner: the \"repair\" household list as a button label when the assistant asks which list."
+    },
+    "list_schedule": {
+      "text": "schedule",
+      "doc": "Telegram runner: the \"schedule\" household list as a button label when the assistant asks which list."
     }
   }
 }

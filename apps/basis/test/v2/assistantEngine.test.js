@@ -91,6 +91,14 @@ describe('createAssistantEngine', () => {
     expect(interpretSystemFor('en')).toContain('Always reply in English');
   });
 
+  it('three items named → three dispatches in one turn (the interpreter\'s `more`)', async () => {
+    const dispatched = [];
+    const interpret = async () => ({ opId: 'addItem', args: { type: 'shopping', text: 'a' }, more: [{ opId: 'addItem', args: { type: 'shopping', text: 'b' } }, { opId: 'addItem', args: { type: 'shopping', text: 'c' } }] });
+    const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), llm, interpret });
+    await e.ask('t', 'a, b en c');
+    expect(dispatched.map((d) => d.args.text)).toEqual(['a', 'b', 'c']);
+  });
+
   it('loadAssistantItems shapes household open items for the retriever', async () => {
     const load = loadAssistantItems({ callSkill: async () => ({ items: [{ id: 9, type: 'shopping', label: 'Milk' }, { id: 10, text: '' }] }) });
     expect(await load()).toEqual([{ id: '9', type: 'shopping', text: 'Milk' }]);

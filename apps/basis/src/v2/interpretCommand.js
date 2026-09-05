@@ -8,12 +8,13 @@
 /** Default tool-selection prompt. Internal (LLM-facing), not a user-visible string. */
 export const DEFAULT_INTERPRET_SYSTEM =
   'You are the assistant in a shared circle. When a member\'s message is a clear request to DO or SEE '
-  + 'something, call AT MOST ONE matching tool — this INCLUDES requests to view, list, or show data (use '
-  + 'the matching list/open tool). Take arguments verbatim from the message; never invent them.\n'
+  + 'something, call the matching tool — this INCLUDES requests to view, list, or show data (use the '
+  + 'matching list/open tool). One call per action: when several items are named, make one call per item, '
+  + 'all in this turn. Take arguments verbatim from the message; never invent them.\n'
   + 'When no single tool clearly fits:\n'
   + '- If you only need ONE detail to choose the right tool or argument, reply with a SHORT clarifying '
   + 'question to the member (e.g. "Which list — shopping or tasks?").\n'
-  + '- If it is ordinary chat or a greeting, reply briefly and naturally.\n'
+  + '- If it is ordinary chat or a greeting ("hoi", "maii", "gaat lekker"), reply briefly and naturally and call NO tool.\n'
   + 'A reply of yours DOES NOTHING: only a tool call adds, completes or shows anything. Never claim that '
   + 'something was added or done, and never write a confirmation line (no ✓) — call the tool instead.\n'
   + 'Always address the MEMBER directly in plain language. NEVER describe your own tool-calling decision — '
@@ -74,7 +75,8 @@ export function buildToolDescriptors(catalogue) {
  *        `context` = RAG items (e.g. from the token gate's `retrieve`) woven into the system prompt.
  *        `history` = prior conversation turns threaded as real messages — so a clarifying follow-up
  *        ("which list?" → "shopping") resolves against what the bot just asked, not a stateless guess.
- * @returns {Promise<{opId:string, args:object}|{reply:string}|null>}
+ * @returns {Promise<{opId:string, args:object, more?:Array<{opId:string,args:object}>}|{reply:string}|null>}
+ *   `more` carries the SECOND and later tool calls of the same turn (a member naming three items).
  */
 export async function interpretToCommand(text, { catalogue, llm, system, options, context, history } = {}) {
   const q = String(text ?? '').trim();
@@ -94,6 +96,10 @@ export async function interpretToCommand(text, { catalogue, llm, system, options
 
   const call = result && result.toolCall;
   if (call && call.id) {
+    const rest = Array.isArray(result.toolCalls) ? result.toolCalls.slice(1).filter((c) => c && c.id) : [];
+    if (rest.length) {
+      return { opId: call.id, args: call.args && typeof call.args === 'object' ? call.args : {}, more: rest.map((c) => ({ opId: c.id, args: c.args && typeof c.args === 'object' ? c.args : {} })) };
+    }
     return { opId: String(call.id), args: call.args && typeof call.args === 'object' ? call.args : {} };
   }
   // No tool — surface the model's conversational reply (a clarifying question, a short answer) so the

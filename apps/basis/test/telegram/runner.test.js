@@ -158,6 +158,15 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(lines.some((l) => l.startsWith('assistant: Welke lijst'))).toBe(true);
   });
 
+  it('an enum ask comes with buttons for its values, and a tap answers it', async () => {
+    const { say, calls } = await boot();
+    const ask = await say('/add-item');   // type + text missing → the first field, type, is an enum
+    expect(ask[0].buttons.map((b) => b.id)).toEqual(['shopping', 'errand', 'repair', 'schedule']);
+    await say('shopping');
+    await say('olie');
+    expect(calls.at(-1)).toMatchObject({ op: 'addItem', args: { type: 'shopping', text: 'olie' } });
+  });
+
   it('a new command cancels a pending ask instead of being swallowed as its answer', async () => {
     const { say, agent, runner } = await boot();
     await say('/add-item');

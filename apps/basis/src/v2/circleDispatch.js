@@ -73,6 +73,9 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             // Carry the gate rule's owning app (K0 de-shadow) so the resolver routes a colliding bare
             // op-id to the gate's app, not the merge's first-declarer.
             await dispatch({ opId: g.command.opId, args: g.command.args || {}, appOrigin: g.command.appOrigin }, ctx);
+            for (const m of (Array.isArray(g.command.more) ? g.command.more : [])) {
+              if (m && m.opId) await dispatch({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? g.command.appOrigin }, ctx);
+            }
             return { via: 'rule', cmd: g.command };
           }
           if (g.via === 'skip') return { via: await sink(trimmed, ctx) };
@@ -103,6 +106,10 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
           }
           if (cmd && cmd.opId) {
             await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
+            // A member who names three items gets three acts in one turn — the further calls, in order.
+            for (const m of (Array.isArray(cmd.more) ? cmd.more : [])) {
+              if (m && m.opId) await dispatch({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} }, ctx);
+            }
             return { via: 'llm', cmd };
           }
           // The LLM ran but mapped the message to NO tool. If it spoke a conversational reply (a clarifying

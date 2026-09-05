@@ -9,14 +9,16 @@ const gate = () => createTokenGate({ rules: circleGateRules() });
 const route = (text) => gate().evaluate(text, {});
 
 describe('circle gate (manifest-derived) — deterministic routing', () => {
-  it('"add X to the list" → addTask{text:X}, dropping the list qualifier', async () => {
+  it('"add X to the list" → addItem{text:X} with NO type — the shell asks which list (L90, 2026-09-05)', async () => {
     const r = await route('add milk to the list');
     expect(r.via).toBe('rule');
-    expect(r.command).toEqual({ opId: 'addTask', args: { text: 'milk' } });
+    expect(r.command).toEqual({ opId: 'addItem', args: { text: 'milk' } });
   });
 
   it('add keeps a multi-word item with no qualifier', async () => {
-    expect((await route('add buy fresh milk')).command).toEqual({ opId: 'addTask', args: { text: 'buy fresh milk' } });
+    expect((await route('add buy fresh milk')).command).toEqual({ opId: 'addItem', args: { text: 'buy fresh milk' } });
+    // saying "task" keeps it a task
+    expect((await route('add task call the plumber')).command).toEqual({ opId: 'addTask', args: { text: 'task call the plumber' } });
   });
 
   it('TYPED list: "add X to the shopping/repair list" → addItem({type}), not addTask', async () => {
@@ -28,8 +30,28 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
     expect((await route('zet melk op de boodschappenlijst')).command).toEqual({ opId: 'addItem', args: { type: 'shopping', text: 'melk' } });
   });
 
-  it('UNTYPED "add X to the list" still → addTask (no type word → falls through)', async () => {
-    expect((await route('add milk to the list')).command).toEqual({ opId: 'addTask', args: { text: 'milk' } });
+  it('an untyped add with a conversation under way is left to the model (memoryTurns > 0)', async () => {
+    const rules = circleGateRules('nl');
+    const rule = rules.find((r) => r.name === 'household:addItem(untyped-asks)');
+    expect(rule.command('doe broccoli erbij', { memoryTurns: 2 })).toBeNull();
+    expect(rule.command('doe broccoli erbij', { memoryTurns: 0 })).toEqual({ opId: 'addItem', args: { text: 'broccoli' } });
+  });
+
+  it('a typed add naming several items → one command per item (more)', async () => {
+    const r = await route('zet stokbrood, melk en eieren op de boodschappenlijst');
+    expect(r.command.args).toEqual({ type: 'shopping', text: 'stokbrood' });
+    expect(r.command.more.map((m) => m.args.text)).toEqual(['melk', 'eieren']);
+    expect((await route('zet brood en eieren op de boodschappen')).command.more).toBeUndefined();
+  });
+
+  it('a stated "X is gekocht/gedaan/bought" → markComplete{match:X} without a model', async () => {
+    expect((await route('kaas is gekocht')).command).toEqual({ opId: 'markComplete', args: { match: 'kaas' } });
+    expect((await route('De afwas is gedaan!')).command).toEqual({ opId: 'markComplete', args: { match: 'afwas' } });
+    expect((await route('milk is bought')).command).toEqual({ opId: 'markComplete', args: { match: 'milk' } });
+  });
+
+  it('UNTYPED "add X to the list" → addItem without a type (asks), never a silent task', async () => {
+    expect((await route('add milk to the list')).command).toEqual({ opId: 'addItem', args: { text: 'milk' } });
   });
 
   it('READ: "show/what\'s on the <type> list" → listOpen({type}) — NOT markComplete (the read misfire)', async () => {
@@ -48,9 +70,9 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
     expect((await route('what should we cook tonight?')).via).toBe('llm');
   });
 
-  it('Dutch: "voeg melk toe" / "zet melk op de lijst" → addTask{text:melk}', async () => {
-    expect((await route('voeg melk toe')).command).toEqual({ opId: 'addTask', args: { text: 'melk' } });
-    expect((await route('zet melk op de lijst')).command).toEqual({ opId: 'addTask', args: { text: 'melk' } });
+  it('Dutch: "voeg melk toe" / "zet melk op de lijst" → addItem{text:melk} without a type (asks which list)', async () => {
+    expect((await route('voeg melk toe')).command).toEqual({ opId: 'addItem', args: { text: 'melk' } });
+    expect((await route('zet melk op de lijst')).command).toEqual({ opId: 'addItem', args: { text: 'melk' } });
   });
 
   it('"done X" → completeTask with id (the pickerSource param), not match', async () => {
@@ -133,7 +155,7 @@ describe('circle bot + manifest gate — routing precedence', () => {
     const { bot, dispatched, interpret } = setup();
     const r = await bot.handle('@assistant add milk to the list');
     expect(r.via).toBe('rule');
-    expect(dispatched).toEqual([{ opId: 'addTask', args: { text: 'milk' } }]);
+    expect(dispatched).toEqual([{ opId: 'addItem', args: { text: 'milk' } }]);
     expect(interpret).not.toHaveBeenCalled();
   });
 

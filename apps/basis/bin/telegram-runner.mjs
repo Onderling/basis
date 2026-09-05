@@ -27,6 +27,9 @@ import { mergeManifests } from '../src/manifestMerge.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { createTokenGate } from '../src/v2/tokenGate.js';
+import { interpretToCommand } from '../src/v2/interpretCommand.js';
+import { LlmClient } from '@onderling/llm-client';
+import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/providers/privatemode';
 import { circleGateRules } from '../src/v2/circleGate.js';
 import { listsManifest } from '../../lists/manifest.js';
 
@@ -41,8 +44,11 @@ function readToken() {
 }
 const token = readToken();
 if (!token) { console.error('telegram-runner: set TG_BOT_TOKEN (or put the token in ~/.canopy-tg-token)'); process.exit(2); }
-const allowedChatIds = String(process.env.TG_ALLOWED_CHAT_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-if (!allowedChatIds.length) console.warn('telegram-runner: TG_ALLOWED_CHAT_IDS is empty — every chat will be told its id and refused');
+// TG_ALLOWED_CHAT_IDS=123,456 pairs exactly those chats; unset (or '*') is the OPEN DOOR: anyone who finds the
+// bot can use it — fine for a first try on a test bot, not for a bot that holds anything of yours.
+const rawAllow = String(process.env.TG_ALLOWED_CHAT_IDS ?? '').trim();
+const allowedChatIds = rawAllow && rawAllow !== '*' ? rawAllow.split(',').map((s) => s.trim()).filter(Boolean) : '*';
+if (allowedChatIds === '*') console.warn('telegram-runner: OPEN DOOR — no TG_ALLOWED_CHAT_IDS, every chat is admitted');
 
 const dataDir = path.resolve(values['data-dir']);
 mkdirSync(dataDir, { recursive: true });
@@ -69,6 +75,14 @@ const sources = [{ manifest: householdManifest }, { manifest: listsManifest }];
 const catalogue = mergeManifests(sources);
 const manifestsByOrigin = Object.fromEntries(sources.map((s) => [s.manifest.appId ?? s.manifest.name, s.manifest]));
 
+// The confidential route: with a Privatemode key on this machine the assistant understands free text
+// (the SDK attests the enclave and encrypts end-to-end here); without one it runs in basic mode —
+// commands and the deterministic gate only. PRIVATEMODE_MODEL picks the model (default gpt-oss-120b).
+let llm = null; let llmModel = null;
+if (readPrivatemodeKey()) {
+  const provider = await privatemodeProvider({ model: process.env.PRIVATEMODE_MODEL || undefined, timeoutMs: 60_000 });
+  llm = new LlmClient({ provider }); llmModel = provider.model;
+}
 const bridge = new TelegramBridge({ botToken: token, mode: 'long-polling' });
 const runner = createTelegramRunner({
   bridge, catalogue, manifestsByOrigin, allowedChatIds, t,
@@ -76,9 +90,10 @@ const runner = createTelegramRunner({
   // The deterministic gate the circle composer uses ("add X" / "done X" route without a model).
   // The interpreter (an LLM route) is wired once a confidential route is configured.
   gate: createTokenGate({ rules: circleGateRules(values.lang) }),
+  ...(llm ? { llm, interpret: interpretToCommand } : {}),
 });
 await runner.start();
-console.log(`telegram-runner: up — data in ${dataDir}, ${allowedChatIds.length} paired chat(s), ${catalogue.commandMenu?.length ?? 0} commands`);
+console.log(`telegram-runner: up — data in ${dataDir}, ${allowedChatIds === '*' ? 'open door' : `${allowedChatIds.length} paired chat(s)`}, ${catalogue.commandMenu?.length ?? 0} commands, ${llm ? `smart chat via Privatemode (${llmModel})` : 'basic mode (no Privatemode key)'}`);
 
 const stop = async () => { try { await runner.stop(); } finally { process.exit(0); } };
 process.on('SIGINT', stop); process.on('SIGTERM', stop);

@@ -7008,6 +7008,7 @@ snapshots:
       '@onderling/pod-routing': link:../../packages/pod-routing
       '@onderling/pod-search': link:../../packages/pod-search
       '@onderling/recipe-loader': link:../../packages/recipe-loader
+      '@onderling/redaction': link:../../packages/redaction
       '@onderling/sdk': link:../../packages/sdk
       '@onderling/secure-agent': link:../../packages/secure-agent
       '@onderling/sync-engine': link:../../packages/sync-engine

@@ -46,6 +46,7 @@ export function renderContactThread(container, {
   inputHint = '',    // optional placeholder override (e.g. "Editing point N")
   langValue = null,        // when set (+ onLangChange), render an NL/EN picker in the header (a bot thread's language)
   onLangChange = null,
+  floor = null,            // the contact's pre-send floor, when declared: { label } — said once under the header
   privacy = null,          // per-circle privacy indicator (§10c): { level:'quiet'|'sharing'|'risk', icon, label, pulse? }
   onPrivacyTap = null,     // tap the badge → the surface's why/change affordance (surface.showPrivacy)
 } = {}) {
@@ -106,6 +107,14 @@ export function renderContactThread(container, {
     header.appendChild(toggle);
   }
   container.appendChild(header);
+  // The pre-send floor, said where the participant reads before typing: personal details are removed on
+  // this device before a message leaves it. Only for a contact that declared it.
+  if (floor && floor.label) {
+    const note = document.createElement('div');
+    note.className = 'cc-cthread__floor';
+    note.textContent = `🛡 ${floor.label}`;
+    container.appendChild(note);
+  }
 
   // ── messages ──────────────────────────────────────────────────────────────
   const log = document.createElement('div');

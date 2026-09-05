@@ -89,6 +89,13 @@ describe('renderContactThread', () => {
     expect(badge.classList.contains('is-pulse')).toBe(true);
   });
 
+  it('says the pre-send floor under the header when the contact declared one, and nothing otherwise', () => {
+    const el = renderContactThread(document.createElement('div'), { name: 'Bot', t, floor: { label: 'circle.contacts.presend_floor' } });
+    expect(el.querySelector('.cc-cthread__floor').textContent).toContain('circle.contacts.presend_floor');
+    const none = renderContactThread(document.createElement('div'), { name: 'Bot', t, floor: null });
+    expect(none.querySelector('.cc-cthread__floor')).toBeNull();
+  });
+
   it('omits the privacy badge when privacy is not applicable (null)', () => {
     const el = renderContactThread(document.createElement('div'), { name: 'Bot', t, privacy: null });
     expect(el.querySelector('.cc-cthread__privacy')).toBe(null);

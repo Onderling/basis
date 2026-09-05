@@ -145,3 +145,36 @@ describe('createContactThreadChannel — messageHandler (S1 #3 peer DM)', () => 
     expect(aliceInbox[0]).toMatchObject({ fromAddr: 'bob', text: 'ja hoor, kom maar langs' });
   });
 });
+
+describe('createContactThreadChannel — the pre-send floor', () => {
+  it('redacts the turn on this device before it leaves, persists the redacted body, and returns it', async () => {
+    const sent = [];
+    const added = [];
+    const ch = createContactThreadChannel({
+      sendToPeer: async (addr, payload) => { sent.push({ addr, payload }); },
+      itemStore: { addItems: async (items) => { added.push(...items); return items.map((i) => ({ id: i.id ?? 'x' })); }, listOpen: async () => [] },
+      now: () => 1000,
+      floorFor: (peerAddr) => (peerAddr === 'bot-addr'
+        ? { rules: [{ type: 'phone', pattern: '\\b06 ?\\d{8}\\b' }], placeholders: { phone: '[telefoon]' } }
+        : null),
+    });
+    const r = ch.sendTurn({ peerAddr: 'bot-addr', threadId: 'thread-1', text: 'bel me op 06 12345678' });
+    await r.sent;
+    expect(r.text).toBe('bel me op [telefoon]');
+    expect(r.redacted).toBe(1);
+    expect(sent[0].payload.text).toBe('bel me op [telefoon]');
+    // the durable copy is the redacted one too — what left the device is what the thread remembers
+    const bodies = JSON.stringify(added);
+    expect(bodies).toContain('[telefoon]');
+    expect(bodies).not.toContain('12345678');
+  });
+  it('a contact without a floor sends the text verbatim and reports nothing redacted', async () => {
+    const sent = [];
+    const ch = createContactThreadChannel({ sendToPeer: async (addr, payload) => { sent.push(payload); }, floorFor: () => null });
+    const r = ch.sendTurn({ peerAddr: 'someone', threadId: 't', text: 'bel me op 06 12345678' });
+    await r.sent;
+    expect(r.text).toBe('bel me op 06 12345678');
+    expect(r.redacted).toBe(0);
+    expect(sent[0].text).toBe('bel me op 06 12345678');
+  });
+});

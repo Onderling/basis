@@ -48,6 +48,10 @@ export async function discoverA2A(agent, url, opts = {}) {
     authScheme:  _detectAuthScheme(card),
     pubKey:      xd.pubKey  ?? null,
     nknAddr:     xd.nknAddr ?? null,
+    // What the agent asks of a client before a turn is sent to it — `'pre-send'` or
+    // `{ mode:'pre-send', rules, placeholders }` (a redaction ruleset as data); a client that
+    // honours it redacts on the sender's device. Absent → nothing asked.
+    redact:      xd.redact  ?? null,
     localTrust:  null,
     lastFetched: Date.now(),
     reachable:   true,

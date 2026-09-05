@@ -135,6 +135,7 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
@@ -2858,6 +2859,9 @@ async function showContactThread(contactId) {
   if (!contactThreads.has(contactId)) contactThreads.set(contactId, { name, peerAddr, messages: [] });
   const thread = contactThreads.get(contactId);
   thread.name = name; thread.peerAddr = peerAddr;
+  // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
+  // every turn, and said in the header so the participant knows before typing.
+  const floor = presendFloorFor(row);
 
   // Phase 2 (C3 / the G18 fix): rehydrate the DURABLE thread on open so a reload
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
@@ -2930,6 +2934,7 @@ async function showContactThread(contactId) {
       return [...thread.messages, ...extra];
     })(),
     skills, busy, error, t,
+    floor: floor ? { label: t('circle.contacts.presend_floor') } : null,
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
     onButtonTap: async (b) => {
@@ -2957,10 +2962,11 @@ async function showContactThread(contactId) {
       try {
         // The id the turn is PERSISTED under rides the bubble, so reopening the thread merges the
         // durable copy onto this one instead of showing the message twice.
-        const { messageId, sent } = circleContactChannel.sendTurn({
-          peerAddr: thread.peerAddr, threadId: contactId, text,
+        // The echo is what LEFT the device: with a floor, the redacted text.
+        const { messageId, sent, text: sentText } = circleContactChannel.sendTurn({
+          peerAddr: thread.peerAddr, threadId: contactId, text, floor,
         });
-        thread.messages.push({ origin: 'user', text, messageId });
+        thread.messages.push({ origin: 'user', text: sentText, messageId });
         rerender();
         await sent;
       } catch {

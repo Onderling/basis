@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
@@ -22,6 +23,9 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
   const contactId = contact?.contactId;
   const peerAddr = contact?.peerAddr ?? contactId;
   const name = contact?.name ?? contactId ?? '';
+  // The pre-send floor this contact declared (its card → the roster row): the channel applies it on
+  // every turn; the header says so before the person types. web≡mobile with contactThread.js.
+  const floor = useMemo(() => presendFloorFor(contact), [contact]);
   // the bot's skills, shown as in-thread quick actions (dispatched to
   // the bot via the registry, distinct from a conversational turn).
   const skills = registry?.skillsFor?.(contactId) ?? [];
@@ -117,17 +121,18 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
     const cmd = commands.parse(text);
     if (cmd) { await runSkill(cmd.opId, cmd.rest ? { text: cmd.rest } : {}); return; }
     setError(false);
-    setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text }]);
     setBusy(true);
     try {
-      const { sent } = channel.sendTurn({ peerAddr, threadId: contactId, text });
+      // The echo is what LEFT the device: with a floor, the redacted text.
+      const { sent, text: sentText } = channel.sendTurn({ peerAddr, threadId: contactId, text, floor });
+      setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: sentText }]);
       await sent;
     } catch {
       setError(true);
     } finally {
       setBusy(false);
     }
-  }, [input, channel, peerAddr, contactId, commands, runSkill]);
+  }, [input, channel, peerAddr, contactId, commands, runSkill, floor]);
 
   return (
     <View style={styles.wrap} testID="contact-thread-screen">
@@ -137,6 +142,9 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
         </Pressable>
         <Text style={styles.title}>{t('circle.contacts.thread_title', { name })}</Text>
       </View>
+      {floor ? (
+        <Text style={styles.floor} testID="contact-thread-floor">{`🛡 ${t('circle.contacts.presend_floor')}`}</Text>
+      ) : null}
 
       <ScrollView
         ref={scrollRef}
@@ -268,6 +276,7 @@ function replyTextFromResult(res) {
 const makeStyles = (theme) => StyleSheet.create({
   wrap: { flex: 1, padding: 16, backgroundColor: theme.color.paper },
   header: { flexDirection: 'row', alignItems: 'baseline', gap: 12, marginBottom: 8 },
+  floor: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingVertical: 4 },
   back: { fontSize: 13, color: theme.color.inkSoft },
   title: { fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },
   log: { flex: 1 },

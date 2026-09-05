@@ -3959,6 +3959,10 @@
     "send_failed": {
       "text": "Kon {{name}} niet bereiken — mogelijk offline.",
       "doc": "P5 — shown when a turn fails to send over the peer transport."
+    },
+    "presend_floor": {
+      "text": "Persoonsgegevens worden op dit apparaat weggehaald voordat je bericht wordt verstuurd.",
+      "doc": "Contact DM thread header note when the contact declared a pre-send redaction floor: the participant sees that structured personal data (id numbers, IBAN, phone, e-mail) is redacted locally before sending."
     }
   },
   "pairedDevices": {

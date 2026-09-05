@@ -22,6 +22,11 @@ describe('peerToContactRow', () => {
     });
   });
 
+  it('carries the contact\'s declared pre-send floor onto the row (null when undeclared)', () => {
+    expect(peerToContactRow({ type: 'a2a', url: 'https://bot.example', name: 'B', redact: 'pre-send' }).redact).toBe('pre-send');
+    expect(peerToContactRow({ type: 'native', pubKey: 'P', name: 'A' }).redact).toBeNull();
+  });
+
   it('maps a native peer → a person row with a peerAddr (pubKey)', () => {
     const row = peerToContactRow({ type: 'native', pubKey: 'PUBKEY1', name: 'Alice', reachable: true });
     expect(row).toMatchObject({ contactId: 'PUBKEY1', isBot: false, peerAddr: 'PUBKEY1', url: null });

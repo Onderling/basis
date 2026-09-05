@@ -26,6 +26,7 @@
  */
 
 import { createAddressedDeliver, chatTurnsFromItems } from '@onderling/item-store';
+import { applyPresendFloor } from './presendFloor.js';
 
 /** Generic platform subtypes for a contact-thread turn / reply. */
 export const DEFAULT_CONTACT_SUBTYPES = { out: 'contact-msg', in: 'contact-reply' };
@@ -46,6 +47,9 @@ export const DEFAULT_CONTACT_SUBTYPES = { out: 'contact-msg', in: 'contact-reply
  *   (`rehydrate`), so the contact/bot DM survives a reload (**the G18 fix**).
  *   Omitted → today's ephemeral behaviour (fully back-compatible). May be a
  *   value / Promise / thunk so a shell can wire a store built asynchronously.
+ * @param {(peerAddr: string, threadId: string) => object|null} [deps.floorFor]
+ *   the PRE-SEND FLOOR a contact declares (see presendFloor.js): a redaction config, or null. Applied
+ *   in `sendTurn` before the turn leaves the device; a turn may also carry its own `floor`.
  * @param {string | null} [deps.localActor]      my webid (persisted `source.fromWebid`).
  * @param {string | null} [deps.localStableId]
  * @returns {{
@@ -67,6 +71,7 @@ export function createContactThreadChannel({
   localActor = null,
   localStableId = null,
   blobStore = null,
+  floorFor = null,
 } = {}) {
   const mkId = typeof genId === 'function'
     ? genId
@@ -114,20 +119,27 @@ export function createContactThreadChannel({
    * @param {string}  [turn.messageId]  caller-supplied id (else generated) — echoed on the reply's `replyTo`.
    * @param {string}  [turn.replyTo]    id of a prior bot message this answers (for IR round-trips).
    * @param {object}  [turn.sender]     `{ displayName?, webid? }` so the bot knows who it's talking to.
-   * @returns {{ messageId: string, sent: Promise<any> }}
+   * @param {object|null} [turn.floor]  a pre-send redaction config for THIS turn (else `floorFor` decides).
+   * @returns {{ messageId: string, sent: Promise<any>, text: string, redacted: number }}
    *   the (possibly generated) message id + a promise for the SEND-AND-PERSIST
-   *   (not the reply, which arrives asynchronously through `replyHandler`).
+   *   (not the reply, which arrives asynchronously through `replyHandler`), plus the text that
+   *   actually left the device (redacted when a floor applied) and how many items the floor took.
    */
-  function sendTurn({ peerAddr, threadId, text, messageId, replyTo, sender } = {}) {
+  function sendTurn({ peerAddr, threadId, text, messageId, replyTo, sender, floor } = {}) {
     if (!peerAddr) throw new Error('contactThreadChannel.sendTurn: peerAddr is required');
     if (typeof sendToPeer !== 'function') throw new Error('contactThreadChannel: sendToPeer is required');
     const id = messageId ?? mkId();
+    // The pre-send floor: what a contact declared is applied HERE, the one place every shell's turn
+    // passes, so nothing raw leaves the device for such a contact — and the durable copy below is the
+    // redacted one, so the thread remembers what actually went out.
+    const cfg = floor !== undefined ? floor : (typeof floorFor === 'function' ? floorFor(peerAddr, threadId) : null);
+    const floored = applyPresendFloor(text ?? '', cfg);
     const envelope = {
       id,
       kind:   subtypes.out,
       ts:     now(),
       author: sender?.webid ?? localActor ?? null,
-      body:   text ?? '',
+      body:   floored.text,
       extras: {
         threadId,
         threadKey: threadId,     // the LOCAL thread group id (the contact id)
@@ -137,7 +149,7 @@ export function createContactThreadChannel({
       },
     };
     const sent = core.deliver(envelope, { to: peerAddr });
-    return { messageId: id, sent };
+    return { messageId: id, sent, text: floored.text, redacted: floored.hits.length };
   }
 
   /**

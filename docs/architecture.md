@@ -712,7 +712,11 @@ proven byte-identical to their old producers by round-trip tests. Over that enve
 two former 1:1 DM paths (the ephemeral contact-thread channel and wireChat's persisted `chat.send`) into a
 single `deliver` — a DM is just `deliver` to an audience-of-one. That fold also made the contact/bot thread
 **durable** (it was in-memory only, lost on reload): each turn persists to a durable thread keyed by the
-envelope id, which doubles as the DM dedup nonce. `wireChat` now routes through the same core. Membership is
+envelope id, which doubles as the DM dedup nonce. `wireChat` now routes through the same core. A contact whose
+card asks for it (`x-onderling.redact`) gets the **pre-send floor**: the channel redacts the turn on the sender's
+device with `@onderling/redaction` before it leaves (the platform's default ruleset, or the ruleset the card
+ships as data), the thread says so under its header, and the echo and the durable copy are the redacted text —
+what left is what is remembered (`presendFloor.js`). Membership is
 **proof-derived** from a per-circle signed log — a member is targeted for fan-out because the log proves they
 belong, not because an ambient list names them.
 

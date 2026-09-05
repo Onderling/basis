@@ -138,6 +138,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Relink workspace
         run: node scripts/relink-workspace.mjs
+      # The relay's durable queue is better-sqlite3, a native module. pnpm's install reuses the store and
+      # does not rebuild the binding on a fresh runner, so the relay suite and the one integration scenario
+      # that needs a durable relay failed with "Could not locate the bindings file" on every cold cache and
+      # passed on a warm one — the green-then-red pattern that looked like flakiness. This is the documented
+      # recovery (relink-workspace.mjs, agent-notes-known-gotchas.md), run every time so the answer does not
+      # depend on the cache.
+      - name: Rebuild native bindings (better-sqlite3)
+        run: npm rebuild better-sqlite3 --prefix packages/relay
       - name: ${{ matrix.suite.label }}
         run: npm test --prefix ${{ matrix.suite.dir }} ${{ matrix.suite.args }}
 

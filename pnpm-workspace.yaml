@@ -7,3 +7,10 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# pnpm 10 runs a dependency's build script only when it is allowed here (the root package.json carries the
+# same list for older readers). better-sqlite3 is the relay's durable queue; without its binding the relay
+# suite fails on every fresh install. CI additionally rebuilds it after the relink, because store reuse skips
+# the build even when it is allowed.
+onlyBuiltDependencies:
+  - better-sqlite3

@@ -93,6 +93,9 @@ importers:
       '@onderling/recipe-loader':
         specifier: workspace:*
         version: link:../../packages/recipe-loader
+      '@onderling/redaction':
+        specifier: workspace:*
+        version: link:../../packages/redaction
       '@onderling/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk

@@ -46,6 +46,8 @@ const _cfg = withOnderlingPreset({
     path.resolve(repoRoot, 'apps/lists'),
     // Workspace packages the composed apps + secure-agent reach for.
     path.resolve(repoRoot, 'packages/vault'),
+    // The pre-send floor (a contact's declared redaction) — basis's shared src imports the engine.
+    path.resolve(repoRoot, 'packages/redaction'),
     path.resolve(repoRoot, 'packages/chat-p2p'),
     path.resolve(repoRoot, 'packages/identity-resolver'),
     path.resolve(repoRoot, 'packages/item-store'),
@@ -120,6 +122,7 @@ const _cfg = withOnderlingPreset({
     // replaces VaultLocalStorage at boot — but the import resolves
     // unconditionally, so the module must still exist on disk).
     '@onderling/vault':             path.resolve(repoRoot, 'packages/vault'),
+    '@onderling/redaction':         path.resolve(repoRoot, 'packages/redaction'),
     '@onderling/chat-p2p':          path.resolve(repoRoot, 'packages/chat-p2p'),
     '@onderling/identity-resolver': path.resolve(repoRoot, 'packages/identity-resolver'),
     '@onderling/item-store':        path.resolve(repoRoot, 'packages/item-store'),

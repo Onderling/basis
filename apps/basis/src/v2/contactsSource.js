@@ -32,6 +32,7 @@ export function peerToContactRow(peer) {
     skillCount: Array.isArray(peer.skills) ? peer.skills.length : 0,
     reachable:  peer.reachable !== false,
     peerAddr:   peer.pubKey ?? null,   // native address → sa.peer conversational channel
+    redact:     peer.redact ?? null,   // the contact's declared pre-send floor (see presendFloor.js)
     url:        peer.url ?? null,      // A2A base URL → HTTP task path
   };
 }

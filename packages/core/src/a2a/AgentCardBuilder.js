@@ -65,6 +65,8 @@ export class AgentCardBuilder {
       relayUrl:   config.relayUrl   ?? null,
       groups:     config.groups     ?? [],
       trustTiers,
+      // Ask clients to redact on their own device before sending (see a2aDiscover's `redact`).
+      ...(config.redact ? { redact: config.redact } : {}),
     };
     const card = {
       name:        config.name        ?? agent.label ?? 'Agent',

@@ -18,8 +18,8 @@ describe('createAssistantEngine', () => {
     const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), llm, interpret });
     e.remember('a', 'you', 'welke lijst?');
     e.remember('a', 'assistant', 'Welke lijst bedoel je — boodschappen of klusjes?');
-    await e.handle('a', 'boodschappen');
-    await e.handle('b', 'boodschappen');
+    await e.ask('a', 'boodschappen');
+    await e.ask('b', 'boodschappen');
     expect(seen[0].context).toEqual(['you: welke lijst?', 'assistant: Welke lijst bedoel je — boodschappen of klusjes?']);
     expect(seen[1].context).toEqual([]);
     expect(dispatched).toHaveLength(2);
@@ -35,7 +35,7 @@ describe('createAssistantEngine', () => {
     const loadItems = async () => [{ id: '1', type: 'shopping', text: 'melk' }, { id: '2', type: 'shopping', text: 'kaas' }, { id: '3', type: 'task', text: 'stofzuigen' }];
     const e = createAssistantEngine({ catalogue, dispatch: () => {}, llm, interpret, loadItems, onNoMatch: () => {} });
     // lexical retrieval matches on the item's words (a full question is the embedder's job — semantic tier)
-    await e.handle('t', 'melk');
+    await e.ask('t', 'melk');
     const lines = (seen[0] ?? []).map((c) => (c?.entry ?? c)?.text ?? c);
     expect(lines.join(' ')).toContain('melk');
   });
@@ -44,9 +44,34 @@ describe('createAssistantEngine', () => {
     const unavailable = [];
     const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), lang: 'en', onLlmUnavailable: () => unavailable.push(1) });
     expect(e.smart).toBe(false);
-    const r = await e.handle('t', 'what is the weather');
+    const r = await e.ask('t', 'what is the weather');
     expect(r.via).toBe('llm-unavailable');
     expect(unavailable).toHaveLength(1);
+  });
+  it('a circle door: handle() takes the raw line — an unaddressed group line is chat, not a bot turn', async () => {
+    const posted = [];
+    const interpret = async () => ({ opId: 'listOpen', args: {} });
+    const dispatched = [];
+    const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), llm, interpret, postToCircle: (text) => posted.push(text) });
+    const r1 = await e.handle('ik koop straks melk', { id: 'c1' });
+    expect(r1.via).toBe('circle');
+    expect(posted).toEqual(['ik koop straks melk']);
+    const r2 = await e.handle('@assistant laat de lijst zien', { id: 'c1' });
+    expect(r2.via).toBe('llm');
+    expect(dispatched).toHaveLength(1);
+  });
+  it('the circle composers\' form: a policy getter, a user default and two providers, plus their own recentTurns', async () => {
+    const seen = [];
+    const interpret = async (text, { context }) => { seen.push(context); return null; };
+    const e = createAssistantEngine({
+      catalogue, dispatch: () => {}, interpret, onNoMatch: () => {},
+      policy: async () => ({ llmTool: 'user' }), userDefault: () => ({ mode: 'cloud' }),
+      llmProviders: { cloud: { invoke: async () => null } },
+      recentTurns: () => ['you: hoi', 'assistant: hallo'],
+    });
+    expect(e.smart).toBe(true);
+    await e.ask('c', 'iets');
+    expect(seen[0]).toEqual(['you: hoi', 'assistant: hallo']);
   });
   it('loadAssistantItems shapes household open items for the retriever', async () => {
     const load = loadAssistantItems({ callSkill: async () => ({ items: [{ id: 9, type: 'shopping', label: 'Milk' }, { id: 10, text: '' }] }) });

@@ -61,8 +61,6 @@ import { calendarManifest } from '@onderling-app/calendar/manifest';
 // like calendar; the skill handlers are composed in-process by realAgent.js.
 import { agentsManifest } from '@onderling-app/agents/manifest';
 import { buildCircleLlmProviders } from '../../src/v2/circleLlmProviders.js';
-import { createTokenGate } from '../../src/v2/tokenGate.js';
-import { circleGateRules } from '../../src/v2/circleGate.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
 import {
@@ -85,7 +83,8 @@ import {
 import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
 import { createCircleCacheMedium } from '../../src/v2/circleCacheMedium.js';
-import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
+import { addressesBot } from '../../src/v2/circleDispatch.js';
+import { createAssistantEngine } from '../../src/v2/assistantEngine.js';
 // Conversation memory — recent circle turns woven into the bot's interpret context.
 import { recentCircleTurns } from '../../src/v2/circleMemory.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
@@ -737,7 +736,7 @@ import { localStorageObjectVersions } from '@onderling/kring-host/objectVersions
 import { loadCircles } from '../../src/v2/circleModel.js';
 import { circleSourcesFromAgent, makeResolvingCallSkill } from '../../src/v2/circleSources.js';
 import { loadCircleItems } from '../../src/v2/circleContent.js';
-import { makeCircleRetriever, DEFAULT_CIRCLE_RAG_MIN_SCORE } from '../../src/v2/circleRetriever.js';
+import { DEFAULT_CIRCLE_RAG_MIN_SCORE } from '../../src/v2/circleRetriever.js';
 import { buildCircleEmbedProviders } from '../../src/v2/circleEmbedProviders.js';
 import { resolveCircleEmbedder } from '../../src/v2/embedPicker.js';
 import { quickCreateCircle } from '../../src/v2/circleCreate.js';
@@ -2512,8 +2511,17 @@ function buildCircleBot(agent) {
     },
   });
 
-  circleBot = createCircleDispatch({
+  // The ONE assistant composition (assistantEngine.js, shared with mobile + the Telegram shell): the
+  // deterministic gate for the user's locale, retrieval over the active circle's items (a PERSISTENT
+  // @onderling/pod-search hybrid index — embed-once via the content-hash cache, restart-safe when a
+  // vectorStore is wired; semantic when the circle's embed policy resolves an embedder, else lexical, no
+  // embed call), the recent circle turns as memory, and the interpreter over the circle policy + the
+  // member's default. This shell injects only its adapters: the policy getter, the live providers, the
+  // embedder resolver, loadItems, the IndexedDB-backed vector store (never sharing/ — invariant #7), and
+  // the sinks below.
+  circleBot = createAssistantEngine({
     catalogue: () => catalogue,
+    lang: currentLang(),
     policy: policyFor,
     userDefault: () => userDefault,
     llmProviders,
@@ -2523,6 +2531,11 @@ function buildCircleBot(agent) {
       rows: circleRows({ events: eventLog.query({ excludeMuted: true }), circles: circlesCache, circleId: getActiveCircle() }),
       limit: 6,
     }),
+    embedder: CIRCLE_EMBED_BASEURL ? resolveCircleRagEmbedder : undefined,
+    loadItems: (ctx) => loadCircleItems({ callSkill: resolveSkill, circleId: ctx?.circleId ?? getActiveCircle() }),
+    minScore: DEFAULT_CIRCLE_RAG_MIN_SCORE,
+    vectorStore: circleSearchVectorStore,
+    retrieverScope: 'circle-rag',
     // A slash STRING → parse to {opId,args}; the LLM yields {opId,args}. Both flow through the
     // clarifying dispatch (unique → run; ambiguous → ask).
     dispatch: (input, ctx) => {
@@ -2564,47 +2577,6 @@ function buildCircleBot(agent) {
     onNoMatch: (_text, _ctx, opts) => { _circleRender?.botBubble((opts && opts.reply) || t('circle.bot.unknown')); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { _circleRender?.botBubble(t('circle.bot.basic_mode')); },
-    // F-retrieve: on the via:'llm' path the gate pulls the circle's relevant items
-    // into the LLM prompt (grounding + fewer tokens). `makeCircleRetriever` is now
-    // backed by a PERSISTENT `@onderling/pod-search` hybrid index — the circle's items
-    // are indexed once (embed-once via the content-hash cache; restart-safe when a
-    // vectorStore is wired) and each turn runs a HYBRID (lexical+semantic RRF)
-    // query. `embedder` rides the circle's embed policy (`resolveCircleRagEmbedder`,
-    // same resolution as folio /zoek); null when off/unconfigured → LEXICAL-only,
-    // NO embed call. Ranking lives once in circleRetriever; `loadItems` is the
-    // shell adapter.
-    gate: createTokenGate({
-      rules: circleGateRules(currentLang()),
-      retrieve: makeCircleRetriever({
-        embedder: CIRCLE_EMBED_BASEURL ? resolveCircleRagEmbedder : undefined,
-        loadItems: (ctx) => loadCircleItems({
-          callSkill: resolveSkill,
-          circleId: ctx?.circleId ?? getActiveCircle(),
-        }),
-        // Semantic cosine floor: weak/near-noise hybrid matches are dropped
-        // before they reach the LLM prompt. Threaded explicitly from the shared
-        // default (also applied by construction inside makeCircleRetriever, so
-        // web ≡ mobile); raise it here to be stricter, pass 0 to disable.
-        minScore: DEFAULT_CIRCLE_RAG_MIN_SCORE,
-        // Persistence seam (vectorStore): threaded end-to-end into PodSearch
-        // (makeCircleRetriever → makePodSearchRetriever → new PodSearch), which
-        // persists vectors under private/state/search-index/circle-rag/<id>/
-        // (NEVER sharing/ — invariant #7). We wire the circle's available
-        // StorageBackend — the SAME @onderling/pseudo-pod substrate the circle pod
-        // runs on — so the seam is LIVE end-to-end: a fresh PodSearch over this
-        // store hydrates the content-hash cache instead of re-embedding
-        // (embed-once, restart-safe by construction when the backend persists).
-        //
-        // Objective L (2026-07-08): the backend now PERSISTS in a real browser —
-        // circleSearchVectorStore is IndexedDB (pickWebBackend), and the circle
-        // ITEMS it indexes are IndexedDB too (makeCirclePodClient → pickWebBackend),
-        // so both survive a hard reload; under SSR / tests (no `indexedDB`) both
-        // fall back to in-memory, unchanged. The remaining persistence path — a
-        // real signed-in Solid pod (live-infra routing) — stays the live-pod tail.
-        vectorStore: circleSearchVectorStore,
-        scope: 'circle-rag',
-      }),
-    }),
     botName: CIRCLE_BOT_NAME,
   });
 

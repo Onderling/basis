@@ -12,8 +12,11 @@
  *     call, because the model remembers nothing between calls (Privatemode is stateless by design);
  *   · the interpreter and the model, when a route is configured — else the gate alone (basic mode).
  *
- * A thread is whatever the door calls one: a circle, a Telegram chat, a DM. `remember()` feeds the
- * memory; the door decides what counts as a turn (the runner records what came in and what went out).
+ * A thread is whatever the door calls one: a circle, a Telegram chat, a DM. Memory comes either from
+ * `remember()` (a door with no stream of its own — Telegram) or from a `recentTurns` getter the door
+ * supplies (the circle composers read the rows already on screen). A private door calls `ask()` — its
+ * lines are addressed by nature; a circle calls `handle()` with the raw line, and the engine decides
+ * whether the bot was addressed at all (a group line that names nobody is chat, and fans out).
  */
 import { createCircleDispatch } from './circleDispatch.js';
 import { createTokenGate } from './tokenGate.js';
@@ -27,26 +30,41 @@ export const ASSISTANT_MEMORY_TURNS = 6;
  * @param {object|(()=>object)} a.catalogue
  * @param {(input:string|{opId:string,args:object,appOrigin?:string}, ctx:object) => any} a.dispatch
  * @param {string} [a.lang='nl']
- * @param {object|null} [a.llm]            an LlmClient; null → basic mode (gate only)
- * @param {Function|null} [a.interpret]    `interpretToCommand`; used only with an llm
+ * @param {object|null} [a.llm]            ONE LlmClient (a single-route door); null → basic mode (gate only)
+ * @param {{local?:object,cloud?:object}|null} [a.llmProviders]  the circle composers' two-route form (wins over `llm`)
+ * @param {object|(()=>object)|((ctx)=>object)} [a.policy]  the circle policy (`llmTool`, `apps`); static or a getter
+ * @param {object|(()=>object)} [a.userDefault]  the member's personal default (when the policy says 'user')
+ * @param {Function|null} [a.interpret]    `interpretToCommand`; used only when a route resolves
  * @param {(ctx:object) => Promise<Array<{id:string,type?:string,text:string}>>} [a.loadItems]  the items
  *        retrieval may draw from; absent → no retrieval
- * @param {object} [a.embedder]            optional; without it retrieval is lexical
+ * @param {object|Function} [a.embedder]   optional (an embedder or a per-turn resolver); without it retrieval is lexical
+ * @param {Function} [a.embed]             the older bare `embed(texts)` form
+ * @param {object} [a.vectorStore] @param {number} [a.minScore] @param {string} [a.retrieverScope]
+ * @param {() => string[]} [a.recentTurns] the door's own memory getter (rows on screen); absent → `remember()` memory
  * @param {string} [a.botName='assistant']
  * @param {number} [a.memoryTurns]
+ * @param {Function} [a.postToCircle]      the chat sink for a line that is not for the bot (circle doors)
  * @param {Function} [a.onUnhandled] @param {Function} [a.onLlmUnavailable] @param {Function} [a.onNoMatch]
- * @param {object} [a.policy]              circle policy; default derives from llm presence
- * @param {{evaluate:Function}} [a.gate]   (tests) a gate override
+ * @param {boolean} [a.dispatchSlash]      forwarded to the engine (a shell that routes slash itself passes false)
+ * @param {{evaluate:Function}} [a.gate]   a gate override (tests)
  */
 export function createAssistantEngine({
-  catalogue, dispatch, lang = 'nl', llm = null, interpret = null, loadItems = null, embedder = null,
-  botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS, onUnhandled, onLlmUnavailable, onNoMatch, policy, gate: gateIn = null,
+  catalogue, dispatch, lang = 'nl', llm = null, llmProviders = null, policy, userDefault, interpret = null,
+  loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
+  recentTurns: recentTurnsIn = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
+  postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
 } = {}) {
   if (!catalogue) throw new TypeError('createAssistantEngine: catalogue required');
   if (typeof dispatch !== 'function') throw new TypeError('createAssistantEngine: dispatch required');
-  const smart = Boolean(llm && typeof interpret === 'function');
+  const providers = llmProviders ?? (llm ? { local: llm } : null);
+  const smart = Boolean(providers && typeof interpret === 'function');
   const retrieve = typeof loadItems === 'function'
-    ? makeCircleRetriever({ loadItems, ...(embedder ? { embedder } : {}) })
+    ? makeCircleRetriever({
+      loadItems,
+      ...(embedder ? { embedder } : {}), ...(typeof embed === 'function' ? { embed } : {}),
+      ...(vectorStore ? { vectorStore } : {}), ...(minScore !== undefined ? { minScore } : {}),
+      ...(retrieverScope ? { scope: retrieverScope } : {}),
+    })
     : undefined;
   const gate = gateIn ?? createTokenGate({ rules: circleGateRules(lang), ...(retrieve ? { retrieve } : {}) });
 
@@ -62,23 +80,27 @@ export function createAssistantEngine({
     memory.set(threadId, lines);
   }
 
-  /** One engine per thread — its `recentTurns` is bound to that thread's memory. */
+  /** One engine per thread — its `recentTurns` is bound to that thread (the door's getter, or the memory). */
   const engines = new Map();
   function engineFor(threadId) {
-    let e = engines.get(threadId);
+    const key = threadId ?? '__default__';
+    let e = engines.get(key);
     if (e) return e;
     e = createCircleDispatch({
       catalogue,
       policy: policy ?? { llmTool: smart ? 'local' : 'off' },
-      llmProviders: smart ? { local: llm } : null,
+      ...(userDefault !== undefined ? { userDefault } : {}),
+      llmProviders: smart ? providers : null,
       interpret: smart ? interpret : async () => null,
       gate,
       botName,
-      recentTurns: () => linesFor(threadId),
+      recentTurns: typeof recentTurnsIn === 'function' ? recentTurnsIn : () => linesFor(threadId),
       dispatch,
+      ...(typeof postToCircle === 'function' ? { postToCircle } : {}),
+      ...(dispatchSlash !== undefined ? { dispatchSlash } : {}),
       onUnhandled, onLlmUnavailable, onNoMatch,
     });
-    engines.set(threadId, e);
+    engines.set(key, e);
     return e;
   }
 
@@ -86,8 +108,10 @@ export function createAssistantEngine({
     smart,
     remember,
     recentTurns: linesFor,
-    /** Run one free-text turn on a thread. The text is tagged for the bot: a private door IS addressed. */
-    handle: (threadId, text, ctx = {}) => engineFor(threadId).handle(`@${botName} ${text}`, { id: threadId, ...ctx }),
+    /** A circle door: the raw line; the engine decides whether the bot was addressed (`ctx.id` = the thread). */
+    handle: (text, ctx = {}) => engineFor(ctx?.id).handle(text, ctx),
+    /** A private door (Telegram, a DM): every line is for the bot — tagged here so the engine treats it so. */
+    ask: (threadId, text, ctx = {}) => engineFor(threadId).handle(`@${botName} ${text}`, { id: threadId, ...ctx }),
     /** Retrieval on its own (tests, diagnostics). */
     retrieve: retrieve ? (text, ctx = {}) => retrieve(text, ctx) : null,
   };

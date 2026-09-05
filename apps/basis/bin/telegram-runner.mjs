@@ -13,7 +13,7 @@
  *   (the token may also live in ~/.canopy-tg-token; TG_ALLOWED_CHAT_IDS pairs the owner's chats —
  *    an unpaired chat is told its chat id so it can be added.)
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -34,8 +34,9 @@ import { circleGateRules } from '../src/v2/circleGate.js';
 import { listsManifest } from '../../lists/manifest.js';
 
 const { values } = parseArgs({ options: {
-  'data-dir': { type: 'string', default: './.basis-telegram' },
+  'data-dir': { type: 'string', default: path.join(homedir(), '.basis-telegram') },
   lang:       { type: 'string', default: 'nl' },
+  'walk-log': { type: 'string' },   // default <data-dir>/walk-log.jsonl — one JSON record per turn, readable after a walk
 } });
 
 function readToken() {
@@ -84,6 +85,12 @@ if (readPrivatemodeKey()) {
   llm = new LlmClient({ provider }); llmModel = provider.model;
 }
 const bridge = new TelegramBridge({ botToken: token, mode: 'long-polling' });
+// The walk log: one JSON line per turn (in, path, dispatch, replies, ms) after a header that says what
+// this run IS (model, route, language, apps) — so a walk can be read afterwards instead of retold.
+const walkLogFile = values['walk-log'] || path.join(dataDir, 'walk-log.jsonl');
+const walkLog = (entry) => appendFileSync(walkLogFile, JSON.stringify(entry) + '\n');
+walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'telegram', lang: values.lang, apps: sources.map((s) => s.manifest.appId ?? s.manifest.name),
+  commands: catalogue.commandMenu?.length ?? 0, llm: llm ? { provider: 'privatemode', model: llmModel } : null, door: allowedChatIds === '*' ? 'open' : 'allow-list' });
 const runner = createTelegramRunner({
   bridge, catalogue, manifestsByOrigin, allowedChatIds, t,
   callSkill: (app, op, args) => agent.callSkill(app, op, args),
@@ -91,8 +98,10 @@ const runner = createTelegramRunner({
   // The interpreter (an LLM route) is wired once a confidential route is configured.
   gate: createTokenGate({ rules: circleGateRules(values.lang) }),
   ...(llm ? { llm, interpret: interpretToCommand } : {}),
+  walkLog,
 });
 await runner.start();
+console.log(`telegram-runner: walk log → ${walkLogFile}`);
 console.log(`telegram-runner: up — data in ${dataDir}, ${allowedChatIds === '*' ? 'open door' : `${allowedChatIds.length} paired chat(s)`}, ${catalogue.commandMenu?.length ?? 0} commands, ${llm ? `smart chat via Privatemode (${llmModel})` : 'basic mode (no Privatemode key)'}`);
 
 const stop = async () => { try { await runner.stop(); } finally { process.exit(0); } };

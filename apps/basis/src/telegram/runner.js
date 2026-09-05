@@ -40,8 +40,11 @@ const CONFIRM_NO  = '__confirm:no';
  * @param {Function|null} [a.interpret]              the NL→op interpreter (`interpretToCommand`) — only with an LLM route
  * @param {object|null} [a.llm]                      the LlmClient the interpreter runs on (the confidential route); null → basic mode
  * @param {string} [a.botName]
+ * @param {(entry: object) => void} [a.walkLog]  a sink for one record per turn — what came in, which path
+ *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
+ *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant' } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -52,7 +55,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   /** chatId → a pending follow-up (single/multi field) or a pending confirmation. */
   const pending = new Map();
 
-  const say = (chatId, text, buttons) => bridge.sendReply({ chatId, text, ...(buttons?.length ? { buttons } : {}) });
+  /** The turn under way (one per chat at a time) — the walk log's record in the making. */
+  const turns = new Map();
+  const note = (chatId, patch) => { const t0 = turns.get(chatId); if (t0) Object.assign(t0, patch); };
+  const say = (chatId, text, buttons) => {
+    const t0 = turns.get(chatId); if (t0) (t0.replies ??= []).push({ text, ...(buttons?.length ? { buttons: buttons.map((b) => b.id) } : {}) });
+    return bridge.sendReply({ chatId, text, ...(buttons?.length ? { buttons } : {}) });
+  };
 
   /** Paint a RenderedReply as bridge messages. */
   async function paint(chatId, rendered) {
@@ -75,8 +84,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   /** Run a ready route and paint its reply. */
   async function run(chatId, ready) {
     let reply;
+    note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
     try { reply = await runDispatch(ready, callSkill); }
-    catch (err) { await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
+    catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin }));
   }
 
@@ -98,7 +108,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const parse = typeof text === 'string'
       ? (tapToParse(text, threadId) ?? parseInput(text, catalogue, { threadId }))
       : opToParse(text, threadId);
+    if (typeof text === 'string') note(chatId, { via: tapToParse(text, threadId) ? 'tap' : 'slash' });
     const r = resolveDispatch(parse, catalogue);
+    note(chatId, { route: r?.kind });
     switch (r?.kind) {
       case 'ready':
         return run(chatId, r);
@@ -149,12 +161,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     if (!pend) return false;
     if (pend.kind === 'confirm') {
       if (text !== CONFIRM_YES && text !== CONFIRM_NO) return false;   // something else — leave the confirm standing
-      pending.delete(chatId);
+      pending.delete(chatId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
       if (text === CONFIRM_YES) await run(chatId, pend.ready);
       return true;
     }
     if (text.startsWith('/')) { pending.delete(chatId); return false; }   // a new command cancels the ask
-    pending.delete(chatId);
+    pending.delete(chatId); note(chatId, { via: 'form' });
     if (pend.p.kind === 'single') { await run(chatId, completeFollowUp({ pending: pend.p, text })); return true; }
     // multi: one field per line, in order
     const p = pend.p;
@@ -175,12 +187,19 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     if (!chatId || !text) return;
     if (!open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
     const threadId = threadFor(chatId);
+    const started = Date.now();
+    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text });
     try {
       if (await continuePending(chatId, text)) return;
       if (text.startsWith('/') || tapToParse(text, threadId)) { await route(chatId, threadId, text); return; }
-      await engine.handle(`@${botName} ${text}`, { id: threadId, chatId });
+      const r = await engine.handle(`@${botName} ${text}`, { id: threadId, chatId });
+      note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
+      note(chatId, { error: err?.message ?? String(err) });
       await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) }));
+    } finally {
+      const rec = turns.get(chatId); turns.delete(chatId);
+      if (rec && typeof walkLog === 'function') { try { walkLog({ ...rec, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
   }
 

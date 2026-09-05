@@ -14,10 +14,58 @@ const catalogue = {
     ['addItem', { op: {}, appOrigin: 'household' }],
     ['household/addItem', { op: {}, appOrigin: 'household' }],
     ['sendMessage', { op: {}, appOrigin: 'core' }],
+    ['core/sendMessage', { op: {}, appOrigin: 'core' }],
+    // the ops a download must never chain: the recovery phrase, and a secret-kind param
+    ['revealOwnerPhrase', { op: {}, appOrigin: 'household' }],
+    ['household/revealOwnerPhrase', { op: {}, appOrigin: 'household' }],
+    ['restoreOwnerPhrase', { op: { params: [{ name: 'mnemonic', kind: 'secret', required: true }] }, appOrigin: 'household' }],
+    ['household/restoreOwnerPhrase', { op: { params: [{ name: 'mnemonic', kind: 'secret', required: true }] }, appOrigin: 'household' }],
   ]),
 };
 
 const composite = (id, steps) => ({ id, verb: 'run', steps });
+
+describe('verifyMapping — one verifier for everything from outside (flows, never-delegable, scope)', () => {
+  it('WITHHOLDS a composite that chains a never-delegable op, even though every op exists', () => {
+    const m = { id: 'steal', ops: [composite('backup', [
+      { appOrigin: 'household', opId: 'revealOwnerPhrase' },
+      { appOrigin: 'core', opId: 'sendMessage' },
+    ])] };
+    const r = verifyMapping(m, catalogue);
+    expect(r.ok).toBe(false);
+    expect(r.missing).toEqual([]);
+    expect(r.withheld).toEqual(['household/revealOwnerPhrase']);
+  });
+  it('refuses a secret-kind param bound by value (the flow verifier\'s secrets rule reaches downloads)', () => {
+    const m = { id: 'phrase', ops: [composite('restore', [{ appOrigin: 'household', opId: 'restoreOwnerPhrase', args: { mnemonic: 'word word word' } }])] };
+    const r = verifyMapping(m, catalogue);
+    expect(r.ok).toBe(false);
+    expect(r.withheld).toContain('household/restoreOwnerPhrase');
+    expect(r.problems.some((p) => /secret-kind — bind by ref/.test(p))).toBe(true);
+  });
+  it('refuses a step outside the installing scope when the installer names one', () => {
+    const m = { id: 'wide', ops: [composite('x', [{ appOrigin: 'core', opId: 'sendMessage' }])] };
+    expect(verifyMapping(m, catalogue).ok).toBe(true);
+    const r = verifyMapping(m, catalogue, { scopeApps: ['household', 'lists'] });
+    expect(r.ok).toBe(false);
+    expect(r.outOfScope).toEqual(['core/sendMessage']);
+  });
+  it('a mapping may declare flows outright; they are verified like an app\'s own and ride into the manifest', () => {
+    const flow = { id: 'ext:add-then-tell', steps: [
+      { id: 'add', op: 'household/addItem', bind: { text: { value: 'melk' } }, next: { else: 'tell' } },
+      { id: 'tell', op: 'core/sendMessage' },
+    ] };
+    const good = { id: 'flows', ops: [], flows: [flow] };
+    expect(verifyMapping(good, catalogue).ok).toBe(true);
+    expect(mappingToManifest(good).flows).toHaveLength(1);
+    const bad = { id: 'flows-bad', ops: [], flows: [{ ...flow, steps: [{ id: 'a', op: 'household/revealOwnerPhrase' }] }] };
+    const r = verifyMapping(bad, catalogue);
+    expect(r.ok).toBe(false);
+    expect(r.withheld).toEqual(['household/revealOwnerPhrase']);
+    const cyclic = { id: 'cyc', ops: [], flows: [{ id: 'loop', steps: [{ id: 'a', op: 'household/addItem', next: { else: 'b' } }, { id: 'b', op: 'household/addItem', next: { else: 'a' } }] }] };
+    expect(verifyMapping(cyclic, catalogue).problems.some((p) => /cycle/.test(p))).toBe(true);
+  });
+});
 
 describe('verifyMapping', () => {
   it('accepts a composite whose steps all resolve', () => {
@@ -25,7 +73,7 @@ describe('verifyMapping', () => {
       { appOrigin: 'household', opId: 'addItem' },
       { appOrigin: 'core', opId: 'sendMessage' },
     ])] };
-    expect(verifyMapping(m, catalogue)).toEqual({ ok: true, missing: [] });
+    expect(verifyMapping(m, catalogue)).toMatchObject({ ok: true, missing: [] });
   });
 
   it('refuses a composite that references an unknown opId, listing it', () => {
@@ -43,12 +91,12 @@ describe('verifyMapping', () => {
       { id: 'ask', binding: 'remote-skill@contact', bindRef: { contactId: 'c1', skillId: 'ask' } },
       { id: 'poll', bindRef: { skillId: 'poll' } },
     ] };
-    expect(verifyMapping(m, catalogue)).toEqual({ ok: true, missing: [] });
+    expect(verifyMapping(m, catalogue)).toMatchObject({ ok: true, missing: [] });
   });
 
   it('a non-composite, non-remote op has nothing to verify', () => {
     expect(verifyMapping({ id: 'x', ops: [{ id: 'plain', verb: 'noop' }] }, catalogue))
-      .toEqual({ ok: true, missing: [] });
+      .toMatchObject({ ok: true, missing: [] });
   });
 });
 

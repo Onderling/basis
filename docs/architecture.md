@@ -712,7 +712,11 @@ proven byte-identical to their old producers by round-trip tests. Over that enve
 two former 1:1 DM paths (the ephemeral contact-thread channel and wireChat's persisted `chat.send`) into a
 single `deliver` — a DM is just `deliver` to an audience-of-one. That fold also made the contact/bot thread
 **durable** (it was in-memory only, lost on reload): each turn persists to a durable thread keyed by the
-envelope id, which doubles as the DM dedup nonce. `wireChat` now routes through the same core. The confidential LLM route for a Node process (the bots, the Telegram shell) is
+envelope id, which doubles as the DM dedup nonce. `wireChat` now routes through the same core. Anything that arrives from outside as behaviour — a downloaded extension (a mapping of composite ops, or
+declared flows) — passes ONE verifier before install and again at boot: its composites compile to flows and are
+checked with the flow verifier (the secrets rule), every step must name an op the catalogue has, a step naming a
+never-delegable op is withheld, and a step outside an installer-named scope is refused; the consent card names
+each refusal (`apps/basis/src/mappings.js`). The confidential LLM route for a Node process (the bots, the Telegram shell) is
 `@onderling/llm-client/providers/privatemode`: the Ollama provider's wire and parser with Privatemode's SDK as the
 transport, which attests the enclave and encrypts end-to-end on the caller's machine — no proxy; the key comes from the
 environment or a key file, never from code. Basis has a third shell beside

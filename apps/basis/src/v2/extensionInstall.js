@@ -28,9 +28,9 @@ const WHAT_IF_DENY = 'Nothing is added or changed — you can open the link agai
  * @param {{ opsById: Map<string, object> }} catalogue
  * @returns {{ ok: boolean, missing: string[], card: object|null }}
  */
-export function buildConsentModel(mapping, catalogue) {
-  const { ok, missing } = verifyMapping(mapping, catalogue);
-  if (!ok) return { ok: false, missing, card: null };
+export function buildConsentModel(mapping, catalogue, opts = {}) {
+  const { ok, missing, withheld, outOfScope, problems } = verifyMapping(mapping, catalogue, opts);
+  if (!ok) return { ok: false, missing, withheld, outOfScope, problems, card: null };
 
   const commands = (mapping?.ops ?? []).map((op) => ({
     command: op?.surfaces?.slash?.command ?? op?.id,
@@ -47,6 +47,8 @@ export function buildConsentModel(mapping, catalogue) {
       scope:     mapping.scope === 'circle' ? 'circle' : 'app',
       needs:     [...(mapping.needs ?? [])],
       commands,
+      // declared flows: each step's op, so the card says what a flow from outside will run
+      flows:     (mapping.flows ?? []).map((f) => ({ id: f.id, invokes: (f.steps ?? []).map((st) => st.op ?? `flow:${st.flow}`) })),
       whatIfDeny: WHAT_IF_DENY,
     },
   };
@@ -58,9 +60,9 @@ export function buildConsentModel(mapping, catalogue) {
  *
  * @returns {Promise<{ ok: boolean, missing?: string[], uri?: string }>}
  */
-export async function installMapping({ store, deviceId, mapping, catalogue }) {
-  const { ok, missing } = verifyMapping(mapping, catalogue);
-  if (!ok) return { ok: false, missing };
+export async function installMapping({ store, deviceId, mapping, catalogue, scopeApps = null }) {
+  const { ok, missing, withheld, outOfScope, problems } = verifyMapping(mapping, catalogue, { scopeApps });
+  if (!ok) return { ok: false, missing, withheld, outOfScope, problems };
   const res = await writeMapping({ pseudoPod: store, deviceId, mapping });
   return { ok: true, uri: res.uri };
 }

@@ -17,10 +17,21 @@
  * Remote-binding ops (a bot's exposed skill — `binding: 'remote-skill@contact'`)
  * are NOT catalogue-verified: their handler is the bot, not a local atom, so the
  * contact-scoped bridge vouches for them instead.
+ *
+ * ONE VERIFIER (2026-09-05). A downloaded mapping is a FLOW that arrived from outside: its
+ * composite ops already compile to flows and run on the one flow runner, so they are verified
+ * as flows too (`verifyFlow` — the secrets rule: a secret-kind param may only bind by
+ * reference, a flow may not produce a secret by value), and a mapping may declare `flows[]`
+ * outright. Two more refusals apply to ANYTHING that arrives from outside, because an installed
+ * mapping runs AS THE USER (the `policy: 'never'` door binds external callers only):
+ *   · a step that names a NEVER_DELEGABLE op (reveal the recovery phrase, enrol or revoke a
+ *     device, grant a connection) is WITHHELD — no download may chain those;
+ *   · when the installer names a scope (the circle's apps), a step outside it is OUT OF SCOPE.
+ * The consent card shows every refusal by name; an unknown op is still simply "missing".
  */
 
-import { verifyComposite } from './composite.js';
-import { validateManifest } from '@onderling/app-manifest';
+import { verifyComposite, compileCompositeToFlow } from './composite.js';
+import { validateManifest, verifyFlow, NEVER_DELEGABLE } from '@onderling/app-manifest';
 
 /** A mapping op is a remote-skill binding (handler is a contact/bot, not a local atom). */
 function isRemoteBinding(op) {
@@ -36,17 +47,78 @@ function isRemoteBinding(op) {
  * @param {{ opsById: Map<string, object> } | { has?: Function }} catalogue
  * @returns {{ ok: boolean, missing: string[] }}
  */
-export function verifyMapping(mapping, catalogue) {
+/** `app/op` → the catalogue's op (params and all), for verifyFlow; bare ids are not resolved here. */
+function flowOpsFor(catalogue) {
+  const m = catalogue?.opsById instanceof Map ? catalogue.opsById : null;
+  const ops = new Map();
+  if (!m) return ops;
+  for (const [key, entry] of m) {
+    const opId = key.includes('/') ? key.slice(key.indexOf('/') + 1) : key;
+    const app = entry?.appOrigin;
+    if (app) ops.set(`${app}/${opId}`, entry?.op ?? {});
+  }
+  return ops;
+}
+
+/** The refusals every flow from outside gets, beyond verifyFlow's own rules. */
+function refusalsFor(flow, { scopeApps }) {
+  const withheld = [];
+  const outOfScope = [];
+  for (const step of flow?.steps ?? []) {
+    if (typeof step?.op !== 'string') continue;
+    const cut = step.op.indexOf('/');
+    if (cut < 0) continue;
+    const app = step.op.slice(0, cut);
+    const opId = step.op.slice(cut + 1);
+    if (NEVER_DELEGABLE.has(`${app}.${opId}`)) withheld.push(step.op);
+    if (Array.isArray(scopeApps) && scopeApps.length && !scopeApps.includes(app)) outOfScope.push(step.op);
+  }
+  return { withheld, outOfScope };
+}
+
+/**
+ * Verify ONE mapping against the catalogue. A mapping is valid only when every composite op's
+ * steps resolve, every flow (compiled composites and declared `flows[]` alike) passes the flow
+ * verifier, no step names a never-delegable op, and — when the installer names a scope — no step
+ * leaves it. Returns every problem by category, so the consent card can say why.
+ *
+ * @param {import('@onderling/pod-routing').Mapping} mapping
+ * @param {{ opsById: Map<string, object> } | { has?: Function }} catalogue
+ * @param {{ scopeApps?: string[]|null }} [opts]  the apps the installing scope allows (a circle's `policy.apps`)
+ * @returns {{ ok: boolean, missing: string[], withheld: string[], outOfScope: string[], problems: string[] }}
+ */
+export function verifyMapping(mapping, catalogue, { scopeApps = null } = {}) {
   const missing = new Set();
+  const withheld = new Set();
+  const outOfScope = new Set();
+  const problems = [];
+  const ops = flowOpsFor(catalogue);
+  const declaredFlows = new Map((mapping?.flows ?? []).filter((f) => f && typeof f.id === 'string').map((f) => [f.id, f]));
+  const check = (flow) => {
+    const r = refusalsFor(flow, { scopeApps });
+    for (const w of r.withheld) withheld.add(w);
+    for (const o of r.outOfScope) outOfScope.add(o);
+    const v = verifyFlow(flow, { ops, flows: declaredFlows });
+    // an unknown op is reported as MISSING (the old contract); every other problem keeps its sentence
+    for (const pr of v.problems) {
+      const m = /references unknown op "([^"]+)"/.exec(pr);
+      if (m) missing.add(m[1]); else problems.push(pr);
+    }
+  };
   for (const op of mapping?.ops ?? []) {
     if (isRemoteBinding(op)) continue;          // bot vouches, not the catalogue
     if (Array.isArray(op?.steps)) {
       const res = verifyComposite(op, catalogue);
       for (const m of res.missing) missing.add(m);
+      check(compileCompositeToFlow(op));
     }
     // A non-composite, non-remote op declares no references → nothing to verify.
   }
-  return { ok: missing.size === 0, missing: [...missing] };
+  for (const flow of declaredFlows.values()) check(flow);
+  return {
+    ok: missing.size === 0 && withheld.size === 0 && outOfScope.size === 0 && problems.length === 0,
+    missing: [...missing], withheld: [...withheld], outOfScope: [...outOfScope], problems,
+  };
 }
 
 /**
@@ -57,13 +129,13 @@ export function verifyMapping(mapping, catalogue) {
  * @param {{ opsById: Map<string, object> }} catalogue
  * @returns {{ accepted: Array<object>, rejected: Array<{id: string, missing: string[]}> }}
  */
-export function verifyMappings(mappings, catalogue) {
+export function verifyMappings(mappings, catalogue, opts = {}) {
   const accepted = [];
   const rejected = [];
   for (const mapping of mappings ?? []) {
-    const { ok, missing } = verifyMapping(mapping, catalogue);
+    const { ok, missing, withheld, outOfScope, problems } = verifyMapping(mapping, catalogue, opts);
     if (ok) accepted.push(mapping);
-    else rejected.push({ id: mapping?.id, missing });
+    else rejected.push({ id: mapping?.id, missing, ...(withheld.length ? { withheld } : {}), ...(outOfScope.length ? { outOfScope } : {}), ...(problems.length ? { problems } : {}) });
   }
   return { accepted, rejected };
 }
@@ -83,6 +155,8 @@ export function mappingToManifest(mapping) {
     app: mapping.id,
     itemTypes: Array.isArray(mapping.itemTypes) ? mapping.itemTypes : [],  // required by validateManifest
     operations: (mapping.ops ?? []).map((op) => ({ ...op })),
+    // A mapping's declared flows ride into the manifest like an app's own (verified above).
+    ...(Array.isArray(mapping.flows) && mapping.flows.length ? { flows: mapping.flows.map((f) => ({ ...f })) } : {}),
   };
 }
 

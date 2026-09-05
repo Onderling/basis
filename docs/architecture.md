@@ -719,7 +719,10 @@ never-delegable op is withheld, and a step outside an installer-named scope is r
 each refusal (`apps/basis/src/mappings.js`). The confidential LLM route for a Node process (the bots, the Telegram shell) is
 `@onderling/llm-client/providers/privatemode`: the Ollama provider's wire and parser with Privatemode's SDK as the
 transport, which attests the enclave and encrypts end-to-end on the caller's machine — no proxy; the key comes from the
-environment or a key file, never from code. Basis has a third shell beside
+environment or a key file, never from code. The assistant a door talks to is one composition
+(`apps/basis/src/v2/assistantEngine.js`): the deterministic gate, retrieval over the items the door can see, the
+last turns of the thread re-sent with every call (the model is stateless), and the interpreter when a route is
+configured — the Telegram shell runs on it. Basis has a third shell beside
 web and mobile: the **Telegram shell** (`apps/basis/src/telegram/runner.js`, `bin/telegram-runner.mjs`) — a
 `MessagingBridge` turn goes through the same compilers (`parseInput → resolveDispatch → runDispatch → renderReply`)
 and, for free text, the circle composer's engine (`createCircleDispatch` with the deterministic gate); a button

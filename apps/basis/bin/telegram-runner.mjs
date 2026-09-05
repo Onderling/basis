@@ -26,11 +26,10 @@ import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { mergeManifests } from '../src/manifestMerge.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
-import { createTokenGate } from '../src/v2/tokenGate.js';
+import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { LlmClient } from '@onderling/llm-client';
 import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/providers/privatemode';
-import { circleGateRules } from '../src/v2/circleGate.js';
 import { listsManifest } from '../../lists/manifest.js';
 
 const { values } = parseArgs({ options: {
@@ -87,7 +86,11 @@ if (readPrivatemodeKey()) {
 const bridge = new TelegramBridge({ botToken: token, mode: 'long-polling' });
 // The walk log: one JSON line per turn (in, path, dispatch, replies, ms) after a header that says what
 // this run IS (model, route, language, apps) — so a walk can be read afterwards instead of retold.
-const walkLogFile = values['walk-log'] || path.join(dataDir, 'walk-log.jsonl');
+// Every run gets its own file, stamped, so walks stay apart when read later (Frits 2026-09-05).
+const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+const walkLogFile = values['walk-log']
+  ? values['walk-log'].replace(/(\.jsonl)?$/, `-${stamp}$1`)
+  : path.join(dataDir, `walk-log-${stamp}.jsonl`);
 const walkLog = (entry) => appendFileSync(walkLogFile, JSON.stringify(entry) + '\n');
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'telegram', lang: values.lang, apps: sources.map((s) => s.manifest.appId ?? s.manifest.name),
   commands: catalogue.commandMenu?.length ?? 0, llm: llm ? { provider: 'privatemode', model: llmModel } : null, door: allowedChatIds === '*' ? 'open' : 'allow-list' });
@@ -96,7 +99,8 @@ const runner = createTelegramRunner({
   callSkill: (app, op, args) => agent.callSkill(app, op, args),
   // The deterministic gate the circle composer uses ("add X" / "done X" route without a model).
   // The interpreter (an LLM route) is wired once a confidential route is configured.
-  gate: createTokenGate({ rules: circleGateRules(values.lang) }),
+  lang: values.lang,
+  loadItems: loadAssistantItems({ callSkill: (app, op, args) => agent.callSkill(app, op, args) }),
   ...(llm ? { llm, interpret: interpretToCommand } : {}),
   walkLog,
 });

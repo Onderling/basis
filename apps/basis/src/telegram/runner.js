@@ -9,9 +9,10 @@
  * a command that must be confirmed offers two buttons. There is no command table here and no verb.
  *
  * Pairing: a chat must be on the allow-list; any other chat is told its id and refused. Free text
- * takes the SAME turn engine as a typed circle line (`createCircleDispatch`): the deterministic
- * gate first (an "add X" / "done X" verb routes without any model), then the interpreter when an
- * LLM route is wired; with neither, the help hint — never silence.
+ * takes the SAME assistant as a typed circle line (`createAssistantEngine`): the deterministic gate
+ * first (an "add X" / "done X" verb routes without any model), retrieval over the node's items, the
+ * last turns of this chat re-sent as memory, then the interpreter when an LLM route is wired; with
+ * no route, the help hint — never silence.
  *
  * Pure over its deps: any `MessagingBridge` (`@onderling/chat-agent`'s Telegram bridge in
  * production, the in-memory one in tests), any `callSkill`.
@@ -21,7 +22,7 @@ import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
-import { createCircleDispatch } from '../v2/circleDispatch.js';
+import { createAssistantEngine } from '../v2/assistantEngine.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -36,15 +37,17 @@ const CONFIRM_NO  = '__confirm:no';
  *   open-door mode for a first try; a list pairs exactly those chats and tells any other chat its id
  * @param {(key:string, params?:object) => string} a.t
  * @param {(chatId:string) => string} [a.threadFor]  the thread id a chat maps to (default: the chat id)
- * @param {{evaluate:Function}|null} [a.gate]        the deterministic token gate (`createTokenGate`), optional
+ * @param {{evaluate:Function}|null} [a.gate]        (tests) an engine override — see `engine` below
  * @param {Function|null} [a.interpret]              the NL→op interpreter (`interpretToCommand`) — only with an LLM route
  * @param {object|null} [a.llm]                      the LlmClient the interpreter runs on (the confidential route); null → basic mode
+ * @param {Function} [a.loadItems]                   the items retrieval may draw on (`loadAssistantItems`)
+ * @param {object} [a.engine]                        (tests) a pre-built assistant engine
  * @param {string} [a.botName]
  * @param {(entry: object) => void} [a.walkLog]  a sink for one record per turn — what came in, which path
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl' } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -139,16 +142,11 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     }
   }
 
-  // Free text: the same engine the circle composer uses. The engine only treats a line as addressed
-  // when the bot is named, and a private Telegram chat IS addressed by nature — so the line is tagged
-  // before it goes in. No interpreter → the engine still runs the gate; a miss answers the hint.
-  const engine = createCircleDispatch({
-    catalogue,
-    policy: { llmTool: interpret && llm ? 'local' : 'off' },
-    llmProviders: interpret && llm ? { local: llm } : null,
-    interpret: typeof interpret === 'function' ? interpret : async () => null,
-    gate,
-    botName,
+  // Free text: the same assistant the circle composer uses — gate, retrieval, memory, interpreter — with
+  // its dispatch pointed at this shell's router. A private Telegram chat IS addressed; the engine tags it.
+  const engine = engineIn ?? createAssistantEngine({
+    catalogue, lang, llm, interpret, loadItems, botName,
+    ...(gate ? { gate } : {}),
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
     onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
     onLlmUnavailable: (_text, ctx) => say(ctx.chatId, t('circle.telegram.unknown')),
@@ -192,13 +190,16 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     try {
       if (await continuePending(chatId, text)) return;
       if (text.startsWith('/') || tapToParse(text, threadId)) { await route(chatId, threadId, text); return; }
-      const r = await engine.handle(`@${botName} ${text}`, { id: threadId, chatId });
+      const r = await engine.handle(threadId, text, { chatId });
       note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
       note(chatId, { error: err?.message ?? String(err) });
       await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) }));
     } finally {
       const rec = turns.get(chatId); turns.delete(chatId);
+      // What the model gets to remember: the line as typed and what went back (buttons aside).
+      if (rec && !/^(__confirm:|[A-Za-z][\w-]*:)/.test(text)) engine.remember(threadId, 'you', text);
+      for (const r of rec?.replies ?? []) engine.remember(threadId, 'assistant', r.text);
       if (rec && typeof walkLog === 'function') { try { walkLog({ ...rec, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
   }

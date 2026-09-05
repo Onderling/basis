@@ -75,7 +75,9 @@ export function createAssistantEngine({
     const t = String(text ?? '').trim();
     if (!threadId || !t) return;
     const lines = memory.get(threadId) ?? [];
-    lines.push(`${who === 'assistant' ? 'assistant' : 'you'}: ${t}`);
+    // Three voices: you · assistant (the model's own words) · system (an op's result). Keeping the
+    // op results apart stops the model imitating "✓ added …" instead of calling the tool.
+    lines.push(`${who === 'assistant' ? 'assistant' : who === 'system' ? 'system' : 'you'}: ${t}`);
     while (lines.length > memoryTurns) lines.shift();
     memory.set(threadId, lines);
   }

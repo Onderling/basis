@@ -68,6 +68,11 @@ const HH_LIST_ALIASES = {
   repair: 'repair', repairs: 'repair', reparatie: 'repair', reparaties: 'repair',
   schedule: 'schedule', schedules: 'schedule', agenda: 'schedule',
 };
+/** A household list named the way people say it ("boodschappen", "klusjes", "groceries") → the addItem enum value, or null. */
+export function householdListType(word) {
+  const w = String(word ?? '').trim().toLowerCase().replace(/(?:lijstje|lijst|list)$/, '');
+  return HH_LIST_ALIASES[w] ?? HH_LIST_ALIASES[String(word ?? '').trim().toLowerCase()] ?? null;
+}
 // "add <item> to [the] <type> [list]" · "noteer <item> op de <type>lijst" · "voeg <item> toe aan de <type>"
 const HH_ADD_TYPED =
   /^(?:add|noteer|zet|voeg)\s+(.+?)\s+(?:toe\s+)?(?:to|on|op|aan|naar)\s+(?:the\s+|de\s+|het\s+|my\s+|mijn\s+)?([a-zA-Z]+?)(?:[-\s]?(?:list|lijst|lijstje))?\.?$/i;

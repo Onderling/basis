@@ -23,6 +23,7 @@ import { runDispatch }     from '../dispatch.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine } from '../v2/assistantEngine.js';
+import { householdListType } from '../v2/circleGate.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -93,6 +94,50 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin }));
   }
 
+  /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue. */
+  function helpText() {
+    const lines = (catalogue.commandMenu ?? []).map((e) => {
+      const op = catalogue.opsById?.get?.(e.opId)?.op;
+      const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
+      return hint ? `${e.command} — ${hint}` : e.command;
+    });
+    return lines.join('\n');
+  }
+
+  /**
+   * A typed body like `/add boodschappen olie`: when the op's first required param is an enum and the
+   * body's first word names one of its values (in any language the gate knows), split it — the enum
+   * takes the word, the next string param takes the rest. Otherwise the body stays whole.
+   */
+  function splitTypedMatch(parse) {
+    const m = parse?.args?._match;
+    if (typeof m !== 'string' || !m.includes(' ')) return parse;
+    const op = catalogue.opsById?.get?.(parse.opId)?.op;
+    const params = Array.isArray(op?.params) ? op.params : [];
+    const enumP = params.find((p) => p?.required && p.kind === 'enum' && Array.isArray(p.of));
+    const textP = params.find((p) => p !== enumP && p?.required && p.kind === 'string');
+    if (!enumP || !textP) return parse;
+    const [first, ...rest] = m.trim().split(/\s+/);
+    const value = enumP.of.includes(first) ? first : (householdListType(first) && enumP.of.includes(householdListType(first)) ? householdListType(first) : null);
+    if (!value) return parse;
+    const { _match, ...others } = parse.args;
+    return { ...parse, args: { ...others, [enumP.name]: value, [textP.name]: rest.join(' ') } };
+  }
+
+  /** An enum arg named the way people say it ("boodschappen") → the declared value ("shopping"). */
+  function coerceEnums(ready) {
+    const op = catalogue.opsById?.get?.(ready.opId)?.op;
+    const args = { ...(ready.args ?? {}) };
+    for (const p of (op?.params ?? [])) {
+      if (p?.kind !== 'enum' || !Array.isArray(p.of)) continue;
+      const v = args[p.name];
+      if (typeof v !== 'string' || p.of.includes(v)) continue;
+      const alt = householdListType(v);
+      if (alt && p.of.includes(alt)) args[p.name] = alt;
+    }
+    return { ...ready, args };
+  }
+
   /** A button tap arrives as its callbackData `opId:itemId` — dispatch it like `/command item`. */
   function tapToParse(text, threadId) {
     const m = /^([A-Za-z][\w-]*):(.*)$/.exec(text);
@@ -108,15 +153,18 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   async function route(chatId, threadId, text) {
-    const parse = typeof text === 'string'
+    if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText()); }
+    let parse = typeof text === 'string'
       ? (tapToParse(text, threadId) ?? parseInput(text, catalogue, { threadId }))
       : opToParse(text, threadId);
     if (typeof text === 'string') note(chatId, { via: tapToParse(text, threadId) ? 'tap' : 'slash' });
+    if (parse?.kind === 'slash') parse = splitTypedMatch(parse);
+    if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText()); }
     const r = resolveDispatch(parse, catalogue);
     note(chatId, { route: r?.kind });
     switch (r?.kind) {
       case 'ready':
-        return run(chatId, r);
+        return run(chatId, coerceEnums(r));
       case 'needsForm': {
         const single = beginFollowUp({ dispatch: r, t });
         const p = single ?? beginFormFollowUp({ dispatch: r, t });
@@ -199,7 +247,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       const rec = turns.get(chatId); turns.delete(chatId);
       // What the model gets to remember: the line as typed and what went back (buttons aside).
       if (rec && !/^(__confirm:|[A-Za-z][\w-]*:)/.test(text)) engine.remember(threadId, 'you', text);
-      for (const r of rec?.replies ?? []) engine.remember(threadId, 'assistant', r.text);
+      // An op's result is the SYSTEM speaking; only a model reply is the assistant's own words.
+      const voice = rec?.opId || rec?.route === 'help' ? 'system' : 'assistant';
+      for (const r of rec?.replies ?? []) engine.remember(threadId, voice, r.text);
       if (rec && typeof walkLog === 'function') { try { walkLog({ ...rec, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
   }
@@ -209,6 +259,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     handle,
     start: () => bridge.start(),
     stop:  () => bridge.stop(),
+    /** test seam: the memory lines for a thread. */
+    recentTurns: (threadId) => engine.recentTurns(threadId),
     /** test seam: is a follow-up or confirmation pending for this chat? */
     pendingFor: (chatId) => pending.get(String(chatId))?.kind ?? null,
   };

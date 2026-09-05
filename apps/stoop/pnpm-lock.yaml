@@ -47,7 +47,7 @@ importers:
         version: file:../../packages/item-types
       '@onderling/llm-client':
         specifier: file:../../packages/llm-client
-        version: file:../../packages/llm-client
+        version: file:../../packages/llm-client(ws@8.21.0)
       '@onderling/local-store':
         specifier: file:../../packages/local-store
         version: file:../../packages/local-store(@onderling/core@file:../../packages/core)
@@ -1059,6 +1059,30 @@ packages:
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
+  openai@7.10.0:
+    resolution: {integrity: sha512-sn9t2Kls7O52PwuF9BUTYNu4Gk/r0lXJyrgaNht4TNRlZFb3dJIGO0RciSgjARGCBRtWjySubAQFJttlzUvGQQ==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      undici: '>=5 <9'
+      ws: ^8.20.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      undici:
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   openid-client@5.7.1:
     resolution: {integrity: sha512-jDBPgSVfTnkIh71Hg9pRvtJc6wTwqjRkN88+gCFtYWrlP4Yx2Dsrow8uPi3qLr/aeymPF3o2+dS+wOpglK04ew==}
 
@@ -1084,6 +1108,11 @@ packages:
     engines: {node: '>=10'}
     deprecated: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
     hasBin: true
+
+  privatemode-ai@1.55.0:
+    resolution: {integrity: sha512-aDz+vWyzIZaevzQao3cel3jjXCKL+YMZiQnHhrB9OljziTnhOJuH2le+Bmf3RTl9u0hxOeXl8vNLU7fwok0XpQ==}
+    peerDependencies:
+      openai: <8
 
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
@@ -1538,9 +1567,19 @@ snapshots:
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
 
-  '@onderling/llm-client@file:../../packages/llm-client':
+  '@onderling/llm-client@file:../../packages/llm-client(ws@8.21.0)':
     dependencies:
       '@onderling/logger': link:../../packages/logger
+    optionalDependencies:
+      openai: 7.10.0(ws@8.21.0)
+      privatemode-ai: 1.55.0(openai@7.10.0(ws@8.21.0))
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
 
   '@onderling/local-store@file:../../packages/local-store(@onderling/core@file:../../packages/core)':
     dependencies:
@@ -2366,6 +2405,11 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
+  openai@7.10.0(ws@8.21.0):
+    optionalDependencies:
+      ws: 8.21.0
+    optional: true
+
   openid-client@5.7.1:
     dependencies:
       jose: 4.15.9
@@ -2402,6 +2446,11 @@ snapshots:
       simple-get: 4.0.1
       tar-fs: 2.1.4
       tunnel-agent: 0.6.0
+
+  privatemode-ai@1.55.0(openai@7.10.0(ws@8.21.0)):
+    dependencies:
+      openai: 7.10.0(ws@8.21.0)
+    optional: true
 
   process-nextick-args@2.0.1:
     optional: true

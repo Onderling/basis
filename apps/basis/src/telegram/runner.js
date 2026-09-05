@@ -32,7 +32,8 @@ const CONFIRM_NO  = '__confirm:no';
  * @param {(app:string, op:string, args:object) => Promise<any>} a.callSkill
  * @param {object} a.catalogue           the merged catalogue (`mergeManifests`)
  * @param {Object<string, object>} [a.manifestsByOrigin]  appOrigin → manifest (list buttons need it)
- * @param {Array<string>} [a.allowedChatIds]  the paired chats; empty → every chat is refused with its id
+ * @param {Array<string>|'*'} [a.allowedChatIds]  the paired chats; `'*'` (or an empty list) admits EVERY chat — the
+ *   open-door mode for a first try; a list pairs exactly those chats and tells any other chat its id
  * @param {(key:string, params?:object) => string} a.t
  * @param {(chatId:string) => string} [a.threadFor]  the thread id a chat maps to (default: the chat id)
  * @param {{evaluate:Function}|null} [a.gate]        the deterministic token gate (`createTokenGate`), optional
@@ -46,7 +47,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
   if (typeof t !== 'function') throw new TypeError('createTelegramRunner: t is required');
 
-  const allowed = new Set(allowedChatIds.map(String));
+  const open = allowedChatIds === '*' || !Array.isArray(allowedChatIds) || allowedChatIds.length === 0;
+  const allowed = new Set(open ? [] : allowedChatIds.map(String));
   /** chatId → a pending follow-up (single/multi field) or a pending confirmation. */
   const pending = new Map();
 
@@ -171,7 +173,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const chatId = String(msg?.chatId ?? '');
     const text = String(msg?.text ?? '').trim();
     if (!chatId || !text) return;
-    if (!allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
+    if (!open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
     const threadId = threadFor(chatId);
     try {
       if (await continuePending(chatId, text)) return;

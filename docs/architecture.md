@@ -712,7 +712,10 @@ proven byte-identical to their old producers by round-trip tests. Over that enve
 two former 1:1 DM paths (the ephemeral contact-thread channel and wireChat's persisted `chat.send`) into a
 single `deliver` — a DM is just `deliver` to an audience-of-one. That fold also made the contact/bot thread
 **durable** (it was in-memory only, lost on reload): each turn persists to a durable thread keyed by the
-envelope id, which doubles as the DM dedup nonce. `wireChat` now routes through the same core. Basis has a third shell beside
+envelope id, which doubles as the DM dedup nonce. `wireChat` now routes through the same core. The confidential LLM route for a Node process (the bots, the Telegram shell) is
+`@onderling/llm-client/providers/privatemode`: the Ollama provider's wire and parser with Privatemode's SDK as the
+transport, which attests the enclave and encrypts end-to-end on the caller's machine — no proxy; the key comes from the
+environment or a key file, never from code. Basis has a third shell beside
 web and mobile: the **Telegram shell** (`apps/basis/src/telegram/runner.js`, `bin/telegram-runner.mjs`) — a
 `MessagingBridge` turn goes through the same compilers (`parseInput → resolveDispatch → runDispatch → renderReply`)
 and, for free text, the circle composer's engine (`createCircleDispatch` with the deterministic gate); a button

@@ -6,18 +6,19 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".":                          "./src/index.js",
-    "./routeSafety":              "./src/routeSafety.js",
-    "./endpoints":                "./src/endpoints.js",
-    "./metering":                 "./src/metering.js",
-    "./providers/ollama":         "./src/providers/ollama.js",
-    "./providers/mock":           "./src/providers/mock.js",
-    "./providers/embeddings":     "./src/providers/embeddings.js",
-    "./providers/ollama-embed":   "./src/providers/ollama-embed.js",
-    "./providers/mockEmbeddings": "./src/providers/mockEmbeddings.js"
+    ".": "./src/index.js",
+    "./routeSafety": "./src/routeSafety.js",
+    "./endpoints": "./src/endpoints.js",
+    "./metering": "./src/metering.js",
+    "./providers/ollama": "./src/providers/ollama.js",
+    "./providers/mock": "./src/providers/mock.js",
+    "./providers/embeddings": "./src/providers/embeddings.js",
+    "./providers/ollama-embed": "./src/providers/ollama-embed.js",
+    "./providers/mockEmbeddings": "./src/providers/mockEmbeddings.js",
+    "./providers/privatemode": "./src/providers/privatemode.js"
   },
   "scripts": {
-    "test":       "vitest run",
+    "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -25,5 +26,9 @@
   },
   "devDependencies": {
     "vitest": "^2.1.0"
+  },
+  "optionalDependencies": {
+    "openai": "<8",
+    "privatemode-ai": "^1.55.0"
   }
 }

@@ -409,6 +409,30 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  openai@7.10.0:
+    resolution: {integrity: sha512-sn9t2Kls7O52PwuF9BUTYNu4Gk/r0lXJyrgaNht4TNRlZFb3dJIGO0RciSgjARGCBRtWjySubAQFJttlzUvGQQ==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      undici: '>=5 <9'
+      ws: ^8.20.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      undici:
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   pathe@1.1.2:
     resolution: {integrity: sha512-whLdWMYL2TwI08hn8/ZqAbrVemu0LNaNNJZX73O6qaIdCTfXutsLhMkjdENX0qhsQ9uIimo4/aQOmXkoon2nDQ==}
 
@@ -422,6 +446,11 @@ packages:
   postcss@8.5.25:
     resolution: {integrity: sha512-DTPx3RWSSnWyzLxQnlH0rJP+EW5ekl16ZU4/psbIhA0e53kJfdgaN5vKM+xP7yJtXVu+nfdVFmlgFDEKAe4Pyw==}
     engines: {node: ^10 || ^12 || >=14}
+
+  privatemode-ai@1.55.0:
+    resolution: {integrity: sha512-aDz+vWyzIZaevzQao3cel3jjXCKL+YMZiQnHhrB9OljziTnhOJuH2le+Bmf3RTl9u0hxOeXl8vNLU7fwok0XpQ==}
+    peerDependencies:
+      openai: <8
 
   rollup@4.62.4:
     resolution: {integrity: sha512-RXOqwaPsBGjMNMa4sQjDjHieHEZDFoj/Rdr46l2MU5DfEs16wHJPC2RPTPHWhNl+M3aI472LLqFkFKut4SblOg==}
@@ -604,6 +633,16 @@ snapshots:
   '@onderling/llm-client@file:../llm-client':
     dependencies:
       '@onderling/logger': link:../logger
+    optionalDependencies:
+      openai: 7.10.0
+      privatemode-ai: 1.55.0(openai@7.10.0)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
 
   '@rollup/rollup-android-arm-eabi@4.62.4':
     optional: true
@@ -789,6 +828,9 @@ snapshots:
 
   nanoid@3.3.17: {}
 
+  openai@7.10.0:
+    optional: true
+
   pathe@1.1.2: {}
 
   pathval@2.0.1: {}
@@ -800,6 +842,11 @@ snapshots:
       nanoid: 3.3.17
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  privatemode-ai@1.55.0(openai@7.10.0):
+    dependencies:
+      openai: 7.10.0
+    optional: true
 
   rollup@4.62.4:
     dependencies:

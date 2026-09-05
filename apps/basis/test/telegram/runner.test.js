@@ -72,6 +72,15 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(agent.state().length).toBe(before);
   });
 
+  it("the open door ('*' or no list) admits any chat; a list pairs exactly those", async () => {
+    const { say, calls } = await boot({ allowedChatIds: '*' });
+    await say('/mine', '777');
+    expect(calls.at(-1)).toMatchObject({ op: 'listOpen' });
+    const { say: say2, calls: calls2 } = await boot({ allowedChatIds: [] });
+    await say2('/mine', '778');
+    expect(calls2.at(-1)).toMatchObject({ op: 'listOpen' });
+  });
+
   it('free text (no LLM wired) answers with the help hint, not silence', async () => {
     const { say } = await boot();
     const out = await say('hoi bot');

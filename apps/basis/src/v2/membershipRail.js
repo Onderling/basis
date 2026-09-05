@@ -27,13 +27,29 @@ export const MEMBERSHIP_CATCHUP_SUBTYPES = Object.freeze({
 /** How long one spineless roster read serves a verification burst (a fold verifies every statement). */
 export const SPINELESS_MEMO_MS = 300;
 
+/**
+ * Does `author` bind to this roster row for a statement at log position `atSeq`? Live addresses always;
+ * a RETIRED address only for statements that landed on this device's log BEFORE the retirement did
+ * (`row.retiredAddresses`, each with the `atSeq` of its revocation as folded here). Revocation cuts the
+ * future, not the past: a revoked device's earlier key events, tasks and votes stay verifiable, while
+ * anything that arrives after — including a backdated statement, whose writer-stamped time is never
+ * consulted — is refused. A retirement whose position is unknown retires everything (deny-favouring).
+ */
+export function addressBindsOnRow(row, author, atSeq = null) {
+  if (!row || typeof author !== 'string' || !author) return false;
+  if (row.circleAddress === author) return true;
+  if (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author)) return true;
+  if (!Array.isArray(row.retiredAddresses) || !Number.isFinite(atSeq)) return false;
+  return row.retiredAddresses.some((r) => r?.address === author && Number.isFinite(r.atSeq) && atSeq < r.atSeq);
+}
+
 export function rosterBindingVerifier(callSkill) {
   // NO re-entrancy breaker, BY CONSTRUCTION (2026-08-21): this verifier reads the roster
   // SPINELESS (trail + display only), so verifying a statement never re-enters the statement
   // fold — there is no recursion left to break. The old per-circle inFlight breaker could not
   // tell recursion from CONCURRENT SIBLING reads and refused valid statements nondeterministically
   // (roster stamps oscillated per read on a seeded device — the bug that forced this design).
-  return async ({ author, ref, circleId }) => {
+  return async ({ author, ref, circleId, atSeq = null }) => {
     try {
       // The DERIVED roster (`listGroupMembers`) is the projection that carries the address facts:
       // `webid` + the primary `circleAddress` + the proven `circleAddresses` SET (each entry
@@ -66,10 +82,7 @@ export function rosterBindingVerifier(callSkill) {
       // binds to the member; checking the primary alone would refuse every second device's
       // statements on every rail.
       return (Array.isArray(r?.members) ? r.members : []).some((m) =>
-        m
-        && (m.webid ?? m.addr ?? m.ref) === ref
-        && (m.circleAddress === author
-          || (Array.isArray(m.circleAddresses) && m.circleAddresses.includes(author))));
+        m && (m.webid ?? m.addr ?? m.ref) === ref && addressBindsOnRow(m, author, atSeq));
     } catch { return false; }
   };
 }

@@ -243,6 +243,28 @@ describe('deriveRoster', () => {
       expect(b.circleAddresses).toEqual([addrOf(1)]);
     });
 
+    it('a retired address stays on the row with the position of its revocation (L83)', () => {
+      const roster = deriveRoster({
+        redemptions: [redemption({
+          redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1),
+          circleAddresses: [{ address: addrOf(2), proof: proofOf(2) }],
+        })],
+        spineStatements: [{ kind: 'address-revoke', author: 'B', subject: addrOf(2), atSeq: 77 }],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b.circleAddresses).toEqual([addrOf(1)]);
+      expect(b.retiredAddresses).toEqual([{ address: addrOf(2), atSeq: 77 }]);
+      // the earliest revocation position wins; an unknown position retires without a position
+      const twice = deriveRoster({
+        redemptions: [redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1), circleAddresses: [{ address: addrOf(2), proof: proofOf(2) }] })],
+        spineStatements: [
+          { kind: 'address-revoke', author: 'B', subject: addrOf(2), atSeq: 90 },
+          { kind: 'address-revoke', author: 'B', subject: addrOf(2), atSeq: 70 },
+        ],
+      });
+      expect(twice.find((m) => m.webid === 'B').retiredAddresses).toEqual([{ address: addrOf(2), atSeq: 70 }]);
+    });
+
     it('the LOSS TAKEOVER: a revoked PRIMARY hands the slot to the first surviving address', () => {
       const roster = deriveRoster({
         redemptions: [

@@ -318,15 +318,22 @@ export function deriveRoster({
   // lands in the author's own bucket and touches nothing. DENY-WINS: once revoked, an address never
   // projects again, whatever announces before or after (the statements live on the compaction-exempt
   // membership lane, so every future fold sees them).
-  const revokedAddresses = new Map();   // webid → Set<address> (their OWN revoked device addresses)
+  // Each retired address keeps the POSITION of its revocation on this device's log (`atSeq`, stamped by
+  // the reading device, never by a writer): the binding verifiers let statements that landed here before
+  // that position keep binding to the retired address — revocation cuts the future, not the past. A
+  // revocation whose position is unknown (the legacy store path) retires everything (deny-favouring).
+  const revokedAddresses = new Map();   // webid → Map<address, atSeq|null> (their OWN revoked device addresses)
   if (Array.isArray(spineStatements)) {
     for (const s of spineStatements) {
       if (s?.kind !== 'address-revoke') continue;
       if (typeof s.author !== 'string' || !s.author) continue;
       if (typeof s.subject !== 'string' || !s.subject) continue;
-      let set = revokedAddresses.get(s.author);
-      if (!set) revokedAddresses.set(s.author, (set = new Set()));
-      set.add(s.subject);
+      let map = revokedAddresses.get(s.author);
+      if (!map) revokedAddresses.set(s.author, (map = new Map()));
+      const at = Number.isFinite(s.atSeq) ? s.atSeq : null;
+      const prev = map.get(s.subject);
+      // the EARLIEST revocation position wins (a second revoke of the same address changes nothing)
+      map.set(s.subject, prev === undefined ? at : (prev === null || at === null ? null : Math.min(prev, at)));
     }
   }
 
@@ -360,11 +367,14 @@ export function deriveRoster({
     // member stays reachable on the devices they still hold.
     const revoked = revokedAddresses.get(rec.webid);
     if (revoked?.size) {
+      const retired = addressSet.filter((a) => revoked.has(a)).map((a) => ({ address: a, atSeq: revoked.get(a) }));
       addressSet = addressSet.filter((a) => !revoked.has(a));
       if (primary && revoked.has(primary)) {
+        if (!retired.some((r) => r.address === primary)) retired.push({ address: primary, atSeq: revoked.get(primary) });
         if (addressSet.length) merged.circleAddress = addressSet[0];
         else delete merged.circleAddress;
       }
+      if (retired.length) merged.retiredAddresses = retired;
     }
     // maxDevicesPerMember — the circle's per-member device ceiling. Deterministic on every fold:
     // primary first, then set insertion order (trail order), truncated at the cap — so the

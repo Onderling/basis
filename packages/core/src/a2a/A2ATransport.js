@@ -60,6 +60,7 @@ export class A2ATransport extends Transport {
   #a2aTLSLayer;
   #staticDir;
   #indexFile;
+  #cardConfig;
   #extraStaticFiles;
   #server = null;
 
@@ -74,7 +75,7 @@ export class A2ATransport extends Transport {
    * @param {string}                             [opts.indexFile='index.html'] — File served when the requested path is `/` (only when `staticDir` is set).
    * @param {Record<string, string|Uint8Array>}  [opts.extraStaticFiles] — Optional in-memory virtual files served alongside `staticDir`. Keys are URL paths (e.g. `/groups.json`); values are the content. Checked BEFORE `staticDir` so virtual files override disk files at the same path. Used to surface runtime-generated state (e.g. multi-group launcher's group index) without writing to the source tree.
    */
-  constructor({ agent, port = null, host = null, baseUrl = null, a2aTLSLayer = null, staticDir = null, indexFile = 'index.html', extraStaticFiles = null }) {
+  constructor({ agent, port = null, host = null, baseUrl = null, a2aTLSLayer = null, staticDir = null, indexFile = 'index.html', extraStaticFiles = null, cardConfig = null }) {
     const address = baseUrl ?? (port ? `http://${host ?? 'localhost'}:${port}` : 'a2a:no-server');
     super({ address });
     this.#agent            = agent;
@@ -85,6 +86,9 @@ export class A2ATransport extends Transport {
     this.#staticDir        = staticDir;
     this.#indexFile        = indexFile;
     this.#extraStaticFiles = extraStaticFiles ?? null;
+    // What the served card says beyond the agent's own facts — name/description, and the asks a
+    // client honours before sending (`redact: 'pre-send'`); see AgentCardBuilder + a2aDiscover.
+    this.#cardConfig       = cardConfig ?? null;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -250,7 +254,7 @@ export class A2ATransport extends Transport {
 
     const builder = new AgentCardBuilder({
       agent:  this.#agent,
-      config: { url: this.#baseUrl ?? undefined },
+      config: { ...(this.#cardConfig ?? {}), url: this.#baseUrl ?? undefined },
     });
     const card = builder.build(tier);
     _json(res, 200, card);

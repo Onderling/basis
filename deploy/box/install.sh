@@ -15,6 +15,7 @@ BOX_DIR="${BOX_DIR:-/opt/onderling}"
 BOX_USER="${BOX_USER:-onderling}"
 BOX_REPO_URL="${BOX_REPO_URL:-https://github.com/Onderling/basis.git}"
 BOX_BRANCH="${BOX_BRANCH:-live}"
+FEEDBACK_REPO_URL="${FEEDBACK_REPO_URL:-https://github.com/Onderling/feedback.git}"
 SKIP_SYSTEM="${SKIP_SYSTEM:-0}"     # 1 = no apt/docker/user/firewall (tests, or a box you prepared yourself)
 
 ask() {   # ask VAR "question" [default]
@@ -30,11 +31,17 @@ ask PROFILE "Profile (relay | platform | feedback-project | personal)" relay
 case "$PROFILE" in
   relay)            ROLES="caddy@canopy-mono relay@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
   platform)         ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  feedback-project) ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono feedback-collect@feedback feedback-aggregate@feedback"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH feedback=$FEEDBACK_REPO_URL#$BOX_BRANCH" ;;
   *) echo "profile '$PROFILE' is not built yet — only 'relay' is (plans/PLAN-vps-runner.md §6)"; exit 2 ;;
 esac
 ask RELAY_DOMAIN "Relay hostname (DNS A-record must point here)"
-case "$PROFILE" in platform) ask POD_DOMAIN "Pod hostname (DNS A-record must point here)" ;; esac
-POD_DOMAIN="${POD_DOMAIN:-}"
+case "$PROFILE" in platform|feedback-project) ask POD_DOMAIN "Pod hostname (DNS A-record must point here)" ;; esac
+case "$PROFILE" in feedback-project)
+  ask ACTIVATE_HOST "Activation hostname (participants redeem their code here)"
+  ask PORTAL_HOST "Portal hostname (the project leads' GUI)"
+  ask PRIVATEMODE_API_KEY "Privatemode API key (the bots' confidential LLM route)" ;;
+esac
+POD_DOMAIN="${POD_DOMAIN:-}"; ACTIVATE_HOST="${ACTIVATE_HOST:-}"; PORTAL_HOST="${PORTAL_HOST:-}"; PRIVATEMODE_API_KEY="${PRIVATEMODE_API_KEY:-}"
 ask ACME_EMAIL "E-mail for Let's Encrypt"
 BOX_ALERT_TG_TOKEN="${BOX_ALERT_TG_TOKEN:-}"; BOX_ALERT_TG_CHAT="${BOX_ALERT_TG_CHAT:-}"
 
@@ -79,6 +86,12 @@ ACME_EMAIL=$ACME_EMAIL
 CSS_CONFIG=
 # companion: your device's pubKey enables the online /manage page (empty = off)
 COMPANION_MANAGE_OWNER_PUBKEY=
+# feedback-project: hostnames, the bots' Privatemode key, the chatId→pseudonym secret, the pod the bots write to
+ACTIVATE_HOST=$ACTIVATE_HOST
+PORTAL_HOST=$PORTAL_HOST
+PRIVATEMODE_API_KEY=$PRIVATEMODE_API_KEY
+FP_PSEUDONYM_SECRET=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
+CSS_URL=http://pod:3000
 # one Telegram line on a failed update / rollback (optional)
 BOX_ALERT_TG_TOKEN=$BOX_ALERT_TG_TOKEN
 BOX_ALERT_TG_CHAT=$BOX_ALERT_TG_CHAT
@@ -127,4 +140,5 @@ echo "box: $BOX_DIR  profile: $PROFILE"
 echo "relay: wss://$RELAY_DOMAIN   (media edge https://$RELAY_DOMAIN/blob-gate once R2_* is set)"
 [ -n "$POD_DOMAIN" ] && echo "pod:   https://$POD_DOMAIN/"
 echo "status page: https://$RELAY_DOMAIN/box/"
+[ -n "$PORTAL_HOST" ] && echo "portal: https://$PORTAL_HOST/   activation: https://$ACTIVATE_HOST/   new project: sudo -u $BOX_USER docker compose --project-name onderling exec feedback-bots node scripts/project.js new <id> --template or-feedback --css-url http://pod:3000"
 echo "state: $BOX_DIR/state.json   log: $BOX_DIR/box.log   freeze: touch $BOX_DIR/HOLD"

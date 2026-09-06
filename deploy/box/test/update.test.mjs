@@ -199,3 +199,48 @@ test('install.sh platform profile: four roles, pod hostname asked, both Caddy si
   assert.match(calls, /build --pull caddy relay pod companion/);
   assert.match(r.stdout, /pod:   https:\/\/pod\.example\.org\//);
 });
+
+test('install.sh feedback-project profile: two repos, five roles, the feedback repo plugs in by the role contract', () => {
+  const root = mkdtempSync(join(tmpdir(), 'box-fb-'));
+  const mk = (name, fill) => {
+    const remote = join(root, `${name}.git`); const work = join(root, `${name}-work`);
+    sh('git', ['init', '-q', '--bare', '-b', 'live', remote]); sh('git', ['init', '-q', '-b', 'live', work]);
+    sh('git', ['-C', work, 'config', 'user.email', 't@t']); sh('git', ['-C', work, 'config', 'user.name', 't']);
+    fill(work);
+    sh('git', ['-C', work, 'add', '-A']); sh('git', ['-C', work, 'commit', '-q', '-m', 'v1']);
+    sh('git', ['-C', work, 'remote', 'add', 'origin', remote]); sh('git', ['-C', work, 'push', '-q', 'origin', 'live']);
+    return remote;
+  };
+  const mono = mk('mono', (w) => { cpSync(RUNNER, join(w, 'deploy/box'), { recursive: true }); cpSync(resolve(RUNNER, '../roles'), join(w, 'deploy/roles'), { recursive: true }); });
+  // a stand-in feedback repo honouring the contract: two roles, a health script each, one caddy snippet
+  const fb = mk('feedback', (w) => {
+    mkdirSync(join(w, 'deploy/roles'), { recursive: true });
+    for (const r of ['feedback-collect', 'feedback-aggregate']) {
+      writeFileSync(join(w, `deploy/roles/${r}.yml`), `services:\n  ${r}:\n    image: x\n`);
+      writeFileSync(join(w, `deploy/roles/${r}.health`), '#!/usr/bin/env bash\nexit 0\n'); chmodSync(join(w, `deploy/roles/${r}.health`), 0o755);
+    }
+    writeFileSync(join(w, 'deploy/roles/feedback-collect.caddy'), '${ACTIVATE_HOST} {\n\treverse_proxy feedback-activation:8787\n}\n${PORTAL_HOST} {\n\treverse_proxy feedback-portal:8080\n}\n');
+  });
+  const bin = join(root, 'bin'); mkdirSync(bin);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf 'caddy\\nrelay\\npod\\nfeedback-collect\\nfeedback-aggregate\\n';; esac\nexit 0\n`);
+  chmodSync(join(bin, 'docker'), 0o755);
+  const box = join(root, 'box');
+  const r = spawnSync('bash', [join(RUNNER, 'install.sh')], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'feedback-project', RELAY_DOMAIN: 'relay.example.org', POD_DOMAIN: 'pod.example.org', ACTIVATE_HOST: 'activate.example.org', PORTAL_HOST: 'portal.example.org', PRIVATEMODE_API_KEY: 'pm-key', ACME_EMAIL: 'a@b.c', BOX_REPO_URL: mono, FEEDBACK_REPO_URL: fb, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' },
+  });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const conf = readFileSync(join(box, 'box.conf'), 'utf8');
+  assert.match(conf, /REPOS="canopy-mono=\S+#live feedback=\S+#live"/);
+  assert.match(conf, /feedback-collect@feedback feedback-aggregate@feedback/);
+  assert.ok(existsSync(join(box, 'repos/feedback/deploy/roles/feedback-collect.yml')), 'the feedback repo is cloned at live');
+  const env = readFileSync(join(box, '.env'), 'utf8');
+  assert.match(env, /ACTIVATE_HOST=activate\.example\.org/); assert.match(env, /PRIVATEMODE_API_KEY=pm-key/); assert.match(env, /FP_PSEUDONYM_SECRET=[0-9a-f]{48}/); assert.match(env, /CSS_URL=http:\/\/pod:3000/);
+  const caddy = readFileSync(join(box, 'data/caddy/Caddyfile'), 'utf8');
+  assert.match(caddy, /activate\.example\.org \{/); assert.match(caddy, /portal\.example\.org \{/); assert.match(caddy, /pod\.example\.org \{/);
+  const calls = readFileSync(join(root, 'calls.log'), 'utf8');
+  assert.match(calls, /-f \S+repos\/feedback\/deploy\/roles\/feedback-collect\.yml/, 'the feedback fragments are in the compose command');
+  const state = JSON.parse(readFileSync(join(box, 'state.json'), 'utf8'));
+  assert.ok(state.repos.feedback.sha && state.repos['canopy-mono'].sha);
+  assert.match(r.stdout, /portal: https:\/\/portal\.example\.org\//);
+});

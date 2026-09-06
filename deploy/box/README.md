@@ -21,16 +21,18 @@ It installs Docker, makes the `onderling` user, opens 80 + 443 only, clones the 
 `PROFILE`, `RELAY_DOMAIN`, `ACME_EMAIL` in the environment to skip the questions; `BOX_REPO_URL` for a
 private clone URL (a read-only deploy key, see the runbook).
 
-Profiles today: **`relay`** (relay + caddy — the first box, go-live's public relay) and **`platform`**
-(relay + pod + companion + caddy; asks for the pod hostname too). `feedback-project` and `personal` are
-named in the plan and refused by `install.sh` until built.
+Profiles today: **`relay`** (relay + caddy — the first box, go-live's public relay), **`platform`**
+(relay + pod + companion + caddy; asks for the pod hostname too) and **`feedback-project`** (relay + pod +
+caddy + the feedback repo's `feedback-collect` and `feedback-aggregate`; asks the activation and portal
+hostnames and the Privatemode key; clones the feedback repo at `live` beside this one). `personal` is
+named in the plan and refused until built.
 
 ## The box directory (`/opt/onderling`)
 
 | file | what |
 |---|---|
 | `box.conf` | the profile: `REPOS="name=url#branch …"` and `ROLES="role@repo …"` |
-| `.env` | secrets + hostnames for compose (`RELAY_DOMAIN`, `ACME_EMAIL`, optional `R2_*`/push, the alert chat). **`update.sh` never writes it.** |
+| `.env` | secrets + hostnames for compose (`RELAY_DOMAIN`, `POD_DOMAIN`, `ACTIVATE_HOST`, `PORTAL_HOST`, `ACME_EMAIL`, `PRIVATEMODE_API_KEY`, optional `R2_*`/push, the alert chat). **`update.sh` never writes it.** |
 | `state.json` | what is RUNNING: per repo the sha + tag + when, `rolledBack`, `failedRole` — the answer to "what are testers on?" |
 | `HOLD` | present ⇒ the updater does nothing. `touch HOLD` before a walk, `rm HOLD` after. |
 | `box.log` | one line per event (fetches, updates, health, rollbacks) |
@@ -70,8 +72,8 @@ A repo provides, under its own `deploy/roles/`:
 
 The box merges the fragments of the enabled roles into one compose project (`onderling`) and renders
 the Caddyfile from the snippets. This repo's roles live in `deploy/roles/` (`relay`, `caddy`, `pod`, `companion`); the
-feedback repo will provide `feedback-collect` and `feedback-aggregate` the same way, and so can a
-partner's repo. The box knows a repo only by `name=url#branch` in `box.conf`.
+feedback repo provides `feedback-collect` and `feedback-aggregate` the same way (its `deploy/roles/`),
+and so can a partner's repo. The box knows a repo only by `name=url#branch` in `box.conf`.
 
 `BOX_SMOKE=1` in the environment of `update.sh` makes the relay's health check also run the wire-protocol
 smoke (`deploy/smoke`) over the public `wss://` — slower, and the real proof after a first bring-up.
@@ -81,4 +83,5 @@ smoke (`deploy/smoke`) over the public `wss://` — slower, and the real proof a
 `node --test deploy/box/test/` proves the updater against a real git remote and a fake `docker`: no
 change → no call; a new commit → checkout, build, up, recorded with its tag; a red health gate → rollback
 to the previous sha, recorded and logged; `HOLD`; `RESET` refused; the Caddyfile rendered; `install.sh`
-end to end with the system steps skipped. It runs inside `npm run guards`.
+end to end with the system steps skipped, for the `relay`, `platform` and `feedback-project` profiles (the
+last with a stand-in second repo honouring the contract). It runs inside `npm run guards`.

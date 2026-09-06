@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# caddy role health: the container is running (certificates are issued lazily per site; a missing
+# cert shows up as a relay smoke failure over wss://, not here).
+set -u
+eval "$COMPOSE ps --status running --services" | grep -qx caddy

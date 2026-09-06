@@ -34,10 +34,10 @@ ask() {   # ask VAR "question" [default]
 # ── 1. profile questions (before anything is installed, so a typo costs nothing) ──
 ask PROFILE "Profile (relay | platform | feedback-project | personal)" relay
 case "$PROFILE" in
-  relay)            ROLES="caddy@canopy-mono relay@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
-  platform)         ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono backup@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
-  personal)         ROLES="companion@canopy-mono assistant@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
-  feedback-project) ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono backup@canopy-mono feedback-collect@feedback feedback-aggregate@feedback"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH feedback=$FEEDBACK_REPO_URL#$BOX_BRANCH" ;;
+  relay)            ROLES="caddy@basis relay@basis"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  platform)         ROLES="caddy@basis relay@basis pod@basis companion@basis backup@basis"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  personal)         ROLES="companion@basis assistant@basis"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  feedback-project) ROLES="caddy@basis relay@basis pod@basis backup@basis feedback-collect@feedback feedback-aggregate@feedback"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH feedback=$FEEDBACK_REPO_URL#$BOX_BRANCH" ;;
   *) echo "profile '$PROFILE' is not built yet — only 'relay' is (plans/PLAN-vps-runner.md §6)"; exit 2 ;;
 esac
 if [ "$PROFILE" = personal ]; then
@@ -138,10 +138,15 @@ for r in $REPOS; do
   git -C "$d" fetch -q origin "$br" --tags
   git -C "$d" checkout -q -f "origin/$br"
 done
-[ "$SKIP_SYSTEM" != 1 ] && chown -R "$BOX_USER:$BOX_USER" "$BOX_DIR"
+if [ "$SKIP_SYSTEM" != 1 ]; then
+  chown -R "$BOX_USER:$BOX_USER" "$BOX_DIR"
+  # the box directory is readable for everyone on the machine (state.json, box.log, repos are not secret);
+  # useradd -m made it 700, which locked the admin user out of `cat state.json`. Secrets keep their own modes.
+  chmod 755 "$BOX_DIR"; chmod 600 "$BOX_DIR/.env"
+fi
 
 # ── 5. the timer ──
-RUNNER="$BOX_DIR/repos/canopy-mono/deploy/box"
+RUNNER="$BOX_DIR/repos/basis/deploy/box"
 if [ "$SKIP_SYSTEM" != 1 ]; then
   sed "s#@BOX_DIR@#$BOX_DIR#g; s#@BOX_USER@#$BOX_USER#g; s#@RUNNER@#$RUNNER#g" "$RUNNER/systemd/onderling-box.service" > /etc/systemd/system/onderling-box.service
   cp "$RUNNER/systemd/onderling-box.timer" /etc/systemd/system/onderling-box.timer

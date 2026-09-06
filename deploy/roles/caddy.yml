@@ -3,7 +3,7 @@
 # ${BOX_DIR}/data/caddy/Caddyfile; certificates come from Let's Encrypt (ports 80 + 443 open, DNS set).
 services:
   caddy:
-    image: caddy:2
+    image: caddy:2@sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d   # pinned by digest — re-vet + re-pin to update
     restart: unless-stopped
     ports:
       - "80:80"

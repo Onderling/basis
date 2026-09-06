@@ -4,7 +4,8 @@
 #
 #   Build context = repo ROOT (the pnpm workspace):
 #     docker build -f deploy/assistant/Dockerfile -t onderling-assistant .
-FROM node:20-bookworm-slim
+# pinned by digest so a rollback rebuilds EXACTLY the previous release (deploy/box); re-vet + re-pin to update
+FROM node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \

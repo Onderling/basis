@@ -6,7 +6,8 @@
 # Focused install of the companion + its dependency subtree (it pulls @onderling/*
 # packages AND @onderling-app/folio). Uses the package's own bin (src/boot.js),
 # which already reads COMPANION_RELAY_URL / PORT / HOST / COMPANION_NODE_CONFIG_DIR.
-FROM node:20-bookworm-slim
+# pinned by digest so a rollback rebuilds EXACTLY the previous release (deploy/box); re-vet + re-pin to update
+FROM node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \

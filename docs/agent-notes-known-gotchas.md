@@ -660,3 +660,13 @@ trusting a change that touches exports, load the page once and read the `pageerr
 `bootProbe.mjs` idea: `page.on('pageerror', …)` + goto + 15s). The harness's `bootPeer` already refuses a
 dead boot, but only after the whole peer setup — the probe is 20 seconds and needs nothing else running.
 
+## A focused pnpm install in Docker leaves transitive workspace links out (2026-09-06)
+
+`pnpm install --filter "@onderling-app/basis..."` in a Dockerfile builds fine, and the runtime then fails
+with `Cannot find package '@onderling/item-types' imported from …/app-manifest/src/validate.js`: with
+`shared-workspace-lockfile=false` every package gets its own `node_modules`, and a workspace dep of a
+workspace dep is not linked into it. The relay and companion images never hit this because their
+subtrees are shallow. **Fix:** run `node scripts/relink-workspace.mjs` right after the install (the
+"second half of installing" CI also runs) — `deploy/assistant/Dockerfile` does. Prove an image with an
+import from inside it (`docker run --rm <img> node -e "import('/app/apps/<app>/src/…')"`), not only
+with a green build.

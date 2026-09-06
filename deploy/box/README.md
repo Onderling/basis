@@ -24,8 +24,10 @@ private clone URL (a read-only deploy key, see the runbook).
 Profiles today: **`relay`** (relay + caddy — the first box, go-live's public relay), **`platform`**
 (relay + pod + companion + caddy; asks for the pod hostname too) and **`feedback-project`** (relay + pod +
 caddy + the feedback repo's `feedback-collect` and `feedback-aggregate`; asks the activation and portal
-hostnames and the Privatemode key; clones the feedback repo at `live` beside this one). `personal` is
-named in the plan and refused until built.
+hostnames and the Privatemode key; clones the feedback repo at `live` beside this one) and **`personal`**
+(companion + the basis assistant on Telegram, dialing the SHARED relay — no hostname, no Caddy, no
+certificate; asks the relay URL, the bot token, your chat id and the Privatemode key). `platform` and
+`feedback-project` also run the `backup` role.
 
 ## The box directory (`/opt/onderling`)
 
@@ -71,12 +73,20 @@ A repo provides, under its own `deploy/roles/`:
 | `<role>.caddy` | optional Caddy site snippet; `${VAR}` is substituted from `.env` |
 
 The box merges the fragments of the enabled roles into one compose project (`onderling`) and renders
-the Caddyfile from the snippets. This repo's roles live in `deploy/roles/` (`relay`, `caddy`, `pod`, `companion`); the
+the Caddyfile from the snippets. This repo's roles live in `deploy/roles/` (`relay`, `caddy`, `pod`, `companion`, `assistant`, `backup`); the
 feedback repo provides `feedback-collect` and `feedback-aggregate` the same way (its `deploy/roles/`),
 and so can a partner's repo. The box knows a repo only by `name=url#branch` in `box.conf`.
 
 `BOX_SMOKE=1` in the environment of `update.sh` makes the relay's health check also run the wire-protocol
 smoke (`deploy/smoke`) over the public `wss://` — slower, and the real proof after a first bring-up.
+
+## Backups (role `backup`)
+
+A restic sidecar snapshots every box volume (relay, pod, companion, assistant, feedback, caddy) plus
+`state.json` to **every** target in `data/backup-targets/*.env` (one file per target — two providers
+= redundancy; see `deploy/backup/targets.env.example`), daily by default (`BACKUP_INTERVAL`), then
+prunes and verifies. No target files ⇒ the run says so and backs up nothing. Restore:
+`docker compose --project-name onderling exec backup sh /backup/backup.sh restore <target> latest /tmp/r`.
 
 ## Tests
 

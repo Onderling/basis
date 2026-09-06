@@ -183,7 +183,7 @@ test('install.sh platform profile: four roles, pod hostname asked, both Caddy si
   sh('git', ['-C', work, 'add', '-A']); sh('git', ['-C', work, 'commit', '-q', '-m', 'v1']);
   sh('git', ['-C', work, 'remote', 'add', 'origin', remote]); sh('git', ['-C', work, 'push', '-q', 'origin', 'live']);
   const bin = join(root, 'bin'); mkdirSync(bin);
-  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf 'caddy\\nrelay\\npod\\ncompanion\\n';; esac\nexit 0\n`);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf 'caddy\\nrelay\\npod\\ncompanion\\nbackup\\n';; esac\nexit 0\n`);
   chmodSync(join(bin, 'docker'), 0o755);
   const box = join(root, 'box');
   const r = spawnSync('bash', [join(RUNNER, 'install.sh')], {
@@ -191,12 +191,12 @@ test('install.sh platform profile: four roles, pod hostname asked, both Caddy si
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'platform', RELAY_DOMAIN: 'relay.example.org', POD_DOMAIN: 'pod.example.org', ACME_EMAIL: 'a@b.c', BOX_REPO_URL: remote, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' },
   });
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono"/);
+  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono backup@canopy-mono"/);
   const caddy = readFileSync(join(box, 'data/caddy/Caddyfile'), 'utf8');
   assert.match(caddy, /relay\.example\.org \{/); assert.match(caddy, /pod\.example\.org \{\n\treverse_proxy pod:3000/);
   assert.match(caddy, /handle_path \/box\/\*/);
   const calls = readFileSync(join(root, 'calls.log'), 'utf8');
-  assert.match(calls, /build --pull caddy relay pod companion/);
+  assert.match(calls, /build --pull caddy relay pod companion backup/);
   assert.match(r.stdout, /pod:   https:\/\/pod\.example\.org\//);
 });
 
@@ -222,7 +222,7 @@ test('install.sh feedback-project profile: two repos, five roles, the feedback r
     writeFileSync(join(w, 'deploy/roles/feedback-collect.caddy'), '${ACTIVATE_HOST} {\n\treverse_proxy feedback-activation:8787\n}\n${PORTAL_HOST} {\n\treverse_proxy feedback-portal:8080\n}\n');
   });
   const bin = join(root, 'bin'); mkdirSync(bin);
-  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf 'caddy\\nrelay\\npod\\nfeedback-collect\\nfeedback-aggregate\\n';; esac\nexit 0\n`);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf 'caddy\\nrelay\\npod\\nbackup\\nfeedback-collect\\nfeedback-aggregate\\n';; esac\nexit 0\n`);
   chmodSync(join(bin, 'docker'), 0o755);
   const box = join(root, 'box');
   const r = spawnSync('bash', [join(RUNNER, 'install.sh')], {
@@ -243,4 +243,31 @@ test('install.sh feedback-project profile: two repos, five roles, the feedback r
   const state = JSON.parse(readFileSync(join(box, 'state.json'), 'utf8'));
   assert.ok(state.repos.feedback.sha && state.repos['canopy-mono'].sha);
   assert.match(r.stdout, /portal: https:\/\/portal\.example\.org\//);
+});
+
+test('install.sh personal profile: no hostnames, the companion dials the shared relay, the assistant gets its token', () => {
+  const root = mkdtempSync(join(tmpdir(), 'box-personal-'));
+  const remote = join(root, 'mono.git'); const work = join(root, 'work');
+  sh('git', ['init', '-q', '--bare', '-b', 'live', remote]); sh('git', ['init', '-q', '-b', 'live', work]);
+  sh('git', ['-C', work, 'config', 'user.email', 't@t']); sh('git', ['-C', work, 'config', 'user.name', 't']);
+  cpSync(RUNNER, join(work, 'deploy/box'), { recursive: true });
+  cpSync(resolve(RUNNER, '../roles'), join(work, 'deploy/roles'), { recursive: true });
+  sh('git', ['-C', work, 'add', '-A']); sh('git', ['-C', work, 'commit', '-q', '-m', 'v1']);
+  sh('git', ['-C', work, 'remote', 'add', 'origin', remote]); sh('git', ['-C', work, 'push', '-q', 'origin', 'live']);
+  const bin = join(root, 'bin'); mkdirSync(bin);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf 'companion\\nassistant\\n';; esac\nexit 0\n`);
+  chmodSync(join(bin, 'docker'), 0o755);
+  const box = join(root, 'box');
+  const r = spawnSync('bash', [join(RUNNER, 'install.sh')], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'personal', COMPANION_RELAY_URL: 'wss://relay.onderling.org', TG_BOT_TOKEN: '1:abc', TG_ALLOWED_CHAT_IDS: '42', PRIVATEMODE_API_KEY: 'pm', BOX_REPO_URL: remote, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' },
+  });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="companion@canopy-mono assistant@canopy-mono"/);
+  const env = readFileSync(join(box, '.env'), 'utf8');
+  assert.match(env, /COMPANION_RELAY_URL=wss:\/\/relay\.onderling\.org/); assert.match(env, /TG_BOT_TOKEN=1:abc/); assert.match(env, /TG_ALLOWED_CHAT_IDS=42/); assert.match(env, /RELAY_DOMAIN=$/m);
+  const calls = readFileSync(join(root, 'calls.log'), 'utf8');
+  assert.match(calls, /build --pull companion assistant/);
+  assert.doesNotMatch(calls, /caddy\.yml/, 'no caddy on a personal box');
+  assert.match(r.stdout, /personal: companion dialing wss:\/\/relay\.onderling\.org · assistant on Telegram \(chats: 42\)/);
 });

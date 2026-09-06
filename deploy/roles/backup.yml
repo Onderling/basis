@@ -1,0 +1,34 @@
+# deploy/roles/backup.yml — restic backups of every box volume to every configured target, on a
+# schedule (the feedback repo's sidecar, generalised). Targets: one env file per target in
+# ${BOX_DIR}/data/backup-targets/*.env (RESTIC_REPOSITORY, RESTIC_PASSWORD, provider creds — see
+# deploy/backup/targets.env.example); none configured ⇒ the run says so and does nothing.
+# Volumes of roles this box does not run are created empty by compose and back up as empty — harmless.
+services:
+  backup:
+    image: restic/restic:0.17.3@sha256:8f5a62b422a2cb1277ea0dd6e826fe1acf649e5b9f02d60e5268d5fd1976255a
+    entrypoint: ["/bin/sh"]
+    command: ["/backup/run-scheduled.sh"]
+    restart: unless-stopped
+    environment:
+      BACKUP_DATA: "/backup/data"
+      BACKUP_TARGETS_DIR: "/backup/targets"
+      BACKUP_INTERVAL: "${BACKUP_INTERVAL:-86400}"
+      BACKUP_TAG: "onderling-box"
+    volumes:
+      - ../backup/backup.sh:/backup/backup.sh:ro
+      - ../backup/run-scheduled.sh:/backup/run-scheduled.sh:ro
+      - ${BOX_DIR}/data/backup-targets:/backup/targets:ro
+      - ${BOX_DIR}/state.json:/backup/data/box/state.json:ro
+      - relay-data:/backup/data/relay:ro
+      - pod-data:/backup/data/pod:ro
+      - companion-data:/backup/data/companion:ro
+      - assistant-data:/backup/data/assistant:ro
+      - feedback-data:/backup/data/feedback:ro
+      - caddy-data:/backup/data/caddy:ro
+volumes:
+  relay-data:
+  pod-data:
+  companion-data:
+  assistant-data:
+  feedback-data:
+  caddy-data:

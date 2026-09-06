@@ -108,3 +108,6 @@ _archive/
 # The Telegram shell's data dir (identity vault + passphrase + items) — never in git
 .basis-telegram/
 .feedback-bot/
+# publish targets hold host/user/path of real web hosts — never committed
+deploy/web/targets/*.env
+!deploy/web/targets/example.env

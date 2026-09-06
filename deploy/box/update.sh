@@ -19,6 +19,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 . "$HERE/lib.sh"
 load_conf
+# Work from the box directory: the timer and `sudo -u onderling` both inherit a cwd the box user may not
+# read (root's shell in /home/ubuntu, mode 750) and docker compose stats "." before doing anything.
+cd "$BOX_DIR"
 
 [ -f "$BOX_DIR/HOLD" ] && { log "HOLD present — not updating"; exit 0; }
 

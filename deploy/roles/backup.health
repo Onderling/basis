@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# backup role health: the scheduler is running. A failed run is logged and retried on the next tick;
+# `backup.sh snapshots` inside the container shows what actually exists.
+set -u
+eval "$COMPOSE ps --status running --services" | grep -qx backup

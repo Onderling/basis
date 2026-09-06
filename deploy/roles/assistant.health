@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# assistant role health: the container is running (it long-polls Telegram; a bad token crashes it,
+# which shows as not-running after the health timeout).
+set -u
+eval "$COMPOSE ps --status running --services" | grep -qx assistant

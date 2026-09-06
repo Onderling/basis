@@ -1,0 +1,18 @@
+# deploy/roles/assistant.yml — the basis assistant on Telegram as a box ROLE (the `personal` profile:
+# one person + their assistant, reachable on Telegram when the phone is off). Same engine as the
+# web/mobile shells. It dials out to Telegram and to Privatemode; no port, no hostname.
+services:
+  assistant:
+    build:
+      context: ../..
+      dockerfile: deploy/assistant/Dockerfile
+    restart: unless-stopped
+    environment:
+      TG_BOT_TOKEN: "${TG_BOT_TOKEN:?set TG_BOT_TOKEN in .env (the assistant's Telegram bot token)}"
+      TG_ALLOWED_CHAT_IDS: "${TG_ALLOWED_CHAT_IDS:-}"
+      PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
+      ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"
+    volumes:
+      - assistant-data:/data/assistant
+volumes:
+  assistant-data:

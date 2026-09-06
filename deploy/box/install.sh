@@ -30,11 +30,21 @@ ask() {   # ask VAR "question" [default]
 ask PROFILE "Profile (relay | platform | feedback-project | personal)" relay
 case "$PROFILE" in
   relay)            ROLES="caddy@canopy-mono relay@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
-  platform)         ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
-  feedback-project) ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono feedback-collect@feedback feedback-aggregate@feedback"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH feedback=$FEEDBACK_REPO_URL#$BOX_BRANCH" ;;
+  platform)         ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono backup@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  personal)         ROLES="companion@canopy-mono assistant@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  feedback-project) ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono backup@canopy-mono feedback-collect@feedback feedback-aggregate@feedback"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH feedback=$FEEDBACK_REPO_URL#$BOX_BRANCH" ;;
   *) echo "profile '$PROFILE' is not built yet — only 'relay' is (plans/PLAN-vps-runner.md §6)"; exit 2 ;;
 esac
-ask RELAY_DOMAIN "Relay hostname (DNS A-record must point here)"
+if [ "$PROFILE" = personal ]; then
+  ask COMPANION_RELAY_URL "The shared relay to dial (wss://relay.onderling.org)" "wss://relay.onderling.org"
+  ask TG_BOT_TOKEN "Telegram bot token for your assistant"
+  ask TG_ALLOWED_CHAT_IDS "Your Telegram chat id(s), comma-separated (empty = open door)" ""
+  ask PRIVATEMODE_API_KEY "Privatemode API key (the assistant's confidential LLM route)"
+  RELAY_DOMAIN=""; ACME_EMAIL=""
+else
+  ask RELAY_DOMAIN "Relay hostname (DNS A-record must point here)"
+fi
+COMPANION_RELAY_URL="${COMPANION_RELAY_URL:-}"; TG_BOT_TOKEN="${TG_BOT_TOKEN:-}"; TG_ALLOWED_CHAT_IDS="${TG_ALLOWED_CHAT_IDS:-}"
 case "$PROFILE" in platform|feedback-project) ask POD_DOMAIN "Pod hostname (DNS A-record must point here)" ;; esac
 case "$PROFILE" in feedback-project)
   ask ACTIVATE_HOST "Activation hostname (participants redeem their code here)"
@@ -42,7 +52,7 @@ case "$PROFILE" in feedback-project)
   ask PRIVATEMODE_API_KEY "Privatemode API key (the bots' confidential LLM route)" ;;
 esac
 POD_DOMAIN="${POD_DOMAIN:-}"; ACTIVATE_HOST="${ACTIVATE_HOST:-}"; PORTAL_HOST="${PORTAL_HOST:-}"; PRIVATEMODE_API_KEY="${PRIVATEMODE_API_KEY:-}"
-ask ACME_EMAIL "E-mail for Let's Encrypt"
+[ "$PROFILE" = personal ] || ask ACME_EMAIL "E-mail for Let's Encrypt"
 BOX_ALERT_TG_TOKEN="${BOX_ALERT_TG_TOKEN:-}"; BOX_ALERT_TG_CHAT="${BOX_ALERT_TG_CHAT:-}"
 
 # ── 2. system: docker, user, firewall ──
@@ -66,7 +76,7 @@ if [ "$SKIP_SYSTEM" != 1 ]; then
 fi
 
 # ── 3. the box directory, conf, env ──
-mkdir -p "$BOX_DIR/repos" "$BOX_DIR/data/caddy"
+mkdir -p "$BOX_DIR/repos" "$BOX_DIR/data/caddy" "$BOX_DIR/data/www" "$BOX_DIR/data/backup-targets"
 if [ ! -f "$BOX_DIR/box.conf" ]; then
   cat > "$BOX_DIR/box.conf" <<EOF
 # the box profile — which repos (name=url#release-branch) and which roles (role@repo)
@@ -84,8 +94,14 @@ POD_DOMAIN=$POD_DOMAIN
 ACME_EMAIL=$ACME_EMAIL
 # pod: WAC (default) or ACP — decide before first boot (runbook B6): @css:config/file-acp.json
 CSS_CONFIG=
-# companion: your device's pubKey enables the online /manage page (empty = off)
+# companion: the relay it dials (empty = this box's own relay) and your device's pubKey for the online /manage page (empty = off)
+COMPANION_RELAY_URL=$COMPANION_RELAY_URL
 COMPANION_MANAGE_OWNER_PUBKEY=
+# personal: the assistant's Telegram bot + who may talk to it
+TG_BOT_TOKEN=$TG_BOT_TOKEN
+TG_ALLOWED_CHAT_IDS=$TG_ALLOWED_CHAT_IDS
+# backups (role backup): interval in seconds; targets in data/backup-targets/*.env
+BACKUP_INTERVAL=86400
 # feedback-project: hostnames, the bots' Privatemode key, the chatId→pseudonym secret, the pod the bots write to
 ACTIVATE_HOST=$ACTIVATE_HOST
 PORTAL_HOST=$PORTAL_HOST
@@ -137,8 +153,9 @@ else
 fi
 echo
 echo "box: $BOX_DIR  profile: $PROFILE"
-echo "relay: wss://$RELAY_DOMAIN   (media edge https://$RELAY_DOMAIN/blob-gate once R2_* is set)"
+[ -n "$RELAY_DOMAIN" ] && echo "relay: wss://$RELAY_DOMAIN   (media edge https://$RELAY_DOMAIN/blob-gate once R2_* is set)"
+[ "$PROFILE" = personal ] && echo "personal: companion dialing $COMPANION_RELAY_URL · assistant on Telegram (chats: ${TG_ALLOWED_CHAT_IDS:-open})"
 [ -n "$POD_DOMAIN" ] && echo "pod:   https://$POD_DOMAIN/"
-echo "status page: https://$RELAY_DOMAIN/box/"
+[ -n "$RELAY_DOMAIN" ] && echo "status page: https://$RELAY_DOMAIN/box/"
 [ -n "$PORTAL_HOST" ] && echo "portal: https://$PORTAL_HOST/   activation: https://$ACTIVATE_HOST/   new project: sudo -u $BOX_USER docker compose --project-name onderling exec feedback-bots node scripts/project.js new <id> --template or-feedback --css-url http://pod:3000"
 echo "state: $BOX_DIR/state.json   log: $BOX_DIR/box.log   freeze: touch $BOX_DIR/HOLD"

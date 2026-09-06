@@ -131,7 +131,7 @@ const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
 export function interpretSystemFor(lang = 'nl') {
   const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
   const add = lang === 'nl'
-    ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named.'
+    ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
   return `${DEFAULT_INTERPRET_SYSTEM}\nAlways reply in ${name}. ${add}`;
 }

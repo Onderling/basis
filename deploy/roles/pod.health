@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# pod role health: CSS answers on / inside the compose network (the container image carries node).
+set -u
+eval "$COMPOSE exec -T pod node -e \"fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))\""

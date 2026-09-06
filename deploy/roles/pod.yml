@@ -1,0 +1,18 @@
+# deploy/roles/pod.yml — the Solid pod (Community Solid Server) as a box ROLE. Same image as
+# deploy/css-pod. CSS bakes the base URL into every WebID → CSS_BASE_URL MUST be the public https
+# domain (POD_DOMAIN in .env). CSS_CONFIG picks WAC (default) or ACP — decide before first boot
+# (DEPLOY-RUNBOOK B6); the box does not change it afterwards.
+services:
+  pod:
+    build:
+      context: ../css-pod
+    restart: unless-stopped
+    environment:
+      CSS_CONFIG: "${CSS_CONFIG:-@css:config/file.json}"
+      CSS_BASE_URL: "https://${POD_DOMAIN}/"
+      CSS_ROOT_FILE_PATH: "/data/pod"
+      CSS_PORT: "3000"
+    volumes:
+      - pod-data:/data/pod
+volumes:
+  pod-data:

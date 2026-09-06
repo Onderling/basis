@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# companion role health: the container is running (it dials out to the relay; no port of its own unless
+# /manage is enabled). A crash loop shows as not-running after the health timeout.
+set -u
+eval "$COMPOSE ps --status running --services" | grep -qx companion

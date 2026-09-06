@@ -21,8 +21,9 @@ It installs Docker, makes the `onderling` user, opens 80 + 443 only, clones the 
 `PROFILE`, `RELAY_DOMAIN`, `ACME_EMAIL` in the environment to skip the questions; `BOX_REPO_URL` for a
 private clone URL (a read-only deploy key, see the runbook).
 
-Profiles today: **`relay`** (relay + caddy — the first box, go-live's public relay). The others
-(`platform`, `feedback-project`, `personal`) are named in the plan and refused by `install.sh` until built.
+Profiles today: **`relay`** (relay + caddy — the first box, go-live's public relay) and **`platform`**
+(relay + pod + companion + caddy; asks for the pod hostname too). `feedback-project` and `personal` are
+named in the plan and refused by `install.sh` until built.
 
 ## The box directory (`/opt/onderling`)
 
@@ -34,7 +35,14 @@ Profiles today: **`relay`** (relay + caddy — the first box, go-live's public r
 | `HOLD` | present ⇒ the updater does nothing. `touch HOLD` before a walk, `rm HOLD` after. |
 | `box.log` | one line per event (fetches, updates, health, rollbacks) |
 | `repos/<name>/` | one git checkout per repo, detached at the release sha |
-| `data/` | the generated Caddyfile; compose volumes hold the rest |
+| `data/` | the generated Caddyfile and the status page (`data/www/`); compose volumes hold the rest |
+
+## The HTML face (kept simple)
+
+`https://<relay-domain>/box/` is a **read-only status page**: profile and roles, whether `HOLD` is set,
+the last update and whether it rolled back, `state.json`, and the last 50 log lines. It is static HTML
+the updater rewrites on every state change (`data/www/`), served by Caddy — no server code, no login,
+nothing secret on it. Anything interactive (freeze, force an update) stays a command on the box.
 
 ## The updater (`update.sh`, every 5 min via `onderling-box.timer`)
 
@@ -61,7 +69,7 @@ A repo provides, under its own `deploy/roles/`:
 | `<role>.caddy` | optional Caddy site snippet; `${VAR}` is substituted from `.env` |
 
 The box merges the fragments of the enabled roles into one compose project (`onderling`) and renders
-the Caddyfile from the snippets. This repo's roles live in `deploy/roles/` (`relay`, `caddy`); the
+the Caddyfile from the snippets. This repo's roles live in `deploy/roles/` (`relay`, `caddy`, `pod`, `companion`); the
 feedback repo will provide `feedback-collect` and `feedback-aggregate` the same way, and so can a
 partner's repo. The box knows a repo only by `name=url#branch` in `box.conf`.
 

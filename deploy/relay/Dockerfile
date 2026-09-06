@@ -8,7 +8,8 @@
 # therefore builds from the workspace root and does a FOCUSED install of just the
 # relay + its dependency subtree (`--filter "@onderling/relay..."`) — never the 17
 # RN/Expo apps. `better-sqlite3` is a native module → build toolchain in one stage.
-FROM node:20-bookworm-slim
+# pinned by digest so a rollback rebuilds EXACTLY the previous release (deploy/box); re-vet + re-pin to update
+FROM node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
 
 # native build deps for better-sqlite3 (kept minimal; slim base + prune after)
 RUN apt-get update \

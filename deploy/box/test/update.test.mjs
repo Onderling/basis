@@ -139,7 +139,7 @@ test('the Caddyfile is rendered from the enabled roles\' snippets with .env valu
 });
 
 test('install.sh (system steps skipped): writes box.conf + .env, clones at live, brings the relay profile up', () => {
-  // a fake "canopy-mono" remote carrying the real runner + roles, so install finds deploy/box and deploy/roles
+  // a fake "basis" remote carrying the real runner + roles, so install finds deploy/box and deploy/roles
   const root = mkdtempSync(join(tmpdir(), 'box-install-'));
   const remote = join(root, 'mono.git'); const work = join(root, 'work');
   sh('git', ['init', '-q', '--bare', '-b', 'live', remote]); sh('git', ['init', '-q', '-b', 'live', work]);
@@ -160,11 +160,11 @@ test('install.sh (system steps skipped): writes box.conf + .env, clones at live,
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'relay', RELAY_DOMAIN: 'relay.example.org', ACME_EMAIL: 'a@b.c', BOX_REPO_URL: remote, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' },
   });
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="caddy@canopy-mono relay@canopy-mono"/);
+  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="caddy@basis relay@basis"/);
   assert.match(readFileSync(join(box, '.env'), 'utf8'), /RELAY_DOMAIN=relay\.example\.org/);
-  assert.ok(existsSync(join(box, 'repos/canopy-mono/deploy/box/update.sh')), 'cloned at live');
+  assert.ok(existsSync(join(box, 'repos/basis/deploy/box/update.sh')), 'cloned at live');
   const state = JSON.parse(readFileSync(join(box, 'state.json'), 'utf8'));
-  assert.equal(state.repos['canopy-mono'].tag, 'v1.0.0');
+  assert.equal(state.repos['basis'].tag, 'v1.0.0');
   assert.equal(state.rolledBack, false);
   assert.match(readFileSync(join(box, 'data/caddy/Caddyfile'), 'utf8'), /relay\.example\.org \{[\s\S]*reverse_proxy relay:8787/);
   assert.match(r.stdout, /relay: wss:\/\/relay\.example\.org/);
@@ -196,7 +196,7 @@ test('install.sh platform profile: four roles, pod hostname asked, both Caddy si
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'platform', RELAY_DOMAIN: 'relay.example.org', POD_DOMAIN: 'pod.example.org', ACME_EMAIL: 'a@b.c', BOX_REPO_URL: remote, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' },
   });
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono backup@canopy-mono"/);
+  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="caddy@basis relay@basis pod@basis companion@basis backup@basis"/);
   const caddy = readFileSync(join(box, 'data/caddy/Caddyfile'), 'utf8');
   assert.match(caddy, /relay\.example\.org \{/); assert.match(caddy, /pod\.example\.org \{\n\treverse_proxy pod:3000/);
   assert.match(caddy, /handle_path \/box\/\*/);
@@ -236,7 +236,7 @@ test('install.sh feedback-project profile: two repos, five roles, the feedback r
   });
   assert.equal(r.status, 0, r.stderr + r.stdout);
   const conf = readFileSync(join(box, 'box.conf'), 'utf8');
-  assert.match(conf, /REPOS="canopy-mono=\S+#live feedback=\S+#live"/);
+  assert.match(conf, /REPOS="basis=\S+#live feedback=\S+#live"/);
   assert.match(conf, /feedback-collect@feedback feedback-aggregate@feedback/);
   assert.ok(existsSync(join(box, 'repos/feedback/deploy/roles/feedback-collect.yml')), 'the feedback repo is cloned at live');
   const env = readFileSync(join(box, '.env'), 'utf8');
@@ -246,7 +246,7 @@ test('install.sh feedback-project profile: two repos, five roles, the feedback r
   const calls = readFileSync(join(root, 'calls.log'), 'utf8');
   assert.match(calls, /-f \S+repos\/feedback\/deploy\/roles\/feedback-collect\.yml/, 'the feedback fragments are in the compose command');
   const state = JSON.parse(readFileSync(join(box, 'state.json'), 'utf8'));
-  assert.ok(state.repos.feedback.sha && state.repos['canopy-mono'].sha);
+  assert.ok(state.repos.feedback.sha && state.repos['basis'].sha);
   assert.match(r.stdout, /portal: https:\/\/portal\.example\.org\//);
 });
 
@@ -268,7 +268,7 @@ test('install.sh personal profile: no hostnames, the companion dials the shared 
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'personal', COMPANION_RELAY_URL: 'wss://relay.onderling.org', TG_BOT_TOKEN: '1:abc', TG_ALLOWED_CHAT_IDS: '42', PRIVATEMODE_API_KEY: 'pm', BOX_REPO_URL: remote, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' },
   });
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="companion@canopy-mono assistant@canopy-mono"/);
+  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="companion@basis assistant@basis"/);
   const env = readFileSync(join(box, '.env'), 'utf8');
   assert.match(env, /COMPANION_RELAY_URL=wss:\/\/relay\.onderling\.org/); assert.match(env, /TG_BOT_TOKEN=1:abc/); assert.match(env, /TG_ALLOWED_CHAT_IDS=42/); assert.match(env, /RELAY_DOMAIN=$/m);
   const calls = readFileSync(join(root, 'calls.log'), 'utf8');

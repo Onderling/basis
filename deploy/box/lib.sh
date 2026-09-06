@@ -34,7 +34,7 @@ load_conf() {
   : "${ROLES:?box.conf: ROLES is required (role@repo …)}"
 }
 
-# REPOS="canopy-mono=git@github.com:Onderling/basis.git#live feedback=…#live"
+# REPOS="basis=git@github.com:Onderling/basis.git#live feedback=…#live"
 repo_names() { for r in $REPOS; do echo "${r%%=*}"; done; }
 # every lookup ends with `return 0`: callers run under set -e inside $(…), and a non-matching last
 # iteration must not read as a failure
@@ -42,7 +42,7 @@ repo_url()   { for r in $REPOS; do [ "${r%%=*}" = "$1" ] && { local rest="${r#*=
 repo_branch(){ for r in $REPOS; do [ "${r%%=*}" = "$1" ] && { local rest="${r#*=}"; echo "${rest#*#}"; }; done; return 0; }
 repo_dir()   { echo "$BOX_DIR/repos/$1"; }
 
-# ROLES="caddy@canopy-mono relay@canopy-mono feedback-collect@feedback"
+# ROLES="caddy@basis relay@basis feedback-collect@feedback"
 role_names() { for r in $ROLES; do echo "${r%%@*}"; done; }
 role_repo()  { for r in $ROLES; do [ "${r%%@*}" = "$1" ] && echo "${r#*@}"; done; return 0; }
 role_file()  { echo "$(repo_dir "$(role_repo "$1")")/deploy/roles/$1.$2"; }

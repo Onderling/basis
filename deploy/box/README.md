@@ -60,7 +60,7 @@ nothing secret on it. Anything interactive (freeze, force an update) stays a com
 
 A release whose tag message contains `RESET` (a data reset by the no-backwards-compat rule) is refused
 until the box is run with `ALLOW_RESET=1`. `FORCE=1 update.sh` rebuilds without a new sha (the first
-bring-up uses it). Run by hand: `sudo -u onderling BOX_DIR=/opt/onderling bash /opt/onderling/repos/canopy-mono/deploy/box/update.sh`.
+bring-up uses it). Run by hand: `sudo -u onderling BOX_DIR=/opt/onderling bash /opt/onderling/repos/basis/deploy/box/update.sh`.
 
 ## The role contract (how a repo plugs in)
 

@@ -670,3 +670,11 @@ subtrees are shallow. **Fix:** run `node scripts/relink-workspace.mjs` right aft
 "second half of installing" CI also runs) — `deploy/assistant/Dockerfile` does. Prove an image with an
 import from inside it (`docker run --rm <img> node -e "import('/app/apps/<app>/src/…')"`), not only
 with a green build.
+
+## `sudo -u <user>` keeps the caller's cwd — and the callee may not be allowed to read it (2026-09-06)
+
+`sudo -u onderling bash update.sh` from root's shell in `/home/ubuntu` (mode 750) ran the script with a
+cwd the `onderling` user cannot stat. Everything that touches "." — docker compose does, first thing —
+fails with `stat .: permission denied`, which read as a build failure. The updater now `cd "$BOX_DIR"`s
+before any work; any script a box runs under another user must do the same. The test reproduces it by
+entering a directory, `chmod 000` on it, then exec'ing the script.

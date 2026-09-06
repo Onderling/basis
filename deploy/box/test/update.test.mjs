@@ -36,7 +36,8 @@ function makeBox() {
 
   // the fake docker: appends every argv line to calls.log; `compose … exec/ps` answer ok
   const bin = join(root, 'bin'); mkdirSync(bin);
-  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\necho "$*" >> "${root}/calls.log"\nexit 0\n`);
+  // like the real docker compose, the fake stats "." first — an unreadable cwd is the 2026-09-06 failure
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\nexit 0\n`);
   chmodSync(join(bin, 'docker'), 0o755);
 
   const commit = (msg, tag) => {
@@ -57,7 +58,11 @@ function makeBox() {
 
 test('nothing new on the release branch → no docker call, no state change', () => {
   const b = makeBox();
-  const first = b.run({ FORCE: '1' });            // the install's first bring-up
+  // the real failure of 2026-09-06: `sudo -u onderling` inherits root's cwd (/home/ubuntu, mode 750), which the
+  // box user cannot stat — reproduced by entering a dir, then dropping its permissions before exec'ing the updater
+  const unreadable = join(b.root, 'private'); mkdirSync(unreadable);
+  const first = spawnSync('bash', ['-c', 'cd "$1" && chmod 000 "$1" && exec bash "$2"', '_', unreadable, join(RUNNER, 'update.sh')], { encoding: 'utf8', env: { ...process.env, PATH: `${join(b.root, 'bin')}:${process.env.PATH}`, BOX_DIR: b.box, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1', FORCE: '1' } });
+  chmodSync(unreadable, 0o755);
   assert.equal(first.status, 0, first.stderr);
   assert.ok(b.calls().some((c) => /compose .* build/.test(c)) && b.calls().some((c) => /compose .* up -d/.test(c)), 'first run builds + starts');
   assert.equal(b.state().rolledBack, false);

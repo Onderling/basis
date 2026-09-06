@@ -28,7 +28,30 @@ if (!URL) {
   process.exit(2);
 }
 
-const WebSocket = (await import('ws')).default;
+// `ws` is the one dependency. Standalone: `npm i ws`. Inside this monorepo there is no root node_modules
+// (per-package installs), so find a package that has it and import from there — running the smoke from
+// deploy/smoke must not depend on where the caller stands.
+async function loadWs() {
+  try { return (await import('ws')).default; } catch { /* look inside the workspace */ }
+  const { readdirSync, existsSync } = await import('node:fs');
+  const { resolve, dirname } = await import('node:path');
+  const { fileURLToPath, pathToFileURL } = await import('node:url');
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  for (const group of ['packages', 'apps']) {
+    const dir = resolve(root, group);
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir)) {
+      const pkg = resolve(dir, name, 'node_modules/ws/package.json');
+      if (existsSync(pkg)) {
+        const { main } = JSON.parse((await import('node:fs')).readFileSync(pkg, 'utf8'));
+        return (await import(pathToFileURL(resolve(dir, name, 'node_modules/ws', main || 'index.js')).href)).default;
+      }
+    }
+  }
+  console.error('smoke: the `ws` package is not installed — run `npm i ws` next to this script, or run it inside the monorepo');
+  process.exit(2);
+}
+const WebSocket = await loadWs();
 const wait  = (ms) => new Promise(r => setTimeout(r, ms));
 
 /**

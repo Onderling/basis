@@ -23,6 +23,14 @@ A durable `SqliteQueueStore` class exists in the package but has **no consumer**
 `ForwardQueue` takes no store (see REMAINING-WORK's ledger). The push-token registry
 DOES persist when you set `PUSH_TOKENS_DB`.
 
+## Self-updating VPS: `deploy/box/`
+
+For a machine you get root on, `deploy/box/install.sh` installs Docker, clones the repos at `live`,
+asks for a profile and hostnames, brings the roles up behind Caddy and installs a timer that keeps the
+box on the release branch (health gate, rollback, `HOLD` to freeze). Roles are compose fragments under
+`deploy/roles/` (this repo: `relay`, `caddy`); another repo plugs in by honouring the same three-file
+contract. → [`deploy/box/README.md`](box/README.md).
+
 ## The monorepo-in-Docker approach (why the Dockerfiles look the way they do)
 
 The relay + companion live in a **pnpm workspace** (`node-linker=hoisted`,

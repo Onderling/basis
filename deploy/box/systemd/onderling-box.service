@@ -1,0 +1,10 @@
+[Unit]
+Description=Onderling box — update the running roles to the release branch
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@BOX_USER@
+Environment=BOX_DIR=@BOX_DIR@
+ExecStart=/usr/bin/bash @RUNNER@/update.sh

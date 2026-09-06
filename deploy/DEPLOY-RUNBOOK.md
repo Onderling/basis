@@ -327,6 +327,11 @@ stays off (the `/manage` route simply has no upstream).
 
 ### B9. Update / restart
 
+> **Prefer the box runner.** `deploy/box/install.sh` does B4–B9 in one shot and keeps the machine on
+> the `live` branch by itself (a 5-minute timer, health gate, rollback) — see `deploy/box/README.md`.
+> The commands below are the manual path it automates.
+
+
 ```bash
 git pull
 docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build

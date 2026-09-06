@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# relay role health: the container answers HTTP 200 on / (the relay's own upstream signal). When the box
+# knows its public hostname and BOX_SMOKE=1, also the wire-protocol smoke over wss:// (two-party delivery,
+# offline hold, fan-out) — deploy/smoke/smoke.mjs.
+set -u
+eval "$COMPOSE exec -T relay node -e \"fetch('http://127.0.0.1:8787/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"" || exit 1
+if [ "${BOX_SMOKE:-0}" = 1 ]; then
+  domain="$(sed -n 's/^RELAY_DOMAIN=//p' "$BOX_DIR/.env" | tr -d '"')"
+  [ -n "$domain" ] && { eval "$COMPOSE exec -T -e NODE_PATH=/app/packages/relay/node_modules relay node deploy/smoke/smoke.mjs wss://$domain" || exit 1; }
+fi
+exit 0

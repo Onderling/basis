@@ -44,6 +44,11 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
     expect((await route('zet brood en eieren op de boodschappen')).command.more).toBeUndefined();
   });
 
+  it('the colon form "voeg toe: X" / "add: X" is an add of X — never a task named "toe: X" (walk 3)', async () => {
+    expect((await route('Voeg toe: spruiten kopen')).command).toEqual({ opId: 'addItem', args: { text: 'spruiten kopen' } });
+    expect((await route('add: milk')).command).toEqual({ opId: 'addItem', args: { text: 'milk' } });
+  });
+
   it('a stated "X is gekocht/gedaan/bought" → markComplete{match:X} without a model', async () => {
     expect((await route('kaas is gekocht')).command).toEqual({ opId: 'markComplete', args: { match: 'kaas' } });
     expect((await route('De afwas is gedaan!')).command).toEqual({ opId: 'markComplete', args: { match: 'afwas' } });

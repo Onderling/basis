@@ -48,7 +48,7 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
     // whose LIST is unknown → addItem WITHOUT a type, so the shell asks "which list?" (a needsForm on `type`)
     // instead of the July default that made every bare add a task (ledger L90, 2026-09-05). A task is still
     // reachable by saying so ("add task …", "taak: …") — that falls through to the tasks rule.
-    { name: 'household:addItem(untyped-asks)', test: HH_ADD_UNTYPED, command: householdUntypedAdd },
+    { name: 'household:addItem(untyped-asks)', test: (t) => HH_ADD_COLON.test(t) || HH_ADD_UNTYPED.test(t), command: householdUntypedAdd },
     // "kaas is gekocht" · "de afwas is gedaan" · "milk is bought" — a statement that an item is done; the model
     // asked "do you want me to …?" instead (eval 2026-09-05). Deterministic: markComplete by name.
     { name: 'household:markComplete(stated-done)', test: HH_STATED_DONE, command: householdStatedDone },
@@ -100,7 +100,12 @@ function householdStatedDone(text) {
 // "add <item>" · "voeg <item> toe" · "zet <item> erbij" · "add <item> to the list" — no list named.
 const HH_ADD_UNTYPED =
   /^(?:add|voeg|zet|doe|noteer)\s+(.+?)(?:\s+(?:toe|erbij|op\s+de\s+lijst|op\s+het\s+lijstje|to\s+the\s+list|on\s+the\s+list))?\s*$/i;
+// "voeg toe: spruiten kopen" · "add: milk" — the verb first, then a colon, then the item (walk 3: the tasks rule
+// took "Voeg toe: …" and made a task named "toe: spruiten kopen").
+const HH_ADD_COLON = /^(?:voeg\s+toe|add|zet\s+erbij|noteer)\s*:\s*(.+?)\s*$/i;
 function householdUntypedAdd(text, ctx) {
+  const colon = HH_ADD_COLON.exec(String(text || '').trim());
+  if (colon) return { opId: 'addItem', args: { text: colon[1].trim() } };   // explicit form: always ours, never a task
   // With a conversation under way the MODEL decides — it has the recent turns ("doe broccoli erbij" after a
   // shopping-list exchange means shopping); the memory-less gate would only ask what the model already knows.
   if (Number(ctx?.memoryTurns) > 0) return null;

@@ -23,6 +23,11 @@ export const FIXTURES = [
   { id: 'gate-add-untyped-nl', text: 'voeg ook de braadlappen en geurkazen toe', expect: { op: 'addItem', args: { text: /braadlappen/ } } },
   { id: 'gate-add-untyped-en', text: 'add milk to the list', lang: 'en', expect: { op: 'addItem', args: { text: 'milk' } } },
   { id: 'gate-add-task-en',    text: 'add task call the plumber', lang: 'en', expect: { op: 'addTask' } },
+  { id: 'gate-add-colon-nl',   text: 'Voeg toe: spruiten kopen', expect: { op: 'addItem', args: { text: 'spruiten kopen' } } },   // walk 3: became a task "toe: spruiten kopen"
+  { id: 'add-typed-colon-nl',  text: 'Kun je er opzetten: kraan aandraaien', before: ['you: wat staat er op de reparatieslijst', 'system: Nog niets.'], expect: { op: 'addItem', args: { type: 'repair', text: /kraan/ } } },
+  { id: 'add-three-repair-nl', text: 'Ook graag op reparaties: wasmachine reinigen, vloer ontkleven en kopjes afbreien', expect: { op: 'addItem', args: { type: 'repair' }, count: 3 } },
+  { id: 'list-tasks-nl',       text: 'Wat staat er op de takenlijst', expect: { op: 'listTasks' } },
+  { id: 'list-now-vague-nl',   text: 'Wat staat op de lijst nu?', expect: { anyOf: [{ reply: 'asks' }, { op: 'listLists' }, { op: 'listOpen' }] } },
   // ── complete / remove ──
   { id: 'done-bought-nl',     text: 'Kaas is gekocht', items: ['kaas', 'melk'], expect: { op: 'markComplete', args: { match: /kaas/ } } },
   // ── memory: a bare answer to the bot's question ──

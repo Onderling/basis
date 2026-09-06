@@ -1,3 +1,15 @@
 ${RELAY_DOMAIN} {
-	reverse_proxy relay:8787
+	# the box's read-only status page (deploy/box lib.sh write_status_page → data/www, mounted by roles/caddy.yml)
+	handle_path /box/* {
+		root * /srv/box
+		file_server
+	}
+	# the companion's online /manage interface, when the companion role runs with an owner pubkey
+	# (a 502 on this path otherwise — harmless; same shape as deploy/caddy/Caddyfile)
+	handle /manage* {
+		reverse_proxy companion:8790
+	}
+	handle {
+		reverse_proxy relay:8787
+	}
 }

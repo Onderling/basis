@@ -1,0 +1,22 @@
+# deploy/roles/companion.yml — the companion node as a box ROLE (hosts the relocatable agent over the
+# mesh; a sealed inbox for its owner). Connects OUT to the relay on the compose network. The online
+# /manage interface is opt-in: set COMPANION_MANAGE_OWNER_PUBKEY in .env to your device's pubKey (the
+# only key allowed to manage); relay.caddy routes /manage* to it.
+services:
+  companion:
+    build:
+      context: ../..
+      dockerfile: deploy/companion-node/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - relay
+    environment:
+      COMPANION_RELAY_URL: "ws://relay:8787"
+      COMPANION_NODE_CONFIG_DIR: "/data/companion"
+      COMPANION_MANAGE_OWNER_PUBKEY: "${COMPANION_MANAGE_OWNER_PUBKEY:-}"
+      COMPANION_MANAGE_HTTP_PORT: "8790"
+      COMPANION_MANAGE_HTTP_HOST: "0.0.0.0"
+    volumes:
+      - companion-data:/data/companion
+volumes:
+  companion-data:

@@ -29,9 +29,12 @@ ask() {   # ask VAR "question" [default]
 ask PROFILE "Profile (relay | platform | feedback-project | personal)" relay
 case "$PROFILE" in
   relay)            ROLES="caddy@canopy-mono relay@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  platform)         ROLES="caddy@canopy-mono relay@canopy-mono pod@canopy-mono companion@canopy-mono"; REPOS="canopy-mono=$BOX_REPO_URL#$BOX_BRANCH" ;;
   *) echo "profile '$PROFILE' is not built yet — only 'relay' is (plans/PLAN-vps-runner.md §6)"; exit 2 ;;
 esac
 ask RELAY_DOMAIN "Relay hostname (DNS A-record must point here)"
+case "$PROFILE" in platform) ask POD_DOMAIN "Pod hostname (DNS A-record must point here)" ;; esac
+POD_DOMAIN="${POD_DOMAIN:-}"
 ask ACME_EMAIL "E-mail for Let's Encrypt"
 BOX_ALERT_TG_TOKEN="${BOX_ALERT_TG_TOKEN:-}"; BOX_ALERT_TG_CHAT="${BOX_ALERT_TG_CHAT:-}"
 
@@ -70,7 +73,12 @@ if [ ! -f "$BOX_DIR/.env" ]; then
 # secrets + hostnames for docker compose. update.sh never writes this file.
 BOX_DIR=$BOX_DIR
 RELAY_DOMAIN=$RELAY_DOMAIN
+POD_DOMAIN=$POD_DOMAIN
 ACME_EMAIL=$ACME_EMAIL
+# pod: WAC (default) or ACP — decide before first boot (runbook B6): @css:config/file-acp.json
+CSS_CONFIG=
+# companion: your device's pubKey enables the online /manage page (empty = off)
+COMPANION_MANAGE_OWNER_PUBKEY=
 # one Telegram line on a failed update / rollback (optional)
 BOX_ALERT_TG_TOKEN=$BOX_ALERT_TG_TOKEN
 BOX_ALERT_TG_CHAT=$BOX_ALERT_TG_CHAT
@@ -117,4 +125,6 @@ fi
 echo
 echo "box: $BOX_DIR  profile: $PROFILE"
 echo "relay: wss://$RELAY_DOMAIN   (media edge https://$RELAY_DOMAIN/blob-gate once R2_* is set)"
+[ -n "$POD_DOMAIN" ] && echo "pod:   https://$POD_DOMAIN/"
+echo "status page: https://$RELAY_DOMAIN/box/"
 echo "state: $BOX_DIR/state.json   log: $BOX_DIR/box.log   freeze: touch $BOX_DIR/HOLD"

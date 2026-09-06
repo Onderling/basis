@@ -112,6 +112,30 @@ write_state() {   # write_state <rolledBack:true|false> [failedRole]
     echo "  }"
     echo "}"
   } > "$BOX_DIR/state.json.tmp" && mv "$BOX_DIR/state.json.tmp" "$BOX_DIR/state.json"
+  write_status_page
+}
+
+# The box's HTML face, kept simple: a static page under data/www/ (served read-only by Caddy at /box/)
+# showing state.json, whether HOLD is set, and the last 50 log lines. No server code, no login — it
+# shows a sha and a tag, nothing secret. Rewritten on every state change.
+write_status_page() {
+  local www="$BOX_DIR/data/www"
+  mkdir -p "$www"
+  cp "$BOX_DIR/state.json" "$www/state.json"
+  tail -n 50 "$BOX_DIR/box.log" 2>/dev/null > "$www/log.txt" || true
+  local hold="no"; [ -f "$BOX_DIR/HOLD" ] && hold="YES — the updater is frozen"
+  local esc; esc() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+  {
+    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>onderling box</title>'
+    echo '<style>body{font:14px/1.5 system-ui,sans-serif;max-width:60em;margin:2em auto;padding:0 1em;color:#222}pre{background:#f4f4f2;padding:1em;overflow:auto}h1{font-size:1.3em}dt{font-weight:600}dd{margin:0 0 .5em}</style>'
+    echo "<h1>onderling box · $(hostname | esc)</h1>"
+    echo "<dl><dt>profile</dt><dd>${PROFILE:-?} · roles: $(echo "$ROLES" | esc)</dd>"
+    echo "<dt>updater frozen (HOLD)</dt><dd>$hold</dd>"
+    echo "<dt>last update</dt><dd>$(sed -n 's/.*"updatedAt": *"\([^"]*\)".*/\1/p' "$BOX_DIR/state.json") · rolled back: $(sed -n 's/.*"rolledBack": *\([a-z]*\).*/\1/p' "$BOX_DIR/state.json")</dd></dl>"
+    echo "<h2>running</h2><pre>$(esc < "$BOX_DIR/state.json")</pre>"
+    echo "<h2>log (last 50)</h2><pre>$(esc < "$www/log.txt")</pre>"
+    echo '<p><a href="state.json">state.json</a> · <a href="log.txt">log.txt</a></p>'
+  } > "$www/index.html"
 }
 
 # One Telegram line when BOX_ALERT_TG_TOKEN + BOX_ALERT_TG_CHAT are set in .env; silent otherwise.

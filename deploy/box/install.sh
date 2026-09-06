@@ -21,7 +21,12 @@ SKIP_SYSTEM="${SKIP_SYSTEM:-0}"     # 1 = no apt/docker/user/firewall (tests, or
 ask() {   # ask VAR "question" [default]
   local var="$1" q="$2" def="${3:-}"
   if [ -n "${!var:-}" ]; then return; fi
-  if [ ! -t 0 ] && [ -z "$def" ]; then echo "set $var (no terminal to ask)"; exit 2; fi
+  # `curl … | bash` makes stdin the pipe, so ask on /dev/tty; only when there is no tty at all (a CI job)
+  # is an unanswered question fatal — then the answer must come from the environment.
+  if [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+    [ -n "$def" ] && { printf -v "$var" '%s' "$def"; return; }
+    echo "set $var in the environment (no terminal to ask)"; exit 2
+  fi
   read -r -p "$q${def:+ [$def]}: " ans </dev/tty || ans=""
   printf -v "$var" '%s' "${ans:-$def}"
 }

@@ -19,8 +19,10 @@ stack in containers.
 holding for offline devices.** Bounded in practice — the lanes' own catch-ups
 (membership/governance/keys pull-all, chat/tasks frontier replay) re-deliver from the
 SENDERS' logs when devices next meet, so the queue is an optimisation, not the record.
-A durable `SqliteQueueStore` class exists in the package but has **no consumer** —
-`ForwardQueue` takes no store (see REMAINING-WORK's ledger). The push-token registry
+`ForwardQueue` takes no store, and the package's `SqliteQueueStore` is **not** the missing half: it
+models a different port (in-flight multi-recipient *request* aggregates), as `ForwardQueue`'s header
+says. Durable hold-and-forward needs a port that does not exist yet. Meanwhile the box no longer
+restarts the relay for a release that did not touch it (`deploy/roles/relay.paths`). The push-token registry
 DOES persist when you set `PUSH_TOKENS_DB`.
 
 ## Publishing the web apps: `deploy/web/`

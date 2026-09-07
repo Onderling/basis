@@ -7,14 +7,14 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, rmSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 
 const RUNNER = resolve(import.meta.dirname, '..');
 
 function sh(cmd, args, opts = {}) { return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim(); }
 
 /** A fake box: a remote repo with a `live` branch carrying one role, a clone under the box, a fake docker. */
-function makeBox() {
+function makeBox({ roles = [], paths = {}, caddySnippets = {} } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'box-'));
   const remote = join(root, 'remote.git');
   const work = join(root, 'work');
@@ -22,26 +22,32 @@ function makeBox() {
   sh('git', ['init', '-q', '-b', 'live', work]);
   sh('git', ['-C', work, 'config', 'user.email', 't@t']); sh('git', ['-C', work, 'config', 'user.name', 't']);
   mkdirSync(join(work, 'deploy/roles'), { recursive: true });
-  writeFileSync(join(work, 'deploy/roles/thing.yml'), 'services:\n  thing:\n    image: x\n');
-  writeFileSync(join(work, 'deploy/roles/thing.health'), '#!/usr/bin/env bash\n[ ! -f "$BOX_DIR/RED" ]\n');
-  chmodSync(join(work, 'deploy/roles/thing.health'), 0o755);
+  const all = ['thing', ...roles];
+  for (const r of all) {
+    writeFileSync(join(work, `deploy/roles/${r}.yml`), `services:\n  ${r}:\n    image: x\n`);
+    writeFileSync(join(work, `deploy/roles/${r}.health`), '#!/usr/bin/env bash\n[ ! -f "$BOX_DIR/RED" ]\n');
+    chmodSync(join(work, `deploy/roles/${r}.health`), 0o755);
+    if (paths[r]) writeFileSync(join(work, `deploy/roles/${r}.paths`), `# generated\n${paths[r].join('\n')}\n`);
+    if (caddySnippets[r]) writeFileSync(join(work, `deploy/roles/${r}.caddy`), caddySnippets[r]);
+  }
   sh('git', ['-C', work, 'add', '-A']); sh('git', ['-C', work, 'commit', '-q', '-m', 'v1']);
   sh('git', ['-C', work, 'remote', 'add', 'origin', remote]); sh('git', ['-C', work, 'push', '-q', 'origin', 'live']);
 
   const box = join(root, 'box');
   mkdirSync(join(box, 'repos'), { recursive: true }); mkdirSync(join(box, 'data/caddy'), { recursive: true });
   sh('git', ['clone', '-q', '--branch', 'live', remote, join(box, 'repos/mono')]);
-  writeFileSync(join(box, 'box.conf'), `REPOS="mono=${remote}#live"\nROLES="thing@mono"\n`);
+  writeFileSync(join(box, 'box.conf'), `REPOS="mono=${remote}#live"\nROLES="${all.map((r) => `${r}@mono`).join(' ')}"\n`);
   writeFileSync(join(box, '.env'), `BOX_DIR=${box}\nACME_EMAIL=a@b.c\n`);
 
   // the fake docker: appends every argv line to calls.log; `compose … exec/ps` answer ok
   const bin = join(root, 'bin'); mkdirSync(bin);
   // like the real docker compose, the fake stats "." first — an unreadable cwd is the 2026-09-06 failure
-  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\nexit 0\n`);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf '${all.join('\\n')}\\n';; esac\nexit 0\n`);
   chmodSync(join(bin, 'docker'), 0o755);
 
-  const commit = (msg, tag) => {
-    writeFileSync(join(work, 'CHANGE'), msg); sh('git', ['-C', work, 'add', '-A']); sh('git', ['-C', work, 'commit', '-q', '-m', msg]);
+  const commit = (msg, tag, file = 'CHANGE') => {
+    mkdirSync(join(work, dirname(file)), { recursive: true });
+    writeFileSync(join(work, file), msg); sh('git', ['-C', work, 'add', '-A']); sh('git', ['-C', work, 'commit', '-q', '-m', msg]);
     if (tag) sh('git', ['-C', work, 'tag', '-a', tag, '-m', tag]);
     sh('git', ['-C', work, 'push', '-q', '--tags', 'origin', 'live']);
     return sh('git', ['-C', work, 'rev-parse', 'HEAD']);
@@ -53,7 +59,7 @@ function makeBox() {
   const clearCalls = () => rmSync(join(root, 'calls.log'), { force: true });
   const state = () => JSON.parse(readFileSync(join(box, 'state.json'), 'utf8'));
   const headOfBox = () => sh('git', ['-C', join(box, 'repos/mono'), 'rev-parse', 'HEAD']);
-  return { root, box, work, commit, run, calls, clearCalls, state, headOfBox };
+  return { root, box, work, commit, run, calls, clearCalls, state, headOfBox, roles: all };
 }
 
 test('nothing new on the release branch → no docker call, no state change', () => {
@@ -275,4 +281,58 @@ test('install.sh personal profile: no hostnames, the companion dials the shared 
   assert.match(calls, /build --pull companion assistant/);
   assert.doesNotMatch(calls, /caddy\.yml/, 'no caddy on a personal box');
   assert.match(r.stdout, /personal: companion dialing wss:\/\/relay\.onderling\.org · assistant on Telegram \(chats: 42\)/);
+});
+
+test('a release that touches nothing in a role\'s declared paths does not rebuild it — and one that does, does', () => {
+  const b = makeBox({ paths: { thing: ['src/thing/', 'deploy/roles/thing.'] } });
+  b.run({ FORCE: '1' });                       // the install's first bring-up builds everything
+  assert.ok(b.calls().some((c) => /build --pull .*thing/.test(c)), 'first run builds');
+
+  b.clearCalls();
+  const unrelated = b.commit('a docs-only release', null, 'docs/readme.md');
+  const r = b.run();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(b.headOfBox(), unrelated, 'the release is applied');
+  assert.equal(b.state().repos.mono.sha, unrelated, 'and recorded');
+  assert.ok(!b.calls().some((c) => /build/.test(c)), `nothing rebuilt: ${b.calls().join(' | ')}`);
+  assert.ok(b.calls().some((c) => /up -d/.test(c)), 'the stack is still brought up');
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /no role's build paths changed/);
+
+  b.clearCalls();
+  const touched = b.commit('a change to the role itself', null, 'src/thing/server.js');
+  assert.equal(b.run().status, 0);
+  assert.equal(b.headOfBox(), touched);
+  assert.ok(b.calls().some((c) => /build --pull .*thing/.test(c)), 'the affected role IS rebuilt');
+});
+
+test('a role without a .paths file is always rebuilt (a repo that does not honour that part of the contract)', () => {
+  const b = makeBox();                          // no paths files at all
+  b.run({ FORCE: '1' }); b.clearCalls();
+  b.commit('a docs-only release', null, 'docs/readme.md');
+  assert.equal(b.run().status, 0);
+  assert.ok(b.calls().some((c) => /build --pull .*thing/.test(c)), 'the safe default: rebuild');
+});
+
+test('caddy is reloaded when the rendered Caddyfile changed, and not when it did not', () => {
+  const b = makeBox({
+    roles: ['caddy'],
+    paths: { thing: ['src/thing/'], caddy: ['deploy/roles/caddy.'] },
+    caddySnippets: { caddy: '${RELAY_DOMAIN} {\n\treverse_proxy relay:8787\n}\n' },
+  });
+  writeFileSync(join(b.box, '.env'), `BOX_DIR=${b.box}\nACME_EMAIL=a@b.c\nRELAY_DOMAIN=relay.example.org\n`);
+  b.run({ FORCE: '1' });
+  assert.ok(b.calls().some((c) => /exec -T caddy caddy reload/.test(c)), 'first render → reload');
+  assert.match(readFileSync(join(b.box, 'data/caddy/Caddyfile'), 'utf8'), /relay\.example\.org \{/);
+
+  b.clearCalls();
+  b.commit('unrelated', null, 'docs/readme.md');
+  assert.equal(b.run().status, 0);
+  assert.ok(!b.calls().some((c) => /caddy reload/.test(c)), 'an unchanged Caddyfile is not reloaded');
+
+  b.clearCalls();
+  b.commit('${RELAY_DOMAIN} {\n\treverse_proxy relay:9999\n}\n', null, 'deploy/roles/caddy.caddy');   // commit() writes the message AS the file
+  assert.equal(b.run().status, 0);
+  assert.ok(b.calls().some((c) => /exec -T caddy caddy reload/.test(c)), 'a changed Caddyfile IS reloaded');
+  assert.match(readFileSync(join(b.box, 'data/caddy/Caddyfile'), 'utf8'), /relay:9999/);
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /caddy: reloaded/);
 });

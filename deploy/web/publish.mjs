@@ -21,6 +21,7 @@
  *   WEB_PORT=22
  *   WEB_PATH=/www/basis.onderling.org        the folder that serves WEB_URL
  *   WEB_MODE=rsync | sftp                    rsync needs a shell on the host; sftp works on any SFTP host
+ *   WEB_BASE=/basis/                         when the app lives under a path, not at the site root (Vite --base)
  * The SSH key is your own (ssh-agent); this script never stores a secret.
  */
 import { spawnSync } from 'node:child_process';
@@ -55,11 +56,11 @@ export function releaseStamp(cwd = ROOT) {
 }
 
 /** Build apps/<app> with the stamp baked in; write dist/version.json. Returns the dist dir. */
-export function build(app, stamp, { appsDir = join(ROOT, 'apps'), log = console.log } = {}) {
+export function build(app, stamp, { appsDir = join(ROOT, 'apps'), log = console.log, base = '/' } = {}) {
   const dir = join(appsDir, app);
   if (!existsSync(join(dir, 'package.json'))) throw new Error(`no app at ${dir}`);
-  log(`building ${app} as ${stamp.tag} …`);
-  const r = spawnSync('npm', ['run', '--silent', 'build'], { cwd: dir, stdio: 'inherit', env: { ...process.env, VITE_APP_VERSION: stamp.tag, VITE_APP_SHA: stamp.sha } });
+  log(`building ${app} as ${stamp.tag} (base ${base}) …`);
+  const r = spawnSync('npm', ['run', '--silent', 'build', '--', '--base', base], { cwd: dir, stdio: 'inherit', env: { ...process.env, VITE_APP_VERSION: stamp.tag, VITE_APP_SHA: stamp.sha } });
   if (r.status !== 0) throw new Error(`build failed for ${app}`);
   return stampDist(app, stamp, join(dir, 'dist'));
 }
@@ -147,12 +148,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (!app) { console.error('usage: publish <app> [--target <name> | --zip | --dry-run]'); process.exit(2); }
   try {
     const stamp = releaseStamp();
-    const dist = values['skip-build'] ? stampDist(app, stamp, join(ROOT, 'apps', app, 'dist')) : build(app, stamp);
+    const tf = values.target ? join(HERE, 'targets', `${values.target}.env`) : null;
+    const t = tf && existsSync(tf) ? parseTarget(readFileSync(tf, 'utf8')) : null;
+    const dist = values['skip-build'] ? stampDist(app, stamp, join(ROOT, 'apps', app, 'dist')) : build(app, stamp, { base: t?.WEB_BASE || '/' });
     if (values.zip) { console.log(`archive: ${zipDist(dist, app, stamp)} — upload its contents to the folder that serves the site`); process.exit(0); }
     if (!values.target) { console.log(`built ${dist} as ${stamp.tag}; give --target <name> to upload, or --zip`); process.exit(values['dry-run'] ? 0 : 2); }
-    const f = join(HERE, 'targets', `${values.target}.env`);
-    if (!existsSync(f)) { console.error(`no target ${values.target}: copy deploy/web/targets/example.env to ${f}`); process.exit(2); }
-    const t = parseTarget(readFileSync(f, 'utf8'));
+    if (!t) { console.error(`no target ${values.target}: copy deploy/web/targets/example.env to ${tf}`); process.exit(2); }
     if (values['dry-run']) { console.log(`would upload ${dist} → ${t.WEB_MODE} ${t.WEB_HOST ? `${t.WEB_USER}@${t.WEB_HOST}:` : ''}${t.WEB_PATH}, then verify ${t.WEB_URL}/version.json = ${stamp.tag}`); process.exit(0); }
     upload(dist, t);
     if (t.WEB_URL) { const seen = await verify(t.WEB_URL, stamp); console.log(`live: ${t.WEB_URL} serves ${seen.tag} (${seen.sha})`); }

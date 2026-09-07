@@ -95,7 +95,7 @@ describe('onboarding chat driver', () => {
     expect(turn.done).toBe(false);
     // welkom + wat_is_dit + alpha + alpha_leren (say bubbles) + own_circle (the choice prompt) = 5.
     expect(turn.bubbles.length).toBe(5);
-    // A7 — the alpha note reaches a first-run user BEFORE the first question, in both shells (they
+    // The alpha note reaches a first-run user BEFORE the first question, in both shells (they
     // render this one template), and says the four things a tester must know.
     const notes = turn.bubbles.map((b) => b.text ?? b.say ?? '').join(' ');
     for (const must of [/testversie/i, /geen meldingen/i, /herstelzin/i, /opnieuw beginnen/i, /willen leren/i]) {

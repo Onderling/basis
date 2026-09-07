@@ -23,10 +23,19 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RELAY_BIN = path.resolve(HERE, '../../../packages/relay/bin/relay.js');
 const PID_FILE = path.join(HERE, '.relay-fixture.pid');
 
+// The default port follows the scheme — a `wss://` relay behind a reverse proxy answers on 443, not on
+// the relay's own 8787. Getting this wrong made a run against a PUBLIC relay try to start a relay on the
+// public hostname, fail, and then silently degrade every relay cell (2026-09-07).
 function parseHostPort(url) {
-  try { const u = new URL(url); return { host: u.hostname || '127.0.0.1', port: Number(u.port || 8787) }; }
-  catch { return { host: '127.0.0.1', port: 8787 }; }
+  try {
+    const u = new URL(url);
+    const secure = u.protocol === 'wss:' || u.protocol === 'https:';
+    return { host: u.hostname || '127.0.0.1', port: Number(u.port || (secure ? 443 : 8787)), secure };
+  } catch { return { host: '127.0.0.1', port: 8787, secure: false }; }
 }
+
+/** Only a relay on THIS machine is ours to start; anything else belongs to someone else. */
+const isLocal = (host) => host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '0.0.0.0';
 
 function portOpen(host, port, timeoutMs = 800) {
   return new Promise((resolve) => {
@@ -54,6 +63,12 @@ export default async function globalSetup() {
   if (await portOpen(host, port)) {
     console.log(`[relay-fixture] ${host}:${port} already listening — attaching (no spawn).`);
     return;
+  }
+  // An EXTERNAL relay (a deployed box, say) is never ours to spawn: say plainly that it is unreachable
+  // rather than start a local one under its name and let every relay cell degrade without saying why.
+  if (!isLocal(host)) {
+    throw new Error(`[relay-fixture] PEER_TEST_RELAY points at ${url}, and ${host}:${port} is not reachable `
+      + 'from here. An external relay is attached, never started — check the URL, DNS and that it is up.');
   }
   console.log(`[relay-fixture] starting @onderling/relay on ${host}:${port} …`);
   const child = spawn(process.execPath, [RELAY_BIN, String(port)], {

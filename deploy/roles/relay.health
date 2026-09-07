@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
-# relay role health: the container answers HTTP 200 on / (the relay's own upstream signal). When the box
-# knows its public hostname and BOX_SMOKE=1, also the wire-protocol smoke over wss:// (two-party delivery,
-# offline hold, fan-out) — deploy/smoke/smoke.mjs.
+# relay role health, two steps:
+#   1. the container answers HTTP 200 on / (the relay's own upstream signal, what Caddy checks too);
+#   2. the WIRE PROTOCOL smoke over the relay's own socket — register + ack, two-party delivery both
+#      ways, offline hold and flush in order, multi-party fan-out with no self-delivery (deploy/smoke).
+#
+# The smoke runs against the relay's INTERNAL socket on purpose. Measured on the first real box
+# (2026-09-07): from inside the container the public wss:// hangs, while https:// to the same name
+# answers 200 from both the host and the container — so gating a release on the public socket from in
+# there would roll back good releases. The public name, its certificate and the WebSocket upgrade
+# through Caddy are proven from OUTSIDE after a bring-up (`node deploy/smoke/smoke.mjs wss://<domain>`),
+# which is the acceptance step in the runbook.
+#
+# BOX_SMOKE=0 in the updater's environment turns the wire check off (leaving step 1).
 set -u
 eval "$COMPOSE exec -T relay node -e \"fetch('http://127.0.0.1:8787/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"" || exit 1
-if [ "${BOX_SMOKE:-0}" = 1 ]; then
-  domain="$(sed -n 's/^RELAY_DOMAIN=//p' "$BOX_DIR/.env" | tr -d '"')"
-  [ -n "$domain" ] && { eval "$COMPOSE exec -T -e NODE_PATH=/app/packages/relay/node_modules relay node deploy/smoke/smoke.mjs wss://$domain" || exit 1; }
+if [ "${BOX_SMOKE:-1}" != 0 ]; then
+  # quiet when it passes (the gate runs on every update); the tail of the failure when it does not
+  out="$(eval "$COMPOSE exec -T relay node deploy/smoke/smoke.mjs ws://127.0.0.1:8787" 2>&1)" || {
+    echo "[relay.health] the wire-protocol smoke FAILED against the relay's own socket:"
+    printf '%s\n' "$out" | tail -6
+    exit 1
+  }
 fi
 exit 0

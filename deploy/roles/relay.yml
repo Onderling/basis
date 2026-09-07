@@ -1,6 +1,9 @@
 # deploy/roles/relay.yml — the relay as a box ROLE (deploy/box). Same image as deploy/relay; plain
 # HTTP inside the compose network, Caddy (roles/caddy.yml) terminates TLS → wss://${RELAY_DOMAIN}.
 # Build context is the repo root (the pnpm workspace), relative to this file.
+# The health check runs the wire-protocol smoke from inside the image, so that file belongs to this
+# role's build inputs even though it is not part of the relay's dependency closure:
+# box-paths: deploy/smoke/
 services:
   relay:
     build:

@@ -6,6 +6,7 @@
 .npmrc
 deploy/relay/
 deploy/roles/relay.
+deploy/smoke/
 package-lock.json
 package.json
 packages/blob-gateway/

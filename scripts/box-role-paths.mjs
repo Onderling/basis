@@ -9,7 +9,10 @@
  * the real box 2026-09-07: relay up 10 h after a release that touched only the web app). With a
  * `.paths` file the updater rebuilds a role only when one of ITS paths changed.
  *
- * The list is DERIVED, never hand-written: the role's compose fragment names a build context and a
+ * A role may name paths the closure cannot know — a file its health check runs from inside the image,
+ * say — with a `# box-paths: <prefix>` comment in its compose fragment.
+ *
+ * The rest of the list is DERIVED, never hand-written: the role's compose fragment names a build context and a
  * Dockerfile, the Dockerfile names the workspace package it installs (`pnpm install --filter "<pkg>..."`),
  * and that package's workspace dependency closure is read from the package.json files. Relative volume
  * mounts (a script the role runs from the repo) count too. A role with no build section gets its own
@@ -61,6 +64,8 @@ export function closureDirs(pkgs, start) {
 /** The paths one role is built from. `yml` is the role's compose fragment text. */
 export function pathsForRole(role, yml, pkgs, readFile = (p) => readFileSync(path.join(ROOT, p), 'utf8')) {
   const out = new Set([`deploy/roles/${role}.`]);
+  // paths the closure cannot know, declared by the role itself
+  for (const m of yml.matchAll(/^#\s*box-paths:\s*(\S+)\s*$/gm)) out.add(m[1]);
   // relative host paths the role mounts (a script it runs from the repo); ${BOX_DIR}/… is box data, not repo.
   // compose resolves them against the FRAGMENT's directory, deploy/roles/ — not deploy/.
   const rel = (p) => path.posix.normalize(`deploy/roles/${p}`);

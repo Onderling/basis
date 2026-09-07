@@ -43,6 +43,7 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
 // #36 pod-sync — the shared factory that builds the register's self-sealed, path-mapped settings pod inner
 // (kept in src/ so web ≡ mobile by construction; the shell only composes it, no routing logic — invariant 1).
 import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
+import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -4323,8 +4324,7 @@ async function showCircleInvite(circleId) {
   // Scannable deep-link: a phone camera opens the hosted app with ?join=<invite> (+ the admin's current
   // relay, so one scan configures transport AND joins). showJoinCircle tolerates the raw invite too (paste).
   const relayForLink = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
-  const deepLink = `${location.origin}/?join=${encodeURIComponent(r.uri)}`
-    + (relayForLink ? `&relay=${encodeURIComponent(relayForLink)}` : '');
+  const deepLink = inviteDeepLink(location, r.uri, relayForLink);   // wherever THIS app is served (a path under a site too)
   const canvas = document.createElement('canvas');
   canvas.width = 220; canvas.height = 220;
   canvas.style.cssText = 'display:block;margin:10px auto;background:#fff;max-width:220px'; // hex-ok: QR scanner contrast

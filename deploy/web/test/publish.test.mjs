@@ -10,7 +10,8 @@ import { join } from 'node:path';
 import { parseTarget, releaseStamp, build, upload, sftpBatch, verify } from '../publish.mjs';
 
 test('parseTarget: defaults, required fields', () => {
-  const t = parseTarget('WEB_URL=https://x.org\nWEB_HOST=h\nWEB_USER=u\nWEB_PATH=/www/x\n# WEB_MODE=rsync\n');
+  const t = parseTarget('WEB_URL=https://x.org\nWEB_HOST=h\nWEB_USER=u\nWEB_PATH=/www/x\nWEB_BASE=/basis/\n# WEB_MODE=rsync\n');
+  assert.equal(t.WEB_BASE, '/basis/');
   assert.deepEqual([t.WEB_MODE, t.WEB_PORT], ['rsync', '22']);
   assert.equal(parseTarget('WEB_PATH=/srv/out\n').WEB_MODE, 'local');
   assert.throws(() => parseTarget('WEB_HOST=h\n'), /WEB_PATH is required/);
@@ -27,10 +28,10 @@ test('build + local swap upload: the stamp is baked in, version.json written, th
   const app = join(root, 'apps/tiny'); mkdirSync(app, { recursive: true });
   // a "vite build" stand-in: writes index.html with the version env baked in
   writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'tiny', scripts: { build: 'node build.js' } }));
-  writeFileSync(join(app, 'build.js'), "const fs=require('fs');fs.mkdirSync('dist/assets',{recursive:true});fs.writeFileSync('dist/index.html',`<p>v ${process.env.VITE_APP_VERSION}</p>`);fs.writeFileSync('dist/assets/a.js','1');");
+  writeFileSync(join(app, 'build.js'), "const fs=require('fs');const b=process.argv[process.argv.indexOf('--base')+1]||'/';fs.mkdirSync('dist/assets',{recursive:true});fs.writeFileSync('dist/index.html',`<p>v ${process.env.VITE_APP_VERSION} base ${b}</p>`);fs.writeFileSync('dist/assets/a.js','1');");
   const stamp = { tag: 'v9.9.9-test', sha: 'abc1234', builtAt: 'now' };
-  const dist = build('tiny', stamp, { appsDir: join(root, 'apps'), log: () => {} });
-  assert.match(readFileSync(join(dist, 'index.html'), 'utf8'), /v v9\.9\.9-test/);
+  const dist = build('tiny', stamp, { appsDir: join(root, 'apps'), log: () => {}, base: '/basis/' });
+  assert.match(readFileSync(join(dist, 'index.html'), 'utf8'), /v v9\.9\.9-test base \/basis\//);
   assert.equal(JSON.parse(readFileSync(join(dist, 'version.json'), 'utf8')).tag, 'v9.9.9-test');
 
   const www = join(root, 'www/site');

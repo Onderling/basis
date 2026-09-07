@@ -19,7 +19,7 @@ for (const s of scripts) {
   const r = spawnSync('bash', ['-n', s], { cwd: ROOT, encoding: 'utf8' });
   if (r.status !== 0) { red++; console.error(`✗ bash -n ${s}\n${r.stderr}`); }
 }
-const t = spawnSync(process.execPath, ['--test', 'deploy/box/test/'], { cwd: ROOT, encoding: 'utf8' });
+const t = spawnSync(process.execPath, ['--test', 'deploy/box/test/', 'deploy/web/test/'], { cwd: ROOT, encoding: 'utf8' });
 if (t.status !== 0) { red++; console.error((t.stdout + t.stderr).split('\n').filter((l) => /not ok|error|Error/.test(l)).slice(0, 20).join('\n')); }
-console.log(red ? `box-runner: ${red} problem(s)` : `box-runner: ${scripts.length} scripts parse, updater tests green`);
+console.log(red ? `box-runner: ${red} problem(s)` : `box-runner: ${scripts.length} scripts parse, updater + publish tests green`);
 process.exit(red ? 1 : 0);

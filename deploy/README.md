@@ -23,6 +23,13 @@ A durable `SqliteQueueStore` class exists in the package but has **no consumer**
 `ForwardQueue` takes no store (see REMAINING-WORK's ledger). The push-token registry
 DOES persist when you set `PUSH_TOKENS_DB`.
 
+## Publishing the web apps: `deploy/web/`
+
+Basis and every derived web app run on **any web server** once built. `npm run publish:web -- basis
+--target <name>` builds on your own machine with the release tag stamped in, uploads with a swap (rsync,
+sftp, or a local directory), and verifies `version.json` on the live URL. No GitHub in the path.
+→ [`deploy/web/README.md`](web/README.md).
+
 ## Self-updating VPS: `deploy/box/`
 
 For a machine you get root on, `deploy/box/install.sh` installs Docker, clones the repos at `live`,

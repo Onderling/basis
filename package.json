@@ -47,6 +47,7 @@
     "plan-index": "node scripts/gen-plan-index.mjs",
     "plan-index:check": "node scripts/gen-plan-index.mjs --check",
     "guards": "node scripts/guards.mjs",
+    "publish:web": "node deploy/web/publish.mjs",
     "guard-index": "node scripts/guard-index.mjs",
     "guard-status": "node scripts/guard-index.mjs --status",
     "health": "node scripts/health.mjs",

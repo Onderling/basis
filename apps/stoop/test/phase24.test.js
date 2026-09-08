@@ -170,6 +170,49 @@ describe('Stoop V2 Phase 24 — QR contact-share', () => {
     expect(add.contact.pubKey).toBe(srcId.pubKey);
   });
 
+  it('the card’s PEER ADDRESS survives the add — it was silently dropped for months (2026-09-08)', async () => {
+    // The card carries the sharer's peer address so the scanner can reach them over the mesh straight
+    // after adding. `addContactFromQr` passed it on and `listContacts` read it back, but the store in
+    // between still called the field by its pre-rename name and rebuilt every member from a whitelist —
+    // so the value was dropped on write, with nothing red. This test is the one that would have caught it:
+    // it asserts the field the SENDER put in is the field the RECEIVER can read.
+    const { bundle: srcBundle } = await buildBundle(ANNE);
+    const dst = await buildBundle('https://id.example/dst2');
+
+    const r = await callSkill(srcBundle.agent, 'getContactShareQr', { peerAddr: 'nkn-anne-native-addr' });
+    const add = await callSkill(dst.bundle.agent, 'addContactFromQr', { payload: r.payload }, 'https://id.example/dst2');
+    expect(add.contact.peerAddr).toBe('nkn-anne-native-addr');
+
+    // …and again from the LIST, which is what a shell actually paints from.
+    const listed = (await callSkill(dst.bundle.agent, 'listContacts', {}, 'https://id.example/dst2')).contacts;
+    expect(listed.find((c) => c.webid === ANNE)?.peerAddr).toBe('nkn-anne-native-addr');
+  });
+
+  it('EVERY field the card carries survives the add — the store must not quietly drop any of them', async () => {
+    // The generalisation of the bug above, and the guard against the next one: the store rebuilds each member
+    // from a fixed whitelist, so ANY field the card gains without a matching key there is discarded in
+    // silence. Asserting the whole card, rather than the four fields the original round-trip happened to
+    // check, is what makes the card the contract.
+    const { bundle: srcBundle, id: srcId } = await buildBundle(ANNE);
+    const dst = await buildBundle('https://id.example/dst3');
+    await callSkill(srcBundle.agent, 'setMyHandle', { handle: 'anne-handle' });
+
+    const r = await callSkill(srcBundle.agent, 'getContactShareQr', { trustOffer: 'vertrouwd', peerAddr: 'peer-anne' });
+    const card = JSON.parse(Buffer.from(r.payload.slice('onderling-contact://'.length), 'base64url').toString());
+    const add = await callSkill(dst.bundle.agent, 'addContactFromQr', { payload: r.payload }, 'https://id.example/dst3');
+
+    // `trustOffer` is the card's name for what the contact stores as `trustLevel`; every other field keeps its name.
+    for (const [key, value] of Object.entries(card)) {
+      if (value == null || key === 'trustOffer') continue;
+      expect(add.contact[key], `the card carried ${key} and the stored contact lost it`).toBe(value);
+    }
+    expect(add.contact.trustLevel).toBe(card.trustOffer);
+    // …and the loop had teeth: a card whose optional fields were all null would satisfy it vacuously.
+    expect(Object.keys(card).filter((k) => card[k] != null).sort())
+      .toEqual(expect.arrayContaining(['handle', 'peerAddr', 'pubKey', 'webid']));
+    expect(card.pubKey).toBe(srcId.pubKey);
+  });
+
   it('addContactFromQr rejects malformed payload', async () => {
     const { bundle } = await buildBundle();
     expect(await callSkill(bundle.agent, 'addContactFromQr', { payload: 'not a contact url' }))

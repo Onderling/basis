@@ -279,12 +279,17 @@ export class MemberMap extends Emitter {
       // they joined AS a persona (property layer — getPersonaRelease). A map {key: coarseValue}; opt-in
       // (default-withhold → absent). Recorded on redeem/create + surfaced by listGroupMembers, like circleAddress.
       personaProperties: (m.personaProperties && typeof m.personaProperties === 'object') ? m.personaProperties : null,
-      // nknAddr: this member's NKN peer address (2026-05-27).  Used
-      // by the chat-shell to route DMs over NKN after a /share-my-
-      // contact QR exchange — addContactFromQr reads it from the
-      // scanned card.  Independent of pubKey (which is the long-
-      // term identity key) — nknAddr can rotate per session.
-      nknAddr:     m.nknAddr ?? null,
+      // peerAddr: this member's address on the peer mesh. Used by the chat shell to reach them straight
+      // after a contact-QR exchange — `addContactFromQr` reads it from the scanned card. Independent of
+      // pubKey (the long-term identity key): a peer address can rotate per session.
+      //
+      // It was called `nknAddr` here until 2026-09-08, and ONLY here. The transport-neutral rename swept
+      // every writer and reader to `peerAddr` and missed this whitelist — which rebuilds each member from
+      // a fixed set of keys, so the incoming value was dropped on write rather than rejected. Both halves
+      // then read null forever and nothing went red: the round-trip test asserted the other four fields.
+      // The lesson is the whitelist's, not the rename's — a normaliser that silently discards what it does
+      // not recognise cannot be renamed safely by grep.
+      peerAddr:    m.peerAddr ?? null,
       // ── Stoop V2 Phase 24: contact-graph fields (additive) ──
       // relation: distinguishes group members (default for back-compat
       //   with V1 callers) from 1:1 contacts.  5.6 (basis v2) added

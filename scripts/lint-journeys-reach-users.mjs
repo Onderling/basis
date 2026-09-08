@@ -49,7 +49,12 @@ import { walk, opsIn, reachedIn, findUnreached, verbsByOp } from './journeys-rea
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
-const BASELINE = path.join(HERE, 'journeys-reach-users-baseline.json');
+// The recorded gaps. `JOURNEYS_BASELINE` overrides the path so the SELF-TEST can drive the real guard
+// against a throwaway copy: it used to write this file and restore it in a `finally`, which is fine until
+// the run is interrupted — one killed run left the repo's own baseline corrupted, and the next guard run
+// failed on an unrelated change (2026-09-08). A test that mutates the artefact it is testing is a test that
+// can break the build it is meant to protect.
+const BASELINE = process.env.JOURNEYS_BASELINE || path.join(HERE, 'journeys-reach-users-baseline.json');
 const UPDATE = process.argv.includes('--update');
 
 /** Where the journeys live, and where a person's corridor is composed. */

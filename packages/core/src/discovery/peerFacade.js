@@ -12,7 +12,7 @@
  *     `pubKey`, `sealingPublicKey`) + the disclosed `personaProperties`
  *     (see apps/stoop/src/lib/deriveRoster.js).
  *   - MemberMap — keyed by `webid`, the DISPLAY / identity-projection cache;
- *     carries `relation`, `trustLevel`, `nknAddr`, handle/displayName, etc.
+ *     carries `relation`, `trustLevel`, `peerAddr`, handle/displayName, etc.
  *     (see packages/identity-resolver/src/MemberMap.js).
  *   - PeerGraph — keyed by signing `pubKey`, the LIVENESS layer; carries
  *     `transports` (name → address), `reachable`, `tier`, `latency`
@@ -158,7 +158,7 @@ function _flattenTransports(live, disp) {
     const addr = typeof cfg === 'string' ? cfg : (cfg?.address ?? cfg?.url ?? null);
     if (typeof addr === 'string' && addr) out[name] = addr;
   }
-  if (!out.nkn && typeof disp?.nknAddr === 'string' && disp.nknAddr) out.nkn = disp.nknAddr;
+  if (!out.nkn && typeof disp?.peerAddr === 'string' && disp.peerAddr) out.nkn = disp.peerAddr;
   return out;
 }
 

@@ -10,7 +10,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findUnreached, opsIn, reachedIn } from './journeys-reach-users.mjs';
@@ -18,7 +19,21 @@ import { findUnreached, opsIn, reachedIn } from './journeys-reach-users.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GUARD = path.join(HERE, 'lint-journeys-reach-users.mjs');
 const BASELINE = path.join(HERE, 'journeys-reach-users-baseline.json');
-const run = () => spawnSync(process.execPath, [GUARD], { encoding: 'utf8' });
+const run = (baseline = null) => spawnSync(process.execPath, [GUARD], {
+  encoding: 'utf8',
+  env: baseline ? { ...process.env, JOURNEYS_BASELINE: baseline } : process.env,
+});
+
+/** Run the guard against a COPY of the real baseline, mutated by `edit`. The repo's file is never touched:
+ *  this test used to write it and restore it in a `finally`, and one interrupted run left it corrupted. */
+function withBaselineCopy(edit, fn) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'journeys-baseline-'));
+  const file = path.join(dir, 'baseline.json');
+  try {
+    writeFileSync(file, JSON.stringify(edit(JSON.parse(readFileSync(BASELINE, 'utf8')))));
+    return fn(file);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
 
 const verbs = { setMemberRole: 'update', listRequests: 'list', addItem: 'add', enrollDevice: 'update' };
 
@@ -77,14 +92,19 @@ describe('the guard on the current tree', () => {
   });
 
   it('FAILS on a baselined gap that has since been closed — debt must not outlive itself', () => {
-    const original = readFileSync(BASELINE, 'utf8');
-    try {
-      const current = JSON.parse(original);
-      writeFileSync(BASELINE, JSON.stringify({ ...current, 'stoop:leaveGroup': 'reached long ago' }));
-      const r = run();
-      expect(r.status).toBe(1);
-      expect(r.stderr).toMatch(/now REACHED/);
-      expect(r.stderr).toMatch(/stoop:leaveGroup/);
-    } finally { writeFileSync(BASELINE, original); }
+    const r = withBaselineCopy(
+      (current) => ({ ...current, 'stoop:leaveGroup': 'reached long ago' }),
+      (file) => run(file),
+    );
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/now REACHED/);
+    expect(r.stderr).toMatch(/stoop:leaveGroup/);
+  });
+
+  it('…and the repo’s own baseline is untouched by that — the test drives a copy', () => {
+    const before = readFileSync(BASELINE, 'utf8');
+    withBaselineCopy((c) => ({ ...c, 'stoop:leaveGroup': 'reached long ago' }), (file) => run(file));
+    expect(readFileSync(BASELINE, 'utf8')).toBe(before);
+    expect(run().status).toBe(0);
   });
 });

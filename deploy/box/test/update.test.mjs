@@ -25,7 +25,8 @@ function makeBox({ roles = [], paths = {}, caddySnippets = {} } = {}) {
   const all = ['thing', ...roles];
   for (const r of all) {
     writeFileSync(join(work, `deploy/roles/${r}.yml`), `services:\n  ${r}:\n    image: x\n`);
-    writeFileSync(join(work, `deploy/roles/${r}.health`), '#!/usr/bin/env bash\n[ ! -f "$BOX_DIR/RED" ]\n');
+    // records what the updater told it, so a test can assert ROLE_REBUILT; still red while RED exists
+    writeFileSync(join(work, `deploy/roles/${r}.health`), '#!/usr/bin/env bash\necho "$ROLE rebuilt=$ROLE_REBUILT" >> "$BOX_DIR/health.log"\n[ ! -f "$BOX_DIR/RED" ]\n');
     chmodSync(join(work, `deploy/roles/${r}.health`), 0o755);
     if (paths[r]) writeFileSync(join(work, `deploy/roles/${r}.paths`), `# generated\n${paths[r].join('\n')}\n`);
     if (caddySnippets[r]) writeFileSync(join(work, `deploy/roles/${r}.caddy`), caddySnippets[r]);
@@ -59,7 +60,9 @@ function makeBox({ roles = [], paths = {}, caddySnippets = {} } = {}) {
   const clearCalls = () => rmSync(join(root, 'calls.log'), { force: true });
   const state = () => JSON.parse(readFileSync(join(box, 'state.json'), 'utf8'));
   const headOfBox = () => sh('git', ['-C', join(box, 'repos/mono'), 'rev-parse', 'HEAD']);
-  return { root, box, work, commit, run, calls, clearCalls, state, headOfBox, roles: all };
+  const health = () => (existsSync(join(box, 'health.log')) ? readFileSync(join(box, 'health.log'), 'utf8').trim().split('\n') : []);
+  const clearHealth = () => rmSync(join(box, 'health.log'), { force: true });
+  return { root, box, work, commit, run, calls, clearCalls, state, headOfBox, roles: all, health, clearHealth };
 }
 
 test('nothing new on the release branch → no docker call, no state change', () => {
@@ -335,4 +338,21 @@ test('caddy is reloaded when the rendered Caddyfile changed, and not when it did
   assert.ok(b.calls().some((c) => /exec -T caddy caddy reload/.test(c)), 'a changed Caddyfile IS reloaded');
   assert.match(readFileSync(join(b.box, 'data/caddy/Caddyfile'), 'utf8'), /relay:9999/);
   assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /caddy: reloaded/);
+});
+
+test('a health script is told whether THIS update rebuilt its role (so an expensive check can skip)', () => {
+  const b = makeBox({ roles: ['other'], paths: { thing: ['src/thing/'], other: ['src/other/'] } });
+  b.run({ FORCE: '1' });
+  assert.deepEqual(b.health().sort(), ['other rebuilt=1', 'thing rebuilt=1'], 'the first bring-up builds both');
+
+  b.clearHealth();
+  b.commit('touch only thing', null, 'src/thing/a.js');
+  assert.equal(b.run().status, 0);
+  assert.deepEqual(b.health().sort(), ['other rebuilt=0', 'thing rebuilt=1'],
+    'only the role whose paths changed is marked rebuilt — both are still checked');
+
+  b.clearHealth();
+  b.commit('touch nothing anyone claims', null, 'docs/x.md');
+  assert.equal(b.run().status, 0);
+  assert.deepEqual(b.health().sort(), ['other rebuilt=0', 'thing rebuilt=0']);
 });

@@ -11,10 +11,12 @@
 # through Caddy are proven from OUTSIDE after a bring-up (`node deploy/smoke/smoke.mjs wss://<domain>`),
 # which is the acceptance step in the runbook.
 #
-# BOX_SMOKE=0 in the updater's environment turns the wire check off (leaving step 1).
+# Step 2 runs when THIS update rebuilt the relay (ROLE_REBUILT=1) — it proves a NEW build, and re-proving
+# a process that never stopped would cost every release ten seconds for nothing. BOX_SMOKE=1 forces it on
+# any update, BOX_SMOKE=0 turns it off entirely.
 set -u
 eval "$COMPOSE exec -T relay node -e \"fetch('http://127.0.0.1:8787/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"" || exit 1
-if [ "${BOX_SMOKE:-1}" != 0 ]; then
+if [ "${BOX_SMOKE:-}" = 1 ] || { [ "${BOX_SMOKE:-}" != 0 ] && [ "${ROLE_REBUILT:-1}" = 1 ]; }; then
   # quiet when it passes (the gate runs on every update); the tail of the failure when it does not
   out="$(eval "$COMPOSE exec -T relay node deploy/smoke/smoke.mjs ws://127.0.0.1:8787" 2>&1)" || {
     echo "[relay.health] the wire-protocol smoke FAILED against the relay's own socket:"

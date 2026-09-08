@@ -85,13 +85,17 @@ the Caddyfile from the snippets. This repo's roles live in `deploy/roles/` (`rel
 feedback repo provides `feedback-collect` and `feedback-aggregate` the same way (its `deploy/roles/`),
 and so can a partner's repo. The box knows a repo only by `name=url#branch` in `box.conf`.
 
+A health script is told whether THIS update rebuilt its role (`ROLE_REBUILT=0|1`), so an expensive check
+can prove a NEW build instead of re-proving a process that never stopped. Every role is still checked.
+
 The relay's health check runs the **wire-protocol smoke** (`deploy/smoke`: register, two-party delivery,
 offline hold and flush, fan-out) against the relay's own socket on every update — so a release that
 breaks message delivery is rolled back rather than served. It uses the INTERNAL socket deliberately:
 measured on the first box, the public `wss://` hangs from inside the container while `https://` to the
-same name answers, so gating on it there would fail good releases. The public name, its certificate and
+same name answers, so gating on it there would fail good releases. It runs when the relay was rebuilt;
+`BOX_SMOKE=1` forces it on any update and `BOX_SMOKE=0` turns it off. The public name, its certificate and
 the upgrade through Caddy are proven from OUTSIDE after a bring-up:
-`node deploy/smoke/smoke.mjs wss://<relay-domain>`. `BOX_SMOKE=0` turns the wire check off.
+`node deploy/smoke/smoke.mjs wss://<relay-domain>`.
 
 ## Backups (role `backup`)
 

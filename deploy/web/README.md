@@ -27,7 +27,12 @@ What a publish does:
 
 A target is a small env file **outside git**: `deploy/web/targets/<name>.env` (gitignored; copy
 `example.env`). It names the host, user, port, path and the public URL. It holds **no password**: the
-SSH/SFTP key is your own, in `ssh-agent`. Publishing to a second host is a second file.
+SSH/SFTP key is your own, in `ssh-agent`.
+
+A target may also carry **`VITE_` keys**, which are passed to the build. That is where a DEPLOYMENT's
+defaults live — the repo deliberately holds none. The one that matters today is
+`VITE_CIRCLE_RELAY_URL`: the relay a hosted build should use out of the box, so someone opening the
+page is on a working transport without touching a setting (they can still change it in the app). Publishing to a second host is a second file.
 
 ## A derived app
 

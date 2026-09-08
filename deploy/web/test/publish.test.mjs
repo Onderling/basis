@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseTarget, releaseStamp, build, upload, sftpBatch, verify } from '../publish.mjs';
+import { parseTarget, releaseStamp, build, upload, sftpBatch, verify, buildEnv } from '../publish.mjs';
 
 test('parseTarget: defaults, required fields', () => {
   const t = parseTarget('WEB_URL=https://x.org\nWEB_HOST=h\nWEB_USER=u\nWEB_PATH=/www/x\nWEB_BASE=/basis/\n# WEB_MODE=rsync\n');
@@ -62,4 +62,21 @@ test('verify: refuses a stale version, accepts once the new one is served', asyn
     const seen = await verify(url, { tag: 'v2' }, { tries: 5, waitMs: 20 });
     assert.equal(seen.tag, 'v2');
   } finally { srv.close(); }
+});
+
+test('buildEnv: a target carries VITE_ defaults into the build, and nothing else', () => {
+  const t = parseTarget('WEB_PATH=/w\nWEB_BASE=/basis/\nVITE_CIRCLE_RELAY_URL=wss://relay.example.org\nVITE_EMPTY=\n');
+  assert.deepEqual(buildEnv(t), { VITE_CIRCLE_RELAY_URL: 'wss://relay.example.org' });
+  assert.deepEqual(buildEnv({}), {});
+});
+
+test('build passes the target env to the app build (a deployment default the repo does not hold)', () => {
+  const root = mkdtempSync(join(tmpdir(), 'publish-env-'));
+  const app = join(root, 'apps/tiny'); mkdirSync(app, { recursive: true });
+  writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'tiny', scripts: { build: 'node build.js' } }));
+  writeFileSync(join(app, 'build.js'), "const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/index.html',`relay=${process.env.VITE_CIRCLE_RELAY_URL||'none'} v=${process.env.VITE_APP_VERSION}`);");
+  const dist = build('tiny', { tag: 'v1', sha: 'a', builtAt: 'now' }, {
+    appsDir: join(root, 'apps'), log: () => {}, env: { VITE_CIRCLE_RELAY_URL: 'wss://relay.example.org' },
+  });
+  assert.match(readFileSync(join(dist, 'index.html'), 'utf8'), /relay=wss:\/\/relay\.example\.org v=v1/);
 });

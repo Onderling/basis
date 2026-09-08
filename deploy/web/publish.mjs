@@ -22,6 +22,9 @@
  *   WEB_PATH=/www/basis.onderling.org        the folder that serves WEB_URL
  *   WEB_MODE=rsync | sftp                    rsync needs a shell on the host; sftp works on any SFTP host
  *   WEB_BASE=/basis/                         when the app lives under a path, not at the site root (Vite --base)
+ *   VITE_*=…                                 any VITE_ key is passed to the build, so a DEPLOYMENT can carry
+ *                                            a default the repo must not (e.g. VITE_CIRCLE_RELAY_URL — the
+ *                                            relay this hosted build should use out of the box)
  * The SSH key is your own (ssh-agent); this script never stores a secret.
  */
 import { spawnSync } from 'node:child_process';
@@ -56,11 +59,12 @@ export function releaseStamp(cwd = ROOT) {
 }
 
 /** Build apps/<app> with the stamp baked in; write dist/version.json. Returns the dist dir. */
-export function build(app, stamp, { appsDir = join(ROOT, 'apps'), log = console.log, base = '/' } = {}) {
+export function build(app, stamp, { appsDir = join(ROOT, 'apps'), log = console.log, base = '/', env = {} } = {}) {
   const dir = join(appsDir, app);
   if (!existsSync(join(dir, 'package.json'))) throw new Error(`no app at ${dir}`);
-  log(`building ${app} as ${stamp.tag} (base ${base}) …`);
-  const r = spawnSync('npm', ['run', '--silent', 'build', '--', '--base', base], { cwd: dir, stdio: 'inherit', env: { ...process.env, VITE_APP_VERSION: stamp.tag, VITE_APP_SHA: stamp.sha } });
+  const extra = Object.keys(env).sort();
+  log(`building ${app} as ${stamp.tag} (base ${base}${extra.length ? `, ${extra.join(', ')}` : ''}) …`);
+  const r = spawnSync('npm', ['run', '--silent', 'build', '--', '--base', base], { cwd: dir, stdio: 'inherit', env: { ...process.env, ...env, VITE_APP_VERSION: stamp.tag, VITE_APP_SHA: stamp.sha } });
   if (r.status !== 0) throw new Error(`build failed for ${app}`);
   return stampDist(app, stamp, join(dir, 'dist'));
 }
@@ -133,6 +137,11 @@ export async function verify(url, stamp, { fetchImpl = fetch, tries = 6, waitMs 
   throw new Error(`verify: ${u} does not report ${stamp.tag} (${last})`);
 }
 
+/** The VITE_ keys a target carries into the build — a deployment's defaults, which the repo must not hold. */
+export function buildEnv(target = {}) {
+  return Object.fromEntries(Object.entries(target).filter(([k, v]) => k.startsWith('VITE_') && v !== ''));
+}
+
 export function zipDist(dist, app, stamp, outDir = ROOT) {
   const out = join(outDir, `${app}-${stamp.tag}.zip`);
   rmSync(out, { force: true });
@@ -150,7 +159,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const stamp = releaseStamp();
     const tf = values.target ? join(HERE, 'targets', `${values.target}.env`) : null;
     const t = tf && existsSync(tf) ? parseTarget(readFileSync(tf, 'utf8')) : null;
-    const dist = values['skip-build'] ? stampDist(app, stamp, join(ROOT, 'apps', app, 'dist')) : build(app, stamp, { base: t?.WEB_BASE || '/' });
+    const dist = values['skip-build']
+      ? stampDist(app, stamp, join(ROOT, 'apps', app, 'dist'))
+      : build(app, stamp, { base: t?.WEB_BASE || '/', env: buildEnv(t) });
     if (values.zip) { console.log(`archive: ${zipDist(dist, app, stamp)} — upload its contents to the folder that serves the site`); process.exit(0); }
     if (!values.target) { console.log(`built ${dist} as ${stamp.tag}; give --target <name> to upload, or --zip`); process.exit(values['dry-run'] ? 0 : 2); }
     if (!t) { console.error(`no target ${values.target}: copy deploy/web/targets/example.env to ${tf}`); process.exit(2); }

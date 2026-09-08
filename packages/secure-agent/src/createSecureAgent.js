@@ -1498,7 +1498,12 @@ export async function createSecureAgent(opts = {}) {
       );
     }
     if (relayState.status === 'connected' || relayState.status === 'connecting') {
-      return { ...relayState };
+      // Same relay ⇒ the cheap no-op this has always been. A DIFFERENT one is a MOVE, and returning the old
+      // state for it is how the in-app relay setting became inert: it saved, reported success, and left the
+      // socket on the previous relay until the next start (2026-09-08). Leave the EXTRA relays alone — they
+      // belong to the kringen that recorded them, not to this setting.
+      if (relayState.url === relayUrl) return { ...relayState };
+      await disconnectRelay();
     }
     relayState.status = 'connecting';
     relayState.url    = relayUrl;

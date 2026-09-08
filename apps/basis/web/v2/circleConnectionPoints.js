@@ -8,7 +8,7 @@
  * Pure render — the host wires the store, `t`, and the back handler.
  */
 
-import { POINT_SOURCE_LABELS } from '../../src/v2/connectionPoints.js';
+import { POINT_SOURCE_LABELS, POINT_STATUS_LABELS, pointStatus } from '../../src/v2/connectionPoints.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderConnectionPoints(container, {
@@ -21,6 +21,12 @@ export function renderConnectionPoints(container, {
   onCancelRemove = null,
   /** The url currently being confirmed, plus its impact report. */
   removing = null,
+  /** `agent.relays.list()` — which of these the device is on RIGHT NOW, and which one is its own. */
+  relays = [],
+  /** Add a relay by hand: `(url) => void`. Absent ⇒ no field (a shell with no agent to dial with). */
+  onAdd = null,
+  /** A locale key for what went wrong with the last add, or null. */
+  addError = null,
 } = {}) {
   const tr = translatorOr(t, 'circleConnectionPoints.js');
   container.innerHTML = '';
@@ -48,9 +54,10 @@ export function renderConnectionPoints(container, {
   if (!points.length) {
     const empty = document.createElement('div');
     empty.className = 'circle-points__empty';
-    // Also says HOW one arrives — you never configure a connection point by hand to join something.
+    // Also says HOW one arrives — you never have to configure a connection point by hand to join something.
     empty.textContent = tr('circle.nearbyScreen.points_empty');
     container.appendChild(empty);
+    appendAddForm(container, { tr, onAdd, addError });   // …but someone running their own relay may want to.
     return container;
   }
 
@@ -65,10 +72,10 @@ export function renderConnectionPoints(container, {
     url.textContent = point.url;
     el.appendChild(url);
 
-    // Which one is actually carrying traffic. The substrate connects to one RELAY at a time, so a list
-    // that showed them all as equal would be claiming something untrue. A POD has no socket — it is used
-    // whenever the circle syncs — so active/standby would be the same lie in the other direction; it gets
-    // its own line, plus the host-sees disclosure so the fact from create/join stays visible here too.
+    // Which of these is actually carrying traffic. Since 2026-09-08 a device is on its OWN relay and on
+    // every relay its kringen ride, all at once — so the line says which is yours, which are also
+    // connected, and which are not, rather than the old one-live-the-rest-reserve story. A POD has no
+    // socket at all; it gets its own line plus the host-sees disclosure, as before.
     const live = document.createElement('div');
     if (point.kind === 'pod') {
       live.className = 'circle-points__live is-pod';
@@ -79,8 +86,9 @@ export function renderConnectionPoints(container, {
       sees.textContent = tr('circle.nearbyScreen.point_pod_host_sees');
       el.appendChild(sees);
     } else {
-      live.className = point.active ? 'circle-points__live is-active' : 'circle-points__live is-standby';
-      live.textContent = tr(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby');
+      const status = pointStatus(point, relays);
+      live.className = `circle-points__live is-${status}`;
+      live.textContent = tr(POINT_STATUS_LABELS[status]);
       el.appendChild(live);
     }
 
@@ -175,5 +183,55 @@ export function renderConnectionPoints(container, {
     container.appendChild(el);
   }
 
+  appendAddForm(container, { tr, onAdd, addError });
   return container;
+}
+
+/**
+ * Add a relay by hand — for someone running their own box, or handed one by a friend.
+ *
+ * It ADDS: the device stays on the relays it is already on. That is worth saying out loud in the hint,
+ * because the old model was one relay that a new one replaced, and that is what people expect.
+ */
+function appendAddForm(container, { tr, onAdd, addError }) {
+  if (typeof onAdd !== 'function') return;
+  const form = document.createElement('form');
+  form.className = 'circle-points__add';
+
+  const title = document.createElement('h3');
+  title.className = 'circle-points__add-title';
+  title.textContent = tr('circle.nearbyScreen.point_add_title');
+  form.appendChild(title);
+
+  const hint = document.createElement('div');
+  hint.className = 'circle-points__add-hint';
+  hint.textContent = tr('circle.nearbyScreen.point_add_hint');
+  form.appendChild(hint);
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'circle-points__add-input';
+  input.placeholder = tr('circle.nearbyScreen.point_add_placeholder');
+  input.setAttribute('aria-label', tr('circle.nearbyScreen.point_add_title'));
+  form.appendChild(input);
+
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'circle-points__add-submit cc-btn';
+  submit.textContent = tr('circle.nearbyScreen.point_add_button');
+  form.appendChild(submit);
+
+  if (addError) {
+    const err = document.createElement('div');
+    err.className = 'circle-points__add-error';
+    err.setAttribute('role', 'alert');
+    err.textContent = tr(addError);
+    form.appendChild(err);
+  }
+
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    onAdd(input.value.trim());
+  });
+  container.appendChild(form);
 }

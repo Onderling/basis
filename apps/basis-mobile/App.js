@@ -482,6 +482,10 @@ export default function App() {
           // The per-user address-fallback setting, read LIVE (batch 4, web≡mobile) — a sync read off
           // the hook-fed cache, because the send path cannot await AsyncStorage per message.
           allowAddressFallback: () => deliverySettingsCacheRef.current.allowFallback === true,
+          // Which kringen I share with a PERSON (2026-09-08, web parity), so a message with no circle —
+          // a DM, a receipt — can ride a relay they are actually on instead of only my own. The same
+          // index the membrane above enforces with; the roster feed keeps it live.
+          circlesForPeer: (addr) => circleGroupsIndexRef.current.groupsFor(addr),
           // Persist the agent identity (chat + host vaults + stoop
           // cache) to AsyncStorage so the NKN address — derived from the
           // identity keypair — stays stable across reboots (otherwise a

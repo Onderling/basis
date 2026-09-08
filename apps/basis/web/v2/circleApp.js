@@ -2177,19 +2177,23 @@ function buildCircleBot(agent) {
       if (relayParam || joinParam) {
         (async () => {
           if (relayParam) {
-            try { await applyRelayUrl(relayParam); } catch { /* relay best-effort */ }
             // Rule 1 — joining populates the connection-point list. This is the real-world path: one
             // scan configures the endpoint AND joins, so the point arrives with the circle rather than
             // being something anyone had to configure.
             //
+            // BESIDE, not INSTEAD (2026-09-08). This used to call `applyRelayUrl`, which rewrites the
+            // device's own relay setting — so scanning a friend's invite silently moved you off your own
+            // relay and marked theirs as the one in use. The in-app join had already stopped doing that;
+            // the scanned link is the same join and now behaves the same way. `dialRelayUrl` adds it
+            // alongside when you already have a relay, and adopts it only when you have none.
+            //
             // NOTE the honest limit: the endpoint rides the DEEP LINK (`?relay=`), not the invite object
             // itself, so a bare `onderling-invite://` pasted by hand brings no point. Recorded in
             // plans/PLAN-nearby.md — making the invite carry it is a change to the invite payload.
-            try {
-              const points = getConnectionPoints();
-              points.addManually(relayParam);
-              points.setActive(relayParam);
-            } catch { /* the list is a convenience; never block a join on it */ }
+            try { getConnectionPoints().addManually(relayParam); }
+            catch { /* the list is a convenience; never block a join on it */ }
+            for (let i = 0; i < 40 && !_peerAgent; i++) await new Promise((r) => setTimeout(r, 500));
+            try { await dialRelayUrl(relayParam); } catch { /* relay best-effort */ }
           }
           if (joinParam) {
             let inv = joinParam; try { inv = decodeURIComponent(joinParam); } catch { /* keep raw */ }
@@ -3293,17 +3297,39 @@ function showConnectionPoints() {
   hideCircleTabBar(tabBarEl);
   const store = getConnectionPoints();
   let removing = null;
+  let addError = null;
 
   const draw = () => renderConnectionPoints(rootEl, {
-    points: store.list(), t, removing,
+    points: store.list(), t, removing, addError,
+    // The LIVE list decides what each row says. The store remembers points; only the agent knows which of
+    // them have a socket right now, and since 2026-09-08 that is several at once.
+    relays: _peerAgent?.relays?.list?.() ?? [],
     onBack: showLauncher,
     onAdopt: (url) => { store.adopt(url); draw(); },
     // Ask before removing: the impact report is the point of this screen.
     onRemove: (url) => { removing = { url, ...store.impactOfRemoving(url) }; draw(); },
     onCancelRemove: () => { removing = null; draw(); },
-    onConfirmRemove: (url) => { store.remove(url); removing = null; draw(); },
+    // Removing DISCONNECTS. Leaving the socket open on a point the person just deleted is the list
+    // claiming one thing while the transport does another — the disagreement this screen exists to end.
+    onConfirmRemove: (url) => {
+      store.remove(url); removing = null; draw();
+      Promise.resolve(_peerAgent?.relays?.remove?.(url)).catch(() => { /* the point is gone either way */ });
+    },
+    onAdd: (url) => { addRelayByHand(url, store, draw).then(() => { /* draw() inside */ }); },
   });
   draw();
+
+  /** Record it, then dial it. Both halves are reported: a point that is listed but not connected is a
+   *  different (and recoverable) state from one that was never accepted at all. */
+  async function addRelayByHand(url, pointsStore, redraw) {
+    if (!pointsStore.addManually(url)?.ok) { addError = 'circle.nearbyScreen.point_add_invalid'; redraw(); return; }
+    addError = null; redraw();
+    try {
+      const r = await _peerAgent?.addRelay?.(url, { awaitReady: true });
+      addError = r && r.ok === false ? 'circle.nearbyScreen.point_add_failed' : null;
+    } catch { addError = 'circle.nearbyScreen.point_add_failed'; }
+    redraw();
+  }
 }
 
 function showNearby() {
@@ -7734,6 +7760,9 @@ async function boot() {
       // from its invite, and nothing else. The seam existed; no shell handed the map in, so the scope was
       // always empty and every circle rode whatever relay came first.
       circlePointsFor: (cid) => relayUrlsForCircle(cid),
+      // …and which kringen I share with a PERSON, so a message with no circle (a DM, a receipt) can ride a
+      // relay they are actually on. The index is the roster feed's own (`householdRosterPairing` fills it).
+      circlesForPeer: (addr) => circleGroupsIndex.groupsFor(addr),
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (see circleVersioning.js).
       versionStoreFor: getCircleVersionStore,

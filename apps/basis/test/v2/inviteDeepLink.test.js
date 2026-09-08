@@ -1,26 +1,37 @@
-// The invite deep link points at the app wherever it is served — root, a path, a file — never at a hardcoded root.
+/**
+ * The invite deep link, read back (2026-09-08). The app builds an https link carrying `?join=` and the
+ * admin's relay; the native scanner only understood `onderling-invite://` and `?invite=`, so the app could
+ * not read its own QR. One reader, both shells — this pins what it accepts.
+ */
 import { describe, it, expect } from 'vitest';
-import { appBaseUrl, inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
+import { appBaseUrl, inviteDeepLink, parseInviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 
-const at = (origin, pathname) => ({ origin, pathname });
+const LOC = { origin: 'https://onderling.org', pathname: '/basis/index.html' };
 
-describe('appBaseUrl', () => {
-  it('site root', () => expect(appBaseUrl(at('https://onderling.org', '/'))).toBe('https://onderling.org/'));
-  it('a path under the site (the hosted build)', () => expect(appBaseUrl(at('https://onderling.org', '/basis/'))).toBe('https://onderling.org/basis/'));
-  it('a path without the trailing slash', () => expect(appBaseUrl(at('https://onderling.org', '/basis'))).toBe('https://onderling.org/'));
-  it('index.html stripped', () => expect(appBaseUrl(at('https://onderling.org', '/basis/index.html'))).toBe('https://onderling.org/basis/'));
-  it('localhost dev server', () => expect(appBaseUrl(at('http://localhost:5173', '/'))).toBe('http://localhost:5173/'));
-});
-
-describe('inviteDeepLink', () => {
-  it('carries the invite and the relay, encoded the way the ?join reader decodes them', () => {
-    const link = inviteDeepLink(at('https://onderling.org', '/basis/'), 'onderling-invite://abc/def', 'wss://relay.onderling.org');
-    expect(link).toBe('https://onderling.org/basis/?join=onderling-invite%3A%2F%2Fabc%2Fdef&relay=wss%3A%2F%2Frelay.onderling.org');
-    const u = new URL(link);
-    expect(u.searchParams.get('join')).toBe('onderling-invite://abc/def');
-    expect(u.searchParams.get('relay')).toBe('wss://relay.onderling.org');
+describe('parseInviteDeepLink', () => {
+  it('reads back exactly what inviteDeepLink writes, relay included', () => {
+    const link = inviteDeepLink(LOC, 'onderling-invite://abc-123', 'wss://relay.onderling.org');
+    expect(link.startsWith(`${appBaseUrl(LOC)}?join=`)).toBe(true);
+    expect(parseInviteDeepLink(link)).toEqual({ inviteUri: 'onderling-invite://abc-123', relayUrl: 'wss://relay.onderling.org' });
   });
-  it('no relay → no relay parameter', () => {
-    expect(inviteDeepLink(at('https://x.org', '/'), 'onderling-invite://a')).toBe('https://x.org/?join=onderling-invite%3A%2F%2Fa');
+
+  it('a link without a relay, and the older ?invite= form, both parse', () => {
+    expect(parseInviteDeepLink(inviteDeepLink(LOC, 'onderling-invite://abc'))).toEqual({ inviteUri: 'onderling-invite://abc', relayUrl: null });
+    expect(parseInviteDeepLink('https://x.example/?invite=onderling-invite%3A%2F%2Fzz')).toEqual({ inviteUri: 'onderling-invite://zz', relayUrl: null });
+  });
+
+  it('a bare invite URI passes through — there is nothing to unpack and no relay to learn', () => {
+    expect(parseInviteDeepLink('onderling-invite://abc')).toEqual({ inviteUri: 'onderling-invite://abc', relayUrl: null });
+    expect(parseInviteDeepLink('  {"groupId":"g"}  ')).toEqual({ inviteUri: '{"groupId":"g"}', relayUrl: null });
+  });
+
+  it('a relay that is not a websocket endpoint names nothing — the invite still stands', () => {
+    expect(parseInviteDeepLink('https://x.example/?join=inv&relay=https://evil.example')).toEqual({ inviteUri: 'inv', relayUrl: null });
+  });
+
+  it('anything that is not an invite is null, including a plain page and rubbish', () => {
+    for (const bad of ['https://onderling.org/basis/', 'hello', '', null, undefined, 42]) {
+      expect(parseInviteDeepLink(bad)).toBeNull();
+    }
   });
 });

@@ -115,6 +115,17 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
   // so, loudly, from `realAgent`), which is the honest degradation — refusing on the strength of not
   // knowing would drop every message in the circle.
   try { await agent.recordCircleSenders?.({ circleId, members }); } catch { /* best-effort */ }
+  // …and the THIRD use of the same rows: the peer → kringen index (2026-09-08). It was filled only by
+  // `feedHouseholdRoster`, which runs when a kring is OPENED — so on a cold start the index was empty and
+  // a direct message could not be routed over a relay the recipient's kring rides until you had visited
+  // that kring. This runs for every circle at boot (`primeCircleSecurity`), off a read that already
+  // happened, so the map is complete before anyone taps anything.
+  const gidx = agent._circleGroupsIndex ?? null;
+  if (gidx) {
+    for (const m of members) {
+      if (m?.addr) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break priming */ } }
+    }
+  }
   return {
     ...bindCircleAddressKeys({
       members,

@@ -291,7 +291,8 @@ export {
 export { registerCircleAddresses, unregisterCircleAddresses, registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays }
                                                 from './v2/circleAddressRegistration.js';
 export {
-  createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS, POINT_KIND,
+  createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS, POINT_KIND, POINT_STATUS_LABELS,
+  pointStatus, relayUrlsForCircles, contactRelayScope,
   // The RN launcher consumes these three via this entry — they were MISSING here (Metro interop turns a
   // missing named export into `undefined`, so the points screen crashed only when opened; the
   // basisIndexExports guard in basis-mobile now pins every launcher import against this entry).

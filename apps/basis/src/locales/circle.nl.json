@@ -2604,13 +2604,17 @@
       "text": "Terugval toestaan",
       "doc": "Turns the per-user fallback setting on."
     },
-    "point_active": {
-      "text": "Nu in gebruik",
-      "doc": "The ONE point the transport is actually connected to. The substrate connects to one relay at a time."
+    "point_primary": {
+      "text": "Jouw relay — verbonden",
+      "doc": "The device's OWN relay (the one in the setting), connected. Replaced point_active on 2026-09-08: a device is now on several relays at once, so 'the one in use' was no longer a fact."
     },
-    "point_standby": {
-      "text": "Reserve",
-      "doc": "A known, adopted point that is not currently carrying anything — a real fallback, not decoration."
+    "point_connected": {
+      "text": "Verbonden",
+      "doc": "A relay a kring brought along, connected right now beside your own. Was labelled 'Reserve', which described it as idle while it was carrying that kring's traffic."
+    },
+    "point_offline": {
+      "text": "Niet verbonden",
+      "doc": "Known and adopted, but no socket to it right now — it comes back at the next start, or when a kring that rides it needs it."
     },
     "remove_was_active": {
       "text": "Dit is degene die in gebruik is. Verwijderen verbreekt de verbinding tot je een andere kiest.",
@@ -2659,6 +2663,30 @@
     "point_remove": {
       "text": "Verwijderen",
       "doc": "Remove a connection point."
+    },
+    "point_add_title": {
+      "text": "Relay toevoegen",
+      "doc": "Heading of the add-a-relay field (2026-09-08). Adding one connects to it beside the relays you are already on — it does not replace your own."
+    },
+    "point_add_hint": {
+      "text": "Draai je zelf een relay, of gaf iemand je er een? Vul het adres in. Je blijft ook op de relays die je al gebruikt.",
+      "doc": "Says what adding does, because the old model (one relay, swapped) is what people expect."
+    },
+    "point_add_placeholder": {
+      "text": "wss://relay.voorbeeld.nl",
+      "doc": "Placeholder for the relay address field."
+    },
+    "point_add_button": {
+      "text": "Toevoegen",
+      "doc": "Confirms the add-a-relay field."
+    },
+    "point_add_invalid": {
+      "text": "Dat is geen relay-adres. Een relay begint met ws:// of wss://.",
+      "doc": "Shown when the typed address is not a websocket endpoint."
+    },
+    "point_add_failed": {
+      "text": "Toegevoegd aan de lijst, maar verbinden lukte niet. Het probeert het opnieuw.",
+      "doc": "The point is recorded but the socket did not open — honest about both halves rather than reporting success."
     },
     "remove_cuts_off": {
       "text": "Dit verwijderen sluit af: {{circles}}",

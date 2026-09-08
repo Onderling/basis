@@ -347,30 +347,6 @@ export default function CircleSettingsScreen({
 
         {/* B · consent-card — apply an authored recipe (URL/JSON) as REVIEWED action: load → native consent
             card (what it enables + opt-out switches) → Agree applies, Decline nothing. Same shared model as web. */}
-        {advancedOpen ? (<>
-        <Text style={styles.section}>{t('circle.recipeApply.heading')}</Text>
-        <TextInput
-          style={styles.recipeInput}
-          value={recipeSource}
-          onChangeText={setRecipeSource}
-          placeholder={t('circle.recipeApply.placeholder')}
-          placeholderTextColor={theme.color.inkSoft}
-          multiline
-          autoCapitalize="none"
-          autoCorrect={false}
-          testID="recipe-source"
-        />
-        <Pressable
-          style={[styles.recipeApply, recipeBusy && styles.recipeApplyBusy]}
-          onPress={loadForReview}
-          disabled={recipeBusy}
-          accessibilityRole="button"
-          testID="recipe-apply"
-        >
-          <Text style={styles.recipeApplyText}>{t('circle.recipeApply.apply')}</Text>
-        </Pressable>
-        {recipeStatus ? <Text style={styles.note} testID="recipe-status">{recipeStatus}</Text> : null}
-        </>) : null}
 
         <Text style={styles.section}>{t('circle.settings.features')}</Text>
         {CIRCLE_FEATURES.map((f) => (
@@ -385,28 +361,8 @@ export default function CircleSettingsScreen({
         ))}
 
         {/* S6.C deep — which whole apps this circle composes (catalogue scope). */}
-        {advancedOpen ? (<>
-        <Text style={styles.section}>{t('circle.settings.apps')}</Text>
-        {DEFAULT_CIRCLE_ORIGINS.map((app) => {
-          const current = Array.isArray(working.apps) ? working.apps : DEFAULT_CIRCLE_ORIGINS;
-          return (
-            <View key={app} style={styles.row}>
-              <Text style={styles.rowLabel}>{t(`circle.settings.app.${app}`)}</Text>
-              <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
-                value={current.includes(app)}
-                onValueChange={(on) => {
-                  const set = new Set(current);
-                  if (on) set.add(app); else set.delete(app);
-                  patch({ apps: DEFAULT_CIRCLE_ORIGINS.filter((a) => set.has(a)) });
-                }}
-                testID={`app-${app}`}
-              />
-            </View>
-          );
-        })}
-        </>) : null}
 
-        {ENUM_AXES.filter((axis) => advancedOpen || !isAdvancedSetting(`axis:${axis}`)).map((axis) => (
+        {ENUM_AXES.filter((axis) => !isAdvancedSetting(`axis:${axis}`)).map((axis) => (
           <View key={axis}>
             <Text style={styles.section}>{t(`circle.settings.${axis}`)}</Text>
             {CIRCLE_POLICY_ENUMS[axis].map((opt) => {
@@ -450,27 +406,6 @@ export default function CircleSettingsScreen({
           </View>
         ))}
 
-        {advancedOpen ? (<>
-        <Text style={styles.section}>{t('circle.settings.consensus')}</Text>
-        {/* WHO DECIDES a settings change (the decision-kind unification): writes the ONE decision
-            table (governance.changePolicy); the old consensus boolean asked exactly this question
-            and is retired from the policy shape. Web parity: circleSettings.js. */}
-        <View style={styles.controlRow} testID="whoDecides">
-          <Text style={styles.rowLabel}>{t('circle.settings.whoDecides')}</Text>
-          <View style={styles.chipRow}>
-            {['any-admin', 'admin-quorum', 'member-vote'].map((cls) => {
-              const on = (working.governance?.changePolicy ?? 'any-admin') === cls;
-              return (
-                <Pressable key={cls} onPress={() => patch({ governance: { ...(working.governance ?? {}), changePolicy: cls } })}
-                  style={[styles.chip, on && styles.chipOn]} testID={`whoDecides-${cls}${on ? '-on' : ''}`}>
-                  <Text style={styles.chipText}>{t(`circle.settings.whoDecides_opt.${cls}`)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-        {consensusActive ? <Text style={styles.note}>{t('circle.settings.pending')}</Text> : null}
-        </>) : null}
         {storageNote ? <Text style={styles.note} testID="circle-settings-storage-note">{storageNote}</Text> : null}
 
         {/* Phase 4 §9 — Connection & transport controls (manifest-declared). The enabledWhen fold
@@ -588,6 +523,115 @@ export default function CircleSettingsScreen({
         >
           <Text style={styles.advancedToggleText}>{advancedOpen ? '▾' : '▸'} {t('circle.settings.advanced')}</Text>
         </Pressable>
+        {/* the folded group, in one place (web parity: the <details> fold sits below the essentials) */}
+        {ENUM_AXES.filter((axis) => isAdvancedSetting(`axis:${axis}`)).map((axis) => (
+          <View key={axis}>
+            <Text style={styles.section}>{t(`circle.settings.${axis}`)}</Text>
+            {CIRCLE_POLICY_ENUMS[axis].map((opt) => {
+              const consKey = `circle.settings.consequence.${opt}`;
+              const consText = t(consKey);
+              const hasCons = consText && consText !== consKey;
+              const selected = working[axis] === opt;
+              return (
+                <View key={opt} style={[styles.optBox, selected && styles.optBoxSelected]}>
+                  <View style={styles.optRow}>
+                    <Pressable
+                      style={styles.optTap}
+                      onPress={() => patch({ [axis]: opt })}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      testID={`opt-${opt}`}
+                    >
+                      <View style={[styles.radio, selected && styles.radioOn]}>
+                        {selected ? <View style={styles.radioDot} /> : null}
+                      </View>
+                      <Text style={styles.rowLabel}>{t(`circle.settings.opt.${opt}`)}</Text>
+                    </Pressable>
+                    {hasCons ? (
+                      <Pressable
+                        onPress={() => setExpanded((e) => ({ ...e, [opt]: !e[opt] }))}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('circle.settings.consequence_aria')}
+                        testID={`info-${opt}`}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.info}>ⓘ</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  {hasCons && expanded[opt] ? (
+                    <Text style={styles.consequence} testID={`consequence-${opt}`}>{consText}</Text>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        ))}
+        {advancedOpen ? (<>
+        <Text style={styles.section}>{t('circle.settings.consensus')}</Text>
+        {/* WHO DECIDES a settings change (the decision-kind unification): writes the ONE decision
+            table (governance.changePolicy); the old consensus boolean asked exactly this question
+            and is retired from the policy shape. Web parity: circleSettings.js. */}
+        <View style={styles.controlRow} testID="whoDecides">
+          <Text style={styles.rowLabel}>{t('circle.settings.whoDecides')}</Text>
+          <View style={styles.chipRow}>
+            {['any-admin', 'admin-quorum', 'member-vote'].map((cls) => {
+              const on = (working.governance?.changePolicy ?? 'any-admin') === cls;
+              return (
+                <Pressable key={cls} onPress={() => patch({ governance: { ...(working.governance ?? {}), changePolicy: cls } })}
+                  style={[styles.chip, on && styles.chipOn]} testID={`whoDecides-${cls}${on ? '-on' : ''}`}>
+                  <Text style={styles.chipText}>{t(`circle.settings.whoDecides_opt.${cls}`)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        {consensusActive ? <Text style={styles.note}>{t('circle.settings.pending')}</Text> : null}
+        </>) : null}
+        {advancedOpen ? (<>
+        <Text style={styles.section}>{t('circle.settings.apps')}</Text>
+        {DEFAULT_CIRCLE_ORIGINS.map((app) => {
+          const current = Array.isArray(working.apps) ? working.apps : DEFAULT_CIRCLE_ORIGINS;
+          return (
+            <View key={app} style={styles.row}>
+              <Text style={styles.rowLabel}>{t(`circle.settings.app.${app}`)}</Text>
+              <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+                value={current.includes(app)}
+                onValueChange={(on) => {
+                  const set = new Set(current);
+                  if (on) set.add(app); else set.delete(app);
+                  patch({ apps: DEFAULT_CIRCLE_ORIGINS.filter((a) => set.has(a)) });
+                }}
+                testID={`app-${app}`}
+              />
+            </View>
+          );
+        })}
+        </>) : null}
+        {advancedOpen ? (<>
+        <Text style={styles.section}>{t('circle.recipeApply.heading')}</Text>
+        <TextInput
+          style={styles.recipeInput}
+          value={recipeSource}
+          onChangeText={setRecipeSource}
+          placeholder={t('circle.recipeApply.placeholder')}
+          placeholderTextColor={theme.color.inkSoft}
+          multiline
+          autoCapitalize="none"
+          autoCorrect={false}
+          testID="recipe-source"
+        />
+        <Pressable
+          style={[styles.recipeApply, recipeBusy && styles.recipeApplyBusy]}
+          onPress={loadForReview}
+          disabled={recipeBusy}
+          accessibilityRole="button"
+          testID="recipe-apply"
+        >
+          <Text style={styles.recipeApplyText}>{t('circle.recipeApply.apply')}</Text>
+        </Pressable>
+        {recipeStatus ? <Text style={styles.note} testID="recipe-status">{recipeStatus}</Text> : null}
+        </>) : null}
 
         {/* manifest-driven per-app settings form */}
         {advancedOpen && settingsForms.length ? (

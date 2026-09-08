@@ -145,6 +145,7 @@ import {
 } from '../../../../basis/src/v2/helpCircle.js';
 import { createOnboardingFlags, asyncStorageOnboardingIo } from '../../../../basis/src/v2/onboardingFlags.js';
 import { alphaViewModes, alphaViewMode, isAlphaTab } from '../../../../basis/src/v2/alphaSurface.js';
+import { chatComposerVisible } from '../../../../basis/src/v2/circleTabs.js';
 import { buildOnboardingTemplate } from '../../../../basis/src/v2/onboardingTemplate.js';
 import { startGuidedSetup } from '../../../../basis/src/v2/guidedSetup.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../../../basis/src/v2/onboardingChat.js';
@@ -4293,6 +4294,7 @@ function CircleDetail({
         {/* The "+" menu — the projected entries, in the composer, exactly as web paints them. Rendered
             ABOVE the row so it opens upward like the web dropdown; absent entirely when this circle
             offers nothing that works. */}
+        {chatComposerVisible(activeTab) ? (<>   {/* the composer is the conversation's — hidden under Leden and the other tabs */}
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (
@@ -4347,6 +4349,7 @@ function CircleDetail({
             <Text style={styles.composerSendText}>↑</Text>
           </Pressable>
         </View>
+        </>) : null}
       </>
       ) : null}
 

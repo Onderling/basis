@@ -112,3 +112,13 @@ const TAB_ID_TO_FEATURE = Object.freeze(
 export function featureForTabId(tabId) {
   return TAB_ID_TO_FEATURE[tabId] ?? null;
 }
+
+/**
+ * Whether the CHAT composer belongs under a circle tab. It is the conversation's input; the noticeboard
+ * owns its own post composer, tasks have their add button, and under Leden it only confused people
+ * (Frits, 2026-09-08: "the chat option should be removed from the members pane"). Shared, so web and
+ * mobile hide it on the same tabs. `null`/unknown resolves to the conversation (the default tab).
+ */
+export function chatComposerVisible(tabId) {
+  return !tabId || tabId === DEFAULT_CIRCLE_TAB;
+}

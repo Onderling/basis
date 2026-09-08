@@ -280,10 +280,18 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(el.querySelector('.circle-view__tab.is-active').dataset.tab).toBe('conversation');
   });
 
-  it('composer stays visible regardless of active tab (v2 §1 boards)', () => {
+  it('the chat composer belongs to the conversation tab — hidden under Leden (2026-09-08; was: every tab)', () => {
+    // v2 §1's boards showed the composer under every tab; under Leden it only confused people. The rule is
+    // shared (circleTabs.chatComposerVisible) so mobile hides it on the same tabs.
     const el = mount();
     renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'members', onSend: () => {} });
-    expect(el.querySelector('.circle-view__composer')).not.toBeNull();
+    expect(el.querySelector('.circle-view__composer')).toBeNull();
+    const el2 = mount();
+    renderCircleView(el2, { circle, rows, t, tabs: circleTabs, activeTab: 'conversation', onSend: () => {} });
+    expect(el2.querySelector('.circle-view__composer')).not.toBeNull();
+    const el3 = mount();
+    renderCircleView(el3, { circle, rows, t, tabs: circleTabs, activeTab: 'tasks', onSend: () => {} });
+    expect(el3.querySelector('.circle-view__composer')).toBeNull();
   });
 
   /* ─── — Chat ↔ Screen header pill (v2 §4 "De mode switch") ─── */

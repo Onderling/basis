@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleView } from '../../web/v2/circleView.js';
-import { circleActions, circleActionsMobile } from '../../src/v2/actionProjection.js';
+import { circleActions, circleActionsMobile, gatedActions } from '../../src/v2/actionProjection.js';
 import { basisManifest } from '../../src/index.js';
 import { DEFAULT_CIRCLE_POLICY, mergeCirclePolicy } from '../../src/v2/circlePolicy.js';
 
@@ -46,24 +46,27 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
       .map((a) => a.id)
       .filter((id) => typeof more[id] === 'function');
     expect(menuActions(el)).toEqual(expected);
-    // Default policy: viewAs + rules shown; files hidden (lists+notes off);
-    // share dropped by the platform gate (mobile-only) despite more.share wired.
-    expect(menuActions(el)).toContain('viewAs');
-    expect(menuActions(el)).toContain('rules');
-    expect(menuActions(el)).not.toContain('files');
-    expect(menuActions(el)).not.toContain('share');
-    // the live-web-menu roster additions are present
-    expect(menuActions(el)).toContain('invite');
-    expect(menuActions(el)).toContain('contacts');
+    // The alpha trims the menu to invite · settings (back is a header affordance; alphaSurface.js). The
+    // gates beneath it are unchanged, observable through `gatedActions`: viewAs + rules on by default,
+    // files hidden (lists+notes off), share dropped by the platform gate (mobile-only).
+    expect(menuActions(el)).toEqual(['invite', 'settings']);
+    const gated = gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
+    expect(gated).toContain('viewAs');
+    expect(gated).toContain('rules');
+    expect(gated).not.toContain('files');
+    expect(gated).not.toContain('share');
+    expect(gated).toContain('contacts');
   });
 
   it('feature gate (requires) rides the projection: policy toggles add/remove items', () => {
     const noDir = mergeCirclePolicy(DEFAULT_CIRCLE_POLICY, { features: { memberDirectory: false, houseRules: false, lists: true } });
+    const gated = gatedActions(basisManifest, { policy: noDir, platform: 'web' }).map((a) => a.id);
+    expect(gated).not.toContain('viewAs');   // memberDirectory off
+    expect(gated).not.toContain('rules');    // houseRules off
+    expect(gated).toContain('files');        // lists on (lists || notes)
     const el = mount();
     renderCircleView(el, { circle, rows: [], t, policy: noDir, more: fullMore() });
-    expect(menuActions(el)).not.toContain('viewAs');   // memberDirectory off
-    expect(menuActions(el)).not.toContain('rules');    // houseRules off
-    expect(menuActions(el)).toContain('files');        // lists on (lists || notes)
+    expect(menuActions(el)).toEqual(['invite', 'settings']);   // the painted menu is the alpha's, whatever the gates
   });
 
   it('handler-presence gate: an action with no more[id] callback is omitted', () => {
@@ -77,8 +80,8 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
     const el = mount();
     const more = fullMore();
     renderCircleView(el, { circle, rows: [], t, policy: DEFAULT_CIRCLE_POLICY, more });
-    el.querySelector('.circle-view__more-menu [data-action="contacts"]').click();
-    expect(more.contacts).toHaveBeenCalledTimes(1);
+    el.querySelector('.circle-view__more-menu [data-action="settings"]').click();
+    expect(more.settings).toHaveBeenCalledTimes(1);
   });
 
   it('web live menu ≡ mobile menu, modulo the manifest-declared platform diff (share)', () => {
@@ -89,9 +92,8 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
     const mobileMenu = circleActionsMobile(basisManifest, { policy: DEFAULT_CIRCLE_POLICY })
       .map((a) => a.id)
       .filter((id) => id !== 'back');
-    // They differ ONLY by the mobile-only `share` (no web CircleShareScreen yet).
-    expect(mobileMenu.filter((id) => id !== 'share')).toEqual(webMenu);
-    expect(mobileMenu).toContain('share');
+    // Identical: the alpha hides the only platform-specific action (share) on both shells.
+    expect(mobileMenu).toEqual(webMenu);
     expect(webMenu).not.toContain('share');
   });
 });

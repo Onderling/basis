@@ -22,6 +22,11 @@ it models, then the system it runs on, then where it's going. Each part assumes 
 
 ---
 
+> **The alpha paints a subset.** `apps/basis/src/v2/alphaSurface.js` names the surfaces that are hidden for the
+> alpha (a deny-list, applied in the one tab projection both shells read, and in the circle header's view pill).
+> Nothing hidden is removed: the manifests, ops, code and tests stay; only the paint is withheld, and a guard
+> (`lint-alpha-surface`) keeps a shell from painting a hidden surface from a literal. Widening the alpha is one edit there.
+
 ## 1 · The model
 
 *The thin waist, and why the two consequences that fall out of it are the whole architecture.*

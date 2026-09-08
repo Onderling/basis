@@ -1608,6 +1608,10 @@
       "text": "Require co-admin approval for changes",
       "doc": "consensusRequired toggle label."
     },
+    "advanced": {
+      "text": "Advanced",
+      "doc": "Settings — the closed fold that holds every setting a member does not need weekly (the alpha keeps five in view; alphaSurface.js ADVANCED_SETTINGS)."
+    },
     "connection": {
       "text": "Connection & transport",
       "doc": "Phase 4 §9 — settings section: circle route + transport controls (transport-mode, relay endpoint, private chat)."

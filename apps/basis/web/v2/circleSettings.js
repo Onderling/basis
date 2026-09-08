@@ -36,6 +36,7 @@ import { renderRecipeConsentCard } from './recipeConsentCard.js';
 // not a hardcoded tr('circle.settings.title') call.  Pure selector in shared src.
 import { pageLabel } from '../../src/v2/pageProjection.js';
 import { SETTINGS_ENUM_AXES } from '../../src/v2/circlePolicy.js';
+import { isAdvancedSetting } from '../../src/v2/alphaSurface.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 // 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' —
@@ -145,6 +146,17 @@ export function renderCircleSettings(container, {
     container.appendChild(guided);
   }
 
+  // The alpha keeps five settings in view and folds the rest behind one closed "Geavanceerd"
+  // (alphaSurface.js ADVANCED_SETTINGS). `place` routes a section to the page or to the fold; the fold is
+  // appended before the save button, so the DOM order reads: essentials · Geavanceerd · Opslaan.
+  const advanced = document.createElement('details');
+  advanced.className = 'circle-settings__advanced';
+  const advancedSummary = document.createElement('summary');
+  advancedSummary.className = 'circle-settings__advanced-summary';
+  advancedSummary.textContent = tr('circle.settings.advanced');
+  advanced.appendChild(advancedSummary);
+  const place = (id, el) => (isAdvancedSetting(id) ? advanced : container).appendChild(el);
+
   // B #64 + consent-card — apply an authored remote recipe. Opt-in; the manual form still works.
   // When `onReviewRecipe` is wired (production), applying a recipe is a REVIEWED action: load → show the
   // consent card (what it would enable + opt-out checkboxes) → on Agree apply, on Decline nothing. A caller
@@ -199,7 +211,7 @@ export function renderCircleSettings(container, {
       finally { apply.disabled = false; }
     });
     sec.append(input, apply, status);
-    container.appendChild(sec);
+    place('recipeApply', sec);
   }
 
   // Axis 1 — features (toggles)
@@ -217,7 +229,7 @@ export function renderCircleSettings(container, {
     row.append(box, span);
     featSection.appendChild(row);
   }
-  container.appendChild(featSection);
+  place('features', featSection);
 
   // S6.C deep — Apps: which whole apps this circle composes into the bot's tools +
   // slash-suggest. Unset (all checked) = all 5; unchecking narrows the catalogue.
@@ -240,7 +252,7 @@ export function renderCircleSettings(container, {
     row.append(box, span);
     appsSection.appendChild(row);
   }
-  container.appendChild(appsSection);
+  place('apps', appsSection);
 
   // Axes 2-5 — single-choice radio groups
   for (const axis of SETTINGS_ENUM_AXES) {
@@ -267,7 +279,7 @@ export function renderCircleSettings(container, {
       addConsequence(row, tr, opt);
       sec.appendChild(row);
     }
-    container.appendChild(sec);
+    place(`axis:${axis}`, sec);
   }
 
   // WHO DECIDES a settings change (the decision-kind unification): the picker writes the ONE
@@ -297,12 +309,15 @@ export function renderCircleSettings(container, {
     orow.append(radio, span);
     consSec.appendChild(orow);
   }
-  container.appendChild(consSec);
+  place('consensus', consSec);
 
   // Phase 4 §9 — the Connection & transport controls (manifest-declared). Rendered only when
   // the host wires them; the `enabledWhen` fold greys out incompatible options (route × capability).
   if (Array.isArray(controls) && controls.length) {
-    renderConnectionControls(container, { controls, policy, transport, tr, emit, onControl });
+    const essential = controls.filter((c) => !isAdvancedSetting(`control:${c.id}`));
+    const rest = controls.filter((c) => isAdvancedSetting(`control:${c.id}`));
+    if (essential.length) renderConnectionControls(container, { controls: essential, policy, transport, tr, emit, onControl });
+    if (rest.length) renderConnectionControls(advanced, { controls: rest, policy, transport, tr, emit, onControl });
   }
 
   // manifest-driven per-app SETTINGS form. Values live in policy.settings keyed
@@ -311,13 +326,13 @@ export function renderCircleSettings(container, {
     const forms = sources
       .map((s) => ({ app: s?.manifest?.app, fields: buildSettingsForm(s?.manifest, { scope: 'circle', values: settingValuesForApp(policy, s?.manifest?.app) }) }))
       .filter((f) => f.app && f.fields.length);
-    renderSettingsSection(container, { forms, tr, emit });
+    renderSettingsSection(advanced, { forms, tr, emit });
 
     // the per-skill FREEDOM matrix over the (verb×noun) capabilities of the enabled
     // apps, merged with the admin freedom template (policy.capabilities). This is what the gate enforces.
     const enabledApps = Array.isArray(policy?.apps) && policy.apps.length ? policy.apps : null;
     const matrix = buildCapabilityMatrix(sources, { enabledApps, template: policy?.capabilities || {} });
-    renderCapabilitiesSection(container, { matrix, tr, emit });
+    renderCapabilitiesSection(advanced, { matrix, tr, emit });
   }
 
   // OBJ-2 — paired devices (no-pod sync). Shown only when the host wires it (household
@@ -334,7 +349,7 @@ export function renderCircleSettings(container, {
       onRemove: onRemoveHouseholdPeer,
     });
     pairedSec.appendChild(mount);
-    container.appendChild(pairedSec);
+    place('pairedDevices', pairedSec);
   }
 
   if (note) {
@@ -343,6 +358,8 @@ export function renderCircleSettings(container, {
     noteEl.textContent = note;
     container.appendChild(noteEl);
   }
+
+  if (advanced.childElementCount > 1) container.appendChild(advanced);   // only when something is folded
 
   const save = document.createElement('button');
   save.type = 'button';

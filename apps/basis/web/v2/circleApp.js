@@ -44,6 +44,7 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
 // (kept in src/ so web ≡ mobile by construction; the shell only composes it, no routing logic — invariant 1).
 import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
+import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -3029,9 +3030,10 @@ function readViewMode(id, policy = null) {
     const raw = window.localStorage.getItem(VIEW_MODE_KEY);
     const map = raw ? JSON.parse(raw) : {};
     const saved = map?.[id];
-    if (saved === 'screen' || saved === 'chat') return saved;
-    return defaultViewModeFromPolicy(policy);
-  } catch { return defaultViewModeFromPolicy(policy); }
+    // clamped to what the alpha paints: a mode saved before the cut (or a policy front door) opens as chat
+    if (saved === 'screen' || saved === 'chat') return alphaViewMode(saved);
+    return alphaViewMode(defaultViewModeFromPolicy(policy));
+  } catch { return alphaViewMode(defaultViewModeFromPolicy(policy)); }
 }
 function writeViewMode(id, mode) {
   try {
@@ -3270,6 +3272,7 @@ function showConnectionPoints() {
 }
 
 function showNearby() {
+  if (!isAlphaTab('nearby')) { showTabBar(ALPHA_FALLBACK_TAB); return; }   // hidden in the alpha (alphaSurface.js)
   showTabBar('nearby');
   closeNearby();
 
@@ -3507,6 +3510,7 @@ let _screenViewBlocks = null;
 let _showActiveScreenToken = 0;
 
 async function showScreens() {
+  if (!isAlphaTab('screens')) { showTabBar(ALPHA_FALLBACK_TAB); return; }   // hidden in the alpha (alphaSurface.js)
   showTabBar('screens');
   let book;
   try { book = await userScreenStore.get(); }

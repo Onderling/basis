@@ -36,6 +36,7 @@
  */
 
 import { actionsForStreamRow } from '../../src/v2/streamActions.js';
+import { chatComposerVisible } from '../../src/v2/circleTabs.js';
 import { alphaViewModes } from '../../src/v2/alphaSurface.js';
 import { deliveryPresentation } from '../../src/v2/deliverySettings.js';
 import { revealedMemberLabel } from '../../src/v2/circleViewAs.js';
@@ -288,6 +289,8 @@ export function renderCircleView(container, {
   // S1 #1 — in the noticeboard tab the body owns its own composer, so the chat
   // composer + inline form below are suppressed.
   const inPrikbord = effectiveTab === 'noticeboard' && !!noticeboard;
+  // the chat composer is the CONVERSATION's; under Leden (and tasks, lists, …) it only confused people
+  const noComposer = inPrikbord || !chatComposerVisible(effectiveTab);
   // P1.7 — the filter strip, above the stream and only in the conversation view. Rendering it only
   // where it applies keeps it from reading as a global control over tabs it does not touch.
   if (chatFilter && typeof onChatFilter === 'function' && effectiveTab === 'conversation' && viewMode !== 'screen') {
@@ -404,7 +407,7 @@ export function renderCircleView(container, {
   // Multi-field inline form (mobile parity). Rendered between the stream and the composer when the host
   // has a `pendingForm` (a 2+-missing-field needsForm). Pure render: the host owns the pending state and
   // the submit handler. Suppressed in screen-mode (not a chat surface). See `renderPendingForm`.
-  if (pendingForm && viewMode !== 'screen' && !inPrikbord && typeof onFormSubmit === 'function') {
+  if (pendingForm && viewMode !== 'screen' && !noComposer && typeof onFormSubmit === 'function') {
     container.appendChild(renderPendingForm(pendingForm, { tr, onFormSubmit }));
   }
 
@@ -412,8 +415,8 @@ export function renderCircleView(container, {
   // because the recept'd page isn't a chat surface; user flips back
   // to Chat to write something.  Also suppressed in the noticeboard tab (it
   // renders its own post composer).
-  if (inPrikbord) {
-    // no chat composer — the noticeboard body owns posting
+  if (noComposer) {
+    // no chat composer — the noticeboard body owns posting; the other tabs are not a chat surface
   } else if (typeof onSend === 'function' && viewMode !== 'screen' && !canPost) {
     // Permission gate — chat is disabled for this circle; show a read-only note in place of the composer.
     const note = document.createElement('div');

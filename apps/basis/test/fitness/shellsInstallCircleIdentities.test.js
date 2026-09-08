@@ -49,7 +49,8 @@ describe('FITNESS — per-circle identity is installed by every shell', () => {
     const source = readFileSync(file, 'utf8');
 
     it(`${name} registers circle presence at all`, () => {
-      expect(source).toMatch(/registerCircleAddresses\s*\(/);
+      // On every relay the device is on (2026-09-08): the per-relay loop calls registerCircleAddresses.
+      expect(source).toMatch(/registerCircleAddresses(OnRelays)?\s*\(/);
     });
 
     for (const [seam, why] of SEAMS) {

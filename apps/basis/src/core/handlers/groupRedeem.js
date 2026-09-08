@@ -215,6 +215,11 @@ export function makeSendGroupRedeemRequest({
     adminPeerAddr, groupId, code, shareCard, peerDisplay, personaProperties,
     circleAddress: presentedCircleAddress, circleAddressProof,
     rulesAccepted,   // task #80 — the version string the joiner accepted, forwarded for the admin-signed join
+    // The relay the invite names (2026-09-08). A device is on its own relay AND the ones its circles ride;
+    // before the join the circle has no recorded point, so without this the redeem left over the device's
+    // own relay — where the admin is not — and waited out the full timeout. Scoping it to the invite's
+    // relay is what the join dial (which now comes BESIDE the primary, not instead of it) was for.
+    relayUrl,
   }) {
     if (!peerUp()) {
       throw new Error('Peer transport not connected. Try /peer-connect first.');
@@ -253,7 +258,7 @@ export function makeSendGroupRedeemRequest({
       pendingMap.set(requestId, { resolve, reject, timer });
     });
     try {
-      await sendPeer(adminPeerAddr, {
+      const request = {
         type:    'p2p-chat',
         subtype: 'group-redeem-request',
         requestId,
@@ -266,7 +271,9 @@ export function makeSendGroupRedeemRequest({
         // Property layer — the joiner's disclosed persona properties (from finalSubmit), forwarded to the admin.
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
         sentAt: Date.now(),
-      });
+      };
+      if (typeof relayUrl === 'string' && relayUrl) await sendPeer(adminPeerAddr, request, { scope: { points: [relayUrl] } });
+      else await sendPeer(adminPeerAddr, request);
     } catch (err) {
       const entry = pendingMap.get(requestId);
       if (entry) {

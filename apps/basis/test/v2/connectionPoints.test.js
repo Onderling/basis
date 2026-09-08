@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createConnectionPoints, POINT_SOURCE, POINT_KIND, adoptExistingRelay,
-  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, bootRelayUrl
+  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, bootRelayUrl, bootRelayUrls, endpointToDialForInvite
 } from '../../src/v2/connectionPoints.js';
 
 const A = 'wss://a.example';
@@ -414,5 +414,29 @@ describe('bootRelayUrl — a device reconnects to a circle it already joined (20
   it('nothing stored and nothing recorded ⇒ null, which is the previous behaviour', () => {
     expect(bootRelayUrl({})).toBeNull();
     expect(bootRelayUrl({ stored: '   ', list: [] })).toBeNull();
+  });
+});
+
+describe('bootRelayUrls — a device is on every relay its circles ride (2026-09-08)', () => {
+  const P = (url, over = {}) => ({ url, kind: POINT_KIND.RELAY, adopted: true, active: false, ...over });
+
+  it('the primary first, then each adopted relay point, unique', () => {
+    expect(bootRelayUrls({ stored: 'ws://mine:8787', list: [P('ws://joined:8788'), P('ws://mine:8787'), P('ws://other:1')] }))
+      .toEqual(['ws://mine:8787', 'ws://joined:8788', 'ws://other:1']);
+  });
+  it('pods, unadopted and malformed points are not relays to dial', () => {
+    expect(bootRelayUrls({ list: [P('https://pod.example/anna/', { kind: POINT_KIND.POD }), P('ws://no', { adopted: false }), P('http://x'), P('ws://yes:1')] }))
+      .toEqual(['ws://yes:1']);
+  });
+  it('no relay anywhere ⇒ an empty list, and a list without a setting is led by what bootRelayUrl picks', () => {
+    expect(bootRelayUrls({})).toEqual([]);
+    expect(bootRelayUrls({ list: [P('ws://newer:1'), P('ws://was-active:2', { active: true })] }))
+      .toEqual(['ws://was-active:2', 'ws://newer:1']);
+  });
+  it('endpointToDialForInvite treats the set of relays the device is on as "already there"', () => {
+    const invite = { relayUrl: 'ws://joined:8788' };
+    expect(endpointToDialForInvite({ invite, activeUrl: ['ws://mine:8787', 'ws://joined:8788'] })).toBeNull();
+    expect(endpointToDialForInvite({ invite, activeUrl: ['ws://mine:8787'] })).toBe('ws://joined:8788');
+    expect(endpointToDialForInvite({ invite, activeUrl: 'ws://joined:8788' })).toBeNull();
   });
 });

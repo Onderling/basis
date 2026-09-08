@@ -288,7 +288,7 @@ export {
   DEFAULT_SHARE_NKN_ADDRESS, normalizeShareNknAddress, shareableAddress,
   SHARE_NKN_ADDRESS_PARAM_KEY,
 } from './v2/addressSharing.js';
-export { registerCircleAddresses, unregisterCircleAddresses }
+export { registerCircleAddresses, unregisterCircleAddresses, registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays }
                                                 from './v2/circleAddressRegistration.js';
 export {
   createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS, POINT_KIND,
@@ -296,6 +296,7 @@ export {
   // missing named export into `undefined`, so the points screen crashed only when opened; the
   // basisIndexExports guard in basis-mobile now pins every launcher import against this entry).
   adoptExistingRelay, asyncStorageConnectionPointsIo, localStorageConnectionPointsIo,
+  bootRelayUrls,
   recordJoinedCirclePoints,
 } from './v2/connectionPoints.js';
 export {

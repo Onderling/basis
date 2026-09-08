@@ -3818,6 +3818,7 @@ async function showAdvanced() {
   wrap.appendChild(h);
   const back = document.createElement('button');
   back.type = 'button';
+  back.className = 'cc-btn cc-btn--quiet';
   back.textContent = t('circle.mydata.back');
   back.addEventListener('click', () => showMij());
   wrap.appendChild(back);
@@ -4681,6 +4682,7 @@ function showEnrollDeviceFlow() {
       }
       const go = document.createElement('button');
       go.type = 'button';
+      go.className = 'cc-btn cc-btn--primary';
       go.textContent = t('circle.enroll.submit');
       go.addEventListener('click', async () => {
         // A pasted code must parse before the ceremony proceeds — a person who pasted one MEANT
@@ -4696,6 +4698,7 @@ function showEnrollDeviceFlow() {
       card.appendChild(go);
       const cancel = document.createElement('button');
       cancel.type = 'button';
+      cancel.className = 'cc-btn cc-btn--quiet';
       cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => { runner.cancel(inst); close(); });
@@ -4720,6 +4723,7 @@ function showEnrollDeviceFlow() {
       card.appendChild(msg);
       const go = document.createElement('button');
       go.type = 'button';
+      go.className = 'cc-btn cc-btn--primary';
       go.textContent = t('circle.enroll.reload');
       go.addEventListener('click', () => { try { window.location.reload(); } catch { /* */ } });
       card.appendChild(go);
@@ -4730,11 +4734,13 @@ function showEnrollDeviceFlow() {
       card.appendChild(msg);
       const retry = document.createElement('button');
       retry.type = 'button';
+      retry.className = 'cc-btn cc-btn--primary';
       retry.textContent = t('circle.enroll.retry');
       retry.addEventListener('click', () => { close(); showEnrollDeviceFlow(); });
       card.appendChild(retry);
       const cancel = document.createElement('button');
       cancel.type = 'button';
+      cancel.className = 'cc-btn cc-btn--quiet';
       cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => close());
@@ -4781,6 +4787,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
       card.appendChild(input);
       const go = document.createElement('button');
       go.type = 'button';
+      go.className = 'cc-btn cc-btn--primary';
       go.textContent = t(`circle.${keyPrefix}.submit`);
       go.addEventListener('click', () => {
         runner.resume(FLOW, inst, { input: { mnemonic: input.value, ...(deviceId ? { deviceId } : {}) } })
@@ -4789,6 +4796,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
       card.appendChild(go);
       const cancel = document.createElement('button');
       cancel.type = 'button';
+      cancel.className = 'cc-btn cc-btn--quiet';
       cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => { runner.cancel(inst); done(); });
@@ -4806,6 +4814,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
     card.appendChild(msg);
     const btn = document.createElement('button');
     btn.type = 'button';
+    btn.className = 'cc-btn cc-btn--primary';
     btn.textContent = outcome === 'ok' ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
       if (outcome === 'ok') return done();
@@ -4815,6 +4824,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
     if (outcome !== 'ok') {
       const cancel = document.createElement('button');
       cancel.type = 'button';
+      cancel.className = 'cc-btn cc-btn--quiet';
       cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => done());
@@ -4965,6 +4975,7 @@ function showRestoreSettingsFlow() {
         for (const value of OPS.get('restore-resolve-mismatch').params[0].of) {
           const b = document.createElement('button');
           b.type = 'button';
+          b.className = 'cc-btn cc-btn--quiet';
           b.textContent = t(`circle.settings_restore.choice_${value}`);
           b.addEventListener('click', () => {
             if (value === 'overwrite' && !window.confirm(t('circle.settings_restore.overwrite_warning'))) return;
@@ -5000,6 +5011,7 @@ function showRestoreSettingsFlow() {
         }
         const go = document.createElement('button');
         go.type = 'button';
+        go.className = 'cc-btn cc-btn--primary';
         go.textContent = t('circle.settings_restore.done');
         go.style.cssText = 'margin-top:1rem;';
         go.addEventListener('click', () => submit({ choices: picks }));
@@ -5017,6 +5029,7 @@ function showRestoreSettingsFlow() {
         }
         const go = document.createElement('button');
         go.type = 'button';
+        go.className = 'cc-btn cc-btn--primary';
         go.textContent = t('circle.settings_restore.done');
         go.addEventListener('click', () => submit(values));
         form.appendChild(go);
@@ -5025,6 +5038,7 @@ function showRestoreSettingsFlow() {
       if (view.actions.canCancel) {
         const cancel = document.createElement('button');
         cancel.type = 'button';
+        cancel.className = 'cc-btn cc-btn--quiet';
         cancel.textContent = t('circle.confirm.cancel', { defaultValue: t('circle.settings_restore.choice_local') });
         cancel.style.cssText = 'margin-top:.6rem;display:block;';
         cancel.addEventListener('click', () => { runner.cancel(inst); close(); });

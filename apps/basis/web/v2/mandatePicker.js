@@ -320,8 +320,8 @@ export function renderMandatePicker(container, {
 
   // ── Confirm ───────────────────────────────────────────────────────────────
   confirmBtn.type = 'button';
-  confirmBtn.className = 'cc-mandate-picker__confirm';
-  confirmBtn.style.cssText = 'width:100%;padding:10px;border:none;border-radius:var(--radius);background:var(--accent);color:var(--accent-contrast);font-weight:600;cursor:pointer';
+  confirmBtn.className = 'cc-mandate-picker__confirm cc-btn cc-btn--primary';   // the shared button look, not inline css
+  confirmBtn.style.width = '100%';
   confirmBtn.textContent = tr('circle.mandate.confirm');
   const syncConfirm = () => {
     // Confirmable only for an ISSUABLE grant kind — an inactive "nog niet actief"

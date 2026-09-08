@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 31
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 32
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -42,6 +42,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `unconstructed-classes` | — | an exported class that nothing ever `new`s is a liability, not an asset |
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |
 | `unreached-exports` | — | a substrate symbol that nothing reaches is a LIABILITY, not an asset |
+| `web-buttons` | — | no bare <button> in the web shell |
 
 ## Named design guards (`G-*`, in fitness tests) · 10
 

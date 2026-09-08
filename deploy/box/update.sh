@@ -73,6 +73,7 @@ apply() {   # build the affected roles, bring the stack up, reload Caddy when it
   else
     eval "$cmd build --pull ${roles[*]}"
   fi
+  REBUILT_ROLES=" ${roles[*]+${roles[*]}} "; export REBUILT_ROLES
   eval "$cmd up -d --remove-orphans"
   if [ "$caddy_changed" = 0 ]; then reload_caddy || true; fi
   return 0

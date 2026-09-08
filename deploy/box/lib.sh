@@ -184,14 +184,19 @@ alert() {
 }
 
 # Run every enabled role's health script; print the first failing role, exit 1. Waits up to
-# HEALTH_TIMEOUT seconds (default 60; tests set it low).
+# HEALTH_TIMEOUT seconds (default 60; tests set it low). REBUILT_ROLES (space-separated) names the roles
+# this update rebuilt; each script gets that as ROLE_REBUILT=0|1.
 health_gate() {
   local deadline=$(( $(date +%s) + ${HEALTH_TIMEOUT:-60} ))
   local role f
   for role in $(role_names); do
     f="$(role_file "$role" health)"
     [ -x "$f" ] || continue
-    until COMPOSE="$(compose_cmd)" BOX_DIR="$BOX_DIR" ROLE="$role" bash "$f" >>"$BOX_DIR/box.log" 2>&1; do
+    # ROLE_REBUILT tells a health script whether THIS update actually rebuilt its role, so an expensive
+    # check (the relay's wire smoke) proves a NEW build rather than re-proving a process that never stopped.
+    local rebuilt=0
+    case " ${REBUILT_ROLES:-} " in *" $role "*) rebuilt=1 ;; esac
+    until COMPOSE="$(compose_cmd)" BOX_DIR="$BOX_DIR" ROLE="$role" ROLE_REBUILT="$rebuilt" bash "$f" >>"$BOX_DIR/box.log" 2>&1; do
       if [ "$(date +%s)" -ge "$deadline" ]; then echo "$role"; return 1; fi
       sleep "${HEALTH_POLL:-3}"
     done

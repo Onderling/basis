@@ -39,6 +39,7 @@ import {
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
+import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
 import {
@@ -2612,6 +2613,19 @@ export async function createRealHouseholdAgent(opts = {}) {
    * without one it is an ordinary hold-forward send. A second sender that did not know about circles
    * is how the receipt left as the canonical identity and was refused on arrival (2026-08-29).
    */
+  /**
+   * The relays a contact is reachable on, or null (the decision itself lives in `contactRelayScope`).
+   *
+   * `requireAliasCapable` is deliberately NOT set: this addresses a PERSON by their own address, not a
+   * per-circle alias, so the unlinkability the circle path protects is not in play — and leaving it off
+   * keeps NKN eligible, which is what an unscoped send could always use.
+   */
+  const contactScope = (to) => contactRelayScope({
+    to,
+    circlesForPeer:  (addr) => opts.circlesForPeer?.(addr) ?? [],
+    circlePointsFor: (cid) => opts.circlePointsFor?.(cid) ?? [],
+  });
+
   async function sendCircleScoped(to, envelope, sendOpts = {}) {
     // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
     // The app owns points; the transport layer owns transports; neither learns the other's vocabulary.
@@ -2620,7 +2634,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     // addressing, because that silently strips member-level unlinkability. With it ON, an NKN circle
     // works on terms the user accepted. → plans/NOTE-circle-scoped-routing.md
     const { circleId, ...rest } = sendOpts;
-    if (circleId == null) return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest });
+    if (circleId == null) {
+      // No circle — a direct message, a receipt, a redeem. Until 2026-09-08 that meant "whatever relay this
+      // device happens to be on", which was fine when there was only one. With several, a DM to someone I
+      // know from a kring on ANOTHER relay went out over mine, where they are not registered.
+      //
+      // What I do know is which kringen I share with them, and a kring names its relays. They are in those
+      // kringen, so their device dialled those relays — so that is where they are. An explicit scope from
+      // the caller always wins (the join's redeem names the relay its invite carried), and when we share no
+      // kring with a recorded relay there is nothing to narrow to and the send stays exactly as it was.
+      const scope = rest.scope ?? contactScope(to);
+      return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest, ...(scope ? { scope } : {}) });
+    }
     const points = opts.circlePointsFor?.(circleId) ?? [];
     const fallbackOn = addressFallbackOn();
     // Decision 4 — sign this circle's traffic as this circle's identity, not as the person.

@@ -45,7 +45,7 @@ import {
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
-  nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS,
+  nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS, POINT_STATUS_LABELS, pointStatus,
   createConnectionPoints, adoptExistingRelay, asyncStorageConnectionPointsIo, recordJoinedCirclePoints,
   // "My things" private notes-list.
   myThingsFromListFiles,
@@ -1531,8 +1531,23 @@ export default function CircleLauncherScreen({
   // OBJ-2 — scanned a circle invite QR → hand it to the shared join wizard.
   const onJoinScan = useCallback((res) => {
     setJoinScanOpen(false);
-    if (res && res.kind === 'invite' && res.payload) setJoinArgs({ invite: res.payload });
-  }, []);
+    if (!(res && res.kind === 'invite' && res.payload)) return;
+    // A scanned code is either a bare invite URI (payload is the string) or the app's own deep link,
+    // which the classifier has already read into `{inviteUri, relayUrl}` (2026-09-08).
+    const parsed = typeof res.payload === 'string' ? { inviteUri: res.payload, relayUrl: null } : res.payload;
+    if (parsed.relayUrl) {
+      // BESIDE, not INSTEAD: scanning someone's invite must not move this device off its own relay.
+      // Recorded first so it survives a restart even if the socket does not open now.
+      (async () => {
+        try {
+          const io = asyncStorageConnectionPointsIo(AsyncStorage);
+          createConnectionPoints({ initial: await io.load(), save: (v) => { io.save(v); } }).addManually(parsed.relayUrl);
+        } catch { /* the list is a convenience; never block a join on it */ }
+        try { await bundle?.agent?.addRelay?.(parsed.relayUrl, { awaitReady: true }); } catch { /* best-effort */ }
+      })();
+    }
+    setJoinArgs({ invite: parsed.inviteUri });
+  }, [bundle]);
   // OBJ-2 — show THIS circle's membership QR (admin-gated by the substrate). Carries the same fields a
   // web-built invite does (invariant 2): the freedom template (join-time consent), the pod disclosure +
   // its url (J-NP3, rule 1), the admin's NKN address (B2) and the RELAY endpoint (the invite-carries-
@@ -1827,7 +1842,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'points') {
     // Connection points (Nearby step I). The store is hydrated + migrated by the host component below.
-    return <ConnectionPointsHost onBack={() => setView('mydata')} />;
+    return <ConnectionPointsHost bundle={bundle} onBack={() => setView('mydata')} />;
   }
   if (view === 'nearby') {
     // Nearby screen. Driven by `createNearbyScreen` (shared with web), fed from the SURFACE — the
@@ -4702,10 +4717,17 @@ function subscribeToNetworkChange(fn) {
 
 // Owns the connection-point store: hydrate from storage, fold in the OLD single-relay setting, and hold
 // the remove-confirmation state. The store itself decides everything; this is lifecycle only.
-function ConnectionPointsHost({ onBack }) {
+function ConnectionPointsHost({ bundle, onBack }) {
   const [points, setPoints] = useState([]);
   const [removing, setRemoving] = useState(null);
+  const [addError, setAddError] = useState(null);
+  // Which points have a socket RIGHT NOW. The store remembers; only the agent knows, and since
+  // 2026-09-08 it knows about several at once. Re-read whenever the list changes or an add lands.
+  const [relays, setRelays] = useState([]);
   const storeRef = useRef(null);
+  const readRelays = useCallback(() => {
+    try { setRelays(bundle?.agent?.relays?.list?.() ?? []); } catch { setRelays([]); }
+  }, [bundle]);
 
   useEffect(() => {
     let alive = true;
@@ -4720,18 +4742,41 @@ function ConnectionPointsHost({ onBack }) {
       storeRef.current = store;
       store.subscribe(setPoints);
       setPoints(store.list());
+      readRelays();
     })();
     return () => { alive = false; };
-  }, []);
+  }, [readRelays]);
+
+  // Record it, then dial it. Both halves are reported: a point that is listed but not connected is a
+  // different (and recoverable) state from one that was never accepted at all.
+  const addByHand = useCallback(async (url) => {
+    if (!storeRef.current?.addManually(url)?.ok) { setAddError('circle.nearbyScreen.point_add_invalid'); return; }
+    setAddError(null);
+    try {
+      const r = await bundle?.agent?.addRelay?.(url, { awaitReady: true });
+      setAddError(r && r.ok === false ? 'circle.nearbyScreen.point_add_failed' : null);
+    } catch { setAddError('circle.nearbyScreen.point_add_failed'); }
+    readRelays();
+  }, [bundle, readRelays]);
 
   return (
     <ConnectionPointsScreen
       points={points}
+      relays={relays}
       onBack={onBack}
       onAdopt={(url) => storeRef.current?.adopt(url)}
       onRemove={(url) => setRemoving({ url, ...storeRef.current?.impactOfRemoving(url) })}
       onCancelRemove={() => setRemoving(null)}
-      onConfirmRemove={(url) => { storeRef.current?.remove(url); setRemoving(null); }}
+      // Removing DISCONNECTS. Leaving the socket open on a point the person just deleted is the list
+      // claiming one thing while the transport does another — the disagreement this screen exists to end.
+      onConfirmRemove={(url) => {
+        storeRef.current?.remove(url); setRemoving(null);
+        Promise.resolve(bundle?.agent?.relays?.remove?.(url))
+          .catch(() => { /* the point is gone either way */ })
+          .then(readRelays);
+      }}
+      onAdd={bundle?.agent?.addRelay ? addByHand : null}
+      addError={addError}
       removing={removing}
     />
   );
@@ -4743,7 +4788,10 @@ function ConnectionPointsHost({ onBack }) {
 // The one thing it must get right is the removal warning: "cut off" and "still reachable another way" are
 // two separate statements, never one merged list of affected circles. Merging them is how someone clicks
 // through the warning that mattered.
-function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConfirmRemove, onCancelRemove, removing }) {
+function ConnectionPointsScreen({
+  points = [], relays = [], onBack, onAdopt, onRemove, onConfirmRemove, onCancelRemove, removing,
+  onAdd = null, addError = null,
+}) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -4763,8 +4811,9 @@ function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConf
           {points.map((point) => (
             <View key={point.url} style={styles.row} testID={`point-${point.url}`}>
               <Text style={styles.rowName}>{point.url}</Text>
-              {/* One RELAY is live at a time (a socket); a POD has no socket — it is used whenever the
-                  circle syncs — so it gets its own line + the host-sees disclosure instead. */}
+              {/* Since 2026-09-08 a device is on its OWN relay and on every relay its kringen ride, all at
+                  once — the line says which is yours, which are also connected, and which are not. A POD
+                  has no socket at all; it gets its own line + the host-sees disclosure instead. */}
               {point.kind === 'pod' ? (
                 <>
                   <Text style={styles.rowMeta} testID={`point-live-${point.url}`}>
@@ -4774,7 +4823,7 @@ function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConf
                 </>
               ) : (
                 <Text style={styles.rowMeta} testID={`point-live-${point.url}`}>
-                  {t(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby')}
+                  {t(POINT_STATUS_LABELS[pointStatus(point, relays)])}
                 </Text>
               )}
               <Text style={styles.rowMeta}>
@@ -4827,6 +4876,46 @@ function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConf
           ))}
         </ScrollView>
       )}
+      <AddRelayForm styles={styles} onAdd={onAdd} addError={addError} />
+    </View>
+  );
+}
+
+/**
+ * Add a relay by hand — for someone running their own box, or handed one by a friend (web parity).
+ *
+ * It ADDS: the device stays on the relays it is already on. That is worth saying out loud in the hint,
+ * because the old model was one relay that a new one replaced, and that is what people expect.
+ */
+function AddRelayForm({ styles, onAdd, addError }) {
+  const [value, setValue] = useState('');
+  if (typeof onAdd !== 'function') return null;
+  return (
+    <View style={styles.row} testID="point-add">
+      <Text style={styles.rowName}>{t('circle.nearbyScreen.point_add_title')}</Text>
+      <Text style={styles.rowMeta}>{t('circle.nearbyScreen.point_add_hint')}</Text>
+      <TextInput
+        style={styles.nearbyInput}
+        value={value}
+        onChangeText={setValue}
+        placeholder={t('circle.nearbyScreen.point_add_placeholder')}
+        autoCapitalize="none"
+        autoCorrect={false}
+        testID="point-add-input"
+      />
+      {addError ? (
+        <Text style={styles.rowName} accessibilityRole="alert" testID="point-add-error">{t(addError)}</Text>
+      ) : null}
+      <View style={styles.nearbyActions}>
+        <Pressable
+          onPress={() => onAdd(value.trim())}
+          accessibilityRole="button"
+          testID="point-add-submit"
+          style={styles.nearbyAction}
+        >
+          <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.point_add_button')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

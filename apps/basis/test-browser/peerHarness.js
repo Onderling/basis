@@ -189,6 +189,12 @@ export function log(step, verdict, note) {
  */
 export async function gotoCircles(page) {
   await dismissAnyModal(page);
+  // A CONTACT THREAD is the other screen that hides the bottom nav, and its back button is its own
+  // (`cc-cthread__back`, not `circle-view__back`). Leaving it out meant any journey that wrote a DM and
+  // then navigated timed out on `.circle-tile` with no tab bar to click — the same shape as the modal
+  // above, so it belongs in the same place: leaving a screen is a property of the PAGE (2026-09-08).
+  const threadBack = page.locator('.cc-cthread__back');
+  if (await threadBack.count()) { await threadBack.first().click(); await page.waitForTimeout(1200); }
   const back = page.locator('.circle-view__back');
   if (await back.count()) { await back.first().click(); await page.waitForTimeout(1500); }
   const tab = page.locator('[data-tab="circles"]');

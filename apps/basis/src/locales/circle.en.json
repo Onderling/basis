@@ -2604,13 +2604,17 @@
       "text": "Allow fallback",
       "doc": "Turns the per-user fallback setting on."
     },
-    "point_active": {
-      "text": "In use now",
-      "doc": "The ONE point the transport is actually connected to. The substrate connects to one relay at a time."
+    "point_primary": {
+      "text": "Your relay — connected",
+      "doc": "The device's OWN relay (the one in the setting), connected. Replaced point_active on 2026-09-08: a device is now on several relays at once, so 'the one in use' was no longer a fact."
     },
-    "point_standby": {
-      "text": "Standby",
-      "doc": "A known, adopted point that is not currently carrying anything — a real fallback, not decoration."
+    "point_connected": {
+      "text": "Connected",
+      "doc": "A relay a kring brought along, connected right now beside your own. Was labelled 'Standby', which described it as idle while it was carrying that kring's traffic."
+    },
+    "point_offline": {
+      "text": "Not connected",
+      "doc": "Known and adopted, but no socket to it right now — it comes back at the next start, or when a kring that rides it needs it."
     },
     "remove_was_active": {
       "text": "This is the one in use. Removing it disconnects until you pick another.",
@@ -2659,6 +2663,30 @@
     "point_remove": {
       "text": "Remove",
       "doc": "Remove a connection point."
+    },
+    "point_add_title": {
+      "text": "Add a relay",
+      "doc": "Heading of the add-a-relay field (2026-09-08). Adding one connects to it beside the relays you are already on — it does not replace your own."
+    },
+    "point_add_hint": {
+      "text": "Running a relay yourself, or did someone give you one? Enter its address. You stay on the relays you already use.",
+      "doc": "Says what adding does, because the old model (one relay, swapped) is what people expect."
+    },
+    "point_add_placeholder": {
+      "text": "wss://relay.example.org",
+      "doc": "Placeholder for the relay address field."
+    },
+    "point_add_button": {
+      "text": "Add",
+      "doc": "Confirms the add-a-relay field."
+    },
+    "point_add_invalid": {
+      "text": "That is not a relay address. A relay starts with ws:// or wss://.",
+      "doc": "Shown when the typed address is not a websocket endpoint."
+    },
+    "point_add_failed": {
+      "text": "Added to the list, but connecting failed. It will keep trying.",
+      "doc": "The point is recorded but the socket did not open — honest about both halves rather than reporting success."
     },
     "remove_cuts_off": {
       "text": "Removing this cuts off: {{circles}}",

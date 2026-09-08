@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createConnectionPoints, POINT_SOURCE, POINT_KIND, adoptExistingRelay,
-  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, bootRelayUrl, bootRelayUrls, endpointToDialForInvite
+  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, bootRelayUrl, bootRelayUrls, endpointToDialForInvite, pointStatus, relayUrlsForCircles, contactRelayScope
 } from '../../src/v2/connectionPoints.js';
 
 const A = 'wss://a.example';
@@ -438,5 +438,63 @@ describe('bootRelayUrls — a device is on every relay its circles ride (2026-09
     expect(endpointToDialForInvite({ invite, activeUrl: ['ws://mine:8787', 'ws://joined:8788'] })).toBeNull();
     expect(endpointToDialForInvite({ invite, activeUrl: ['ws://mine:8787'] })).toBe('ws://joined:8788');
     expect(endpointToDialForInvite({ invite, activeUrl: 'ws://joined:8788' })).toBeNull();
+  });
+});
+
+describe('pointStatus — what a point IS now that several relays are live at once (2026-09-08)', () => {
+  const P = (url, over = {}) => ({ url, kind: POINT_KIND.RELAY, adopted: true, active: false, ...over });
+  const R = (url, over = {}) => ({ url, primary: false, connected: true, ...over });
+
+  it('the live list decides: your own relay, another connected one, or one you are not on', () => {
+    const relays = [R('ws://mine:1', { primary: true }), R('ws://theirs:2')];
+    expect(pointStatus(P('ws://mine:1'), relays)).toBe('primary');
+    expect(pointStatus(P('ws://theirs:2'), relays)).toBe('connected');
+    expect(pointStatus(P('ws://unknown:3'), relays)).toBe('offline');
+    expect(pointStatus(P('ws://theirs:2'), [R('ws://theirs:2', { connected: false })])).toBe('offline');
+  });
+
+  it('a pod is never "connected" — it has no socket to be connected on', () => {
+    expect(pointStatus(P('https://pod.example/anna/', { kind: POINT_KIND.POD }), [])).toBe('pod');
+  });
+
+  it('with no live list (the panel opened before the agent came up) the store’s memory stands in', () => {
+    expect(pointStatus(P('ws://mine:1', { active: true }), [])).toBe('primary');
+    expect(pointStatus(P('ws://other:2'), [])).toBe('offline');
+  });
+});
+
+describe('relayUrlsForCircles — the union that turns shared kringen into reachable relays', () => {
+  it('dedupes across circles, keeps order, and drops pods and unadopted points', () => {
+    const byCircle = {
+      a: [{ url: 'ws://one:1' }, { url: 'https://pod/', kind: POINT_KIND.POD }],
+      b: [{ url: 'ws://one:1' }, { url: 'ws://two:2' }, { url: 'ws://no:3', adopted: false }],
+    };
+    expect(relayUrlsForCircles(['a', 'b'], (c) => byCircle[c] ?? [])).toEqual(['ws://one:1', 'ws://two:2']);
+  });
+  it('a circle with no points, an unknown circle, and bad input all contribute nothing', () => {
+    expect(relayUrlsForCircles(['x'], () => [])).toEqual([]);
+    expect(relayUrlsForCircles(['x'], () => { throw new Error('boom'); })).toEqual([]);
+    expect(relayUrlsForCircles(null, () => [{ url: 'ws://a:1' }])).toEqual([]);
+    expect(relayUrlsForCircles(['x'], null)).toEqual([]);
+  });
+});
+
+describe('contactRelayScope — a message to a PERSON rides the relays of the kringen we share (2026-09-08)', () => {
+  const circles = { anna: ['k1', 'k2'], bram: ['k3'], carla: [] };
+  const points = { k1: [{ url: 'ws://mine:1' }], k2: [{ url: 'ws://theirs:2' }], k3: [] };
+  const scope = (to) => contactRelayScope({
+    to, circlesForPeer: (a) => circles[a] ?? [], circlePointsFor: (c) => points[c] ?? [],
+  });
+
+  it('the union of their kringen\u2019s relays, so someone I know from another relay is reached there', () => {
+    expect(scope('anna')).toEqual({ points: ['ws://mine:1', 'ws://theirs:2'] });
+  });
+
+  it('no shared kring, or none with a recorded relay \u21d2 null \u2014 the send stays exactly as it was', () => {
+    expect(scope('carla')).toBeNull();          // we share nothing
+    expect(scope('bram')).toBeNull();           // shared, but the kring rides the deployment default
+    expect(scope('stranger')).toBeNull();       // never seen
+    expect(contactRelayScope({ to: 'anna' })).toBeNull();        // no index wired
+    expect(contactRelayScope({ circlesForPeer: () => ['k1'], circlePointsFor: (c) => points[c] })).toBeNull();
   });
 });

@@ -150,15 +150,29 @@ describe('invariant 8', () => {
   });
 });
 
-describe('one is live, the rest are standby', () => {
-  it('marks the point actually in use, and the others as standby', () => {
-    // The substrate connects to one relay at a time; a list showing them all as equal would claim
-    // something untrue.
+describe('your own relay, the others you are also on, and the ones you are not (2026-09-08)', () => {
+  it('the LIVE list decides — not the store, which only remembers', () => {
+    // Was: one point "in use", every other "Reserve". A device is now on its own relay AND on every relay
+    // its kringen ride, all at once, so "Reserve" described a point that was carrying traffic.
     const el = render({
-      points: [point({ active: true }), point({ url: 'wss://b.example', active: false })],
+      points: [point(), point({ url: 'wss://b.example' }), point({ url: 'wss://c.example' })],
+      relays: [
+        { url: 'wss://a.example', primary: true, connected: true },
+        { url: 'wss://b.example', primary: false, connected: true },
+      ],
     });
-    const labels = [...el.querySelectorAll('.circle-points__live')].map((n) => n.textContent);
-    expect(labels).toEqual(['circle.nearbyScreen.point_active', 'circle.nearbyScreen.point_standby']);
+    expect([...el.querySelectorAll('.circle-points__live')].map((n) => n.textContent)).toEqual([
+      'circle.nearbyScreen.point_primary',
+      'circle.nearbyScreen.point_connected',
+      'circle.nearbyScreen.point_offline',
+    ]);
+  });
+
+  it('before the agent is up nothing is connected, and the store’s memory of the primary stands in', () => {
+    const el = render({ points: [point({ active: true }), point({ url: 'wss://b.example' })], relays: [] });
+    expect([...el.querySelectorAll('.circle-points__live')].map((n) => n.textContent)).toEqual([
+      'circle.nearbyScreen.point_primary', 'circle.nearbyScreen.point_offline',
+    ]);
   });
 
   it('removing the LIVE point warns about the disconnect, even with nothing cut off', () => {
@@ -172,7 +186,7 @@ describe('one is live, the rest are standby', () => {
     expect(el.querySelector('.circle-points__impact-none')).toBeNull();
   });
 
-  it('removing a STANDBY point does not warn about disconnecting', () => {
+  it('removing a point that is not the primary does not warn about disconnecting', () => {
     const el = render({
       points: [point()],
       removing: { url: 'wss://a.example', losesReachability: [], stillReachable: [], wasActive: false },
@@ -182,3 +196,26 @@ describe('one is live, the rest are standby', () => {
   });
 });
 
+
+describe('adding a relay by hand — for someone running their own box (2026-09-08)', () => {
+  it('reports the address typed, and says that it comes BESIDE the ones you are on', () => {
+    const onAdd = vi.fn();
+    const el = render({ points: [point()], onAdd });
+    expect(el.querySelector('.circle-points__add-hint').textContent).toBe('circle.nearbyScreen.point_add_hint');
+    el.querySelector('.circle-points__add-input').value = ' wss://mine.example ';
+    el.querySelector('.circle-points__add').dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(onAdd).toHaveBeenCalledWith('wss://mine.example');
+  });
+
+  it('the EMPTY list offers it too — otherwise a self-hoster has nowhere to start', () => {
+    expect(render({ points: [], onAdd: vi.fn() }).querySelector('.circle-points__add')).toBeTruthy();
+    expect(render({ points: [] }).querySelector('.circle-points__add')).toBeNull();   // no agent ⇒ no field
+  });
+
+  it('a bad address is reported as an alert, in the locale', () => {
+    const el = render({ points: [point()], onAdd: vi.fn(), addError: 'circle.nearbyScreen.point_add_invalid' });
+    const err = el.querySelector('.circle-points__add-error');
+    expect(err.getAttribute('role')).toBe('alert');
+    expect(err.textContent).toBe('circle.nearbyScreen.point_add_invalid');
+  });
+});

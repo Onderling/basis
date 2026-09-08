@@ -348,6 +348,9 @@ export async function bootAgentBundle(opts = {}) {
       // recorded, nothing else. Sends are synchronous readers, the store is AsyncStorage-backed, so this
       // reads the snapshot refreshed at boot and at every presence registration (which a join triggers).
       circlePointsFor: (cid) => circlePointsSnapshot(cid),
+      // …and the peer → kringen half of the same map, so a DM reaches someone on a relay of a kring we
+      // share rather than only on mine. App.js owns the index (the membrane enforces with it).
+      circlesForPeer: opts.circlesForPeer,
       publishEvent:     opts.publishEvent,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (RN twin of web's

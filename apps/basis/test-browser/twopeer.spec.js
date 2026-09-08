@@ -16,6 +16,7 @@
  * Each step logs PASS / FAIL / BLOCKED + what was OBSERVED (quoted on-screen text).
  */
 import { test, expect } from '@playwright/test';
+import { createCircleViaWizard } from './helpers.js';
 
 const SHOTS = '/home/frits/.claude/jobs/c6a31a12/tmp/verify-shots';
 
@@ -56,11 +57,12 @@ async function tileNames(page) {
   return out;
 }
 
-async function createCircle(page, name) {
-  page.once('dialog', (d) => d.accept(name));
-  await page.locator('.circle-launcher__new').click();
-  await page.waitForTimeout(5000);
-}
+// Creating a circle is `createCircleViaWizard` in ./helpers.js — the ONE copy, kept current with the
+// wizard. This file used to carry its own: click "+ nieuwe kring" and answer a prompt() with the name.
+// The app stopped asking with a prompt long ago, so that copy clicked the button, no dialog came, the
+// create wizard stayed open, and every later click in the story was intercepted by it — which is why
+// this story could not run (go-live "believe the browser suite"). Found 2026-09-07 by running it.
+const createCircle = createCircleViaWizard;
 
 async function openCircleMatching(page, re) {
   const names = await tileNames(page);

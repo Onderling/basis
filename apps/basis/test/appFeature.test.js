@@ -24,10 +24,10 @@ describe('isAppSurfaceEnabled (real circlePolicy)', () => {
   it('core apps are always enabled, whatever the policy', () => {
     expect(isAppSurfaceEnabled('stoop', { features: { tasks: false } }, isFeatureEnabled)).toBe(true);
   });
-  it('tasks surfaces follow policy.features.tasks (default OFF → gated)', () => {
-    // default policy has tasks:false → a fresh circle gates the task screen
-    expect(isAppSurfaceEnabled('tasks', DEFAULT_CIRCLE_POLICY, isFeatureEnabled)).toBe(false);
-    expect(isAppSurfaceEnabled('tasks', { features: { tasks: true } }, isFeatureEnabled)).toBe(true);
+  it('tasks surfaces follow policy.features.tasks (default ON since the alpha cut; off → gated)', () => {
+    // the alpha's default tab set is Gesprek · Prikbord · Taken · Leden → a fresh circle shows the task screen
+    expect(isAppSurfaceEnabled('tasks', DEFAULT_CIRCLE_POLICY, isFeatureEnabled)).toBe(true);
+    expect(isAppSurfaceEnabled('tasks', { features: { tasks: false } }, isFeatureEnabled)).toBe(false);
   });
   it('calendar surfaces follow policy.features.calendar', () => {
     expect(isAppSurfaceEnabled('calendar', { features: { calendar: true } }, isFeatureEnabled)).toBe(true);

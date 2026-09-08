@@ -577,12 +577,13 @@ export const basisManifest = {
        * op) vs circle-policy (`policyField`, saved with the rest of the policy).
        */
       controls: [
-        // Transport-mode picker — device-scoped; dispatches the `transport-mode` op. `nkn` is the
-        // default transport (always available); `relay`/`both` grey out with no relay endpoint
-        // (optionEnabledWhen: 'transportAvailable').
+        // Transport-mode picker — device-scoped; dispatches the `transport-mode` op. Relay first: the
+        // hosted build ships with a relay preset and the first walks showed NKN degrading while the relay
+        // held (2026-09-07), so the relay is what "standaard" means now; `nkn` stays always available;
+        // `relay`/`both` grey out with no relay endpoint (optionEnabledWhen: 'transportAvailable').
         {
           id: 'transport-mode', kind: 'choice', scope: 'device',
-          opId: 'transport-mode', arg: 'mode', of: ['nkn', 'relay', 'both'],
+          opId: 'transport-mode', arg: 'mode', of: ['relay', 'nkn', 'both'],
           labelKey: 'circle.settings.transportMode', hintKey: 'circle.settings.transportMode_hint',
           optLabelPrefix: 'circle.settings.transportMode_opt',
           enabledWhen: 'always', optionEnabledWhen: 'transportAvailable',

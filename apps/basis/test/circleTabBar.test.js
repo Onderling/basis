@@ -14,10 +14,10 @@ import { basisManifest } from '../src/index.js';
 const t = (k) => k;
 
 describe('renderCircleTabBar', () => {
-  it('renders the five tabs in order — Nearby after Circles, Contacten between Nearby and Mij', () => {
+  it('renders the alpha tabs in order — Circles, Contacten, Mij (Screens and Nearby are hidden, not removed)', () => {
     const el = renderCircleTabBar(document.createElement('nav'), { active: 'circles', t });
     const tabs = [...el.querySelectorAll('.circle-tabbar__tab')].map((b) => b.dataset.tab);
-    expect(tabs).toEqual(['screens', 'circles', 'nearby', 'contacten', 'mij']);
+    expect(tabs).toEqual(['circles', 'contacten', 'mij']);
     expect(el.querySelector('[data-tab="circles"]').classList.contains('is-active')).toBe(true);
   });
 
@@ -34,7 +34,7 @@ describe('renderCircleTabBar', () => {
   it('is a genuine projection consumer: the DOM tabs match manifest.tabs (ids + labels)', () => {
     const projected = circleTabs(basisManifest);
     // The manifest is the single source of the roster (no per-shell literal).
-    expect(projected.map((tab) => tab.id)).toEqual(['screens', 'circles', 'nearby', 'contacten', 'mij']);
+    expect(projected.map((tab) => tab.id)).toEqual(['circles', 'contacten', 'mij']);
     const el = renderCircleTabBar(document.createElement('nav'), { active: 'screens', t });
     const btns = [...el.querySelectorAll('.circle-tabbar__tab')];
     expect(btns.map((b) => b.dataset.tab)).toEqual(projected.map((tab) => tab.id));

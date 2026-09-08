@@ -14,9 +14,16 @@
  * per language.
  *
  * Flow: welkom (who the bot is + encrypted + no account) → wat_is_dit (messages/
- * tasks/plans for neighbourhood/household/club) → own_circle (choice: "start your
- * own circle?" — YES hands off to the create wizard, LATER continues) → uitnodigen
- * (point at the invite flow) → klaar. Short, honest, no hype.
+ * tasks/plans for neighbourhood/household/club) → alpha + alpha_leren (what a tester
+ * must know BEFORE they invest anything: one build for everyone, no notifications,
+ * restore brings back you and not yet your circles, data may start over — and what we
+ * hope to learn) → own_circle (choice: "start your own circle?" — YES hands off to the
+ * create wizard, LATER continues) → uitnodigen (point at the invite flow) → klaar.
+ * Short, honest, no hype.
+ *
+ * The alpha steps come BEFORE the first question on purpose: someone should know the
+ * limits while deciding whether to start a circle, not after. They are ordinary steps,
+ * so a remote template can drop them the day the alpha ends (go-live checklist A7).
  */
 import { isValidTemplate } from './guidedSetup.js';
 
@@ -28,11 +35,13 @@ import { isValidTemplate } from './guidedSetup.js';
  */
 const FLOW = Object.freeze({
   id: 'onboarding',
-  version: 1,
+  version: 2,
   start: 'welkom',
   steps: {
     welkom:      { kind: 'say',    next: 'wat_is_dit' },
-    wat_is_dit:  { kind: 'say',    next: 'own_circle' },
+    wat_is_dit:  { kind: 'say',    next: 'alpha' },
+    alpha:       { kind: 'say',    next: 'alpha_leren' },
+    alpha_leren: { kind: 'say',    next: 'own_circle' },
     own_circle: {
       kind: 'choice',
       sets: 'wantsCircle',
@@ -49,18 +58,22 @@ const FLOW = Object.freeze({
 /** Per-language leaf copy for each step (the bot's line + any option labels). */
 const COPY = Object.freeze({
   nl: {
-    welkom: 'Hoi, ik ben Onderling. Dit is een circle — een plek waar je met een paar mensen dingen regelt. Ik ben zelf ook gewoon lid van deze circle; je praat met mij zoals met iedereen. Je berichten zijn versleuteld en je hoeft geen account te maken.',
+    welkom: 'Hoi, ik ben Onderling. Dit is een kring — een plek waar je met een paar mensen dingen regelt. Ik ben zelf ook gewoon lid van deze kring; je praat met mij zoals met iedereen. Je berichten zijn versleuteld en je hoeft geen account te maken.',
     wat_is_dit: 'Onderling is voor het dagelijkse: berichten, taken en afspraken. Voor je buurt, je huishouden of een club. Klein en overzichtelijk.',
+    alpha: 'Even eerlijk over waar we staan: dit is een testversie, en iedereen draait dezelfde. Je krijgt geen meldingen — berichten komen binnen als je de app opent. Begin je opnieuw met je herstelzin, dan krijg je jezelf terug, je kringen nog niet. En verandert er iets aan de techniek, dan kunnen gegevens opnieuw beginnen.',
+    alpha_leren: 'Wat we willen leren: of je het snapt zonder uitleg, of het werkt tussen twee apparaten, en waar je vastloopt. Laat het gerust weten via Feedback onder Contacten.',
     own_circle: {
-      ask: 'Wil je zelf een circle beginnen?',
+      ask: 'Wil je zelf een kring beginnen?',
       options: { ja: 'Ja, help me', later: 'Nu even niet' },
     },
-    uitnodigen: 'Prima. Als je een circle hebt, kun je buren of huisgenoten uitnodigen met een link of een QR-code. Dat kan ook later nog.',
+    uitnodigen: 'Prima. Als je een kring hebt, kun je buren of huisgenoten uitnodigen met een link of een QR-code. Dat kan ook later nog.',
     klaar: 'Klaar. Ik blijf hier staan — stel gerust een vraag als je iets wilt weten.',
   },
   en: {
     welkom: "Hi, I'm Onderling. This is a circle — a place where you sort things out with a few people. I'm just a member of this circle too; you talk to me like anyone else. Your messages are encrypted, and you don't need an account.",
     wat_is_dit: 'Onderling is for the everyday: messages, tasks and plans. For your neighbourhood, your household or a club. Small and manageable.',
+    alpha: 'Straight about where we are: this is a test version, and everyone runs the same one. You get no notifications — messages arrive when you open the app. Start again with your recovery phrase and you get yourself back, not yet your circles. And if something changes in the plumbing, data may start over.',
+    alpha_leren: 'What we want to learn: whether it makes sense without an explanation, whether it works between two devices, and where you get stuck. Do let us know via Feedback under Contacts.',
     own_circle: {
       ask: 'Want to start a circle of your own?',
       options: { ja: 'Yes, help me', later: 'Not right now' },

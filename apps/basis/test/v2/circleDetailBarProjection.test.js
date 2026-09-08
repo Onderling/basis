@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { renderCircleDetail } from '../../web/v2/circleDetail.js';
-import { circleActions, circleActionsMobile, circleActionRoster } from '../../src/v2/actionProjection.js';
+import { circleActions, circleActionsMobile, circleActionRoster, gatedActions } from '../../src/v2/actionProjection.js';
 import { basisManifest } from '../../src/index.js';
 import { DEFAULT_CIRCLE_POLICY, mergeCirclePolicy } from '../../src/v2/circlePolicy.js';
 
@@ -28,21 +28,27 @@ describe('circle detail bar — projected from manifest.actions', () => {
     renderCircleDetail(el, { circle: { id: 'g1', name: 'Selwerd' }, items: [], t, policy: DEFAULT_CIRCLE_POLICY });
     const projected = circleActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' });
     expect(barActions(el)).toEqual(projected.map((a) => a.id));
-    // Default policy: memberDirectory + houseRules on → viewAs + rules shown;
+    // The alpha trims the bar to back · invite · settings (alphaSurface.js). The gates beneath it are
+    // unchanged and observable through `gatedActions`: memberDirectory + houseRules on → viewAs + rules;
     // lists + notes off → files hidden; share is mobile-only → absent on web.
-    expect(barActions(el)).toContain('viewAs');
-    expect(barActions(el)).toContain('rules');
-    expect(barActions(el)).not.toContain('files');
-    expect(barActions(el)).not.toContain('share');
+    expect(barActions(el)).toEqual(['back', 'invite', 'settings']);
+    const gated = gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
+    expect(gated).toContain('viewAs');
+    expect(gated).toContain('rules');
+    expect(gated).not.toContain('files');
+    expect(gated).not.toContain('share');
   });
 
   it('feature gate (requires) rides the projection: toggling policy adds/removes buttons', () => {
     const noDir = mergeCirclePolicy(DEFAULT_CIRCLE_POLICY, { features: { memberDirectory: false, houseRules: false, lists: true } });
+    const gated = gatedActions(basisManifest, { policy: noDir, platform: 'web' }).map((a) => a.id);
+    expect(gated).not.toContain('viewAs');   // memberDirectory off
+    expect(gated).not.toContain('rules');    // houseRules off
+    expect(gated).toContain('files');        // lists on (lists || notes)
+    // and the painted bar follows the projection either way (the alpha trim hides files too)
     const el = mount();
     renderCircleDetail(el, { circle: { id: 'g1' }, items: [], t, policy: noDir });
-    expect(barActions(el)).not.toContain('viewAs');   // memberDirectory off
-    expect(barActions(el)).not.toContain('rules');    // houseRules off
-    expect(barActions(el)).toContain('files');        // lists on (lists || notes)
+    expect(barActions(el)).toEqual(circleActions(basisManifest, { policy: noDir, platform: 'web' }).map((a) => a.id));
   });
 
   it('labels resolve from the projected labelKey via t(); handlers fire by id', () => {
@@ -71,8 +77,10 @@ describe('circle detail bar — projected from manifest.actions', () => {
     // manifest-declared `share` (mobile-only; no web CircleShareScreen yet).
     const webIds    = webRoster.map((a) => a.id);
     const mobileIds = mobileRoster.map((a) => a.id);
-    expect(mobileIds.filter((id) => id !== 'share')).toEqual(webIds);
-    expect(mobileIds).toContain('share');
+    expect(mobileIds).toEqual(webIds);   // the alpha hides the only platform-specific action (share) on both
+    // beneath the trim the platform gate still holds: share is mobile-only
+    expect(gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'mobile', renderer: undefined }).map((a) => a.id)).toContain('share');
+    expect(gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id)).not.toContain('share');
     expect(webIds).not.toContain('share');
   });
 });

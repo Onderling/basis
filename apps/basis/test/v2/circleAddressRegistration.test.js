@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { Transport } from '@onderling/core';
-import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
+import { registerCircleAddresses, unregisterCircleAddresses, registerCircleAddressesOnRelays } from '../../src/v2/circleAddressRegistration.js';
 
 class FakeRelay extends Transport {
   bound = [];
@@ -190,5 +190,36 @@ describe('a pod point is not a relay (2026-07-30, S4 pod walk)', () => {
     });
     expect(r.skippedOffRelay).toEqual(['both']);
     expect(registered).toEqual([]);
+  });
+});
+
+describe('registerCircleAddressesOnRelays — every relay the device is on, each scoped (2026-09-08)', () => {
+  it('a circle on relay B registers on B only; an unmapped circle lands on the primary only', async () => {
+    const A = mk(), B = mk();
+    const circlesForPoint = pointsMap({ 'ws://b': ['c-b'] });
+    const results = await registerCircleAddressesOnRelays({
+      relays: [{ url: 'ws://a', primary: true, port: A }, { url: 'ws://b', primary: false, port: B }],
+      circleIds: ['c-b', 'c-unmapped'],
+      circleAddressFor: addr,
+      circleAddressSignerFor: () => () => 'sig',
+      circlesForPoint,
+    });
+    expect(A.bound).toEqual(['addr-c-unmapped']);
+    expect(B.bound).toEqual(['addr-c-b']);
+    expect(results.map((r) => [r.relayUrl, r.registered, r.skippedOffRelay])).toEqual([
+      ['ws://a', ['c-unmapped'], ['c-b']],
+      ['ws://b', ['c-b'], ['c-unmapped']],
+    ]);
+  });
+  it('an explicit default wins over the primary flag; an empty list is a no-op', async () => {
+    const A = mk(), B = mk();
+    await registerCircleAddressesOnRelays({
+      relays: [{ url: 'ws://a', primary: true, port: A }, { url: 'ws://b', port: B }],
+      defaultRelayUrl: 'ws://b',
+      circleIds: ['c'], circleAddressFor: addr, circleAddressSignerFor: () => () => 'sig', circlesForPoint: pointsMap({}),
+    });
+    expect(A.bound).toEqual([]);
+    expect(B.bound).toEqual(['addr-c']);
+    expect(await registerCircleAddressesOnRelays({ relays: [], circleIds: ['c'], circleAddressFor: addr })).toEqual([]);
   });
 });

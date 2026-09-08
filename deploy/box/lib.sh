@@ -82,8 +82,43 @@ render_caddyfile() {
     v="${v%\"}"; v="${v#\"}"
     tpl="${tpl//\$\{$k\}/$v}"
   done < "$BOX_DIR/.env"
-  printf '%s\n' "$tpl" > "$out"
+  printf '%s\n' "$tpl" > "$out.next"
   rm -f "$out.tpl"
+  if [ -f "$out" ] && cmp -s "$out" "$out.next"; then rm -f "$out.next"; return 1; fi   # 1 = unchanged
+  mv "$out.next" "$out"
+  return 0                                                                              # 0 = changed
+}
+
+# Caddy holds the rendered Caddyfile as a BIND MOUNT, so `compose up -d` never notices a change to it —
+# a re-rendered file (a role added, a hostname edited) would be ignored until something recreated the
+# container. Seen on the real box 2026-09-07: caddy up 27 h across two releases. Reload it in place.
+reload_caddy() {
+  local cmd; cmd="$(compose_cmd)"
+  case " $(role_names | tr '\n' ' ') " in *" caddy "*) ;; *) return 0 ;; esac
+  eval "$cmd ps --status running --services" 2>/dev/null | grep -qx caddy || return 0
+  if eval "$cmd exec -T caddy caddy reload --config /etc/caddy/Caddyfile" >>"$BOX_DIR/box.log" 2>&1; then
+    log "caddy: reloaded the rendered Caddyfile"
+  else
+    log "caddy: reload REFUSED the new Caddyfile (it keeps serving the old one) — see box.log"
+    return 1
+  fi
+}
+
+# Which enabled roles a set of changed repo paths affects. A role declares its build paths in
+# deploy/roles/<role>.paths (generated: scripts/box-role-paths.mjs). No file, or an empty line in it,
+# means "always" — the safe default, so a repo that does not honour this part of the contract still works.
+#   role_affected <role> <file-with-changed-paths>
+role_affected() {
+  local paths; paths="$(role_file "$1" paths)"
+  [ -f "$paths" ] || return 0
+  local prefix f
+  while IFS= read -r prefix; do
+    case "$prefix" in '#'*) continue ;; '') return 0 ;; esac
+    while IFS= read -r f; do
+      case "$f" in "$prefix"*) return 0 ;; esac
+    done < "$2"
+  done < "$paths"
+  return 1
 }
 
 # state.json helpers (no jq dependency: the file is small and we own its shape)
@@ -149,14 +184,19 @@ alert() {
 }
 
 # Run every enabled role's health script; print the first failing role, exit 1. Waits up to
-# HEALTH_TIMEOUT seconds (default 60; tests set it low).
+# HEALTH_TIMEOUT seconds (default 60; tests set it low). REBUILT_ROLES (space-separated) names the roles
+# this update rebuilt; each script gets that as ROLE_REBUILT=0|1.
 health_gate() {
   local deadline=$(( $(date +%s) + ${HEALTH_TIMEOUT:-60} ))
   local role f
   for role in $(role_names); do
     f="$(role_file "$role" health)"
     [ -x "$f" ] || continue
-    until COMPOSE="$(compose_cmd)" BOX_DIR="$BOX_DIR" ROLE="$role" bash "$f" >>"$BOX_DIR/box.log" 2>&1; do
+    # ROLE_REBUILT tells a health script whether THIS update actually rebuilt its role, so an expensive
+    # check (the relay's wire smoke) proves a NEW build rather than re-proving a process that never stopped.
+    local rebuilt=0
+    case " ${REBUILT_ROLES:-} " in *" $role "*) rebuilt=1 ;; esac
+    until COMPOSE="$(compose_cmd)" BOX_DIR="$BOX_DIR" ROLE="$role" ROLE_REBUILT="$rebuilt" bash "$f" >>"$BOX_DIR/box.log" 2>&1; do
       if [ "$(date +%s)" -ge "$deadline" ]; then echo "$role"; return 1; fi
       sleep "${HEALTH_POLL:-3}"
     done

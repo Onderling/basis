@@ -104,7 +104,7 @@ import { circleActionsMobile } from '../../../../basis/src/v2/actionProjection.j
 // de-registers its per-circle address on the transport. Both shared with web; the transport handle
 // is the only per-shell part, passed in as `unregister`.
 import { leaveCircleLocally } from '../../../../basis/src/v2/circleMembershipHygiene.js';
-import { unregisterCircleAddresses } from '../../../../basis/src/v2/circleAddressRegistration.js';
+import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 // Which ops the DEVICE declares — the gate on the typed door's general case, read from the one contract
 // rather than from a list kept beside it.
@@ -144,6 +144,8 @@ import {
   HELP_CIRCLE_ID, helpCircleSpec, helpCircleRoster, onderlingBotMember, provisionHelpCircle,
 } from '../../../../basis/src/v2/helpCircle.js';
 import { createOnboardingFlags, asyncStorageOnboardingIo } from '../../../../basis/src/v2/onboardingFlags.js';
+import { alphaViewModes, alphaViewMode, isAlphaTab } from '../../../../basis/src/v2/alphaSurface.js';
+import { chatComposerVisible } from '../../../../basis/src/v2/circleTabs.js';
 import { buildOnboardingTemplate } from '../../../../basis/src/v2/onboardingTemplate.js';
 import { startGuidedSetup } from '../../../../basis/src/v2/guidedSetup.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../../../basis/src/v2/onboardingChat.js';
@@ -1435,8 +1437,8 @@ export default function CircleLauncherScreen({
                 await leaveCircleLocally({
                   agent: bundle.agent, callSkill: bundle.callSkill,
                   circleId: cid,
-                  unregister: () => unregisterCircleAddresses({
-                    transport: bundle.agent?.relay, circleIds: [cid],
+                  unregister: () => unregisterCircleAddressesOnRelays({
+                    relays: bundle.agent?.relays?.list?.() ?? [], circleIds: [cid],
                     circleAddressFor: (id) => bundle.agent?.circleAddressFor?.(id) ?? null,
                   }),
                 });
@@ -1518,6 +1520,7 @@ export default function CircleLauncherScreen({
   // new primary; Stroom is retired (now lives as the seeded "Stream"
   // screen on the Screens tab).
   const onTab = (id) => {
+    if (!isAlphaTab(id)) id = 'circles';   // a hidden surface lands on the circles list (alphaSurface.js)
     if (id === 'screens') setView('screens');
     else if (id === 'circles') { setActiveCircle(null); setSelected(null); setView('list'); }
     else if (id === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
@@ -2091,7 +2094,7 @@ export default function CircleLauncherScreen({
             // list already uses (`CircleListScreen.js`).
             keyboardShouldPersistTaps="handled"
           >
-            {bundle?.mdns ? (
+            {bundle?.mdns && isAlphaTab('nearby') ? (
               <Pressable style={styles.nearbyRow} testID="circle-nearby" accessibilityRole="button" onPress={() => setView('nearby')}>
                 <Text style={styles.nearbyText}>
                   {formatNearbyLabel(nearbyCount, t, { radioOff: readNearbyRadio() === 'off' })}
@@ -2156,7 +2159,7 @@ export default function CircleLauncherScreen({
             // the redeem goes out over whatever transport this device happens to have, and a relay-only
             // admin never hears it.
             dialEndpoint={(url) => bundle?.reconnectPeer?.({ relayUrl: url })}
-            activeEndpointUrl={() => bundle?.activeRelayUrl?.() ?? null}
+            activeEndpointUrl={() => bundle?.relayUrls?.() ?? bundle?.activeRelayUrl?.() ?? null}
             // Post-join reachability (G13) — the same seam the chat-shell host passes, so a join is
             // equally complete from either surface. This screen already bound the roster keys in
             // `onDispatched`; what it never did was RE-REGISTER this device's per-circle address, so the
@@ -2825,17 +2828,18 @@ function CircleDetail({
   // §4 — until the member has flipped the pill for this circle, the
   // landing surface is the admin's policy.view front door
   // (defaultViewModeFromPolicy): 'screen' → screen, else → chat.
-  const [viewMode, setViewModeState] = useState(() => defaultViewModeFromPolicy(policy));
+  const [viewMode, setViewModeState] = useState(() => alphaViewMode(defaultViewModeFromPolicy(policy)));
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!circle?.id) return;
-      const fallback = defaultViewModeFromPolicy(policy);
+      const fallback = alphaViewMode(defaultViewModeFromPolicy(policy));
       try {
         const raw = await AsyncStorage.getItem('cc.circleViewMode');
         const map = raw ? JSON.parse(raw) : {};
         const saved = map?.[circle.id];
-        if (alive) setViewModeState(saved === 'screen' || saved === 'chat' ? saved : fallback);
+        // clamped to what the alpha paints: a mode saved before the cut opens as chat (alphaSurface.js)
+        if (alive) setViewModeState(saved === 'screen' || saved === 'chat' ? alphaViewMode(saved) : fallback);
       } catch { if (alive) setViewModeState(fallback); }
     })();
     return () => { alive = false; };
@@ -3830,12 +3834,13 @@ function CircleDetail({
             'group' (that's a web-only ARIA role).  The buttons inside
             carry their own role + accessibilityState; the wrapper just
             needs a label for screen-reader context. */}
+        {alphaViewModes().length > 1 ? (
         <View
           style={styles.viewToggle}
           accessibilityLabel={t('circle.view.view_toggle_label')}
           testID="circle-detail-view-toggle"
         >
-          {['chat', 'screen'].map((mode) => (
+          {alphaViewModes().map((mode) => (
             <Pressable
               key={mode}
               accessibilityRole="button"
@@ -3850,6 +3855,7 @@ function CircleDetail({
             </Pressable>
           ))}
         </View>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('circle.view.more')}
@@ -4288,6 +4294,7 @@ function CircleDetail({
         {/* The "+" menu — the projected entries, in the composer, exactly as web paints them. Rendered
             ABOVE the row so it opens upward like the web dropdown; absent entirely when this circle
             offers nothing that works. */}
+        {chatComposerVisible(activeTab) ? (<>   {/* the composer is the conversation's — hidden under Leden and the other tabs */}
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (
@@ -4342,6 +4349,7 @@ function CircleDetail({
             <Text style={styles.composerSendText}>↑</Text>
           </Pressable>
         </View>
+        </>) : null}
       </>
       ) : null}
 

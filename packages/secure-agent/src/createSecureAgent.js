@@ -1651,6 +1651,75 @@ export async function createSecureAgent(opts = {}) {
     relayState.error = null;
   }
 
+  // ── More than one relay (2026-09-08) ───────────────────────────────────────────────────────────
+  // `sa.relay` is the PRIMARY relay — this device's own default. A device is ALSO on every relay a circle
+  // it is in rides (the circle's invite named it; the app recorded it as a connection point). Each of
+  // those is one more RelayTransport, wrapped by the same receive handler and registered with the router
+  // under `relay:<url>`, beside the primary. A circle-scoped send (`scope.points`) then lands on the relay
+  // whose url the circle recorded — `route()` walks the primary, the extras, then NKN. An UNSCOPED send
+  // (a DM, a first contact) still rides the primary: the router's name table only knows 'relay', and
+  // choosing among relays for a bare address needs the map of which circles the contact shares, which the
+  // app does not hand down yet. `transportMode` is left alone on purpose — adding a relay must not flip a
+  // relay-only device into 'both' (that is what `addSecureTransport` does for mdns/ble, and it would route
+  // unscoped sends through the shared strategy instead of the pinned relay).
+  const RELAY_NAME_PREFIX = 'relay:';
+  const relayNameFor = (url) => `${RELAY_NAME_PREFIX}${url}`;
+  function relayEntry(url, tx, primary) {
+    return {
+      url,
+      primary,
+      get connected() { return tx?.connected === true; },
+      // The alias half of the transport port, per relay — what the host's per-circle address registration
+      // needs, scoped to the circles that ride THIS relay (the relay-diversity rule lives in the caller).
+      port: {
+        get supportsAliases() { return tx?.supportsAliases ?? false; },
+        get addresses()       { return tx?.addresses ?? []; },
+        addAddress:    (a, o) => (tx ? tx.addAddress(a, o) : Promise.resolve({ ok: false, reason: 'not-connected' })),
+        removeAddress: (a) => { try { tx?.removeAddress(a); } catch { /* best-effort */ } },
+      },
+    };
+  }
+  function hasRelay(url) {
+    return (!!relayTransport && relayState.url === url) || extraTransports.has(relayNameFor(url));
+  }
+  async function addRelay(url, { awaitReady = false } = {}) {
+    if (typeof url !== 'string' || !url) throw new Error('relays.add: url required');
+    if (relayTransport && relayState.url === url) {
+      if (awaitReady) await waitForSocket(relayTransport, relayReadyTimeoutMs);
+      return relayEntry(url, relayTransport, true);
+    }
+    const name = relayNameFor(url);
+    const have = extraTransports.get(name);
+    if (have) {
+      if (awaitReady) await waitForSocket(have, relayReadyTimeoutMs);
+      return relayEntry(url, have, false);
+    }
+    const tx = new RelayTransport({
+      identity,
+      relayUrl: url,
+      onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
+    });
+    makeReceiveHandler(tx);                 // the secure receive wiring — same as the primary
+    await tx.connect();                     // requests the socket; never blocks boot (see connectRelay)
+    routing.addTransport(name, tx);
+    extraTransports.set(name, tx);
+    if (auditAutoLog) audit('relay.add', url);
+    if (awaitReady) await waitForSocket(tx, relayReadyTimeoutMs);
+    return relayEntry(url, tx, false);
+  }
+  async function removeRelay(url) {
+    if (relayTransport && relayState.url === url) { await disconnectRelay(); return; }
+    await removeSecureTransport(relayNameFor(url));
+  }
+  function listRelays() {
+    const out = [];
+    if (relayTransport) out.push(relayEntry(relayState.url, relayTransport, true));
+    for (const [name, tx] of extraTransports) {
+      if (name.startsWith(RELAY_NAME_PREFIX)) out.push(relayEntry(name.slice(RELAY_NAME_PREFIX.length), tx, false));
+    }
+    return out;
+  }
+
   function setTransportMode(mode) {
     if (mode !== 'nkn' && mode !== 'relay' && mode !== 'both') {
       throw new Error(`setTransportMode: invalid mode "${mode}"; expected nkn|relay|both`);
@@ -2456,6 +2525,8 @@ export async function createSecureAgent(opts = {}) {
         ? relayTransport.unregisterPushToken()
         : Promise.resolve({ ok: false, reason: 'not-connected' })),
     },
+    // Every relay this device is on: the primary first, then the ones its circles ride (2026-09-08).
+    relays: { add: addRelay, remove: removeRelay, list: listRelays, has: hasRelay },
     get transportMode() { return transportMode; },
     setTransportMode,
     // Phase-2 · Piece-2 (B2 wiring) — attach (or replace) the peer registry on

@@ -41,19 +41,42 @@ for name in $(repo_names); do
     log "$name: $new is tagged RESET — refusing without ALLOW_RESET=1"; alert "$name: release $new needs a data reset; held"; continue
   fi
   log "$name: $cur → $new ($br)"
+  $GIT -C "$d" diff --name-only "$cur" "$new" > "$BOX_DIR/.changed-$name" 2>/dev/null || : > "$BOX_DIR/.changed-$name"
   $GIT -C "$d" checkout -q -f "$new"
   changed+=("$name")
 done
 
 [ ${#changed[@]} -eq 0 ] && exit 0
 
-apply() {   # build + (re)start the roles that belong to the changed repos, then the whole stack up
+# The roles a release touches: of the changed repos' roles, those whose declared build paths saw a change.
+# FORCE (the install's first bring-up) and a repo we cannot diff mean "all of them".
+affected_roles() {
+  local out=() name r list
+  for name in "$@"; do
+    list="$BOX_DIR/.changed-$name"
+    if [ "${FORCE:-0}" = 1 ] || [ ! -s "$list" ]; then
+      for r in $(roles_of_repo "$name"); do out+=("$r"); done
+    else
+      for r in $(roles_of_repo "$name"); do role_affected "$r" "$list" && out+=("$r"); done
+    fi
+  done
+  [ ${#out[@]} -eq 0 ] || printf '%s\n' "${out[@]}"
+}
+
+apply() {   # build the affected roles, bring the stack up, reload Caddy when its rendered file changed
   local cmd; cmd="$(compose_cmd)"
-  render_caddyfile
-  local roles=()
-  for name in "$@"; do for r in $(roles_of_repo "$name"); do roles+=("$r"); done; done
-  eval "$cmd build --pull ${roles[*]}"
+  local caddy_changed=1
+  if render_caddyfile; then caddy_changed=0; fi
+  local roles=(); mapfile -t roles < <(affected_roles "$@")
+  if [ ${#roles[@]} -eq 0 ]; then
+    log "no role's build paths changed — nothing to rebuild"
+  else
+    eval "$cmd build --pull ${roles[*]}"
+  fi
+  REBUILT_ROLES=" ${roles[*]+${roles[*]}} "; export REBUILT_ROLES
   eval "$cmd up -d --remove-orphans"
+  if [ "$caddy_changed" = 0 ]; then reload_caddy || true; fi
+  return 0
 }
 
 if apply "${changed[@]}" && failed="$(health_gate)"; then

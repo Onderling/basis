@@ -21,6 +21,7 @@
  * a future mobile-only NavModel field never forks the selection logic.
  */
 import { renderWeb, renderMobile } from '@onderling/app-manifest';
+import { alphaTabs } from './alphaSurface.js';
 
 /**
  * The ordered top-level TAB BAR roots a manifest projects, in declaration
@@ -34,6 +35,14 @@ import { renderWeb, renderMobile } from '@onderling/app-manifest';
  * @returns {Array<{id: string, labelKey: string, icon?: string, target: object}>}
  */
 export function circleTabs(manifest, renderer = renderWeb) {
+  const nav = renderer(manifest);
+  // The alpha paints a subset (alphaSurface.js); the manifest keeps declaring every tab. Filtering HERE,
+  // in the one projection both shells consume, is what keeps web ≡ mobile without a shell knowing why.
+  return alphaTabs(Array.isArray(nav.tabs) ? nav.tabs : []);
+}
+
+/** Every tab the manifest declares, hidden ones included — for tests and the guard, never for a shell. */
+export function allManifestTabs(manifest, renderer = renderWeb) {
   const nav = renderer(manifest);
   return Array.isArray(nav.tabs) ? nav.tabs : [];
 }

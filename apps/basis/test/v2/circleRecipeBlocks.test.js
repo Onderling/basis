@@ -293,12 +293,14 @@ describe('circleRecipeBlocks · D1 (§5A) — quickActions', () => {
   const block = { id: 'q', type: 'quickActions', config: { limit: 4 } };
 
   it('cold start: falls back to enabledFeatures order, source=default', async () => {
-    // Default policy enables chat, noticeboard, houseRules, memberDirectory (CIRCLE_FEATURES order; S1 #1).
+    // Default policy enables chat, noticeboard, tasks, houseRules, memberDirectory (CIRCLE_FEATURES order;
+    // tasks on since the alpha cut, 2026-09-08).
     const r = await materializeBlock({ block, circleId: 'c1', hostOps: { policy: null } });
     expect(r.type).toBe('quickActions');
     expect(r.status).toBe('ok');
     expect(r.content.source).toBe('default');
-    expect(r.content.actions.map((a) => a.key)).toEqual(['chat', 'noticeboard', 'houseRules', 'memberDirectory']);
+    // the row is capped at the block's default limit of 4, so memberDirectory (fifth) falls off
+    expect(r.content.actions.map((a) => a.key)).toEqual(['chat', 'noticeboard', 'tasks', 'houseRules']);
   });
 
   it('frequency reorders within the enabled set, source=frequency', async () => {

@@ -50,6 +50,9 @@ describe('onboarding template', () => {
     let s = startGuidedSetup(T);
     expect(stepOf(T, s).say).toMatch(/Onderling/);          // welkom
     s = submitGuidedStep(T, s, undefined).state;            // → wat_is_dit
+    s = submitGuidedStep(T, s, undefined).state;            // → alpha (the alpha note)
+    expect(stepOf(T, s).say).toMatch(/testversie/);
+    s = submitGuidedStep(T, s, undefined).state;            // → alpha_leren
     s = submitGuidedStep(T, s, undefined).state;            // → own_circle (choice)
     expect(stepOf(T, s).kind).toBe('choice');
     const r = submitGuidedStep(T, s, 'ja');                 // pick "ja" → per-option handoff
@@ -61,6 +64,8 @@ describe('onboarding template', () => {
     const T = buildOnboardingTemplate('nl');
     let s = startGuidedSetup(T);
     s = submitGuidedStep(T, s, undefined).state;            // wat_is_dit
+    s = submitGuidedStep(T, s, undefined).state;            // alpha
+    s = submitGuidedStep(T, s, undefined).state;            // alpha_leren
     s = submitGuidedStep(T, s, undefined).state;            // own_circle
     let r = submitGuidedStep(T, s, 'later');                // → uitnodigen
     expect(r.handoff).toBe(false);
@@ -88,8 +93,14 @@ describe('onboarding chat driver', () => {
     const turn = onboardingTurn(T, startGuidedSetup(T));
     expect(turn.awaiting).toBe(true);
     expect(turn.done).toBe(false);
-    // welkom + wat_is_dit (say bubbles) + own_circle (the choice prompt) = 3 bubbles.
-    expect(turn.bubbles.length).toBe(3);
+    // welkom + wat_is_dit + alpha + alpha_leren (say bubbles) + own_circle (the choice prompt) = 5.
+    expect(turn.bubbles.length).toBe(5);
+    // The alpha note reaches a first-run user BEFORE the first question, in both shells (they
+    // render this one template), and says the four things a tester must know.
+    const notes = turn.bubbles.map((b) => b.text ?? b.say ?? '').join(' ');
+    for (const must of [/testversie/i, /geen meldingen/i, /herstelzin/i, /opnieuw beginnen/i, /willen leren/i]) {
+      expect(notes).toMatch(must);
+    }
     const last = turn.bubbles[turn.bubbles.length - 1];
     expect(last.buttons.map((b) => b.action)).toEqual([onboardingActionFor('ja'), onboardingActionFor('later')]);
     expect(turn.bubbles[0].buttons).toBeNull();

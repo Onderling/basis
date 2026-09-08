@@ -26,6 +26,7 @@
  *     circle policy with the SAME `isFeatureEnabled` both shells used before.
  */
 import { renderWeb, renderMobile } from '@onderling/app-manifest';
+import { alphaActions } from './alphaSurface.js';
 import { isFeatureEnabled } from './circlePolicy.js';
 
 /**
@@ -57,7 +58,18 @@ function actionAllowed(action, policy, platform) {
  * @param {Function}    [opts.renderer]   — the pure projector (renderWeb | renderMobile)
  * @returns {Array<object>}
  */
-export function circleActions(manifest, { policy = null, platform = 'web', renderer = renderWeb } = {}) {
+export function circleActions(manifest, opts = {}) {
+  // the alpha's trimmed ⋯ menu (alphaSurface.js) — filtered HERE, over the gated roster, so web ≡ mobile
+  // without a shell knowing why; the gates themselves stay observable through `gatedActions`.
+  return alphaActions(gatedActions(manifest, opts));
+}
+
+/**
+ * The gated roster BEFORE the alpha trim: every action the manifest declares that this policy and
+ * platform allow. What a shell would paint once the alpha widens; what tests of the feature gate and
+ * the platform gate assert on, since the trim hides most of the gated ids from the DOM today.
+ */
+export function gatedActions(manifest, { policy = null, platform = 'web', renderer = renderWeb } = {}) {
   const nav = renderer(manifest);
   const actions = Array.isArray(nav.actions) ? nav.actions : [];
   return actions.filter((action) => actionAllowed(action, policy, platform));

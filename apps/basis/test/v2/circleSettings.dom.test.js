@@ -17,8 +17,21 @@ describe('renderCircleSettings', () => {
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t });
     expect(el.querySelectorAll('.circle-settings__feature input[type=checkbox]')).toHaveLength(8);
     expect(el.querySelectorAll('.circle-settings__axis')).toHaveLength(SETTINGS_ENUM_AXES.length);
-    expect([...el.querySelectorAll('.circle-settings__axis')].map((s) => s.dataset.axis))
-      .toEqual([...SETTINGS_ENUM_AXES]);
+    // every axis is rendered, in axis order — `pod` in view, the others inside the closed
+    // "Geavanceerd" fold (alphaSurface.js ADVANCED_SETTINGS), so the DOM order is pod first
+    expect([...el.querySelectorAll('.circle-settings__axis')].map((s) => s.dataset.axis).sort())
+      .toEqual([...SETTINGS_ENUM_AXES].sort());
+    const fold = el.querySelector('details.circle-settings__advanced');
+    expect(fold).not.toBeNull();
+    expect(fold.open).toBe(false);
+    expect(fold.querySelector('summary').textContent).toBe('circle.settings.advanced');
+    expect(el.querySelector('.circle-settings__axis[data-axis=pod]').closest('details')).toBeNull();
+    expect(el.querySelector('.circle-settings__axis[data-axis=decisionDeadline]').closest('details')).toBe(fold);
+    expect(el.querySelector('.circle-settings__consensus').closest('details')).toBe(fold);
+    expect(el.querySelector('.circle-settings__feature').closest('details')).toBeNull();
+    // the fold sits before the save button: essentials · Geavanceerd · Opslaan
+    const kids = [...el.children];
+    expect(kids.indexOf(fold)).toBeLessThan(kids.indexOf(el.querySelector('.circle-settings__save')));
     expect(el.querySelector('input[data-feature=chat]').checked).toBe(true);
     expect(el.querySelector('.circle-settings__axis[data-axis=pod] input[value=none]').checked).toBe(true);
     // obj L — sharePosture axis is editable; default 'closed' reflects DEFAULT_CIRCLE_POLICY.

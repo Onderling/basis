@@ -1608,6 +1608,10 @@
       "text": "Wijzigingen vereisen goedkeuring van mede-admins",
       "doc": "consensusRequired toggle label."
     },
+    "advanced": {
+      "text": "Geavanceerd",
+      "doc": "Settings — the closed fold that holds every setting a member does not need weekly (the alpha keeps five in view; alphaSurface.js ADVANCED_SETTINGS)."
+    },
     "connection": {
       "text": "Verbinding & transport",
       "doc": "Phase 4 §9 — settings section: circle route + transport controls (transport-mode, relay endpoint, private chat)."
@@ -1622,11 +1626,11 @@
     },
     "transportMode_opt": {
       "nkn": {
-        "text": "NKN (standaard)",
+        "text": "NKN",
         "doc": "transport-mode option: the built-in NKN transport."
       },
       "relay": {
-        "text": "Relay",
+        "text": "Relay (standaard)",
         "doc": "transport-mode option: a WebSocket relay."
       },
       "both": {

@@ -52,9 +52,16 @@ nothing secret on it. Anything interactive (freeze, force an update) stays a com
 
 1. `HOLD` present → exit.
 2. Per repo: fetch the release branch. Same sha as `state.json` → nothing to do.
-3. New sha → check it out (detached), `compose build` the roles of that repo, `compose up -d`.
-4. Wait for every enabled role's health script (`HEALTH_TIMEOUT`, 60 s).
-5. Green → write `state.json`. Red → check the previous sha back out, restart, write `state.json` with
+3. New sha → check it out (detached), `compose build` the roles of that repo **whose `<role>.paths` the
+   release actually touched**, then `compose up -d`. This is what keeps a docs-only release from
+   recreating the public relay container — which drops its in-memory hold-and-forward queue and
+   disconnects every client (measured on the first box: the relay had been restarted by a release that
+   changed only the web app).
+4. If the rendered Caddyfile changed, reload Caddy in place — its config is a bind mount, so
+   `compose up -d` never notices a change to it (a role added, a hostname edited) and the old config
+   would keep serving.
+5. Wait for every enabled role's health script (`HEALTH_TIMEOUT`, 60 s).
+6. Green → write `state.json`. Red → check the previous sha back out, restart, write `state.json` with
    `rolledBack: true` + the failing role, log it, and send one Telegram line when `BOX_ALERT_TG_TOKEN` +
    `BOX_ALERT_TG_CHAT` are set in `.env`.
 
@@ -71,14 +78,24 @@ A repo provides, under its own `deploy/roles/`:
 | `<role>.yml` | a docker compose fragment; build contexts relative to the file |
 | `<role>.health` | optional executable: exit 0 = healthy. Gets `COMPOSE` (the full compose command), `BOX_DIR`, `ROLE` |
 | `<role>.caddy` | optional Caddy site snippet; `${VAR}` is substituted from `.env` |
+| `<role>.paths` | optional: the repo paths this role's image is built from, one prefix per line. The updater rebuilds the role only when a release touched one of them. **No file = always rebuild** (the safe default). In this repo they are GENERATED from the real workspace dependency closure — `npm run box-role-paths`, checked by `npm run guards` |
 
 The box merges the fragments of the enabled roles into one compose project (`onderling`) and renders
 the Caddyfile from the snippets. This repo's roles live in `deploy/roles/` (`relay`, `caddy`, `pod`, `companion`, `assistant`, `backup`); the
 feedback repo provides `feedback-collect` and `feedback-aggregate` the same way (its `deploy/roles/`),
 and so can a partner's repo. The box knows a repo only by `name=url#branch` in `box.conf`.
 
-`BOX_SMOKE=1` in the environment of `update.sh` makes the relay's health check also run the wire-protocol
-smoke (`deploy/smoke`) over the public `wss://` — slower, and the real proof after a first bring-up.
+A health script is told whether THIS update rebuilt its role (`ROLE_REBUILT=0|1`), so an expensive check
+can prove a NEW build instead of re-proving a process that never stopped. Every role is still checked.
+
+The relay's health check runs the **wire-protocol smoke** (`deploy/smoke`: register, two-party delivery,
+offline hold and flush, fan-out) against the relay's own socket on every update — so a release that
+breaks message delivery is rolled back rather than served. It uses the INTERNAL socket deliberately:
+measured on the first box, the public `wss://` hangs from inside the container while `https://` to the
+same name answers, so gating on it there would fail good releases. It runs when the relay was rebuilt;
+`BOX_SMOKE=1` forces it on any update and `BOX_SMOKE=0` turns it off. The public name, its certificate and
+the upgrade through Caddy are proven from OUTSIDE after a bring-up:
+`node deploy/smoke/smoke.mjs wss://<relay-domain>`.
 
 ## Backups (role `backup`)
 

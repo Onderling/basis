@@ -12,15 +12,15 @@ describe('buildCircleTabs · SP-13.3', () => {
     expect(DEFAULT_CIRCLE_TAB).toBe('conversation');
   });
 
-  it('default policy → CONVERSATION + NOTICEBOARD + MEMBERS (chat + noticeboard + memberDirectory are default on)', () => {
+  it('default policy → CONVERSATION + NOTICEBOARD + TASKS + MEMBERS (the alpha default set, 2026-09-08)', () => {
     // S1 #1 (2026-06-15): noticeboard flipped on by default now that its noticeboard surface exists.
     const tabs = buildCircleTabs(DEFAULT_CIRCLE_POLICY).map((t) => t.id);
-    expect(tabs).toEqual(['conversation', 'noticeboard', 'members']);
+    expect(tabs).toEqual(['conversation', 'noticeboard', 'tasks', 'members']);
   });
 
   it('circle-shape policy → CONVERSATION / NOTICEBOARD / MEMBERS (board Example 1)', () => {
     const policy = {
-      features: { chat: true, noticeboard: true, memberDirectory: true },
+      features: { chat: true, noticeboard: true, memberDirectory: true, tasks: false },   // tasks is on by default since the alpha cut
     };
     expect(buildCircleTabs(policy).map((t) => t.id))
       .toEqual(['conversation', 'noticeboard', 'members']);
@@ -80,7 +80,7 @@ describe('buildCircleTabs · SP-13.3', () => {
   it('houseRules does not produce a tab', () => {
     // Explicitly turn memberDirectory off so the only on-by-default
     // feature besides chat doesn't show up in the assertion.
-    const policy = { features: { chat: true, noticeboard: false, houseRules: true, memberDirectory: false } };
+    const policy = { features: { chat: true, noticeboard: false, tasks: false, houseRules: true, memberDirectory: false } };
     expect(buildCircleTabs(policy).map((t) => t.id)).toEqual(['conversation']);
   });
 
@@ -97,9 +97,9 @@ describe('buildCircleTabs · SP-13.3', () => {
   });
 
   it('handles null / empty / garbage policy gracefully (treats as defaults)', () => {
-    expect(buildCircleTabs(null).map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'members']);
-    expect(buildCircleTabs(undefined).map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'members']);
-    expect(buildCircleTabs('nope').map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'members']);
+    expect(buildCircleTabs(null).map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'tasks', 'members']);
+    expect(buildCircleTabs(undefined).map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'tasks', 'members']);
+    expect(buildCircleTabs('nope').map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'tasks', 'members']);
   });
 });
 

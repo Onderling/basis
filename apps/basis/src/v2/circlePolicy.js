@@ -157,7 +157,9 @@ export const DEFAULT_CIRCLE_POLICY = {
   features: {
     chat:            true,
     noticeboard:     true,
-    tasks:           false,
+    // The alpha's default tab set is Gesprek · Prikbord · Taken · Leden (Frits, 2026-09-08): fewer tabs by
+    // DEFAULT, not by removal — lists, notes and calendar stay one switch away for an admin.
+    tasks:           true,
     lists:           false,
     calendar:        false,
     notes:           false,

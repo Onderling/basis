@@ -1626,11 +1626,11 @@
     },
     "transportMode_opt": {
       "nkn": {
-        "text": "NKN (standaard)",
+        "text": "NKN",
         "doc": "transport-mode option: the built-in NKN transport."
       },
       "relay": {
-        "text": "Relay",
+        "text": "Relay (standaard)",
         "doc": "transport-mode option: a WebSocket relay."
       },
       "both": {

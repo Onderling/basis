@@ -51,14 +51,16 @@ describe('circlePolicy · normalizeCirclePolicy', () => {
 describe('circlePolicy · isFeatureEnabled (P6.1)', () => {
   it('returns the default for null / undefined / non-object policy', () => {
     expect(isFeatureEnabled(null,      'chat')).toBe(true);   // default on
-    expect(isFeatureEnabled(undefined, 'tasks')).toBe(false); // default off
+    expect(isFeatureEnabled(undefined, 'tasks')).toBe(true);  // default ON since the alpha cut (Gesprek · Prikbord · Taken · Leden)
+    expect(isFeatureEnabled(undefined, 'lists')).toBe(false); // default off
     expect(isFeatureEnabled('garbage', 'houseRules')).toBe(true);
     expect(isFeatureEnabled(42,        'memberDirectory')).toBe(true);
   });
 
   it('returns the default when policy has no .features field', () => {
     expect(isFeatureEnabled({}, 'chat')).toBe(true);
-    expect(isFeatureEnabled({ view: 'chat' }, 'tasks')).toBe(false);
+    expect(isFeatureEnabled({ view: 'chat' }, 'tasks')).toBe(true);   // default on
+    expect(isFeatureEnabled({ view: 'chat' }, 'lists')).toBe(false);  // default off
     expect(isFeatureEnabled({ features: null }, 'houseRules')).toBe(true);
   });
 
@@ -78,15 +80,16 @@ describe('circlePolicy · isFeatureEnabled (P6.1)', () => {
   it('treats non-boolean flag values as the default', () => {
     const garbage = { features: { chat: 'yes', tasks: 1 } };
     expect(isFeatureEnabled(garbage, 'chat')).toBe(true);   // default on
-    expect(isFeatureEnabled(garbage, 'tasks')).toBe(false); // default off
+    expect(isFeatureEnabled(garbage, 'tasks')).toBe(true);  // garbage → the default, which is on
   });
 });
 
 describe('circlePolicy · enabledFeatures (P6.1)', () => {
   it('returns the default-enabled set for a null/empty policy', () => {
-    // Defaults: chat, noticeboard, houseRules, memberDirectory (S1 #1 flipped noticeboard on).
-    expect(enabledFeatures(null)).toEqual(['chat', 'noticeboard', 'houseRules', 'memberDirectory']);
-    expect(enabledFeatures({})).toEqual(['chat', 'noticeboard', 'houseRules', 'memberDirectory']);
+    // Defaults: chat, noticeboard, tasks, houseRules, memberDirectory — the alpha's Gesprek · Prikbord · Taken ·
+    // Leden (2026-09-08; S1 #1 had flipped noticeboard on). CIRCLE_FEATURES order.
+    expect(enabledFeatures(null)).toEqual(['chat', 'noticeboard', 'tasks', 'houseRules', 'memberDirectory']);
+    expect(enabledFeatures({})).toEqual(['chat', 'noticeboard', 'tasks', 'houseRules', 'memberDirectory']);
   });
 
   it('respects explicit on/off overrides + preserves CIRCLE_FEATURES order', () => {

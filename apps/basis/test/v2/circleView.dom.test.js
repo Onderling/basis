@@ -294,25 +294,16 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(el.querySelector('.circle-view__view-toggle')).toBeNull();
   });
 
-  it('renders both Chat and Screen buttons with the active one marked', () => {
-    const el = mount();
-    renderCircleView(el, { circle, rows, t, viewMode: 'chat', onViewMode: () => {} });
-    const btns = el.querySelectorAll('.circle-view__view-toggle-btn');
-    expect([...btns].map((b) => b.dataset.viewMode)).toEqual(['chat', 'screen']);
-    expect(el.querySelector('.circle-view__view-toggle-btn.is-active').dataset.viewMode).toBe('chat');
-    expect(btns[0].getAttribute('aria-pressed')).toBe('true');
-    expect(btns[1].getAttribute('aria-pressed')).toBe('false');
-  });
-
-  it('clicking the inactive view-toggle fires onViewMode; clicking the active one is a no-op', () => {
+  it('the alpha paints ONE view mode, so no pill even when onViewMode is wired (alphaSurface.js)', () => {
+    // The scherm view is a stub ("komt in een vervolg-slice"); the pill that reached it is hidden, not
+    // removed — widening ALPHA_VIEW_MODES brings back the two buttons, the active mark, and the click
+    // wiring below, which stay in the renderer.
     const el = mount();
     const onViewMode = vi.fn();
     renderCircleView(el, { circle, rows, t, viewMode: 'chat', onViewMode });
-    el.querySelector('.circle-view__view-toggle-btn[data-view-mode=screen]').click();
-    expect(onViewMode).toHaveBeenCalledTimes(1);
-    expect(onViewMode.mock.calls[0][0]).toBe('screen');
-    el.querySelector('.circle-view__view-toggle-btn[data-view-mode=chat]').click();
-    expect(onViewMode).toHaveBeenCalledTimes(1); // unchanged — re-tap on active = no-op
+    expect(el.querySelector('.circle-view__view-toggle')).toBeNull();
+    expect(el.querySelectorAll('.circle-view__view-toggle-btn').length).toBe(0);
+    expect(onViewMode).not.toHaveBeenCalled();
   });
 
   it('screen-mode renders the screen body (α.1c) and suppresses bubbles', () => {

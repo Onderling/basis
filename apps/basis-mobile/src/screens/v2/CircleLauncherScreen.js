@@ -144,6 +144,7 @@ import {
   HELP_CIRCLE_ID, helpCircleSpec, helpCircleRoster, onderlingBotMember, provisionHelpCircle,
 } from '../../../../basis/src/v2/helpCircle.js';
 import { createOnboardingFlags, asyncStorageOnboardingIo } from '../../../../basis/src/v2/onboardingFlags.js';
+import { alphaViewModes, alphaViewMode, isAlphaTab } from '../../../../basis/src/v2/alphaSurface.js';
 import { buildOnboardingTemplate } from '../../../../basis/src/v2/onboardingTemplate.js';
 import { startGuidedSetup } from '../../../../basis/src/v2/guidedSetup.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../../../basis/src/v2/onboardingChat.js';
@@ -1518,6 +1519,7 @@ export default function CircleLauncherScreen({
   // new primary; Stroom is retired (now lives as the seeded "Stream"
   // screen on the Screens tab).
   const onTab = (id) => {
+    if (!isAlphaTab(id)) id = 'circles';   // a hidden surface lands on the circles list (alphaSurface.js)
     if (id === 'screens') setView('screens');
     else if (id === 'circles') { setActiveCircle(null); setSelected(null); setView('list'); }
     else if (id === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
@@ -2091,7 +2093,7 @@ export default function CircleLauncherScreen({
             // list already uses (`CircleListScreen.js`).
             keyboardShouldPersistTaps="handled"
           >
-            {bundle?.mdns ? (
+            {bundle?.mdns && isAlphaTab('nearby') ? (
               <Pressable style={styles.nearbyRow} testID="circle-nearby" accessibilityRole="button" onPress={() => setView('nearby')}>
                 <Text style={styles.nearbyText}>
                   {formatNearbyLabel(nearbyCount, t, { radioOff: readNearbyRadio() === 'off' })}
@@ -2825,17 +2827,18 @@ function CircleDetail({
   // §4 — until the member has flipped the pill for this circle, the
   // landing surface is the admin's policy.view front door
   // (defaultViewModeFromPolicy): 'screen' → screen, else → chat.
-  const [viewMode, setViewModeState] = useState(() => defaultViewModeFromPolicy(policy));
+  const [viewMode, setViewModeState] = useState(() => alphaViewMode(defaultViewModeFromPolicy(policy)));
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!circle?.id) return;
-      const fallback = defaultViewModeFromPolicy(policy);
+      const fallback = alphaViewMode(defaultViewModeFromPolicy(policy));
       try {
         const raw = await AsyncStorage.getItem('cc.circleViewMode');
         const map = raw ? JSON.parse(raw) : {};
         const saved = map?.[circle.id];
-        if (alive) setViewModeState(saved === 'screen' || saved === 'chat' ? saved : fallback);
+        // clamped to what the alpha paints: a mode saved before the cut opens as chat (alphaSurface.js)
+        if (alive) setViewModeState(saved === 'screen' || saved === 'chat' ? alphaViewMode(saved) : fallback);
       } catch { if (alive) setViewModeState(fallback); }
     })();
     return () => { alive = false; };
@@ -3830,12 +3833,13 @@ function CircleDetail({
             'group' (that's a web-only ARIA role).  The buttons inside
             carry their own role + accessibilityState; the wrapper just
             needs a label for screen-reader context. */}
+        {alphaViewModes().length > 1 ? (
         <View
           style={styles.viewToggle}
           accessibilityLabel={t('circle.view.view_toggle_label')}
           testID="circle-detail-view-toggle"
         >
-          {['chat', 'screen'].map((mode) => (
+          {alphaViewModes().map((mode) => (
             <Pressable
               key={mode}
               accessibilityRole="button"
@@ -3850,6 +3854,7 @@ function CircleDetail({
             </Pressable>
           ))}
         </View>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('circle.view.more')}

@@ -36,6 +36,7 @@
  */
 
 import { actionsForStreamRow } from '../../src/v2/streamActions.js';
+import { alphaViewModes } from '../../src/v2/alphaSurface.js';
 import { deliveryPresentation } from '../../src/v2/deliverySettings.js';
 import { revealedMemberLabel } from '../../src/v2/circleViewAs.js';
 import { renderMandateLegibility } from './mandatePicker.js';
@@ -211,12 +212,14 @@ export function renderCircleView(container, {
   // Chat ↔ Screen pill (v2 §4 board "De mode switch").
   // Only renders when the host wires `onViewMode`; otherwise the
   // header stays clean (some hosts may want to suppress it).
-  if (typeof onViewMode === 'function') {
+  // The alpha offers one mode (alphaSurface.js), so the pill is not painted at all; the day the scherm
+  // view is real, widening the list there brings the pill back on both shells.
+  if (typeof onViewMode === 'function' && alphaViewModes().length > 1) {
     const toggle = document.createElement('div');
     toggle.className = 'circle-view__view-toggle';
     toggle.setAttribute('role', 'group');
     toggle.setAttribute('aria-label', tr('circle.view.view_toggle_label'));
-    for (const mode of ['chat', 'screen']) {
+    for (const mode of alphaViewModes()) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'circle-view__view-toggle-btn';

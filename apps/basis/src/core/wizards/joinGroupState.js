@@ -955,6 +955,8 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
           adminPeerAddr:    inv.adminPeerAddr,
           groupId:     inv.groupId,
           code:        inv.code,
+          // Over the relay the invite names — the one the dial above put this device on (2026-09-08).
+          ...(typeof inv.relayUrl === 'string' && inv.relayUrl ? { relayUrl: inv.relayUrl } : {}),
           shareCard:   !!state.shareAddress,
           peerDisplay: state.handle,
           ...personaArg,

@@ -356,6 +356,27 @@ export function bootRelayUrl({ stored = null, list = [] } = {}) {
 }
 
 /**
+ * EVERY relay a device dials at boot (2026-09-08): its own default first (`bootRelayUrl`), then each adopted
+ * relay a circle it is in recorded from its invite. One socket per url. Before this a device was on ONE
+ * relay: joining a circle on someone else's relay dialled it for the join and, at the next boot, `bootRelayUrl`
+ * picked one url — so a person in two circles on two relays was reachable in only one of them.
+ *
+ * @param {object} [a]
+ * @param {string|null} [a.stored]     the explicit relay setting
+ * @param {Array<object>} [a.list]     `store.list()`
+ * @returns {string[]}  unique, the primary first; `[]` when there is no relay at all
+ */
+export function bootRelayUrls({ stored = null, list = [] } = {}) {
+  const primary = bootRelayUrl({ stored, list });
+  const out = primary ? [primary] : [];
+  for (const p of (Array.isArray(list) ? list : [])) {
+    if (p?.kind === POINT_KIND.POD || p?.adopted === false || !isUrl(p?.url, POINT_KIND.RELAY)) continue;
+    if (!out.includes(p.url)) out.push(p.url);
+  }
+  return out;
+}
+
+/**
  * Rule 1, applied EARLIER — the endpoint a joiner must be on **before** the redeem, or `null`.
  *
  * `recordJoinedCirclePoints` above runs from the join callback, which needs a circle id, which only
@@ -374,15 +395,16 @@ export function bootRelayUrl({ stored = null, list = [] } = {}) {
  *
  * @param {object} a
  * @param {object|null} a.invite      the DECODED invite (`relayUrl` is the field read).
- * @param {string|null} [a.activeUrl] the relay this device is already on, if any.
+ * @param {string|string[]|null} [a.activeUrl]  the relay(s) this device is already on, if any.
  * @returns {string|null} the url to dial, or null when there is nothing to do.
  */
 export function endpointToDialForInvite({ invite, activeUrl = null } = {}) {
   const url = typeof invite?.relayUrl === 'string' ? invite.relayUrl.trim() : '';
   if (!url || !isUrl(url, POINT_KIND.RELAY)) return null;
-  // Already there ⇒ nothing to do. A device is on at most one relay (`setActive` is relay-only), so this
-  // is a straight comparison rather than a membership test.
-  if (typeof activeUrl === 'string' && activeUrl.trim() === url) return null;
+  // Already there ⇒ nothing to do. `activeUrl` is the relay this device is on, or — since a device is on
+  // every relay its circles ride (2026-09-08) — the list of them.
+  const on = Array.isArray(activeUrl) ? activeUrl : [activeUrl];
+  if (on.some((u) => typeof u === 'string' && u.trim() === url)) return null;
   return url;
 }
 

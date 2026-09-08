@@ -104,7 +104,7 @@ import { circleActionsMobile } from '../../../../basis/src/v2/actionProjection.j
 // de-registers its per-circle address on the transport. Both shared with web; the transport handle
 // is the only per-shell part, passed in as `unregister`.
 import { leaveCircleLocally } from '../../../../basis/src/v2/circleMembershipHygiene.js';
-import { unregisterCircleAddresses } from '../../../../basis/src/v2/circleAddressRegistration.js';
+import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 // Which ops the DEVICE declares — the gate on the typed door's general case, read from the one contract
 // rather than from a list kept beside it.
@@ -1436,8 +1436,8 @@ export default function CircleLauncherScreen({
                 await leaveCircleLocally({
                   agent: bundle.agent, callSkill: bundle.callSkill,
                   circleId: cid,
-                  unregister: () => unregisterCircleAddresses({
-                    transport: bundle.agent?.relay, circleIds: [cid],
+                  unregister: () => unregisterCircleAddressesOnRelays({
+                    relays: bundle.agent?.relays?.list?.() ?? [], circleIds: [cid],
                     circleAddressFor: (id) => bundle.agent?.circleAddressFor?.(id) ?? null,
                   }),
                 });
@@ -2158,7 +2158,7 @@ export default function CircleLauncherScreen({
             // the redeem goes out over whatever transport this device happens to have, and a relay-only
             // admin never hears it.
             dialEndpoint={(url) => bundle?.reconnectPeer?.({ relayUrl: url })}
-            activeEndpointUrl={() => bundle?.activeRelayUrl?.() ?? null}
+            activeEndpointUrl={() => bundle?.relayUrls?.() ?? bundle?.activeRelayUrl?.() ?? null}
             // Post-join reachability (G13) — the same seam the chat-shell host passes, so a join is
             // equally complete from either surface. This screen already bound the roster keys in
             // `onDispatched`; what it never did was RE-REGISTER this device's per-circle address, so the

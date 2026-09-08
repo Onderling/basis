@@ -4694,6 +4694,23 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A1 (2026-05-23) — second cross-peer transport: WebSocket relay.
     // Symmetric to .peer; main.js + the /set-relay slash use these.
     relay: sa.relay,
+    // Every relay this device is on — the primary plus the relays its circles ride (2026-09-08). The host
+    // registers per-circle addresses on each, scoped, through `registerCircleAddressesOnRelays`.
+    relays: sa.relays,
+    /**
+     * Be on ONE MORE relay — the one an invite names, or one a circle recorded. The primary stays what it
+     * is: a join used to swap the device's relay for the circle's, so the person was then on the new one
+     * and off their own. `awaitReady` for a caller about to send over it (the join's redeem).
+     */
+    async addRelay(url, { awaitReady = true } = {}) {
+      if (typeof url !== 'string' || !url) return { ok: false, error: 'no-url' };
+      try {
+        const entry = await sa.relays.add(url, { awaitReady });
+        return { ok: true, url, connected: entry.connected === true, primary: entry.primary === true };
+      } catch (err) {
+        return { ok: false, url, error: err?.message ?? String(err) };
+      }
+    },
 
     // T5.2d — secure-mesh seams (the unified secure-mesh factory's surface).
     // Lets a shell inject a RUNTIME-built transport (e.g. basis-mobile's
@@ -4831,7 +4848,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * only `nknLib` is the original NKN path; both → the unified router picks the best route per peer.
      * Caller (web main.js / circleApp / RN bundle) injects its runtime's nkn-sdk when available.
      */
-    async connectPeerTransport({ nknLib, onPeerMessage, relayUrl, rendezvous = false, rtcLib = null, awaitRelayReady = false }) {
+    async connectPeerTransport({ nknLib, onPeerMessage, relayUrl, extraRelayUrls = [], rendezvous = false, rtcLib = null, awaitRelayReady = false }) {
       if (!nknLib && !relayUrl) {
         throw new Error('connectPeerTransport: provide nknLib and/or relayUrl (nothing to connect)');
       }
@@ -4882,6 +4899,13 @@ export async function createRealHouseholdAgent(opts = {}) {
           await sa.relay.connect({ relayUrl, onPeerMessage: routedOnPeerMessage, awaitReady: awaitRelayReady });
           sa.setTransportMode(nknLib ? 'both' : 'relay');
           if (typeof console !== 'undefined') console.info(`[realAgent] relay connected — routing across {${nknLib ? 'nkn, relay' : 'relay'}}`);
+          // The relays my circles ride, beside the primary (2026-09-08). Best-effort each: one relay that is
+          // down must not cost the others. Boot does not wait for their sockets (same reason as above).
+          for (const url of (Array.isArray(extraRelayUrls) ? extraRelayUrls : [])) {
+            if (!url || url === relayUrl) continue;
+            try { await sa.relays.add(url); }
+            catch (err) { if (typeof console !== 'undefined') console.warn(`[realAgent] extra relay ${url} failed:`, err?.message ?? err); }
+          }
         } catch (err) {
           if (typeof console !== 'undefined') console.warn(`[realAgent] relay connect failed${nknLib ? ' (continuing on NKN)' : ' (no cross-peer wire — relay was the only transport)'}:`, err?.message ?? err);
         }

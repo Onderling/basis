@@ -68,7 +68,7 @@ import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../.
 import {
   normalizeRetentionDays, retentionFromDays, DEFAULT_RETENTION_DAYS, daysToMs,
 } from '../../src/v2/retentionPref.js';
-import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
+import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../../src/v2/circleAddressRegistration.js';
 // removing one member from ONE circle, and leaving one, live in shared code: both end by
 // re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
 // makes a removal a security change rather than a list edit. web ≡ mobile by construction.
@@ -77,10 +77,10 @@ import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembe
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
 import {
-  createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints,
+  createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND,
   // Used at module scope to pick the boot relay; it was never imported, so loading the web shell threw
   // `bootRelayUrl is not defined` before anything rendered — a BLANK PAGE, not a degraded one.
-  bootRelayUrl,
+  bootRelayUrl, bootRelayUrls,
 } from '../../src/v2/connectionPoints.js';
 import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
@@ -885,6 +885,8 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
       nknLib:        nknLib ?? undefined,   // relay-only when the CDN didn't load
       onPeerMessage: peerMessageRouter,
       relayUrl:      CIRCLE_RELAY_URL,
+      // …and every other relay my circles ride (2026-09-08), one socket each, beside the primary.
+      extraRelayUrls: extraRelayUrlsAtBoot(),
       rendezvous:    true,
       // Only a caller about to send over this relay waits for the socket (the join dial). Boot does not:
       // blocking start-up behind a relay is what the transport's non-blocking connect exists to avoid.
@@ -933,9 +935,10 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   const points = getConnectionPoints();
   const circlesForPoint = (url) => points.circlesFor(url);
   circlesForPoint.pointsFor = (cid) => points.pointsFor(cid);   // the reverse view the scoper duck-types
-  registerCircleAddresses({
-    transport: agent.relay,   // the facade quacks like the port's alias half — never the transport itself
-    relayUrl: CIRCLE_RELAY_URL,
+  // On EVERY relay this device is on (2026-09-08), each scoped to the circles that ride it — the facade's
+  // per-relay port, never the transport itself.
+  registerCircleAddressesOnRelays({
+    relays: agent.relays?.list?.() ?? [],
     circleIds,
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
     // An address IS a key, so registering it means answering the relay's challenge with the key
@@ -985,6 +988,12 @@ async function applyRelayUrl(url) {
 async function dialRelayUrl(url) {
   if (typeof url !== 'string' || !url || !_peerAgent) return { ok: false, error: 'no-transport' };
   if (CIRCLE_RELAY_URL === url) return { ok: true, effective: url };
+  // Already on a relay ⇒ this one comes BESIDE it (2026-09-08): a join used to swap the device's relay for
+  // the circle's, which put the person on the new relay and off their own. The primary stays.
+  if (CIRCLE_RELAY_URL && typeof _peerAgent.addRelay === 'function') {
+    const r = await _peerAgent.addRelay(url, { awaitReady: true });
+    return r.ok ? { ok: true, effective: url } : { ok: false, error: r.error, effective: CIRCLE_RELAY_URL };
+  }
   CIRCLE_RELAY_URL = url;                       // the live resolved value tryConnect… reads
   try {
     await tryConnectPeerTransport(_peerAgent, _peerRouter, { awaitRelayReady: true });
@@ -1617,6 +1626,11 @@ let circleAttachMenu = [];
 // artifact into a finding. Pair it with `onderlingDispatch` and a walk does what a person does: read
 // what is offered, then invoke one of those ops through the waist.
 if (typeof window !== 'undefined') {
+  /** The relays this device is on — the primary and the ones its circles ride (an e2e/debug seam). */
+  window.onderlingRelays = () => {
+    try { return (_peerAgent?.relays?.list?.() ?? []).map((r) => ({ url: r.url, primary: r.primary, connected: r.connected })); }
+    catch { return []; }
+  };
   /** @param {object[]} [items] the rows in front of the walker, if it is looking at a list. */
   window.onderlingSurface = async (items = []) => {
     const circleId = getActiveCircle();
@@ -3178,8 +3192,8 @@ async function onLeaveCircle(id, circle) {
     await leaveCircleLocally({
       agent: _peerAgent, callSkill: rawCallSkill,
       circleId: id,
-      unregister: () => unregisterCircleAddresses({
-        transport: _peerAgent?.relay, circleIds: [id],
+      unregister: () => unregisterCircleAddressesOnRelays({
+        relays: _peerAgent?.relays?.list?.() ?? [], circleIds: [id],
         circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
       }),
     });
@@ -3252,6 +3266,27 @@ function getConnectionPoints() {
   try { adoptExistingRelay({ relayUrl: CIRCLE_RELAY_URL, points: connectionPointsStore }); }
   catch { /* best-effort */ }
   return connectionPointsStore;
+}
+
+/** The relay urls a circle recorded (pods are not relays). Read live from the shared store. */
+function relayUrlsForCircle(circleId) {
+  try {
+    return getConnectionPoints().pointsFor(circleId)
+      .filter((p) => p?.kind !== POINT_KIND.POD && p?.adopted !== false)
+      .map((p) => p.url);
+  } catch { return []; }
+}
+/** Every adopted relay point besides the primary — what boot dials in addition (2026-09-08). */
+function extraRelayUrlsAtBoot() {
+  try { return bootRelayUrls({ stored: CIRCLE_RELAY_URL, list: getConnectionPoints().list() }).filter((u) => u !== CIRCLE_RELAY_URL); }
+  catch { return []; }
+}
+/** The relays this device is on right now — the primary and the ones its circles ride. */
+function connectedRelayUrls() {
+  try {
+    const live = _peerAgent?.relays?.list?.().map((r) => r.url) ?? [];
+    return live.length ? live : (CIRCLE_RELAY_URL ? [CIRCLE_RELAY_URL] : []);
+  } catch { return CIRCLE_RELAY_URL ? [CIRCLE_RELAY_URL] : []; }
 }
 
 function showConnectionPoints() {
@@ -4226,7 +4261,7 @@ async function showJoinCircle(inviteArg) {
     signCircleLink: (cid, gid, addr) => circleHouseholdAgent?.signCircleLink?.(cid, gid, addr) ?? null,
     // be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
     dialEndpoint: (url) => dialRelayUrl(url),
-    activeEndpointUrl: () => CIRCLE_RELAY_URL || null,
+    activeEndpointUrl: () => connectedRelayUrls(),
     // Post-join reachability (G13, web ≡ mobile). Joining puts you on the roster; it does not make you
     // reachable. Two things must follow, and neither used to: register THIS device's per-circle address for
     // the circle, and bind the other members' addresses to their keys from the roster. `onDispatched` below
@@ -7695,6 +7730,10 @@ async function boot() {
       // `requireAliasCapable` + the fan's address choice) was wired end-to-end; no shell passed the
       // setting in, so "fallback off" was unenforceable and every install behaved as default-on.
       allowAddressFallback: () => deliverySettingsCache.allowFallback === true,
+      // The circle → relays map (2026-09-08): a circle-scoped send rides the relays the circle recorded
+      // from its invite, and nothing else. The seam existed; no shell handed the map in, so the scope was
+      // always empty and every circle rode whatever relay came first.
+      circlePointsFor: (cid) => relayUrlsForCircle(cid),
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (see circleVersioning.js).
       versionStoreFor: getCircleVersionStore,

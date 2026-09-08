@@ -59,9 +59,9 @@ import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
-import { registerCircleAddresses } from '../../../basis/src/v2/circleAddressRegistration.js';
+import { registerCircleAddressesOnRelays } from '../../../basis/src/v2/circleAddressRegistration.js';
 import { makeCircleReachable } from '../../../basis/src/v2/householdRosterPairing.js';
-import { createConnectionPoints, bootRelayUrl, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
+import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnectionPointsIo, POINT_KIND } from '../../../basis/src/v2/connectionPoints.js';
 // SILENT out-of-circle delivery — the per-user "shared with me" store (TIERED: AsyncStorage canonical + pod
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
@@ -89,14 +89,27 @@ export async function resolveMobileRelayUrl() {
  * wins) — see its header for why a suggested point and a pod are both excluded.
  */
 export async function resolveBootRelayUrl() {
+  return (await resolveBootRelayUrls())[0] ?? null;
+}
+
+/**
+ * EVERY relay to be on at boot (2026-09-08): the primary first, then each relay a circle recorded.
+ * @returns {Promise<string[]>}
+ */
+export async function resolveBootRelayUrls() {
   const stored = await resolveMobileRelayUrl();
   try {
-    const io = asyncStorageConnectionPointsIo(AsyncStorage);
-    const points = createConnectionPoints({ initial: await io.load(), save: () => {} });
-    return bootRelayUrl({ stored, list: points.list() });
+    const points = await loadConnectionPoints();
+    return bootRelayUrls({ stored, list: points.list() });
   } catch {
-    return stored;      // no points store ⇒ exactly the previous behaviour
+    return stored ? [stored] : [];      // no points store ⇒ exactly the previous behaviour
   }
+}
+
+/** A read-only view of the persisted connection points (the launcher owns the writing store). */
+async function loadConnectionPoints() {
+  const io = asyncStorageConnectionPointsIo(AsyncStorage);
+  return createConnectionPoints({ initial: await io.load(), save: () => {} });
 }
 import { discoverA2A } from '@onderling/core';
 
@@ -331,6 +344,10 @@ export async function bootAgentBundle(opts = {}) {
       // bool); realAgent threads it into both halves of the choice (the fan's address pick and
       // reliableSend's `requireAliasCapable`). Absent → the pre-existing default (on), unchanged.
       allowAddressFallback: opts.allowAddressFallback,
+      // The circle → relays map (2026-09-08, web parity): a circle-scoped send rides the relays the circle
+      // recorded, nothing else. Sends are synchronous readers, the store is AsyncStorage-backed, so this
+      // reads the snapshot refreshed at boot and at every presence registration (which a join triggers).
+      circlePointsFor: (cid) => circlePointsSnapshot(cid),
       publishEvent:     opts.publishEvent,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (RN twin of web's
@@ -408,6 +425,10 @@ export async function bootAgentBundle(opts = {}) {
   // socket fact behind `setActive`, and the join path reads it to decide whether an invite's endpoint
   // still needs dialling (J-CP1).
   let _activeRelayUrl = null;
+  let _pointsList = [];          // the connection points as last loaded — see `circlePointsFor`
+  const circlePointsSnapshot = (cid) => _pointsList
+    .filter((p) => p?.kind !== POINT_KIND.POD && p?.adopted !== false && Array.isArray(p?.circles) && p.circles.includes(cid))
+    .map((p) => p.url);
   if (typeof opts.buildPeerWiring === 'function') {
     try {
       const w = opts.buildPeerWiring({ agent, callSkill: agent.callSkill });
@@ -575,13 +596,14 @@ export async function bootAgentBundle(opts = {}) {
       // per-circle address timed out. Found by walking the first message round-trip on hardware.
       const relayUrl = agent?.relay?.url ?? _activeRelayUrl ?? await resolveMobileRelayUrl();
       if (!relayUrl || !agent?.relay?.supportsAliases) return;
-      const io = asyncStorageConnectionPointsIo(AsyncStorage);
-      const points = createConnectionPoints({ initial: await io.load(), save: () => {} });
+      const points = await loadConnectionPoints();
+      _pointsList = points.list();   // the send-time circle → relays snapshot (see `circlePointsFor`)
       const circlesForPoint = (url) => points.circlesFor(url);
       circlesForPoint.pointsFor = (cid) => points.pointsFor(cid);   // the reverse view the scoper duck-types
-      await registerCircleAddresses({
-        transport: agent.relay,   // the facade quacks like the port's alias half — never the transport itself
-        relayUrl,
+      // On EVERY relay this device is on (2026-09-08), each scoped to the circles that ride it — the
+      // facade's per-relay port, never the transport itself.
+      await registerCircleAddressesOnRelays({
+        relays: agent.relays?.list?.() ?? [],
         circleIds: ids,
         circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
         circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
@@ -644,12 +666,16 @@ export async function bootAgentBundle(opts = {}) {
         // Stable wrapper reads the mutable slot at delivery time, so a
         // router attached after connect still receives messages.
         _connNknLib = nknLib; _connRtcLib = rtcLib;   // capture for reconnectPeer (live relay reconnect)
-        _activeRelayUrl = await resolveBootRelayUrl();
+        const bootRelays = await resolveBootRelayUrls();
+        _activeRelayUrl = bootRelays[0] ?? null;
+        try { _pointsList = (await loadConnectionPoints()).list(); } catch { /* no store yet */ }
         await agent.connectPeerTransport({
           nknLib,
           onPeerMessage: (addr, payload) => peerWiringRef.onPeerMessage?.(addr, payload),
           // T3a — relay alongside NKN (routed); the in-app setting wins over the env (no rebuild). unset → NKN-only.
           relayUrl: _activeRelayUrl,
+          // …and every other relay my circles ride (2026-09-08), one socket each, beside the primary.
+          extraRelayUrls: bootRelays.slice(1),
           // T5.2d — direct WebRTC upgrade over the nkn/relay signalling path.
           rendezvous: true,
           rtcLib,
@@ -823,6 +849,13 @@ export async function bootAgentBundle(opts = {}) {
   const reconnectPeer = async ({ relayUrl: override = null } = {}) => {
     if (typeof agent?.connectPeerTransport !== 'function') return { ok: false, error: 'no transport' };
     const relayUrl = (typeof override === 'string' && override) ? override : await resolveMobileRelayUrl();
+    // Already on a relay ⇒ the invite's relay comes BESIDE it (2026-09-08, web parity): a join used to swap
+    // the device's relay for the circle's, which put the person on the new relay and off their own.
+    if (override && _activeRelayUrl && override !== _activeRelayUrl && typeof agent?.addRelay === 'function') {
+      const r = await agent.addRelay(override, { awaitReady: true });
+      if (r.ok) { registerCirclePresence(); return { ok: true, effective: override }; }
+      return { ok: false, error: r.error, effective: _activeRelayUrl };
+    }
     try {
       await agent.connectPeerTransport({
         nknLib: _connNknLib ?? undefined,
@@ -853,6 +886,11 @@ export async function bootAgentBundle(opts = {}) {
     reconnectPeer,
     /** The relay this device is on right now (null = none). Read live; do not cache across renders. */
     activeRelayUrl: () => _activeRelayUrl,
+    /** Every relay this device is on — the primary and the ones its circles ride (2026-09-08). */
+    relayUrls: () => {
+      try { const live = agent?.relays?.list?.().map((r) => r.url) ?? []; return live.length ? live : (_activeRelayUrl ? [_activeRelayUrl] : []); }
+      catch { return _activeRelayUrl ? [_activeRelayUrl] : []; }
+    },
     registerCirclePresence,   // G13 — callable with no args from anywhere; asks the substrate for the list
     /**
      * Post-join: make a circle reachable (G13). Register this device's per-circle address AND bind the

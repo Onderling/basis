@@ -99,6 +99,28 @@ export async function registerCircleAddresses({
 }
 
 /**
+ * Register this device's per-circle addresses on EVERY relay it is on (2026-09-08) — the primary and the
+ * relays its circles ride — each scoped by `registerCircleAddresses`, so a relay still learns only its own
+ * circles. One loop shared by both shells; the shell passes what it holds and paints nothing.
+ *
+ * @param {object} a
+ * @param {Array<{url: string, primary?: boolean, port: object}>} a.relays   `agent.relays.list()`
+ * @param {string|null} [a.defaultRelayUrl]  the deployment default (unmapped circles register there alone);
+ *   absent ⇒ the primary entry's url
+ * @returns {Promise<Array<{relayUrl: string} & Awaited<ReturnType<typeof registerCircleAddresses>>>>}
+ */
+export async function registerCircleAddressesOnRelays({ relays = [], defaultRelayUrl = null, ...rest } = {}) {
+  const list = Array.isArray(relays) ? relays.filter((r) => r && typeof r.url === 'string' && r.url) : [];
+  const fallback = defaultRelayUrl ?? list.find((r) => r.primary)?.url ?? list[0]?.url ?? null;
+  const out = [];
+  for (const r of list) {
+    const result = await registerCircleAddresses({ ...rest, transport: r.port, relayUrl: r.url, defaultRelayUrl: fallback });
+    out.push({ relayUrl: r.url, ...result });
+  }
+  return out;
+}
+
+/**
  * Unregister the addresses of circles that no longer ride this relay — the other half of J-R4: a relay you
  * moved a circle away from stops receiving its registrations, and learns nothing about where it went.
  */
@@ -112,6 +134,16 @@ export async function unregisterCircleAddresses({ transport, circleIds = [], cir
     try { transport.removeAddress(address); removed.push(circleId); } catch { /* best-effort */ }
   }
   return { removed };
+}
+
+/** The leave half over every relay the device is on (2026-09-08): a left circle's address goes off each. */
+export async function unregisterCircleAddressesOnRelays({ relays = [], ...rest } = {}) {
+  const out = [];
+  for (const r of (Array.isArray(relays) ? relays : [])) {
+    if (!r?.port) continue;
+    out.push({ relayUrl: r.url, ...(await unregisterCircleAddresses({ ...rest, transport: r.port })) });
+  }
+  return out;
 }
 
 /** Is this circle mapped to any OTHER RELAY? (A helper the scoping rule reads; never throws.) */

@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RELAY_BIN = path.resolve(HERE, '../../../packages/relay/bin/relay.js');
 const PID_FILE = path.join(HERE, '.relay-fixture.pid');
+const PID_FILE_2 = path.join(HERE, '.relay-fixture-2.pid');
 
 // The default port follows the scheme — a `wss://` relay behind a reverse proxy answers on 443, not on
 // the relay's own 8787. Getting this wrong made a run against a PUBLIC relay try to start a relay on the
@@ -56,7 +57,13 @@ async function waitForPort(host, port, tries = 40) {
 }
 
 export default async function globalSetup() {
-  const url = process.env.PEER_TEST_RELAY;
+  // A second relay (PEER_TEST_RELAY_2) arms the two-relay stories: a device on its own relay joining a
+  // circle that rides another. Same rules: attach if listening, spawn only on this machine (2026-09-08).
+  await startOne(process.env.PEER_TEST_RELAY, PID_FILE);
+  await startOne(process.env.PEER_TEST_RELAY_2, PID_FILE_2);
+}
+
+async function startOne(url, pidFile) {
   if (!url) return;   // not armed — default/nkn runs stay exactly as they were.
   const { host, port } = parseHostPort(url);
 
@@ -76,17 +83,19 @@ export default async function globalSetup() {
     stdio: 'inherit',
     detached: false,
   });
-  try { fs.writeFileSync(PID_FILE, String(child.pid)); } catch { /* */ }
+  try { fs.writeFileSync(pidFile, String(child.pid)); } catch { /* */ }
   const up = await waitForPort(host, port);
   if (!up) { console.warn(`[relay-fixture] relay did NOT come up on ${host}:${port} — relay cells will degrade.`); }
   else     { console.log(`[relay-fixture] relay ready at ${url}`); }
 }
 
 export async function globalTeardown() {
-  let pid = null;
-  try { pid = Number(fs.readFileSync(PID_FILE, 'utf8').trim()); } catch { return; }
-  if (pid) {
-    try { process.kill(pid); console.log(`[relay-fixture] stopped relay (pid ${pid}).`); } catch { /* already gone */ }
+  for (const pidFile of [PID_FILE, PID_FILE_2]) {
+    let pid = null;
+    try { pid = Number(fs.readFileSync(pidFile, 'utf8').trim()); } catch { continue; }
+    if (pid) {
+      try { process.kill(pid); console.log(`[relay-fixture] stopped relay (pid ${pid}).`); } catch { /* already gone */ }
+    }
+    try { fs.unlinkSync(pidFile); } catch { /* */ }
   }
-  try { fs.unlinkSync(PID_FILE); } catch { /* */ }
 }

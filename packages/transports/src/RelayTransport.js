@@ -116,6 +116,11 @@ export class RelayTransport extends Transport {
   // on the same socket, which the relay accepts (step A).
   get supportsAliases() { return true; }
 
+  /** The relay this socket dials. Routing narrows a circle-scoped send to the relays the circle recorded by
+   *  comparing THIS against the scope's points — with more than one relay up, a transport that cannot say
+   *  which relay it is would be eligible for every circle (2026-09-08). */
+  get url() { return this.#relayUrl; }
+
   async _bindAddress(address, opts) {
     // Refuse locally what the relay would refuse anyway, and say which of the two it was. Without a
     // signer for this alias we cannot answer its challenge, so registering it is not something that

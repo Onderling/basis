@@ -57,6 +57,8 @@ import { buildCircleLanes } from '../src/v2/circleLanes.js';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
+import { makeCircleAddressAnnouncePeerHandler } from '../src/v2/circleAddressAnnounce.js';
+import { makeRosterUpdatedPeerHandler } from '../src/v2/rosterUpdated.js';
 import { applyRulesUpdates } from '../src/v2/rulesUpdateLane.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 
@@ -181,6 +183,12 @@ if (relayUrl) {
       ...lanes.handlers,
       [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
       [contactChannel.subtypes.out]: contactChannel.messageHandler(landTurn),
+      // A member — above all this owner's OTHER device — says where it answers in a circle. Without
+      // this the box never learns a sibling's address, its sibling set stays empty, and the fan above
+      // has nowhere to go: the one message this device exists to pass on would stop here.
+      'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent, logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} } }),
+      // A roster owner says a row changed; the values are re-read, never carried on this wire.
+      'roster-updated': makeRosterUpdatedPeerHandler({ eventLog: deviceLog, onPull: async () => {} }),
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>

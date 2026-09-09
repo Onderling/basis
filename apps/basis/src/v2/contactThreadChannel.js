@@ -50,12 +50,19 @@ export const DEFAULT_CONTACT_SUBTYPES = { out: 'contact-msg', in: 'contact-reply
  * @param {(peerAddr: string, threadId: string) => object|null} [deps.floorFor]
  *   the PRE-SEND FLOOR a contact declares (see presendFloor.js): a redaction config, or null. Applied
  *   in `sendTurn` before the turn leaves the device; a turn may also carry its own `floor`.
+ * @param {((turn: object) => any) | null} [deps.fanToOwnDevices]
+ *   hand a turn to the person's OTHER DEVICES (`contactTurnFan.js`). A DM is addressed to a person
+ *   but arrives at one device, so without this the thread reads differently on each of them. Wired
+ *   HERE, at the one place every turn in either direction passes, so both shells get it by
+ *   construction. Omitted → the turn stays on this device (today's behaviour, and the honest state
+ *   for a composition with no peer transport).
  * @param {string | null} [deps.localActor]      my webid (persisted `source.fromWebid`).
  * @param {string | null} [deps.localStableId]
  * @returns {{
  *   sendTurn: (turn: object) => { messageId: string, sent: Promise<any> },
  *   persistInbound: (turn: object) => Promise<{ itemId: string|null }>,
  *   persistOutbound: (turn: object) => Promise<{ itemId: string|null }>,
+ *   applyOwnDeviceTurn: (wire: object) => Promise<object>,
  *   rehydrate: (contactId: string) => Promise<Array<object>>,
  *   replyHandler: (onReply: (reply: object) => void) => ((fromAddr: string, payload: object) => void),
  *   messageHandler: (onMessage: (msg: object) => void) => ((fromAddr: string, payload: object) => void),
@@ -72,10 +79,26 @@ export function createContactThreadChannel({
   localStableId = null,
   blobStore = null,
   floorFor = null,
+  fanToOwnDevices = null,
 } = {}) {
   const mkId = typeof genId === 'function'
     ? genId
     : () => `ct-${now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  /**
+   * Hand a turn to the owner's other devices. Never throws and never delays the caller's own
+   * result: a sibling that misses a turn has an incomplete thread, which must not become a failed
+   * send or a message this device refuses to store.
+   */
+  async function fanOwn(turn) {
+    if (typeof fanToOwnDevices !== 'function') return;
+    try { await fanToOwnDevices(turn); }
+    catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn(`[contact-turns] could not reach my own devices with this turn: ${err?.message ?? err}`);
+      }
+    }
+  }
 
   // The shared addressed-send core (C3). `sendTurn` now routes through this
   // instead of a bare ephemeral peer-send: it still sends over the injected
@@ -148,7 +171,20 @@ export function createContactThreadChannel({
         ...(sender?.webid       ? { webid: sender.webid }             : {}),
       },
     };
-    const sent = core.deliver(envelope, { to: peerAddr });
+    // The fan rides the SEND's promise, after the turn has actually gone out and been stored — so a
+    // sibling is never shown a message that this device failed to send. What it carries is the
+    // redacted text, the same bytes the contact received and the same bytes stored here.
+    const sent = Promise.resolve(core.deliver(envelope, { to: peerAddr })).then(async (res) => {
+      // A resend of a turn already stored has already been fanned once; fanning it again would put a
+      // second copy on every sibling's wire for nothing.
+      if (!res?.deduped) {
+        await fanOwn({
+          direction: 'out', contactId: threadId, peerAddr, replyTo,
+          text: floored.text, messageId: id, ts: envelope.ts,
+        });
+      }
+      return res;
+    });
     return { messageId: id, sent, text: floored.text, redacted: floored.hits.length };
   }
 
@@ -166,9 +202,12 @@ export function createContactThreadChannel({
    * @param {Array}   [turn.buttons]
    * @param {string}  [turn.replyTo]
    * @param {number}  [turn.ts]
+   * @param {boolean} [turn.viaOwnDevice]  this turn ARRIVED from one of my own devices' fan — store
+   *   it, do not send it onward. Without this the two devices would hand the same turn back and
+   *   forth: each hand-off looks like a fresh arrival to the other.
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
-  function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file } = {}) {
+  function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice = false } = {}) {
     const envelope = {
       id:     messageId ?? mkId(),
       kind:   subtypes.in,
@@ -184,7 +223,14 @@ export function createContactThreadChannel({
         ...(file && typeof file === 'object' ? { file } : {}),
       },
     };
-    return core.persistInbound(envelope, { to: fromAddr });
+    return Promise.resolve(core.persistInbound(envelope, { to: fromAddr })).then(async (res) => {
+      // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
+      // and re-fanning it would put a second copy on every sibling's wire for nothing.
+      if (!viaOwnDevice && !res?.deduped) {
+        await fanOwn({ direction: 'in', contactId, fromAddr, text, messageId, replyTo, ts, buttons, file });
+      }
+      return res;
+    });
   }
 
   /**
@@ -199,9 +245,10 @@ export function createContactThreadChannel({
    * @param {string}  [turn.messageId]  dedup key (else generated).
    * @param {string}  [turn.replyTo]    what this answers (a post id).
    * @param {number}  [turn.ts]
+   * @param {boolean} [turn.viaOwnDevice]  arrived from my own device's fan — store, do not re-send.
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
-  function persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts } = {}) {
+  function persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, viaOwnDevice = false } = {}) {
     const envelope = {
       id:     messageId ?? mkId(),
       kind:   subtypes.out,
@@ -210,7 +257,41 @@ export function createContactThreadChannel({
       body:   text ?? '',
       extras: { threadId: contactId, threadKey: contactId, peerAddr, replyTo },
     };
-    return core.persistOutbound(envelope, { to: peerAddr ?? contactId });
+    return Promise.resolve(core.persistOutbound(envelope, { to: peerAddr ?? contactId })).then(async (res) => {
+      if (!viaOwnDevice && !res?.deduped) {
+        await fanOwn({ direction: 'out', contactId, peerAddr, text, messageId: envelope.id, replyTo, ts: envelope.ts });
+      }
+      return res;
+    });
+  }
+
+  /**
+   * Land a turn that one of MY OWN DEVICES fanned here (`contactTurnFan.js` verified the sender
+   * before calling this). One function rather than a direction branch in each shell: which of the
+   * two persist paths a fanned turn takes is this module's business, not a projector's.
+   *
+   * It answers what the shell needs to PAINT — the thread it belongs to, which side of the
+   * conversation it is, and whether it was already known — so the shell adds a bubble or does
+   * nothing, and never has to work out either from the wire.
+   *
+   * @param {object} wire  a turn from the fan (`contactTurnToWire`'s shape)
+   * @returns {Promise<{ contactId: string, origin: 'user'|'bot', deduped: boolean, itemId: string|null,
+   *   text: string, messageId?: string, replyTo?: string, ts?: number, buttons?: Array, file?: object,
+   *   fromAddr?: string }>}
+   */
+  async function applyOwnDeviceTurn(wire = {}) {
+    const { direction, contactId, peerAddr, fromAddr, text = '', messageId, replyTo, ts, buttons, file } = wire;
+    const outbound = direction === 'out';
+    const res = outbound
+      ? await persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, viaOwnDevice: true })
+      : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true });
+    return {
+      contactId,
+      origin:  outbound ? 'user' : 'bot',
+      deduped: res?.deduped === true,
+      itemId:  res?.itemId ?? null,
+      text, messageId, replyTo, ts, buttons, file, fromAddr, peerAddr,
+    };
   }
 
   /**
@@ -274,5 +355,5 @@ export function createContactThreadChannel({
     };
   }
 
-  return { sendTurn, persistInbound, persistOutbound, rehydrate, replyHandler, messageHandler, subtypes };
+  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, replyHandler, messageHandler, subtypes };
 }

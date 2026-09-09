@@ -2160,6 +2160,9 @@ function buildCircleBot(agent) {
     // async-built store doesn't block channel construction; null → ephemeral.
     itemStore:  () => getContactDmStore(),
     localActor: LOCAL_ACTOR,
+    // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
+    // this person's other devices so the thread reads the same on all of them.
+    fanToOwnDevices: agent.contactTurnFan,
   });
   if (typeof window !== 'undefined') {
     window.onderlingContactChannel = circleContactChannel;
@@ -2998,15 +3001,38 @@ function onContactReply({ contactId: keyedBy, fromAddr, threadId, text, buttons,
   // still routes by its echoed threadId; an unresolved sender still falls back to their address.
   const contactId = keyedBy
     ?? ((threadId && contactThreads.has(threadId)) ? threadId : fromAddr);
+  paintContactTurn({ contactId, fromAddr, origin: 'bot', text, buttons, messageId, replyTo, file });
+  // Phase 2 (C3 / the G18 fix): persist the inbound turn so the thread is durable
+  // in BOTH directions (dedup on messageId is shared with sendTurn's outbound). Persisting is also
+  // what hands the turn to my OTHER DEVICES, so their thread reads the same as this one.
+  try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, ts, file }); }
+  catch { /* best-effort — durability never blocks the live render */ }
+}
+
+// A turn one of MY OWN DEVICES carried here (the sender was verified as mine before this runs). The
+// channel decides which of its two persist paths a fanned turn takes and tells us which side of the
+// conversation it is; this only paints, and only when the turn is genuinely new — a device that
+// already holds the turn must not grow a second bubble for it.
+async function onOwnDeviceContactTurn(wire) {
+  const landed = await circleContactChannel.applyOwnDeviceTurn(wire);
+  if (landed.deduped) return;
+  paintContactTurn({
+    contactId: landed.contactId,
+    fromAddr:  landed.fromAddr ?? landed.peerAddr,
+    origin:    landed.origin,
+    text: landed.text, buttons: landed.buttons, messageId: landed.messageId,
+    replyTo: landed.replyTo, file: landed.file,
+  });
+}
+
+// The render half every arriving turn shares: put the bubble in its thread, paint if that thread is
+// on screen, and give a thread nobody has named yet a real name when the directory can supply one.
+function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageId, replyTo, file }) {
   let thread = contactThreads.get(contactId);
   const isNew = !thread;
   if (isNew) { thread = { name: contactId, peerAddr: fromAddr, messages: [] }; contactThreads.set(contactId, thread); }
   // `file` — a received peer-wire file (photo, document) rides the turn; the thread is its durable home.
-  thread.messages.push({ origin: 'bot', text, buttons, messageId, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}) });
-  // Phase 2 (C3 / the G18 fix): persist the inbound turn so the thread is durable
-  // in BOTH directions (dedup on messageId is shared with sendTurn's outbound).
-  try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, ts, file }); }
-  catch { /* best-effort — durability never blocks the live render */ }
+  thread.messages.push({ origin, text, buttons, messageId, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}) });
   if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
   // Resolve a friendlier name for an unsolicited inbound thread (fire-and-forget).
   if (isNew) {
@@ -8212,6 +8238,11 @@ async function boot() {
           // The grants lane (connections belong to the person): a sibling device's grant/revoke
           // lands through the agent's ready-made receiver and refolds the door's grant set live.
           ...(agent.grantsPeerHandler ? { [GRANTS_BROADCAST]: agent.grantsPeerHandler } : {}),
+          // The contact-thread fan's receive half: a turn one of MY OWN devices took delivery of.
+          // The agent's handler proves the sender is mine before this shell paints anything.
+          ...(agent.contactTurnHandler ? {
+            [agent.contactTurnBroadcast]: agent.contactTurnHandler((wire) => onOwnDeviceContactTurn(wire)),
+          } : {}),
           ...(agent.grantsCatchUp ? {
             [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
             [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,

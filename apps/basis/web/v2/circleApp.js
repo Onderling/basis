@@ -182,14 +182,10 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
-import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
-import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
-import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
+// The lane table both shells (and a headless device) build from one place.
+import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
-import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
-import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
-import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
@@ -315,7 +311,7 @@ import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
 // No-pod group-key rotation, RECEIVE side: record a fanned key-event into the local per-circle log +
 // fold the recorded events into the key chain on a content read (the counterpart to the key-event log sink).
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../src/v2/keyEventStore.js';
-import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler, projectKeyEventsIntoStore } from '../../src/v2/keyRail.js';
+import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../src/v2/keyRail.js';
 // OBJ-2 membership — the peer-redeem handshake (joiner ⇄ admin) is shared core; v2 just wires the
 // same three factories the classic shells use (groupRedeem.js) into its peer router + join glue.
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../../src/core/handlers/groupRedeem.js';
@@ -7993,39 +7989,9 @@ async function boot() {
         applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
         if (getActiveCircle() === cid) _govRerender?.();
       };
-      govCatchUpShell = govShellRail ? makeGovernanceCatchUp({
-        rail: govShellRail,
-        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
-        onChange: govChanged,
-        // The durable-head serve: a member offline past the lane's audit window still receives the
-        // preserved (original, signed) rules-update statement — the final setting never deletes.
-        extraStatementsFor: (cid) => preservedRulesStatementsFor({ callSkill: rawCallSkill, circleId: cid }),
-      }) : null;
-      // The membership lane's catch-up: the same lane-parametrized mechanism over the agent's rail.
-      memCatchUpShell = agent.membershipRail ? makeGovernanceCatchUp({
-        rail: agent.membershipRail,
-        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
-        subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
-        onChange: (circleId) => agent.rosterReads?.invalidate(circleId),   // a landed batch changes the roster
-      }) : null;
-      // The KEY lane's catch-up (pull-all — one small statement per version): a long-offline or freshly
-      // enrolled device converges on the circle's group-key chain; the store refreshes as the projection.
-      keyCatchUpShell = agent.keyRail ? makeGovernanceCatchUp({
-        rail: agent.keyRail,
-        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
-        subtypes: KEY_CATCHUP_SUBTYPES,
-        onChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
-      }) : null;
-      // The task lane's catch-up is the FRONTIER REPLAY (windowed, chunked — content lanes never pull-all):
-      // the receiver sends its head hashes + a limit; the serve set is the stored entries PLUS signed
-      // snapshots of live heads whose entries aged out (the store row outlives the 14-day lane window), so
-      // a long-offline device still converges on every open task, paging as needed.
-      taskCatchUpShell = agent.taskRail ? makeFrontierReplay({
-        rail: agent.taskRail,
-        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
-        subtypes: TASK_CATCHUP_SUBTYPES,
-        statementsFor: (cid) => agent.taskRail.catchUpStatements(cid),
-      }) : null;
+      // The five lanes' catch-ups are built once, further down, together with the chat lane's —
+      // one table for every shell (`buildCircleLanes`). `govChanged` above is this shell's reaction
+      // to a landed governance statement, and is handed to that call.
       // Route the auto-resolving callSkill through the calendar-wrapped one too,
       // so button-driven calendar dispatches fan out as well as the bot path.
       // Pass a catalogue GETTER so the resolver skips origins that don't declare the
@@ -8119,41 +8085,44 @@ async function boot() {
       // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
       // entry (bubble + proof). The side effects mirror the legacy inbox's: the store copy (durable
       // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
-      const circleChatStatementHandler = agent.chatRail ? makeChatPeerHandler({
-        rail: agent.chatRail,
-        // A pod-signal circle fans a REF to the statement's sealed pod row — resolved through the same
-        // sealed-pod reader the legacy inbox used, then verified at the rail like any fanned statement.
+      // THE LANE TABLE, built once for every shell (`buildCircleLanes`): the five signed lanes with
+      // their catch-ups, plus the personal ones — grants, the roster seed, and the turns this person's
+      // own devices hand each other. This shell passes only its own reactions: what to repaint, where
+      // a projection lives, and how it asks the catch-up's consent question.
+      const circleLanes = buildCircleLanes({
+        agent,
+        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
+        govRail: govShellRail,
+        eventLog,
         resolveRef: circleResolveRef,
-        // The persisted log IS the record — a landed signed entry needs no store copy anymore (the
-        // history migration carried the store era over once). Side effects: the receipt + the repaint.
-        onLanded: async (cid, entry, fromPeerAddr) => {
-          onCircleStored({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' });
-        },
-      }) : null;
-      // POD-ONLY circles never fan — the shared pod is the meeting point. On the same reconnect kick as
-      // the peer catch-ups, range-read each pod circle's statement rows since the local watermark and
-      // ingest them through the rail's verify gate.
-      podChatCatchUpShell = agent.chatRail ? makePodChatCatchUp({
-        rail: agent.chatRail,
         podReadSince: circlePodReadSince,
         dataMoveFor: circleSendDataMove,
-        eventLog,
-      }) : null;
-      // The chat lane's catch-up: windowed frontier replay with the consent rung. Above the auto-allow
-      // ceiling the user gets the real question as a circle bubble with a download button.
-      chatCatchUpShell = agent.chatRail ? makeFrontierReplay({
-        rail: agent.chatRail,
-        sendToPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
-        subtypes: CHAT_CATCHUP_SUBTYPES,
-        onChange: (cid) => { if (cid === _circleRender?.circleId) { try { _circleRender?.rerender?.(); } catch { /* */ } } },
-        onOffer: ({ circleId: cid, count, approxBytes, allow }) => {
-          const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
-          _circleRender?.botBubble?.(t('circle.chat.catchup_offer', { count, size: mb }), {
-            buttons: [{ action: 'chat-catchup-allow', label: t('circle.chat.catchup_allow') }],
-          });
-          _chatCatchUpPendingAllows.set(cid, allow);
+        // The durable-head serve: a member offline past the lane's audit window still receives the
+        // preserved (original, signed) rules-update statement — the final setting never deletes.
+        extraGovStatementsFor: (cid) => preservedRulesStatementsFor({ callSkill: rawCallSkill, circleId: cid }),
+        on: {
+          govChange: govChanged,
+          keyChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
+          membershipChange: (cid) => { pullRosterForCircle({ circleId: cid }).catch(() => { /* best-effort */ }); },
+          chatLanded: ({ msgId, circleId: cid, fromPeerAddr, source }) => onCircleStored({ msgId, circleId: cid, fromPeerAddr, source }),
+          chatChange: (cid) => { if (cid === _circleRender?.circleId) { try { _circleRender?.rerender?.(); } catch { /* the entry landed either way */ } } },
+          // Above the auto-allow ceiling the person gets the real question, as a circle bubble here.
+          chatCatchUpOffer: ({ circleId: cid, count, approxBytes, allow }) => {
+            const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
+            _circleRender?.botBubble?.(t('circle.chat.catchup_offer', { count, size: mb }), {
+              buttons: [{ action: 'chat-catchup-allow', label: t('circle.chat.catchup_allow') }],
+            });
+            _chatCatchUpPendingAllows.set(cid, allow);
+          },
+          ownDeviceTurn: (wire) => onOwnDeviceContactTurn(wire),
         },
-      }) : null;
+      });
+      govCatchUpShell     = circleLanes.catchUps.gov;
+      memCatchUpShell     = circleLanes.catchUps.membership;
+      keyCatchUpShell     = circleLanes.catchUps.key;
+      taskCatchUpShell    = circleLanes.catchUps.task;
+      chatCatchUpShell    = circleLanes.catchUps.chat;
+      podChatCatchUpShell = circleLanes.catchUps.podChat;
       // THE ONE-TIME HISTORY MIGRATION (store copy → persisted device log): the log is the record now
       // (durable since the persistence slice), so the store-era history lands on it ONCE through the
       // shared inbox and a device-local latch skips every later boot. The per-boot rehydrate is retired
@@ -8201,13 +8170,10 @@ async function boot() {
 
       const peerMessageRouter = makePeerRouter({
         handlers: {
-          // The SIGNED chat lane: verify-at-the-rail receive + its windowed, consent-gated catch-up.
-          ...(circleChatStatementHandler ? { [CHAT_STATEMENT_BROADCAST]: circleChatStatementHandler } : {}),
-          ...(chatCatchUpShell ? {
-            [chatCatchUpShell.subtypes.request]: chatCatchUpShell.onRequest,
-            [chatCatchUpShell.subtypes.batch]:   chatCatchUpShell.onBatch,
-            [chatCatchUpShell.subtypes.offer]:   chatCatchUpShell.onOffer,
-          } : {}),
+          // The five signed lanes and the personal ones, from the ONE table every shell builds
+          // (`buildCircleLanes`). What stays below is what only THIS shell can answer: bubbles,
+          // wizard stashes, the nearby room, and the threads it paints.
+          ...circleLanes.handlers,
           // Delivery honesty — the peer's app stored our message; advance the shared δ.2 map to `stored`.
           // The shared receiver validates (rebuilt, `from` off the wire), checks the sender against the
           // circle's roster, and the map's monotonic rule orders it. Fire-and-forget: the roster read is a
@@ -8216,51 +8182,6 @@ async function boot() {
           'circle-recipe-broadcast':  circleRecipeHandler,
           'circle-rules-broadcast':   circleRulesHandler,
           'circle-policy-broadcast':  circlePolicyHandler,
-          // Wave C tail A — ingest fanned governance/report events into the one log so a
-          // vote/report raised on another device shows here; re-render an open panel.
-          ...(govCatchUpShell ? { [govCatchUpShell.subtypes.request]: govCatchUpShell.onRequest, [govCatchUpShell.subtypes.batch]: govCatchUpShell.onBatch } : {}),
-          // The membership rider: the fan receiver (verify-on-ingest at the agent's rail) + its catch-up pair.
-          // …and REFRESH the open circle when one lands. The handler has taken an `onChange` since it
-          // was written and this call site never passed one, so a membership statement arriving from
-          // somebody else changed the fold and repainted nothing: the roster on screen stayed as it
-          // was, and every notice that hangs off `loadRoster` — you were removed, the circle became
-          // yours — waited for the person to navigate somewhere before it would speak.
-          //
-          // That is why three separate notices read as broken while being built, correct and localised
-          // (walked 2026-08-28). Same shape as the delivery chip the day before: the state was right
-          // and the screen was never told. `pullRosterForCircle` already does exactly this for the
-          // member-side pull and no-ops when the circle is not open.
-          ...(agent.membershipRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({
-            rail: agent.membershipRail,
-            onChange: (circleId) => { agent.rosterReads?.invalidate(circleId); pullRosterForCircle({ circleId }).catch(() => { /* best-effort */ }); },
-          }) } : {}),
-          ...(memCatchUpShell ? { [memCatchUpShell.subtypes.request]: memCatchUpShell.onRequest, [memCatchUpShell.subtypes.batch]: memCatchUpShell.onBatch } : {}),
-          // The grants lane (connections belong to the person): a sibling device's grant/revoke
-          // lands through the agent's ready-made receiver and refolds the door's grant set live.
-          ...(agent.grantsPeerHandler ? { [GRANTS_BROADCAST]: agent.grantsPeerHandler } : {}),
-          // The contact-thread fan's receive half: a turn one of MY OWN devices took delivery of.
-          // The agent's handler proves the sender is mine before this shell paints anything.
-          ...(agent.contactTurnHandler ? {
-            [agent.contactTurnBroadcast]: agent.contactTurnHandler((wire) => onOwnDeviceContactTurn(wire)),
-          } : {}),
-          ...(agent.grantsCatchUp ? {
-            [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
-            [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,
-          } : {}),
-          // The roster seed (pod-less enroll S1): serve a sibling's trail request; land a served
-          // parcel (both device-set verified inside the agent's handlers).
-          ...(agent.rosterSeed ? {
-            [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
-            [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
-          } : {}),
-          // The task lane (the content re-root): the fan receiver verifies at the agent's rail AND causally
-          // merges the snapshot into the circle's store head; the catch-up pair covers the offline device.
-          ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
-          ...(taskCatchUpShell ? {
-            [taskCatchUpShell.subtypes.request]: taskCatchUpShell.onRequest,
-            [taskCatchUpShell.subtypes.batch]:   taskCatchUpShell.onBatch,
-            [taskCatchUpShell.subtypes.offer]:   taskCatchUpShell.onOffer,
-          } : {}),
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.
@@ -8339,20 +8260,6 @@ async function boot() {
               groupId: circleId, publicKey: podSealingPublicKeyFromNetworkKey(address),
             }),
           }),
-          // No-pod group-key rotation — RECEIVE side, on the KEY LANE: a fanned statement verifies at the
-          // rail (signature + chain + rotateKey authority; a forked rotator's statements are discounted)
-          // and the local key-event store refreshes as the lane's PROJECTION. A removed member is never a
-          // recipient of the rotation fan → never folds the new version → cannot open post-removal content.
-          ...(agent.keyRail ? {
-            [KEY_STATEMENT_BROADCAST]: makeKeyPeerHandler({
-              rail: agent.keyRail,
-              onChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
-            }),
-            ...(keyCatchUpShell ? {
-              [keyCatchUpShell.subtypes.request]: keyCatchUpShell.onRequest,
-              [keyCatchUpShell.subtypes.batch]:   keyCatchUpShell.onBatch,
-            } : {}),
-          } : {}),
           // personas#2 — post-join persona-property push: admin records the member's disclosure onto
           // the roster + acks; the member resolves the pending push on the ack.
           'persona-props-update':    makeHandlePersonaPropsUpdate({ callSkill: rawCallSkill, sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts), announceRosterUpdate }),

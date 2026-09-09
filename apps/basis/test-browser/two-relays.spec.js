@@ -68,7 +68,21 @@ async function sendDirectMessage(page, text) {
   await input.first().fill(text);
   await page.locator('.cc-cthread__send').first().click();
   await page.waitForTimeout(2500);
-  return { sent: true, to };
+  // Clicking send is not evidence that anything was sent. Ask the thread whether it kept the turn:
+  // the channel persists what actually left the device, so a turn that is there went out, and one that
+  // is not never did. Without this, a receive-side failure and a send-side failure look identical, and
+  // this probe reported both as `sent: true` (2026-09-09).
+  const kept = await page.evaluate(async (t) => {
+    try {
+      const rows = await window.onderlingContactChannel?.rehydrate?.(
+        document.querySelector('.cc-cthread')?.getAttribute('data-contact-id')
+        ?? window.__ccActiveThread ?? '',
+      );
+      if (Array.isArray(rows) && rows.some((r) => r.text === t)) return true;
+    } catch { /* fall through to the rendered log */ }
+    return (document.querySelector('.cc-cthread__log')?.innerText ?? '').includes(t);
+  }, text);
+  return { sent: kept, to, why: kept ? '' : 'the sender did not keep the turn — it never left this device' };
 }
 
 /** Poll the other side's contact threads until the text shows up in one. */
@@ -83,6 +97,18 @@ async function waitForContactMessage(page, text, { tries = 10, every = 3000 } = 
       await page.waitForTimeout(1500);
       const log_ = await page.evaluate(() => document.querySelector('.cc-cthread__log')?.innerText ?? '');
       if (log_.includes(text)) return true;
+      // The rendered log is one answer; the DURABLE thread is the other, and they can disagree. A turn
+      // that arrived while this pane was closed is stored before it is ever painted, so checking the
+      // store as well separates "never arrived" from "arrived and was not shown" — two different bugs
+      // that this probe used to report with the same red.
+      const stored = await page.evaluate(async (t) => {
+        try {
+          const id = document.querySelector('.cc-cthread')?.getAttribute('data-contact-id');
+          const rows = await window.onderlingContactChannel?.rehydrate?.(id ?? '');
+          return Array.isArray(rows) && rows.some((r) => r.text === t);
+        } catch { return false; }
+      }, text);
+      if (stored) { console.log('### NOTE: the turn is in the durable thread but was not painted'); return true; }
       const back = page.locator('.cc-cthread__back, .circle-view__back');
       if (await back.count()) { await back.first().click(); await page.waitForTimeout(800); }
     }

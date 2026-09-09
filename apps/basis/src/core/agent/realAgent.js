@@ -3448,8 +3448,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         // …gated by the user's publication lock: a contact card is the single most travelled copy of
         // this address, so "never share my global address" has to hold here first. Off ⇒ the card simply
         // carries no peerAddr and the scanner reaches them by the other rungs.
+        // WHICHEVER address this device can actually be reached at. The mesh address first, because it
+        // survives a change of relay; the relay's otherwise, which is what a device with no mesh
+        // transport has — and until 2026-09-09 that case put NO address on the card at all, so a card
+        // shared by a relay-only device (every headless one, and a browser with the mesh off) named a
+        // person the scanner had no way to write to. The publication lock below still governs both:
+        // "never share my global address" is a decision about the address, not about the transport.
         const myPeerAddr = shareableAddress(
-          sa?.peer?.address ?? null,
+          sa?.peer?.address ?? sa?.relay?.address ?? null,
           // The LIVE register value (device scope) — a flip in my-data binds here immediately.
           // opts stays as a test override; no shell passes it.
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),

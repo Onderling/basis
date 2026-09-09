@@ -1,6 +1,6 @@
-# The basis assistant on Telegram — the personal box's bot (apps/basis/bin/telegram-runner.mjs):
-# the same assistant engine the web and mobile shells use, reached through a Telegram bot, with the
-# household lists in a data dir. Same monorepo-in-Docker shape as the relay + companion images.
+# YOUR ALWAYS-ON DEVICE (apps/basis/bin/device-runner.mjs): the same agent the web and mobile shells
+# boot, running headless — it joins the relay, holds your circles, and answers on Telegram too when a
+# token is set. Same monorepo-in-Docker shape as the relay + companion images.
 #
 #   Build context = repo ROOT (the pnpm workspace):
 #     docker build -f deploy/assistant/Dockerfile -t onderling-assistant .
@@ -28,4 +28,4 @@ RUN mkdir -p /data/assistant
 VOLUME ["/data/assistant"]
 
 # TG_BOT_TOKEN · TG_ALLOWED_CHAT_IDS · PRIVATEMODE_API_KEY come from the box's .env (roles/assistant.yml).
-CMD ["node", "apps/basis/bin/telegram-runner.mjs", "--data-dir", "/data/assistant", "--walk-log", "/data/assistant/walks/"]
+CMD ["node", "apps/basis/bin/device-runner.mjs", "--data-dir", "/data/assistant", "--walk-log", "/data/assistant/walks/"]

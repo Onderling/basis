@@ -508,6 +508,14 @@ export default function ChatScreen({
       try { eventLogRef.current?.append?.(evt); } catch { /* defensive */ }
     };
 
+    // A DM that arrived DIRECTLY: store it, which is also what hands it to this person's other
+    // devices. Keyed on the SENDER's address, the same key `ContactThreadScreen`'s rehydrate already
+    // reads for an unsolicited inbound, and the same one web falls back to.
+    const landContactTurn = ({ fromAddr, text, buttons, messageId, replyTo, ts }) => {
+      contactChannel?.persistInbound?.({ contactId: fromAddr, fromAddr, text, buttons, messageId, replyTo, ts })
+        ?.catch?.(() => { /* durability is best-effort; the live push still lands */ });
+    };
+
     // Delivery honesty (receiver half) — who is ALLOWED to tell us a message arrived. Built here rather
     // than at the handler so the roster cache lives as long as the peer wiring does. The shell injects
     // only its two adapters (the log it already owns, the roster skill); the rule is shared with web.
@@ -564,9 +572,26 @@ export default function ChatScreen({
       // chat wire).  Guarded: the channel is absent in stub-mode boots.
       // S1 #3 — also an inbound PEER DM (contact-msg): a person's message lands in
       // the same inbox (the thread screen routes it by sender address).
+      // Persisting is web parity AND the seam the own-devices fan hangs off: `file-share` and
+      // `chat-message` below already store what they deliver, while a plain DM only ever went to the
+      // live inbox — so a reload lost it and the person's other devices never heard of it.
       ...(contactChannel ? {
-        [contactChannel.subtypes.in]:  contactChannel.replyHandler((reply) => pushContactReply(reply)),
-        [contactChannel.subtypes.out]: contactChannel.messageHandler((msg) => pushContactReply(msg)),
+        [contactChannel.subtypes.in]:  contactChannel.replyHandler((reply) => { landContactTurn(reply); pushContactReply(reply); }),
+        [contactChannel.subtypes.out]: contactChannel.messageHandler((msg) => { landContactTurn(msg); pushContactReply(msg); }),
+        // The fan's receive half: a turn one of MY OWN devices took delivery of. The agent's handler
+        // proves the sender is mine; the channel decides which persist path a fanned turn takes and
+        // says which side of the conversation it is, so an open thread paints it on the right side.
+        ...(bundle?.agent?.contactTurnHandler ? {
+          [bundle.agent.contactTurnBroadcast]: bundle.agent.contactTurnHandler(async (wire) => {
+            const landed = await contactChannel.applyOwnDeviceTurn(wire);
+            if (landed.deduped) return;
+            pushContactReply({
+              fromAddr: landed.fromAddr ?? landed.peerAddr, threadId: landed.contactId,
+              text: landed.text, buttons: landed.buttons, replyTo: landed.replyTo,
+              messageId: landed.messageId, file: landed.file, origin: landed.origin,
+            });
+          }),
+        } : {}),
       } : {}),
       'calendar-rsvp':         makeHandleCalendarRsvp({ callSkill, publishEvent }),
       'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),

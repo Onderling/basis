@@ -9,7 +9,8 @@
       "basis",
       "onderling-invite",
       "onderling-contact",
-      "onderling-pair"
+      "onderling-pair",
+      "onderling-enroll"
     ],
     "android": {
       "package": "org.onderling.basis",

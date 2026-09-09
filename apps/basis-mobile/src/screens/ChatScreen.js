@@ -58,6 +58,7 @@ import {
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
 import { makeReceiptReceiver, rehydrateDeliveryState } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
+import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
 import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
 import { makeCirclePolicyPeerHandler } from '../../../basis/src/v2/circlePolicyReceiver.js';
@@ -2054,6 +2055,16 @@ export default function ChatScreen({
       } catch (err) {
         appendBotText(t('chat.scan_failed', { error: err?.message ?? String(err) }));
       }
+      return;
+    }
+    if (res.kind === 'enroll') {
+      // An offer for ANOTHER DEVICE OF YOUR OWN. Stashing is the whole of what an offer can do here:
+      // it carries the circles this device will need, never authority — the ceremony asks for the
+      // recovery phrase, on the screen that owns it. Web stashes the same way when it reads the link
+      // out of its own address bar, and then opens the flow; this shell says where to finish it,
+      // because the flow lives on another screen (see docs/conventions/web-mobile-exceptions.md).
+      const stashed = await stashEnrollOffer(AsyncStorage, payload).catch(() => ({ ok: false }));
+      appendBotText(stashed.ok ? t('chat.scan_enroll_stashed') : t('chat.scan_enroll_failed'));
       return;
     }
     if (res.kind === 'invite') {

@@ -34,7 +34,12 @@ describe('circle chat — one inbox, card-fan parity (web ≡ mobile)', () => {
   it('the legacy plain-envelope receive is GONE — live chat arrives only as signed statements', () => {
     expect(chatScreen).not.toMatch(/makeFallbackInbox/);
     expect(chatScreen).not.toMatch(/'circle-chat-message'\s*:/);          // no unsigned receive path
-    expect(chatScreen).toMatch(/CHAT_STATEMENT_BROADCAST/);               // the signed one is registered
+    // The signed lane is still registered, one level up: since 2026-09-09 the five signed lanes are
+    // built once in `src/v2/circleLanes.js` and spread into both shells, so this screen names the
+    // table rather than the subtype. `shellsRouteTheSameSubtypes` holds the table itself to routing
+    // CHAT_STATEMENT_BROADCAST, and holds both shells to spreading it.
+    expect(chatScreen).toMatch(/buildCircleLanes/);
+    expect(chatScreen).toMatch(/\.\.\.lanes\.handlers/);
   });
 
   it('the App singleton carries the full receive config (resolveRef + receipts + self-author)', () => {

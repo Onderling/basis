@@ -86,6 +86,14 @@ function vaultPassphrase() {
 }
 
 const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase());
+// The CHAT-side vault, durable, because on a box there is no browser storage to fall back to.
+//
+// Without this the factory falls back to a MEMORY vault (`makeBrowserVault` has no `localStorage` here),
+// and this device forgets, every restart, everything that lives on the chat side: the delegation blob
+// that says which device it is, and — since content became sealed at rest — the key its own stored items
+// are sealed under. A box is the one device that is expected to run for months untouched, so it is the
+// worst possible host for a vault that only exists until the process does.
+const chatVault = new VaultNodeFs(path.join(dataDir, 'chat-vault.json'), vaultPassphrase());
 
 // The device log is the record every lane rides, so it is hydrated from disk BEFORE the agent boots:
 // a device that forgets its log on restart would re-admit a connection its owner revoked, and would
@@ -97,6 +105,7 @@ const { hydrated } = await wireEventLogPersistence({
 
 const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
+  chatVault,
   householdPersistDb: { path: path.join(dataDir, 'household-items.json') },
   deviceLog,
   seedDemoData: false,

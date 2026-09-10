@@ -29,3 +29,4 @@ export { SyncCadence } from './src/SyncCadence.js';
 export {
   createSettingsModule,
 } from './src/Settings.js';
+export { sealedPersist } from './src/sealedPersist.js';

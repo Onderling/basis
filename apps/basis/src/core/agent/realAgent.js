@@ -42,6 +42,10 @@ import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressS
 import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
+import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
+import { sealsAtRest, localStorageAtRestIo } from '../../v2/atRestSettings.js';   // the one opt-out, default sealed
+import { createSealingBackend, PLAINTEXT_AT_REST } from '@onderling/pseudo-pod';   // the seal above a blind local store, and the explicit opt-out
+import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
 import {
   createHistoryMirror, hydrateHistory, exportHistoryArchive,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
@@ -259,9 +263,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Default (undefined) → in-memory `MemorySource`, unchanged.  The actual
   // shell threading of `householdPersistDb` is a follow-up; realAgent just
   // accepts + wires it here.
-  const householdDataSource = opts.householdPersistDb
-    ? await buildHouseholdDataSource(opts.householdPersistDb)
-    : undefined;
+  // (BUILT BELOW, once the content-at-rest key exists — see `contentSeal`. It has to be sealed from its
+  // first write, and the key lives behind the identity vault, which this point in the boot is too early
+  // for. `getCircleScope` below closes over it and only runs at op time, long after.)
+  let householdDataSource;
   // Per-circle store registry (no-pod scoping). One shared DataSource; each circle gets an ItemStore
   // rooted at mem://household/circles/<id>/ so its list is its OWN. The legacy bucket ('household' /
   // no active circle) keeps the bare root, so the pre-partition pile stays reachable as a default.
@@ -295,10 +300,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // to the pod). The platform provisions it (`opts.provisionCircleMedium`, web-woven) at circle-open, keyed
   // here; `dataSourceFor` hands it to the store at build time. Absent injection → the shared local backing.
   const circleMedia = new Map();          // circleId → cache-mode PseudoPod medium (DataSource-shaped)
-  const householdService = householdApp.createHouseholdService({
-    dataSource: householdDataSource,
-    dataSourceFor: (id) => circleMedia.get(id) ?? null,
-  });
+  let householdService;   // built with `householdDataSource` below, for the same reason
   // The task lane (the content re-root) — ASSIGNED where the device log is handed over, further down; declared
   // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
   let taskRail = null;
@@ -444,6 +446,34 @@ export async function createRealHouseholdAgent(opts = {}) {
   // root is the one repair that keeps the person reachable at their roster addresses.
   const chatVaultBacking = opts.chatVault ?? makeBrowserVault('cc-chat-id:');
   const chatVault = await sealedVault(chatVaultBacking);
+
+  // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
+  // Key material was already sealed here; a person's own words were not. Their lists, messages and
+  // search index reached IndexedDB, AsyncStorage and disk in the clear. The content key rides INSIDE
+  // the sealed chat vault: exactly as durable as the identity (lose one and the other is gone anyway),
+  // and resealed by the custody ceremony along with every other sealed backing — so the key rotates
+  // while not one item byte is rewritten. See `v2/contentAtRest.js` for why it is not the vault key.
+  // Default sealed. Only an explicit choice by the person turns this off, and every failure path in
+  // `sealsAtRest` returns sealed — a settings store that will not load must not be the reason a disk goes
+  // readable. `PLAINTEXT_AT_REST` is a distinct value from "no key yet" on purpose: one is a decision that
+  // stores plain text, the other is a wiring bug that refuses the write.
+  const atRestIo = opts.atRestIo ?? (typeof globalThis.localStorage !== 'undefined' ? localStorageAtRestIo() : null);
+  const contentSeal = (await sealsAtRest(atRestIo))
+    ? await contentSealStrategy(chatVault)
+    : PLAINTEXT_AT_REST;
+  // The shells build their own stores (a circle's items, the search index, the device-log snapshot) and
+  // cannot reach into this boot for the key, so it is published for them here. Deliberately NOT read back
+  // by this agent: a test process boots several agents, and a shared holder would hand the second one's
+  // key to the first one's stores. See `v2/localStoreSeal.js`.
+  setShellContentSeal(contentSeal);
+  // Now the stores that hold content can be built, sealed from their first write.
+  householdDataSource = opts.householdPersistDb
+    ? await buildHouseholdDataSource(opts.householdPersistDb, { strategy: contentSeal })
+    : undefined;
+  householdService = householdApp.createHouseholdService({
+    dataSource: householdDataSource,
+    dataSourceFor: (id) => circleMedia.get(id) ?? null,
+  });
   // THE HISTORY KEYS (the replace ceremony's re-wrap, held locally): group-key versions this person is
   // entitled to that were wrapped to a RETIRED device's derivable sealing key. The ceremony unwraps them
   // with the old device's re-derived key and keeps the raw keys here, sealed at rest under this device's
@@ -575,7 +605,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The outbox (held messages + the dead-address verdict) on a DEVICE-LOCAL store, so neither resets
     // on every launch. Same builder as the settings store; never the pod — a held message is this
     // device's promise to try again, not the person's data.
-    holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource(opts.outboxPersistDb) : undefined,
+    holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource(opts.outboxPersistDb, { strategy: contentSeal }) : undefined,
     holdStoreUri: 'mem://basis/outbox.json',
     // onPeerMessage + nknLib supplied later via setPeerWiring().
     // Pass-through for extra factory opts (tests + future ops):
@@ -700,7 +730,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // `opts.settingsDataSource` (a pod-backed store, or a SHARED one across a user's devices in a journey);
   // else in-memory (tests / transient).
   const settingsDataSource = opts.settingsDataSource
-    ?? (opts.settingsPersistDb ? await buildHouseholdDataSource(opts.settingsPersistDb) : memoryDataSource());
+    ?? (opts.settingsPersistDb ? await buildHouseholdDataSource(opts.settingsPersistDb, { strategy: contentSeal }) : memoryDataSource());
   // Pod-sync the settings store. The settings `CachingDataSource` starts LOCAL; when the shell can reach the
   // signed-in pod it hands a pod-backed inner (a self-sealed pod DataSource over the settings container) via
   // `opts.provisionSettingsMedium` — EXACT mirror of `opts.provisionCircleMedium` for circle stores. `attachInner`
@@ -1175,7 +1205,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       const strategy = typeof opts.provisionRegistryMedium === 'function' ? settingsSealStrategyForIdentity(chatId) : null;
       const medium   = strategy ? await opts.provisionRegistryMedium(strategy) : null;
       const carrier  = createRegistryCarrier({
-        backend: opts.registryBackend ?? null, deviceId: chatId.pubKey,
+        // Sealed at rest: the registry holds who this device belongs to — the person's curated
+        // properties, their circle memberships, their device names — and it held all of it in the clear.
+        // The pod MIRROR was already sealed (`provisionRegistryMedium`); the LOCAL copy was not, so the
+        // copy on the disk in the room was the readable one. Same content key as every other local store.
+        backend: opts.registryBackend
+          ? createSealingBackend({ backend: opts.registryBackend, getStrategy: () => contentSeal })
+          : null,
+        deviceId: chatId.pubKey,
         medium, name: medium ? registryPodName(chatId) : null,
         onKeyMismatch: () => opts.onRegistryKeyMismatch?.(),
         warn: (m) => { if (typeof console !== 'undefined') console.warn(m); },
@@ -2369,6 +2406,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // 4 demo tasks (the data-loss bug behind the
     // `cc.firstBootSeeded.v1` workaround in App.js).
     persistDb: opts.tasksPersistDb,
+    contentSeal,                       // its list is content too — sealed on the way to disk
     label: 'TasksCircle(cc)',
     // One-store-per-circle (G-C1) — hand every tasks circle its household
     // CircleItemStore instead of tasks-v0 constructing a second one. Tasks then
@@ -2718,6 +2756,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       ] : []),
     ],
     persistDb:  opts.stoopPersistDb,   // browser IDB; opt-in via caller
+    contentSeal,                       // its posts are content too — sealed on the way to disk
     // S4 — per-circle control-agent router: redeem→addMember / leave→removeMember route
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent
     // → membership hooks no-op (the pre-S4 behaviour).

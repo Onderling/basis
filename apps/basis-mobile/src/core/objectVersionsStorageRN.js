@@ -21,6 +21,7 @@
 
 import { createObjectVersionsAdapter } from '@onderling/kring-host/objectVersionsStorage';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
+import { sealedLocalBackend } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 
 /** AsyncStorage scope for circle version history (disjoint from `pp:`). */
 export const VERSIONS_AS_SCOPE = 'ccv';
@@ -37,7 +38,7 @@ export const VERSIONS_AS_SCOPE = 'ccv';
 export function asyncStorageObjectVersions(storeName, storage, retention) {
   return createObjectVersionsAdapter({
     storeName,
-    backend: createAsBackend({ AsyncStorage: storage, scope: VERSIONS_AS_SCOPE }),
+    backend: sealedLocalBackend(createAsBackend({ AsyncStorage: storage, scope: VERSIONS_AS_SCOPE })),
     retention,
   });
 }

@@ -22,7 +22,7 @@
  * tasks-v0's `storage/persist/*` so behaviour is identical.
  */
 
-import { CachingDataSource } from '@onderling/local-store';
+import { CachingDataSource, sealedPersist } from '@onderling/local-store';
 
 /**
  * Build a persistent household DataSource from a `persistDb` descriptor.
@@ -39,15 +39,21 @@ import { CachingDataSource } from '@onderling/local-store';
  *   - `{path}`                  → FilePersist (Node)
  *   - `{dbName, storeName?}`    → IndexedDBPersist (browser)
  *   - `{dbName, asyncStorage}`  → AsyncStoragePersist (RN)
+ * @param {object} [opts]
+ * @param {{seal:Function, open:Function}|null} [opts.strategy]  this device's content-seal strategy —
+ *   what makes the persisted copy unreadable without the key. Omit for the previous, plaintext behaviour.
  * @returns {Promise<CachingDataSource|null>}
  */
-export async function buildHouseholdDataSource(persistDb) {
+export async function buildHouseholdDataSource(persistDb, { strategy = null } = {}) {
   if (!persistDb || typeof persistDb !== 'object') return null;
 
   const picked = await pickPersist(persistDb);
   if (!picked) return null; // no path/dbName → caller uses in-memory
 
-  const { persist } = picked;
+  // At rest, the adapter writes ciphertext; the cache above it stays plaintext, so `query()` still
+  // parses and filters. Without a strategy the adapter is returned unchanged — a host with no content
+  // key behaves exactly as it did, rather than half-sealing. See `sealedPersist`.
+  const persist = sealedPersist(picked.persist, strategy);
   const localStore = await persist.load();
 
   return new CachingDataSource({

@@ -27,3 +27,5 @@ export { createSyncEnginePodClient } from './src/syncEngineAdapter.js';
 // `globalThis.indexedDB`) — is exported from its own subpath, keeping
 // the portable main surface free of any platform coupling:
 //   import { createIndexedDbBackend } from '@onderling/pseudo-pod/browser'
+export { createSealingBackend } from './src/SealingBackend.js';
+export { PLAINTEXT_AT_REST } from './src/SealingBackend.js';

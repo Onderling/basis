@@ -61,6 +61,7 @@ export async function createBrowserTasksAgent({
   identityVault,
   circleConfig,
   persistDb,
+  contentSeal = null,   // this device's content-seal strategy — the persisted copy is unreadable without it
   label = 'TasksCircle',
 }) {
   if (!bus) throw new TypeError('createBrowserTasksAgent: bus required');
@@ -81,7 +82,7 @@ export async function createBrowserTasksAgent({
   // AsyncStorage on RN, file on Node).  Without it, the cache stays
   // Map-only (legacy behaviour).
   const localStoreBundle = persistDb
-    ? await buildBundle({ persistDb })
+    ? await buildBundle({ persistDb, contentSeal })
     : buildBundle();
 
   const circle = await createCircleAgent({
@@ -156,6 +157,7 @@ export async function createBrowserMultiCircleTasksAgent({
   identityVault,
   primaryCircleConfig,
   persistDb,
+  contentSeal = null,   // this device's content-seal strategy — the persisted copy is unreadable without it
   label = 'TasksMeshAgent(cc)',
   // The caller's role in a circle, answered by the HOST's membership head. Threaded to the
   // authority gates; absent, they refuse rather than fall back to this bundle's own member list
@@ -190,7 +192,7 @@ export async function createBrowserMultiCircleTasksAgent({
   // items under mem://tasks/circles/<circleId>/).  When `persistDb` is set,
   // one persistence adapter covers them all.
   const localStoreBundle = persistDb
-    ? await buildBundle({ persistDb })
+    ? await buildBundle({ persistDb, contentSeal })
     : buildBundle();
 
   const { meshAgent } = await buildMeshAgent({

@@ -50,6 +50,7 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
+import { sealedLocalBackend } from '../../src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
 // session routes a sealed circle to the user's REAL pod; otherwise the in-memory pseudo-pod.
@@ -1837,7 +1838,7 @@ async function resolveCircleMediaComposition(circleId, policy) {
  * reload; falls back to in-memory under SSR / tests (no `indexedDB`) — see `pickWebBackend`. */
 function makeCirclePodClient(circleId) {
   const deviceId = `circle-${circleId}`;
-  const backend  = pickWebBackend(`cc-circle-${circleId}`);
+  const backend  = sealedLocalBackend(pickWebBackend(`cc-circle-${circleId}`));
   // versioning: displaced bytes (overwrites · peer-updates · dropped
   // concurrent forks · deletes) land in `versions/` on the SAME backend —
   // the substrate under the my-data restore ops. Best-effort by design
@@ -1984,7 +1985,7 @@ const circleInputHistory = createInputHistory();
 // #7). Same @onderling/pseudo-pod substrate the circle pods run on. Objective L:
 // browser-PERSISTENT (IndexedDB) so embedded vectors survive a reload instead of
 // re-embedding; falls back to in-memory under SSR / tests (no `indexedDB`).
-const circleSearchVectorStore = pickWebBackend('cc-circle-rag');
+const circleSearchVectorStore = sealedLocalBackend(pickWebBackend('cc-circle-rag'));
 
 function buildCircleBot(agent) {
   // Merged catalogue (the LLM tool list + dispatch catalogue) — mirrors main.js.
@@ -7700,7 +7701,7 @@ async function boot() {
   // a blocked IndexedDB degrades to the old in-memory behaviour, never a broken boot.
   try {
     const { hydrated } = await wireEventLogPersistence({
-      eventLog, io: backendSnapshotIo(pickWebBackend('cc-device-log')),
+      eventLog, io: backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log'))),
     });
     if (hydrated) console.info(`[device-log] hydrated ${hydrated} persisted entries`);
   } catch (err) { console.warn('[device-log] persistence wiring failed — in-memory this session:', err?.message ?? err); }
@@ -7818,6 +7819,8 @@ async function boot() {
       },
       // The owner's REGISTRY survives the device: a persistent local backend, and when signed in
       // a sealed mirror on the user's own pod under an opaque name. Same shape as the settings medium.
+      // NOT wrapped here on purpose: realAgent seals the registry itself, because it also owns the pod
+      // mirror's strategy and the two must be the same key. Wrapping it again would seal twice.
       registryBackend: pickWebBackend('cc-agent-registry'),
       provisionRegistryMedium: async (strategy) => {
         try {
@@ -7858,7 +7861,7 @@ async function boot() {
           console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy.pod ?? null)} → ${mode}`);   // web ≡ mobile
           if (mode !== 'cache') return null;   // no-pod → shared local backing
           const medium = createCircleCacheMedium({
-            localBackend: pickWebBackend(`cc-circle-cache-${circleId}`),
+            localBackend: sealedLocalBackend(pickWebBackend(`cc-circle-cache-${circleId}`)),
             deviceId:     `circle-cache-${circleId}`,
             resolvePod:   () => resolveCirclePodCustody(circleId),
           });

@@ -90,3 +90,49 @@ describe('sa.relays — the primary plus the relays my circles ride', () => {
     }
   }, 20000);
 });
+
+describe('changing the relay you are on', () => {
+  it('connect() to a DIFFERENT url moves the socket — it used to be a silent no-op', async () => {
+    // The in-app relay setting (Mij → Relayserver) reconnects by calling connect() with the new url. While
+    // a relay was connected that returned early with the OLD state, so the setting appeared to save and
+    // changed nothing until the next start — and the panel then reported the old relay as the live one.
+    const A = await startRelay({ port: 0, log: false });
+    const B = await startRelay({ port: 0, log: false });
+    const urlA = `ws://127.0.0.1:${A.port}`, urlB = `ws://127.0.0.1:${B.port}`;
+    const anna = await agent();
+    try {
+      await anna.relay.connect({ relayUrl: urlA, awaitReady: true });
+      expect(anna.relay.url).toBe(urlA);
+
+      const moved = await anna.relay.connect({ relayUrl: urlB, awaitReady: true });
+      expect(moved.url).toBe(urlB);
+      expect(anna.relay.url).toBe(urlB);
+      expect(anna.relay.status).toBe('connected');
+      // …and the one it left is not still listed as a relay this device is on.
+      expect(anna.relays.list().map((r) => r.url)).toEqual([urlB]);
+
+      // Connecting to the SAME url stays the cheap no-op it always was.
+      const again = await anna.relay.connect({ relayUrl: urlB });
+      expect(again.url).toBe(urlB);
+      expect(anna.relays.list()).toHaveLength(1);
+    } finally {
+      await anna.shutdown(); await A.stop(); await B.stop();
+    }
+  }, 20000);
+
+  it('an extra relay survives a change of the primary — it belongs to a kring, not to the setting', async () => {
+    const A = await startRelay({ port: 0, log: false });
+    const B = await startRelay({ port: 0, log: false });
+    const C = await startRelay({ port: 0, log: false });
+    const urlA = `ws://127.0.0.1:${A.port}`, urlB = `ws://127.0.0.1:${B.port}`, urlC = `ws://127.0.0.1:${C.port}`;
+    const anna = await agent();
+    try {
+      await anna.relay.connect({ relayUrl: urlA, awaitReady: true });
+      await anna.relays.add(urlC, { awaitReady: true });
+      await anna.relay.connect({ relayUrl: urlB, awaitReady: true });
+      expect(anna.relays.list().map((r) => [r.url, r.primary])).toEqual([[urlB, true], [urlC, false]]);
+    } finally {
+      await anna.shutdown(); await A.stop(); await B.stop(); await C.stop();
+    }
+  }, 25000);
+});

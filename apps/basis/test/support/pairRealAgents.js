@@ -52,6 +52,10 @@ import { createCirclePodProducer, createCircleControlAgentRouter } from '../../s
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
 import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
+// The contact-thread channel + its own-devices fan — composed here ONLY when a walk asks for it
+// (`contactChannel: true`), so every existing node keeps sending contact turns to `received`.
+import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import {
   makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, projectKeyEventsIntoStore,
 } from '../../src/v2/keyRail.js';
@@ -127,7 +131,7 @@ const LIVE_NODES = new Set();
  * keep the minimal composition. Same shape as `verifyChatBinding`: the harness offers the production
  * wiring, the test decides it needs it.
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, taskLane = false } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, taskLane = false, contactChannel = false } = {}) {
   const routerRef = { fn: null };
   // The device log the lane rides. Handed to the factory below exactly as both shells hand theirs.
   const deviceLog = taskLane ? new EventLog({ initial: [], muted: [] }) : null;
@@ -233,6 +237,27 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       try { return await rosterBinding(q); } catch { return false; }
     }),
   });
+  // ── The contact thread (opt-in) ────────────────────────────────────────────────────────────────
+  // Composed the way a shell composes it: the shared channel over the shared DM store, handed the
+  // agent's ready-made own-devices fan. A DM is addressed to a PERSON, so on a relay it lands at
+  // whichever of that person's devices holds the profile address — the fan is what carries it to
+  // the others, and this is the composition that exercises it end to end.
+  const contactTurnsSeen = [];       // turns that arrived from one of MY OWN devices
+  const contactTurnsRefused = [];    // fanned turns this node refused, with the reason
+  const contactThreadChannel = contactChannel
+    ? createContactThreadChannel({
+        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        itemStore:  createContactDmStore({ dataSource: null, localActor: pubKey }),
+        localActor: pubKey,
+        fanToOwnDevices: agent.contactTurnFan,
+      })
+    : null;
+  /** A turn that arrived DIRECTLY (a contact's DM or a bot's reply): store it, which also fans it. */
+  const landContactTurn = ({ fromAddr, text, messageId, replyTo, ts, buttons }) => {
+    contactThreadChannel?.persistInbound({ contactId: fromAddr, fromAddr, text, messageId, replyTo, ts, buttons })
+      ?.catch?.(() => { /* durability is best-effort here, as in the shells */ });
+  };
+
   const handlers = {
     [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
     // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
@@ -314,6 +339,18 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
     } : {}),
+    // The contact thread, when a walk asked for it — the same three registrations both shells make:
+    // a bot's reply, a person's DM, and a turn one of MY OWN devices carried here. All three land in
+    // the durable thread through the channel, which is what makes `contactTurns` a real read of the
+    // stored conversation and not a list of what happened to arrive.
+    ...(contactChannel ? {
+      [contactThreadChannel.subtypes.in]:  contactThreadChannel.replyHandler(landContactTurn),
+      [contactThreadChannel.subtypes.out]: contactThreadChannel.messageHandler(landContactTurn),
+      [agent.contactTurnBroadcast]: agent.contactTurnHandler(
+        async (wire) => { const r = await contactThreadChannel.applyOwnDeviceTurn(wire); if (!r.deduped) contactTurnsSeen.push(r); },
+        (reason, fromAddr) => { contactTurnsRefused.push({ reason, fromAddr }); },
+      ),
+    } : {}),
   };
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
@@ -336,7 +373,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, deviceLog, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });

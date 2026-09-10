@@ -39,6 +39,7 @@ import {
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
 import { createRosterReadCache, isRosterRead } from '../../v2/rosterReadCache.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
+import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
 import {
@@ -75,6 +76,11 @@ import {
   makeGrantsRail, makeGrantsFan, makeGrantsCatchUp, makeGrantsPeerHandler,
   deviceSetBindingVerifier, siblingDeviceAddresses, GRANTS_CATCHUP_SUBTYPES,
 } from '../../v2/grantsRail.js';
+// A direct message is addressed to a PERSON but arrives at ONE device: the contact card carries the
+// profile address, which every device derives from the same seed, and a relay maps one address to one
+// socket. This carries a landed turn to the person's other devices so the thread reads the same on all
+// of them — the grants lane's fan, pointed at conversation instead of authority.
+import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
@@ -1662,13 +1668,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     signerFor: () => grantsSignerPromise,
     verifyBinding: deviceSetVerifier,
   });
-  const grantsSiblings = () => siblingDeviceAddresses({
+  // MY OTHER DEVICES, resolved once and shared by everything that speaks to them — the grants lane
+  // and the contact-thread fan today. Two lookups would be two places for "who am I, elsewhere" to
+  // drift apart, and they must answer the same set or a revoke and a message would disagree about
+  // which devices are mine.
+  const ownDeviceSiblings = () => siblingDeviceAddresses({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
     circleAddressFor,
   });
   const grantsFan = makeGrantsFan({
-    siblings: grantsSiblings,
+    siblings: ownDeviceSiblings,
     sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
   });
   const surfaceGrants = createSurfaceGrants({
@@ -1693,13 +1703,28 @@ export async function createRealHouseholdAgent(opts = {}) {
   const grantsCatchUp = makeGrantsCatchUp({
     rail: grantsRail,
     sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
-    siblings: grantsSiblings,
+    siblings: ownDeviceSiblings,
     selfPubKey: chatId.pubKey,
     onChange: () => surfaceGrants.recompute(),
   });
   // Kick the first fold; the door refuses until it lands (`isRevoked` fails closed), so a boot
   // cannot race it.
   const surfaceGrantsReady = surfaceGrants.hydrate().catch(() => false);
+  // THE CONTACT-THREAD FAN: the same sibling set, carrying conversation. `contactTurnFan` is what a
+  // shell hands to `createContactThreadChannel`, so every turn in either direction is offered to the
+  // person's other devices at the one place all of them pass. `contactTurnHandler(applyTurn)` is the
+  // receive half: the shell says what to do with a landed turn, this side says who may send one.
+  const contactTurnFan = makeContactTurnFan({
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+  });
+  const contactTurnHandler = (applyTurn, onRefused = null) => makeContactTurnPeerHandler({
+    siblings: ownDeviceSiblings,
+    selfPubKey: chatId.pubKey,
+    applyTurn,
+    onRefused,
+  });
+
 
   // THE ROSTER SEED (pod-less enroll S1): a freshly enrolled sibling asks THIS device for a
   // circle's membership-redemption trail rows — the head its roster projection folds statements
@@ -2612,6 +2637,19 @@ export async function createRealHouseholdAgent(opts = {}) {
    * without one it is an ordinary hold-forward send. A second sender that did not know about circles
    * is how the receipt left as the canonical identity and was refused on arrival (2026-08-29).
    */
+  /**
+   * The relays a contact is reachable on, or null (the decision itself lives in `contactRelayScope`).
+   *
+   * `requireAliasCapable` is deliberately NOT set: this addresses a PERSON by their own address, not a
+   * per-circle alias, so the unlinkability the circle path protects is not in play — and leaving it off
+   * keeps NKN eligible, which is what an unscoped send could always use.
+   */
+  const contactScope = (to) => contactRelayScope({
+    to,
+    circlesForPeer:  (addr) => opts.circlesForPeer?.(addr) ?? [],
+    circlePointsFor: (cid) => opts.circlePointsFor?.(cid) ?? [],
+  });
+
   async function sendCircleScoped(to, envelope, sendOpts = {}) {
     // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
     // The app owns points; the transport layer owns transports; neither learns the other's vocabulary.
@@ -2620,7 +2658,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     // addressing, because that silently strips member-level unlinkability. With it ON, an NKN circle
     // works on terms the user accepted. → plans/NOTE-circle-scoped-routing.md
     const { circleId, ...rest } = sendOpts;
-    if (circleId == null) return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest });
+    if (circleId == null) {
+      // No circle — a direct message, a receipt, a redeem. Until 2026-09-08 that meant "whatever relay this
+      // device happens to be on", which was fine when there was only one. With several, a DM to someone I
+      // know from a kring on ANOTHER relay went out over mine, where they are not registered.
+      //
+      // What I do know is which kringen I share with them, and a kring names its relays. They are in those
+      // kringen, so their device dialled those relays — so that is where they are. An explicit scope from
+      // the caller always wins (the join's redeem names the relay its invite carried), and when we share no
+      // kring with a recorded relay there is nothing to narrow to and the send stays exactly as it was.
+      const scope = rest.scope ?? contactScope(to);
+      return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest, ...(scope ? { scope } : {}) });
+    }
     const points = opts.circlePointsFor?.(circleId) ?? [];
     const fallbackOn = addressFallbackOn();
     // Decision 4 — sign this circle's traffic as this circle's identity, not as the person.
@@ -3399,8 +3448,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         // …gated by the user's publication lock: a contact card is the single most travelled copy of
         // this address, so "never share my global address" has to hold here first. Off ⇒ the card simply
         // carries no peerAddr and the scanner reaches them by the other rungs.
+        // WHICHEVER address this device can actually be reached at. The mesh address first, because it
+        // survives a change of relay; the relay's otherwise, which is what a device with no mesh
+        // transport has — and until 2026-09-09 that case put NO address on the card at all, so a card
+        // shared by a relay-only device (every headless one, and a browser with the mesh off) named a
+        // person the scanner had no way to write to. The publication lock below still governs both:
+        // "never share my global address" is a decision about the address, not about the transport.
         const myPeerAddr = shareableAddress(
-          sa?.peer?.address ?? null,
+          sa?.peer?.address ?? sa?.relay?.address ?? null,
           // The LIVE register value (device scope) — a flip in my-data binds here immediately.
           // opts stays as a test override; no shell passes it.
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
@@ -3496,6 +3551,33 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runStoop);
       const out = await runStoop();
       rosterReads.afterWrite(realOpId);
+      // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
+      //
+      // Joining wrote this record (the join wizard, after the redeem) and creating never did, so the
+      // person who STARTED a circle was the one person who could not get it back: their recovery file
+      // carried nothing, their pod registry carried nothing, and a restored device re-opened nothing —
+      // measured 2026-09-10, creator 0 circles, joiner 1, from the same paired circle. That is the
+      // first thing anyone does with this product, and the site promises the opposite in the present
+      // tense.
+      //
+      // Written HERE rather than in the create wizard because this is the one seam every creation
+      // passes — both shells, the quick-create, and the help circle — and the address the record needs
+      // was derived a few lines above for exactly this op. Best-effort and AFTER success: a failure
+      // costs the restore list, never the circle that was just made.
+      if (realOpId === 'createGroupV2' && !out?.error) {
+        const circleId = out?.groupId ?? realArgs.groupId;
+        const address = realArgs.circleAddress ?? null;
+        if (circleId && address) {
+          try {
+            // No handle: a founder has none yet (they never redeemed an invite), and restore does not
+            // need one — the circle id and this device's address are what re-open a circle. A handle
+            // the person chooses later merges into the same record through the ordinary setter.
+            await callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address });
+          } catch (err) {
+            if (typeof console !== 'undefined') console.warn(`[restore-data] the created circle ${String(circleId).slice(0, 12)}… is not in the restore list: ${err?.message ?? err}`);
+          }
+        }
+      }
       return out;
     }
     if (appOrigin === 'folio') {
@@ -5021,6 +5103,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     grantsRail,
     grantsPeerHandler,
     grantsCatchUp,
+    // The contact-thread fan (a DM reaches the person, not one of their devices): the shells hand
+    // `contactTurnFan` to the contact channel and register `contactTurnHandler(applyTurn)` under
+    // CONTACT_TURN_BROADCAST.
+    contactTurnFan,
+    contactTurnHandler,
+    contactTurnBroadcast: CONTACT_TURN_BROADCAST,
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its
     // subtypes; `consumeEnrollOffer` sends `buildRequest` to the sibling.
     rosterSeed,

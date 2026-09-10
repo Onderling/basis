@@ -88,7 +88,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
       const forThis = (reply.threadId && reply.threadId === contactId) || reply.fromAddr === peerAddr;
       if (!forThis) return;
       setMessages((prev) => [...prev, {
-        id: mkId(), origin: 'bot', text: reply.text ?? '', buttons: reply.buttons,
+        id: mkId(), origin: reply.origin === 'user' ? 'user' : 'bot', text: reply.text ?? '', buttons: reply.buttons,
         ...(reply.replyTo ? { replyTo: reply.replyTo } : {}),
         ...(reply.file ? { file: reply.file } : {}),
       }]);

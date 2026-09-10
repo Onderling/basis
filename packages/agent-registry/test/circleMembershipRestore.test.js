@@ -32,11 +32,16 @@ describe('the circle-membership record vocabulary', () => {
     expect(isKeyRef('dec:x')).toBe(false);
   });
 
-  it('validates a record: handle + address required, the rest optional facets', () => {
+  it('validates a record: an ADDRESS is required, everything else is an optional facet', () => {
+    // The handle used to be required too, and that excluded the one person who most needs the record:
+    // a FOUNDER never redeems an invite, so never chooses a handle, so their own circle was refused an
+    // entry — and a restored device re-opened everything they had joined and nothing they had started
+    // (measured 2026-09-10: creator 0 circles, joiner 1, from one paired circle).
+    expect(isCircleMembershipRecord({ address: 'nkn:abc' }), 'a founder has an address and no handle').toBe(true);
     expect(isCircleMembershipRecord({ handle: 'anne', address: 'nkn:abc' })).toBe(true);
     expect(isCircleMembershipRecord({ handle: 'anne', address: 'nkn:abc', relays: ['wss://r'], key: { ref: 'dec:k' } })).toBe(true);
     expect(isCircleMembershipRecord({ handle: 'anne' })).toBe(false);      // no address
-    expect(isCircleMembershipRecord({ address: 'nkn:abc' })).toBe(false);  // no handle
+    expect(isCircleMembershipRecord({ handle: '', address: 'nkn:abc' }), 'an EMPTY handle is still malformed').toBe(false);
     expect(isCircleMembershipRecord({ handle: 'a', address: 'b', relays: [1] })).toBe(false);
     expect(isCircleMembershipRecord({ handle: 'a', address: 'b', key: { ref: 'bad' } })).toBe(false);
   });
@@ -45,7 +50,8 @@ describe('the circle-membership record vocabulary', () => {
     const rec = normaliseCircleMembership({ handle: 'a', address: 'b', proof: 'p', relays: ['r'], key: { ref: 'dec:k', posture: 'p2' }, junk: 1 });
     expect(rec).toEqual({ handle: 'a', address: 'b', proof: 'p', relays: ['r'], key: { ref: 'dec:k', posture: 'p2' } });
     expect(Object.isFrozen(rec)).toBe(true);
-    expect(normaliseCircleMembership({ handle: 'a' })).toBeNull();
+    expect(normaliseCircleMembership({ handle: 'a' }), 'no address: nothing to reach').toBeNull();
+    expect(normaliseCircleMembership({ address: 'b' }), 'a founder normalises to an address alone').toEqual({ address: 'b' });
   });
 
   it('setCircleMembership upserts one circle without dropping the others', () => {

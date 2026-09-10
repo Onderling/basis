@@ -127,8 +127,16 @@
       "doc": "Bot-bericht na onderling-contact:// scan + addContactFromQr"
     },
     "scan_invite_open": {
-      "text": "Bezig met openen van de join-buurt-wizard…",
+      "text": "Bezig met openen van de kring-join-wizard…",
       "doc": "Bot-bericht voordat joinGroup-wizard opent"
+    },
+    "scan_enroll_stashed": {
+      "text": "Code voor een extra apparaat opgeslagen. Open Mij → dit apparaat en typ je herstelzin om verder te gaan.",
+      "doc": "Bot-bericht na een gescande of getikte onderling-enroll:// code of #enroll= link — de code is bewaard, de ceremonie zelf vraagt om de herstelzin"
+    },
+    "scan_enroll_failed": {
+      "text": "Deze code voor een extra apparaat kon niet worden opgeslagen.",
+      "doc": "Bot-bericht wanneer het bewaren van een enroll-code mislukt"
     },
     "scan_failed": {
       "text": "Scan mislukt: {{error}}",

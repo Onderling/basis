@@ -2,7 +2,7 @@
  * feedHouseholdRoster — turn a circle's member roster into no-pod household-sync peers.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { feedHouseholdRoster } from '../../src/v2/householdRosterPairing.js';
+import { feedHouseholdRoster, bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 
 function mkAgent({ members = [], selfAddr = 'me', skill, paired = [] } = {}) {
   const added = [];
@@ -67,5 +67,41 @@ describe('feedHouseholdRoster', () => {
     const agent = mkAgent({ skill: vi.fn(async () => { throw new Error('no roster'); }) });
     expect(await feedHouseholdRoster({ agent, circleId: 'c' })).toBe(0);
     expect(agent.added).toEqual([]);
+  });
+});
+
+describe('bindCircleAddressKeysFor — the peer → kringen index is complete at boot (2026-09-08)', () => {
+  // Why this lives here and not in the screen that opens a kring: the index decides which relay a DIRECT
+  // message takes, and a DM is sent from Contacten, which nobody has to visit a kring to reach. Filled
+  // only on circle-open, the map was empty exactly when someone starts the app and messages a person.
+  function mkIndexAgent(members) {
+    const edges = [];
+    return {
+      edges,
+      identity: { pubKey: 'me' },
+      registerPeerAddress: () => {},
+      callSkill: async (_app, op) => (op === 'listGroupMembers' ? { members } : {}),
+      _circleGroupsIndex: { add: (circleId, webid) => edges.push([circleId, webid]) },
+    };
+  }
+
+  it('records every member of the circle it just read, from that same read', async () => {
+    const agent = mkIndexAgent([{ addr: 'anna' }, { addr: 'bram' }, { addr: 'me' }]);
+    await bindCircleAddressKeysFor({ agent, circleId: 'k1' });
+    expect(agent.edges).toEqual([['k1', 'anna'], ['k1', 'bram'], ['k1', 'me']]);
+  });
+
+  it('a shell with no index, and a member row with no address, are both no-ops', async () => {
+    const agent = mkIndexAgent([{ addr: 'anna' }, { name: 'no address' }]);
+    await bindCircleAddressKeysFor({ agent, circleId: 'k1' });
+    expect(agent.edges).toEqual([['k1', 'anna']]);
+    const bare = { identity: { pubKey: 'me' }, registerPeerAddress: () => {}, callSkill: async () => ({ members: [{ addr: 'anna' }] }) };
+    await expect(bindCircleAddressKeysFor({ agent: bare, circleId: 'k1' })).resolves.toBeTruthy();
+  });
+
+  it('an index that throws never breaks priming — the circle still binds', async () => {
+    const agent = mkIndexAgent([{ addr: 'anna' }]);
+    agent._circleGroupsIndex = { add: () => { throw new Error('boom'); } };
+    await expect(bindCircleAddressKeysFor({ agent, circleId: 'k1' })).resolves.toMatchObject({ members: [{ addr: 'anna' }] });
   });
 });

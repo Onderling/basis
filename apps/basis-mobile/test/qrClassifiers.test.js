@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { classifyQrPayload } from '@onderling/react-native/qr';
+import { encodeEnrollOffer, enrollOfferLink } from '../../basis/src/v2/enrollOffer.js';
 import { getBasisClassifiers } from '../src/core/qrClassifiers.js';
 
 const CL = getBasisClassifiers();
@@ -22,6 +23,18 @@ describe('basis-mobile QR classifiers', () => {
     expect(r.kind).toBe('invite');
   });
 
+  it('classifies the app’s OWN deep link (?join=…&relay=…) and hands back the invite + its relay', () => {
+    // 2026-09-08: the hosted app's invite QR is `…?join=<enc>&relay=<ws url>`. The scanner matched
+    // `?invite=` only, so scanning the app's own QR with the app did nothing at all.
+    const r = classifyQrPayload('https://onderling.org/basis/?join=onderling-invite%3A%2F%2Fabc&relay=wss%3A%2F%2Frelay.onderling.org', CL);
+    expect(r.kind).toBe('invite');
+    expect(r.payload).toEqual({ inviteUri: 'onderling-invite://abc', relayUrl: 'wss://relay.onderling.org' });
+  });
+
+  it('a scheme URI still comes back as the bare string the wizard has always decoded', () => {
+    expect(classifyQrPayload('onderling-invite://eyJ4IjoxfQ', CL).payload).toBe('onderling-invite://eyJ4IjoxfQ');
+  });
+
   it('returns kind:unknown for an unrelated string', () => {
     const r = classifyQrPayload('https://example.com/random', CL);
     expect(r.kind).toBe('unknown');
@@ -40,5 +53,33 @@ describe('basis-mobile QR classifiers', () => {
 
   it('returns kind:unknown for empty input', () => {
     expect(classifyQrPayload('', CL).kind).toBe('unknown');
+  });
+
+  // Adding a device of your OWN — until 2026-09-09 both carriers fell to 'unknown' here, so a scanned
+  // code and a tapped link did nothing at all while pasting the same string worked. Same shape as the
+  // invite-link bug this file already records, on the flow the second device depends on.
+  describe('an offer to add another device of your own', () => {
+    const OFFER = encodeEnrollOffer({ relays: ['wss://relay.example'], circles: [{ id: 'c1', handle: 'anna', address: 'addr-1' }] });
+
+    it('classifies the scanned CODE as kind:enroll and hands back the offer URI', () => {
+      const r = classifyQrPayload(OFFER, CL);
+      expect(r.kind).toBe('enroll');
+      expect(r.payload).toBe(OFFER);
+    });
+
+    it('classifies the clickable LINK form the same way — one payload, two carriers', () => {
+      const { link } = enrollOfferLink('https://onderling.org/basis', OFFER);
+      const r = classifyQrPayload(link, CL);
+      expect(r.kind).toBe('enroll');
+      expect(r.payload, 'the link must resolve to the same offer the code carries').toBe(OFFER);
+    });
+
+    it('does not swallow a circle invite, which is a different act entirely', () => {
+      expect(classifyQrPayload('onderling-invite://eyJ4IjoxfQ', CL).kind).toBe('invite');
+    });
+
+    it('refuses a malformed offer rather than classifying it', () => {
+      expect(classifyQrPayload('onderling-enroll://not-base64url-at-all!!', CL).kind).toBe('unknown');
+    });
   });
 });

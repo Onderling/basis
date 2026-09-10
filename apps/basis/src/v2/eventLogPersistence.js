@@ -92,6 +92,30 @@ export function backendSnapshotIo(backend, ref = REF) {
   };
 }
 
+/** Snapshot io over a plain FILE — the node shape, for a device that runs on a machine rather than in
+ *  an app. Written whole and replaced, like the other two: the log is one snapshot, not an append file,
+ *  so a half-written save is a corrupt snapshot the loader must survive. It does: a load that throws
+ *  degrades to an empty log rather than a broken boot. The write goes to a temporary neighbour first and
+ *  is renamed over the target, which on every filesystem this runs on is atomic — so a process killed
+ *  mid-save leaves the previous snapshot intact instead of a truncated one. */
+export function fileSnapshotIo(filePath) {
+  return {
+    async load() {
+      const { readFile } = await import('node:fs/promises');
+      try { return JSON.parse(await readFile(filePath, 'utf8')); }
+      catch (err) { if (err?.code === 'ENOENT') return null; throw err; }
+    },
+    async save(events) {
+      const { writeFile, rename, mkdir } = await import('node:fs/promises');
+      const dir = filePath.slice(0, filePath.lastIndexOf('/'));
+      if (dir) await mkdir(dir, { recursive: true }).catch(() => { /* it usually exists */ });
+      const tmp = `${filePath}.tmp`;
+      await writeFile(tmp, JSON.stringify(events), { mode: 0o600 });
+      await rename(tmp, filePath);
+    },
+  };
+}
+
 /** Snapshot io over an AsyncStorage-shaped store (`getItem`/`setItem`) — the mobile shape. */
 export function asyncStorageSnapshotIo(storage, key = 'cc-device-log') {
   return {

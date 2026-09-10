@@ -32,6 +32,8 @@ export { createContactSkillRegistry, chainContactCallSkill } from './v2/contactS
 // transport-agnostic conversational channel; rides sa.peer → mdns/relay/nkn),
 // the Contacten roster source, and adding a bot to the app PeerGraph.
 export { createContactThreadChannel, DEFAULT_CONTACT_SUBTYPES } from './v2/contactThreadChannel.js';
+// The same turn, on the person's other devices — the fan the contact channel is handed.
+export { makeContactTurnFan, makeContactTurnPeerHandler, contactTurnToWire, CONTACT_TURN_BROADCAST } from './v2/contactTurnFan.js';
 export { listContacts, peerToContactRow, stoopContactToRow, mergeContacts } from './v2/contactsSource.js';
 // S4 (stoop dissolution — pod foundation, SAFE offline slice): per-circle sealing
 // identity + control-agent composition over the @onderling/pod-client sealing substrate.
@@ -291,7 +293,8 @@ export {
 export { registerCircleAddresses, unregisterCircleAddresses, registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays }
                                                 from './v2/circleAddressRegistration.js';
 export {
-  createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS, POINT_KIND,
+  createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS, POINT_KIND, POINT_STATUS_LABELS,
+  pointStatus, relayUrlsForCircles, contactRelayScope,
   // The RN launcher consumes these three via this entry — they were MISSING here (Metro interop turns a
   // missing named export into `undefined`, so the points screen crashed only when opened; the
   // basisIndexExports guard in basis-mobile now pins every launcher import against this entry).

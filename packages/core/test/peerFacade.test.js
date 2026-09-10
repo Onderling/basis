@@ -43,7 +43,7 @@ const trailX = [
 
 const memberMapX = [
   { webid: 'https://anna.example/me', displayName: 'Anna', relation: 'group-member', trustLevel: 'vertrouwd' },
-  { webid: 'https://bram.example/me', displayName: 'Bram', relation: 'contact', nknAddr: 'nkn-bram-native' },
+  { webid: 'https://bram.example/me', displayName: 'Bram', relation: 'contact', peerAddr: 'nkn-bram-native' },
   { webid: 'https://cleo.example/me', displayName: 'Cleo', relation: 'agent' },
 ];
 
@@ -98,7 +98,7 @@ describe('peerFacade — per-circle projection', () => {
 
     const bram = peers.find(p => p.webid === 'https://bram.example/me');
     expect(bram.reachability).toBe(false);
-    // PeerGraph supplies the relay address; the display-cache nknAddr backfills
+    // PeerGraph supplies the relay address; the display cache's peerAddr backfills
     // the nkn transport PeerGraph didn't gossip yet.
     expect(bram.transports).toEqual({ relay: 'relay-bram-addr', nkn: 'nkn-bram-native' });
     // relation + trust fall back to the display cache when PeerGraph has none.
@@ -118,12 +118,12 @@ describe('peerFacade — per-circle projection', () => {
     expect(cleo.sealingKey).toBe('cleo-sealing-X');
   });
 
-  it('falls back to the display-cache nknAddr when the peer is not yet in PeerGraph', () => {
-    // Bram has an nknAddr in MemberMap and only a relay transport in PeerGraph;
-    // a peer entirely absent from PeerGraph but with an nknAddr should surface it.
+  it('falls back to the display cache’s peerAddr when the peer is not yet in PeerGraph', () => {
+    // Bram has a peerAddr in MemberMap and only a relay transport in PeerGraph;
+    // a peer entirely absent from PeerGraph but with a peerAddr should surface it.
     const peers = peerFacade({
       trailRoster: [trailX[2]], // cleo — no PeerGraph record
-      memberMap: [{ webid: 'https://cleo.example/me', relation: 'group-member', nknAddr: 'nkn-cleo-native' }],
+      memberMap: [{ webid: 'https://cleo.example/me', relation: 'group-member', peerAddr: 'nkn-cleo-native' }],
       peerGraph: peerGraphGlobal,
       circleId: 'circleX',
     });

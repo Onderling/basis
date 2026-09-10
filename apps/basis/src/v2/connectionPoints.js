@@ -57,6 +57,14 @@ export const POINT_SOURCE_LABELS = Object.freeze({
   suggested: 'circle.nearbyScreen.point_suggested',
 });
 
+/** Status → locale key. Shared, so web and mobile cannot describe the same point differently. */
+export const POINT_STATUS_LABELS = Object.freeze({
+  pod:       'circle.nearbyScreen.point_kind_pod',
+  primary:   'circle.nearbyScreen.point_primary',
+  connected: 'circle.nearbyScreen.point_connected',
+  offline:   'circle.nearbyScreen.point_offline',
+});
+
 /**
  * Build the connection-point store.
  *
@@ -353,6 +361,81 @@ export function bootRelayUrl({ stored = null, list = [] } = {}) {
   const active = usable.find((p) => p?.active === true);
   if (active) return active.url;
   return usable[0]?.url ?? null;      // `list()` is newest first
+}
+
+/**
+ * What a point IS right now, for a renderer to label (2026-09-08).
+ *
+ * Until today a device held one relay socket, so the list said "Nu in gebruik" for one point and "Reserve"
+ * for the rest. That is no longer true: a device is on its own relay AND on every relay its circles ride,
+ * all at once, so "Reserve" described a point that was carrying traffic. The truth now has three shapes —
+ * your own relay, another one you are also connected to, and one you are not connected to — and the LIVE
+ * list from the agent is what decides, never the store, which only remembers.
+ *
+ * @param {object} point                 a row from `list()`
+ * @param {Array<{url: string, primary?: boolean, connected?: boolean}>} [relays]  `agent.relays.list()`
+ * @returns {'pod'|'primary'|'connected'|'offline'}
+ */
+export function pointStatus(point, relays = []) {
+  if (point?.kind === POINT_KIND.POD) return 'pod';
+  const live = (Array.isArray(relays) ? relays : []).find((r) => r?.url === point?.url);
+  if (live) return live.connected === false ? 'offline' : (live.primary ? 'primary' : 'connected');
+  // No live list at all (the panel opened before the agent came up): fall back to what the store remembers
+  // about the primary. Everything else is honestly "not connected" — because nothing is, yet.
+  return relays?.length === 0 && point?.active ? 'primary' : 'offline';
+}
+
+/**
+ * The relays a set of circles ride, as one list (2026-09-08) — the union, newest circle first, deduplicated,
+ * pods dropped. This is what turns "which circles do I share with this person" into "which relays can reach
+ * them": they are in those circles, so their device dialled those relays, so that is where they are.
+ *
+ * @param {string[]} circleIds
+ * @param {(circleId: string) => Array<{url: string, kind?: string, adopted?: boolean}>} pointsFor
+ * @returns {string[]}
+ */
+export function relayUrlsForCircles(circleIds, pointsFor) {
+  if (!Array.isArray(circleIds) || typeof pointsFor !== 'function') return [];
+  const out = [];
+  for (const circleId of circleIds) {
+    let points = [];
+    try { points = pointsFor(circleId) ?? []; } catch { points = []; }
+    for (const p of points) {
+      const url = typeof p === 'string' ? p : p?.url;
+      const kind = typeof p === 'string' ? POINT_KIND.RELAY : (p?.kind ?? POINT_KIND.RELAY);
+      if (!url || kind === POINT_KIND.POD || p?.adopted === false) continue;
+      if (!out.includes(url)) out.push(url);
+    }
+  }
+  return out;
+}
+
+/**
+ * The relays to send to a PERSON over, or `null` when we cannot say (2026-09-08).
+ *
+ * A message with no circle — a direct message, a receipt — used to go over whatever relay this device
+ * happened to be on. With one relay that was the only option; with several it was a guess, and a wrong one
+ * for anyone I know from a kring that rides someone else's relay.
+ *
+ * What I do know is which kringen I share with them, and a kring names its relays. They are in those
+ * kringen, so their device dialled those relays — so that is where they are. Sharing no kring, or sharing
+ * only kringen with no recorded relay, means there is nothing to narrow to: `null`, and the caller sends as
+ * it always did rather than inventing a route.
+ *
+ * @param {object} a
+ * @param {string} a.to                                       the person's address
+ * @param {(addr: string) => string[]} a.circlesForPeer       the kringen I share with them
+ * @param {(circleId: string) => Array<object>} a.circlePointsFor   that kring's points
+ * @returns {{points: string[]}|null}
+ */
+export function contactRelayScope({ to, circlesForPeer, circlePointsFor } = {}) {
+  if (typeof to !== 'string' || !to || typeof circlesForPeer !== 'function') return null;
+  let circleIds = [];
+  try { circleIds = circlesForPeer(to) ?? []; } catch { circleIds = []; }
+  const points = relayUrlsForCircles(circleIds, (cid) => {
+    try { return circlePointsFor?.(cid) ?? []; } catch { return []; }
+  });
+  return points.length ? { points } : null;
 }
 
 /**

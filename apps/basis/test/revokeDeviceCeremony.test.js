@@ -200,9 +200,23 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     // ── THE ROTATION FIRED: the ceremony asked the sealed-key router to rotate away from the
     //    revoked device's sealing key, ban policy — nothing pod-fetchable remains for the island. ──
     expect(rotations.length).toBeGreaterThanOrEqual(1);
-    const rot = rotations.find((r) => r.groupId === GROUP);
-    expect(rot).toBeTruthy();
-    expect(rot.policy).toBe('ban');
-    expect(rot.publicKey).toBe(sealingPublicKeyFromNetworkKey(addrA2));
+    // SEVERAL bans for this circle are correct, and it is worth saying why rather than taking the
+    // first. Revoking by device id works for a device the registry never saw — that IS the lost-phone
+    // case, and this walk exercises it a step earlier with `never-enrolled-here`. Each such ceremony
+    // derives that device's address per circle and bans its sealing key. Until 2026-09-10 none of them
+    // reached a circle the person had CREATED, because a founder's own circle was in no registry
+    // membership list, so the ceremony's circle set was empty for it. It is covered now, which is why
+    // this asserts that the THIEF's key is among the bans rather than that it is the only one.
+    const banned = rotations.filter((r) => r.groupId === GROUP);
+    expect(banned.length, 'the ceremony banned nothing in this circle').toBeGreaterThanOrEqual(1);
+    expect(banned.every((r) => r.policy === 'ban')).toBe(true);
+    expect(
+      banned.map((r) => r.publicKey),
+      "the stolen device's sealing key was never banned — the island can still be re-admitted by a pod fetch",
+    ).toContain(sealingPublicKeyFromNetworkKey(addrA2));
+    expect(
+      banned.map((r) => r.publicKey),
+      'the SURVIVING device was banned from its own circle',
+    ).not.toContain(sealingPublicKeyFromNetworkKey(survivor));
   }, 120_000);
 });

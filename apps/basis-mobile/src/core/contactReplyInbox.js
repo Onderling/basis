@@ -13,7 +13,13 @@
 
 const subscribers = new Set();
 
-/** Push an inbound reply `{ fromAddr, threadId, text, buttons?, replyTo?, messageId? }`. */
+/**
+ * Push an inbound reply `{ fromAddr, threadId, text, buttons?, replyTo?, messageId?, origin? }`.
+ *
+ * `origin` says which side of the conversation the turn is and defaults to the other party's, which
+ * is what every DIRECT arrival is. A turn carried here by one of the owner's OWN devices can be
+ * either side — they may be passing on what they received, or what the person said there.
+ */
 export function pushContactReply(reply) {
   for (const fn of subscribers) {
     try { fn(reply); } catch { /* a bad subscriber must not break delivery to others */ }

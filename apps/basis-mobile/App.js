@@ -63,7 +63,8 @@ import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
 import { createHistoryPodMedium } from '../basis/src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../basis/src/v2/registryCarrier.js';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
-import { wireEventLogPersistence, asyncStorageSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
+import { sealedLocalBackend } from '../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { backendSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
@@ -445,18 +446,20 @@ export default function App() {
         // tasks-v0 gains AsyncStorage persistence the flag becomes
         // redundant (the probe will return non-empty); leaving the
         // flag in place is harmless.
-        // THE DEVICE LOG IS DURABLE (the content re-root's first slice): hydrate + wire the debounced
-        // save before the bundle boots (whose entries would otherwise race an unhydrated log). Best-effort.
-        try {
-          const { hydrated } = await wireEventLogPersistence({
-            eventLog: eventLogRef.current, io: asyncStorageSnapshotIo(AsyncStorage),
-          });
-          // `dlog` is a channel object, not a function — calling it here threw, and so did the catch
-          // below, which turned one log line into "boot failed (App)" from the first launch that had
-          // anything to hydrate. Found on a device 2026-08-29; guarded by
-          // test/devLogIsNeverCalledAsAFunction.test.js.
-          if (hydrated) dlog.boot(`[device-log] hydrated ${hydrated} persisted entries`);
-        } catch (err) { dlog.warn(`[device-log] persistence wiring failed: ${err?.message ?? err}`); }
+        // THE DEVICE LOG IS DURABLE, and now SEALED — the same storage web uses, by construction.
+        //
+        // It used to hydrate here, over `asyncStorageSnapshotIo(AsyncStorage)`: raw AsyncStorage, no
+        // seal at all. When content was sealed at rest on 2026-09-10 the commit said "both shells" and
+        // only the web line was changed — and under `record` retention the device log IS the chat
+        // record, so a phone kept every message in the clear. The guard could not see it either: it
+        // looks for the backend factories, and this path used none.
+        //
+        // Now it is a sealed StorageBackend like web's, and the AGENT hydrates it — at the first moment
+        // the content key exists, which is why this no longer happens before the bundle boots. Reading
+        // it here would hand back an envelope nobody can open yet.
+        const deviceLogIo = backendSnapshotIo(
+          sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' })),
+        );
         const SEED_FLAG = 'cc.firstBootSeeded.v1';
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
         let eventSeq = 0;
@@ -514,6 +517,7 @@ export default function App() {
           // fetch + root, exactly like provisionCircleMedium above. Null fetch/root → factory returns null → local.
           // The membership rider: hand the device log so membership statements ride its lane.
           deviceLog: eventLogRef.current ?? undefined,
+          deviceLogIo,          // the agent hydrates it once the content key exists — see the note there
           provisionSettingsMedium: async (strategy) => createSettingsPodMedium({
             fetch:   getCirclePodFetch(),
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,

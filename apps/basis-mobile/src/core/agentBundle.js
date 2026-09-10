@@ -335,6 +335,7 @@ export async function bootAgentBundle(opts = {}) {
       onSettingsConflicts: opts.onSettingsConflicts,
       // The membership rider: the device log (the shells' EventLog) — membership statements ride its lane.
       deviceLog: opts.deviceLog,
+      deviceLogIo: opts.deviceLogIo,   // hydrated inside the agent, once the content key exists
       // The A2A surface (web parity): these manifests' ops become kernel skills a granted agent can
       // invoke, each gated by a CapabilityToken naming exactly that op. The list is the SHARED one the
       // connection menu paints from, so what this shell offers is what it exposes — and matches web.

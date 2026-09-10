@@ -64,16 +64,6 @@
  * @param {(msg: string, err?: unknown) => void} [a.onWarn]  where an unopenable value is reported.
  * @returns {object} the same port, sealed
  */
-/**
- * The person chose NOT to seal this device's storage.
- *
- * A `getStrategy` that returns this writes plain text, deliberately. It exists so that choice can never be
- * confused with `null`, which means "the key is not ready yet" and refuses the write. One is a decision and
- * the other is a bug, they want opposite handling, and a single falsy value for both is how the bug would
- * come to look like the decision — silently, on the path where it matters most.
- */
-export const PLAINTEXT_AT_REST = Symbol.for('onderling.plaintextAtRest');
-
 export function createSealingBackend({ backend, getStrategy, onWarn = null } = {}) {
   if (!backend || typeof backend.put !== 'function' || typeof backend.get !== 'function') {
     throw new Error('createSealingBackend: a StorageBackend (put/get/list) is required');
@@ -89,7 +79,6 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
   async function strategy() {
     if (cached) return cached;
     const s = await getStrategy();
-    if (s === PLAINTEXT_AT_REST) return PLAINTEXT_AT_REST;   // a choice, re-read every time it can change
     if (s && typeof s.seal === 'function' && typeof s.open === 'function') cached = s;
     return cached;
   }
@@ -132,13 +121,12 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
     /**
      * The one place a local write becomes ciphertext.
      *
-     * With no strategy this THROWS rather than storing the plain text. That is the deliberate half: an
-     * app that cannot seal must not quietly fall back to the behaviour this exists to end, because the
-     * fallback is invisible and the promise it breaks is the one on the front page.
+     * With no key this THROWS rather than storing the plain text. There is no opt-out and no degraded
+     * mode: an app that cannot seal must not quietly fall back to the behaviour this exists to end,
+     * because the fallback is invisible and the promise it breaks is the one on the front page.
      */
     async put(ref, bytes, ...rest) {
       const s = await strategy();
-      if (s === PLAINTEXT_AT_REST) return backend.put(ref, bytes, ...rest);   // opted out — stored as it is
       if (!s) throw new Error(`SealingBackend: refusing to store "${ref}" unsealed — no content key yet`);
       return backend.put(ref, s.seal(encode(bytes)), ...rest);
     },
@@ -148,7 +136,7 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
      *   • a sealed value opens — the ordinary path;
      *   • a PLAIN value passes through — the underlying `open` does this itself, which is what makes
      *     the no-migration decision work: pre-seal rows stay readable instead of becoming noise;
-     *   • no strategy yet — the record is returned as it stands, as it always was;
+     *   • no key yet — the record is returned as it stands, as it always was;
      *   • an envelope this key cannot open yields a null record, loudly. Not the ciphertext, which a
      *     caller would parse and store onward as if it were content, and not a throw, which would take
      *     a whole store down over one bad row. Null is what an absent ref already means.
@@ -157,10 +145,20 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
       const rec = await backend.get(ref, ...rest);
       if (rec == null) return null;
       const s = await strategy();
-      // Opted out, or not ready: hand back what is stored. Anything sealed BEFORE the person opted out
-      // stays sealed on disk and is opened by the seal path above whenever the key is available again —
-      // turning the setting off does not strand what was already written.
-      if (!s || s === PLAINTEXT_AT_REST) return rec;
+      // NO KEY YET. A plain value is handed back as it always was; a SEALED one is refused, loudly.
+      //
+      // Returning the envelope was this file breaking its own rule two paragraphs down — "not the
+      // ciphertext, which a caller would parse and store onward as if it were content". A caller did
+      // exactly that: the device-log loader `JSON.parse`d `fp1:eyJ2Ijo…` and threw, and its caller
+      // caught the throw and started with an empty log. The read is fixed at its source now (the agent
+      // hydrates once the key exists), but a wrapper that hands out ciphertext when it cannot open it
+      // will find another caller eventually.
+      if (!s) {
+        const looksSealed = typeof carried === 'string' && carried.startsWith('fp1:');
+        if (!looksSealed) return rec;
+        warn(`[at-rest] ${ref}: sealed, and read before this device had its content key`, null);
+        return null;
+      }
       // Some backends hand back the value itself, others a record carrying it as `bytes`.
       const carried = (rec && typeof rec === 'object' && 'bytes' in rec) ? rec.bytes : rec;
       if (carried == null) return rec;

@@ -34,8 +34,8 @@
  * @param {{load:Function, save?:Function, scheduleSave?:Function, flush?:Function, cancel?:Function, close?:Function}} persist
  *   the adapter (FilePersist / IndexedDBPersist / AsyncStoragePersist — all share this surface).
  * @param {{seal:(t:string)=>string, open:(t:string)=>string}|null} strategy
- *   this device's content-seal strategy. `null` returns the adapter UNCHANGED, so a host with no key
- *   behaves exactly as before rather than half-sealing.
+ *   this device's content-seal strategy. `null` returns the adapter UNCHANGED — a host with no key
+ *   behaves as it did rather than half-sealing.
  * @param {(msg:string, err?:unknown)=>void} [onWarn]  where an unopenable value is reported.
  * @returns the same adapter surface, sealing on the way out to storage.
  */
@@ -43,9 +43,9 @@ export function sealedPersist(persist, strategy, onWarn = null) {
   if (!persist || typeof persist.load !== 'function') {
     throw new Error('sealedPersist: a persist adapter with load() is required');
   }
-  // No strategy, or the person opted out (`PLAINTEXT_AT_REST` from @onderling/pseudo-pod, passed through
-  // as an opaque value so this package gains no dependency on it): the adapter is returned UNCHANGED, so
-  // the previous plaintext behaviour is exactly what happens rather than something half-sealed.
+  // No strategy — a host with no content key (a test, a composition that stores nothing sensitive):
+  // the adapter is returned UNCHANGED rather than half-sealed. There is no opt-out; sealing is what
+  // happens whenever a key exists.
   if (!strategy || typeof strategy.seal !== 'function' || typeof strategy.open !== 'function') return persist;
   const warn = typeof onWarn === 'function' ? onWarn : (m, e) => console.warn(m, e);
 

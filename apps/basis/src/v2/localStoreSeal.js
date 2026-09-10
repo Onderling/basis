@@ -16,7 +16,7 @@
  * local value, because a test process routinely boots several agents and a shared holder would hand the
  * second one's key to the first one's stores. Shells never do that; test processes always do.
  */
-import { createSealingBackend, PLAINTEXT_AT_REST } from '@onderling/pseudo-pod';
+import { createSealingBackend } from '@onderling/pseudo-pod';
 
 let current = null;
 
@@ -25,7 +25,6 @@ let current = null;
  * @param {{seal:Function, open:Function}|null} strategy
  */
 export function setShellContentSeal(strategy) {
-  if (strategy === PLAINTEXT_AT_REST) { current = PLAINTEXT_AT_REST; return; }   // the person opted out
   current = (strategy && typeof strategy.seal === 'function' && typeof strategy.open === 'function') ? strategy : null;
 }
 
@@ -88,7 +87,6 @@ export function sealedLocalVault(vault) {
   const wrapped = {
     async set(key, value) {
       const s = strategy();
-      if (s === PLAINTEXT_AT_REST) return vault.set(key, value);
       if (!s) throw new Error(`sealedLocalVault: refusing to store "${key}" unsealed — no content key yet`);
       return vault.set(key, s.seal(typeof value === 'string' ? value : JSON.stringify(value)));
     },
@@ -97,7 +95,7 @@ export function sealedLocalVault(vault) {
       const stored = await vault.get(key);
       if (stored == null) return null;
       const s = strategy();
-      if (!s || s === PLAINTEXT_AT_REST) return stored;
+      if (!s) return stored;
       let opened;
       try { opened = s.open(String(stored)); }
       catch (err) {

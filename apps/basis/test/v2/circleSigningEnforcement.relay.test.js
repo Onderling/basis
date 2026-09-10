@@ -113,11 +113,19 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
 
   /* ── The founder ─────────────────────────────────────────────────────────────────────────── */
 
-  it('THE FOUNDER: their own row proves no address — they never redeemed anything', async () => {
+  it('THE FOUNDER: their own row proves no address at first — they never redeemed anything', async () => {
     // The reason to check rather than assume. Enforcement is built on a proof captured at JOIN, and
     // the circle's creator never joins: `deriveRoster` supplies founders separately, with no keys at
-    // all. If nothing healed this, the founder would be the one member permanently allowed to speak
-    // canonically — an enforcement with a hole shaped exactly like whoever made the circle.
+    // all. The next two tests are what keeps that from being a hole — a joiner holds them proven from
+    // the redeem response, and their own row self-heals at the announce.
+    //
+    // ⚠ 2026-09-10: proving the founder AT CREATION was attempted and BACKED OUT. Recording their
+    // proven address from the waist's `createGroupV2` post-step stopped the membership spine emitting
+    // `join` and `rules-accept` entirely — the fold saw only `create`, so a joiner landed on the trail
+    // but their signed acceptance folded nowhere. Isolated to that change by disabling it; the likely
+    // mechanism is a reentrant `callSkill` into stoop while a stoop op is still in flight, which was
+    // not confirmed. Whoever tries again: start there, and watch these two tests plus
+    // `rulesAcceptance.journey.test.js`.
     const own = rowFor(await readRoster(admin, CIRCLE_A), admin.pubKey);
     expect(own, 'the founder is on their own roster').toBeTruthy();
     expect(own.circleAddressProof, 'and has proved nothing about their address yet').toBeFalsy();

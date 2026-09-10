@@ -31,7 +31,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { bootRealAgentNode, teardown } from '../support/pairRealAgents.js';
-import { atRestSettings } from '../../src/v2/atRestSettings.js';
 
 /** Words no part of the machinery would ever emit on its own — so a hit is this person's content. */
 const SECRET_ITEM   = 'zwijgplicht-broodbeleg-8821';
@@ -94,36 +93,5 @@ describe('content is sealed at rest — a person\'s words are nowhere on this di
     expect(registryDump.length, 'the registry probe read nothing — it cannot prove anything').toBeGreaterThan(0);
     expect(registryDump, 'the registry holds the circle name in the clear').not.toContain(SECRET_CIRCLE);
     expect(registryDump, 'the registry holds the person\'s name in the clear').not.toContain(SECRET_NAME);
-  }, 120_000);
-
-  it('only an explicit choice turns sealing off — everything else means sealed', () => {
-    // The default is the whole decision. A missing store, an empty one, a corrupt read and an unrelated
-    // value must all land on SEALED, because the failure that silently removes protection is the one
-    // worth designing against — and it is the one a person would never notice.
-    expect(atRestSettings().sealAtRest, 'no settings at all').toBe(true);
-    expect(atRestSettings({}).sealAtRest, 'an empty store').toBe(true);
-    expect(atRestSettings(null).sealAtRest, 'an unreadable store').toBe(true);
-    expect(atRestSettings({ sealAtRest: 'no' }).sealAtRest, 'a non-boolean').toBe(true);
-    // ...and the one thing that does turn it off is a person setting it to false.
-    expect(atRestSettings({ sealAtRest: false }).sealAtRest, 'the explicit opt-out').toBe(false);
-  });
-
-  it('a person who opts out gets what they chose — plain text on their own disk', async () => {
-    const optOutDir = await mkdtemp(path.join(tmpdir(), 'at-rest-off-'));
-    const file = path.join(optOutDir, 'household-items.json');
-    // The shell's settings IO, saying what a person said in the toggle.
-    const io = { load: async () => ({ sealAtRest: false }) };
-    const off = await bootRealAgentNode('opted-out', {
-      agentOpts: { householdPersistDb: { path: file }, atRestIo: io },
-    });
-    try {
-      await off.agent.callSkill('household', 'addItem', { type: 'shopping', text: SECRET_ITEM });
-      await new Promise((r) => setTimeout(r, 1200));
-      const onDisk = await readFile(file, 'utf-8').catch(() => '');
-      expect(onDisk, 'opting out must actually opt out — otherwise the setting is a lie').toContain(SECRET_ITEM);
-    } finally {
-      await teardown(off).catch(() => {});
-      await rm(optOutDir, { recursive: true, force: true }).catch(() => {});
-    }
   }, 120_000);
 });

@@ -187,7 +187,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
-import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
+import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
 import { noticeWants } from '../../src/v2/noticeSettings.js';
@@ -7701,12 +7701,10 @@ async function boot() {
   // anything appends, then late-bind the debounced save. Without this every reload wiped the log and the
   // legacy chat store quietly stayed the real record — the inverse of the decided hierarchy. Best-effort:
   // a blocked IndexedDB degrades to the old in-memory behaviour, never a broken boot.
-  try {
-    const { hydrated } = await wireEventLogPersistence({
-      eventLog, io: backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log'))),
-    });
-    if (hydrated) console.info(`[device-log] hydrated ${hydrated} persisted entries`);
-  } catch (err) { console.warn('[device-log] persistence wiring failed — in-memory this session:', err?.message ?? err); }
+  // Hydration happens INSIDE the agent now, at the first moment the content key exists — see the note
+  // there. Reading it here, before that, handed back a sealed envelope and started the log empty on
+  // every reload. The shell's job is the storage; when to read it is the agent's.
+  const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log')));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.
@@ -7755,6 +7753,7 @@ async function boot() {
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
       deviceLog: eventLog,
+      deviceLogIo,          // the agent hydrates it once the content key exists — see the note there
       // The A2A surface: these manifests' ops become kernel skills another agent can invoke, each
       // gated by a CapabilityToken naming exactly that op, with the escalation family refused
       // outright. Same list the connection DO menu is built from — see CONNECTION_MANIFESTS.

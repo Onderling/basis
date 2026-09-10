@@ -164,8 +164,29 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
       // Some backends hand back the value itself, others a record carrying it as `bytes`.
       const carried = (rec && typeof rec === 'object' && 'bytes' in rec) ? rec.bytes : rec;
       if (carried == null) return rec;
+      // NOT A STRING means it was written before sealing began — binary, straight from the store. Return
+      // it untouched. Coercing it with `String()` produced "91,123,34…", the comma-joined bytes: not
+      // sealed, so the opener passes it through, no tag matches, and the caller gets that text.
+      //
+      // The one caller that writes binary is the DEVICE-LOG snapshot, and the device log is the record
+      // every lane rides. Its loader `JSON.parse`s what it is given, so this threw
+      // `Unexpected non-whitespace character after JSON at position 2` — and its caller catches exactly
+      // that and degrades to an empty log rather than a broken boot. So an existing install's first boot
+      // after the update came back with no history at all, behind one console warning: not a crash, which
+      // someone would have noticed, but a device that reads as a fresh install.
+      //
+      // Measured both ways (the fix removed, then restored), because the first explanation of this was
+      // wrong — the test that "found" it was reading the wrong ref, and the real mechanism is a throw,
+      // not the null I first assumed.
+      if (typeof carried !== 'string') return rec;
       try {
-        const opened = decode(s.open(typeof carried === 'string' ? carried : String(carried)));
+        // Only a value that was actually SEALED carries a type tag, so only that one is decoded. The
+        // opener returns non-sealed text unchanged, which is how we can tell: `opened !== carried` means
+        // it came out of an envelope. Without this check a pre-seal value beginning with `s`, `j` or `b`
+        // would have its first character eaten as a tag. Nothing stored here starts that way today (these
+        // are JSON bodies), which is precisely why it would have sat unnoticed until something did.
+        const openedText = s.open(carried);
+        const opened = openedText === carried ? carried : decode(openedText);
         return (rec && typeof rec === 'object' && 'bytes' in rec) ? { ...rec, bytes: opened } : opened;
       } catch (err) {
         warn(`[at-rest] ${ref}: stored here but not openable with this device's content key`, err);

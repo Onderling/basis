@@ -133,11 +133,14 @@ export function createCircleSenderAuthorization({
    * @param {string} a.ownAddress          this device's per-circle address in that circle
    * @param {Array<object>} a.members      roster rows (`stoop listGroupMembers`)
    * @param {string[]} [a.selfKeys]        keys of OURS that speak in this circle
+   * @param {string|null} [a.selfWebid]     OUR webid on this roster — how our own row is recognised when
+   *   its `pubKey` is a display-cache artefact rather than a key of ours (see the branch below).
    * @returns {number} how many distinct keys are now allowed
    */
-  function recordCircleRoster({ circleId, ownAddress, members, selfKeys = [] } = {}) {
+  function recordCircleRoster({ circleId, ownAddress, members, selfKeys = [], selfWebid = null } = {}) {
     if (typeof ownAddress !== 'string' || !ownAddress) return 0;
     const mine = new Set((Array.isArray(selfKeys) ? selfKeys : []).filter((k) => typeof k === 'string' && k));
+    const myWebid = (typeof selfWebid === 'string' && selfWebid) ? selfWebid : null;
     const keys = new Set();
     /** canonical keys deliberately EXCLUDED — members who have proved they can sign per-circle. */
     const refusedCanonical = new Set();
@@ -155,6 +158,19 @@ export function createCircleSenderAuthorization({
       for (const extra of Array.isArray(m?.circleAddresses) ? m.circleAddresses : []) {
         if (typeof extra === 'string' && extra) keys.add(extra);
       }
+      // OUR OWN ROW, IDENTIFIED BY WEBID — and its key is NOT admitted.
+      //
+      // A founder gets no keys of their own from `deriveRoster`, so their whole row comes from the
+      // display cache, and the `pubKey` that lands there is this device's STOOP agent identity: seeded
+      // once per device, identical in every circle, and not one of `selfKeys`. Recognised only by key,
+      // that row fell past the branch below and was ALLOWED — admitting a global, cross-circle constant
+      // onto a per-circle allow-list, which is exactly the linkability this gate exists to prevent. It
+      // also counted itself as one member still speaking canonically, so the diagnostic pointed at a
+      // stranger who did not exist: a circle with nobody in it, reporting one.
+      //
+      // Ours, so neither enforced nor counted — but `continue` WITHOUT adding the key, because
+      // `selfKeys` already names every key of ours that speaks here, and this is not one of them.
+      if (myWebid && typeof m?.webid === 'string' && m.webid === myWebid) continue;
       if (!canonical) continue;
       // Our own row is neither enforced nor counted: `selfKeys` already decides which keys of ours
       // speak here, and our other devices may still be speaking canonically (see the header).

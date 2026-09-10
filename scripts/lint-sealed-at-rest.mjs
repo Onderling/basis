@@ -33,6 +33,13 @@ const FILES = [
   // The per-circle KEY vault — two private keys per circle. See the header.
   { path: 'apps/basis/web/v2/circleApp.js',                        factory: 'new VaultIndexedDB',    wrapper: 'sealedLocalVault' },
   { path: 'apps/basis-mobile/src/core/circlePods.js',              factory: 'new VaultAsyncStorage', wrapper: 'sealedLocalVault' },
+  // The DEVICE-LOG snapshot. It is the record every lane rides, and under `record` retention it IS the
+  // chat record — so an unsealed one is a phone keeping every message in the clear. Mobile had exactly
+  // that until 2026-09-10, over a raw AsyncStorage IO the earlier version of this guard could not see:
+  // it looked only for the backend factories, and that path used none. The raw IO is deleted; this row
+  // makes sure the snapshot's backend keeps its wrapper on both shells.
+  { path: 'apps/basis/web/v2/circleApp.js',                        factory: 'backendSnapshotIo', wrapper: 'sealedLocalBackend' },
+  { path: 'apps/basis-mobile/App.js',                              factory: 'backendSnapshotIo', wrapper: 'sealedLocalBackend' },
 ];
 
 /** Sealed by realAgent instead, so the shell hands it over bare. Matched on the store name. */
@@ -54,10 +61,12 @@ for (const { path, factory, wrapper } of FILES) {
     if (line.startsWith('import ') || line.includes('export function') || line.includes('} from ')) return;
     checked += 1;
     if (SEALED_ELSEWHERE.test(line)) return;                        // the registry — sealed in realAgent
-    // A construction is often wrapped across LINES — the vault ones open the wrapper, then an IIFE, then
-    // the constructor. So look at the small window above as well as the line itself. Three lines is the
-    // width of the real shapes here and narrow enough that an unrelated call cannot vouch for one.
-    const window = lines.slice(Math.max(0, i - 3), i + 1).join('\n');
+    // A construction is often wrapped across LINES, and the wrapper can sit on either side of the
+    // factory: the vault ones open the wrapper, then an IIFE, then the constructor (wrapper ABOVE);
+    // the device-log one opens `backendSnapshotIo(` and puts the seal on the next line (wrapper BELOW).
+    // So look a few lines each way. Three is the width of the real shapes here and narrow enough that
+    // an unrelated call cannot vouch for one.
+    const window = lines.slice(Math.max(0, i - 3), i + 4).join('\n');
     if (window.includes(`${wrapper}(`)) return;                     // the ordinary, correct shape
     problems.push({ path, line: i + 1, text: line.slice(0, 120) });
   });

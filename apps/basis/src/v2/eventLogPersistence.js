@@ -116,15 +116,3 @@ export function fileSnapshotIo(filePath) {
   };
 }
 
-/** Snapshot io over an AsyncStorage-shaped store (`getItem`/`setItem`) — the mobile shape. */
-export function asyncStorageSnapshotIo(storage, key = 'cc-device-log') {
-  return {
-    async load() {
-      const text = await storage.getItem(key);
-      return text ? JSON.parse(text) : null;
-    },
-    async save(events) {
-      await storage.setItem(key, JSON.stringify(events));
-    },
-  };
-}

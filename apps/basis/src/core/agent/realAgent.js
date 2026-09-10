@@ -43,9 +43,9 @@ import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
 import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
-import { sealsAtRest, localStorageAtRestIo } from '../../v2/atRestSettings.js';   // the one opt-out, default sealed
-import { createSealingBackend, PLAINTEXT_AT_REST } from '@onderling/pseudo-pod';   // the seal above a blind local store, and the explicit opt-out
+import { createSealingBackend } from '@onderling/pseudo-pod';            // the seal above a blind local store
 import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
+import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
 import {
   createHistoryMirror, hydrateHistory, exportHistoryArchive,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
@@ -453,19 +453,37 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the sealed chat vault: exactly as durable as the identity (lose one and the other is gone anyway),
   // and resealed by the custody ceremony along with every other sealed backing — so the key rotates
   // while not one item byte is rewritten. See `v2/contentAtRest.js` for why it is not the vault key.
-  // Default sealed. Only an explicit choice by the person turns this off, and every failure path in
-  // `sealsAtRest` returns sealed — a settings store that will not load must not be the reason a disk goes
-  // readable. `PLAINTEXT_AT_REST` is a distinct value from "no key yet" on purpose: one is a decision that
-  // stores plain text, the other is a wiring bug that refuses the write.
-  const atRestIo = opts.atRestIo ?? (typeof globalThis.localStorage !== 'undefined' ? localStorageAtRestIo() : null);
-  const contentSeal = (await sealsAtRest(atRestIo))
-    ? await contentSealStrategy(chatVault)
-    : PLAINTEXT_AT_REST;
+  // UNCONDITIONAL. There is no opt-out and no setting: content on this device is sealed, for everyone
+  // (Frits, 2026-09-10 — *"it is just encrypted for everyone"*). An earlier version of this carried a
+  // per-device toggle, defaulting to sealed; it is gone, because a switch nobody should ever flip is a
+  // branch that has to stay correct forever in exchange for nothing.
+  const contentSeal = await contentSealStrategy(chatVault);
   // The shells build their own stores (a circle's items, the search index, the device-log snapshot) and
   // cannot reach into this boot for the key, so it is published for them here. Deliberately NOT read back
   // by this agent: a test process boots several agents, and a shared holder would hand the second one's
   // key to the first one's stores. See `v2/localStoreSeal.js`.
   setShellContentSeal(contentSeal);
+
+  // ── THE DEVICE LOG HYDRATES HERE, and it has to be here ────────────────────────────────────────
+  //
+  // Both shells used to hydrate it themselves, as the first thing they did. That was correct until the
+  // snapshot became sealed, and then it was silently wrong: the read happened BEFORE this key existed,
+  // so the backend handed back the raw envelope, `JSON.parse` threw, and `wireEventLogPersistence`
+  // caught it and started empty — which is the right thing for a corrupt snapshot and the wrong thing
+  // for one that is merely locked. The WRITE, later, was sealed. Sealed on the way out, unreadable on
+  // the way back: every reload came up with no history at all, behind one console warning.
+  //
+  // So it moves in here, to the first moment the key exists — and still before anything appends (the
+  // first `deviceLog.append` is several hundred lines below). One place, both shells, by construction:
+  // a shell now hands over the storage and this decides when to read it.
+  if (opts.deviceLog && opts.deviceLogIo) {
+    try {
+      const { hydrated } = await wireEventLogPersistence({ eventLog: opts.deviceLog, io: opts.deviceLogIo });
+      if (hydrated && typeof console !== 'undefined') console.info(`[device-log] hydrated ${hydrated} persisted entries`);
+    } catch (err) {
+      if (typeof console !== 'undefined') console.warn('[device-log] persistence wiring failed — in-memory this session:', err?.message ?? err);
+    }
+  }
   // Now the stores that hold content can be built, sealed from their first write.
   householdDataSource = opts.householdPersistDb
     ? await buildHouseholdDataSource(opts.householdPersistDb, { strategy: contentSeal })

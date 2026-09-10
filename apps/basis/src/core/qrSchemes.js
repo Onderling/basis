@@ -14,6 +14,10 @@ export const QR_URI_PREFIXES = Object.freeze([
   'onderling-contact://',
   'onderling-invite://',
   'onderling-pair://', // OBJ-2 no-pod device/agent pairing: encodes a household peer address
+  // Adding a device of your OWN — a distinct scheme from every other one here on purpose (recorded
+  // rule, see enrollOffer.js): the others make a CONNECTION, this one makes a DEVICE, and a code is
+  // the one moment a person is choosing between the two.
+  'onderling-enroll://',
   'basis://',    // future: chat-shell-level invites
 ]);
 

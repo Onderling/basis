@@ -745,6 +745,9 @@ export async function bootAgentBundle(opts = {}) {
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
     itemStore:  () => getContactDmStore(),
     localActor: 'me',
+    // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
+    // this person's other devices so the thread reads the same on all of them (web parity).
+    fanToOwnDevices: agent.contactTurnFan,
   });
   const coreAgent = agent.sa?.agent ?? null;   // discoverA2A's hello/native-upgrade target
 

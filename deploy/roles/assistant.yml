@@ -1,6 +1,15 @@
-# deploy/roles/assistant.yml — the basis assistant on Telegram as a box ROLE (the `personal` profile:
-# one person + their assistant, reachable on Telegram when the phone is off). Same engine as the
-# web/mobile shells. It dials out to Telegram and to Privatemode; no port, no hostname.
+# deploy/roles/assistant.yml — YOUR ALWAYS-ON DEVICE as a box role (the `personal` profile).
+#
+# Not a bot: the same agent the web and mobile shells boot, running headless on a machine you keep on.
+# It joins the relay, is a full member of your circles, takes delivery of what arrives while your phone
+# is in a drawer, and hands each turn to your other devices. With a Telegram token present the SAME
+# process also answers there, which is why this profile runs one service rather than two.
+#
+# It dials out only — the relay, Telegram, Privatemode. No port, no hostname.
+#
+# The service is still called `assistant` because that is the name on the boxes already running and on
+# their .env files; renaming it would recreate the container. `device` is the honest name and the rename
+# is recorded as a follow-up.
 services:
   assistant:
     build:
@@ -8,7 +17,11 @@ services:
       dockerfile: deploy/assistant/Dockerfile
     restart: unless-stopped
     environment:
-      TG_BOT_TOKEN: "${TG_BOT_TOKEN:?set TG_BOT_TOKEN in .env (the assistant's Telegram bot token)}"
+      # The wire. Without it the device still runs, but only locally — it joins no relay, so nothing
+      # reaches it and it reaches nobody.
+      ONDERLING_RELAY_URL: "${COMPANION_RELAY_URL:-}"
+      # Telegram is OPTIONAL now: no token simply means this box is a device and not also a bot.
+      TG_BOT_TOKEN: "${TG_BOT_TOKEN:-}"
       TG_ALLOWED_CHAT_IDS: "${TG_ALLOWED_CHAT_IDS:-}"
       PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"

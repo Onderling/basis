@@ -3,14 +3,21 @@
  *
  * The peer router is composed twice: web builds its handler map in `web/v2/circleApp.js`
  * (`makePeerRouter({ handlers: { … } })`), mobile in `basis-mobile/src/screens/ChatScreen.js`
- * (`buildPeerWiring`). Same shared model underneath (the rails, the catch-ups, the notice modules), two
- * hand-written compositions on top — and on 2026-08-29 one of them was wrong in a way nothing caught:
- * a stale closure gave every rail a null and the mobile router was never attached at all. The phone
- * could send and could not receive, and the UI painted perfectly the whole time.
+ * (`buildPeerWiring`). On 2026-08-29 one of them was wrong in a way nothing caught: a stale closure
+ * gave every rail a null and the mobile router was never attached at all. The phone could send and
+ * could not receive, and the UI painted perfectly the whole time.
  *
  * A subtype one shell routes and the other does not is the same class of defect one step smaller: a
- * message kind that lands on web and vanishes on the phone. This guard reads both compositions and
- * fails on ANY difference — either direction — except the ones listed below with a reason.
+ * message kind that lands on web and vanishes on the phone. This guard fails on ANY difference —
+ * either direction — except the ones listed below with a reason.
+ *
+ * Since 2026-09-09 most of the answer is structural rather than checked: the five signed lanes and the
+ * personal ones are built ONCE in `src/v2/circleLanes.js` and spread into both compositions, so they
+ * cannot drift apart at all. What remains hand-written in each shell is what only that shell can
+ * answer — bubbles, wizard stashes, the nearby room, the threads it paints — and that remainder is what
+ * the comparison below covers. The first test is therefore the load-bearing one: it checks that both
+ * shells actually spread the shared table, because a shell that stopped would lose every lane at once
+ * and every other assertion here would still pass.
  *
  * Reading source rather than running it is deliberate: `src/screens/**` has no runtime test coverage
  * (docs/agent-notes-known-gotchas.md), and the composition is the thing that drifted.
@@ -64,6 +71,8 @@ function subtypesOf(block) {
   return out;
 }
 
+const LANES = readFileSync(dir('../../src/v2/circleLanes.js'), 'utf8');
+
 const webBlock    = region(WEB,    /const peerMessageRouter = makePeerRouter\(\{/, /\n\s*defaultHandler/);
 const mobileBlock = region(MOBILE, /const buildPeerWiring = useCallback/,           /const defaultHandler/);
 
@@ -71,6 +80,15 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
   it('finds both compositions', () => {
     expect(webBlock.length, 'web: makePeerRouter({ handlers }) block').toBeGreaterThan(200);
     expect(mobileBlock.length, 'mobile: buildPeerWiring handler block').toBeGreaterThan(200);
+  });
+
+  it('both shells spread the SHARED lane table — the one thing nothing after it could catch', () => {
+    // A shell that stopped spreading this would lose every signed lane in a single edit, and the
+    // comparison below would go on passing, because it compares the two remainders to each other.
+    expect(webBlock,    'web no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
+    expect(mobileBlock, 'mobile no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
+    expect(WEB,    'web does not import buildCircleLanes').toContain('buildCircleLanes');
+    expect(MOBILE, 'mobile does not import buildCircleLanes').toContain('buildCircleLanes');
   });
 
   const web = subtypesOf(webBlock);
@@ -93,7 +111,19 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
     expect(phantom, 'listed as a difference, but neither shell routes it').toEqual([]);
   });
 
-  it('is comparing a real set, not an empty one', () => {
-    expect([...web].filter((s) => mobile.has(s)).length, 'shared subtypes').toBeGreaterThan(20);
+  it('is comparing real sets, not empty ones', () => {
+    // The shared table carries the lanes; each shell's own block carries its own answers. Both have to
+    // be non-trivial, or this file is asserting nothing at all.
+    // Counted by SHAPE, not by lane: the shared table writes the catch-up trio once and reuses it for
+    // every lane, which is the deduplication that made it worth extracting. So name the lanes instead.
+    const shared = subtypesOf(LANES);
+    for (const lane of ['CHAT_STATEMENT_BROADCAST', 'KEY_STATEMENT_BROADCAST', 'TASK_BROADCAST',
+                        'MEMBERSHIP_BROADCAST', 'GRANTS_BROADCAST']) {
+      expect(shared.has(lane), `the shared lane table no longer routes ${lane}`).toBe(true);
+    }
+    expect([...shared].filter((x) => x.startsWith('catchup:')).length,
+      'the shared table routes no catch-up at all — an offline device would never converge').toBeGreaterThan(1);
+    expect(web.size,    'subtypes the web shell answers itself').toBeGreaterThan(8);
+    expect(mobile.size, 'subtypes the mobile shell answers itself').toBeGreaterThan(8);
   });
 });

@@ -25,6 +25,7 @@
  * marked with the phase that makes them green — Phase 0 lands the net, not the fixes.
  */
 
+import { assertDevServerIsFresh } from './devServerFreshness.js';
 import { createCircleViaWizard } from './helpers.js';
 
 /** Where every journey drops its screenshots. */
@@ -77,6 +78,15 @@ export const FIXTURE_RELAY = process.env.PEER_TEST_RELAY || '';
  * @param {string} [opts.storageState]  path to a Playwright storageState JSON to REUSE another client's
  *        storage → the SAME identity on a second context (multi-device). Omit for a fresh identity.
  */
+/** The freshness check runs once per process, on the first peer that boots. */
+let _freshnessChecked = false;
+async function assertDevServerFreshOnce() {
+  if (_freshnessChecked) return;
+  _freshnessChecked = true;
+  // The same port the config computes; no private Playwright internals.
+  await assertDevServerIsFresh(`http://localhost:${process.env.PEER_TEST_PORT || '5173'}`);
+}
+
 export async function bootPeer(browser, label, opts = {}) {
   const { lang = 'nl', transportMode, relayUrl, pod = 'no-pod', storageState } = opts;
 
@@ -128,6 +138,11 @@ export async function bootPeer(browser, label, opts = {}) {
   // `?relay=` is the belt to the localStorage braces: the app applies it at boot even if a
   // pre-nav storage seed didn't stick. Only added when this client is meant to use a relay.
   const dest = effRelay ? `/?relay=${encodeURIComponent(effRelay)}` : '/';
+  // Before the first page loads: is the server behind this base URL serving THIS working tree? Playwright
+  // reuses an existing dev server, and one left running by an earlier session keeps its own module graph —
+  // so a run can measure code nobody has any more, and the failure looks like a product bug three steps
+  // later. Checked once per run, loudly. (See devServerFreshness.js for what it cost.)
+  await assertDevServerFreshOnce();
   await page.goto(dest);
   await page.waitForTimeout(4000);
   if (bootLog.failed) {

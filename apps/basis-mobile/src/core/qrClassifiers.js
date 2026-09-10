@@ -19,6 +19,7 @@
  */
 
 import { parseInviteDeepLink } from '../../../basis/src/v2/inviteDeepLink.js';
+import { enrollOfferFromLink } from '../../../basis/src/v2/enrollOffer.js';
 
 const STOOP_CONTACT_SCHEME = 'onderling-contact://';
 const STOOP_INVITE_SCHEME  = 'onderling-invite://';
@@ -32,7 +33,22 @@ export function getBasisClassifiers() {
     { kind: 'contact', classify: _classifyContact },
     { kind: 'invite',  classify: _classifyInvite  },
     { kind: 'pair',    classify: _classifyPair    },
+    { kind: 'enroll',  classify: _classifyEnroll  },
   ];
+}
+
+// Adding a device of your OWN. Both carriers go through the SHARED reader, which takes the raw
+// `onderling-enroll://` code and the clickable `#enroll=` link alike — so the box printing a link and
+// a person scanning a code end up in the same place. It classifies LAST because it is the narrowest:
+// nothing else answers to that scheme or that hash key.
+//
+// Until this, mobile accepted an offer only by PASTE. A scanned code and a tapped link both fell to
+// 'unknown' — the same shape as the invite-link bug this file's header records, on the flow a person
+// adding their second device is most likely to use.
+function _classifyEnroll(text) {
+  if (typeof text !== 'string') return null;
+  const parsed = enrollOfferFromLink(text);
+  return parsed.ok ? parsed.uri : null;
 }
 
 // OBJ-2 device/agent pairing: `onderling-pair://<addr>?name=<label>` (output of the paired-devices QR).

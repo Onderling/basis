@@ -76,6 +76,11 @@ import {
   makeGrantsRail, makeGrantsFan, makeGrantsCatchUp, makeGrantsPeerHandler,
   deviceSetBindingVerifier, siblingDeviceAddresses, GRANTS_CATCHUP_SUBTYPES,
 } from '../../v2/grantsRail.js';
+// A direct message is addressed to a PERSON but arrives at ONE device: the contact card carries the
+// profile address, which every device derives from the same seed, and a relay maps one address to one
+// socket. This carries a landed turn to the person's other devices so the thread reads the same on all
+// of them — the grants lane's fan, pointed at conversation instead of authority.
+import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
@@ -1663,13 +1668,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     signerFor: () => grantsSignerPromise,
     verifyBinding: deviceSetVerifier,
   });
-  const grantsSiblings = () => siblingDeviceAddresses({
+  // MY OTHER DEVICES, resolved once and shared by everything that speaks to them — the grants lane
+  // and the contact-thread fan today. Two lookups would be two places for "who am I, elsewhere" to
+  // drift apart, and they must answer the same set or a revoke and a message would disagree about
+  // which devices are mine.
+  const ownDeviceSiblings = () => siblingDeviceAddresses({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
     circleAddressFor,
   });
   const grantsFan = makeGrantsFan({
-    siblings: grantsSiblings,
+    siblings: ownDeviceSiblings,
     sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
   });
   const surfaceGrants = createSurfaceGrants({
@@ -1694,13 +1703,28 @@ export async function createRealHouseholdAgent(opts = {}) {
   const grantsCatchUp = makeGrantsCatchUp({
     rail: grantsRail,
     sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
-    siblings: grantsSiblings,
+    siblings: ownDeviceSiblings,
     selfPubKey: chatId.pubKey,
     onChange: () => surfaceGrants.recompute(),
   });
   // Kick the first fold; the door refuses until it lands (`isRevoked` fails closed), so a boot
   // cannot race it.
   const surfaceGrantsReady = surfaceGrants.hydrate().catch(() => false);
+  // THE CONTACT-THREAD FAN: the same sibling set, carrying conversation. `contactTurnFan` is what a
+  // shell hands to `createContactThreadChannel`, so every turn in either direction is offered to the
+  // person's other devices at the one place all of them pass. `contactTurnHandler(applyTurn)` is the
+  // receive half: the shell says what to do with a landed turn, this side says who may send one.
+  const contactTurnFan = makeContactTurnFan({
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+  });
+  const contactTurnHandler = (applyTurn, onRefused = null) => makeContactTurnPeerHandler({
+    siblings: ownDeviceSiblings,
+    selfPubKey: chatId.pubKey,
+    applyTurn,
+    onRefused,
+  });
+
 
   // THE ROSTER SEED (pod-less enroll S1): a freshly enrolled sibling asks THIS device for a
   // circle's membership-redemption trail rows — the head its roster projection folds statements
@@ -3424,8 +3448,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         // …gated by the user's publication lock: a contact card is the single most travelled copy of
         // this address, so "never share my global address" has to hold here first. Off ⇒ the card simply
         // carries no peerAddr and the scanner reaches them by the other rungs.
+        // WHICHEVER address this device can actually be reached at. The mesh address first, because it
+        // survives a change of relay; the relay's otherwise, which is what a device with no mesh
+        // transport has — and until 2026-09-09 that case put NO address on the card at all, so a card
+        // shared by a relay-only device (every headless one, and a browser with the mesh off) named a
+        // person the scanner had no way to write to. The publication lock below still governs both:
+        // "never share my global address" is a decision about the address, not about the transport.
         const myPeerAddr = shareableAddress(
-          sa?.peer?.address ?? null,
+          sa?.peer?.address ?? sa?.relay?.address ?? null,
           // The LIVE register value (device scope) — a flip in my-data binds here immediately.
           // opts stays as a test override; no shell passes it.
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
@@ -5046,6 +5076,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     grantsRail,
     grantsPeerHandler,
     grantsCatchUp,
+    // The contact-thread fan (a DM reaches the person, not one of their devices): the shells hand
+    // `contactTurnFan` to the contact channel and register `contactTurnHandler(applyTurn)` under
+    // CONTACT_TURN_BROADCAST.
+    contactTurnFan,
+    contactTurnHandler,
+    contactTurnBroadcast: CONTACT_TURN_BROADCAST,
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its
     // subtypes; `consumeEnrollOffer` sends `buildRequest` to the sibling.
     rosterSeed,

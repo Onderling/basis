@@ -130,6 +130,14 @@
       "text": "Opening join-circle wizard with scanned invite…",
       "doc": "Bot bubble before opening joinGroup wizard with pre-filled invite"
     },
+    "scan_enroll_stashed": {
+      "text": "Offer for another device saved. Open Mij → this device and type your recovery phrase to continue.",
+      "doc": "Bot bubble after a scanned or tapped onderling-enroll:// code or #enroll= link — the offer is stored; the ceremony itself asks for the phrase"
+    },
+    "scan_enroll_failed": {
+      "text": "That offer for another device could not be saved.",
+      "doc": "Bot bubble when stashing an enroll offer fails"
+    },
     "scan_failed": {
       "text": "Scan failed: {{error}}",
       "doc": "Substrate error after scan"

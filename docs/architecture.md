@@ -728,7 +728,10 @@ environment or a key file, never from code. The assistant a door talks to is one
 (`apps/basis/src/v2/assistantEngine.js`): the deterministic gate, retrieval over the items the door can see, the
 last turns of the thread re-sent with every call (the model is stateless), and the interpreter when a route is
 configured — the Telegram shell runs on it. Basis has a third shell beside
-web and mobile: the **Telegram shell** (`apps/basis/src/telegram/runner.js`, `bin/telegram-runner.mjs`) — a
+web and mobile, and it is not a shell so much as a DEVICE: `bin/device-runner.mjs` boots the same agent
+headless on a machine that stays on, joins the relay, holds its owner's circles, and hands each contact-thread
+turn to their other devices. With a Telegram token present the same process also answers there — that is the
+**Telegram shell** (`apps/basis/src/telegram/runner.js`), where a
 `MessagingBridge` turn goes through the same compilers (`parseInput → resolveDispatch → runDispatch → renderReply`)
 and, for free text, the circle composer's engine (`createCircleDispatch` with the deterministic gate); a button
 tap returns as `opId:itemId` and dispatches like a typed command; chats pair by allow-list. A contact whose

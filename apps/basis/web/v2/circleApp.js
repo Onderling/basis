@@ -50,7 +50,7 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
-import { sealedLocalBackend } from '../../src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedLocalBackend, sealedLocalVault } from '../../src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
 // session routes a sealed circle to the user's REAL pod; otherwise the in-memory pseudo-pod.
@@ -1713,10 +1713,12 @@ let feedHouseholdRosterForCircle = null;
 // a dedicated vault for per-circle sealing identities + controller keys + the
 // persisted group-key resource (durability). IndexedDB-backed so a sealed circle's keys
 // survive reloads; falls back to in-memory where IndexedDB is unavailable.
-const circleVault = (() => {
+// SEALED at rest: it holds two private keys per circle. It is built here rather than in `realAgent`,
+// which is why `sealedVault()` never reached it and its rows sat readable — see `sealedLocalVault`.
+const circleVault = sealedLocalVault((() => {
   try { return new VaultIndexedDB({ dbName: 'cc-circle-pod' }); }
   catch { return new VaultMemory(); }
-})();
+})());
 const circlePods = new Map();    // circleId → per-circle pod producer (sealing identity + control agent)
 let circleRealPodRouting = null; // S4 circle OIDC — set when signed in; routes sealed circles to the real pod
 const circleSealStrategies = new Map();   // circleId → resolved {seal,open} content strategy (or null for p0/p1)

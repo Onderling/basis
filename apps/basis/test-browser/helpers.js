@@ -107,8 +107,15 @@ export async function bootCircle(page, circleName = 'Test Circle', { tasks = fal
   if (await mine.count() === 0) await createCircleViaWizard(page, circleName);
   await mine.first().click();
   await page.waitForTimeout(2500);
-  await page.locator('.circle-view__view-toggle-btn', { hasText: 'Chat' }).click();
-  await page.waitForTimeout(1200);
+  // The chat/scherm pill is GONE from the shipping surface — `ALPHA_VIEW_MODES` is `['chat']`, and
+  // `circleView` paints the toggle only when there is more than one mode. Clicking it unguarded made
+  // 17 specs fail with `waiting for locator('.circle-view__view-toggle-btn')` on a circle that was
+  // open, with its composer visible: the app was fine and the harness was reaching for a control the
+  // alpha cut removed (PR #68, 2026-09-08). Ten lines up, `enableTasksFeature` already guards the same
+  // click with `.count()` — this one did not, which is why the walk specs were unaffected and these
+  // were not. Guarded the same way, so it works whether or not the pill comes back.
+  const chatPill = page.locator('.circle-view__view-toggle-btn', { hasText: 'Chat' });
+  if (await chatPill.count()) { await chatPill.click(); await page.waitForTimeout(1200); }
   await expect(page.locator('.circle-view__composer-input')).toBeVisible();
   if (tasks) await enableTasksFeature(page);
 }

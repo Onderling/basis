@@ -67,9 +67,13 @@ test('MEMBERS tab renders member rows and a tap opens the member card / self-vie
   await tile.click();
   await expect(page.locator('.circle-view__title')).toBeVisible({ timeout: LONG });
 
-  // A fresh circle lands in screen-mode (default view='screen'), which hides the
-  // per-circle tab bar — flip to Chat so the bottom tabs (incl. MEMBERS) render.
-  await page.locator('.circle-view__view-toggle-btn[data-view-mode="chat"]').click();
+  // A fresh circle USED to land in screen-mode, which hid the per-circle tab bar, so this flipped to
+  // Chat to make the bottom tabs render. The alpha surface cut removed the mode toggle entirely
+  // (`ALPHA_VIEW_MODES` is `['chat']`), so there is one mode, the tabs are already there, and the pill
+  // this clicked does not exist. Guarded rather than deleted: it costs nothing and it is correct again
+  // the day a second view mode returns.
+  const chatPill = page.locator('.circle-view__view-toggle-btn[data-view-mode="chat"]');
+  if (await chatPill.count()) await chatPill.click();
 
   // Switch to the MEMBERS tab (memberDirectory is on by default → the tab is present).
   const ledenTab = page.locator('.circle-view__tab', { hasText: /members|member/i });

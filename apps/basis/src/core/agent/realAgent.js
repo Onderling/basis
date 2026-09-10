@@ -3551,6 +3551,33 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runStoop);
       const out = await runStoop();
       rosterReads.afterWrite(realOpId);
+      // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
+      //
+      // Joining wrote this record (the join wizard, after the redeem) and creating never did, so the
+      // person who STARTED a circle was the one person who could not get it back: their recovery file
+      // carried nothing, their pod registry carried nothing, and a restored device re-opened nothing —
+      // measured 2026-09-10, creator 0 circles, joiner 1, from the same paired circle. That is the
+      // first thing anyone does with this product, and the site promises the opposite in the present
+      // tense.
+      //
+      // Written HERE rather than in the create wizard because this is the one seam every creation
+      // passes — both shells, the quick-create, and the help circle — and the address the record needs
+      // was derived a few lines above for exactly this op. Best-effort and AFTER success: a failure
+      // costs the restore list, never the circle that was just made.
+      if (realOpId === 'createGroupV2' && !out?.error) {
+        const circleId = out?.groupId ?? realArgs.groupId;
+        const address = realArgs.circleAddress ?? null;
+        if (circleId && address) {
+          try {
+            // No handle: a founder has none yet (they never redeemed an invite), and restore does not
+            // need one — the circle id and this device's address are what re-open a circle. A handle
+            // the person chooses later merges into the same record through the ordinary setter.
+            await callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address });
+          } catch (err) {
+            if (typeof console !== 'undefined') console.warn(`[restore-data] the created circle ${String(circleId).slice(0, 12)}… is not in the restore list: ${err?.message ?? err}`);
+          }
+        }
+      }
       return out;
     }
     if (appOrigin === 'folio') {

@@ -47,13 +47,23 @@ export function isKeyRef(v) {
 }
 
 /**
- * True iff `v` is a well-formed per-circle membership record. `handle` + `address` are required (who
- * you are in the circle + where you are reachable); `proof`, `relays`, and `key` are optional facets.
+ * True iff `v` is a well-formed per-circle membership record. `address` is required — it is where you
+ * are reachable, and the only field a restore actually needs to re-open a circle. `handle`, `proof`,
+ * `relays` and `key` are optional facets.
+ *
+ * The handle used to be required too, and that quietly excluded the one person who most needs this
+ * record: a FOUNDER never redeems an invite, so they never choose a handle, so their own circle was
+ * refused a membership entry — and a restored device re-opened everything they had joined and nothing
+ * they had started. Measured 2026-09-10 from one paired circle: the creator's recovery file carried
+ * 0 circles, the joiner's carried 1. The requirement encoded an assumption that only joiners exist.
+ *
+ * Readers were already null-tolerant (`memberships[id]?.handle ?? null`), and a handle chosen later
+ * merges onto the same record through the ordinary setter.
  * @param {*} v
  */
 export function isCircleMembershipRecord(v) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
-  if (typeof v.handle !== 'string' || !v.handle) return false;
+  if (v.handle != null && (typeof v.handle !== 'string' || !v.handle)) return false;
   if (typeof v.address !== 'string' || !v.address) return false;
   if (v.proof != null && typeof v.proof !== 'string') return false;
   if (v.relays != null && (!Array.isArray(v.relays) || v.relays.some((r) => typeof r !== 'string'))) return false;
@@ -64,7 +74,8 @@ export function isCircleMembershipRecord(v) {
 /** Freeze-normalise a record to exactly the known facets (drops unknown fields). Invalid → null. */
 export function normaliseCircleMembership(v) {
   if (!isCircleMembershipRecord(v)) return null;
-  const rec = { handle: v.handle, address: v.address };
+  const rec = { address: v.address };
+  if (v.handle != null) rec.handle = v.handle;
   if (v.proof != null) rec.proof = v.proof;
   if (Array.isArray(v.relays)) rec.relays = Object.freeze([...v.relays]);
   if (v.key != null) rec.key = Object.freeze({ ref: v.key.ref, ...(v.key.posture ? { posture: v.key.posture } : {}) });
@@ -132,6 +143,6 @@ export function setCircleMembership(properties, circleId, patch) {
   if (Array.isArray(patch.relays)) merged.relays = patch.relays;
   if (patch.key != null) merged.key = patch.key;
   const rec = normaliseCircleMembership(merged);
-  if (!rec) throw new TypeError('setCircleMembership: invalid membership record (handle + address required)');
+  if (!rec) throw new TypeError('setCircleMembership: invalid membership record (an address is required)');
   return setOwn(properties, CIRCLE_MEMBERSHIPS_KEY, { ...curMap, [circleId]: rec });
 }

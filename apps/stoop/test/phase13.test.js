@@ -198,11 +198,15 @@ describe('Stoop V1 Phase 13.4 — stale-post detection', () => {
     const bundle = await buildAgent();
     await callSkill(bundle.agent, 'postRequest',
       { text: 'fresh post', kind: 'ask', expectClaims: 0, timeoutMs: 1 });
-    // Wait a brief moment so the item's addedAt is strictly less than now.
-    await new Promise(r => setTimeout(r, 5));
-    // thresholdDays = a tiny fractional number (4 ms) — items older than that count as stale.
+    // Wait long enough that the item is UNAMBIGUOUSLY older than the threshold. The margin used to be
+    // 1 ms — sleep 5, ask for older-than-4 — and a loaded runner does not honour a 5 ms timer that
+    // precisely, so this failed in CI while passing on every developer machine (2026-09-10). What the
+    // test is about is the threshold arithmetic, not the clock, so the margin is now wide enough that
+    // scheduling cannot decide the outcome.
+    await new Promise(r => setTimeout(r, 60));
+    // thresholdDays = a tiny fraction of a day (10 ms) — anything older than that counts as stale.
     const r = await callSkill(bundle.agent, 'listMyStalePosts',
-      { thresholdDays: 4 / (24 * 60 * 60 * 1000) });
+      { thresholdDays: 10 / (24 * 60 * 60 * 1000) });
     expect(r.stale).toHaveLength(1);
     expect(r.stale[0].text).toBe('fresh post');
   });

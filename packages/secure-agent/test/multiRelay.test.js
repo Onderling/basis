@@ -136,3 +136,54 @@ describe('changing the relay you are on', () => {
     }
   }, 25000);
 });
+
+/**
+ * A MESSAGE WITH NO CIRCLE — a DM, a receipt — when the person is on a relay that is not my primary.
+ *
+ * A circle-scoped send names its relay, so it lands (the tests above). A DM carries no circle, so nothing
+ * names one, and `route()` then picks `candidates.find(eligible && reachable)` — with `relayTransport`,
+ * the PRIMARY, first in that list. `eligibleUnderScope` returns true for everything when the scope is
+ * empty, and a relay socket's `reachable` only means "I am connected". So the primary always wins.
+ *
+ * Nobody notices, because nothing fails. The primary relay ACCEPTS the frame — it cannot know the
+ * recipient is not registered with it — and parks it. The message is not lost; it is waiting on a relay
+ * the recipient will never dial. The sender is told it was delivered.
+ *
+ * Which is the point: **the sender cannot know which relay a peer is on.** `canReach` on a relay socket
+ * answers a different question. Picking one is a guess, and this is what the guess costs.
+ *
+ * Seen first as `two-relays.spec.js` STEP4 failing in the browser (2026-09-10); this is the same thing in
+ * one file, without a browser.
+ */
+describe('a circle-less message reaches a peer who is not on my primary relay', () => {
+  it('anna (primary A, also on B) writes to bram (B only) with no scope', async () => {
+    const A = await startRelay({ port: 0, log: false });
+    const B = await startRelay({ port: 0, log: false });
+    const urlA = `ws://127.0.0.1:${A.port}`, urlB = `ws://127.0.0.1:${B.port}`;
+    const received = [];
+    const anna = await agent();
+    const bram = await agent((m) => received.push(m));
+    try {
+      await anna.relay.connect({ relayUrl: urlA, awaitReady: true });
+      await anna.relays.add(urlB, { awaitReady: true });
+      await bram.relay.connect({ relayUrl: urlB, awaitReady: true });   // bram is ONLY on B
+      // Compose it the way the app does: `realAgent` pins the mode when a relay comes up —
+      // `sa.setTransportMode(nknLib ? 'both' : 'relay')` — and this run has no NKN, exactly like the
+      // browser walk. Without this the agent sits on the factory default ('nkn') with no NKN transport,
+      // and every unscoped send is held for a reason that belongs to the harness, not the product.
+      anna.setTransportMode('relay');
+      bram.setTransportMode('relay');
+      expect(anna.relays.list().map((r) => r.url)).toEqual([urlA, urlB]);
+
+      // No scope: this is a DM. Nothing tells the send path which relay bram is on.
+      const r = await anna.peer.sendTo(bram.identity.pubKey, { subtype: 'dm', text: 'waar ben je' }, HOLD);
+
+      expect(await until(() => received.find((m) => m.payload?.text === 'waar ben je'), { timeout: 6000 }),
+        `bram never got it — the send reported ${JSON.stringify({ delivered: r?.delivered, held: r?.held })}, `
+        + 'which is the shape of a message parked on the wrong relay').toBeTruthy();
+    } finally {
+      await anna.shutdown(); await bram.shutdown();
+      await A.stop(); await B.stop();
+    }
+  }, 30000);
+});

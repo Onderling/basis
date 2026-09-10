@@ -5222,6 +5222,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         // the second because our OTHER devices share this profile seed and may still be speaking
         // canonically, and refusing ourselves is never the right answer.
         selfKeys: [selfCircleKey, chatId.pubKey].filter(Boolean),
+        // …and our WEBID, because a founder's own row can carry a pubKey that is neither of those:
+        // `deriveRoster` gives a founder no keys, so the row comes from the display cache and brings
+        // this device's stoop identity with it. Without this the row reads as a stranger's.
+        selfWebid: chatId.pubKey,
       });
     },
     /** Drop a circle's authorize snapshot — the circle was left. */

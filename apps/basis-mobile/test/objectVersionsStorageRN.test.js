@@ -11,6 +11,11 @@ import {
   asyncStorageObjectVersions,
   VERSIONS_AS_SCOPE,
 } from '../src/core/objectVersionsStorageRN.js';
+import { useTestContentSeal } from './support/contentSeal.js';
+
+// A real device holds a content key before any circle store exists; these tests build one without an
+// agent, so they announce the key the same way boot does. Without it every local write refuses, by design.
+useTestContentSeal();
 
 function mockAsyncStorage() {
   const m = new Map();

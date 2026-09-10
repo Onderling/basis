@@ -521,6 +521,8 @@ export default function App() {
           }),
           // The owner's REGISTRY survives the device (web parity): AsyncStorage locally, and a
           // sealed mirror on the user's own pod under an opaque name when signed in.
+          // NOT wrapped here on purpose: realAgent seals the registry itself, because it also owns the
+          // pod mirror's strategy and the two must be the same key. Wrapping it again would seal twice.
           registryBackend: createAsBackend({ AsyncStorage, scope: 'cc-agent-registry' }),
           provisionRegistryMedium: async (strategy) => createRegistryPodMedium({
             fetch:   getCirclePodFetch(),

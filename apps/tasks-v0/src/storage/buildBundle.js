@@ -41,6 +41,7 @@
 import { CachingDataSource, SyncCadence } from '@onderling/local-store';
 
 import { pickPersist } from './persist/persistPicker.js';
+import { sealedPersist } from '@onderling/local-store';   // content is sealed on the way to disk, plaintext in the cache
 
 /**
  * Build a Tasks-shaped local-first storage bundle.
@@ -178,6 +179,7 @@ export function buildBundle({
 async function buildBundleWithPersistImpl({
   inner,
   persistDb,
+  contentSeal = null,
   localOnlyPrefixes,
   cadenceCfg,
 }) {
@@ -188,7 +190,9 @@ async function buildBundleWithPersistImpl({
   let persist = null;
   let onLocalChange;
   if (picked) {
-    persist        = picked.persist;
+    // Sealed at rest: the adapter writes ciphertext, the cache above it stays plaintext so `query()`
+    // still parses and filters. Without a strategy the adapter is returned unchanged.
+    persist        = sealedPersist(picked.persist, contentSeal);
     loadedStore    = await persist.load();
     onLocalChange  = (m) => persist.scheduleSave(m);
   }

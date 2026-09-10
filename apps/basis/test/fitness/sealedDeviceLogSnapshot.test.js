@@ -92,3 +92,42 @@ describe('a value that predates sealing is never mistaken for a tagged one', () 
     });
   }
 });
+
+/**
+ * THE THIRD TYPE — the circle cache's write-through queue stores plain OBJECTS.
+ *
+ * Three local stores, three different things handed to the same `put`: the item stores pass strings, the
+ * device log passes a `Uint8Array`, and the cache queue passes an object it expects back AS an object —
+ * `list()` reads `rec.bytes` and immediately compares `.queuedAt` on it. Hand that a JSON string and the
+ * ordering silently degrades to string comparison; hand it the wrong type and it throws.
+ *
+ * Every one of the three lives only in a shell composition, and shell compositions have no CI test. That
+ * is how the first two produced regressions that seven green suites could not see. This is the third, and
+ * it is pinned before it can be the third regression rather than after.
+ */
+describe('the cache queue\'s objects survive the seal as objects', () => {
+  const strategy3 = groupKeyStrategy({ groupKey: KEY });
+  const RECORD = { op: 'write', uri: 'mem://circles/c1/items/x.json', queuedAt: 1725900000000, seq: 3 };
+
+  it('an object put through the seal comes back an object, field for field', async () => {
+    const raw3 = createMemoryBackend();
+    const sealed = createSealingBackend({ backend: raw3, getStrategy: () => strategy3 });
+    await sealed.put('wtq/1', RECORD);
+    const back = (await sealed.get('wtq/1'))?.bytes;
+    expect(typeof back, 'a JSON string here would make the queue sort by text, quietly').toBe('object');
+    expect(back).toEqual(RECORD);
+  });
+
+  it('…and the queue body is not on the disk in the clear', async () => {
+    const raw3 = createMemoryBackend();
+    await createSealingBackend({ backend: raw3, getStrategy: () => strategy3 }).put('wtq/1', RECORD);
+    expect(JSON.stringify(await raw3.get('wtq/1')), 'the queued uri is readable').not.toContain('mem://circles/c1');
+  });
+
+  it('an object written BEFORE sealing still comes back an object', async () => {
+    const raw3 = createMemoryBackend();
+    await raw3.put('wtq/1', RECORD);   // the unsealed shell's queue
+    const back = (await createSealingBackend({ backend: raw3, getStrategy: () => strategy3 }).get('wtq/1'))?.bytes;
+    expect(back).toEqual(RECORD);
+  });
+});

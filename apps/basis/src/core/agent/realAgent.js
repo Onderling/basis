@@ -612,15 +612,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // identityResolver, capabilityIssuer, policyEngine, groupManager,
     // a2aTls, rateLimit, usePerfectFwdSec, webidClaim, helloGate, …
     //
-    // ⚠ `rateLimit` is deliberately NOT enabled by default, and the reason is worth keeping (2026-07-30).
-    // It DROPS over-quota envelopes, and catch-up replay is a legitimate burst: a replay serve fetches
-    // up to 1000 items, while the limiter's per-peer bucket is burst 30 / refill 5-per-second. Turning it
-    // on at the default tuning would silently discard most of a catch-up — message loss on reconnect,
-    // which is worse than the flood it defends against.
+    // (`rateLimit` IS enabled — see the block further down, where it is configured with the catch-up
+    // exemption that made turning it on safe. A comment here used to say the opposite, kept from the
+    // period when it was off; it outlived the change by three weeks and put a finished item back on a
+    // go-live brief, which is a good argument for deleting a stale comment rather than leaving it.)
     //
-    // Flooding IS defended, at the layer that can afford to be strict: the nearby room's per-author ask
-    // budget (`createAskBudget`, nearbyRoom.js), which protects the expensive half — matching, which can
-    // call a language model. Enabling this one properly needs a catch-up exemption first.
+    // Flooding is defended in a second place too, at the layer that can afford to be strict: the nearby
+    // room's per-author ask budget (`createAskBudget`, nearbyRoom.js), which protects the expensive half —
+    // matching, which can call a language model.
     //
     // The INBOUND GATE on the externally reachable agent (2026-08-19). This agent is the one peers can
     // actually reach; the host agent that holds the skill registry runs on an InternalTransport and no

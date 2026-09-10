@@ -68,3 +68,27 @@ describe('the device-log snapshot survives the seal', () => {
     expect(await sealedIo.load(), 'a pre-seal snapshot must still load').toEqual(EVENTS);
   });
 });
+
+/**
+ * The tag is an implementation detail of the ENVELOPE, and must never touch a value that never had one.
+ *
+ * The wrapper puts a one-character type tag inside the sealed text (`s` a string, `j` JSON, `b` bytes) so
+ * a value comes back as the type it went in as. A pre-seal value has no envelope and no tag — and if it
+ * happens to begin with one of those letters, stripping "the tag" eats a real character.
+ *
+ * Nothing stored through these backends starts that way today; they are all JSON bodies. That is exactly
+ * why it is worth pinning: the case is unreachable until the day something reaches it, and then it is a
+ * silent one-character corruption in a store nobody is watching.
+ */
+describe('a value that predates sealing is never mistaken for a tagged one', () => {
+  const strategy2 = groupKeyStrategy({ groupKey: KEY });
+
+  for (const value of ['some plain text', 'json is not this', 'best guess', '{"ok":true}']) {
+    it(`leaves ${JSON.stringify(value.slice(0, 12))} exactly as it found it`, async () => {
+      const raw2 = createMemoryBackend();
+      await raw2.put('pre/seal.json', value);   // written by the unsealed shell
+      const sealed = createSealingBackend({ backend: raw2, getStrategy: () => strategy2 });
+      expect((await sealed.get('pre/seal.json'))?.bytes).toBe(value);
+    });
+  }
+});

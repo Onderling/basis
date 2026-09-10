@@ -180,7 +180,13 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
       // not the null I first assumed.
       if (typeof carried !== 'string') return rec;
       try {
-        const opened = decode(s.open(typeof carried === 'string' ? carried : String(carried)));
+        // Only a value that was actually SEALED carries a type tag, so only that one is decoded. The
+        // opener returns non-sealed text unchanged, which is how we can tell: `opened !== carried` means
+        // it came out of an envelope. Without this check a pre-seal value beginning with `s`, `j` or `b`
+        // would have its first character eaten as a tag. Nothing stored here starts that way today (these
+        // are JSON bodies), which is precisely why it would have sat unnoticed until something did.
+        const openedText = s.open(carried);
+        const opened = openedText === carried ? carried : decode(openedText);
         return (rec && typeof rec === 'object' && 'bytes' in rec) ? { ...rec, bytes: opened } : opened;
       } catch (err) {
         warn(`[at-rest] ${ref}: stored here but not openable with this device's content key`, err);

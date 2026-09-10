@@ -1174,6 +1174,11 @@ export async function createSecureAgent(opts = {}) {
   let transportMode = opts.transportMode ?? 'nkn';
   // T5.2a — extra transports added via addSecureTransport (mdns/ble injected by the RN app,
   // rendezvous by enableSecureRendezvous). Tracked for shutdown.
+  /** How long a SPECULATIVE relay attempt waits before the next one is tried (see `_sendWithFailover`).
+   *  Short on purpose: there is nothing to wait for on a relay the recipient never dialled, and the last
+   *  attempt in the sweep keeps the caller's own timeout so a slow peer is still given time. */
+  const SPECULATIVE_RELAY_TIMEOUT_MS = 700;
+
   const extraTransports = new Map();
 
   // (T2/T5.1 — `routing` is created above and shared with the core Agent; in transportMode:'both'
@@ -1716,6 +1721,25 @@ export async function createSecureAgent(opts = {}) {
     if (relayTransport && relayState.url === url) { await disconnectRelay(); return; }
     await removeSecureTransport(relayNameFor(url));
   }
+  /**
+   * Every relay socket this device holds, primary first — the candidates for a message that names none.
+   *
+   * A circle-scoped message carries its relay in the scope, because the alias it is addressed to was
+   * registered there. A DM and a receipt carry no circle, so nothing names a relay — and a relay socket
+   * cannot answer the question either: `RelayTransport.canReach` returns `connected`, not "that address
+   * is registered with me". Only the relay knows, and the sender has no way to ask.
+   *
+   * So the send tries them, rather than picking one and hoping. See `_sendWithFailover`.
+   */
+  function relaySweep() {
+    const out = [];
+    if (relayTransport) out.push({ name: 'relay', transport: relayTransport });
+    for (const [name, tx] of extraTransports) {
+      if (name.startsWith(RELAY_NAME_PREFIX)) out.push({ name, transport: tx });
+    }
+    return out.filter(({ transport }) => (typeof transport?.canReach !== 'function' || transport.canReach() !== false));
+  }
+
   function listRelays() {
     const out = [];
     if (relayTransport) out.push(relayEntry(relayState.url, relayTransport, true));
@@ -2050,6 +2074,56 @@ export async function createSecureAgent(opts = {}) {
       : FAILOVER_ATTEMPT_BUDGET);
     const tried  = new Set();
     let   lastErr = null;
+
+    // ── A MESSAGE THAT NAMES NO RELAY, ON A DEVICE THAT HOLDS SEVERAL ─────────────────────────────
+    //
+    // `routeUnscoped` can only ever reach the PRIMARY relay and NKN: the extra relays are keyed by url
+    // and never appear in `TRANSPORT_PRIORITY`, so a circle-less message could not take one at all. Two
+    // people on different relays could talk inside a shared kring — the alias carries the route — and a
+    // DM between them went nowhere. Measured 2026-09-10: `{delivered: false, held: true}`, held on a
+    // device that was connected to the right relay the whole time.
+    //
+    // The sender cannot know which relay the recipient is on, so this TRIES them, primary first, and
+    // stops at the first that reports delivered. Not a fan: one delivery, no duplicate, and no envelope
+    // handed to a relay after the message has already arrived somewhere. A wrong relay costs one send
+    // timeout, which is why the ordering will matter once a contact card carries the person's own relays
+    // — then the first attempt is usually the right one and this becomes the fallback it should be.
+    //
+    // Only when NOTHING names a route: a scope with points is a route that is known, and it is used.
+    const routeNamed = Array.isArray(opts?.scope?.points) && opts.scope.points.length > 0;
+    const sweep = routeNamed ? [] : relaySweep();
+    if (sweep.length > 1) {
+      // ONE AT A TIME, and briefly.
+      //
+      // Concurrently was tried and is worse: two `_sendOverRoute` calls for the same peer at once
+      // interfere — the HI handshake and the hold queue are per peer — and the message arrives nowhere.
+      // So they go in turn, and the cost of a wrong relay is bounded instead of a full send timeout:
+      // every attempt but the last gets a short speculative window, because there is nothing to wait
+      // for on a relay the recipient never dialled. The last keeps the caller's own timeout, so a peer
+      // who is simply slow still gets the patience they would have had.
+      //
+      // Duplicates are handled where they arrive — the chat inbox dedupes on `msgId` (LRU, cap 256) and
+      // the hold queue keys on `id:<msgId>` — so a message that does reach two relays lands once.
+      let lastResult = null;
+      for (let k = 0; k < sweep.length; k++) {
+        const { name, transport } = sweep[k];
+        const last = k === sweep.length - 1;
+        const attemptOpts = last ? opts : { ...opts, firstSendTimeoutMs: SPECULATIVE_RELAY_TIMEOUT_MS };
+        let res;
+        try {
+          res = await _sendOverRoute(addr, payload, { name, transport, address: await addressFor(addr, name) }, attemptOpts);
+        } catch (err) {
+          if (isApplicationError(err)) throw err;   // a refusal is a refusal on every relay
+          lastErr = err; continue;
+        }
+        if (res?.delivered) return res;
+        lastResult = res ?? lastResult;
+      }
+      // Nobody acked: the peer is offline, or on a relay this device does not hold. The hold-forward
+      // queue already has it — once, by message id — so reporting that is more honest than falling
+      // through to try the primary a second time.
+      if (lastResult) return lastResult;
+    }
 
     for (let attempt = 0; attempt < budget; attempt++) {
       const sel = await route(addr, opts?.scope ?? null);

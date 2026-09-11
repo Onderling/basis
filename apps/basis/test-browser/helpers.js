@@ -71,13 +71,18 @@ export async function createCircleViaWizard(page, name) {
  * "That isn't turned on for this circle" and no task is ever created. Three specs assumed tasks-on because
  * they used to inherit whatever circle they happened to land in.
  */
-export async function enableTasksFeature(page) {
+export async function enableTasksFeature(page, on = true) {
   await page.locator('.circle-view__more').click();
   await page.locator('.circle-view__more-item[data-action="settings"]').click();
   await page.waitForTimeout(800);
   const box = page.locator('input[data-feature="tasks"]');
   await expect(box).toBeVisible({ timeout: 5000 });
-  if (!(await box.isChecked())) await box.check();
+  // Both directions. A gate is only proven by watching it CLOSE as well as open, and which way a
+  // feature happens to start is a product decision that moves (tasks went on by default on 2026-09-08).
+  // A test that reads the default as if it were the rule goes stale every time someone changes their
+  // mind; one that toggles proves the mechanism whatever the default is.
+  if (on && !(await box.isChecked())) await box.check();
+  if (!on && (await box.isChecked())) await box.uncheck();
   await page.locator('.circle-settings__save').click();   // the toggle alone only edits local state
   await page.waitForTimeout(800);
   const back = page.locator('.circle-settings__back');

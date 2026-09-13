@@ -46,10 +46,11 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
       .map((a) => a.id)
       .filter((id) => typeof more[id] === 'function');
     expect(menuActions(el)).toEqual(expected);
-    // The alpha trims the menu to invite · settings (back is a header affordance; alphaSurface.js). The
-    // gates beneath it are unchanged, observable through `gatedActions`: viewAs + rules on by default,
-    // files hidden (lists+notes off), share dropped by the platform gate (mobile-only).
-    expect(menuActions(el)).toEqual(['invite', 'settings']);
+    // The alpha trims the menu to invite · settings · admin (back is a header affordance; alphaSurface.js;
+    // Beheer is back since 2026-09-13). The gates beneath it are unchanged, observable through
+    // `gatedActions`: viewAs + rules on by default, files hidden (lists+notes off), share dropped by the
+    // platform gate (mobile-only).
+    expect(menuActions(el)).toEqual(['invite', 'settings', 'admin']);
     const gated = gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
     expect(gated).toContain('viewAs');
     expect(gated).toContain('rules');
@@ -66,7 +67,7 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
     expect(gated).toContain('files');        // lists on (lists || notes)
     const el = mount();
     renderCircleView(el, { circle, rows: [], t, policy: noDir, more: fullMore() });
-    expect(menuActions(el)).toEqual(['invite', 'settings']);   // the painted menu is the alpha's, whatever the gates
+    expect(menuActions(el)).toEqual(['invite', 'settings', 'admin']);   // the painted menu is the alpha's, whatever the gates
   });
 
   it('handler-presence gate: an action with no more[id] callback is omitted', () => {

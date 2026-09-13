@@ -419,6 +419,16 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
           catch (err) { logger?.warn?.('[circle-address] sealed-audience grant failed', err?.message ?? err); }
         }
       }
+      // A DEVICE OF MINE just appeared (the enrolled boot announcing itself): it knows nobody yet —
+      // hand it everyone this device knows, bindings and contacts, at the address it just proved.
+      // This is the moment a new sibling exists, and the only one both facts are in hand.
+      const me = agent?.identity?.chat?.pubKey ?? null;
+      const ownHere = (() => { try { return agent?.circleAddressFor?.(circleId) ?? null; } catch { return null; } })();
+      for (const one of proven) {
+        if (!me || one.memberWebid !== me || one.circleAddress === ownHere) continue;
+        try { await agent?.knownPeersSync?.pushTo?.(one.circleAddress); }
+        catch (err) { logger?.warn?.('[circle-address] could not hand a new device of mine who I know', err?.message ?? err); }
+      }
     }
     return { recorded, refused };
   };

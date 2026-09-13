@@ -339,6 +339,9 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
     } : {}),
+    // Who the person knows, on every device of theirs (bindings + contact book) — the same entries the
+    // shared lane table spreads into both shells.
+    ...(agent.knownPeersSync?.handlers ?? {}),
     // The contact thread, when a walk asked for it — the same three registrations both shells make:
     // a bot's reply, a person's DM, and a turn one of MY OWN devices carried here. All three land in
     // the durable thread through the channel, which is what makes `contactTurns` a real read of the

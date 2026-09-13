@@ -85,6 +85,7 @@ import {
 // socket. This carries a landed turn to the person's other devices so the thread reads the same on all
 // of them — the grants lane's fan, pointed at conversation instead of authority.
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
+import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
@@ -1778,6 +1779,58 @@ export async function createRealHouseholdAgent(opts = {}) {
     applyTurn,
     onRefused,
   });
+  // WHO I KNOW, on every device of mine: the security layer's bindings and the contact book ride the
+  // same sibling set. A greeting binds a key on the ONE device it landed on, and a card scanned on the
+  // phone is a contact on the phone — this carries both to the person's other devices, live, to a
+  // newly announced sibling in full, and on request. The contact book is read and written RAW here
+  // (the stoop agent directly, not the waist), because the waist's add is what fans a row out and a
+  // landed row must not fan back.
+  const stoopAgentRef = { current: null };   // late-bound: the stoop agent is created further down this scope
+  const rawStoop = async (opId, args = {}) => {
+    const result = await chatAgent.invoke(stoopAgentRef.current.address, opId, [DataPart(args)]);
+    return (Array.isArray(result) ? result[0] : null)?.data ?? null;
+  };
+  const rawContacts = async () => (await rawStoop('listContacts', {}))?.contacts ?? [];
+  const knownPeersSync = createKnownPeersSync({
+    siblings: ownDeviceSiblings,
+    selfPubKey: chatId.pubKey,
+    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+    snapshot: async () => ({
+      peers: sa.agent.security?.peerBindings?.() ?? [],
+      contacts: await rawContacts(),
+    }),
+    learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
+    contacts: {
+      has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
+      add: (contact) => rawStoop('addContact', contact),
+    },
+  });
+  // LIVE, the key half: a greeting that passed the hello gate just bound a key here. The core agent
+  // says so (`peer`) for the initial HI and for the ack alike, so both directions of first contact
+  // reach the siblings.
+  sa.agent.on?.('peer', ({ address }) => {
+    const pubKey = sa.agent.security?.getPeerKey?.(address);
+    if (typeof address === 'string' && address && pubKey) knownPeersSync.fanPeer({ address, pubKey }).catch(() => {});
+  });
+  // A REFUSED envelope says so, once per sender and reason. The security layer refuses silently
+  // toward the sender by design (an attacker learns nothing), and until now silently toward US too:
+  // the wire transports re-emit their `security-error` on the agent and nothing listened, so a
+  // person whose greeting reached one device and whose message reached another simply saw nothing
+  // arrive. Counted per reason, so a diagnostic can read it; warned once per pair, so a log stays
+  // readable under a storm.
+  const refusedInbound = new Map();
+  const refusedInboundWarned = new Set();
+  sa.agent.on?.('security-error', (err, raw) => {
+    const code = err?.code ?? 'SECURITY_ERROR';
+    refusedInbound.set(code, (refusedInbound.get(code) ?? 0) + 1);
+    const from = typeof raw?._from === 'string' ? raw._from : '?';
+    const key = `${code}:${from}`;
+    if (refusedInboundWarned.has(key)) return;
+    refusedInboundWarned.add(key);
+    if (typeof console !== 'undefined') {
+      console.warn(`[security] refused an inbound envelope from ${from.slice(0, 12)}… (${code}) — ${String(err?.message ?? err).slice(0, 160)}`);
+    }
+  });
 
 
   // THE ROSTER SEED (pod-less enroll S1): a freshly enrolled sibling asks THIS device for a
@@ -2805,6 +2858,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     allowAddressFallback: opts.allowAddressFallback,
     label:      'StoopAgent(cc)',
   });
+  stoopAgentRef.current = stoopAgent;   // the raw contact-book reads above may run from here on
   // Every noticeboard item the stoop store ACCEPTS fans to its circle — a request, an offer, an
   // announcement, and the next kind — through the one `circle-post` door (`noticeboardFan.js` decides from
   // the item; a received item never echoes). Installed on the store event, so no op has to remember.
@@ -3592,11 +3646,13 @@ export async function createRealHouseholdAgent(opts = {}) {
           note:        'Multi-circle support requires multi-agent topology — separate slice.',
         };
       }
+      let rawReply = null;   // the stoop reply before shaping — the own-devices fan below reads the contact row
       const runStoop = async () => {
         const parts = [DataPart(realArgs)];
         const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts);
         const first  = Array.isArray(result) ? result[0] : null;
         const reply  = first?.data ?? null;
+        rawReply = reply;
         // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the stoop
         // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
         return adaptStoopReply(opId, reply, realArgs);
@@ -3607,6 +3663,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runStoop);
       const out = await runStoop();
       rosterReads.afterWrite(realOpId);
+      // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
+      // is a contact on the person's other devices too. Best-effort and after success.
+      if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
+        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
       // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
       //
       // Joining wrote this record (the join wizard, after the redeem) and creating never did, so the
@@ -5165,6 +5226,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     contactTurnFan,
     contactTurnHandler,
     contactTurnBroadcast: CONTACT_TURN_BROADCAST,
+    // Who this device knows, carried to the person's other devices (bindings + contact book): the
+    // shells spread `handlers` into the router and kick `requestFromSiblings` on connect; the
+    // announce landing calls `pushTo` for a device of mine that just appeared.
+    knownPeersSync,
+    /** Inbound envelopes the security layer refused, per reason — the diagnostic read of the warning above. */
+    refusedInboundByReason: () => Object.fromEntries(refusedInbound),
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its
     // subtypes; `consumeEnrollOffer` sends `buildRequest` to the sibling.
     rosterSeed,

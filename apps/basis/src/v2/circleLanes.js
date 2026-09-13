@@ -42,7 +42,7 @@ const NOOP = () => {};
  * @param {object} a
  * @param {object} a.agent  the basis agent — its rails (`chatRail`, `taskRail`, `keyRail`,
  *   `membershipRail`), its ready-made receivers (`grantsPeerHandler`, `grantsCatchUp`, `rosterSeed`,
- *   `contactTurnHandler`) and `rosterReads`. A rail this agent does not have yields no entry.
+ *   `contactTurnHandler`, `knownPeersSync`) and `rosterReads`. A rail this agent does not have yields no entry.
  * @param {(addr: string, payload: object, opts?: object) => any} [a.sendToPeer]
  *   how a catch-up asks; defaults to the agent's own send.
  * @param {object|null} [a.govRail]  the governance rail (each shell builds its own today).
@@ -188,6 +188,10 @@ export function buildCircleLanes({
     ...((agent.contactTurnHandler && typeof ownDeviceTurn === 'function')
       ? { [agent.contactTurnBroadcast]: agent.contactTurnHandler(ownDeviceTurn) }
       : {}),
+    // Who the person knows, on every device of theirs: a greeting's binding and a contact-book row
+    // land here from a sibling (live, in full for a new device, or as a catch-up answer), and a
+    // sibling's request is answered. Entries only — the agent owns the gate and the landing.
+    ...(agent.knownPeersSync?.handlers ?? {}),
   };
 
   return {

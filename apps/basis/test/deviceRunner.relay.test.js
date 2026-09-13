@@ -122,15 +122,18 @@ describe('the always-on device runs, joins the relay, and keeps what arrives', (
     // The kicks are deliberately staggered over the first few seconds, so this waits for them rather
     // than assuming they have already run — the difference between a slow kick and no kick at all is
     // the whole point of checking.
+    const EXPECTED = ['governance', 'membership', 'grants', 'known-peers', 'tasks', 'chat'];
     const kicks = await until(
       async () => {
         const lanes = walkLog(dataDir).filter((e) => e.kind === 'catch-up-kick').map((e) => e.lane);
-        return lanes.length >= 5 ? lanes : null;
+        // The NAMED set, not a count: a count is satisfied by whichever kicks fired first, and a lane
+        // added to the stagger would then make the last one look missing.
+        return EXPECTED.every((l) => lanes.includes(l)) ? lanes : null;
       },
       { timeout: 20_000, step: 500 },
     );
-    expect(kicks, 'the device never asked any lane for what it missed').toBeTruthy();
-    for (const lane of ['governance', 'membership', 'grants', 'tasks', 'chat']) {
+    expect(kicks, `the device did not ask every lane for what it missed — asked: ${JSON.stringify(walkLog(dataDir).filter((e) => e.kind === 'catch-up-kick').map((e) => e.lane))}`).toBeTruthy();
+    for (const lane of EXPECTED) {
       expect(kicks, `nothing pulled the ${lane} lane on reconnect`).toContain(lane);
     }
   }, 30_000);

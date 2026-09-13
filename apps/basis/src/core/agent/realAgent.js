@@ -5012,6 +5012,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       host: { pubKey: hostId.pubKey, stableId: hostId.stableId },
       chat: { pubKey: chatId.pubKey, stableId: chatId.stableId },
     },
+    /** Whether this install is an ENROLLED device (a delegation under the owner root) — read by a
+     *  headless operator command that must refuse to enrol an install twice. */
+    isEnrolledDevice: () => !!enrolledDevice,
 
     // Cross-peer state (delegates to sa.peer).  Same surface main.js
     // already consumes: peer.address / peer.status / peer.error.

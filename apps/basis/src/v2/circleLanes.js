@@ -53,7 +53,8 @@ const NOOP = () => {};
  * @param {object} [a.on]  the shell's reactions, all optional:
  *   `govChange(circleId)` · `keyChange(circleId)` · `membershipChange(circleId)` ·
  *   `chatLanded({msgId, circleId, fromPeerAddr, source})` · `chatChange(circleId)` ·
- *   `chatCatchUpOffer({circleId, count, approxBytes, allow})` · `ownDeviceTurn(wire)`.
+ *   `chatCatchUpOffer({circleId, count, approxBytes, allow})` · `chatRefused({circleId, fromPeerAddr, reason})` ·
+ *   `ownDeviceTurn(wire)`.
  * @returns {{ handlers: Object<string, Function>, catchUps: object, chatStatementHandler: object|null }}
  *   `handlers` is spread into the router; `catchUps` holds `{gov, membership, key, task, chat, podChat}`
  *   for the connect-time kicks, each null when its rail is absent.
@@ -75,7 +76,7 @@ export function buildCircleLanes({
     : (addr, payload, opts) => agent.sendPeerMessage?.(addr, payload, opts);
   const {
     govChange = NOOP, keyChange = NOOP, membershipChange = null,
-    chatLanded = NOOP, chatChange = NOOP, chatCatchUpOffer = null,
+    chatLanded = NOOP, chatChange = NOOP, chatCatchUpOffer = null, chatRefused = null,
     ownDeviceTurn = null,
   } = on;
 
@@ -128,6 +129,7 @@ export function buildCircleLanes({
     sendToPeer: send,
     subtypes: CHAT_CATCHUP_SUBTYPES,
     onChange: chatChange,
+    ...(typeof chatRefused === 'function' ? { onRefused: chatRefused } : {}),
     ...(typeof chatCatchUpOffer === 'function' ? { onOffer: chatCatchUpOffer } : {}),
   }) : null;
 

@@ -234,6 +234,9 @@ if (relayUrl) {
       chatLanded: ({ msgId, circleId, source }) => walkLog({ kind: 'chat-landed', msgId, circleId, source: source ?? null }),
       // …and a catch-up that brought statements in (the pull at connect, the enrol consume's content pull).
       chatChange: (circleId) => walkLog({ kind: 'chat-change', circleId }),
+      // …and one it could NOT take: a pulled statement refused at the rail is dropped, and only a later
+      // pull brings it back — said in the log with its reason, so "behind" is never a mystery.
+      chatRefused: ({ circleId, fromPeerAddr, reason }) => walkLog({ kind: 'chat-refused', circleId, from: String(fromPeerAddr).slice(0, 12), reason }),
     },
   });
 

@@ -32,7 +32,10 @@ SSH/SFTP key is your own, in `ssh-agent`.
 A target may also carry **`VITE_` keys**, which are passed to the build. That is where a DEPLOYMENT's
 defaults live — the repo deliberately holds none. The one that matters today is
 `VITE_CIRCLE_RELAY_URL`: the relay a hosted build should use out of the box, so someone opening the
-page is on a working transport without touching a setting (they can still change it in the app). Publishing to a second host is a second file.
+page is on a working transport without touching a setting (they can still change it in the app). The
+second is `VITE_SEEDED_CONTACT_CARD`: the contact the build ships with — the maker's own card, printed with
+`/share-my-contact` on any device of that account — so a fresh install has someone to write to (the
+alpha's feedback path). Both are in `example.env`. Publishing to a second host is a second file.
 
 ## A derived app
 

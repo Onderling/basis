@@ -101,11 +101,13 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
  * arrival as a member's canonical key inside a circle (by design), and which of the two rows sorted
  * first depended on the key bytes — the "flaky DM" of 2026-09-10/13 in `two-relays.spec.js` STEP4,
  * seen in the trace as `refused a validly-signed envelope … canonical identity`. The shell hands in
- * the device's own alias→identity read (`agent.identityOfAddress`); an alias is skipped.
+ * the device's own address→person read (`agent.identityOfAddress`, the one place that links a
+ * person's per-circle addresses back to one person — Frits, 2026-09-03: a surface that names a person
+ * keys on it); an address that resolves to someone else is skipped.
  *
  * @param {{ all: () => Promise<object[]> } | null} peerGraph  the agent's `peers`
  * @param {object} [opts]
- * @param {(address: string) => string|null} [opts.identityOf]  the peer an alias belongs to, or null
+ * @param {(address: string) => string|null} [opts.identityOf]  the person behind an address (itself, or null, when it is nobody's alias)
  * @returns {Promise<Array<object>>}
  */
 export async function listContacts(peerGraph, { identityOf = null } = {}) {

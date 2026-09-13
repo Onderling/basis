@@ -28,8 +28,14 @@
 import { assertDevServerIsFresh } from './devServerFreshness.js';
 import { createCircleViaWizard } from './helpers.js';
 
-/** Where every journey drops its screenshots. */
-export const SHOTS = '/home/frits/.claude/jobs/c6a31a12/tmp/verify-shots';
+import { test } from '@playwright/test';
+
+/**
+ * Where a journey drops its screenshots and saved storage: Playwright's own output directory for the
+ * running test. Never a path from one machine — a hardcoded home directory here made every story that
+ * took a screenshot fail on any other machine, CI included (2026-09-13).
+ */
+const outPath = (name) => test.info().outputPath(name);
 
 /** Console lines worth surfacing during a run (transport/redeem/membership events). */
 const INTERESTING = /redeem|group-member|pair|joinedGroup|relay connected|peer transport/i;
@@ -181,14 +187,14 @@ export async function teardown(peers) {
  * localStorage/IndexedDB metadata; the app's identity lives in the seeded localStorage keys.)
  */
 export async function saveStorage(peer, path) {
-  const out = path || `${SHOTS}/${peer.label}-storage-state.json`;
+  const out = path || outPath(`${peer.label}-storage-state.json`);
   await peer.context.storageState({ path: out });
   return out;
 }
 
-/** Screenshot helper — writes `${SHOTS}/${name}.png`. */
+/** Screenshot helper — writes `<test output dir>/${name}.png`. */
 export async function shot(page, name) {
-  await page.screenshot({ path: `${SHOTS}/${name}.png` }).catch(() => {});
+  await page.screenshot({ path: outPath(`${name}.png`) }).catch(() => {});
 }
 
 export function log(step, verdict, note) {

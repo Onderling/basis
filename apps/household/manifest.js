@@ -52,7 +52,7 @@ export const householdManifest = {
   domainVerbs: [
     'help', 'register',
     'enroll-device', 'revoke-device', 'reveal-owner-phrase', 'restore-owner-phrase',
-    'replace-device', 'export-recovery-file', 'import-recovery-file', 'restore-status', 'restore-source', 'restore-intent',
+    'replace-device', 'list-recovery-circles', 'export-recovery-file', 'import-recovery-file', 'restore-status', 'restore-source', 'restore-intent',
     'grant-surface', 'revoke-surface', 'list-surface-grants',
   ],
 
@@ -308,12 +308,24 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'listRecoveryCircles', group: 'device',
+      verb: 'list-recovery-circles',
+      // The circles a recovery file would carry, with their names — what the export door lists with its
+      // per-circle choice (carry a member's address so a new device can find the circle again).
+      params: [],
+      surfaces: {},
+    },
+    {
       id:   'exportRecoveryFile', group: 'device',
       verb: 'export-recovery-file',
       // THE RECOVERY FILE, out: the registry (circles, devices, wrapped-key refs) sealed exactly as the pod
       // mirror seals it — to the profile-derived key the phrase re-derives — so the phrase is the only
       // secret. Reached from My data → "Save a recovery file" (both shells); no chat/slash surface.
-      params: [],
+      // `peers`: the circle ids whose record carries ONE other member's address (the per-circle choice,
+      // default all) — a restored device announces itself to that member and pulls the circle from them.
+      params: [
+        { name: 'peers', kind: 'string', required: false },
+      ],
       surfaces: {},
     },
     {

@@ -72,7 +72,8 @@ import {
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
+import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeTaskPeerHandler, TASK_BROADCAST } from '../../src/v2/taskRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
@@ -258,8 +259,15 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       ?.catch?.(() => { /* durability is best-effort here, as in the shells */ });
   };
 
+  // The chat lane's catch-up — the same frontier replay the shared lane table builds for both shells
+  // (`circleLanes.js`), so a walk can pull a circle's conversation from a member by address the way
+  // the enrol/restore consume does (`contentPulls`).
+  const chatCatchUp = makeFrontierReplay({ rail: chatRail, sendToPeer: sendPeer, subtypes: CHAT_CATCHUP_SUBTYPES });
   const handlers = {
     [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
+    [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
+    [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
+    [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,
     // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
     'group-redeem-request': makeHandleGroupRedeemRequest({
       callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
@@ -376,7 +384,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });

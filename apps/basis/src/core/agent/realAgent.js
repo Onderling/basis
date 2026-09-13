@@ -191,6 +191,8 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
+import { chooseBootstrapPeer, bodyWithBootstrapPeers, bootstrapOfferFromEntry } from '../../v2/recoveryBootstrap.js';
+import { stashEnrollOffer } from '../../v2/enrollOffer.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
@@ -1839,10 +1841,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   // two subtypes and `consumeEnrollOffer` sends the request.
   const rosterSeed = {
     subtypes: ROSTER_SEED_SUBTYPES,
-    buildRequest: (circleId, replyTo) => buildRosterSeedRequest({
-      signer: grantsSignerPromise,
+    // `asMember`: ask another MEMBER as the person (the recovery file's bootstrap) — signed by the
+    // profile key the phrase re-derived, no delegation record; a sibling is asked as a device.
+    buildRequest: (circleId, replyTo, { asMember = false } = {}) => buildRosterSeedRequest({
+      signer: asMember ? { identity: chatId, ref: chatId.pubKey } : grantsSignerPromise,
       delegationRecord: enrolledDevice?.record ?? null,
-      circleId, replyTo,
+      circleId, replyTo, asMember,
     }),
     onRequest: makeRosterSeedServer({
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
@@ -1851,6 +1855,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
       sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+      // Serving a MEMBER (their recovery file named this person): the parcel is signed as the person,
+      // which is the address that file carries.
+      memberSigner: chatId,
       // The introduce-back (see the serve): the fresh sibling can only bind statements THIS
       // device signs once it holds this device's per-circle address as a proven fact.
       ownAnnouncement: (cid) => ownCircleAddressAnnouncement({
@@ -1865,6 +1872,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       callSkill: (...a) => callSkill(...a),
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
+      // A member's parcel counts only from the member the recovery file named for that circle.
+      trustedSeederFor: async (circleId) => (await readSelfCircleMemberships().catch(() => ({})))?.[circleId]?.peer?.address ?? null,
     }),
   };
 
@@ -2259,16 +2268,50 @@ export async function createRealHouseholdAgent(opts = {}) {
    * so the phrase is the only secret; import opens it with this device's key and upserts every entry
    * through the registry handle, then runs the boot re-open loop. A file sealed by someone else's
    * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
-  hostAgent.register('exportRecoveryFile', async () => {
+  hostAgent.register('exportRecoveryFile', async ({ parts }) => {
     try {
       const strategy = settingsSealStrategyForIdentity(chatId);
       if (!strategy) return [DataPart({ ok: false, error: 'no-identity' })];
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
-      const circles = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {})).length;
-      return [DataPart({ ok: true, file: sealRecoveryFile({ strategy, body }), circles })];
+      const circleIds = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {}));
+      // SOMEONE TO ASK, per circle (Frits, 2026-09-11): the file carries one other member's per-circle
+      // address and the point they were reached on, for every circle the person ticked — all of them
+      // unless the caller says otherwise (`peers`: the ticked circle ids). Without it a restored device
+      // gets the circle's name and nobody to reach (`recoveryBootstrap.js`). Chosen NOW, from the
+      // roster: an admin first, else any member with an address. The device's own registry is not
+      // changed — the choice belongs to the file being written.
+      const ticked = Array.isArray(parts?.[0]?.data?.peers) ? new Set(parts[0].data.peers) : null;
+      const peers = {};
+      const chosen = {};
+      for (const circleId of circleIds) {
+        if (ticked && !ticked.has(circleId)) { peers[circleId] = null; chosen[circleId] = null; continue; }
+        let members = [];
+        try { members = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
+        const pick = chooseBootstrapPeer({ members, selfPubKey: chatId.pubKey });
+        const point = (opts.circlePointsFor?.(circleId) ?? []).map((p) => (typeof p === 'string' ? p : p?.url)).find(Boolean)
+          ?? sa.relay?.url ?? null;
+        peers[circleId] = pick ? { address: pick.webid, point } : null;
+        chosen[circleId] = pick?.webid ?? null;
+      }
+      const file = sealRecoveryFile({ strategy, body: bodyWithBootstrapPeers({ body, peers }) });
+      return [DataPart({ ok: true, file, circles: circleIds.length, peers: chosen })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'export-failed' })]; }
   }, { visibility: 'trusted' });   // the sealed circle list: owner-only
+
+  /** The circles a recovery file would carry — what the export door lists with its per-circle choice. */
+  hostAgent.register('listRecoveryCircles', async () => {
+    try {
+      const memberships = await readSelfCircleMemberships().catch(() => ({}));
+      let rows = [];
+      try { rows = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { rows = []; }
+      const nameOf = new Map(rows.map((c) => [typeof c === 'string' ? c : (c?.groupId ?? c?.id), typeof c === 'string' ? null : (c?.name ?? null)]));
+      const circles = Object.keys(memberships)
+        .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household')
+        .map((id) => ({ id, name: nameOf.get(id) ?? null }));
+      return [DataPart({ ok: true, circles })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
+  }, { visibility: 'trusted' });
 
   const importRecoveryFileText = async (file) => {
     if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
@@ -2286,7 +2329,29 @@ export async function createRealHouseholdAgent(opts = {}) {
         agents += 1;
       }
       const { reopened } = await reopenMemberCircles();
-      return { ok: true, agents, circles: reopened };
+      // THE BOOTSTRAP: the peers the file carried become an enrol offer — the same artefact the
+      // add-a-device path consumes (seed the roster from that member, announce this device's fresh
+      // address, pull every lane). Stashed where the shell's boot-time consume looks, when the shell
+      // handed that storage in, so it also retries on the next launch; returned as well, so the shell
+      // can consume it NOW rather than after a relaunch.
+      let bootstrap = null;
+      try {
+        const entry = body.agents.find((a) => a?.agentId === 'default') ?? null;
+        const made = bootstrapOfferFromEntry(entry);
+        if (made) {
+          let stashed = false;
+          if (opts.enrollOfferStorage) {
+            try { stashed = (await stashEnrollOffer(opts.enrollOfferStorage, made.offer)).ok === true; } catch { stashed = false; }
+          }
+          bootstrap = { ...made, stashed };
+          // Consume it NOW, through the shell's own consume (it attaches `bootstrapFromStashedOffer`
+          // at connect, with its presence registration and content pulls): a restored device should
+          // hear its circles again on this launch, not the next. After the reply, so the door paints
+          // the circles that came back while the announce and the pulls go out.
+          if (stashed) setTimeout(() => { try { selfAgent?.bootstrapFromStashedOffer?.(); } catch { /* retried at the next boot from the stash */ } }, 0);
+        }
+      } catch { bootstrap = null; }
+      return { ok: true, agents, circles: reopened, bootstrap };
     } catch (e) { return { ok: false, error: e?.message ?? 'import-failed' }; }
   };
   hostAgent.register('importRecoveryFile', async ({ parts }) => [DataPart(await importRecoveryFileText(parts?.[0]?.data?.file))],
@@ -2752,11 +2817,19 @@ export async function createRealHouseholdAgent(opts = {}) {
    * per-circle alias, so the unlinkability the circle path protects is not in play — and leaving it off
    * keeps NKN eligible, which is what an unscoped send could always use.
    */
-  const contactScope = (to) => contactRelayScope({
+  const contactScope = (to, contactPoints = []) => contactRelayScope({
     to,
     circlesForPeer:  (addr) => opts.circlesForPeer?.(addr) ?? [],
     circlePointsFor: (cid) => opts.circlePointsFor?.(cid) ?? [],
+    contactPoints,
   });
+  /** The points the person's own card named, kept on their contact — by any address of theirs. */
+  const contactPointsFor = async (to) => {
+    try {
+      const c = (await rawContacts()).find((x) => x && (x.webid === to || x.pubKey === to || x.peerAddr === to));
+      return Array.isArray(c?.points) ? c.points : [];
+    } catch { return []; }
+  };
 
   async function sendCircleScoped(to, envelope, sendOpts = {}) {
     // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
@@ -2775,7 +2848,18 @@ export async function createRealHouseholdAgent(opts = {}) {
       // kringen, so their device dialled those relays — so that is where they are. An explicit scope from
       // the caller always wins (the join's redeem names the relay its invite carried), and when we share no
       // kring with a recorded relay there is nothing to narrow to and the send stays exactly as it was.
-      const scope = rest.scope ?? contactScope(to);
+      const scope = rest.scope ?? contactScope(to, await contactPointsFor(to));
+      // "Contact reveals, so contact is minimised": the fewest points that reach them. A relay this
+      // device is already on wins; only when it is on NONE of the person's points does it come beside
+      // the first one the card named — dialling a relay registers this device there, which is the
+      // one disclosure a card the person handed out asks for.
+      if (scope?.points?.length) {
+        const on = (() => { try { return sa.relays.list().map((r) => r.url); } catch { return []; } })();
+        if (!scope.points.some((u) => on.includes(u))) {
+          try { await sa.relays.add(scope.points[0], { awaitReady: true }); }
+          catch (err) { if (typeof console !== 'undefined') console.warn(`[realAgent] could not come beside ${scope.points[0]} for a contact: ${err?.message ?? err}`); }
+        }
+      }
       return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest, ...(scope ? { scope } : {}) });
     }
     const points = opts.circlePointsFor?.(circleId) ?? [];
@@ -3571,6 +3655,20 @@ export async function createRealHouseholdAgent(opts = {}) {
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
         );
         if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
+        // WHERE I CAN BE FOUND (Frits, 2026-09-11): the primary relay by default; every extra relay this
+        // device is on only when the person named it (`extraRelays`, off by default — relay diversity is
+        // an unlinkability strategy, and a card listing every relay hands its holder a linkage across
+        // them). Never mDNS. An extra relay this device is NOT on is not put on the card: a card must
+        // not name a place the person cannot be reached. Under the same publication lock as the address.
+        if (myPeerAddr) {
+          const on = (() => { try { return sa.relays.list().map((r) => r.url).filter(Boolean); } catch { return []; } })();
+          const primary = sa.relay?.url ?? on[0] ?? null;
+          const wanted = String(realArgs.extraRelays ?? realArgs['extra-relays'] ?? '').split(',').map((u) => u.trim()).filter(Boolean);
+          const relays = [];
+          if (primary) relays.push(primary);
+          for (const u of wanted) if (on.includes(u) && !relays.includes(u)) relays.push(u);
+          if (relays.length) realArgs = { ...realArgs, relays };
+        }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
@@ -4510,6 +4608,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         title:    'Share your contact card',
         trust:    args?.trustOffer ?? args?.trust ?? 'bekend',
         payload:  data.payload,
+        // Where the card says this person can be found — surfaced so the person sees what they hand out.
+        ...(Array.isArray(data.relays) ? { relays: data.relays } : {}),
         message:  'Copy the payload above + paste into any QR generator.  The receiver scans + uses /add-contact to add you with the proposed trust level.',
       };
     }

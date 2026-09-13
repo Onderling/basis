@@ -82,6 +82,7 @@ export function createContactBook({ members, dataSource }) {
    * @param {boolean} [args.shareLocation]
    * @param {boolean} [args.allowHopThrough]
    * @param {boolean} [args.allowAutomatching]
+   * @param {string[]} [args.points]   where this person can be found (relay urls) — from their card
    */
   async function addContact(args) {
     if (!args?.webid) throw new TypeError('addContact: webid required');

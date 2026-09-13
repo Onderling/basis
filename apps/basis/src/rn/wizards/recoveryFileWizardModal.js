@@ -4,15 +4,24 @@
  * by the screen (`onPickFile`, `onSaveFile`) so this module stays free of expo modules.
  * Shares src/core/wizards/recoveryFileState.js with web.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Modal, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 import {
   initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey,
+  loadExportChoices, togglePeerChoice,
 } from '../../core/wizards/recoveryFileState.js';
-import { Body, Actions, ErrorBanner, Submitting } from './_kit.js';
+import { Body, Actions, ErrorBanner, Submitting, Checkbox } from './_kit.js';
 
 export default function RecoveryFileWizardModal({ visible, mode = 'export', callSkill, onClose, onDispatched, onPickFile, onSaveFile, t }) {
   const [state, setState] = useState(() => (mode === 'import' ? initialImportState() : initialExportState()));
+
+  // The per-circle choice (someone to ask, default on) is listed before the file is made — web parity.
+  useEffect(() => {
+    if (mode !== 'export' || !visible) return;
+    let live = true;
+    loadExportChoices({ state: { ...state }, callSkill }).then((after) => { if (live) setState((s) => ({ ...s, choices: after.choices })); });
+    return () => { live = false; };
+  }, [mode, visible]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const doExport = useCallback(async () => {
     const next = { ...state, submitting: true, submitError: null }; setState(next);
@@ -60,7 +69,24 @@ export default function RecoveryFileWizardModal({ visible, mode = 'export', call
           <ScrollView style={styles.scroll}>
             {mode === 'export' && (
               <Body title={t('circle.wizard.recovery.export_title')} intro={t('circle.wizard.recovery.export_intro')}>
+                {!state.file && Array.isArray(state.choices) && state.choices.length > 0 && (
+                  <>
+                    {state.choices.map((c) => (
+                      <Checkbox
+                        key={c.id}
+                        label={t('circle.wizard.recovery.peer_choice', { name: c.name ?? c.id })}
+                        checked={c.peer}
+                        onToggle={() => setState((s) => ({ ...togglePeerChoice({ ...s, choices: s.choices.map((x) => ({ ...x })) }, c.id) }))}
+                        testID={`recovery-peer-${c.id}`}
+                      />
+                    ))}
+                    <Text style={styles.note}>{t('circle.wizard.recovery.peer_note')}</Text>
+                  </>
+                )}
                 {state.file && <Text style={styles.note}>{t('circle.wizard.recovery.export_ready')} {state.circles} · {state.filename}</Text>}
+                {state.file && (state.choices ?? []).filter((c) => c.peer && state.peers && state.peers[c.id] === null).map((c) => (
+                  <Text key={c.id} style={styles.note}>{c.name ?? c.id}: {t('circle.wizard.recovery.peer_none')}</Text>
+                ))}
                 <ErrorBanner message={state.submitError} />
                 <Submitting visible={state.submitting} label={t('circle.wizard.recovery.sealing')} />
               </Body>

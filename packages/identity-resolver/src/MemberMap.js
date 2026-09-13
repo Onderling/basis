@@ -290,6 +290,10 @@ export class MemberMap extends Emitter {
       // The lesson is the whitelist's, not the rename's — a normaliser that silently discards what it does
       // not recognise cannot be renamed safely by grep.
       peerAddr:    m.peerAddr ?? null,
+      // points: where this person can be FOUND — the relay urls their contact card named (2026-09-13).
+      // A message to a contact rides these before any kring's relay; two people who share no kring
+      // have no other route. The same whitelist lesson as `peerAddr` above: named here or dropped.
+      points:      Array.isArray(m.points) ? m.points.filter((u) => typeof u === 'string' && u) : [],
       // ── Stoop V2 Phase 24: contact-graph fields (additive) ──
       // relation: distinguishes group members (default for back-compat
       //   with V1 callers) from 1:1 contacts.  5.6 (basis v2) added

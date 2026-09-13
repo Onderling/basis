@@ -43,7 +43,7 @@ export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
 });
 
 /** The contact fields that cross: what another device needs to hold the same person. Never a blob. */
-const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr',
+const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr', 'points',
   'shareLocation', 'allowHopThrough', 'allowAutomatching'];
 
 function bindingToWire(b) {

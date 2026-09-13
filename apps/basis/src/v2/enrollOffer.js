@@ -69,7 +69,14 @@ const b64url = {
 export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
   const c = (Array.isArray(circles) ? circles : [])
     .filter((x) => x && typeof x.id === 'string' && x.id && typeof x.address === 'string' && x.address)
-    .map((x) => ({ id: x.id, ...(typeof x.handle === 'string' && x.handle ? { h: x.handle } : {}), a: x.address }));
+    .map((x) => ({
+      id: x.id,
+      ...(typeof x.handle === 'string' && x.handle ? { h: x.handle } : {}),
+      a: x.address,
+      // `m` — the address is ANOTHER MEMBER's, not a sibling's (the recovery file's bootstrap): the
+      // consume then asks as the person, not as one of their devices. Absent = a sibling, as before.
+      ...(x.member === true ? { m: 1 } : {}),
+    }));
   if (c.length === 0) throw new Error('encodeEnrollOffer: at least one circle with an address is required');
   const r = (Array.isArray(relays) ? relays : []).filter((u) => typeof u === 'string' && u);
   return ENROLL_SCHEME + b64url.encode({ v: 1, ...(r.length ? { r } : {}), c });
@@ -78,7 +85,7 @@ export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
 /**
  * Parse an offer. Deny-safe: every failure is a REASON, never a partial object.
  * @param {string} uri
- * @returns {{ok:true, relays:string[], circles:Array<{id:string, handle:?string, address:string}>}
+ * @returns {{ok:true, relays:string[], circles:Array<{id:string, handle:?string, address:string, member:boolean}>}
  *          |{ok:false, reason:'not-an-enroll-uri'|'unreadable'|'wrong-version'|'incomplete'}}
  */
 export function parseEnrollOffer(uri) {
@@ -90,7 +97,7 @@ export function parseEnrollOffer(uri) {
   if (body.v !== 1) return { ok: false, reason: 'wrong-version' };
   const circles = (Array.isArray(body.c) ? body.c : [])
     .filter((x) => x && typeof x.id === 'string' && x.id && typeof x.a === 'string' && x.a)
-    .map((x) => ({ id: x.id, handle: typeof x.h === 'string' && x.h ? x.h : null, address: x.a }));
+    .map((x) => ({ id: x.id, handle: typeof x.h === 'string' && x.h ? x.h : null, address: x.a, member: x.m === 1 }));
   if (circles.length === 0) return { ok: false, reason: 'incomplete' };
   const relays = (Array.isArray(body.r) ? body.r : []).filter((u) => typeof u === 'string' && u);
   return { ok: true, relays, circles };
@@ -195,6 +202,14 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
   const offer = await pendingEnrollOffer(storage);
   if (!offer) return { consumed: false, reason: 'nothing-pending' };
 
+  // Be where the offer says the circles are, before asking anyone anything. The offer's relays were
+  // recorded on the registry record (step 1) and, until 2026-09-13, dialled by nobody — right on a
+  // one-relay alpha, wrong the day a person's circle rides another relay: the seed request below
+  // would leave over a socket the sibling is not on. Best-effort per url; the primary stays what it is.
+  for (const url of offer.relays) {
+    try { if (!agent.relays?.has?.(url)) await agent.addRelay?.(url, { awaitReady: true }); }
+    catch { /* an unreachable relay must not stop the circles that ride the one we are on */ }
+  }
   const report = [];
   let allOk = true;
   for (const c of offer.circles) {
@@ -228,7 +243,10 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // that never comes must not hang the boot.
       if (agent.rosterSeed && ownAddress) {
         try {
-          const req = await agent.rosterSeed.buildRequest(c.id, ownAddress);
+          // A sibling seeds a device of its own profile; a MEMBER (the recovery file's peer) seeds the
+          // person — so the request is signed as the person, and the member's parcel is trusted because
+          // it comes from the very address the file named (`rosterSeed.js`).
+          const req = await agent.rosterSeed.buildRequest(c.id, ownAddress, { asMember: c.member === true });
           if (req) {
             await sendPeerMessage(c.address, req, SEND);
             row.steps.push('seed-requested');

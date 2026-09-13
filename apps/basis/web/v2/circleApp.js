@@ -7787,6 +7787,10 @@ async function boot() {
       // …and which kringen I share with a PERSON, so a message with no circle (a DM, a receipt) can ride a
       // relay they are actually on. The index is the roster feed's own (`householdRosterPairing` fills it).
       circlesForPeer: (addr) => circleGroupsIndex.groupsFor(addr),
+      // Where a scanned add-a-device offer waits out the ceremony reload — handed to the agent too, so a
+      // recovery-file import can stash the bootstrap it builds in the SAME place the boot-time consume
+      // reads (it retries there on the next launch; the import result also runs it right away).
+      enrollOfferStorage: window.localStorage,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (see circleVersioning.js).
       versionStoreFor: getCircleVersionStore,
@@ -8340,8 +8344,10 @@ async function boot() {
         } catch { /* a malformed hash is not an error state */ }
         // The enroll-offer consume (once per boot, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the scanned offer — the
-        // registry membership record, the announce to the sibling, the catch-up pulls.
-        consumeEnrollOffer({
+        // registry membership record, the announce to the sibling, the catch-up pulls. The SAME
+        // consume runs after a recovery-file import: the file's peers are stashed as an offer, and
+        // the import door calls this rather than waiting for the next launch.
+        agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
           agent,
           callSkill: rawCallSkill,
           sendPeerMessage: (to, payload, opts2) => agent.sendPeerMessage(to, payload, opts2),
@@ -8355,7 +8361,9 @@ async function boot() {
           ]),
         }).then((r) => {
           if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+          return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
+        agent.bootstrapFromStashedOffer();
         taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).

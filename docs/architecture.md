@@ -952,8 +952,19 @@ the *list* of circles those keys belong to. That list lives in the owner's regis
 device-local store unless it is mirrored to a pod, so a person whose only device is gone comes back as
 provably themselves with nothing to re-open. The honest paths out are a registry that survives the device
 (mirrored to the owner's pod — sealed to the owner, which is the part that has to be built, since this
-resource carries no sealing of its own) or an offer from another device they still hold; a
-recovery screen that promises more than that is promising the wrong thing.
+resource carries no sealing of its own), the **recovery file** (the registry sealed to the phrase, exported
+by the person), or an offer from another device they still hold; a recovery screen that promises more
+than that is promising the wrong thing.
+
+**The recovery file also carries someone to ask** (2026-09-13). The list alone gave a restored device the
+circle's name and nobody to reach: restore enrols the new device, so its per-circle addresses are fresh
+and no roster names them, and its own roster is empty because the trail lived on the lost phone. So the
+export offers, per circle and on by default, to carry ONE other member's address and the relay they were
+reached on — the person's choice, made when the artefact is written, sealed to the phrase, and never a
+name. The import turns those into the add-a-device offer and runs the same consume: the roster seed
+(with a second admission beside the sibling one — a member asking as the person, served signed as the
+person, admitted by the requester only from the member its own file named), the announce of the fresh
+address, and every lane's catch-up. A restored phone then hears its circles again on that launch.
 
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,
@@ -1229,7 +1240,11 @@ the price of first-contact verifiability.
 
 **Contact reveals, so contact is minimised.** A sender uses the *fewest* connection points that achieve
 delivery — sequential fallback, sticky on what worked, backing off from what fails — never race-them-all,
-because every point tried is an extra observer. A member may sit on one point or several (resilience is
+because every point tried is an extra observer. A message with no circle (a direct message) rides the
+points the person's own **contact card** named first (the card carries the sharer's primary relay by
+default and an extra relay only when they named it; never the local network), then the relays of the
+kringen the two share; the sender comes beside a card's relay only when it is on none of them. Two people
+who met by card and share no kring have no other route. A member may sit on one point or several (resilience is
 a member's choice, not a circle-wide tax), and "I could not reach them" is a real outcome the UI is
 allowed to say. The relay holds messages 24 hours — an agreement pinned by a test that reads both the
 relay's and the app's value, so the two cannot silently disagree.

@@ -13,7 +13,7 @@ import {
   exportProfileRegistry, importProfileRegistry, restoreProfilesInto,
   createProfile, profilePubKey,
   setCircleMembership, circleMembershipOf, circleKeyRefOf, circleMembershipsFromProperties,
-  isKeyRef, isCircleMembershipRecord, normaliseCircleMembership,
+  isKeyRef, isCircleMembershipRecord, normaliseCircleMembership, isBootstrapPeer, circleBootstrapPeerOf,
 } from '../index.js';
 
 const LIGHT = { m: 8, t: 1, p: 1 };   // fast argon2 for tests (prod cost is much higher)
@@ -44,6 +44,26 @@ describe('the circle-membership record vocabulary', () => {
     expect(isCircleMembershipRecord({ handle: '', address: 'nkn:abc' }), 'an EMPTY handle is still malformed').toBe(false);
     expect(isCircleMembershipRecord({ handle: 'a', address: 'b', relays: [1] })).toBe(false);
     expect(isCircleMembershipRecord({ handle: 'a', address: 'b', key: { ref: 'bad' } })).toBe(false);
+  });
+
+  it('the bootstrap PEER facet: an address, an optional point; set, kept beside the rest, and removable', () => {
+    // The recovery file's "someone to ask" (2026-09-13): one other member's address and the point they
+    // were reached on, carried only for the circles the person ticked at export.
+    expect(isBootstrapPeer({ address: 'bea' })).toBe(true);
+    expect(isBootstrapPeer({ address: 'bea', point: 'wss://r' })).toBe(true);
+    expect(isBootstrapPeer({ address: '' })).toBe(false);
+    expect(isBootstrapPeer({ address: 'bea', point: '' }), 'an empty point is malformed, not absent').toBe(false);
+    expect(isBootstrapPeer('bea')).toBe(false);
+    expect(isCircleMembershipRecord({ address: 'a', peer: { address: 'bea', point: 'wss://r' } })).toBe(true);
+    expect(isCircleMembershipRecord({ address: 'a', peer: { point: 'wss://r' } })).toBe(false);
+    let p = setCircleMembership({}, 'c1', { address: 'me', handle: 'an', peer: { address: 'bea', point: 'wss://r' } });
+    expect(circleBootstrapPeerOf({ properties: p }, 'c1')).toEqual({ address: 'bea', point: 'wss://r' });
+    p = setCircleMembership(p, 'c1', { key: { ref: 'dec:k' } });
+    expect(circleBootstrapPeerOf({ properties: p }, 'c1'), 'a later facet patch keeps the peer').toEqual({ address: 'bea', point: 'wss://r' });
+    p = setCircleMembership(p, 'c1', { peer: null });
+    expect(circleBootstrapPeerOf({ properties: p }, 'c1'), '`peer: null` removes it — the one facet a person un-ticks').toBeNull();
+    expect(circleMembershipOf({ properties: p }, 'c1').handle, 'the rest survives the removal').toBe('an');
+    expect(normaliseCircleMembership({ address: 'a', peer: { address: 'bea', junk: 1 } })).toEqual({ address: 'a', peer: { address: 'bea' } });
   });
 
   it('normalise keeps exactly the known facets and freezes', () => {

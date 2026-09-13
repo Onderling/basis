@@ -422,19 +422,28 @@ export function relayUrlsForCircles(circleIds, pointsFor) {
  * only kringen with no recorded relay, means there is nothing to narrow to: `null`, and the caller sends as
  * it always did rather than inventing a route.
  *
+ * And since 2026-09-13 the person may have SAID where they are: their contact card carries their
+ * relay(s), kept on the contact as `points`. Those come FIRST — the person's own word about where to
+ * find them beats an inference from a kring — and they are what makes two people who share no kring
+ * reachable at all.
+ *
  * @param {object} a
  * @param {string} a.to                                       the person's address
  * @param {(addr: string) => string[]} a.circlesForPeer       the kringen I share with them
  * @param {(circleId: string) => Array<object>} a.circlePointsFor   that kring's points
+ * @param {string[]} [a.contactPoints]                        the points the person's own card named
  * @returns {{points: string[]}|null}
  */
-export function contactRelayScope({ to, circlesForPeer, circlePointsFor } = {}) {
+export function contactRelayScope({ to, circlesForPeer, circlePointsFor, contactPoints = [] } = {}) {
   if (typeof to !== 'string' || !to || typeof circlesForPeer !== 'function') return null;
+  const points = (Array.isArray(contactPoints) ? contactPoints : []).filter((u) => isUrl(u, POINT_KIND.RELAY));
   let circleIds = [];
   try { circleIds = circlesForPeer(to) ?? []; } catch { circleIds = []; }
-  const points = relayUrlsForCircles(circleIds, (cid) => {
+  for (const url of relayUrlsForCircles(circleIds, (cid) => {
     try { return circlePointsFor?.(cid) ?? []; } catch { return []; }
-  });
+  })) {
+    if (!points.includes(url)) points.push(url);
+  }
   return points.length ? { points } : null;
 }
 

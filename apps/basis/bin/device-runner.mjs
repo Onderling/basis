@@ -25,11 +25,12 @@
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            optional — the web app, so a printed enrolment offer is also a link
  *
- * Flags: --data-dir · --lang · --walk-log · --show-offer (print an add-a-device offer and exit)
+ * Flags: --data-dir · --lang · --walk-log · --show-offer (print an add-a-device offer and exit) ·
+ *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual)
  *
  * The recovery phrase is NEVER read from the environment or a file here. A device is enrolled by a
- * ceremony that asks for it, once; storing it beside the machine that runs unattended would hand the
- * whole account to anyone who reads that machine's disk.
+ * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
+ * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
@@ -51,7 +52,10 @@ import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/p
 import { listsManifest } from '../../lists/manifest.js';
 
 import { EventLog } from '../src/eventLog.js';
-import { wireEventLogPersistence, fileSnapshotIo } from '../src/v2/eventLogPersistence.js';
+import { wireEventLogPersistence, fileSnapshotIo, fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
+import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
+import { registerCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
 import { buildCircleLanes } from '../src/v2/circleLanes.js';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
@@ -67,6 +71,7 @@ const { values } = parseArgs({ options: {
   lang:         { type: 'string',  default: 'nl' },
   'walk-log':   { type: 'string' },
   'show-offer': { type: 'boolean', default: false },
+  enrol:        { type: 'boolean', default: false },
 } });
 
 const dataDir = path.resolve(values['data-dir']);
@@ -103,6 +108,10 @@ const { hydrated } = await wireEventLogPersistence({
   eventLog: deviceLog, io: fileSnapshotIo(path.join(dataDir, 'device-log.json')),
 });
 
+// Where an add-a-device offer waits between the enrol ceremony and the next start — the node shape of
+// what the shells keep in plain storage. Public data (the offer grants nothing without the phrase).
+const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
+
 const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
   chatVault,
@@ -110,6 +119,7 @@ const agent = await createRealHouseholdAgent({
   deviceLog,
   seedDemoData: false,
   seedHousehold: false,
+  enrollOfferStorage: offerStash,
 });
 const callSkill = (app, op, args) => agent.callSkill(app, op, args);
 
@@ -142,6 +152,47 @@ async function printEnrollOffer() {
 }
 
 if (values['show-offer']) { await printEnrollOffer(); process.exit(0); }
+
+// ── The enrol ceremony, phone-first ─────────────────────────────────────────────────────────────
+// The phone already has the circles and shows an add-a-device offer. Run ONCE with `--enrol`: the offer
+// is pasted (stashed for the next start — public data), the phrase is typed (used for the ceremony and
+// never written anywhere), and the process exits. The next ordinary start consumes the offer the way
+// both shells do after a scanned one. Two lines on stdin, in this order, so a pipe can drive it too.
+async function enrolOnce() {
+  const { createInterface } = await import('node:readline/promises');
+  const tty = process.stdin.isTTY === true;
+  const rl = createInterface({ input: process.stdin, output: tty ? process.stdout : undefined, terminal: tty });
+  const ask = async (label, { hidden = false } = {}) => {
+    if (!tty) { const line = (await rl[Symbol.asyncIterator]().next()).value; return String(line ?? '').trim(); }
+    if (hidden) {
+      // Echo off for the phrase: the readline writes nothing while the person types it.
+      const orig = rl._writeToOutput;
+      rl._writeToOutput = () => {};
+      process.stdout.write(label);
+      const line = await rl.question('');
+      rl._writeToOutput = orig;
+      process.stdout.write('\n');
+      return String(line ?? '').trim();
+    }
+    return String((await rl.question(label)) ?? '').trim();
+  };
+  try {
+    const offerLine = await ask('The offer from your phone (onderling-enroll://… or the link): ');
+    const stashed = await stashEnrollOffer(offerStash, offerLine);
+    if (!stashed.ok) { console.error(`device-runner: that is not an add-a-device offer (${stashed.reason}).`); return 2; }
+    const mnemonic = await ask('Your recovery phrase (24 words, not shown): ', { hidden: true });
+    const r = await callSkill('household', 'enrollDevice', { mnemonic, label: 'box' });
+    if (!r?.ok) {
+      await offerStash.removeItem('onderling.enrollOffer').catch(() => {});
+      console.error(`device-runner: not enrolled — ${r?.outcome === 'invalid-phrase' ? 'that is not a valid recovery phrase' : (r?.error ?? 'the ceremony failed')}.`);
+      return 2;
+    }
+    console.log(`device-runner: enrolled as device ${String(r.deviceId ?? '').slice(0, 12)}… for ${stashed.circles.length} circle(s).`);
+    console.log('  Now start the runner as usual; on that start it joins the circles the offer names.');
+    return 0;
+  } finally { rl.close(); }
+}
+if (values.enrol) { process.exit(await enrolOnce()); }
 
 // ── The wire ────────────────────────────────────────────────────────────────────────────────────
 let contactChannel = null;
@@ -178,6 +229,11 @@ if (relayUrl) {
         Promise.resolve(allow()).catch(() => {});
       },
       ownDeviceTurn: (wire) => contactChannel.applyOwnDeviceTurn(wire).catch(() => {}),
+      // A circle message landed. Nothing to paint — but said in the log, because "did the circle reach
+      // this device" is the one question an operator (and the walk) has.
+      chatLanded: ({ msgId, circleId, source }) => walkLog({ kind: 'chat-landed', msgId, circleId, source: source ?? null }),
+      // …and a catch-up that brought statements in (the pull at connect, the enrol consume's content pull).
+      chatChange: (circleId) => walkLog({ kind: 'chat-change', circleId }),
     },
   });
 
@@ -210,6 +266,56 @@ if (relayUrl) {
   });
 
   await agent.connectPeerTransport({ relayUrl, onPeerMessage: (env) => router(env) });
+
+  // ── Presence in every circle: the per-circle addresses on the relay, then the announce ─────────
+  // The same three acts both shells perform on connect (`registerCirclePresence`): prime the signing
+  // identities and the sender authorization, register each per-circle address on the relay (signed —
+  // an address IS a key), and only then announce. Without this the box was reachable at its profile
+  // address alone: a circle's fan to its per-circle address went to a relay that had never heard of
+  // it, and "a full member of your circles" was true of the lanes and false of the wire.
+  const registerCirclePresence = async (extraCircleIds = []) => {
+    let ids = [];
+    try { ids = ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean); } catch { ids = []; }
+    const circleIds = [...new Set([...ids, ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : [])])];
+    if (circleIds.length === 0) return;
+    await primeCircleSecurity({ agent, circleIds }).catch((err) => console.warn('device-runner: circle security priming failed:', err?.message ?? err));
+    if (!agent.relay?.supportsAliases) return;
+    const circlesForPoint = () => circleIds;   // one relay here: every circle rides it
+    circlesForPoint.pointsFor = () => [relayUrl];
+    await registerCircleAddressesOnRelays({
+      relays: agent.relays?.list?.() ?? [],
+      circleIds,
+      circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+      circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+      circlesForPoint,
+      defaultRelayUrl: relayUrl,
+      onError: (err, cid) => console.warn(`device-runner: circle-address register failed (${String(cid).slice(0, 12)}…):`, err?.message ?? err),
+    }).then(() => announceCircleAddresses({ agent, circleIds }))
+      .catch((err) => console.warn('device-runner: circle-address registration failed:', err?.message ?? err));
+    walkLog({ kind: 'presence', circles: circleIds.length });
+  };
+  await registerCirclePresence();
+
+  // The stashed offer (from `--enrol`, or a re-try from an earlier start): consumed exactly as both
+  // shells consume a scanned one — registry record, presence, the roster seed from the sibling, the
+  // announce, every lane's catch-up. No-op when nothing is stashed.
+  agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+    agent, callSkill,
+    sendPeerMessage: (to, payload, o) => agent.sendPeerMessage(to, payload, o),
+    storage: offerStash,
+    registerCirclePresence: (ids) => registerCirclePresence(ids),
+    contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+      lanes.catchUps.task?.requestFrom(siblingAddress, circleId),
+      lanes.catchUps.chat?.requestFrom(siblingAddress, circleId),
+    ]),
+  }).then((r) => {
+    if (r?.consumed) {
+      walkLog({ kind: 'enroll-offer', cleared: r.cleared, circles: r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps })) });
+      console.log(`device-runner: joined ${r.circles?.filter((c) => c.ok).length ?? 0} circle(s) from the offer${r.cleared ? '' : ' — some did not complete; retried on the next start'}.`);
+    }
+    return r;
+  }).catch((err) => { console.warn('device-runner: the offer could not be consumed now — retried on the next start:', err?.message ?? err); });
+  agent.bootstrapFromStashedOffer();
 
   // Which lanes this device actually carries. Said out loud because a missing rail is invisible: the
   // device would run, receive nothing on that lane, and look like a quiet network rather than a

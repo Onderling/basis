@@ -23,10 +23,12 @@ test('launcher renders + "+ new circle" creates a circle that then appears', asy
 
   await createCircleViaWizard(page, 'Test Circle');
 
-  // createGroupV2 → reload via listMyCircles → a tile appears. The tile name
-  // is the groupId slug today (name enrichment is a later polish).
+  // createGroupV2 → reload via listMyCircles → a tile appears, showing the circle's DISPLAY NAME.
+  // (This asserted the groupId slug, with a note that "name enrichment is a later polish". The polish
+  // landed, and the id is founder-derived now — `deriveCircleId(key, nonce)` — so the slug never
+  // appears on a tile at all.)
   await expect(
-    page.locator('.circle-tile__name', { hasText: 'test-circle' }),
+    page.locator('.circle-tile__name', { hasText: 'Test Circle' }),
   ).toBeVisible({ timeout: LONG });
 });
 

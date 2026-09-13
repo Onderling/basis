@@ -28,8 +28,14 @@
 import { assertDevServerIsFresh } from './devServerFreshness.js';
 import { createCircleViaWizard } from './helpers.js';
 
-/** Where every journey drops its screenshots. */
-export const SHOTS = '/home/frits/.claude/jobs/c6a31a12/tmp/verify-shots';
+import { test } from '@playwright/test';
+
+/**
+ * Where a journey drops its screenshots and saved storage: Playwright's own output directory for the
+ * running test. Never a path from one machine — a hardcoded home directory here made every story that
+ * took a screenshot fail on any other machine, CI included (2026-09-13).
+ */
+const outPath = (name) => test.info().outputPath(name);
 
 /** Console lines worth surfacing during a run (transport/redeem/membership events). */
 const INTERESTING = /redeem|group-member|pair|joinedGroup|relay connected|peer transport/i;
@@ -181,14 +187,14 @@ export async function teardown(peers) {
  * localStorage/IndexedDB metadata; the app's identity lives in the seeded localStorage keys.)
  */
 export async function saveStorage(peer, path) {
-  const out = path || `${SHOTS}/${peer.label}-storage-state.json`;
+  const out = path || outPath(`${peer.label}-storage-state.json`);
   await peer.context.storageState({ path: out });
   return out;
 }
 
-/** Screenshot helper — writes `${SHOTS}/${name}.png`. */
+/** Screenshot helper — writes `<test output dir>/${name}.png`. */
 export async function shot(page, name) {
-  await page.screenshot({ path: `${SHOTS}/${name}.png` }).catch(() => {});
+  await page.screenshot({ path: outPath(`${name}.png`) }).catch(() => {});
 }
 
 export function log(step, verdict, note) {
@@ -273,8 +279,14 @@ export async function createCircle(page, name) {
 /** Open the launcher tile matching `re` (falls back to the first tile). */
 export async function openCircleMatching(page, re) {
   const names = await tileNames(page);
-  let idx = names.findIndex((s) => re.test(s));
-  if (idx < 0) idx = 0;
+  const idx = names.findIndex((s) => re.test(s));
+  // No silent fallback to tile 0. That fallback made `walk-stories` story 7 type its "private" message
+  // into the SHARED circle when the second wizard run left no tile, and the assertion then reported a
+  // cross-circle leak that did not exist — a probe that could not name its branch, believed. A setup
+  // that cannot find the circle it was asked for is a failed setup, and it must say so as itself.
+  if (idx < 0) {
+    throw new Error(`openCircleMatching: no circle tile matches ${re} — tiles present: ${JSON.stringify(names)}`);
+  }
   await page.locator('.circle-tile').nth(idx).click();
   await page.waitForTimeout(2500);
   return { names, idx };
@@ -397,8 +409,15 @@ export const enableTasks = (page) => enableFeature(page, 'tasks');
  * Returns `{present, count, names}`.
  */
 export async function readRoster(page) {
-  if (!(await openMore(page, 'admin'))) return { present: false, count: 0, names: [] };
-  const rows = page.locator('.cc-admin__member');
+  // The MEMBERS tab (Leden), which is in the alpha's default tab set — not the ⋯ menu's `admin` panel,
+  // which `HIDDEN_CIRCLE_ACTIONS` removes from the shipping surface. This used to open that panel, get
+  // `false` back, and return `{present:false, count:0}`; the journey then asserted `count >= 2` and
+  // reported a pairing defect that was never there (matrix pairing passed on every transport). The
+  // probe named its branch; the caller discarded it. Now the probe reads the surface people use.
+  const tab = page.locator('.circle-view__tab', { hasText: /leden|members/i });
+  if (!(await tab.count())) return { present: false, count: 0, names: [], why: 'no members tab' };
+  await tab.first().click();
+  const rows = page.locator('.circle-view__member');
   let n = 0;
   for (let i = 0; i < 8; i++) {
     await page.waitForTimeout(1200);
@@ -407,8 +426,9 @@ export async function readRoster(page) {
   }
   const names = [];
   for (let i = 0; i < n; i++) names.push((await rows.nth(i).innerText()).replace(/\s+/g, ' ').trim());
-  const back = page.locator('.cc-admin__back');
-  if (await back.count()) { await back.first().click(); await page.waitForTimeout(1000); }
+  // Back to the conversation tab, so the caller's next step lands where it expects.
+  const chatTab = page.locator('.circle-view__tab', { hasText: /gesprek|chat/i });
+  if (await chatTab.count()) { await chatTab.first().click(); await page.waitForTimeout(600); }
   return { present: true, count: n, names };
 }
 

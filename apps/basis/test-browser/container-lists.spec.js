@@ -5,8 +5,15 @@
  */
 import { test, expect } from '@playwright/test';
 import { bootCircle } from './helpers.js';
+import { isAlphaAction } from '../src/v2/alphaSurface.js';
 
 test.setTimeout(70_000);
+// The Lists panel is reached through the ⋯ menu's `lists` action, and the alpha surface HIDES that
+// action (Frits' cut, PR #68, 2026-09-08 — `HIDDEN_CIRCLE_ACTIONS`). So there is no route to this panel
+// in the shipping surface, and these specs failed on a menu item that is not there. Skipped on the
+// product's own declaration rather than by hand: the day `lists` leaves that list, these run again
+// without anyone remembering to un-skip them.
+test.skip(!isAlphaAction('lists'), 'the Lists action is hidden from the alpha surface');
 
 test('Lists panel: create a list, add a nested item, complete it', async ({ page }) => {
   await bootCircle(page, 'Lists Circle');

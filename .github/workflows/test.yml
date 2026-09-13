@@ -207,8 +207,12 @@ jobs:
       - name: Browsers
         run: npx playwright install --with-deps chromium
         working-directory: apps/basis
+      # ONE retry, not zero: the two walks that ride the public NKN network (walk-transports 3/4, walk-nkn)
+      # pass alone and coin-flip on a runner under load — a 3-minute story lost to a slow NKN bootstrap
+      # should not red the whole suite. A retry is a measurement of that flakiness, not a cure for it; the
+      # report names every test that needed one.
       - name: Browser suite, shard ${{ matrix.shard }} of 4 (serial inside; two dev servers + two relays)
-        run: npx playwright test --shard=${{ matrix.shard }}/4 --workers=1 --retries=0
+        run: npx playwright test --shard=${{ matrix.shard }}/4 --workers=1 --retries=1
         working-directory: apps/basis
         env:
           CI: 'true'

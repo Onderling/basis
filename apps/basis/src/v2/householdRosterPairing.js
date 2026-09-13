@@ -38,7 +38,7 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
   for (const m of (Array.isArray(r?.members) ? r.members : [])) {
     // Per-circle (OBJ-2 Phase 6): pair the member into THIS circle's mirror, not a global roster.
     if (m?.addr && m.addr !== self) { want.add(m.addr); try { agent.addCirclePeer(circleId, m.addr); added += 1; } catch { /* */ } }
-    if (m?.addr && gidx) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break pairing */ } }
+    if (gidx) indexMember(gidx, circleId, m);
   }
 
   // ── AND UNPAIR WHOEVER THE ROSTER NO LONGER NAMES ───────────────────────────────────────────────
@@ -101,6 +101,28 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
  * @param {string} a.circleId
  * @returns {Promise<{bound: number, skipped: number, members: Array<object>}>}
  */
+/**
+ * Record a roster row in the peer → kringen index under BOTH keys a message can arrive by, or be sent to.
+ *
+ * The index is keyed by the PERSON (its own header: "webid → circleIds") — and the 2026-09-08 fill fed
+ * it the row's routing `addr` instead, which is the member's PER-CIRCLE address once they have proven
+ * one. After the signing enforcement that is every member after their first boot. So the index knew
+ * each person only by an address that a direct message never uses: a DM is addressed to the global key,
+ * `circlesForPeer(globalKey)` found nothing, the send fell back to "my own relay" — and the recipient
+ * was on the kring's relay, not mine. It worked exactly when the DM raced ahead of the announce, which
+ * is why the 09-08 walk saw five green steps and the 1.2-hour baseline did not (measured 2026-09-13, three
+ * runs: two misses, one hit, the hit being the run where the index still held the global key).
+ *
+ * Both keys, then. The membrane's inbound lookup needs both as well: circle traffic arrives FROM the
+ * per-circle address, a DM FROM the global key, and "which kringen am I in with this sender" must answer
+ * either. Idempotent, and the index never breaks priming or pairing.
+ */
+function indexMember(gidx, circleId, m) {
+  for (const key of new Set([m?.addr, m?.webid, m?.pubKey])) {
+    if (typeof key === 'string' && key) { try { gidx.add(circleId, key); } catch { /* never fatal */ } }
+  }
+}
+
 export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
   if (!agent || typeof agent.callSkill !== 'function' || !circleId) return { bound: 0, skipped: 0, members: [] };
   if (typeof agent.registerPeerAddress !== 'function') return { bound: 0, skipped: 0, members: [] };
@@ -121,11 +143,7 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
   // that kring. This runs for every circle at boot (`primeCircleSecurity`), off a read that already
   // happened, so the map is complete before anyone taps anything.
   const gidx = agent._circleGroupsIndex ?? null;
-  if (gidx) {
-    for (const m of members) {
-      if (m?.addr) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break priming */ } }
-    }
-  }
+  if (gidx) for (const m of members) indexMember(gidx, circleId, m);
   return {
     ...bindCircleAddressKeys({
       members,

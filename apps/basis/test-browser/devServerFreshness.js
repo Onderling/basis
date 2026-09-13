@@ -34,7 +34,7 @@ const PROBES = [
   'src/v2/contactTurnFan.js',
   'src/v2/contactThreadChannel.js',
   // 2026-09-10: the file that actually went stale mid-run — a concurrent session switched branches and
-  // vite served a version without `sealedLocalVault`, so every peer from test #135 on rendered nothing.
+  // vite served a version without `sealedLocalVault`, and every peer booted after that rendered nothing.
   // It was not on this list, so the guard could not see it.
   'src/v2/localStoreSeal.js',
 ];

@@ -191,7 +191,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
-import { chooseBootstrapPeer, bodyWithBootstrapPeers, bootstrapOfferFromEntry } from '../../v2/recoveryBootstrap.js';
+import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
 import { stashEnrollOffer } from '../../v2/enrollOffer.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
@@ -1841,12 +1841,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // two subtypes and `consumeEnrollOffer` sends the request.
   const rosterSeed = {
     subtypes: ROSTER_SEED_SUBTYPES,
-    // `asMember`: ask another MEMBER as the person (the recovery file's bootstrap) — signed by the
-    // profile key the phrase re-derived, no delegation record; a sibling is asked as a device.
-    buildRequest: (circleId, replyTo, { asMember = false } = {}) => buildRosterSeedRequest({
-      signer: asMember ? { identity: chatId, ref: chatId.pubKey } : grantsSignerPromise,
+    buildRequest: (circleId, replyTo) => buildRosterSeedRequest({
+      signer: grantsSignerPromise,
       delegationRecord: enrolledDevice?.record ?? null,
-      circleId, replyTo, asMember,
+      circleId, replyTo,
     }),
     onRequest: makeRosterSeedServer({
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
@@ -1855,9 +1853,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
       sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
-      // Serving a MEMBER (their recovery file named this person): the parcel is signed as the person,
-      // which is the address that file carries.
-      memberSigner: chatId,
       // The introduce-back (see the serve): the fresh sibling can only bind statements THIS
       // device signs once it holds this device's per-circle address as a proven fact.
       ownAnnouncement: (cid) => ownCircleAddressAnnouncement({
@@ -1872,8 +1867,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       callSkill: (...a) => callSkill(...a),
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
-      // A member's parcel counts only from the member the recovery file named for that circle.
-      trustedSeederFor: async (circleId) => (await readSelfCircleMemberships().catch(() => ({})))?.[circleId]?.peer?.address ?? null,
     }),
   };
 
@@ -2275,27 +2268,40 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
       const circleIds = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {}));
-      // SOMEONE TO ASK, per circle (Frits, 2026-09-11): the file carries one other member's per-circle
-      // address and the point they were reached on, for every circle the person ticked — all of them
-      // unless the caller says otherwise (`peers`: the ticked circle ids). Without it a restored device
-      // gets the circle's name and nobody to reach (`recoveryBootstrap.js`). Chosen NOW, from the
-      // roster: an admin first, else any member with an address. The device's own registry is not
-      // changed — the choice belongs to the file being written.
-      const ticked = Array.isArray(parts?.[0]?.data?.peers) ? new Set(parts[0].data.peers) : null;
-      const peers = {};
-      const chosen = {};
+      // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): the file
+      // carries each ticked circle's roster — the trail rows and the member rows, the same a sibling
+      // would serve as a seed — for every circle the person ticked; all of them unless the caller says
+      // otherwise (`rosters`: the ticked circle ids). Without it a restored device gets the circle's
+      // name and nobody to reach (`recoveryBootstrap.js`). The device's own registry is not changed —
+      // the choice belongs to the file being written.
+      const ticked = Array.isArray(parts?.[0]?.data?.rosters) ? new Set(parts[0].data.rosters) : null;
+      const rosters = {};
+      const carried = {};
       for (const circleId of circleIds) {
-        if (ticked && !ticked.has(circleId)) { peers[circleId] = null; chosen[circleId] = null; continue; }
+        if (ticked && !ticked.has(circleId)) { carried[circleId] = null; continue; }
+        let rows = [];
         let members = [];
+        try {
+          const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+          const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
+          rows = items.filter((it) => it?.source?.groupId === circleId);
+        } catch { rows = []; }
         try { members = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
-        const pick = chooseBootstrapPeer({ members, selfPubKey: chatId.pubKey });
-        const point = (opts.circlePointsFor?.(circleId) ?? []).map((p) => (typeof p === 'string' ? p : p?.url)).find(Boolean)
-          ?? sa.relay?.url ?? null;
-        peers[circleId] = pick ? { address: pick.webid, point } : null;
-        chosen[circleId] = pick?.webid ?? null;
+        const snap = rosterSnapshot({
+          rows, members,
+          // This device's proven address in the circle — the same announcement the seed serve introduces
+          // itself back with (`rosterSeed`), minted while this device still holds the key.
+          ownAnnouncement: ownCircleAddressAnnouncement({
+            circleId, memberWebid: chatId.pubKey, circleAddressFor,
+            signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
+            ceremonyCommitmentFor, signCeremonyCommitment,
+          }),
+        });
+        rosters[circleId] = snap;
+        carried[circleId] = snap ? snap.members.filter((m) => m.webid !== chatId.pubKey).length : null;
       }
-      const file = sealRecoveryFile({ strategy, body: bodyWithBootstrapPeers({ body, peers }) });
-      return [DataPart({ ok: true, file, circles: circleIds.length, peers: chosen })];
+      const file = sealRecoveryFile({ strategy, body: bodyWithRosters({ body, rosters }) });
+      return [DataPart({ ok: true, file, circles: circleIds.length, rosters: carried })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'export-failed' })]; }
   }, { visibility: 'trusted' });   // the sealed circle list: owner-only
 
@@ -2329,21 +2335,39 @@ export async function createRealHouseholdAgent(opts = {}) {
         agents += 1;
       }
       const { reopened } = await reopenMemberCircles();
-      // THE BOOTSTRAP: the peers the file carried become an enrol offer — the same artefact the
-      // add-a-device path consumes (seed the roster from that member, announce this device's fresh
-      // address, pull every lane). Stashed where the shell's boot-time consume looks, when the shell
-      // handed that storage in, so it also retries on the next launch; returned as well, so the shell
-      // can consume it NOW rather than after a relaunch.
+      // THE ROSTERS the file carried land through the seed's own ingest (id-preserved, first-write-wins),
+      // so the circles have members before anything is asked of anyone.
+      let landed = 0;
+      for (const [circleId, snap] of Object.entries(rostersOf(body))) {
+        try {
+          const r = await callSkill('stoop', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members });
+          if (r && !r.error) landed += 1;
+          // The owner's own proven address from before the wipe — through the announce's receive door,
+          // proof re-verified, so what the owner said with it binds on this device too.
+          if (snap.own) {
+            await callSkill('stoop', 'recordCircleAddressAnnouncement', {
+              groupId: circleId, memberWebid: snap.own.memberWebid, circleAddress: snap.own.circleAddress,
+              circleAddressProof: snap.own.circleAddressProof,
+              ...(snap.own.ceremonyCommitment ? { ceremonyCommitment: snap.own.ceremonyCommitment, ceremonyCommitmentProof: snap.own.ceremonyCommitmentProof } : {}),
+            });
+          }
+        } catch (err) { if (typeof console !== 'undefined') console.warn(`[restore] ${String(circleId).slice(0, 12)}…: the file's roster did not land: ${err?.message ?? err}`); }
+      }
+      // THE BOOTSTRAP: the members the file named become an enrol offer — the same artefact the
+      // add-a-device path consumes (announce this device's fresh address to every member, pull every
+      // lane from them; the roster itself is already here, so no seed is asked). Stashed where the
+      // shell's boot-time consume looks, when the shell handed that storage in, so it also retries on
+      // the next launch; returned as well, so the shell can consume it NOW rather than after a relaunch.
       let bootstrap = null;
       try {
         const entry = body.agents.find((a) => a?.agentId === 'default') ?? null;
-        const made = bootstrapOfferFromEntry(entry);
+        const made = bootstrapOfferFromRosters({ body, selfPubKey: chatId.pubKey, memberships: circleMembershipsOf(entry ?? {}) });
         if (made) {
           let stashed = false;
           if (opts.enrollOfferStorage) {
             try { stashed = (await stashEnrollOffer(opts.enrollOfferStorage, made.offer)).ok === true; } catch { stashed = false; }
           }
-          bootstrap = { ...made, stashed };
+          bootstrap = { ...made, rosters: landed, stashed };
           // Consume it NOW, through the shell's own consume (it attaches `bootstrapFromStashedOffer`
           // at connect, with its presence registration and content pulls): a restored device should
           // hear its circles again on this launch, not the next. After the reply, so the door paints

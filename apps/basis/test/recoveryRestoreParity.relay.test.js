@@ -31,11 +31,12 @@
  *      gone. Announcing where it now is requires knowing whom to tell; catching the roster up requires
  *      knowing a member to ask. Circular, both ways. Measured: roster `[]`, two circles re-opened,
  *      nothing sent or received in 25s.
- *      CLOSED by Frits' decision of 2026-09-11: the recovery file carries, per circle the person ticks
- *      at export (default on), ONE other member's address and the point they were reached on. The
- *      import turns those into the add-a-device offer and the same consume seeds the roster from that
- *      member (the seed's MEMBER admission, `rosterSeed.js`), announces, and pulls every lane. The
- *      third test below is that half: Bea writes, Anna answers, both circles, no admin re-inviting her.
+ *      CLOSED 2026-09-13 (Frits: "why not back up the roster itself?"): the recovery file carries, per
+ *      circle the person ticks at export (default on), that circle's MEMBER LIST — the rows a sibling
+ *      would serve as a seed. The import lands them through the seed's own ingest, then the same
+ *      consume as add-a-device announces the fresh address to every member and pulls every lane from
+ *      them; what happened since the export folds on top as signed statements. No new trust admission.
+ *      The third test below is that half: Bea writes, Anna answers, both circles, no admin re-inviting her.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
@@ -102,15 +103,16 @@ describe('a restored phone is still a member — the circles talk to it again', 
     phrase = (await anna.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(phrase?.trim().split(/\s+/).length, 'no recovery phrase to walk with').toBe(24);
 
-    // The export carries, per circle, ONE other member's address — the person's choice at export, on by
-    // default (Frits, 2026-09-11): it is what lets a restored device find the circle again, and the
-    // walk's second half is exactly that. Nothing was passed, so every circle is ticked.
+    // The export carries, per circle, the MEMBER LIST — the person's choice at export, on by default
+    // (Frits, 2026-09-13): it is what lets a restored device find the circle again, and the walk's
+    // second half is exactly that. Nothing was passed, so every circle is ticked.
     const exported = await anna.agent.callSkill('household', 'exportRecoveryFile', {});
     expect(exported.ok, JSON.stringify(exported)).toBe(true);
     expect(exported.circles, 'the file should carry both circles').toBe(2);
     expect(exported.file, 'the circle ids must not be in the file in clear').not.toContain(HUIS);
-    expect(exported.peers?.[HUIS], 'the file carries a member to ask for Huis').toBe(bea.pubKey);
-    expect(exported.peers?.[KOOR], 'the file carries a member to ask for Koor').toBe(bea.pubKey);
+    expect(exported.file, 'the member list is sealed too — no key in clear').not.toContain(bea.pubKey);
+    expect(exported.rosters?.[HUIS], 'the file carries Huis\'s list, naming one other member').toBe(1);
+    expect(exported.rosters?.[KOOR], 'the file carries Koor\'s list, naming one other member').toBe(1);
     file = exported.file;
 
     // ── The phone is gone. ──────────────────────────────────────────────────────────────────────
@@ -162,12 +164,20 @@ describe('a restored phone is still a member — the circles talk to it again', 
   }, 60_000);
 
   it('the circles TALK to her again: Bea writes, she answers, in both — no admin re-invites her', async () => {
-    // ── The bootstrap the file carried. The import hands back an enrol offer shaped from the file's
-    //    peers — the SAME artefact the add-a-device path consumes — and the shell stashes and consumes it
-    //    exactly as it does after a scanned offer. The harness performs the shell's two acts here: the
-    //    per-circle presence on the relay, and the consume. ───────────────────────────────────────────
-    expect(bootstrap?.offer, 'the import produced no bootstrap — the file carried nobody to ask').toBeTruthy();
-    expect(bootstrap.circles, 'both circles carried a peer').toBe(2);
+    // ── The rosters the file carried are already in: the import landed them through the seed's own
+    //    ingest, so the new phone knows who is in each circle before it says a word. ───────────────
+    for (const id of [HUIS, KOOR]) {
+      const r = await annaAgain.agent.callSkill('stoop', 'listGroupMembers', { groupId: id });
+      const webids = (r?.members ?? []).map((m) => m.webid);
+      expect(webids, `${id}: the file's member list did not land`).toEqual(expect.arrayContaining([bea.pubKey, annaAgain.pubKey]));
+    }
+    // ── The bootstrap. The import hands back an enrol offer naming every member of every circle — the
+    //    SAME artefact the add-a-device path consumes — and the shell stashes and consumes it exactly as
+    //    it does after a scanned offer. The harness performs the shell's two acts here: the per-circle
+    //    presence on the relay, and the consume. ───────────────────────────────────────────────────────
+    expect(bootstrap?.offer, 'the import produced no bootstrap — the file carried nobody to tell').toBeTruthy();
+    expect(bootstrap.circles, 'both circles carried a list naming someone').toBe(2);
+    expect(bootstrap.rosters, 'both lists landed').toBe(2);
     const storage = memStorage();
     expect((await stashEnrollOffer(storage, bootstrap.offer)).ok).toBe(true);
     await bindCircleAddresses([annaAgain], HUIS, KOOR);
@@ -183,6 +193,7 @@ describe('a restored phone is still a member — the circles talk to it again', 
       const row = consumed.circles?.find((c) => c.circleId === id);
       expect(row?.ok, `${id}: ${JSON.stringify(consumed)}`).toBe(true);
       expect(row.steps, `${id}: the new phone announced itself to Bea`).toContain('announce');
+      expect(row.steps, `${id}: the roster came from the file — nothing was asked of a sibling`).not.toContain('seed-requested');
     }
 
     // ── Bea's roster row for Anna grows into the SET holding the new phone's address. ─────────────

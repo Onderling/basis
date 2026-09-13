@@ -74,8 +74,11 @@ export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
       ...(typeof x.handle === 'string' && x.handle ? { h: x.handle } : {}),
       a: x.address,
       // `m` — the address is ANOTHER MEMBER's, not a sibling's (the recovery file's bootstrap): the
-      // consume then asks as the person, not as one of their devices. Absent = a sibling, as before.
+      // roster came with the file, so there is nothing to seed; the device announces itself to the
+      // members and pulls the lanes from them. `o` — the other members, for the same. Absent = a
+      // sibling, as before.
       ...(x.member === true ? { m: 1 } : {}),
+      ...(Array.isArray(x.others) && x.others.length ? { o: x.others.filter((u) => typeof u === 'string' && u) } : {}),
     }));
   if (c.length === 0) throw new Error('encodeEnrollOffer: at least one circle with an address is required');
   const r = (Array.isArray(relays) ? relays : []).filter((u) => typeof u === 'string' && u);
@@ -85,7 +88,7 @@ export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
 /**
  * Parse an offer. Deny-safe: every failure is a REASON, never a partial object.
  * @param {string} uri
- * @returns {{ok:true, relays:string[], circles:Array<{id:string, handle:?string, address:string, member:boolean}>}
+ * @returns {{ok:true, relays:string[], circles:Array<{id:string, handle:?string, address:string, member:boolean, others:string[]}>}
  *          |{ok:false, reason:'not-an-enroll-uri'|'unreadable'|'wrong-version'|'incomplete'}}
  */
 export function parseEnrollOffer(uri) {
@@ -97,7 +100,13 @@ export function parseEnrollOffer(uri) {
   if (body.v !== 1) return { ok: false, reason: 'wrong-version' };
   const circles = (Array.isArray(body.c) ? body.c : [])
     .filter((x) => x && typeof x.id === 'string' && x.id && typeof x.a === 'string' && x.a)
-    .map((x) => ({ id: x.id, handle: typeof x.h === 'string' && x.h ? x.h : null, address: x.a, member: x.m === 1 }));
+    .map((x) => ({
+      id: x.id,
+      handle: typeof x.h === 'string' && x.h ? x.h : null,
+      address: x.a,
+      member: x.m === 1,
+      others: (Array.isArray(x.o) ? x.o : []).filter((u) => typeof u === 'string' && u),
+    }));
   if (circles.length === 0) return { ok: false, reason: 'incomplete' };
   const relays = (Array.isArray(body.r) ? body.r : []).filter((u) => typeof u === 'string' && u);
   return { ok: true, relays, circles };
@@ -241,12 +250,11 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // sending the pulls below, so the served statements bind on arrival instead of being
       // refused and re-pulled on some later reconnect. Best-effort with a bounded wait: a seed
       // that never comes must not hang the boot.
-      if (agent.rosterSeed && ownAddress) {
+      // The roster seed is a SIBLING's to give (device-set trust). A MEMBER entry — the recovery file's
+      // bootstrap — brought the roster in the file, so there is nothing to ask for here.
+      if (agent.rosterSeed && ownAddress && c.member !== true) {
         try {
-          // A sibling seeds a device of its own profile; a MEMBER (the recovery file's peer) seeds the
-          // person — so the request is signed as the person, and the member's parcel is trusted because
-          // it comes from the very address the file named (`rosterSeed.js`).
-          const req = await agent.rosterSeed.buildRequest(c.id, ownAddress, { asMember: c.member === true });
+          const req = await agent.rosterSeed.buildRequest(c.id, ownAddress);
           if (req) {
             await sendPeerMessage(c.address, req, SEND);
             row.steps.push('seed-requested');
@@ -275,27 +283,37 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
           }
         } catch { /* the pulls below still go out; the next boot retries the seed */ }
       }
-      // 3 — announce our fresh per-circle address to the sibling (the proven-set growth).
+      // Whom this device talks to: the sibling — or, for a member entry, every member the file named
+      // (announce to all, so each roster grows; pull from all, any one complete answer suffices).
+      const targets = [c.address, ...(Array.isArray(c.others) ? c.others : [])];
+      // 3 — announce our fresh per-circle address (the proven-set growth).
       const mine = ownAnnouncementFor({ agent, circleId: c.id });
       if (mine) {
-        await sendPeerMessage(c.address, {
-          type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
-          msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
-        }, SEND);
+        for (const to of targets) {
+          await sendPeerMessage(to, {
+            type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
+            msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
+          }, SEND);
+        }
         row.steps.push('announce');
       }
-      // 4 — pull the circle's truth from the sibling: membership, governance, and the KEY lane
-      // (the group-key chain travels as signed statements like everything else — a sealed circle
-      // opens on this device once the chain folds; no side-channel replay).
-      for (const subtype of [MEMBERSHIP_CATCHUP_SUBTYPES.request, GOV_CATCHUP_REQUEST, KEY_CATCHUP_SUBTYPES.request]) {
-        // held per lane per circle — a sibling that is offline meets one request, not one per attempt
-        await sendPeerMessage(c.address, { subtype, circleId: c.id }, { ...SEND, holdKey: `${subtype}:${c.id}` });
+      // 4 — pull the circle's truth: membership, governance, and the KEY lane (the group-key chain
+      // travels as signed statements like everything else — a sealed circle opens on this device once
+      // the chain folds; no side-channel replay).
+      for (const to of targets) {
+        for (const subtype of [MEMBERSHIP_CATCHUP_SUBTYPES.request, GOV_CATCHUP_REQUEST, KEY_CATCHUP_SUBTYPES.request]) {
+          // held per lane per circle per peer — one that is offline meets one request, not one per attempt
+          await sendPeerMessage(to, { subtype, circleId: c.id }, { ...SEND, holdKey: `${subtype}:${c.id}:${to}` });
+        }
       }
       row.steps.push('catch-up');
-      // 5 — the CONTENT pulls (tasks + chat), targeted at the sibling — see the header. Best-effort:
-      // the statements bind against the freshly seeded roster; the reconnect requestAll retries.
+      // 5 — the CONTENT pulls (tasks + chat), targeted by address — see the header. Best-effort: the
+      // statements bind against the roster; the reconnect requestAll retries.
       if (typeof contentPulls === 'function') {
-        try { await contentPulls(c.id, c.address); row.steps.push('content'); } catch { /* reconnect retries */ }
+        for (const to of targets) {
+          try { await contentPulls(c.id, to); } catch { /* reconnect retries */ }
+        }
+        row.steps.push('content');
       }
     } catch (err) {
       row.ok = false;

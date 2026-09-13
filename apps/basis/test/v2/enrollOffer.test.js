@@ -71,11 +71,14 @@ function wireMembershipCatchUp(node) {
 }
 
 describe('the enroll offer — encode/parse', () => {
-  it('carries the MEMBER marker for a recovery-file peer, and reads it back; absent means a sibling', () => {
-    const uri = encodeEnrollOffer({ relays: ['wss://r'], circles: [{ id: 'c1', address: 'bea-webid', member: true }, { id: 'c2', address: 'sib-addr' }] });
+  it('carries the MEMBER marker and the other members for a recovery-file circle, and reads them back; absent means a sibling', () => {
+    const uri = encodeEnrollOffer({ relays: ['wss://r'], circles: [
+      { id: 'c1', address: 'bea-webid', member: true, others: ['cas-webid', '', 7] },
+      { id: 'c2', address: 'sib-addr' },
+    ] });
     const parsed = parseEnrollOffer(uri);
     expect(parsed.ok).toBe(true);
-    expect(parsed.circles.map((c) => [c.id, c.member])).toEqual([['c1', true], ['c2', false]]);
+    expect(parsed.circles.map((c) => [c.id, c.member, c.others])).toEqual([['c1', true, ['cas-webid']], ['c2', false, []]]);
   });
 
   it('round-trips, and every failure is a typed reason', () => {
@@ -88,8 +91,8 @@ describe('the enroll offer — encode/parse', () => {
     expect(p.ok).toBe(true);
     expect(p.relays).toEqual(['ws://relay.example']);
     expect(p.circles).toEqual([
-      { id: 'c1', handle: 'anna', address: 'addr-1', member: false },
-      { id: 'c2', handle: null, address: 'addr-2', member: false },
+      { id: 'c1', handle: 'anna', address: 'addr-1', member: false, others: [] },
+      { id: 'c2', handle: null, address: 'addr-2', member: false, others: [] },
     ]);
 
     expect(parseEnrollOffer('onderling-connect://abc').reason).toBe('not-an-enroll-uri');
@@ -110,7 +113,7 @@ describe('the enroll offer — encode/parse', () => {
       const back = enrollOfferFromLink(input);
       expect(back.ok, input.slice(0, 40)).toBe(true);
       expect(back.uri).toBe(uri);
-      expect(back.circles[0]).toEqual({ id: 'c1', handle: 'anna', address: 'addr-1', member: false });
+      expect(back.circles[0]).toEqual({ id: 'c1', handle: 'anna', address: 'addr-1', member: false, others: [] });
     }
     expect(enrollOfferLink('not-a-url', uri).reason).toBe('bad-app-url');
     expect(enrollOfferFromLink('https://app.example/#other=1').reason).toBe('not-an-enroll-link');
@@ -301,50 +304,4 @@ describe('the roster seed — the device-set gate, unit-level', () => {
     expect(ROSTER_SEED_VERSION).toBe(sent[0].payload.body.v);
   });
 
-  it('a MEMBER asking as the person is served, signed as the person; a non-member is not; the requester admits the parcel only from the member the file named', async () => {
-    const bea = await mkIdentity();        // the server — the member the recovery file named
-    const anna = await mkIdentity();       // the restored person, asking with her profile key
-    const stranger = await mkIdentity();
-    const rows = [{ id: 'r1', type: 'membership-redemption', text: 'joined', source: { groupId: 'c1', redeemedBy: anna.pubKey } }];
-    const members = [{ webid: bea.pubKey, role: 'admin' }, { webid: anna.pubKey, role: 'member' }];
-    const sent = [];
-    const server = makeRosterSeedServer({
-      callSkill: async (app, op) => (op === 'listOpen' ? { items: rows } : op === 'listGroupMembers' ? { members } : {}),
-      signerPromise: Promise.resolve({ identity: await mkIdentity() }),   // Bea's DEVICE key — never used for a member
-      verifyDeviceSet: async () => false,                                // nobody here is Bea's device
-      selfPubKey: bea.pubKey,
-      memberSigner: bea,
-      sendToPeer: (to, payload) => { sent.push({ to, payload }); },
-    });
-
-    // A stranger asking as a member: signed fine, not on the roster — silence.
-    await server('x', await buildRosterSeedRequest({ signer: { identity: stranger }, circleId: 'c1', replyTo: 'addr-x', asMember: true }));
-    expect(sent).toHaveLength(0);
-    // A member asking as a DEVICE (no `asMember`): the device-set gate, which refuses a foreign device.
-    await server('x', await buildRosterSeedRequest({ signer: { identity: anna }, circleId: 'c1', replyTo: 'addr-x' }));
-    expect(sent).toHaveLength(0);
-    // The member, as the person: served, and the parcel is signed by BEA'S profile key.
-    await server('x', await buildRosterSeedRequest({ signer: { identity: anna }, circleId: 'c1', replyTo: 'addr-anna2', asMember: true }));
-    expect(sent).toHaveLength(1);
-    expect(sent[0].to).toBe('addr-anna2');
-    expect(sent[0].payload.by).toBe(bea.pubKey);
-    expect(sent[0].payload.body.asMember).toBe(true);
-    expect(sent[0].payload.delegation).toBeUndefined();
-
-    // The requester: the parcel counts from the member her file named for THIS circle, and no other.
-    const applied = [];
-    const receiverFor = (trusted) => makeRosterSeedReceiver({
-      callSkill: async (app, op, args) => { applied.push({ op, args }); return { ok: true }; },
-      verifyDeviceSet: async () => false,
-      selfPubKey: anna.pubKey,
-      trustedSeederFor: async (circleId) => (circleId === 'c1' ? trusted : null),
-    });
-    await receiverFor(stranger.pubKey)('x', sent[0].payload);
-    expect(applied, 'a parcel from someone the file did not name binds nothing').toHaveLength(0);
-    await receiverFor(null)('x', sent[0].payload);
-    expect(applied, 'no named member for the circle — nothing is admitted').toHaveLength(0);
-    await receiverFor(bea.pubKey)('x', sent[0].payload);
-    expect(applied).toHaveLength(1);
-    expect(applied[0].op).toBe('recordRosterSeed');
-  });
 });

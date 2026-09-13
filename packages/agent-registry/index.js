@@ -35,8 +35,8 @@ export { loadProfile } from './src/loadProfile.js';
 // pre-wipe content via the wrapped-key ref) after a phrase restore. Personal restore data, NOT a
 // disclosed attribute — no disclosure ladder.
 export {
-  CIRCLE_MEMBERSHIPS_KEY, isKeyRef, isBootstrapPeer, isCircleMembershipRecord, normaliseCircleMembership,
-  circleMembershipsOf, circleMembershipOf, circleKeyRefOf, circleBootstrapPeerOf, circleMembershipsFromProperties,
+  CIRCLE_MEMBERSHIPS_KEY, isKeyRef, isCircleMembershipRecord, normaliseCircleMembership,
+  circleMembershipsOf, circleMembershipOf, circleKeyRefOf, circleMembershipsFromProperties,
   setCircleMembership,
 } from './src/circleMembership.js';
 // The enrolled-devices map (add-a-device): root-signed delegation records per deviceId — the

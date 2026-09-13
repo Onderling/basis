@@ -8,14 +8,14 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Modal, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 import {
   initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey,
-  loadExportChoices, togglePeerChoice,
+  loadExportChoices, toggleRosterChoice,
 } from '../../core/wizards/recoveryFileState.js';
 import { Body, Actions, ErrorBanner, Submitting, Checkbox } from './_kit.js';
 
 export default function RecoveryFileWizardModal({ visible, mode = 'export', callSkill, onClose, onDispatched, onPickFile, onSaveFile, t }) {
   const [state, setState] = useState(() => (mode === 'import' ? initialImportState() : initialExportState()));
 
-  // The per-circle choice (someone to ask, default on) is listed before the file is made — web parity.
+  // The per-circle choice (the member list, default on) is listed before the file is made — web parity.
   useEffect(() => {
     if (mode !== 'export' || !visible) return;
     let live = true;
@@ -74,18 +74,18 @@ export default function RecoveryFileWizardModal({ visible, mode = 'export', call
                     {state.choices.map((c) => (
                       <Checkbox
                         key={c.id}
-                        label={t('circle.wizard.recovery.peer_choice', { name: c.name ?? c.id })}
-                        checked={c.peer}
-                        onToggle={() => setState((s) => ({ ...togglePeerChoice({ ...s, choices: s.choices.map((x) => ({ ...x })) }, c.id) }))}
-                        testID={`recovery-peer-${c.id}`}
+                        label={t('circle.wizard.recovery.roster_choice', { name: c.name ?? c.id })}
+                        checked={c.roster}
+                        onToggle={() => setState((s) => ({ ...toggleRosterChoice({ ...s, choices: s.choices.map((x) => ({ ...x })) }, c.id) }))}
+                        testID={`recovery-roster-${c.id}`}
                       />
                     ))}
-                    <Text style={styles.note}>{t('circle.wizard.recovery.peer_note')}</Text>
+                    <Text style={styles.note}>{t('circle.wizard.recovery.roster_note')}</Text>
                   </>
                 )}
                 {state.file && <Text style={styles.note}>{t('circle.wizard.recovery.export_ready')} {state.circles} · {state.filename}</Text>}
-                {state.file && (state.choices ?? []).filter((c) => c.peer && state.peers && state.peers[c.id] === null).map((c) => (
-                  <Text key={c.id} style={styles.note}>{c.name ?? c.id}: {t('circle.wizard.recovery.peer_none')}</Text>
+                {state.file && (state.choices ?? []).filter((c) => c.roster && state.rosters && !state.rosters[c.id]).map((c) => (
+                  <Text key={c.id} style={styles.note}>{c.name ?? c.id}: {t('circle.wizard.recovery.roster_none')}</Text>
                 ))}
                 <ErrorBanner message={state.submitError} />
                 <Submitting visible={state.submitting} label={t('circle.wizard.recovery.sealing')} />

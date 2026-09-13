@@ -71,7 +71,7 @@ describe('the shared wizard state', () => {
     expect(bad.submitError).toBe('not-your-file');
     expect(importErrorKey(bad.submitError)).toBe('circle.wizard.recovery.err_not_yours');
     const good = await submitImport({ state: { ...initialImportState(), fileText: 'good' }, callSkill });
-    expect(good.result).toEqual({ agents: 1, circles: ['c'], bootstrap: null });   // no peer in the file: nothing to bootstrap from
+    expect(good.result).toEqual({ agents: 1, circles: ['c'], bootstrap: null });   // no roster in the file: nothing to bootstrap from
     expect(calls.every(([app]) => app === 'household')).toBe(true);
   });
 });

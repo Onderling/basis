@@ -8,14 +8,14 @@
 import { mkBody, mkActions, mkError, mkSubmitting, mkCheck, refreshActions } from './_wizardKit.js';
 import {
   initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey,
-  loadExportChoices, togglePeerChoice,
+  loadExportChoices, toggleRosterChoice,
 } from '../../core/wizards/recoveryFileState.js';
 import { t } from '../../localisation.js';
 
 export function renderRecoveryExportWizard({ container, doc, callSkill, onClose, onDispatched }) {
   const state = initialExportState();
   rerender();
-  // The per-circle choice (someone to ask, default on) is listed before the file is made.
+  // The per-circle choice (the member list, default on) is listed before the file is made.
   loadExportChoices({ state, callSkill }).then(() => rerender());
   async function run() {
     rerender();
@@ -27,12 +27,12 @@ export function renderRecoveryExportWizard({ container, doc, callSkill, onClose,
     container.innerHTML = '';
     const body = mkBody(doc, t('circle.wizard.recovery.export_title'), t('circle.wizard.recovery.export_intro'));
     if (!state.file && Array.isArray(state.choices) && state.choices.length) {
-      // One checkbox per circle: carry ONE other member's address so a new device can find it again.
+      // One checkbox per circle: carry the member list so a new device can find the circle again.
       for (const c of state.choices) {
-        mkCheck(body, doc, t('circle.wizard.recovery.peer_choice', { name: c.name ?? c.id }), c.peer, () => { togglePeerChoice(state, c.id); });
+        mkCheck(body, doc, t('circle.wizard.recovery.roster_choice', { name: c.name ?? c.id }), c.roster, () => { toggleRosterChoice(state, c.id); });
       }
       const note = doc.createElement('p'); note.className = 'cc-wizard-blurb';
-      note.textContent = t('circle.wizard.recovery.peer_note');
+      note.textContent = t('circle.wizard.recovery.roster_note');
       body.appendChild(note);
     }
     if (state.file) {
@@ -41,9 +41,9 @@ export function renderRecoveryExportWizard({ container, doc, callSkill, onClose,
       body.appendChild(p);
       // A ticked circle nobody else is in: said, not silently dropped.
       for (const c of state.choices ?? []) {
-        if (c.peer && state.peers && state.peers[c.id] === null) {
+        if (c.roster && state.rosters && !state.rosters[c.id]) {
           const q = doc.createElement('p'); q.className = 'cc-wizard-blurb';
-          q.textContent = `${c.name ?? c.id}: ${t('circle.wizard.recovery.peer_none')}`;
+          q.textContent = `${c.name ?? c.id}: ${t('circle.wizard.recovery.roster_none')}`;
           body.appendChild(q);
         }
       }

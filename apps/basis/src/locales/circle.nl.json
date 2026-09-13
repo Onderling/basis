@@ -5568,17 +5568,17 @@
         "text": "Bestand opslaan",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
       },
-      "peer_choice": {
-        "text": "Adres van een kringlid meenemen, zodat een nieuw apparaat {{name}} weer kan vinden",
-        "doc": "Recovery file — the per-circle choice to carry ONE other member's address, so a restored device can find the circle again (Frits, 2026-09-11; copy drafted by Fable 2026-09-13, [copy: Frits])."
+      "roster_choice": {
+        "text": "Ledenlijst van {{name}} meenemen, zodat een nieuw apparaat de kring weer kan vinden",
+        "doc": "Recovery file — the per-circle choice to carry the circle's member list, so a restored device can find the circle again (Frits, 2026-09-13; [copy: Frits])."
       },
-      "peer_note": {
-        "text": "Het bestand bevat dan het adres van één lid van deze kring. Alleen jij kunt het bestand openen.",
-        "doc": "Recovery file — the per-circle choice to carry ONE other member's address, so a restored device can find the circle again (Frits, 2026-09-11; copy drafted by Fable 2026-09-13, [copy: Frits])."
+      "roster_note": {
+        "text": "Het bestand bevat dan de ledenlijst van deze kring, zoals die nu is. Alleen jij kunt het bestand openen.",
+        "doc": "Recovery file — the per-circle choice to carry the circle's member list, so a restored device can find the circle again (Frits, 2026-09-13; [copy: Frits])."
       },
-      "peer_none": {
-        "text": "Niemand om te vragen: je bent de enige in deze kring.",
-        "doc": "Recovery file — the per-circle choice to carry ONE other member's address, so a restored device can find the circle again (Frits, 2026-09-11; copy drafted by Fable 2026-09-13, [copy: Frits])."
+      "roster_none": {
+        "text": "Je bent de enige in deze kring: er is geen ledenlijst om mee te nemen.",
+        "doc": "Recovery file — the per-circle choice to carry the circle's member list, so a restored device can find the circle again (Frits, 2026-09-13; [copy: Frits])."
       },
       "make": {
         "text": "Bestand maken",

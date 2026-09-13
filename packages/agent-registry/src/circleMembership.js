@@ -47,24 +47,9 @@ export function isKeyRef(v) {
 }
 
 /**
- * True iff `v` is a well-formed bootstrap PEER: `{ address, point? }` — one other member's per-circle
- * address, and the connection point they were reached on. What a restored device announces itself to
- * and pulls the circle from (the recovery file's answer to "I have the circle list, now who do I ask?").
- * Carried only when the person ticked it at export: it is another member's address in a user-held
- * file, which is theirs to include (Frits, 2026-09-11).
- * @param {*} v
- */
-export function isBootstrapPeer(v) {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
-  if (typeof v.address !== 'string' || !v.address) return false;
-  if (v.point != null && (typeof v.point !== 'string' || !v.point)) return false;
-  return true;
-}
-
-/**
  * True iff `v` is a well-formed per-circle membership record. `address` is required — it is where you
  * are reachable, and the only field a restore actually needs to re-open a circle. `handle`, `proof`,
- * `relays`, `key` and `peer` are optional facets.
+ * `relays` and `key` are optional facets.
  *
  * The handle used to be required too, and that quietly excluded the one person who most needs this
  * record: a FOUNDER never redeems an invite, so they never choose a handle, so their own circle was
@@ -83,7 +68,6 @@ export function isCircleMembershipRecord(v) {
   if (v.proof != null && typeof v.proof !== 'string') return false;
   if (v.relays != null && (!Array.isArray(v.relays) || v.relays.some((r) => typeof r !== 'string'))) return false;
   if (v.key != null && !isKeyRef(v.key)) return false;
-  if (v.peer != null && !isBootstrapPeer(v.peer)) return false;
   return true;
 }
 
@@ -95,13 +79,7 @@ export function normaliseCircleMembership(v) {
   if (v.proof != null) rec.proof = v.proof;
   if (Array.isArray(v.relays)) rec.relays = Object.freeze([...v.relays]);
   if (v.key != null) rec.key = Object.freeze({ ref: v.key.ref, ...(v.key.posture ? { posture: v.key.posture } : {}) });
-  if (v.peer != null) rec.peer = Object.freeze({ address: v.peer.address, ...(v.peer.point ? { point: v.peer.point } : {}) });
   return Object.freeze(rec);
-}
-
-/** The bootstrap peer a circle's record carries, or null. */
-export function circleBootstrapPeerOf(entry, circleId) {
-  return circleMembershipOf(entry, circleId)?.peer ?? null;
 }
 
 /** Read the OWN `{ [circleId]: record }` map straight off one registry entry (no inherit chain). */
@@ -147,8 +125,7 @@ export function circleMembershipsFromProperties(getProfile, profileId, opts = {}
  * the exact "nothing came back" failure.
  * @param {object} properties  the profile's current properties map
  * @param {string} circleId
- * @param {object} patch       any subset of { handle, address, proof, relays, key, peer } to merge in;
- *                             `peer: null` REMOVES the bootstrap peer (the one facet a person un-ticks)
+ * @param {object} patch       any subset of { handle, address, proof, relays, key } to merge in
  */
 export function setCircleMembership(properties, circleId, patch) {
   if (typeof circleId !== 'string' || !circleId) throw new TypeError('setCircleMembership: circleId required');
@@ -165,8 +142,6 @@ export function setCircleMembership(properties, circleId, patch) {
   if (patch.proof != null) merged.proof = patch.proof;
   if (Array.isArray(patch.relays)) merged.relays = patch.relays;
   if (patch.key != null) merged.key = patch.key;
-  if (patch.peer === null) delete merged.peer;
-  else if (patch.peer != null) merged.peer = patch.peer;
   const rec = normaliseCircleMembership(merged);
   if (!rec) throw new TypeError('setCircleMembership: invalid membership record (an address is required)');
   return setOwn(properties, CIRCLE_MEMBERSHIPS_KEY, { ...curMap, [circleId]: rec });

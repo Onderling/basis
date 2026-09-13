@@ -956,15 +956,17 @@ resource carries no sealing of its own), the **recovery file** (the registry sea
 by the person), or an offer from another device they still hold; a recovery screen that promises more
 than that is promising the wrong thing.
 
-**The recovery file also carries someone to ask** (2026-09-13). The list alone gave a restored device the
-circle's name and nobody to reach: restore enrols the new device, so its per-circle addresses are fresh
-and no roster names them, and its own roster is empty because the trail lived on the lost phone. So the
-export offers, per circle and on by default, to carry ONE other member's address and the relay they were
-reached on — the person's choice, made when the artefact is written, sealed to the phrase, and never a
-name. The import turns those into the add-a-device offer and runs the same consume: the roster seed
-(with a second admission beside the sibling one — a member asking as the person, served signed as the
-person, admitted by the requester only from the member its own file named), the announce of the fresh
-address, and every lane's catch-up. A restored phone then hears its circles again on that launch.
+**The recovery file also carries each circle's member list** (2026-09-13). The list of circles alone
+gave a restored device a circle's name and nobody to reach: restore enrols the new device, so its
+per-circle addresses are fresh and no roster names them, and its own roster is empty because the trail
+lived on the lost phone. So the export offers, per circle and on by default, to carry that circle's
+roster — the trail rows and the member rows, the same a sibling would serve as a seed — together with
+the device's own proven address announcement, minted while it still holds the key. The person chooses
+when the artefact is written; the file is sealed to the phrase. The import lands the rows through the
+seed's own ingest and the announcement through the announce's own receive door (proof re-verified),
+then runs the add-a-device consume: announce the fresh address to every member, pull every lane from
+them. The snapshot is as old as the file; what happened since folds on top as signed statements as
+soon as one member is online. No new trust admission anywhere.
 
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,

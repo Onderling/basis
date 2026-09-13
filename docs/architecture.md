@@ -729,8 +729,13 @@ environment or a key file, never from code. The assistant a door talks to is one
 last turns of the thread re-sent with every call (the model is stateless), and the interpreter when a route is
 configured — the Telegram shell runs on it. Basis has a third shell beside
 web and mobile, and it is not a shell so much as a DEVICE: `bin/device-runner.mjs` boots the same agent
-headless on a machine that stays on, joins the relay, holds its owner's circles, and hands each contact-thread
-turn to their other devices. With a Telegram token present the same process also answers there — that is the
+headless on a machine that stays on, joins the relay, registers its per-circle addresses there and announces
+them (the same three acts a shell performs on connect), holds its owner's circles, and hands each contact-thread
+turn to their other devices. It is enrolled either box-first (`--show-offer` hands the phone an offer) or
+phone-first (`--enrol`, once: the phone's offer pasted, the phrase typed with echo off and never written; the
+next start consumes the offer the way a shell consumes a scanned one). What it does not do is follow a
+circle's traffic live: the circle fan delivers to one address per member and never to the sender's own other
+devices, so the box holds a circle by catch-up at connect. With a Telegram token present the same process also answers there — that is the
 **Telegram shell** (`apps/basis/src/telegram/runner.js`), where a
 `MessagingBridge` turn goes through the same compilers (`parseInput → resolveDispatch → runDispatch → renderReply`)
 and, for free text, the circle composer's engine (`createCircleDispatch` with the deterministic gate); a button

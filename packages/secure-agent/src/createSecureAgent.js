@@ -1543,6 +1543,12 @@ export async function createSecureAgent(opts = {}) {
         onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
       });
       makeReceiveHandler(tx);
+      // A send made before this socket opened was HELD — nothing could carry it, and no peer event
+      // would ever flush it (presence flushes are per peer, on THEIR inbound). The socket opening is the
+      // event that makes those holds sendable, so it flushes them; whatever still cannot route re-holds.
+      // Same on every reconnect. Found 2026-09-13: a fresh install that wrote to its seeded contact in
+      // its first second parked the message until the contact happened to speak first.
+      tx.on('connect', () => { flushHeld().catch(() => { /* re-hold handled inside */ }); });
       await tx.connect();
       // `connect()` only REQUESTS the socket — it deliberately does not await it, so that
       // `agent.start()` never blocks on a relay that may be unreachable. That is right for boot and
@@ -2003,7 +2009,13 @@ export async function createSecureAgent(opts = {}) {
         // offers the address-fallback trade — a trade that cannot help someone who is simply offline),
         // while a genuinely scoped-out send was held silently as `unreachable`, so the one offer that
         // WOULD have fixed it never appeared. Found by J-CS4/CS6/CS7.
-        const scopedOut = !!opts?.scope && (await hasLiveRoute(addr));
+        // …and "reachable in general" has to mean a transport that can reach them NOW: the unscoped
+        // route under a pinned transport mode names that transport whether or not its socket is open,
+        // so a send in the first second after boot — socket still opening — used to be labelled as
+        // scoped out (an offer to accept the address fallback, which cannot help) instead of offline.
+        const unscoped = await route(addr).catch(() => null);
+        const reachableNow = !!unscoped && (typeof unscoped.transport?.canReach !== 'function' || unscoped.transport.canReach(addr) === true);
+        const scopedOut = !!opts?.scope && reachableNow;
         return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
       }
       try {

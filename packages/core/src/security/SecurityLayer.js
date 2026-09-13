@@ -471,6 +471,24 @@ export class SecurityLayer {
     return this.#peers.get(address) ?? null;
   }
 
+  /**
+   * Every binding this layer holds for OTHERS — what a device hands its own sibling devices, so a
+   * key that greeted one of them is known to all of them. Read-only: the receiving side files each
+   * row through `learnPeerKey`, which establishes and never replaces. Own identities are left out;
+   * a sibling has its own.
+   *
+   * @returns {Array<{address: string, pubKey: string}>}
+   */
+  peerBindings() {
+    const own = new Set([this.#identity.pubKey, ...this.#selfIdentities.keys(), ...this.#selfAddressByPubKey.keys()]);
+    const out = [];
+    for (const [address, pubKey] of this.#peers) {
+      if (own.has(address) || own.has(pubKey)) continue;
+      out.push({ address, pubKey });
+    }
+    return out;
+  }
+
   /** Remove a peer's key so future sends require a fresh hello. */
   unregisterPeer(address) {
     this.#peers.delete(address);

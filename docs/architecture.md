@@ -1200,6 +1200,21 @@ re-grant loses to the revoke it never saw, and re-admitting the view is a delibe
 after the merge. One honest edge: a person in no circles has no live fan target between their
 devices — restore-time (the log itself) is the designed floor there.
 
+**Who you know belongs to the person too** (2026-09-13). A greeting binds a key on the ONE device it
+landed on, and a card scanned on the phone is a contact on the phone; on a relay the person's address
+maps to one socket, so the next message from that contact can land on a device that has never heard
+of them — and be refused as a stranger's. So a device's bindings (the security layer's, read-only)
+and its contact rows ride the same sibling set as the grants lane, over hold-forward
+(`apps/basis/src/v2/knownPeersSync.js`): live as a greeting lands or a contact is added, in full to a
+device of yours that just announced its address (the enrol moment), and on request at connect. A
+sibling's row ESTABLISHES a binding and never replaces one (`learnPeerKey`), and adds a contact it
+lacks without touching one it has. The same gate as the contact-thread fan admits it: the profile
+address, or a proven sibling address. Two substrate facts this made true: the secure agent's
+transports now say `peer` on an accepted greeting (they never handed a HI to the kernel's dispatch,
+so the kernel's event never fired on the wire), and their `security-error` reaches the agent, where
+basis counts it per reason and warns once per sender — a refused envelope is no longer
+indistinguishable from one that never arrived.
+
 ### The Connectivity home
 
 *How agents reach each other: transports are adapters behind one surface, and every hop is designed

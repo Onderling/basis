@@ -1226,6 +1226,14 @@ export async function createSecureAgent(opts = {}) {
     // + nacl.box encrypted with a per-peer shared secret.  HI stays
     // plaintext-but-signed so peers can bootstrap.
     tx.useSecurityLayer(agent.security);
+    // A refusal is silent on the wire by design; it must not be silent HERE. The kernel re-emits a
+    // transport's `security-error` on the agent when it owns the transport (`Agent.addTransport`);
+    // these transports are owned by this factory instead, so until now a refused envelope — an
+    // unknown sender, a bad signature, an oversize frame — reached no listener at all, and "refused"
+    // was indistinguishable from "never arrived". Same event, same place an app already listens.
+    tx.on('security-error', (err, raw) => {
+      try { agent.emit('security-error', err, raw); } catch { /* a listener that throws must not take the receive path down */ }
+    });
     // bilateral HI auto-handshake on receive.  When we
     // receive an envelope from a peer we haven't HI'd, send HI to
     // them so THEIR SecurityLayer registers our pubKey too.
@@ -1284,6 +1292,22 @@ export async function createSecureAgent(opts = {}) {
       // we don't want them to make us spam them in return).  The injected
       // exemption passes legitimate bursts (catch-up batches) untouched.
       if (rateLimiter && !(rateLimitExempt?.(env)) && !rateLimiter.check(env?._from)) return;
+      // A greeting that passed every gate above: say so, the way the kernel's own hello handler
+      // does (`peer`, same shape). The kernel never sees a HI on these transports — they hand
+      // envelopes here, not to its dispatch — so without this nothing above the substrate learns
+      // that a first contact happened, and a device cannot carry the binding it just made to the
+      // person's other devices.
+      if (env?._p === 'HI') {
+        try {
+          agent.emit('peer', {
+            address:      env._from,
+            pubKey:       env.payload?.pubKey ?? null,
+            label:        env.payload?.label ?? null,
+            ack:          !!env.payload?.ack,
+            capabilities: env.payload?.capabilities ?? null,
+          });
+        } catch { /* a listener that throws must not take the receive path down */ }
+      }
       // v0.7.cc — record for /debug-dump.  Size is the JSON-
       // serialised length of the envelope; matches the wire bytes
       // the transport actually received.

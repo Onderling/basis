@@ -8319,6 +8319,9 @@ async function boot() {
         // The grants lane's pull: my own devices — a revoke made elsewhere while this device was
         // offline binds at this door now, before a stale view is served.
         agent.grantsCatchUp?.requestFromSiblings().catch(() => {});
+        // Who my other devices know — a greeting or a contact that landed there while this device
+        // was off: bindings and contact rows, established here, never replacing what this device holds.
+        agent.knownPeersSync?.requestFromSiblings().catch(() => {});
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on

@@ -790,6 +790,11 @@ export default function ChatScreen({
           globalThis.__onderlingGrantsCatchUpKicked = true;
           setTimeout(() => { grantsCatchUp.requestFromSiblings().catch(() => {}); }, 2500);
         }
+        // Who my other devices know (bindings + contact rows) — web parity with the kick above.
+        if (bundle?.agent?.knownPeersSync && !globalThis.__onderlingKnownPeersKicked) {
+          globalThis.__onderlingKnownPeersKicked = true;
+          setTimeout(() => { bundle.agent.knownPeersSync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
         // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
         if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {

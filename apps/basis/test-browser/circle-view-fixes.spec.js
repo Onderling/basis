@@ -30,14 +30,22 @@ test('#5 add vs complete replies are distinct (Added: / Completed:)', async ({ p
   expect(await blob(page)).toMatch(/Completed:\s*distinctmilk/i);
 });
 
-test('#2 /me is scoped out — graceful reply, no raw locale key, no page crash', async ({ page }) => {
+test('#2 /me typed in a circle answers through the typed door — no raw locale key, no page crash', async ({ page }) => {
+  // This USED to assert that `/me` is scoped OUT of a circle. That was true when the only route into a
+  // circle was the scoped catalogue, which drops basis's infra ops so the LLM cannot mis-pick them (the
+  // device-run `/me` fix; `circleCatalogueScope.test.js` still pins it). It stopped being true when the
+  // typed door landed: "a command a person can TYPE must have a door, in both shells", enforced by the
+  // `typed-commands-reachable` guard, which routes a typed basis op straight to `runComposerOp`. So the
+  // catalogue scoping is about what the LLM and slash-suggest SEE, and a person typing `/me` is answered.
+  // The assertion now says that — and keeps the two halves that were always the point: no raw locale
+  // key leaks, and nothing crashes.
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await openCircleComposer(page);
   await send(page, '/me');
   const b = await blob(page);
   expect(b, `raw locale key leaked: ${b}`).not.toMatch(/circle\.bot\./);
-  expect(b).toMatch(/couldn.t turn that into an action/i);
+  expect(b, 'the typed door should answer /me with the identity, not refuse it').toMatch(/agent identity/i);
   expect(errs).toEqual([]);
 });
 

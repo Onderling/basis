@@ -27,9 +27,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 /* The connectivity SETUP/MODE MATRIX (test-browser/setups.js + matrix.spec.js) adds a small set of
  * transport-dimension PROJECTS so a reviewer can run one setup:
- *   --project=chromium  the existing default (NKN, no relay env) — unchanged.
- *   --project=nkn       the NKN transport setup explicitly (alias of the default transport).
- *   --project=relay     the relay transport setup. Bring up a local @onderling/relay by ARMING the
+ *   --project=no-relay  the single-context specs, against a server with NO relay configured.
+ *   --project=relay     the multi-client specs, against a server WITH the relay. Bring up a local
+ *                       @onderling/relay by ARMING the
  *                       fixture with PEER_TEST_RELAY (a ws:// URL); globalSetup starts it, the harness
  *                       seeds it per-client (localStorage cc.relayUrl + ?relay=), globalTeardown kills it:
  *                         PEER_TEST_RELAY=ws://127.0.0.1:8787 npx playwright test --project=relay
@@ -41,6 +41,19 @@ const RELAY_URL = process.env.PEER_TEST_RELAY || null;
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8788 npx playwright test --project=relay  */
 const PORT = process.env.PEER_TEST_PORT || '5173';
 const BASE_URL = `http://localhost:${PORT}`;
+/* The NO-RELAY configuration gets its OWN dev server on the next port. It has to: `VITE_CIRCLE_RELAY_URL`
+ * is baked into the bundle at boot, so one server cannot serve both "a relay is configured" and "no relay
+ * is configured", and `circle-settings-controls.spec.js` asserts a real product rule about the second
+ * (§7 route × capability: no relay ⇒ private DM and the relay transport options are disabled). Before
+ * 2026-09-11 the suite had these two configurations and one server, so one `playwright test` run could
+ * never be fully green — whichever way the env was set, the other half was wrong by construction. */
+const NO_RELAY_PORT = String(Number(PORT) + 1);
+const NO_RELAY_BASE_URL = `http://localhost:${NO_RELAY_PORT}`;
+
+/* Which specs boot SEVERAL clients over the relay fixture (`peerHarness.js`, or their own contexts): they
+ * run under `relay`. Everything else is a single-context spec through `helpers.js` and runs under
+ * `no-relay`. Matched by file so a spec belongs to exactly one project and nothing has to declare it. */
+const RELAY_SPECS = /(journeys|matrix|twopeer|two-relays|walk-[a-z0-9]+)\.spec\.js$/;
 
 export default defineConfig({
   testDir: './test-browser',
@@ -81,16 +94,26 @@ export default defineConfig({
     headless: true,
   },
   projects: [
-    /* Existing default — kept first + unchanged so bare `playwright test` behaves exactly as before. */
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    /* Transport-dimension setups. Same browser; they differ by which transport the harness seeds per
-     * client (the transportMode boot option). `relay` needs PEER_TEST_RELAY armed (see the fixture). */
-    { name: 'nkn',   use: { ...devices['Desktop Chrome'] } },
-    { name: 'relay', use: { ...devices['Desktop Chrome'] } },
+    /* Two projects, two configurations, two dev servers (2026-09-11). Until now there were three projects
+     * — `chromium`, `nkn`, `relay` — all identical Desktop Chrome, with nothing anywhere reading the
+     * project name: `--project=relay` was a no-op, and the real switch was the PEER_TEST_RELAY env var
+     * read by the harness and the server alike. That is what the project mechanism is FOR, so it now does
+     * the job: each project points at the server built for its configuration, and `testMatch` decides
+     * membership by file. One command runs both; every spec runs under exactly one. */
+    {
+      name: 'relay',
+      testMatch: RELAY_SPECS,
+      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL },
+    },
+    {
+      name: 'no-relay',
+      testIgnore: RELAY_SPECS,
+      use: { ...devices['Desktop Chrome'], baseURL: NO_RELAY_BASE_URL },
+    },
   ],
   /* Boot the dev server automatically.  The reuseExistingServer flag
    * lets a manually-started `pnpm dev` survive across test runs. */
-  webServer: {
+  webServer: [{
     // `pnpm dev -- --port X` does NOT reach vite as a port: the `--` is passed straight through, vite
     // treats everything after it as positional, and serves on its own default instead. Playwright then
     // waits on the port it asked for until the 240s timeout and reports "Timed out waiting from
@@ -115,5 +138,13 @@ export default defineConfig({
        * as its build-time default too (ignored by a reused server — the per-client cc.relayUrl wins). */
       ...(RELAY_URL ? { VITE_CIRCLE_RELAY_URL: RELAY_URL } : {}),
     },
-  },
+  }, {
+    /* The no-relay server: same app, same LLM stub, NO relay baked in. This is the configuration the
+     * single-context specs were written against and the one `circle-settings-controls` asserts. */
+    command: `pnpm exec vite --port ${NO_RELAY_PORT} --strictPort`,
+    url: NO_RELAY_BASE_URL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 240_000,
+    env: { VITE_CIRCLE_LLM_BASEURL: 'http://127.0.0.1:9999' },
+  }],
 });

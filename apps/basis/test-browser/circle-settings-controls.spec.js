@@ -40,7 +40,10 @@ test('/settings (G17 built-in) opens the settings panel with the Connection cont
   await expect(page.locator('.circle-view__composer-input')).toHaveCount(0);   // the circle composer is gone → we're in the panel, not chat
 
   // §9 — the manifest-declared Connection & transport controls render.
-  const connection = page.locator('.circle-settings__connection');
+  // Two sections carry this class now: the ESSENTIAL controls on the page, and the advanced ones
+  // (`control:wake-nudges`) inside the closed fold, each rendered by the same function. The three
+  // controls this spec asserts on are all essential, so it is the first — the page-level — section.
+  const connection = page.locator('.circle-settings__connection').first();
   await expect(connection).toBeVisible({ timeout: LONG });
   await expect(connection.locator('[data-control="transport-mode"]')).toBeVisible();
   await expect(connection.locator('[data-control="relay-endpoint"]')).toBeVisible();

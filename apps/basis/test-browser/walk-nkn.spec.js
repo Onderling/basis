@@ -12,6 +12,12 @@ import { bootPeers, teardown, log, gotoCircles, createCircle, openCircleMatching
 
 test.setTimeout(420_000);
 
+// These walks ride the PUBLIC NKN network, which a CI runner reaches when it reaches it: on 2026-09-13
+// the fallback story passed once and failed three times on the same tree (RpcTimeoutError, connect-to-node
+// timeout), and a retry did not help. What they prove is real and they pass alone on a developer machine;
+// they are not a fact CI can assert, so CI does not. Run them by hand: `npx playwright test walk-transports`.
+test.skip(!!process.env.CI, 'rides the public NKN network — passes alone, not a CI fact');
+
 test('nkn — do two peers find each other with no relay at all?', async ({ browser }) => {
   const peers = await bootPeers(browser, 2, { transportMode: 'nkn' });
   const [A, B] = peers;

@@ -187,6 +187,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
+import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
@@ -1370,6 +1371,9 @@ const CIRCLE_EMBED_APIKEY  = import.meta.env?.VITE_CIRCLE_EMBED_APIKEY ?? CIRCLE
 // configurable without a rebuild. localStorage is sync, so resolve it here at module-init — before the
 // boot-time tryConnectPeerTransport reads it. Empty setting ⇒ env fallback. `applyRelayUrl` reconnects live.
 const CIRCLE_RELAY_ENV     = import.meta.env?.VITE_CIRCLE_RELAY_URL ?? null;
+// The contact the app ships with (the alpha's feedback path: Frits himself, as a person in Contacten).
+// A build-time card beside the app-native relay; absent ⇒ no seeded contact (seededContact.js).
+const SEEDED_CONTACT_CARD  = import.meta.env?.VITE_SEEDED_CONTACT_CARD ?? null;
 const relayPrefStore       = createRelayPrefStore(localStorageRelayIo());
 // The two delivery settings, and the per-message state map they govern the display of.
 const deliverySettingsStore = createDeliverySettingsStore(localStorageDeliveryIo());
@@ -8355,6 +8359,11 @@ async function boot() {
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        // The shipped contact, once: added through the scanned-card path if the card is set and the
+        // person is not in the book yet.
+        seedContactCard({ payload: SEEDED_CONTACT_CARD, callSkill: rawCallSkill })
+          .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
+          .catch(() => { /* an install without it is not an error state */ });
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {

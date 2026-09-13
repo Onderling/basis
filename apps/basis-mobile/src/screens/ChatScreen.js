@@ -68,6 +68,7 @@ import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '..
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer } from '../../../basis/src/v2/enrollOffer.js';
+import { seedContactCard }    from '../../../basis/src/v2/seededContact.js';
 import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
@@ -811,6 +812,14 @@ export default function ChatScreen({
               if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
             }).catch(() => { /* retried next launch — the stash only clears on full success */ });
           }, 3000);
+        }
+        // The shipped contact, once per launch (web parity): added through the scanned-card path if the
+        // build-time card is set and the person is not in the book yet.
+        if (bundle?.callSkill && !globalThis.__onderlingSeededContactKicked) {
+          globalThis.__onderlingSeededContactKicked = true;
+          seedContactCard({ payload: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD, callSkill: bundle.callSkill })
+            .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
+            .catch(() => { /* an install without it is not an error state */ });
         }
         if (taskCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
           globalThis.__onderlingTaskCatchUpKicked = true;

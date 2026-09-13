@@ -429,6 +429,15 @@ describe how a *request* travels; this is what it travels **to**: one sentence, 
 `CircleItemStore` (`packages/item-store`), rooted per circle. "Which circle" is not a filter applied to a
 shared pile — it is which store you are holding. Two stores for one circle is a defect, not a design.
 
+One row in that store is not synced like the others, on purpose: the roster's **trail row** (the
+`membership-redemption` item a circle's membership is projected from). Its addresses enter the projection
+only proven, it is patched in place by the announce receive path, and it reaches other devices by carriers
+that keep that trust — the join statements on the membership lane, the announces, the roster seed between
+a person's own devices. The task lane, which carries a store's rows as causally merged snapshots, neither
+serves nor applies a roster row (`packages/circles/src/rosterTrail.js`): two devices of one person each
+hold "the person's row" with a different primary address, and a snapshot of one replacing the other is how
+a device came to refuse everything its sibling signed (2026-09-13).
+
 **Store → items.** Items are typed, and the types are declared, not implied — `packages/item-types`
 carries a schema per canonical type:
 

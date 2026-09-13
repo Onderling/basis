@@ -109,5 +109,10 @@ describe('the box enrols from the phone\'s offer and the circle reaches it', () 
     expect(consumed.circles?.[0]?.steps, 'the box pulled the content lanes').toContain('content');
     const pulled = await until(async () => walkLog(dataDir).find((e) => e.kind === 'chat-change' && e.circleId === CIRCLE) ?? null, { timeout: 30_000, step: 500 });
     expect(pulled, `the circle's conversation never reached the box — refused: ${JSON.stringify(walkLog(dataDir).filter((e) => e.kind === 'chat-refused'))}; log kinds: ${JSON.stringify(walkLog(dataDir).map((e) => e.kind))}\n${box.out.slice(-800)}`).toBeTruthy();
+    // …and it bound FIRST TIME: the sibling's address rode inside the seed parcel, so the pull never
+    // raced it. A refusal here would mean the deferred re-ingest carried the walk — the fallback, not
+    // the mechanism.
+    const refusals = walkLog(dataDir).filter((e) => e.kind === 'chat-refused');
+    expect(refusals.length, `the pulled conversation was refused and only re-ingested later: ${JSON.stringify(refusals)}; the phone's address is ${own.slice(0, 8)}; consume ${JSON.stringify(consumed.circles?.[0]?.steps)}; runner said:\n${box.out.split('\n').filter((l) => /\[roster-seed\]|\[circle-address\]/.test(l)).slice(-10).join('\n')}`).toBe(0);
   }, 180_000);
 });

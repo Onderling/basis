@@ -66,6 +66,7 @@
     "@onderling/attribute-charter": "workspace:*",
     "@onderling/blob-gateway": "workspace:*",
     "@onderling/chat-nav": "workspace:*",
+    "@onderling/circles": "workspace:*",
     "@onderling/core": "workspace:*",
     "@onderling/item-store": "workspace:*",
     "@onderling/item-types": "workspace:*",

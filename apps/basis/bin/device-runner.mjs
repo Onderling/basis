@@ -236,7 +236,22 @@ if (relayUrl) {
       chatChange: (circleId) => walkLog({ kind: 'chat-change', circleId }),
       // …and one it could NOT take: a pulled statement refused at the rail is dropped, and only a later
       // pull brings it back — said in the log with its reason, so "behind" is never a mystery.
-      chatRefused: ({ circleId, fromPeerAddr, reason }) => walkLog({ kind: 'chat-refused', circleId, from: String(fromPeerAddr).slice(0, 12), reason }),
+      chatRefused: async ({ circleId, fromPeerAddr, reason, statement }) => {
+        // With the roster as this device holds it at that moment: a refusal is almost always "the
+        // author's address is not on the row yet", and the row says whether that is so.
+        let roster = null;
+        try {
+          const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+          roster = (r?.members ?? []).map((m) => ({ webid: String(m.webid).slice(0, 8), primary: m.circleAddress ? String(m.circleAddress).slice(0, 8) : null, set: (m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)) }));
+        } catch { roster = null; }
+        let trail = null;
+        try {
+          const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+          const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
+          trail = items.filter((it) => it?.source?.groupId === circleId).map((it) => ({ id: String(it.id).slice(0, 10), by: String(it.source?.redeemedBy ?? it.source?.confirmedBy ?? '').slice(0, 8), addr: it.source?.circleAddress ? String(it.source.circleAddress).slice(0, 8) : null, set: (it.source?.circleAddresses ?? []).map((p) => String(p?.address ?? p).slice(0, 8)), etag: it.etag ?? it._etag ?? null }));
+        } catch { trail = null; }
+        walkLog({ kind: 'chat-refused', circleId, from: String(fromPeerAddr).slice(0, 12), reason, author: String(statement?.body?.author ?? statement?.author ?? '').slice(0, 8), roster, trail });
+      },
     },
   });
 

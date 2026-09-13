@@ -71,6 +71,16 @@ function wireMembershipCatchUp(node) {
 }
 
 describe('the enroll offer — encode/parse', () => {
+  it('carries the MEMBER marker and the other members for a recovery-file circle, and reads them back; absent means a sibling', () => {
+    const uri = encodeEnrollOffer({ relays: ['wss://r'], circles: [
+      { id: 'c1', address: 'bea-webid', member: true, others: ['cas-webid', '', 7] },
+      { id: 'c2', address: 'sib-addr' },
+    ] });
+    const parsed = parseEnrollOffer(uri);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.circles.map((c) => [c.id, c.member, c.others])).toEqual([['c1', true, ['cas-webid']], ['c2', false, []]]);
+  });
+
   it('round-trips, and every failure is a typed reason', () => {
     const uri = encodeEnrollOffer({
       relays: ['ws://relay.example'],
@@ -81,8 +91,8 @@ describe('the enroll offer — encode/parse', () => {
     expect(p.ok).toBe(true);
     expect(p.relays).toEqual(['ws://relay.example']);
     expect(p.circles).toEqual([
-      { id: 'c1', handle: 'anna', address: 'addr-1' },
-      { id: 'c2', handle: null, address: 'addr-2' },
+      { id: 'c1', handle: 'anna', address: 'addr-1', member: false, others: [] },
+      { id: 'c2', handle: null, address: 'addr-2', member: false, others: [] },
     ]);
 
     expect(parseEnrollOffer('onderling-connect://abc').reason).toBe('not-an-enroll-uri');
@@ -103,7 +113,7 @@ describe('the enroll offer — encode/parse', () => {
       const back = enrollOfferFromLink(input);
       expect(back.ok, input.slice(0, 40)).toBe(true);
       expect(back.uri).toBe(uri);
-      expect(back.circles[0]).toEqual({ id: 'c1', handle: 'anna', address: 'addr-1' });
+      expect(back.circles[0]).toEqual({ id: 'c1', handle: 'anna', address: 'addr-1', member: false, others: [] });
     }
     expect(enrollOfferLink('not-a-url', uri).reason).toBe('bad-app-url');
     expect(enrollOfferFromLink('https://app.example/#other=1').reason).toBe('not-an-enroll-link');
@@ -293,4 +303,5 @@ describe('the roster seed — the device-set gate, unit-level', () => {
     expect(applied[0].args.rows).toHaveLength(1);
     expect(ROSTER_SEED_VERSION).toBe(sent[0].payload.body.v);
   });
+
 });

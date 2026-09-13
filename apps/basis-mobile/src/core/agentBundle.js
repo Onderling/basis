@@ -352,6 +352,9 @@ export async function bootAgentBundle(opts = {}) {
       // …and the peer → kringen half of the same map, so a DM reaches someone on a relay of a kring we
       // share rather than only on mine. App.js owns the index (the membrane enforces with it).
       circlesForPeer: opts.circlesForPeer,
+      // Where a scanned add-a-device offer waits out the ceremony reload (web parity): a recovery-file
+      // import stashes the bootstrap it builds here, where the boot-time consume reads.
+      enrollOfferStorage: AsyncStorage,
       publishEvent:     opts.publishEvent,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (RN twin of web's

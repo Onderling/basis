@@ -4656,8 +4656,12 @@ export function buildSkills({
         // (basis's realAgent) passes args.peerAddr; the stoop
         // substrate doesn't have its own NKN identity.
         ...(typeof a.peerAddr === 'string' && a.peerAddr ? { peerAddr: a.peerAddr } : {}),
+        // Where this person can be FOUND — the relay(s) the caller chose to put on the card (basis
+        // hands in the primary by default and any extra the person ticked). A message to a contact
+        // rides these before any kring's relay; two people who share no kring have no other route.
+        ...(Array.isArray(a.relays) && a.relays.length ? { relays: a.relays.filter((u) => typeof u === 'string' && u) } : {}),
       };
-      return { payload: `onderling-contact://${_encodeQrPayload(card)}` };
+      return { payload: `onderling-contact://${_encodeQrPayload(card)}`, ...(card.relays ? { relays: card.relays } : {}) };
     }, {
       description: 'Canonical QR/URL payload for sharing this actor as a contact.',
       visibility:  'authenticated',
@@ -4694,6 +4698,8 @@ export function buildSkills({
         // 2026-05-27 — preserve the NKN peer address embedded in the
         // QR card so the chat-shell can DM straight after add.
         ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
+        // The card's relays become the contact's POINTS — where a message to them goes first.
+        ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
         trustLevel,
       });
       metrics?.record?.('contact-added-from-qr');

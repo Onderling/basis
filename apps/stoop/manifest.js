@@ -705,6 +705,9 @@ export const stoopManifest = {
       id:   'getContactShareQr', group: 'data', verb: 'list',
       params: [
         { name: 'trust', kind: 'enum', of: ['known', 'trusted'], required: false },
+        // The card carries the sharer's PRIMARY relay by default; every EXTRA relay this device is on
+        // goes on the card only when named here (comma-separated urls) — off by default, per relay.
+        { name: 'extra-relays', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/share-my-contact', body: 'flags' },

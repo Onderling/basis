@@ -5568,6 +5568,18 @@
         "text": "Save file",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
       },
+      "roster_choice": {
+        "text": "Carry the member list of {{name}}, so a new device can find the circle again",
+        "doc": "Recovery file — the per-circle choice to carry the circle's member list, so a restored device can find the circle again (Frits, 2026-09-13; [copy: Frits])."
+      },
+      "roster_note": {
+        "text": "The file then holds this circle's member list, as it is now. Only you can open the file.",
+        "doc": "Recovery file — the per-circle choice to carry the circle's member list, so a restored device can find the circle again (Frits, 2026-09-13; [copy: Frits])."
+      },
+      "roster_none": {
+        "text": "You are the only one in this circle: there is no member list to carry.",
+        "doc": "Recovery file — the per-circle choice to carry the circle's member list, so a restored device can find the circle again (Frits, 2026-09-13; [copy: Frits])."
+      },
       "make": {
         "text": "Make the file",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."

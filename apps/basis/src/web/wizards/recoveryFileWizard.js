@@ -5,15 +5,18 @@
  * there is no passphrase to type) and import (choose a file → the circles come back). State in
  * src/core/wizards/recoveryFileState.js, shared with mobile.
  */
-import { mkBody, mkActions, mkError, mkSubmitting, refreshActions } from './_wizardKit.js';
+import { mkBody, mkActions, mkError, mkSubmitting, mkCheck, refreshActions } from './_wizardKit.js';
 import {
   initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey,
+  loadExportChoices, toggleRosterChoice,
 } from '../../core/wizards/recoveryFileState.js';
 import { t } from '../../localisation.js';
 
 export function renderRecoveryExportWizard({ container, doc, callSkill, onClose, onDispatched }) {
   const state = initialExportState();
   rerender();
+  // The per-circle choice (the member list, default on) is listed before the file is made.
+  loadExportChoices({ state, callSkill }).then(() => rerender());
   async function run() {
     rerender();
     await submitExport({ state, callSkill });
@@ -23,10 +26,27 @@ export function renderRecoveryExportWizard({ container, doc, callSkill, onClose,
   function rerender() {
     container.innerHTML = '';
     const body = mkBody(doc, t('circle.wizard.recovery.export_title'), t('circle.wizard.recovery.export_intro'));
+    if (!state.file && Array.isArray(state.choices) && state.choices.length) {
+      // One checkbox per circle: carry the member list so a new device can find the circle again.
+      for (const c of state.choices) {
+        mkCheck(body, doc, t('circle.wizard.recovery.roster_choice', { name: c.name ?? c.id }), c.roster, () => { toggleRosterChoice(state, c.id); });
+      }
+      const note = doc.createElement('p'); note.className = 'cc-wizard-blurb';
+      note.textContent = t('circle.wizard.recovery.roster_note');
+      body.appendChild(note);
+    }
     if (state.file) {
       const p = doc.createElement('p'); p.className = 'cc-wizard-blurb';
       p.textContent = `${t('circle.wizard.recovery.export_ready')} ${state.circles} · ${state.filename}`;
       body.appendChild(p);
+      // A ticked circle nobody else is in: said, not silently dropped.
+      for (const c of state.choices ?? []) {
+        if (c.roster && state.rosters && !state.rosters[c.id]) {
+          const q = doc.createElement('p'); q.className = 'cc-wizard-blurb';
+          q.textContent = `${c.name ?? c.id}: ${t('circle.wizard.recovery.roster_none')}`;
+          body.appendChild(q);
+        }
+      }
       const btn = doc.createElement('button'); btn.type = 'button';
       btn.className = 'cc-wizard-btn cc-wizard-btn-primary';
       btn.textContent = t('circle.wizard.recovery.download');

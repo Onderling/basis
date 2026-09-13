@@ -798,25 +798,27 @@ export default function ChatScreen({
         }
         // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
+        // The SAME consume runs after a recovery-file import (the agent calls it: the file's peers are
+        // stashed as an offer), so a restored phone hears its circles again on this launch.
         if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {
           globalThis.__onderlingEnrollOfferConsumed = true;
-          setTimeout(() => {
-            consumeEnrollOffer({
-              agent: bundle.agent,
-              callSkill: bundle.callSkill,
-              sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
-              storage: AsyncStorage,
-              registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
-              // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
-              // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
-              contentPulls: (circleId, siblingAddress) => Promise.allSettled([
-                taskCatchUp?.requestFrom(siblingAddress, circleId),
-                chatCatchUp?.requestFrom(siblingAddress, circleId),
-              ]),
-            }).then((r) => {
-              if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
-            }).catch(() => { /* retried next launch — the stash only clears on full success */ });
-          }, 3000);
+          bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+            agent: bundle.agent,
+            callSkill: bundle.callSkill,
+            sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
+            storage: AsyncStorage,
+            registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
+            // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
+            // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
+            contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+              taskCatchUp?.requestFrom(siblingAddress, circleId),
+              chatCatchUp?.requestFrom(siblingAddress, circleId),
+            ]),
+          }).then((r) => {
+            if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+            return r;
+          }).catch(() => { /* retried next launch — the stash only clears on full success */ });
+          setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);
         }
         // The shipped contact, once per launch (web parity): added through the scanned-card path if the
         // build-time card is set and the person is not in the book yet.

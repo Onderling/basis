@@ -5198,6 +5198,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `{pubKey, circleAddress}` per member. → `src/v2/circleAddressKeys.js` for the reasoning.
     registerPeerAddress: (address, pubKey, addrOpts) =>
       sa.registerPeerAddress?.(address, pubKey, addrOpts) ?? false,
+    /** The peer an alias (a per-circle address) belongs to, or null — the read the contacts roster asks. */
+    identityOfAddress: (address) => sa.identityOfAddress?.(address) ?? null,
     forgetPeerAddress:   (address) => sa.forgetPeerAddress?.(address) ?? false,
     /**
      * WHO is at this address — the person's canonical identity key, or the address itself when this

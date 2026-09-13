@@ -94,13 +94,29 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
  * journey A), then by name; deterministic so the screen doesn't reshuffle on
  * every refresh.
  *
+ * A PER-CIRCLE ADDRESS IS NOT A CONTACT. Every send populates the graph with the address it reached —
+ * including a member's per-circle address, which the circle fan reaches constantly — so without this
+ * the roster showed a member twice: once as themselves, once as a raw key that is where they are
+ * reached in one circle. A direct message to that second row is signed as the person and refused on
+ * arrival as a member's canonical key inside a circle (by design), and which of the two rows sorted
+ * first depended on the key bytes — the "flaky DM" of 2026-09-10/13 in `two-relays.spec.js` STEP4,
+ * seen in the trace as `refused a validly-signed envelope … canonical identity`. The shell hands in
+ * the device's own alias→identity read (`agent.identityOfAddress`); an alias is skipped.
+ *
  * @param {{ all: () => Promise<object[]> } | null} peerGraph  the agent's `peers`
+ * @param {object} [opts]
+ * @param {(address: string) => string|null} [opts.identityOf]  the peer an alias belongs to, or null
  * @returns {Promise<Array<object>>}
  */
-export async function listContacts(peerGraph) {
+export async function listContacts(peerGraph, { identityOf = null } = {}) {
   if (!peerGraph || typeof peerGraph.all !== 'function') return [];
   let peers = [];
   try { peers = await peerGraph.all(); } catch { return []; }
-  const rows = peers.map(peerToContactRow).filter(Boolean);
+  const isAlias = (peer) => {
+    if (typeof identityOf !== 'function' || typeof peer?.pubKey !== 'string') return false;
+    try { const owner = identityOf(peer.pubKey); return typeof owner === 'string' && owner !== '' && owner !== peer.pubKey; }
+    catch { return false; }
+  };
+  const rows = peers.filter((p) => !isAlias(p)).map(peerToContactRow).filter(Boolean);
   return sortContactRows(rows);
 }

@@ -2469,6 +2469,18 @@ export async function createSecureAgent(opts = {}) {
      * @param {{signingKey?: string}} [opts]  the key that signs AT this address; default `pubKey`
      * @returns {boolean} whether the mapping was recorded
      */
+    /**
+     * The peer an ALIAS address belongs to, or null when the address is nobody's alias (a canonical
+     * address answers null too — it is not an alias of anyone). The device-local read behind
+     * `registerPeerAddress`: what a contacts roster asks before showing an address as a person, since a
+     * per-circle address is where a member is REACHED in one circle, never a second contact.
+     * @param {string} address
+     * @returns {string|null}
+     */
+    identityOfAddress(address) {
+      return (typeof address === 'string' && address) ? (peerIdentityOf.get(address) ?? null) : null;
+    },
+
     registerPeerAddress(address, pubKey, opts = {}) {
       if (typeof address !== 'string' || !address) return false;
       if (typeof pubKey !== 'string' || !pubKey) return false;

@@ -20,8 +20,9 @@
  * it, that signature must verify against exactly that key, and the key must be the one already bound
  * to the sender's address (an unbound address is refused outright unless it is a first-contact
  * greeting). A per-circle address IS its signing key. So "this came from one of my own device
- * addresses" is a cryptographic statement, not a hint — and the profile address itself qualifies,
- * because only devices grown from the owner's seed can sign as it.
+ * addresses" is a cryptographic statement, not a hint. The profile address does NOT qualify: every
+ * device grown from the owner's seed can sign as it — a revoked one too — and a revocation retires
+ * per-circle addresses, never that key. So a sibling speaks as its address in a circle we share.
  *
  * What this does NOT do, said plainly: there is no pull to reconcile a device that was off longer
  * than the relay holds. The fan is hold-forward and that is the whole durability story here.
@@ -90,23 +91,28 @@ export function contactTurnToWire(turn) {
  * @param {object} a
  * @param {() => Promise<string[]>} a.siblings   the owner's other device addresses
  * @param {(addr: string, payload: object) => any} a.sendToPeer  hold-forward send
- * @returns {(turn: object) => Promise<{ attempted: number }>}
+ * @returns {(turn: object) => Promise<{ attempted: number, outcomes: Array<{to: string, delivered: boolean, held: boolean, error: string|null}> }>}
+ *   per sibling, what the send reported: delivered now, held for its presence, or failed — so a device
+ *   log can say which, rather than a thread quietly missing a turn.
  */
 export function makeContactTurnFan({ siblings, sendToPeer }) {
   if (typeof siblings !== 'function') throw new Error('makeContactTurnFan: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('makeContactTurnFan: `sendToPeer` is required');
   return async function fanContactTurn(turn) {
     const wire = contactTurnToWire(turn);
-    if (!wire) return { attempted: 0 };
+    if (!wire) return { attempted: 0, outcomes: [] };
     let addrs = [];
     try { addrs = (await siblings()) ?? []; } catch { addrs = []; }
-    await Promise.all(addrs.map(async (addr) => {
-      try { await sendToPeer(addr, { subtype: CONTACT_TURN_BROADCAST, turn: wire }); }
-      catch (err) {
+    const outcomes = await Promise.all(addrs.map(async (addr) => {
+      try {
+        const r = await sendToPeer(addr, { subtype: CONTACT_TURN_BROADCAST, turn: wire });
+        return { to: addr, delivered: r?.delivered === true || (r?.held !== true && r?.delivered !== false), held: r?.held === true, error: null };
+      } catch (err) {
         console.warn(`[contact-turns] fan to own device failed — that device's thread will be missing this turn: ${err?.message ?? err}`);
+        return { to: addr, delivered: false, held: false, error: err?.message ?? String(err) };
       }
     }));
-    return { attempted: addrs.length };
+    return { attempted: addrs.length, outcomes };
   };
 }
 
@@ -137,11 +143,12 @@ export function makeContactTurnPeerHandler({ siblings, selfPubKey, applyTurn, on
     if (!payload || payload.subtype !== CONTACT_TURN_BROADCAST) return;   // not ours
     const wire = contactTurnToWire(payload.turn);
     if (!wire) { refuse('malformed', fromAddr); return; }
-    if (fromAddr !== selfPubKey) {
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { refuse('siblings-unavailable', fromAddr); return; }
-      if (!addrs.includes(fromAddr)) { refuse('not-a-sibling', fromAddr); return; }
-    }
+    // The profile address is NOT one of my devices here: every device of the person speaks as it, a
+    // revoked one included, and revocation retires per-circle addresses only. A turn from one of my
+    // own devices arrives from that device's proven address in a circle we share (2026-09-14).
+    let addrs = [];
+    try { addrs = (await siblings()) ?? []; } catch { refuse('siblings-unavailable', fromAddr); return; }
+    if (!addrs.includes(fromAddr)) { refuse('not-a-sibling', fromAddr); return; }
     try { await applyTurn(wire, { fromAddr }); } catch { /* a landed turn never throws into the router */ }
   };
 }

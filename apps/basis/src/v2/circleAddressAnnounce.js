@@ -424,11 +424,25 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
       // This is the moment a new sibling exists, and the only one both facts are in hand.
       const me = agent?.identity?.chat?.pubKey ?? null;
       const ownHere = (() => { try { return agent?.circleAddressFor?.(circleId) ?? null; } catch { return null; } })();
+      // …and INTRODUCE it to the circle. A fresh device's own announcement cannot reach the other
+      // members: they authorize a circle-scoped envelope by the key that signed it, and its key is on
+      // nobody's roster yet — the announce that would put it there is refused as a stranger's. Its
+      // sibling is on every roster, so the sibling fans the announcement on; the proof inside it is
+      // the new device's own, re-verified by every receiver. Until 2026-09-14 no one did this, and a
+      // second device was a member of its circles toward its sibling only: nobody else ever fanned to
+      // it. Same shape as the admin introducing a joiner; no loop, because the receivers are not the
+      // person (and the device itself skips its own address above).
+      let introduced = 0;
       for (const one of proven) {
         if (!me || one.memberWebid !== me || one.circleAddress === ownHere) continue;
         try { await agent?.knownPeersSync?.pushTo?.(one.circleAddress); }
         catch (err) { logger?.warn?.('[circle-address] could not hand a new device of mine who I know', err?.message ?? err); }
+        try {
+          const r = await agent?.callSkill?.('stoop', 'broadcastCircleAddresses', { groupId: circleId, announcements: [one] });
+          if (r && !r.error) introduced += 1;
+        } catch (err) { logger?.warn?.('[circle-address] could not introduce a new device of mine to the circle', err?.message ?? err); }
       }
+      if (introduced > 0) logger?.info?.(`[circle-address] introduced ${introduced} new device(s) of mine to ${circleId}`);
     }
     return { recorded, refused };
   };

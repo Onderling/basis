@@ -79,8 +79,11 @@ describe('the box enrols from the phone\'s offer and the circle reaches it', () 
     expect(code, `--enrol did not exit cleanly:\n${once.out.slice(-1500)}`).toBe(0);
     expect(once.out).toMatch(/enrolled/i);
     // The phrase is used and forgotten: nothing in the data dir holds it.
-    for (const f of readdirSync(dataDir)) {
-      expect(readFileSync(path.join(dataDir, f), 'utf8'), `${f} must not contain the phrase`).not.toContain(phrase.split(' ').slice(0, 3).join(' '));
+    // …every file, the registry's records under their own directory included.
+    for (const f of readdirSync(dataDir, { recursive: true, withFileTypes: true })) {
+      if (!f.isFile()) continue;
+      const full = path.join(f.parentPath ?? f.path ?? dataDir, f.name);
+      expect(readFileSync(full, 'utf8'), `${f.name} must not contain the phrase`).not.toContain(phrase.split(' ').slice(0, 3).join(' '));
     }
   }, 120_000);
 

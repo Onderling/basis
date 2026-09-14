@@ -954,7 +954,16 @@ phrase is the authority, it is typed on the device that is *gaining* it, and it 
   the device's delegation and, per circle, retires that device's address: senders stop accepting its
   statements, delivery stops trying it, and sealed circles rotate their key to the surviving devices. The
   revocation binds only by the root's reveal against the row's commitment, so a stolen device can neither
-  revoke you nor counter-revoke — it holds no root.
+  revoke you nor counter-revoke — it holds no root. The first such ceremony on an unenrolled first device
+  enrols that device too (every legitimate device then signs with a revocable key), and a migrated device
+  presents fresh per-circle addresses after its reload: the ceremony introduces them to every roster
+  while it still speaks as the old ones, then retires the old ones with the root it holds this once —
+  nothing will hold those keys after the cutover (2026-09-14). **What a revoked device can still do,
+  stated plainly:** it holds the profile's chat key, which is one per person and no ceremony retires; on a
+  relay it can register the profile address again and take the person's direct messages until a live
+  device registers it back, and nothing it says reaches the person's devices — but what a person sends
+  to that address in the meantime lands on it. A compromised box is stopped, not only revoked; a stolen
+  phone's window closes only with a new phrase. The relay's registration knows nothing of revocation.
 - **Replace a device.** Restoring onto a new phone is the *add* case: the replacement enrolls with its own
   keys, and then one ceremony on it, with the phrase, retires every other device the registry lists — the
   registry that came back from the pod or the recovery file. Before retiring, the ceremony unwraps the
@@ -1237,12 +1246,49 @@ and its contact rows ride the same sibling set as the grants lane, over hold-for
 (`apps/basis/src/v2/knownPeersSync.js`): live as a greeting lands or a contact is added, in full to a
 device of yours that just announced its address (the enrol moment), and on request at connect. A
 sibling's row ESTABLISHES a binding and never replaces one (`learnPeerKey`), and adds a contact it
-lacks without touching one it has. The same gate as the contact-thread fan admits it: the profile
-address, or a proven sibling address. Two substrate facts this made true: the secure agent's
-transports now say `peer` on an accepted greeting (they never handed a HI to the kernel's dispatch,
-so the kernel's event never fired on the wire), and their `security-error` reaches the agent, where
-basis counts it per reason and warns once per sender — a refused envelope is no longer
-indistinguishable from one that never arrived.
+lacks without touching one it has. The same gate as the contact-thread fan admits it: a proven
+sibling address. Two substrate facts this made true: the secure agent's transports now say `peer` on
+an accepted greeting (they never handed a HI to the kernel's dispatch, so the kernel's event never
+fired on the wire), and their `security-error` reaches the agent, where basis counts it per reason and
+warns once per sender — a refused envelope is no longer indistinguishable from one that never arrived.
+**And the bindings survive a reload** (2026-09-14): they lived in memory only, so every web session and
+every restart of a box forgot every contact, and their next message was refused as a stranger's —
+silently, since a sender greets once per session of its own. The snapshot (public keys) is kept in the
+sealed chat vault and restored establish-never-replace; a proof-verified roster row is still the last
+word on any address it covers.
+
+**A device speaks to its sibling in the circle they share** (2026-09-14, the revoke walk). Every
+own-device message — the grants fan and its catch-up, the contact-thread fan, who-you-know, the
+introductions — leaves as this device's per-circle address in a circle both devices are in, addressed
+to the sibling's proven address there; and every circle lane's catch-up request and reply leaves the
+same way. Until then all of it left as the profile key, and that had three failures. A revoked device
+holds the profile key forever (it is one per person, derived from the phrase, and revocation retires
+per-circle addresses only), so it went on speaking as one of the person's devices and pulling every
+lane from its former siblings. On a relay the profile address belongs to whichever device registered it
+last, so a greeting answered to it landed on the wrong device — as often as not the sender's own
+sibling — while the send waited out its timeout and was held. And a member's catch-up request, signed
+by the canonical key, was refused at every member's sender gate (a member who has proved a per-circle
+address is refused by their canonical key on purpose): the pull-all catch-ups between members had never
+served once. The profile address is therefore not a device of the person's on any own-device lane. Two
+messages still speak as the person, deliberately: an enrolling device's first announcement to its
+sibling, and the sibling's roster seed back — the fresh device's gate knows nobody until that parcel
+lands, and the parcel is what it verifies by (the root-signed delegation). The roster seed's landing
+refreshes the receiver's sealing bindings and sender gate from the rows it just took, as the announce
+door does; and a device that verified a sibling's carried delegation keeps the record in its registry,
+which is what My data lists and the revoke door acts on.
+
+**An enrolled device is introduced to its circles by its sibling** (2026-09-14). A fresh device's own
+announcement cannot reach the other members: they authorize a circle-scoped envelope by the key that
+signed it, and its key is on nobody's roster yet — the announce that would put it there is refused as a
+stranger's. So the sibling that recorded the announcement fans it on (the proof inside is the new
+device's own, re-verified by every receiver), the same shape as the admin introducing a joiner. Until
+then a second device was a member of its circles toward its sibling only, and nobody else ever fanned
+to it. The enrol consume runs in this order for the same reason: bind the sibling's address the offer
+named (an address is its key, so the first send needs no greeting), announce to the sibling, ask for the
+seed and wait for it, then announce to every member the seeded roster names and pull the sibling's
+who-you-know and grants. A box keeps on disk what a shell keeps in IndexedDB — registry, item stores,
+settings, outbox — so a restart, which a rented machine has on every deploy, is a restart and not a new
+device.
 
 ### The Connectivity home
 

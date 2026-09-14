@@ -88,13 +88,17 @@ describe('landing', () => {
 });
 
 describe('the gate', () => {
-  it('admits the profile address and a proven sibling; refuses everyone else, naming the reason', async () => {
+  it('admits a proven sibling; refuses everyone else — the profile address included — naming the reason', async () => {
     const r = rig();
     const wire = { subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: 'p', pubKey: 'k' }], contacts: [] };
     await r.sync.handlers[KNOWN_PEERS_BROADCAST](STRANGER, wire);
     expect(r.bindings.size, 'a stranger\'s "who I know" binds nothing').toBe(0);
     expect(r.refused).toEqual([{ reason: 'not-a-sibling', from: STRANGER }]);
+    // The profile address is every device's — a revoked one too — so it is nobody's device here (2026-09-14).
     await r.sync.handlers[KNOWN_PEERS_BROADCAST](ME, wire);
+    expect(r.bindings.size, 'the profile address is not a sibling').toBe(0);
+    expect(r.refused.at(-1)).toEqual({ reason: 'not-a-sibling', from: ME });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, wire);
     expect(r.bindings.get('p')).toBe('k');
   });
   it('a malformed payload from a sibling is refused as such, not silently', async () => {

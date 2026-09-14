@@ -66,7 +66,7 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
         } catch { /* the durable-head read is best-effort */ }
       }
       if (statements.length === 0) return;   // nothing to serve — silence, not an empty batch
-      await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements });
+      await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements }, { circleId });
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }
   }
 
@@ -109,7 +109,12 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
 
   /** Ask one peer for one circle's governance statements. */
   // One held request per lane per circle (see frontierReplay): the newest supersedes, never stacks.
-  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: REQ, circleId }, { holdKey: `${REQ}:${circleId}` });
+  // SPOKEN AS THIS CIRCLE'S IDENTITY (`circleId` in the send options): a request that left as the
+  // canonical self was refused at every member — their sender gate admits a circle's traffic only from
+  // a key on that circle's roster, and a member who has proved a per-circle address is refused by their
+  // canonical key on purpose. Nine refusals per reconnect, silently, measured 2026-09-14: the pull-all
+  // catch-ups between members had never served once. The reply below is scoped the same way.
+  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: REQ, circleId }, { holdKey: `${REQ}:${circleId}`, circleId });
 
   /**
    * The reconnect kick: request every circle's governance statements from that circle's reachable members

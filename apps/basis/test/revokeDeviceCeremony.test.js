@@ -111,6 +111,13 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const unseen = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'never-enrolled-here' });
     expect(unseen.ok).toBe(true);
     expect(unseen.known).toBe(false);
+    // The first ceremony that proves the phrase on a root-custody device enrols it — once. It will present
+    // a fresh address after its reload, introduced here while it still speaks as the old one, which is
+    // retired in the same breath (2026-09-14). Later ceremonies in this session do not migrate it again.
+    expect(unseen.migrated, 'the first ceremony enrolled the first device').toBe(true);
+    const moved = unseen.introduced.find((x) => x.circleId === GROUP)?.address;
+    expect(moved, 'the ceremony introduced the address A moves to').toBeTruthy();
+    expect(moved).not.toBe(addrA);
 
     // ── THE CEREMONY, on the surviving device. ──
     const r = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
@@ -124,13 +131,14 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const rec = props[DEVICE_DELEGATIONS_KEY]?.value?.[deviceId] ?? props[DEVICE_DELEGATIONS_KEY]?.[deviceId];
     expect(rec?.revoked).toBe(true);
 
-    // A's OWN fold retires the address at once — and the LOSS-TAKEOVER fail-over holds: the
-    // announce had made the (now-revoked) device address the primary slot, so the surviving
-    // device's address takes it back.
+    expect(r.migrated, 'a second ceremony before the reload must not migrate the device again').toBeUndefined();
+    // A's OWN fold retires the address at once. The row names neither the thief's address nor the one A
+    // left behind at its self-enrolment — only the one A moves to.
     const aRow = await rowFor(A, A.pubKey);
     expect(aRow?.circleAddresses ?? []).not.toContain(addrA2);
-    expect(aRow?.circleAddresses).toContain(addrA);
-    expect(aRow?.circleAddress).toBe(addrA);
+    expect(aRow?.circleAddresses ?? [], 'the address A leaves behind is retired').not.toContain(addrA);
+    expect(aRow?.circleAddresses).toContain(moved);
+    expect(aRow?.circleAddress).toBe(moved);
     // …and B's follows over the wire, through the production ingest + fold.
     await until(async () => {
       const row = await rowFor(B, A.pubKey);

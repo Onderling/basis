@@ -179,7 +179,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const pubKey = agent.identity.chat.pubKey;
   const callSkill = (app, op, args) => agent.callSkill(app, op, args);
-  const sendPeer = (addr, payload) => agent.sendPeerMessage(addr, payload);
+  // The options travel: a lane's `circleId` is what makes its request leave as the circle identity.
+  const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
 
   const pendingMap = new Map();
   const propagateMeshIntros = makePropagateMeshIntros({ callSkill, sendPeer, logger: QUIET });
@@ -300,7 +301,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       const refresh = (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: keyEventStore, circleId: cid }).catch(() => {});
       const keyCU = makeGovernanceCatchUp({
         rail: agent.keyRail,
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: sendPeer,
         subtypes: KEY_CATCHUP_SUBTYPES,
         onChange: refresh,
       });

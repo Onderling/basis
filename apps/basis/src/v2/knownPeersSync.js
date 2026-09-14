@@ -94,9 +94,9 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
   const refuse = (reason, fromAddr) => { try { onRefused?.(reason, fromAddr); } catch { /* observability never throws */ } };
   const warn = (msg) => { if (typeof console !== 'undefined') console.warn(`[own-devices] ${msg}`); };
 
-  /** The gate every landing passes: the person's own address, or one of their proven device addresses. */
+  /** The gate every landing passes: one of the person's proven device addresses — never the profile
+   *  address, which every device of theirs holds, a revoked one included (2026-09-14). */
   async function fromOwnDevice(fromAddr) {
-    if (fromAddr === selfPubKey) return true;
     let addrs = [];
     try { addrs = (await siblings()) ?? []; } catch { return false; }
     return addrs.includes(fromAddr);

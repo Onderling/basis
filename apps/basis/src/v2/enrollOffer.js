@@ -28,7 +28,7 @@
  *                                              announce own address to the sibling
  *                                              pull membership + governance catch-up from it
  */
-import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor } from './circleAddressAnnounce.js';
+import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor, announceOwnCircleAddress } from './circleAddressAnnounce.js';
 import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
@@ -191,9 +191,12 @@ const SEND = { guarantee: 'hold-forward' };
  *      the waist — the standing reopenMemberCircles then owns every future boot;
  *   2. install the per-circle signing identity + open the circle STORE (this boot — what the
  *      restore path does on every later one), so pulled content merges into the head instead of
- *      parking on the log until the next launch;
+ *      parking on the log until the next launch; bind the sibling's address the offer named (an
+ *      address is its key) so the first send needs no greeting;
  *   3. announce this device's own per-circle address to the SIBLING — the roster-set growth that
- *      makes this device reachable (the boot re-announce reaches the rest as the roster hydrates);
+ *      makes this device reachable, and what binds this address at the sibling's end before the
+ *      seed reply needs it; then ask the sibling for the ROSTER SEED and wait for it; then announce
+ *      to every member the seeded roster names (a device enrolled today is a member today);
  *   4. pull membership + governance catch-up from the sibling — the roster folds in, and the
  *      rules doc arrives (live or from the preserved head);
  *   5. pull the CONTENT lanes (`contentPulls` — the shells hand in their task frontier-replay and
@@ -244,6 +247,33 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // The content rails' storeFor only PEEKS: without an open store the pulled task snapshots
       // park on the device log until the next launch instead of merging into the visible head.
       try { await agent.ensureCircleSync?.(c.id); row.steps.push('store-open'); } catch { /* parked statements merge next boot */ }
+      // 2c — THE OFFER INTRODUCES THE SIBLING. Its per-circle address IS its signing key, and the
+      // owner handed this device the offer — so it is bound here as the roster binds every proven
+      // address, before the first send. Without it that send opened with a greeting, and the sibling's
+      // answer went to the PROFILE address, which every device of the person registers and the relay
+      // maps to whichever registered last: this device, as often as not, greeting itself while the
+      // send waited out its five seconds and was held (2026-09-14).
+      const me = agent.identity?.chat?.pubKey ?? null;
+      if (me && typeof agent.registerPeerAddress === 'function') {
+        try { agent.registerPeerAddress(c.address, me, { signingKey: c.address }); } catch { /* the greeting still works when the relay maps our way */ }
+      }
+      // 3 — announce our fresh per-circle address to the sibling (the proven-set growth) — BEFORE the
+      // seed request, because landing it is what binds this address's key at the sibling's end, and the
+      // seed reply needs that key: sent before it was bound, the reply opened with a greeting that the
+      // relay handed to whichever device of ours held the profile address, and came ten seconds late.
+      // A MEMBER entry (the file's bootstrap) announces to every member the file named.
+      const targets = [c.address, ...(Array.isArray(c.others) ? c.others : [])];
+      const mine = ownAnnouncementFor({ agent, circleId: c.id });
+      if (mine) {
+        for (const to of targets) {
+          await sendPeerMessage(to, {
+            type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
+            msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
+          }, SEND);
+        }
+        row.steps.push('announce');
+      }
+      let derivedHere = c.member === true;   // a member entry brought its roster in the file
       // 2b — THE ROSTER SEED (pod-less enroll S1): ask the sibling for the circle's trail rows —
       // without them this device cannot project a roster, and the rails refuse every fanned
       // statement for want of binding rows. Then WAIT (briefly) for the roster to derive before
@@ -266,7 +296,6 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
             // content pull raced the seed and lost, one enrol in four (the box's walk).
             // RE-SEND the request while waiting: a single packet on a busy boot is exactly the
             // kind of loss the first-write-wins ingest makes free to retry.
-            const me = agent.identity?.chat?.pubKey ?? null;
             const deadline = Date.now() + 10000;
             let nextResend = Date.now() + 2500;
             let derived = false;
@@ -287,23 +316,30 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
               }
               await new Promise((resolve) => setTimeout(resolve, 250));
             }
-            if (derived) row.steps.push('roster-derived');
+            if (derived) { row.steps.push('roster-derived'); derivedHere = true; }
           }
         } catch { /* the pulls below still go out; the next boot retries the seed */ }
       }
-      // Whom this device talks to: the sibling — or, for a member entry, every member the file named
-      // (announce to all, so each roster grows; pull from all, any one complete answer suffices).
-      const targets = [c.address, ...(Array.isArray(c.others) ? c.others : [])];
-      // 3 — announce our fresh per-circle address (the proven-set growth).
-      const mine = ownAnnouncementFor({ agent, circleId: c.id });
+      // 3a — now that this device knows who its sibling is, ask it what IT knows: the bindings and
+      // contacts the person has, and the grants. The sibling's own push on the announce (its live half)
+      // reached this device before the seed had landed, when its gate still knew nobody — refused as a
+      // stranger's, as it must be. The pull, after the roster, is the half that lands (2026-09-14).
+      // Kicked, not awaited: a sibling the roster still names but that is gone (a lost phone's, before
+      // the ceremony that retires it) costs a greeting's timeout per lane, and this boot must not wait on it.
+      if (derivedHere) {
+        try { Promise.resolve(agent.knownPeersSync?.requestFromSiblings?.()).catch(() => {}); row.steps.push('known-peers'); } catch { /* the reconnect kick retries */ }
+        try { Promise.resolve(agent.grantsCatchUp?.requestFromSiblings?.()).catch(() => {}); } catch { /* the reconnect kick retries */ }
+      }
+      // 3b — …and announce to everyone the seeded roster names. The offer named ONE device of mine
+      // (the file, the members it listed); the circle is everyone on the roster, and a member who never
+      // hears this address never fans to it — Bea's messages went to the sibling only, and this device
+      // was a member of the circle on every lane but the wire. The boot re-announce closed that on the
+      // NEXT start; a device enrolled today is a member today (2026-09-14). Idempotent at every receiver.
       if (mine) {
-        for (const to of targets) {
-          await sendPeerMessage(to, {
-            type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
-            msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
-          }, SEND);
-        }
-        row.steps.push('announce');
+        try {
+          const r = await announceOwnCircleAddress({ agent, circleId: c.id });
+          if (r?.announced) row.steps.push('announce-roster');
+        } catch { /* the next boot re-announces */ }
       }
       // 4 — pull the circle's truth: membership, governance, and the KEY lane (the group-key chain
       // travels as signed statements like everything else — a sealed circle opens on this device once

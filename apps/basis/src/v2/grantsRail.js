@@ -51,8 +51,13 @@ export const GRANTS_CATCHUP_SUBTYPES = Object.freeze({
  *   signed with the shared PROFILE key no longer counts — the one signature a revoked-but-stolen
  *   device still holds (Frits' v1 ruling, 2026-08-23; L30's bounded closer). Absent/erroring →
  *   the floor stays open, matching the tombstone's best-effort registry semantics.
+ * @param {((record: object) => Promise<void>|void)|null} [a.learnDelegation]  called with a CARRIED
+ *   record that just bound (root-signed by THIS owner, not tombstoned) and that the registry does not
+ *   hold. A device's registry is local until a pod mirrors it, so the first device never saw the
+ *   ceremony that enrolled the second — and My data, which lists the registry, showed no device to
+ *   revoke (the box, 2026-09-14). The record proves itself; keeping it is bookkeeping, best-effort.
  */
-export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, lookupDelegations = null, floorClosed = null } = {}) {
+export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, lookupDelegations = null, floorClosed = null, learnDelegation = null } = {}) {
   if (typeof selfPubKey !== 'string' || !selfPubKey) {
     throw new Error('deviceSetBindingVerifier: selfPubKey required');
   }
@@ -74,7 +79,12 @@ export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, l
     const rec = payload?.delegation;
     if (rec && typeof rec === 'object' && rec.pubKey === author && verifyDeviceDelegation(rec)) {
       if (map[rec.deviceId]?.revoked === true) return false;   // deny wins — the tombstone refuses
-      if (rootFingerprint && ownerRootFingerprint(rec.by) === rootFingerprint) return true;
+      if (rootFingerprint && ownerRootFingerprint(rec.by) === rootFingerprint) {
+        if (!map[rec.deviceId] && typeof learnDelegation === 'function') {
+          try { await learnDelegation(rec); } catch { /* the statement binds either way */ }
+        }
+        return true;
+      }
     }
     // No usable carried record: the registry's own record for this key (already owner-scoped).
     for (const r of Object.values(map)) {
@@ -134,10 +144,34 @@ export function makeGrantsPeerHandler({ rail, onChange = null } = {}) {
  * @param {(circleId: string) => string|null} a.circleAddressFor  this device's own per-circle address
  * @returns {Promise<string[]>} deduped sibling addresses
  */
-export async function siblingDeviceAddresses({ callSkill, selfPubKey, circleAddressFor }) {
-  const out = new Set();
+export async function siblingDeviceAddresses(a) {
+  return (await siblingDevices(a)).map((d) => d.address);
+}
+
+/**
+ * The same sibling set WITH the circle each address was proven in — the circle a device speaks to
+ * that sibling in. A sibling is reached at its per-circle address, and the sender speaks as ITS OWN
+ * address in that same circle: that is the one identity the sibling's roster (and its sender gate)
+ * already vouches for. Speaking as the profile key instead — what every own-device send did until
+ * 2026-09-14 — has two failures the revoke walk found: every device of the person holds that key, so a
+ * revoked device kept speaking as one of them; and on a relay the profile address belongs to whichever
+ * device registered it last, so a greeting answered to it landed on the wrong device (as often as not
+ * the sender's own sibling) while the send waited out its timeout and was held.
+ *
+ * One entry per address (the first circle it is seen in wins); a sibling shared in several circles is
+ * still one device.
+ *
+ * @returns {Promise<Array<{address: string, circleId: string}>>}
+ */
+export async function siblingDevices({ callSkill, selfPubKey, circleAddressFor, circleIds = null }) {
+  const out = new Map();
   let circles = [];
-  try { circles = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { return []; }
+  // The circles to walk: the caller's list when it has a fuller one (the registry's memberships beside the
+  // item store's — a founder restored from the recovery file has the former and not yet the latter, and
+  // was blind to her own devices in the circle she made until 2026-09-14), else the item store's.
+  try {
+    circles = typeof circleIds === 'function' ? ((await circleIds()) ?? []) : ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []);
+  } catch { return []; }
   for (const c of circles) {
     // `listMyCircles` answers plain circle-id strings on this composition; other hosts answer rows.
     const circleId = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
@@ -153,10 +187,10 @@ export async function siblingDeviceAddresses({ callSkill, selfPubKey, circleAddr
       ...(typeof mine.circleAddress === 'string' && mine.circleAddress ? [mine.circleAddress] : []),
     ];
     for (const addr of set) {
-      if (typeof addr === 'string' && addr && addr !== own && addr !== selfPubKey) out.add(addr);
+      if (typeof addr === 'string' && addr && addr !== own && addr !== selfPubKey && !out.has(addr)) out.set(addr, { address: addr, circleId });
     }
   }
-  return [...out];
+  return [...out.values()];
 }
 
 /**
@@ -181,14 +215,15 @@ export function makeGrantsFan({ siblings, sendToPeer }) {
 /**
  * Pull-all catch-up for the grants lane — the same lane-parametrized mechanism the membership lane
  * reuses (`makeGovernanceCatchUp`), pointed at the sibling set instead of circle rosters. Serving
- * defaults to the SIBLING CHECK: the requester must present a known own-device address (or the
- * profile key itself) — grant metadata is the owner's business, not a circle's.
+ * defaults to the SIBLING CHECK: the requester must present a known own-device address — grant
+ * metadata is the owner's business, not a circle's.
  *
  * @returns the catch-up trio plus `requestFromSiblings()` — the boot/reconnect kick.
  */
 export function makeGrantsCatchUp({ rail, sendToPeer, siblings, selfPubKey, onChange = null, mayServe = null } = {}) {
+  // The profile key is NOT a sibling: every device of the person holds it, a revoked one included.
+  // Only a proven per-circle address on the person's own row is one of their devices (2026-09-14).
   const serve = mayServe ?? (async (fromPeerAddr) => {
-    if (fromPeerAddr === selfPubKey) return true;
     try { return ((await siblings()) ?? []).includes(fromPeerAddr); } catch { return false; }
   });
   const inner = makeGovernanceCatchUp({

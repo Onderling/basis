@@ -338,7 +338,16 @@ if (relayUrl) {
       onError: (err, cid) => console.warn(`device-runner: circle-address register failed (${String(cid).slice(0, 12)}…):`, err?.message ?? err),
     }).then(() => announceCircleAddresses({ agent, circleIds }))
       .catch((err) => console.warn('device-runner: circle-address registration failed:', err?.message ?? err));
-    walkLog({ kind: 'presence', circles: circleIds.length });
+    // …and the rosters as this device holds them now — who is in each circle and at which addresses.
+    // A box that fans to nobody, or to an address nobody holds, is read from this line.
+    const rosters = {};
+    for (const cid of circleIds) {
+      try {
+        const r = await callSkill('stoop', 'listGroupMembers', { groupId: cid });
+        rosters[cid] = (r?.members ?? []).map((m) => ({ who: String(m.webid ?? '').slice(0, 8), set: (m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)) }));
+      } catch { rosters[cid] = null; }
+    }
+    walkLog({ kind: 'presence', circles: circleIds.length, rosters });
   };
   await registerCirclePresence();
 
@@ -438,6 +447,12 @@ console.log(`  walk log  ${walkLogFile}\n`);
 
 const stop = async () => {
   try { await tgRunner?.stop?.(); } catch { /* stopping is best-effort */ }
+  // The stores write behind a short debounce (200 ms in the file adapters, 400 ms for the device log,
+  // whose timer is unref'd and would not hold the process either). A stop that exits inside that window
+  // loses the last change — a roster row learned a moment before a deploy's restart, and the box came
+  // back not knowing a device it had just met (2026-09-14). The stores expose no flush through the
+  // agent yet; until they do, the window is waited out, with margin for the write itself.
+  await new Promise((resolve) => { setTimeout(resolve, 700); });
   process.exit(0);
 };
 process.on('SIGINT', stop);

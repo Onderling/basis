@@ -82,7 +82,7 @@ async function startBox(dataDir, env) {
 }
 
 describe('the box is revoked while it holds the address', () => {
-  let relay; let relayUrl; let dataDir; let env; let web; let bea; let box; let person; let phrase; let boxAddr; let boxDeviceIdPrefix;
+  let relay; let relayUrl; let dataDir; let env; let web; let bea; let box; let person; let phrase; let boxAddr; let boxDeviceIdPrefix; let oldWebAddr;
   // What the web app keeps across a reload: its vaults, its registry, its device log, and its item store
   // (IndexedDB in the browser; a file here). A reboot that forgot any of these would not be a reload.
   const webDir = mkdtempSync(path.join(tmpdir(), 'basis-revoke-web-'));
@@ -200,8 +200,13 @@ describe('the box is revoked while it holds the address', () => {
     // The person who has been writing to the web app is known to it — by the box's hand, since their
     // greeting landed on the box — and stays known across the reload.
     expect(!!web.agent.sa.agent.security.getPeerKey(person.pubKey), 'the web app does not hold the person\'s key before the reload').toBe(true);
-    await new Promise((res) => { setTimeout(res, 600); });   // the vault write behind the last binding
-    const oldWebAddr = web.agent.circleAddressFor(CIRCLE);
+    // A greeting that lands AFTER the ceremony resealed the vaults must not cost the snapshot: this
+    // running agent still writes under the old key, and a write now would replace the carried-over
+    // snapshot with one the next boot cannot open (CI found it: the person's binding saved late, gone
+    // after the reload). The ceremony wrote the snapshot once, just before the reseal, and froze it.
+    web.agent.sa.agent.emit?.('peer', { address: bea.pubKey, pubKey: bea.pubKey });
+    await new Promise((res) => { setTimeout(res, 600); });
+    oldWebAddr = web.agent.circleAddressFor(CIRCLE);
     const webPubKey = web.pubKey;
     await teardown(web);
     web = await bootWeb('web-after');
@@ -250,26 +255,28 @@ describe('the box is revoked while it holds the address', () => {
     await person.contactThreadChannel.sendTurn({ peerAddr: web.pubKey, threadId: web.pubKey, text: 'en nu?', messageId: 'fb-3' }).sent;
     expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'en nu?') ?? null, { timeout: 30_000, step: 500 }),
       'the box did not take the address back — the window this walk states is not there').toBeTruthy();
-    // …and hands it on, as it always did. This is what MUST fail. A device speaks to its sibling as its
-    // address in the circle they share, and the box's is retired: the web app's sender gate refuses the
-    // envelope as a stranger's before any handler sees it — or, cut off from the roster since the
-    // ceremony, the box only knows the address the web app left behind, and its fan is held for a
-    // device that will never register it. (The profile address the box also holds is not a device of the
-    // person's on any own-device lane: every device holds that key, a revoked one included.) The box's
-    // log names which; the web app's thread stays clean either way.
-    const fanned = await until(async () => walkLog(dataDir).slice(before).find((e) => e.kind === 'own-device-fan') ?? null, { timeout: 75_000, step: 250 });
-    expect(fanned?.attempted, `the revoked box did not even try to hand the message on:\n${box.out.slice(-1200)}`).toBeGreaterThanOrEqual(1);
+    // …and hands it on, as it always did. This is what MUST fail, and the box's log names how. A device
+    // speaks to its sibling as its address in the circle they share, and the box's is retired — so one of
+    // three things, depending on what the box heard before it was cut off: it reaches for the web app's
+    // live address and the sender gate refuses the envelope as a stranger's; it only knows the address the
+    // web app left behind at the ceremony, and fans into a queue nobody will ever drain; or it heard that
+    // address retired too and holds no device of the person's at all, and fans to nobody. (The profile
+    // address the box also holds is not a device of the person's on any own-device lane: every device
+    // holds that key, a revoked one included.) The web app's thread stays clean whichever it is.
     const live = web.agent.circleAddressFor(CIRCLE);
+    const fanned = await until(async () => walkLog(dataDir).slice(before).find((e) => e.kind === 'own-device-fan') ?? null, { timeout: 75_000, step: 250 });
+    expect(fanned, `the box did not record its fan — its rosters at boot: ${JSON.stringify(presence.rosters)}:\n${box.out.slice(-800)}`).toBeTruthy();
     const toLive = fanned.outcomes.filter((o) => live.startsWith(o.to));
     if (toLive.length) {
-      // It reached for the web app's live address: the gate must have refused it, by name.
       const refusedAtGate = () => (web.agent.refusedInboundByReason?.()?.SENDER_NOT_AUTHORIZED ?? 0) > 0;
       const refusedAtLane = () => web.contactTurnsRefused.some((x) => x.reason === 'not-a-sibling');
       expect(await until(async () => ((refusedAtGate() || refusedAtLane()) ? true : null), { timeout: 30_000, step: 250 }),
         `the web app did not refuse the revoked box's fan — seen: ${JSON.stringify(web.contactTurnsSeen.map((t) => t?.text))}; refused: ${JSON.stringify(web.agent.refusedInboundByReason?.())}`).toBe(true);
     } else {
-      // It only knows the address the web app left behind — a fan into a queue nobody will ever drain.
-      expect(fanned.outcomes.length, 'the box fanned to nobody at all').toBeGreaterThan(0);
+      // Dead addresses or none: the box's row for the person names nothing live. Named, so a run that
+      // lands here is not mistaken for one where the fan is merely slow.
+      const known = presence.rosters?.[CIRCLE]?.find((m) => web.pubKey.startsWith(m.who))?.set ?? [];
+      expect(known.some((a) => live.startsWith(a)), 'the box knew the live address and fanned elsewhere').toBe(false);
       await new Promise((res) => { setTimeout(res, 2000); });
     }
     expect(web.contactTurnsSeen.some((t) => t?.text === 'en nu?'), 'the web app accepted a turn from the revoked box').toBe(false);

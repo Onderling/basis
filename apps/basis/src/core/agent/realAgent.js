@@ -1842,13 +1842,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // roster row is still the last word on any address it covers.
   const PEER_BINDINGS_VAULT_KEY = 'peer-bindings';
   let peerBindingsSaveTimer = null;
+  // Frozen once this session's vaults have been resealed under the key the NEXT boot will hold (the
+  // revoke ceremony's self-enrolment): this wrapper still writes under the old key, and a write after
+  // the reseal would replace the carried-over snapshot with one the next boot cannot open. The ceremony
+  // writes the snapshot once, just before it reseals; nothing learned in the minutes before the reload
+  // is worth that. (CI, 2026-09-14: the person's binding arrived late, was saved late, and was gone.)
+  let peerBindingsFrozen = false;
+  const writePeerBindings = async () => {
+    try { await chatVault.set(PEER_BINDINGS_VAULT_KEY, JSON.stringify(sa.agent.security?.peerBindings?.() ?? [])); }
+    catch (err) { if (typeof console !== 'undefined') console.warn('[security] could not keep the peer bindings:', err?.message ?? err); }
+  };
   const savePeerBindings = () => {
-    if (peerBindingsSaveTimer) return;
+    if (peerBindingsSaveTimer || peerBindingsFrozen) return;
     peerBindingsSaveTimer = setTimeout(async () => {
       peerBindingsSaveTimer = null;
-      try { await chatVault.set(PEER_BINDINGS_VAULT_KEY, JSON.stringify(sa.agent.security?.peerBindings?.() ?? [])); }
-      catch (err) { if (typeof console !== 'undefined') console.warn('[security] could not keep the peer bindings:', err?.message ?? err); }
+      if (!peerBindingsFrozen) await writePeerBindings();
     }, 250);
+  };
+  const freezePeerBindings = async () => {
+    if (peerBindingsSaveTimer) { clearTimeout(peerBindingsSaveTimer); peerBindingsSaveTimer = null; }
+    await writePeerBindings();
+    peerBindingsFrozen = true;
   };
   try {
     const raw = await chatVault.get(PEER_BINDINGS_VAULT_KEY);
@@ -2311,6 +2325,9 @@ export async function createRealHouseholdAgent(opts = {}) {
             ? deviceDerivationSeed
             : deriveDeviceSeed(root.deriveAgentSeed('default'), selfDeviceId);
           const newKey = deriveVaultAtRestKeyFrom(selfSeed);
+          // The last snapshot of who this device knows, written under the key the reseal below will
+          // carry over — and no write after it (see `freezePeerBindings`).
+          await freezePeerBindings();
           for (const backing of sealedBackings) {
             await resealVault({ backing, oldKey: atRestKey, newKey });
           }

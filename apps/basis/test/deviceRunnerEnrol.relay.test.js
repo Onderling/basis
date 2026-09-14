@@ -108,6 +108,6 @@ describe('the box enrols from the phone\'s offer and the circle reaches it', () 
     // works when the box registered that address on the relay.
     expect(consumed.circles?.[0]?.steps, 'the box pulled the content lanes').toContain('content');
     const pulled = await until(async () => walkLog(dataDir).find((e) => e.kind === 'chat-change' && e.circleId === CIRCLE) ?? null, { timeout: 30_000, step: 500 });
-    expect(pulled, `the circle's conversation never reached the box:\n${box.out.slice(-1500)}`).toBeTruthy();
+    expect(pulled, `the circle's conversation never reached the box — refused: ${JSON.stringify(walkLog(dataDir).filter((e) => e.kind === 'chat-refused'))}; log kinds: ${JSON.stringify(walkLog(dataDir).map((e) => e.kind))}\n${box.out.slice(-800)}`).toBeTruthy();
   }, 180_000);
 });

@@ -740,9 +740,11 @@ configured — the Telegram shell runs on it. Basis has a third shell beside
 web and mobile, and it is not a shell so much as a DEVICE: `bin/device-runner.mjs` boots the same agent
 headless on a machine that stays on, joins the relay, registers its per-circle addresses there and announces
 them (the same three acts a shell performs on connect), holds its owner's circles, and hands each contact-thread
-turn to their other devices. It is enrolled either box-first (`--show-offer` hands the phone an offer) or
-phone-first (`--enrol`, once: the phone's offer pasted, the phrase typed with echo off and never written; the
-next start consumes the offer the way a shell consumes a scanned one). What it does not do is follow a
+turn to their other devices. It is enrolled from the owner's other device — for the alpha, the web app —
+(`--enrol`, once: that device's offer pasted, the phrase typed with echo off and never written; the next
+start consumes the offer the way a shell consumes a scanned one); the other direction, the box created
+first and handing its offer out (`--show-offer`), waits on a registry the box and the web app share (the
+pod mirror), because a circle created on one device reaches a sibling only that way. What it does not do is follow a
 circle's traffic live: the circle fan delivers to one address per member and never to the sender's own other
 devices, so the box holds a circle by catch-up at connect. With a Telegram token present the same process also answers there — that is the
 **Telegram shell** (`apps/basis/src/telegram/runner.js`), where a

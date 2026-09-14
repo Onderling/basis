@@ -73,6 +73,19 @@ describe('Stoop V2 Phase 24 — ContactBook', () => {
     expect(r.contact.handle).toBe('klusclub-bob');
   });
 
+  it('the op\'s `name` is the contact\'s displayName — what every list shows (2026-09-14)', async () => {
+    // `/add-contact --name Bea` sent `name`, the member map's whitelist dropped it, and the contact showed
+    // its key. The op maps the manifest's word onto the book's field; an explicit displayName still wins.
+    const { bundle } = await buildBundle();
+    const r = await callSkill(bundle.agent, 'addContact', { webid: 'https://id.example/bea', name: 'Bea' });
+    expect(r.contact.displayName).toBe('Bea');
+    expect(r.contact.name, 'nothing rides under the unkept field').toBeUndefined();
+    const listed = (await callSkill(bundle.agent, 'listContacts', {})).contacts.find((c) => c.webid === 'https://id.example/bea');
+    expect(listed?.displayName).toBe('Bea');
+    const r2 = await callSkill(bundle.agent, 'addContact', { webid: 'https://id.example/cas', name: 'ignored', displayName: 'Cas' });
+    expect(r2.contact.displayName).toBe('Cas');
+  });
+
   it('removeContact drops the entry + cleans lists', async () => {
     const { bundle } = await buildBundle();
     await callSkill(bundle.agent, 'addContact', { webid: BOB, trustLevel: 'bekend' });

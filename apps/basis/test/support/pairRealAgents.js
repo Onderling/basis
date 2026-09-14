@@ -76,7 +76,7 @@ import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCH
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeTaskPeerHandler, TASK_BROADCAST } from '../../src/v2/taskRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
-import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
+import { rosterBindingVerifier, makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
@@ -130,7 +130,10 @@ const LIVE_NODES = new Set();
  * stolen-device walk's strict-verify equilibrium once before (reverted, three-party-walk session). Tests
  * that need items to CROSS between agents ask for the lane; tests probing verify/eviction equilibrium
  * keep the minimal composition. Same shape as `verifyChatBinding`: the harness offers the production
- * wiring, the test decides it needs it.
+ * wiring, the test decides it needs it. (Since 2026-09-14 a node that HAS the rail also gets the
+ * membership lane's receive half and catch-up pair registered — the same entries the shared lane table
+ * makes — so an address-revoke fanned to it lands; two walks had wired that by hand. The full suite
+ * stayed green: the equilibrium tests keep the minimal composition, which has no rail.)
  */
 export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, taskLane = false, contactChannel = false } = {}) {
   const routerRef = { fn: null };
@@ -334,6 +337,19 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // the statement and causally merges the item snapshot into the circle's store head, which is what
     // makes an item written on A appear in B's store.
     ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
+    // The MEMBERSHIP lane, when this node has a device log (the factory builds the rail off it): the
+    // fan's receive half and the catch-up pair, the same registration the shared lane table makes for
+    // both shells. Two walks (the replace ceremony, the lost phone) wired this by hand before an
+    // address-revoke could reach the member it was fanned to; a node with the rail and no receiver is
+    // the "two green tests flanking a dead seam" shape.
+    ...(agent.membershipRail ? (() => {
+      const cu = makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES });
+      return {
+        [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }),
+        [cu.subtypes.request]: cu.onRequest,
+        [cu.subtypes.batch]:   cu.onBatch,
+      };
+    })() : {}),
     // The grants lane (connections belong to the person) — the agent's ready-made receiver + its
     // catch-up pair, the same registration both shells make. A sibling device's grant/revoke lands
     // through the full ingest gate and refolds this node's door.

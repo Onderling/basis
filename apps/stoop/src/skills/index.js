@@ -4427,39 +4427,23 @@ export function buildSkills({
       // admission trail, and the creation statement for a circle that has admitted nobody yet. A
       // seeded device learns who runs a circle the way every other device does, by folding it.
       //
-      // The SELF row (same webid — every device of one person shares it) gets a NARROWER merge:
-      // only the ADDRESS facts, and only ADDITIVELY into the set. The sibling's per-circle
-      // address is the binding fact every statement it authored needs on this device (without it
-      // the content lanes refuse the sibling's tasks and messages as unbindable), but the full
-      // row must not land: `addMember` merges field-over-field, and the sibling's PRIMARY
-      // address would overwrite this device's own live local bindings.
+      // The SELF row (same webid — every device of one person shares it) is NOT written from the
+      // display rows at all. Its addresses are the sibling's own devices' addresses, and an address
+      // reaches a roster only PROVEN — the projection admits a per-circle address to a row's set when
+      // its proof verifies and from nowhere else (deriveRoster's deny-by-default gate). A merge that
+      // wrote `circleAddresses` onto the member map sat here from 2026-08-21 to 2026-09-13 and did
+      // nothing: the map's whitelist dropped the field on write, the projection would not have read
+      // it, and the full row must not land either (`addMember` merges field-over-field, and the
+      // sibling's PRIMARY would overwrite this device's own bindings). The sibling's address arrives
+      // the proven way, inside the seed parcel as its own announcement, recorded through the
+      // announce's door by the receiver (`rosterSeed.js`).
       let membersRecorded = 0;
       if (Array.isArray(a.members) && members) {
         for (const m of a.members) {
-          if (!m || typeof m.webid !== 'string' || !m.webid) continue;
+          if (!m || typeof m.webid !== 'string' || !m.webid || m.webid === from) continue;
           try {
-            if (m.webid === from) {
-              const mine = await members.resolveByWebid(from);
-              const set = new Set([
-                ...(Array.isArray(mine?.circleAddresses) ? mine.circleAddresses : []),
-                ...(typeof mine?.circleAddress === 'string' && mine.circleAddress ? [mine.circleAddress] : []),
-                ...(Array.isArray(m.circleAddresses) ? m.circleAddresses : []),
-                ...(typeof m.circleAddress === 'string' && m.circleAddress ? [m.circleAddress] : []),
-              ].filter(Boolean));
-              if (set.size === 0) continue;
-              await members.addMember({
-                webid: from,
-                circleAddresses: [...set],
-                // The ceremony commitment is one per person per circle (a commitment to the owner root —
-                // core ceremonyCommitment.js), identical on every device, so carrying it when this device
-                // has none adds a fact, not a claim.
-                ...(!mine?.ceremonyCommitment && typeof m.ceremonyCommitment === 'string' && m.ceremonyCommitment
-                  ? { ceremonyCommitment: m.ceremonyCommitment } : {}),
-              });
-            } else {
-              const { role: _role, ...displayOnly } = m;
-              await members.addMember(displayOnly);
-            }
+            const { role: _role, ...displayOnly } = m;
+            await members.addMember(displayOnly);
             membersRecorded += 1;
           } catch { /* per-row best-effort */ }
         }

@@ -86,6 +86,7 @@ import {
 // of them — the grants lane's fan, pointed at conversation instead of authority.
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
+import { isRosterTrailItem } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
@@ -1057,7 +1058,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     for (const it of (Array.isArray(items) ? items : [])) {
       // Every head republishes as a signed lane snapshot (the receiver's rail verifies + causally
-      // merges — idempotent).
+      // merges — idempotent) — except a roster row, which travels by its own proof-keeping carriers
+      // and would otherwise overwrite the peer's proven addresses with this device's view of them.
+      if (isRosterTrailItem(it)) continue;
       try { if (it) taskEmit.snapshot(id, it); } catch { /* best-effort */ }
     }
   }

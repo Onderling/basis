@@ -258,17 +258,25 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
           if (req) {
             await sendPeerMessage(c.address, req, SEND);
             row.steps.push('seed-requested');
-            // Wait for the roster to DERIVE (the seed applied and the projection has its head),
-            // not merely for any rows — the fallback display list also answers, addressless.
+            // Wait for the SIBLING'S ADDRESS to be on my own row — the seed applied, and the sibling's
+            // own announcement (it rides inside the parcel) recorded. That is the one fact the pulls
+            // below depend on: every statement the sibling signed binds against it, and a pull that
+            // leaves before it is refused. "Any member has an address" was the test until 2026-09-13,
+            // and this device's OWN address satisfied it before the parcel had even arrived — so the
+            // content pull raced the seed and lost, one enrol in four (the box's walk).
             // RE-SEND the request while waiting: a single packet on a busy boot is exactly the
             // kind of loss the first-write-wins ingest makes free to retry.
+            const me = agent.identity?.chat?.pubKey ?? null;
             const deadline = Date.now() + 10000;
             let nextResend = Date.now() + 2500;
             let derived = false;
             while (Date.now() < deadline) {
               try {
                 const r = await callSkill('stoop', 'listGroupMembers', { groupId: c.id });
-                if ((Array.isArray(r?.members) ? r.members : []).some((m) => m?.circleAddress || m?.circleAddresses?.length)) {
+                const rows = Array.isArray(r?.members) ? r.members : [];
+                const mine = me ? rows.find((m) => m?.webid === me) : null;
+                const siblingKnown = !!mine && (mine.circleAddress === c.address || (Array.isArray(mine.circleAddresses) && mine.circleAddresses.includes(c.address)));
+                if (siblingKnown || (!me && rows.some((m) => m?.circleAddress || m?.circleAddresses?.length))) {
                   derived = true;
                   break;
                 }

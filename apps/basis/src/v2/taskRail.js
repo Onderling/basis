@@ -13,6 +13,7 @@
  * This lane replaces the unsigned peer-mirror carry for task items (per-type one-path): the store's publish
  * hook routes every circle-content publish onto the lane — see `routeTaskMirror` (unsigned carry deleted).
  */
+import { isRosterTrailItem } from '@onderling/circles';
 import { signSpine, authorHead, frontier } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -69,6 +70,10 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     if (body.kind === 'snapshot') {
       const item = body.payload?.item;
       if (!item || typeof item.id !== 'string' || !item.id) return;
+      // A roster row never lands through this lane: its addresses are proven facts patched in place,
+      // and a peer's snapshot of "the person's row" is that peer's view, not this device's. Refused
+      // here whatever served it (`rosterTrail.js` says why).
+      if (isRosterTrailItem(item)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       await store.put(item, { sync: false, origin: true });
@@ -99,7 +104,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     }
     let rows = [];
     try { rows = (await store.list()) ?? []; } catch { return stored; }
-    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id));
+    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id) && !isRosterTrailItem(it));
     if (uncovered.length === 0) return stored;
     let resolved = null;
     try { resolved = await circleIdentityFor(circleId); } catch { return stored; }

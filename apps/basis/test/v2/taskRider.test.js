@@ -104,6 +104,34 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     expect(ada.eventLog.entries).toHaveLength(3);                       // the contact snapshot joined the lane
   });
 
+  it('a ROSTER row never rides this lane: not served in a catch-up, and refused if a peer snapshots one (2026-09-13)', async () => {
+    // Two devices of one person each hold "the person's row" with a different primary (a device never
+    // records its own address; it records its siblings' by announce). Carried as a task-lane snapshot,
+    // the phone's version replaced the box's freshly patched one and everything the phone signed was
+    // refused on the box as unbindable — one enrol in ten. The roster converges by its own carriers.
+    const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:bo', role: 'member' }];
+    const wire = [];
+    const ada = await device('webid:ada', rosterAll, wire);
+    const bo  = await device('webid:bo',  rosterAll, wire);
+    ada.registry.registerType('membership-redemption', { type: 'object', properties: { type: { const: 'membership-redemption' } } });
+    bo.registry.registerType('membership-redemption', { type: 'object', properties: { type: { const: 'membership-redemption' } } });
+
+    // ada holds a roster row and a task; a catch-up from ada serves the task, never the row.
+    await ada.store.put({ id: 'row-ada', type: 'membership-redemption', source: { groupId: CIRCLE, redeemedBy: 'webid:ada', circleAddress: 'ada-in-circle' } }, { by: 'webid:ada', sync: false });
+    await ada.store.put({ id: 'task-1', type: 'task', text: 'fix the gate', createdBy: 'webid:ada' }, { by: 'webid:ada', sync: false });
+    const served = await ada.rail.catchUpStatements(CIRCLE);
+    const servedIds = served.map((s) => s.body?.payload?.item?.id ?? s.body?.subject);
+    expect(servedIds).toContain('task-1');
+    expect(servedIds, 'a roster row is not task-lane content').not.toContain('row-ada');
+
+    // …and a peer that DOES snapshot one (an older device, or a hostile one) does not overwrite bo's row.
+    await bo.store.put({ id: 'row-ada', type: 'membership-redemption', source: { groupId: CIRCLE, redeemedBy: 'webid:ada', circleAddress: 'ada-as-bo-knows-it', circleAddressProof: 'p' } }, { by: 'webid:bo', sync: false });
+    const stmt = await ada.rail.append(CIRCLE, { kind: 'snapshot', subject: 'row-ada', payload: { item: { id: 'row-ada', type: 'membership-redemption', source: { groupId: CIRCLE, redeemedBy: 'webid:ada', circleAddress: 'ada-in-circle' } } } });
+    await bo.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: stmt.statement });
+    const boRow = await bo.store.get('row-ada');
+    expect(boRow?.source?.circleAddress, 'bo\'s proven row survived a peer\'s snapshot of it').toBe('ada-as-bo-knows-it');
+  });
+
   it('the writer-computed claim cluster travels: a claim lands with claimSeq + confirmation; a later authoritative reassign supersedes it', async () => {
     const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:bo', role: 'member' }];
     const wire = [];

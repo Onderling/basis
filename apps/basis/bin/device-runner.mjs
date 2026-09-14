@@ -177,6 +177,17 @@ async function enrolOnce() {
     return String((await rl.question(label)) ?? '').trim();
   };
   try {
+    // An install enrols ONCE. Its vault is re-keyed to the enrolled root at the ceremony, so a second
+    // ceremony in the same data dir cannot open it ("wrong unlock secret") — and after a replace
+    // ceremony on the owner's new phone this device IS the retired one: its keys are gone from every
+    // roster. The way back is a fresh data dir; its contact threads are on the owner's other devices by
+    // the fan. Said here, before the phrase is asked for.
+    if (agent.isEnrolledDevice?.()) {
+      console.error('device-runner: this install is already an enrolled device. To enrol it again (after a replace ceremony on');
+      console.error('  your new phone, say), start it with a fresh --data-dir; the old one keeps its threads sealed, and your');
+      console.error('  other devices hold them anyway.');
+      return 2;
+    }
     const offerLine = await ask('The offer from your phone (onderling-enroll://… or the link): ');
     const stashed = await stashEnrollOffer(offerStash, offerLine);
     if (!stashed.ok) { console.error(`device-runner: that is not an add-a-device offer (${stashed.reason}).`); return 2; }

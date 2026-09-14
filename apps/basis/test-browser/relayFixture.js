@@ -89,12 +89,25 @@ async function warmAndCheckEveryServer(config) {
   try {
     for (const base of bases) {
       const t0 = Date.now();
-      const page = await browser.newPage();
-      try {
-        await page.goto(base, { waitUntil: 'load', timeout: 180_000 });
-        // The app is up when its root has painted something — the same signal every spec waits for.
-        await page.waitForSelector('#circle-root :first-child', { timeout: 180_000 });
-      } finally { await page.close(); }
+      // Two attempts, not one. Vite's first compile of the whole module graph on a cold runner is the
+      // slowest thing in the suite, and one shard lost a whole run to it on 2026-09-13 (180 s, no test
+      // ever started). A second page load after the first timeout hits a server that has finished
+      // compiling; only two failures in a row say the server is really not coming up.
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const page = await browser.newPage();
+        try {
+          await page.goto(base, { waitUntil: 'load', timeout: 180_000 });
+          // The app is up when its root has painted something — the same signal every spec waits for.
+          await page.waitForSelector('#circle-root :first-child', { timeout: 180_000 });
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`[dev-server] ${base} not warm after attempt ${attempt} (${Math.round((Date.now() - t0) / 1000)}s): ${err?.message?.split('\n')[0] ?? err}`);
+        } finally { await page.close(); }
+      }
+      if (lastErr) throw lastErr;
       await assertDevServerIsFresh(base);
       console.log(`[dev-server] ${base} warm and serving this tree (${Math.round((Date.now() - t0) / 1000)}s).`);
     }

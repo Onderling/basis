@@ -1191,7 +1191,12 @@ async function addContactCore(scope, a, ctx) {
   if (!bundle?.contacts) return { error: 'no-contacts' };
   if (typeof a.webid !== 'string' || !a.webid) return { error: 'webid required' };
   try {
-    const m = await bundle.contacts.addContact(a);
+    // The op's `name` (the manifest's word, what `/add-contact --name` sends) IS the contact's
+    // `displayName` — the field the book keeps and every list shows. Passed through as `name` it was
+    // dropped by the member map's whitelist, and a contact added by the assistant showed its key.
+    const { name, ...rest } = a;
+    const record = (typeof name === 'string' && name.trim() && !rest.displayName) ? { ...rest, displayName: name.trim() } : rest;
+    const m = await bundle.contacts.addContact(record);
     metrics?.record?.('contact-added');
     return { contact: m };
   } catch (err) {

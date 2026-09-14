@@ -58,6 +58,7 @@ import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSe
 import { registerCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
 import { buildCircleLanes } from '../src/v2/circleLanes.js';
+import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
@@ -112,10 +113,20 @@ const { hydrated } = await wireEventLogPersistence({
 // what the shells keep in plain storage. Public data (the offer grants nothing without the phrase).
 const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 
+// EVERYTHING A SHELL KEEPS, this device keeps — on disk, under the data dir, sealed like the shells seal
+// it. Until 2026-09-14 only the household items and the log were kept; the registry (which circles this
+// device is in, which devices the person has), the item store (rosters, contacts, the trail) and the
+// settings were memory, and a restart — every deploy of a box — came back to no circles at all. The
+// same descriptors the web app passes, with a file where it has an IndexedDB store.
 const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
   chatVault,
+  registryBackend: createNodeFsBackend({ dir: path.join(dataDir, 'registry') }),
+  stoopPersistDb:     { path: path.join(dataDir, 'stoop-items.json') },
   householdPersistDb: { path: path.join(dataDir, 'household-items.json') },
+  tasksPersistDb:     { path: path.join(dataDir, 'tasks-items.json') },
+  settingsPersistDb:  { path: path.join(dataDir, 'settings.json') },
+  outboxPersistDb:    { path: path.join(dataDir, 'outbox.json') },
   deviceLog,
   seedDemoData: false,
   seedHousehold: false,
@@ -216,7 +227,13 @@ if (relayUrl) {
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     localActor: 'me',
     // A turn that arrives here is meant for the PERSON, so it goes on to their other devices.
-    fanToOwnDevices: agent.contactTurnFan,
+    // …and the log says where it went: per device of the person's, delivered, held for its presence,
+    // or failed. A revoked device's fan lands nowhere, and the log is where that is legible.
+    fanToOwnDevices: async (turn) => {
+      const r = await agent.contactTurnFan(turn);
+      walkLog({ kind: 'own-device-fan', attempted: r?.attempted ?? 0, outcomes: (r?.outcomes ?? []).map((o) => ({ ...o, to: String(o.to).slice(0, 12) })) });
+      return r;
+    },
   });
 
   // What a shell would repaint, this device only stores. Every reaction below is that substitution and

@@ -169,15 +169,16 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
       turn: { direction: 'in', contactId: 'someone-else', fromAddr: 'someone-else', text: 'ik ben jouw laptop', messageId: 'forged-1' },
     }, SEND);
 
+    // Bea's, by name: an own-device fan that arrives before its sibling is on the roster is refused the
+    // same way, so the first refusal on record is not necessarily hers.
     const refused = await until(async () => {
       for (const n of [phone, alwaysOn]) {
-        const hit = n.contactTurnsRefused.find((r) => r.reason === 'not-a-sibling');
+        const hit = n.contactTurnsRefused.find((r) => r.reason === 'not-a-sibling' && r.fromAddr === bea.pubKey);
         if (hit) return { node: n, hit };
       }
       return null;
     }, { timeout: 20000, step: 100 });
-    expect(refused, 'a stranger\'s fan was not refused').toBeTruthy();
-    expect(refused.hit.fromAddr).toBe(bea.pubKey);
+    expect(refused, `a stranger's fan was not refused — refusals: ${JSON.stringify([phone, alwaysOn].map((n) => n.contactTurnsRefused))}`).toBeTruthy();
     expect(await textsIn(refused.node, 'someone-else'), 'a refused turn still reached a thread').toEqual([]);
     expect(await textsIn(phone, bea.pubKey), 'a refused turn disturbed the real thread').toEqual(before);
   }, 60_000);

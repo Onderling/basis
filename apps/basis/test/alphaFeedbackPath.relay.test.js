@@ -70,7 +70,9 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     relayUrl = relay.url;
     dataDir = mkdtempSync(path.join(tmpdir(), 'basis-feedback-box-'));
     env = { PATH: process.env.PATH, HOME: dataDir, ONDERLING_RELAY_URL: relayUrl, BASIS_VAULT_PASSPHRASE: 'test-only-passphrase' };
-    vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
+    // What the phone keeps across a reboot: its vaults and its item store (IndexedDB in the shell; a
+    // file here). A reboot that forgot its rosters would not know its own box.
+    vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), stoopPersistDb: { path: path.join(dataDir, 'phone-stoop-state.json') } };
 
     // ── Frits' phone: his account, one circle (the sibling rail rides circles), on the relay. ──────
     phone = await bootPhone(vaults, relayUrl);

@@ -34,7 +34,7 @@ import {
   bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, sendCircleChat, until, teardown,
 } from './support/pairRealAgents.js';
 import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
-import { rosterBindingVerifier, makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
+import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
 import { seedContactCard } from '../src/v2/seededContact.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
@@ -56,15 +56,6 @@ const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k
 const chatIn = (node, circleId) => node.chatRail.storedStatements(circleId).map((s) => s?.body?.payload?.text).filter(Boolean);
 const arrives = (node, circleId, text, why) => until(async () => (chatIn(node, circleId).includes(text) ? true : null), { timeout: 25_000, step: 200 }).then((got) => expect(got, why).toBe(true));
 const textsIn = async (node, contactId) => ((await node.contactThreadChannel.rehydrate(contactId)) ?? []).map((t) => t.text);
-/** The membership lane's receive half, the way both shells register it (the harness leaves it to the walk). */
-function routeMembership(node) {
-  const onMembership = makeMembershipPeerHandler({ rail: node.agent.membershipRail });
-  const prior = node._routerRef.fn;
-  node._routerRef.fn = (env) => {
-    if (env?.payload?.subtype === MEMBERSHIP_BROADCAST) return onMembership(env.from, env.payload);
-    return prior?.(env);
-  };
-}
 
 async function enrolBox(dataDir, env, offerUri, phrase) {
   const once = run(['--data-dir', dataDir, '--enrol'], { env, stdin: `${offerUri}\n${phrase}\n` });
@@ -94,7 +85,6 @@ describe('the phone is lost, and there is a box', () => {
     phone = await bootRealAgentNode('phone', { contactChannel: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), deviceLog: new EventLog({ initial: [], muted: [] }) } });
     bea = await bootRealAgentNode('bea', { contactChannel: true, verifyChatBinding: productionBinding(beaRef), agentOpts: { deviceLog: new EventLog({ initial: [], muted: [] }) } });
     beaRef.node = bea;
-    routeMembership(bea);
     await connectNodesOverRelay([phone, bea], { relayUrl });
     await pairCircle(phone, bea, { groupId: CIRCLE, name: 'Thuis', handle: 'bea' });
     await bindCircleAddresses([phone, bea], CIRCLE);
@@ -130,7 +120,6 @@ describe('the phone is lost, and there is a box', () => {
     await teardown(pre);
     newPhone = await bootRealAgentNode('new-phone', { contactChannel: true, agentOpts: { ...newPhoneVaults, registryBackend: createMemoryBackend(), deviceLog: new EventLog({ initial: [], muted: [] }) }, verifyChatBinding: productionBinding(newRef) });
     newRef.node = newPhone;
-    routeMembership(newPhone);
     await newPhone.agent.connectPeerTransport({ relayUrl, onPeerMessage: (env2) => newPhone._routerRef.fn?.(env2), awaitRelayReady: true });
 
     const imported = await newPhone.agent.callSkill('household', 'importRecoveryFile', { file });
@@ -207,7 +196,7 @@ describe('the phone is lost, and there is a box', () => {
       const onBox = await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'na de wissel: werkt het nog?') ?? null, { timeout: 30_000, step: 500 });
       expect(onBox, `the re-enrolled box did not take the feedback:\n${box.out.slice(-1200)}`).toBeTruthy();
       const onPhone = await until(async () => (newPhone.contactTurnsSeen.some((t) => t?.text === 'na de wissel: werkt het nog?') ? true : null), { timeout: 30_000, step: 250 });
-      expect(onPhone, `the new phone never got it from the box — refused: ${JSON.stringify(newPhone.contactTurnsRefused)}; thread: ${JSON.stringify(await textsIn(newPhone, person.pubKey))}`).toBe(true);
+      expect(onPhone, `the new phone never got it from the box — refused: ${JSON.stringify(newPhone.contactTurnsRefused)}; thread: ${JSON.stringify(await textsIn(newPhone, person.pubKey))}; own address ${mine.slice(0, 12)}; my row: ${JSON.stringify(((await newPhone.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? []).find((m) => m.webid === newPhone.pubKey)?.circleAddresses?.map((a) => a.slice(0, 12)))}; circles: ${JSON.stringify((await newPhone.agent.callSkill('stoop', 'listMyCircles', {}))?.circles)}`).toBe(true);
     } finally { await teardown(person); }
   }, 240_000);
 });

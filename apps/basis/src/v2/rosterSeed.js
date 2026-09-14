@@ -165,8 +165,10 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
  * @param {Function} a.verifyDeviceSet   the same verifier instance as the serve half
  * @param {string} a.selfPubKey
  * @param {(circleId:string, result:object) => void} [a.onApplied]
+ * @param {(circleId:string) => Promise<any>} [a.refreshBindings]  re-read the seeded roster into the
+ *   sealing binding + the sender gate (`bindCircleAddressKeysFor`) — the announce door's own refresh
  */
-export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey, onApplied = null } = {}) {
+export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey, onApplied = null, refreshBindings = null } = {}) {
   return async function onRosterSeedBatch(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== ROSTER_SEED_SUBTYPES.batch) return;
     const { body, sig, by } = payload;
@@ -206,6 +208,14 @@ export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey,
             console.info(`[roster-seed] sibling address ${String(body.own.circleAddress).slice(0, 8)}… for ${String(body.circleId).slice(0, 12)}…: ${JSON.stringify({ ok: a?.ok, patched: a?.patched, created: a?.created, unchanged: a?.unchanged, reason: a?.reason })} rows=${JSON.stringify(rowsNow)}`);
           }
         } catch (err) { if (typeof console !== 'undefined') console.warn(`[roster-seed] the sibling's own address could not be recorded: ${err?.message ?? err}`); }
+      }
+      // The refresh the announce's own door does after recording — not optional here either: the rows
+      // just landed name the members and the sibling, and until the sealing binding and the sender
+      // gate are re-read from them, every envelope those members send is a stranger's. Found the day
+      // the sibling's replies started arriving as its per-circle address (2026-09-14).
+      if (typeof refreshBindings === 'function') {
+        try { await refreshBindings(body.circleId); }
+        catch (err) { if (typeof console !== 'undefined') console.warn(`[roster-seed] could not refresh the bindings for ${String(body.circleId).slice(0, 12)}…: ${err?.message ?? err}`); }
       }
       if (typeof onApplied === 'function') { try { onApplied(body.circleId, r); } catch { /* observer only */ } }
     } catch { /* ingest is best-effort — the next boot's request retries */ }

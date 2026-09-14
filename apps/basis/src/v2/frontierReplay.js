@@ -130,7 +130,7 @@ export function makeFrontierReplay({
       if (missing.length > offerThreshold && allowance === 0) {
         await sendToPeer(fromPeerAddr, {
           subtype: OFFER, circleId, count: missing.length, approxBytes: approxBytesOf(missing),
-        });
+        }, { circleId });
         return;
       }
       // An allowance AUTHORIZES the transfer; it does not change the round size — the window + paging
@@ -144,7 +144,7 @@ export function makeFrontierReplay({
         await sendToPeer(fromPeerAddr, {
           subtype: BATCH, circleId, statements: chunks[i],
           seq: i, done: i === chunks.length - 1, more,
-        });
+        }, { circleId });
       }
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }
   }
@@ -220,10 +220,12 @@ export function makeFrontierReplay({
     const allowance = granted.get(`${peerAddr}|${circleId}`) ?? 0;
     // One slot per lane per circle: a request held for an offline peer is superseded by the next boot's,
     // never stacked — the frontier in the newest is the only one worth answering.
+    // Spoken as this circle's identity — see `governanceCatchUp.requestFrom` for why a canonical request
+    // was refused at every member's sender gate.
     return sendToPeer(peerAddr, {
       subtype: REQ, circleId, frontier: localFrontier(circleId), limit,
       ...(allowance > 0 ? { allowance } : {}),
-    }, { holdKey: `${REQ}:${circleId}` });
+    }, { holdKey: `${REQ}:${circleId}`, circleId });
   };
 
   /** The reconnect kick — same roster walk as the pull-all catch-up (any ONE complete peer suffices). */

@@ -284,7 +284,7 @@ export const stoopManifest = {
         },
         // appliesTo-gated row button on /feed posts.  Click → form
         // prompts for body, then dispatches.
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.respondToItem' },
       },
     },
     {
@@ -325,7 +325,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'cancelRequest', args: {} },
           },
         },
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.cancelRequest' },
       },
     },
 
@@ -385,7 +385,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'markReturned', args: {} },
           },
         },
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.markReturned' },
       },
     },
 
@@ -417,7 +417,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'reportPost', args: {} },
           },
         },
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.reportPost' },
       },
     },
     // ── Profile / reveals ───────────────────────────────────────────
@@ -624,7 +624,7 @@ export const stoopManifest = {
       params: [{ name: 'webid', kind: 'string', required: true }],
       surfaces: {
         chat: { reply: 'text', hint: 'open a DM with this peer' },
-        ui:   { control: 'button' },
+        ui:   { control: 'button', labelKey: 'circle.button.stoop.startDm' },
       },
     },
 
@@ -686,7 +686,7 @@ export const stoopManifest = {
       surfaces: {
         slash: { command: '/remove-contact' },
         chat:  { reply: 'text', hint: 'remove a contact' },
-        ui:    { control: 'button' },
+        ui:    { control: 'button', labelKey: 'circle.button.stoop.removeContact' },
       },
     },
     {
@@ -738,7 +738,7 @@ export const stoopManifest = {
         slash: { command: '/dispute', body: 'flags' },
         chat:  { hint: 'raise a conflict-resolution dispute in your circle' },
         page:  { kind: 'side-panel', title: 'Raise a dispute' },
-        ui:    { control: 'button' },
+        ui:    { control: 'button', labelKey: 'circle.button.stoop.conflictDisputeWizard' },
       },
     },
     {

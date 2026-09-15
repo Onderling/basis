@@ -49,6 +49,7 @@ import { renderCircleNoticeboard } from './circleNoticeboard.js';
 import { buildAttachControl } from './attachControl.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { pickRowText } from '../../src/v2/rowText.js';
+import { embedButtonText } from '../../src/v2/replyEmbeds.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 // Long bot bubbles (e.g. a big verify-summary) chunk to a preview + "Show more" — shared with mobile so the
 // truncation is identical across surfaces.
@@ -1093,7 +1094,7 @@ function renderBubble(row, {
       // A `labelKey` is resolved; a literal `label` is printed as given. An op that declares neither
       // shows its id, which is honest and ugly enough to get noticed — the state 31 stoop buttons were
       // in while `labelKey` was validated and read by nothing.
-      btn.textContent = (b.labelKey ? tr(b.labelKey) : null) ?? b.label ?? b.opId ?? b.screen ?? b.action;
+      btn.textContent = embedButtonText(b, tr);
       btn.addEventListener('click', () => onEmbedButton(b));   // pass the whole button so a non-circle source survives
       bRow.appendChild(btn);
     }

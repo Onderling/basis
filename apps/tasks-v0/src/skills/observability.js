@@ -25,6 +25,7 @@ import { defineSkill } from '@onderling/core';
 
 import { resolveCadence, sanitiseCadenceMap } from '../observability/cadence.js';
 import { argsFromParts } from '../bundleResolver.js';
+import { makeRoleOf } from './roleOf.js';
 
 /**
  * Build the observability skills.
@@ -39,7 +40,7 @@ import { argsFromParts } from '../bundleResolver.js';
  *   Fallback used only if `circle.userSettings` is missing — typically
  *   the no-op default supplied by wireSkills on the V0 path.
  */
-export function buildObservabilitySkills({ bundleResolver, userSettings: fallbackUserSettings } = {}) {
+export function buildObservabilitySkills({ bundleResolver, userSettings: fallbackUserSettings, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildObservabilitySkills: bundleResolver(parts, ctx) required');
   }
@@ -74,7 +75,7 @@ export function buildObservabilitySkills({ bundleResolver, userSettings: fallbac
     defineSkill('setCircleCadences', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }

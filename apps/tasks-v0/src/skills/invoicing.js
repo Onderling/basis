@@ -25,6 +25,7 @@
 import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
+import { makeRoleOf } from './roleOf.js';
 
 function isoMonthOf(epochMs) {
   const d = new Date(epochMs);
@@ -81,7 +82,7 @@ export async function recordInvoiceLine({ dataSource, circleId, member, task }) 
  *   Resolver returns a CircleState; per-CircleState `onCompensationChange`
  *   callback re-attaches the item-completed listener in `Circle.js`.
  */
-export function buildInvoicingSkills({ bundleResolver } = {}) {
+export function buildInvoicingSkills({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildInvoicingSkills: bundleResolver(parts, ctx) required');
   }
@@ -97,7 +98,7 @@ export function buildInvoicingSkills({ bundleResolver } = {}) {
         return { error: 'memberWebid required (or call as self)' };
       }
       // Admin sees anyone; member sees only own.
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && from !== target) {
         return { error: 'admin required to view another member\'s compensation' };
       }
@@ -130,7 +131,7 @@ export function buildInvoicingSkills({ bundleResolver } = {}) {
     defineSkill('setMemberCompensation', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const a = argsFromParts(parts);
       if (typeof a.memberWebid !== 'string' || !a.memberWebid.trim()) {
@@ -158,7 +159,7 @@ export function buildInvoicingSkills({ bundleResolver } = {}) {
     defineSkill('setCompensationEnabled', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const a = argsFromParts(parts);
       if (typeof a.enabled !== 'boolean') return { error: 'enabled (boolean) required' };

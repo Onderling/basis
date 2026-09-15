@@ -119,6 +119,7 @@ import { makeHandleSharedCopy } from '../../../basis/src/core/handlers/sharedCop
 // implementation, called by web (circleApp) and the mobile launcher too.
 import { feedHouseholdRoster } from '../../../basis/src/v2/householdRosterPairing.js';
 import { computeEmbedButtons } from '../../../basis/src/core/embedButtons.js';
+import { embedButtonText } from '../../../basis/src/v2/replyEmbeds.js';
 import { makeCalendarOutboundHook }
                                from '../../../basis/src/core/handlers/calendarOutbound.js';
 import { interceptButtonTap }       from '../core/buttonSpecials.js';
@@ -2482,17 +2483,17 @@ function EmbedActionButtons({ msg, embed, buttons, enabled, onButtonTap }) {
           onPress={() => onButtonTap?.({
             opId:    btn.opId,
             itemId:  btn.itemId,
-            buttonLabel: btn.label,
+            buttonLabel: embedButtonText(btn, t),
             originMessageId: msg.id,
             embed,
           })}
           disabled={!enabled}
           style={[styles.embedBtn, !enabled && styles.embedBtnDisabled]}
           accessibilityRole="button"
-          accessibilityLabel={btn.label}
+          accessibilityLabel={embedButtonText(btn, t)}
           testID={`embed-btn-${btn.opId}-${btn.itemId}`}
         >
-          <Text style={styles.embedBtnText}>{btn.label}</Text>
+          <Text style={styles.embedBtnText}>{embedButtonText(btn, t)}</Text>
         </TouchableOpacity>
       ))}
     </View>

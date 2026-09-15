@@ -4,7 +4,7 @@
  * against the contract the bot actually composes.
  */
 import { describe, it, expect } from 'vitest';
-import { snapshotsFromReply, embedButtonsForReply, embedsFromReply } from '../src/v2/replyEmbeds.js';
+import { snapshotsFromReply, embedButtonsForReply, embedsFromReply, embedButtonText } from '../src/v2/replyEmbeds.js';
 import { mockTasksManifest } from '../src/core/manifests/mockManifests.js';
 import { buildCapabilityMatrix, capabilityKey } from '@onderling/app-manifest';
 
@@ -105,5 +105,26 @@ describe('embedButtonsForReply — B/S4 4c capability consequence', () => {
   it('no matrix ⇒ every appliesTo-gated button shows (unchanged)', () => {
     const btns = embedButtonsForReply({ reply, appOrigin: APP, manifestsByOrigin });
     expect(btns.some((b) => b.opId === 'claimTask' && !b.disabled)).toBe(true);
+  });
+});
+
+describe('a reply button carries its labelKey and paints translated, with the item name beside it', () => {
+  // Walked 2026-09-14: the assistant's task answer showed "Claim · brood halen" and "circle.item.share · brood
+  // halen" — the LITERAL label composed in, the key dropped, nothing translated. Both shells now paint through one
+  // helper: the translated key when there is one, the literal otherwise, the item name after it either way.
+  it('embedButtonsForReply keeps labelKey and itemLabel beside the composed literal', () => {
+    const btns = embedButtonsForReply({ reply: { task: { id: 't1', state: 'open', label: 'boodschappen' } }, appOrigin: 'tasks', manifestsByOrigin });
+    const claim = btns.find((b) => b.opId === 'claimTask');
+    expect(claim.labelKey).toBe('circle.button.tasks.claimTask');
+    expect(claim.itemLabel).toBe('boodschappen');
+    expect(claim.label).toMatch(/Claim · boodschappen/);          // the literal composition stays for consumers that have no translator
+  });
+
+  it('embedButtonText translates the key and keeps the item name; falls back to the literal; never paints a bare key', () => {
+    const t = (k) => (k === 'circle.button.tasks.claimTask' ? 'Oppakken' : k);
+    expect(embedButtonText({ labelKey: 'circle.button.tasks.claimTask', itemLabel: 'boodschappen', label: 'Claim · boodschappen' }, t)).toBe('Oppakken · boodschappen');
+    expect(embedButtonText({ label: 'All tasks →' }, t)).toBe('All tasks →');
+    expect(embedButtonText({ labelKey: 'circle.button.unknown', itemLabel: 'x', label: 'Fallback · x' }, t), 'an unresolved key falls back to the literal').toBe('Fallback · x');
+    expect(embedButtonText({ opId: 'x.y' }, t)).toBe('x.y');
   });
 });

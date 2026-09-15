@@ -148,7 +148,7 @@ export const householdManifest = {
             onEmpty:    { skillId: 'help', args: {} },
           },
         },
-        ui: { control: 'button', label: 'Done' },   // web surface
+        ui: { control: 'button', labelKey: 'circle.button.household.markComplete', label: 'Done' },   // web surface
       },
     },
     {
@@ -170,7 +170,7 @@ export const householdManifest = {
             onEmpty:    { skillId: 'help', args: {} },
           },
         },
-        ui: { control: 'button', label: 'Remove' },  // web surface
+        ui: { control: 'button', labelKey: 'circle.button.household.removeItem', label: 'Remove' },  // web surface
       },
     },
     {
@@ -254,7 +254,7 @@ export const householdManifest = {
             onEmpty: { skillId: 'help', args: {} },
           },
         },
-        ui:    { control: 'button', label: "I'll do this" },
+        ui:    { control: 'button', labelKey: 'circle.button.household.claim', label: "I'll do this" },
       },
     },
     {

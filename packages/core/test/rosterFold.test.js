@@ -437,3 +437,29 @@ describe('foldRoster — how each admin came to hold it', () => {
     expect(b.adminProvenance).toEqual(a.adminProvenance);
   });
 });
+
+describe('foldRoster — the handle a member chose rides the join', () => {
+  // Walked 2026-09-14: only the admin's device knew a joiner's handle, because the handle lived on the
+  // redemption row in the admin's store and that row never reaches the other members. Every device folds the
+  // spine; so the spine carries the handle, and the fold hands it out beside the membership it establishes.
+  it('a join carrying peerDisplay yields that handle for its subject', async () => {
+    const { founder, bob } = await ids();
+    const r = foldRoster([body(bob, 'join', bob, { payload: { peerDisplay: 'bee' } })], { founders: [founder.pubKey] });
+    expect(r.members).toContain(bob.pubKey);
+    expect(r.handles?.[bob.pubKey]).toBe('bee');
+  });
+
+  it('a join without one yields no handle; a later re-join with one wins; an evicted member leaves none', async () => {
+    const { founder, bob } = await ids();
+    const plain = body(bob, 'join', bob);
+    expect(foldRoster([plain], { founders: [founder.pubKey] }).handles?.[bob.pubKey]).toBeUndefined();
+    const evict  = body(founder, 'evict', bob);
+    const rejoin = body(bob, 'join', bob, { payload: { peerDisplay: 'bee2' }, parent: plain.hash, deps: [evict.hash] });
+    const r = foldRoster([plain, evict, rejoin], { founders: [founder.pubKey] });
+    expect(r.members).toContain(bob.pubKey);
+    expect(r.handles?.[bob.pubKey]).toBe('bee2');
+    const gone = foldRoster([plain, body(founder, 'evict', bob, { deps: [plain.hash] })], { founders: [founder.pubKey] });
+    expect(gone.members).not.toContain(bob.pubKey);
+    expect(gone.handles?.[bob.pubKey]).toBeUndefined();
+  });
+});

@@ -204,6 +204,10 @@ export async function redeemMembershipCode({
   // self-authored join only when that row exists (deny-favouring: a not-yet-arrived row defers, never forges).
   await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
     redemptionRef: item.id,
+    // The handle the joiner presented, so every device that folds this join can name them — the redemption
+    // row above carries it too, but only the admitting device ever holds that row. Self-asserted, like the
+    // circle address; uniqueness within the circle is enforced at redemption, before this is emitted.
+    ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
     // Rules acceptance rides the SIGNED join (task #80): the version the joiner accepted, or absent —
     // and absence is what a rules-gated fold refuses, on every receiving device.
     ...(typeof a.rulesAccepted === 'string' && a.rulesAccepted ? { rulesAccepted: a.rulesAccepted } : {}),
@@ -382,6 +386,10 @@ export async function verifyMembershipCodeForPeer({
   // that validated the code + enforced the ceiling, and a join needs no authority in the fold anyway. Additive.
   await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
     redemptionRef: item.id,
+    // The handle the joiner presented, so every device that folds this join can name them — the redemption
+    // row above carries it too, but only the admitting device ever holds that row. Self-asserted, like the
+    // circle address; uniqueness within the circle is enforced at redemption, before this is emitted.
+    ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
     // The remote joiner's acceptance, forwarded from the redeem request (task #80). The admin signs the
     // join; the acceptance value is the joiner's — recorded verbatim, refused-at-fold when absent on a
     // rules-gated circle.

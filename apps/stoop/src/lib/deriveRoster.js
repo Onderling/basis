@@ -268,6 +268,13 @@ export function deriveRoster({
         else if (inAdmins.has(webid)) roster.get(webid).role = 'admin';
       }
     }
+    // The handle a person chose at join rides the signed join as well as the redemption row — and only the
+    // admitting device holds the row. Fills an empty slot only: a trail row's handle, or the handle the
+    // MemberMap holds now (a rename, merged below), still wins.
+    for (const webid of roster.keys()) {
+      const h = folded.handles?.[webid];
+      if (typeof h === 'string' && h) upsert(webid, undefined, { handle: h });
+    }
     // ── HOW EACH ADMIN CAME TO BE ONE ─────────────────────────────────────────────────────────────
     // The fold names it (`adminProvenance`): they made the circle, an admin promoted them, or the
     // circle was left without an admin and the fold handed it over. All three used to render as the

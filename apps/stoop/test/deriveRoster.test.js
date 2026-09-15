@@ -359,6 +359,25 @@ describe('deriveRoster', () => {
       });
       expect(roster.map((m) => m.webid).sort()).toEqual(['B', 'NEW-MEMBER']);   // admitted, B kept
     });
+
+    it('the join-time handle rides the spine onto the row of a device that holds NO trail for the joiner', async () => {
+      // B's device folds C's join from the spine; C's redemption row lives in the admin's store and never
+      // arrives here. Before this, C rendered as `peer-…` on every device but the admin's (walked 2026-09-14).
+      const joiner = await AgentIdentity.generate(new VaultMemory());
+      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const roster = deriveRoster({ redemptions: [], spineStatements: [join], foldAuthoritative: true });
+      expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee');
+    });
+
+    it('a handle the MemberMap holds NOW (a rename) still wins over the join-time one', async () => {
+      const joiner = await AgentIdentity.generate(new VaultMemory());
+      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const roster = deriveRoster({
+        redemptions: [], spineStatements: [join], foldAuthoritative: true,
+        memberMapForDisplay: [{ webid: 'NEW-MEMBER', handle: 'cee-renamed' }],
+      });
+      expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee-renamed');
+    });
   });
 
   // ── HOW an admin came to be one, carried onto the row (`adminVia`) ────────────────────────────────

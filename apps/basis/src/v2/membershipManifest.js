@@ -30,6 +30,11 @@ export const membershipManifest = Object.freeze({
     // version. Self-subject at the fold (nobody accepts on another's behalf); an older acceptance is
     // stale-but-valid, so this statement is always the member's own act, never an obligation the fold
     // enforces — rule churn must not become invisible exclusion.
+    // The person's CURRENT signing key (the rotating person key — never the static profile key). A ceremony
+    // announces version n+1 to every circle the person is in; the statement binds by root reveal, and the
+    // reveal covers the key, so a device that holds the current key can neither rotate nor substitute one.
+    // Self-subject at the fold: the highest version is current (core personKeyFold.js).
+    { id: 'membership.personKey', description: "A member announces their CURRENT person key (version n+1) — a ceremony statement: binds by root reveal covering the key; self-subject; the highest version is current.", appends: [{ lane: MEMBERSHIP_LANE, kind: 'person-key' }] },
     { id: 'membership.rulesAccept', description: "A member re-accepts the circle's current rules version (self-subject; supersedes the version on their signed join).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'rules-accept' }] },
   ],
 });

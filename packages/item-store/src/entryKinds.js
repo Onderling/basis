@@ -51,7 +51,7 @@ const K = (lane, wakes, retain, audit) => Object.freeze({ lane, wakes, retain, a
 export const ENTRY_KINDS = Object.freeze({
   // ── human-facing ──────────────────────────────────────────────────────────
   'chat-message':    K(LANE.HUMAN, true,  RETAIN.RECORD, false),   // the conversation's RECORD — never drops
-  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),     // the store row is the durable head; entries age out
+  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),     // a task LINE in the conversation — derived from a head, never the statement itself
   ask:             K(LANE.HUMAN, true,  RETAIN.CHAT, false),
   offer:            K(LANE.HUMAN, true,  RETAIN.CHAT, false),
   lend:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),
@@ -62,6 +62,11 @@ export const ENTRY_KINDS = Object.freeze({
   // See `governanceWakes()`.
   governance:        K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
   report:            K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
+  // The task lane's signed statements: the carrier of a store head (a full-item snapshot, a removal), verified
+  // at the rail and merged into the circle's store. Plumbing — the head is what a screen reads and what a
+  // conversation line would be derived from; the statement itself must never paint. Same retention as the
+  // human task kind: the store row is the durable head, the statements age out and catch-up re-serves heads.
+  'task-statement':  K(LANE.SYSTEM, false, RETAIN.CHAT, false),
   'roster-updated':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
   'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening

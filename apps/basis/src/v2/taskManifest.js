@@ -21,7 +21,11 @@
 /** The device-log lane task statements ride. The lane name doubles as the log-entry type, which the shared
  *  entry-kind table already classes as 14-day retention — the entries age out; the STORE ROW is the durable
  *  head, and catch-up serves both. */
-export const TASK_LANE = 'task';
+// The device-log kind the task lane's SIGNED STATEMENTS ride (a snapshot of a store head, a removal). It is
+// deliberately not `'task'`: that name is the kinds table's HUMAN-facing task kind — the line a conversation
+// may show — and a lane statement is not a line, it is the carrier of one. When the two shared a name, the
+// conversation projection painted every statement as an empty bubble (walked 2026-09-14).
+export const TASK_LANE = 'task-statement';
 
 export const taskManifest = Object.freeze({
   app: 'task-lane',

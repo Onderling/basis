@@ -34,7 +34,11 @@ const KINDS_FILE = 'packages/item-store/src/entryKinds.js';
  */
 export const APPENDERS = {
   'chat-message':    { file: 'apps/basis/src/v2/chatRail.js', needle: 'CHAT_LANE' },
-  task:              { file: 'apps/basis/src/v2/taskRail.js', needle: 'TASK_LANE' },
+  // The human-facing task LINE — what a conversation shows when the circle's rules say tasks belong there. It is
+  // derived from a task head, never appended as such, and nothing derives it yet: the lane's own statements are
+  // `task-statement` (below) and are plumbing. Carried as debt until the derived line exists.
+  task:              { pending: 'the derived "task added" line in a conversation, gated by the circle\'s conversation kinds; the lane\'s statements are task-statement and never paint' },
+  'task-statement':  { file: 'apps/basis/src/v2/taskRail.js', needle: 'TASK_LANE' },
   ask:               { file: 'apps/basis/src/core/agent/realAgent.js', needle: "'ask'" },
   offer:             { file: 'apps/basis/src/core/agent/realAgent.js', needle: "'offer'" },
   lend:              { file: 'apps/basis/web/v2/circleNoticeboard.js', needle: "'lend'" },

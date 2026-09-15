@@ -115,6 +115,12 @@ jobs:
           # 2026-09-05 they carry no optional sibling-repo suites: the whole suite runs here.
           - { label: basis,             dir: apps/basis,                 args: '' }
           - { label: basis-mobile,      dir: apps/basis-mobile,          args: '' }
+          # household, calendar and agents are composed into basis (their manifests are what the shells paint) and
+          # had never been in this matrix. Found 2026-09-15: calendar had two tests red on the trunk since 2026-08-01
+          # — a date-fixed fixture that rotted — and nobody could have seen it here.
+          - { label: household,         dir: apps/household,             args: '' }
+          - { label: calendar,          dir: apps/calendar,              args: '' }
+          - { label: agents,            dir: apps/agents,                args: '' }
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

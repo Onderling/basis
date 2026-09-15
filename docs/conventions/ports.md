@@ -13,6 +13,9 @@ SDK" means exactly "satisfies the port."** Two things make that concrete and che
 
 > Implement the port **and** pass its conformance harness = your adapter is compatible.
 
+*(This is the contract for **replacing an adapter**. For **adding functionality** — nouns, verbs, flows that run
+inside Basis — see [`../extending.md`](../extending.md).)*
+
 There are four ports today — three general adapters (`Transport`, `DataSource`, `ActorResolver`) and one
 narrower store port (`StorageBackend`).
 

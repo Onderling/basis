@@ -1374,5 +1374,7 @@ Two directions are settled and already shaping the work described above:
   for deriving a design fork from them. Read it first when a decision needs a value, not a mechanism.
 - [`CLAUDE.md`](../CLAUDE.md) — the working conventions + the invariants, for agents editing code here.
 - [`conventions/`](./conventions/) — the detailed project-wide rules.
+- [`extending.md`](./extending.md) — the contract for adding functionality: extensions, what they may declare and
+  reach, where they run, how they are checked (each section marked built · designed · direction).
 - [`glossary.md`](./glossary.md) — every term used above, defined.
 - [project overview](../README.md) — the apps, the status, how to run things.

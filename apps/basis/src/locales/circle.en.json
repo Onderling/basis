@@ -346,6 +346,14 @@
       "text": "You are no longer an admin of this circle.",
       "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
     },
+    "member_is_now_admin": {
+      "text": "{{name}} is now an admin of this circle.",
+      "doc": "Membership notice RENDERED from the log entry — a role change is everyone's line, not only the promoted member's (decided 2026-09-15). {{name}} is the member's revealed label."
+    },
+    "member_is_no_longer_admin": {
+      "text": "{{name}} is no longer an admin of this circle.",
+      "doc": "Membership notice RENDERED from the log entry — a role change is everyone's line (decided 2026-09-15). {{name}} is the member's revealed label."
+    },
     "someone_joined": {
       "text": "{{name}} joined this circle.",
       "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."

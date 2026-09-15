@@ -17,7 +17,8 @@
  * — may this wake a sleeping phone (`wakes`), and is it conversation (`lane`). Membership must never wake
  * a device; that was right. But "silent" had come to mean "invisible", and a person was never told what
  * happened to them. `VIEWER_FACING_SYSTEM_KINDS` is that distinction made explicit: silent on the wire,
- * shown to the one it concerns.
+ * shown to the one it concerns — and a role change is shown to everyone in the circle, because who runs it
+ * is everyone's business.
  *
  * The decisions stay small and pure, and mirror `removalNotice`/`caretakerNotice`. Whether a person
  * WANTS each of these lines is a separate question (a circle default with a private per-member override,
@@ -34,6 +35,11 @@ export const MEMBERSHIP_NOTICE_KEYS = Object.freeze({
   promoted:  'circle.membership.you_are_now_admin',
   demoted:   'circle.membership.you_are_no_longer_admin',
   joined:    'circle.membership.someone_joined',
+  // A role change is the circle's fact, not a private message: the person it concerns reads "you", everyone
+  // else reads their name (decided 2026-09-15 — before that only the promoted member got a line). Both
+  // wordings follow the one "promoted" / "demoted" setting.
+  memberPromoted: 'circle.membership.member_is_now_admin',
+  memberDemoted:  'circle.membership.member_is_no_longer_admin',
 });
 
 const refOf = (row) => (typeof row === 'string' ? row : (row?.webid ?? row?.addr ?? row?.ref ?? ''));
@@ -54,11 +60,12 @@ export function membershipNoticeFor(body, { viewerId, members = null } = {}) {
       : { notice: 'removed' };
   }
   if (kind === 'role') {
-    if (subject !== viewerId) return null;
     const role = body.payload?.role;
-    if (role === 'admin')  return { notice: 'promoted' };
-    if (role === 'member') return { notice: 'demoted' };
-    return null;
+    if (role !== 'admin' && role !== 'member') return null;
+    if (subject === viewerId) return { notice: role === 'admin' ? 'promoted' : 'demoted' };
+    const row = Array.isArray(members) ? members.find((m) => refOf(m) === subject) : null;
+    const name = row ? revealedMemberLabel(row, { viewerId }).primary : subject;
+    return { notice: role === 'admin' ? 'memberPromoted' : 'memberDemoted', args: { name } };
   }
   if (kind === 'join') {
     // Addressed to the person who admitted them (the statement's author when admin-authored). A

@@ -230,15 +230,19 @@ export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {
 }
 
 /** Peer handler for `circle-task-broadcast` → the rail's full ingest gate + the head apply. */
-export function makeTaskPeerHandler({ rail, onChange = null } = {}) {
+/** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
+export function makeTaskPeerHandler({ rail, onChange = null, onLanded = null } = {}) {
   if (!rail) throw new Error('makeTaskPeerHandler: a task rail is required');
-  return async function onCircleTask(_fromPeerAddr, payload) {
+  return async function onCircleTask(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== TASK_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
     try {
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
+      if (res?.ok && !res.existed && typeof onLanded === 'function') {
+        try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }
+      }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };
 }

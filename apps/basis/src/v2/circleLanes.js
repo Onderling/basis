@@ -37,6 +37,18 @@ import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler } fro
 const NOOP = () => {};
 
 /**
+ * Hand a statement that just LANDED from a member to the person's other devices — the receiving half of the
+ * one sibling carry (`siblingCarry.js`). The payload is the lane's own wire shape, so a sibling's rail lands
+ * it through the very handler a member's fan reaches. Best-effort: catch-up reconciles what this misses.
+ * Exported so a harness that composes its own router can carry through the same function.
+ */
+export function carryLandedStatement({ carry, subtype, circleId, statement, fromPeerAddr, msgId = null }) {
+  if (typeof carry !== 'function' || !statement) return Promise.resolve(null);
+  const payload = { subtype, circleId, event: statement, ts: Date.now(), ...(msgId ? { msgId } : {}) };
+  return Promise.resolve(carry(payload, { from: fromPeerAddr ?? null })).catch(() => null);
+}
+
+/**
  * Build the lane half of a shell's peer-router table.
  *
  * @param {object} a
@@ -142,6 +154,11 @@ export function buildCircleLanes({
     eventLog,
   }) : null;
 
+  // THE SIBLING CARRY — the person's other devices as a standing peer of every lane. Composed by the
+  // host (basis: `makeSiblingCarry` over the proven own-device set); absent on a composition without
+  // one, and then every hook below is a no-op.
+  const carry = typeof agent.siblingCarry?.carry === 'function' ? (p, o) => agent.siblingCarry.carry(p, o) : null;
+
   // ── the fan receivers ────────────────────────────────────────────────────────────────────────
   const chatStatementHandler = agent.chatRail ? makeChatPeerHandler({
     rail: agent.chatRail,
@@ -150,9 +167,11 @@ export function buildCircleLanes({
     ...(typeof resolveRef === 'function' ? { resolveRef } : {}),
     // The persisted log IS the record, so a landed signed entry needs no second copy. What is left is
     // the side effect: tell the sender it arrived, and repaint if this circle is on screen.
-    onLanded: async (circleId, entry, fromPeerAddr) => {
+    onLanded: async (circleId, entry, fromPeerAddr, statement) => {
       try { await chatLanded({ msgId: entry?.id, circleId, fromPeerAddr, source: 'receiver' }); }
       catch { /* a receipt that fails must not un-land the message */ }
+      // …and hand it to my other devices (the one sibling carry; a no-op on a one-device person).
+      await carryLandedStatement({ carry, subtype: CHAT_STATEMENT_BROADCAST, circleId, statement, fromPeerAddr, msgId: entry?.id ?? null });
     },
   }) : null;
 
@@ -171,7 +190,11 @@ export function buildCircleLanes({
     ...catchUpEntries(chat),
     ...(keyStatementHandler ? { [KEY_STATEMENT_BROADCAST]: keyStatementHandler } : {}),
     ...catchUpEntries(key),
-    ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
+    ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({
+      rail: agent.taskRail,
+      onLanded: (circleId, statement, fromPeerAddr) =>
+        carryLandedStatement({ carry, subtype: TASK_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
+    }) } : {}),
     ...catchUpEntries(task),
     ...(agent.membershipRail ? {
       [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail, onChange: onMembership }),

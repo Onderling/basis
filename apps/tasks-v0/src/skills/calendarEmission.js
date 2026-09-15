@@ -19,6 +19,7 @@
 import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
+import { makeRoleOf } from './roleOf.js';
 
 /**
  * @param {object} args
@@ -26,7 +27,7 @@ import { argsFromParts } from '../bundleResolver.js';
  *   Resolver returns a CircleState; per-CircleState `onCalendarEmissionChange`
  *   callback wires the rewire loop in `Circle.js`.
  */
-export function buildCalendarEmissionSkills({ bundleResolver } = {}) {
+export function buildCalendarEmissionSkills({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildCalendarEmissionSkills: bundleResolver(parts, ctx) required');
   }
@@ -35,7 +36,7 @@ export function buildCalendarEmissionSkills({ bundleResolver } = {}) {
     defineSkill('setCalendarEmission', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }
@@ -89,7 +90,7 @@ export function buildCalendarEmissionSkills({ bundleResolver } = {}) {
       if (!circle) return { error: 'circleId required' };
       const lc = circle.liveCircle ?? {};
       const enabled = !!lc.calendarEmission?.enabled;
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       const canToggle = role === 'admin' || role === 'coordinator';
       return {
         enabled,

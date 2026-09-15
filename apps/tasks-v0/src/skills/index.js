@@ -46,6 +46,7 @@ import { computeStatus, effectiveStatus, unmetDeps, detectCycle } from '../dag.j
 import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
+import { makeRoleOf } from './roleOf.js';
 import { validateCanonical, LISTS_TYPES } from '@onderling/item-types';
 import { saveCircleConfig, loadCircleConfig, KIND_DEFAULTS } from '../Circle.js';
 import { tasksManifest } from '../../manifest.js';
@@ -460,10 +461,12 @@ export const TASK_CORES = Object.freeze({
  * @param {(circleId: string, webid: string) => Promise<string|null>} [deps.circleRoleOf]
  *   The caller's role IN A CIRCLE, read from the host's membership head (the fold of the circle's
  *   signed statements). Injected because this app must not reach into the host's roster itself.
- *   Absent ⇒ the role half of an authority gate cannot be answered and the gate refuses; the
- *   creator path (below) still stands on its own.
+ * @param {(circle: object, webid: string) => Promise<string|null>} [deps.roleOf]
+ *   The ONE reader every authority gate asks — built from `circleRoleOf` by default (see
+ *   `roleOf.js`: the host's head when injected, else the composition's declared map per circle; a
+ *   reader that throws or answers nothing yields null, and every gate refuses on null).
  */
-export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = null } = {}) {
+export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = null, roleOf = makeRoleOf(circleRoleOf) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildSkills: bundleResolver(parts, ctx) required');
   }
@@ -626,10 +629,7 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
       // Absence refuses; it never falls through to a yes.
       const isCreator = task.addedBy === from || task.master === from;
       if (!isCreator) {
-        if (typeof circleRoleOf !== 'function') return { ok: false, error: 'authority-unavailable' };
-        let role = null;
-        try { role = await circleRoleOf(circle.circleId ?? circle.id ?? null, from); }
-        catch { return { ok: false, error: 'authority-unavailable' }; }
+        const role = await roleOf(circle, from);
         if (role !== 'admin') return { ok: false, error: 'permission-denied' };
       }
 
@@ -751,8 +751,7 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
       if (!conflict) return { error: 'no-conflict' };
 
       // Reuse the reassign/revoke gate: admin / coordinator resolve.
-      const role = circle.liveCircle?.members?.find?.((m) => m.webid === from)?.role
-        ?? circle?.roles?.[from] ?? null;
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') return { error: 'permission-denied' };
 
       const keepLocal = decision !== 'theirs';
@@ -914,8 +913,7 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
       if (!circle) return { error: 'circleId required' };
       const a = argsFromParts(parts);
       // Admin / coordinator gate via the circle's role map.
-      const role = circle.liveCircle?.members?.find?.((m) => m.webid === from)?.role
-        ?? circle?.roles?.[from] ?? null;
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin-only' };
       }

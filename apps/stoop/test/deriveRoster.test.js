@@ -483,3 +483,18 @@ describe('W10 — a person\'s chosen handle reaches BOTH rosters (2026-08-29)', 
     expect(roster.find((m) => m.webid === 'B')?.handle).toBe('current-handle');
   });
 });
+
+describe('the roster row carries the member\'s CURRENT person key (the person-key head)', () => {
+  it('a verified person-key statement lands on the row; the highest version is current; nobody announces for another', () => {
+    const roster = deriveRoster({
+      redemptions: [redemption({ redeemedBy: 'B', circleAddress: 'addrB' }), redemption({ redeemedBy: 'C', circleAddress: 'addrC' })],
+      spineStatements: [
+        { kind: 'person-key', author: 'B', subject: 'B', payload: { version: 1, pubKey: 'B-1' } },
+        { kind: 'person-key', author: 'B', subject: 'B', payload: { version: 2, pubKey: 'B-2' } },
+        { kind: 'person-key', author: 'C', subject: 'B', payload: { version: 9, pubKey: 'FORGED' } },   // self-subject: ignored
+      ],
+    });
+    expect(roster.find((m) => m.webid === 'B').personKey).toEqual({ version: 2, pubKey: 'B-2' });
+    expect('personKey' in roster.find((m) => m.webid === 'C'), 'no announcement → no key on the row').toBe(false);
+  });
+});

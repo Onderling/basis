@@ -1,4 +1,4 @@
-import { foldRoster, verifyCircleLink } from '@onderling/core';
+import { foldRoster, verifyCircleLink, foldPersonKeys } from '@onderling/core';
 import { hasHumanRules } from '@onderling/circles';
 import { isExited } from './circleExits.js';
 
@@ -337,6 +337,13 @@ export function deriveRoster({
     }
   }
 
+  // ── THE PERSON KEY (the rotating person-level signing key, per member) ─────────────────────────────
+  // `person-key` statements arrive in the same verified spine feed (bound by root reveal at the rail, so
+  // what reaches here is the person's own ceremony announcement). The fold is core's — self-subject, the
+  // highest version is current, ties resolved identically on every replica — and lands on the row as
+  // `personKey: { version, pubKey }`. Absent until the person's first announcement in this circle.
+  const personKeys = foldPersonKeys(spineStatements);
+
   // LEFT-JOIN the MemberMap for display fields; the trail wins on existence + keys.
   // Spread disp first, then the derived record: rec only carries keys it actually
   // has a value for, so a trail-captured key overrides the display cache while an
@@ -385,6 +392,8 @@ export function deriveRoster({
     if (cap && addressSet.length > cap) addressSet.length = cap;
     if (addressSet.length) merged.circleAddresses = addressSet;
     else delete merged.circleAddresses;
+    const pk = personKeys.get(rec.webid);
+    if (pk) merged.personKey = { version: pk.version, pubKey: pk.pubKey };
     out.push(merged);
   }
   return out;

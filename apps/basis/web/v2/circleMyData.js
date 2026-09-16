@@ -36,6 +36,7 @@ export function renderCircleMyData(container, {
   // fileBytes: 'full'|'description', kringenOff: Set<string>, kringen: [{id, name}] }` + `onSetSync({ silo?, value?, fileBytes?, kringId?, on? })`.
   syncSelection = null,
   onSetSync = null,
+  onMakePrimary,
   // CONNECTIONS (gekoppelde apparaten) — screens that are yours, somewhere else. Rows come from the
   // shared `connectionRows` projection; the two columns are the whole product question (what it may
   // SEE, what it may DO). Absent handler ⇒ the section is omitted, like every other section here.
@@ -204,6 +205,8 @@ export function renderCircleMyData(container, {
     ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
     // The replace ceremony: after a restore, retire every other device in one act.
     ['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice],
+    // The member's choice of which device others deliver to first (their primary contact address).
+    ['cc-mydata__primary', 'circle.mydata.make_primary', onMakePrimary],
   ].filter(([, , fn]) => typeof fn === 'function');
   if (acts.length) {
     const keys = section(tr('circle.mydata.keys'));

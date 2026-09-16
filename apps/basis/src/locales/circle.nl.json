@@ -4636,6 +4636,14 @@
       "text": "Nog geen kringen.",
       "doc": "Empty list."
     },
+    "make_primary": {
+      "text": "Dit apparaat als eerste contactadres",
+      "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
+    },
+    "make_primary_done": {
+      "text": "Dit apparaat is nu je eerste contactadres in {{count}} kringen",
+      "doc": "After the tap: how many circles took the choice (count)."
+    },
     "devices": "Mijn apparaten",
     "connections": {
       "text": "Gekoppelde apparaten",

@@ -4636,6 +4636,14 @@
       "text": "No circles yet.",
       "doc": "Empty list."
     },
+    "make_primary": {
+      "text": "Make this device my primary contact address",
+      "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."
+    },
+    "make_primary_done": {
+      "text": "This device is now your primary contact address in {{count}} circles",
+      "doc": "After the tap: how many circles took the choice (count)."
+    },
     "devices": "My devices",
     "connections": {
       "text": "Connected devices",

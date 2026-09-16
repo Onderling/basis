@@ -28,7 +28,7 @@ import {
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
+  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
@@ -523,14 +523,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE PERSON KEY (rotating, per profile — identity/personKey.js). A root-custody device re-derives the
   // current version each boot; an enrolled device was handed it at its ceremony and keeps it sealed. Absent
   // on an enrolled device from before person keys: it announces no key at joins, and says so once.
+  // The LINK KEY's public half rides with it (personKey.js): root custody derives it; an enrolled device was handed
+  // it at its ceremony. The link SEED exists only inside a ceremony — it is what vouches for a rotation to a contact.
+  const derivedLinkKeyPub = defaultProfileSeed ? personKeyPubKeyB64(derivePersonLinkKeySeed(defaultProfileSeed)) : null;
   let personKey = await (async () => {
-    try { const stored = await loadPersonKey(chatVault); if (stored) return stored; } catch { /* re-derive below */ }
-    if (defaultProfileSeed) return { version: 1, seed: derivePersonKeySeed(defaultProfileSeed, 1) };
+    try {
+      const stored = await loadPersonKey(chatVault);
+      if (stored) return (stored.linkKeyPub || !derivedLinkKeyPub) ? stored : { ...stored, linkKeyPub: derivedLinkKeyPub };
+    } catch { /* re-derive below */ }
+    if (defaultProfileSeed) return { version: 1, seed: derivePersonKeySeed(defaultProfileSeed, 1), linkKeyPub: derivedLinkKeyPub };
     console.warn('[realAgent] no person key on this enrolled device — it announces none at joins; a phrase ceremony on it hands it one');
     return null;
   })();
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
   const currentPersonKey = () => (personKey ? { version: personKey.version, pubKey: personKeyPubKeyB64(personKey.seed) } : null);
+  /** The same, with the link key's public half — what a CARD and a chain reply carry, so a contact can pin it and verify rotations. */
+  const personKeyForContacts = () => (personKey ? { ...currentPersonKey(), ...(personKey.linkKeyPub ? { linkKeyPub: personKey.linkKeyPub } : {}) } : null);
   // THE PERSON KEY ON THE WIRE (binding-levels §10.5 step 4): an identity the secure agent can sign envelopes with
   // (`sendAs`), registered as OURS at the security layer and as an address on the relays. It is what a device
   // speaks as when nothing else of it is known to the other end — the enrolling device's first requests to its
@@ -1911,7 +1919,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
   });
   /** My chain, for a contact's pull: the current key and the links that vouch for it from any earlier version. */
-  const personKeyChainOf = () => (personKey ? { current: currentPersonKey(), links: Array.isArray(personKey.links) ? personKey.links : [] } : null);
+  const personKeyChainOf = () => (personKey ? { current: personKeyForContacts(), links: Array.isArray(personKey.links) ? personKey.links : [] } : null);
   /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
   const personSeedFor = (version) => (personKey?.version === version ? personKey.seed : (personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
   /** A contact's row in the contact book, by their webid (the profile address a direct message goes to). */
@@ -2472,8 +2480,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       let personKeyVersion = null;
       try {
         const nextVersion = (personKey?.version ?? 0) + 1;
-        const nextSeed = derivePersonKeySeed(root.deriveAgentSeed('default'), nextVersion);
+        const profileSeedNow = root.deriveAgentSeed('default');
+        const nextSeed = derivePersonKeySeed(profileSeedNow, nextVersion);
         const pubKey = personKeyPubKeyB64(nextSeed);
+        // The link key: derived here, used once, dropped — its public half is what every device of mine keeps.
+        const linkSeed = derivePersonLinkKeySeed(profileSeedNow);
+        const linkKeyPub = personKeyPubKeyB64(linkSeed);
         // The hand-over's reveals, one per circle: the root's word that THIS seed is version n of THIS person —
         // what a survivor verifies against its own commitment (personKeySync.js). Kept beside the key so a
         // sibling that asks later gets the same proof.
@@ -2484,13 +2496,14 @@ export async function createRealHouseholdAgent(opts = {}) {
             facts: personKeyFacts({ version: nextVersion, pubKey }),
           });
         }
-        // The chain link: version n vouches for n+1, signed with the seed being retired — what a contact who knew n
-        // verifies to learn n+1 without the root. Older seeds are kept, so a message sealed to n still opens.
-        const link = personKey ? signPersonKeyLink(personKey.seed, { version: nextVersion, pubKey, prevVersion: personKey.version }) : null;
+        // The chain link: the LINK KEY vouches that n+1 follows n — what a contact who knew n verifies to learn n+1
+        // without the root. Never signed with the seed being retired: the revoked device holds that seed and would
+        // vouch for a key of its own (the hole of 2026-09-16). Older seeds are kept, so a message sealed to n still opens.
+        const link = personKey ? signPersonKeyLink(linkSeed, { version: nextVersion, pubKey, prevVersion: personKey.version }) : null;
         // The seed being retired rides along explicitly: a root-custody device derived v1 at boot and never stored it.
         const previous = personKey ? [...(personKey.previous ?? []), { version: personKey.version, seed: personKey.seed }] : [];
-        if (await storePersonKey(chatVault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous })) {
-          await adoptPersonKey((await loadPersonKey(chatVault)) ?? { version: nextVersion, seed: nextSeed, reveals });
+        if (await storePersonKey(chatVault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub })) {
+          await adoptPersonKey((await loadPersonKey(chatVault)) ?? { version: nextVersion, seed: nextSeed, reveals, linkKeyPub });
         }
         personKeyVersion = nextVersion;
         if (typeof membershipEmit === 'function') {
@@ -4037,7 +4050,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         );
         if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
         // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
-        if (personKey) realArgs = { ...realArgs, personKey: currentPersonKey(), personKeyLinks: Array.isArray(personKey.links) ? personKey.links : [] };
+        if (personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(personKey.links) ? personKey.links : [] };
         // WHERE I CAN BE FOUND (Frits, 2026-09-11): the primary relay by default; every extra relay this
         // device is on only when the person named it (`extraRelays`, off by default — relay diversity is
         // an unlinkability strategy, and a card listing every relay hands its holder a linkage across

@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { bootRealAgentNode, connectNodesOverBus, until, teardown } from '../support/pairRealAgents.js';
 import { EventLog } from '../../src/eventLog.js';
+import { Bootstrap, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, signPersonKeyLink } from '@onderling/core';
 
 const log = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
 const tapWire = (node) => {   // every contact-message payload as it arrives on the wire, before the channel opens it
@@ -44,9 +45,34 @@ describe('contacts seal direct messages to the person key', () => {
   }, 60_000);
   afterAll(async () => { await teardown(A, B); });
 
-  it('the card carries the person key; the contact book keeps it', async () => {
-    expect(await contactKey(B, A.pubKey)).toEqual(A.agent.personKey() && { version: 1, pubKey: A.agent.personKey().pubKey });
-    expect(await contactKey(A, B.pubKey)).toEqual({ version: 1, pubKey: B.agent.personKey().pubKey });
+  it('the card carries the person key AND the link key\'s public half; the contact book keeps both (the pin)', async () => {
+    const pinA = await contactKey(B, A.pubKey);
+    expect(pinA).toMatchObject({ version: 1, pubKey: A.agent.personKey().pubKey });
+    expect(typeof pinA.linkKeyPub, 'no link key pinned from the card').toBe('string');
+    expect(pinA.linkKeyPub).not.toBe(pinA.pubKey);
+    expect(await contactKey(A, B.pubKey)).toMatchObject({ version: 1, pubKey: B.agent.personKey().pubKey });
+    expect(typeof (await contactKey(A, B.pubKey)).linkKeyPub).toBe('string');
+  });
+
+  it('THE HOLE (2026-09-16), closed: a revoked device holds seed n and the profile address — its forged chain moves nothing, and neither does a card with a link key of its own', async () => {
+    // The thief: everything the lost device holds — version 1's seed (derivable from the phrase it saw at its ceremony,
+    // never the root afterwards). It signs "1 vouches for 2" itself, naming a key of its own, and answers Bea's pull.
+    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    const profileSeed = Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default');
+    const seed1 = derivePersonKeySeed(profileSeed, 1);
+    expect(personKeyPubKeyB64(seed1), 'the test holds what the lost device holds').toBe(A.agent.personKey().pubKey);
+    const thiefKey = personKeyPubKeyB64(derivePersonKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default'), 1));
+    const forged = signPersonKeyLink(seed1, { version: 2, pubKey: thiefKey, prevVersion: 1 });
+    const before = await contactKey(B, A.pubKey);
+    const r = await B.agent.callSkill('stoop', 'setContactPersonKey', { webid: A.pubKey, personKey: { version: 2, pubKey: thiefKey }, links: [forged] });
+    expect(r.personKey ?? null).toEqual(before);
+    expect(await contactKey(B, A.pubKey), 'the forged chain moved the record').toEqual(before);
+    // A fresh card with the thief's OWN link key — the pin refuses it.
+    const thiefLinkPub = personKeyPubKeyB64(derivePersonLinkKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default')));
+    const forgedByOwnLink = signPersonKeyLink(derivePersonLinkKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default')), { version: 2, pubKey: thiefKey, prevVersion: 1 });
+    await B.agent.callSkill('stoop', 'setContactPersonKey', { webid: A.pubKey, personKey: { version: 2, pubKey: thiefKey, linkKeyPub: thiefLinkPub }, links: [forgedByOwnLink] });
+    expect(await contactKey(B, A.pubKey), 'a card with a different link key replaced the pin').toEqual(before);
+    // And the genuine link, signed by the real link key, IS what Bea will accept — proven by the rotation below.
   });
 
   it('a direct message crosses as a box, not text — and lands opened', async () => {

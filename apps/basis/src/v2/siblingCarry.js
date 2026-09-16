@@ -46,9 +46,11 @@ export function makeSiblingCarry({ siblings, sendToPeer, onWarn = null } = {}) {
    * @param {object} payload  the lane's own wire payload — `{ subtype, circleId, event, … }` for a circle lane, exactly
    *   what the member fan sends; `{ subtype, … }` for a PERSONAL channel (grants, contact turns, known peers), which
    *   has no circle — the send picks the circle it shares with each sibling.
-   * @param {{ from?: string|null }} [opts]  the address the statement ARRIVED from (a landed statement); absent for an own write
+   * @param {{ from?: string|null, exclude?: string[] }} [opts]  `from`: the address the statement ARRIVED from (a landed
+   *   statement), absent for an own write; `exclude`: sibling addresses that must NOT receive this — a device being
+   *   revoked in the very ceremony that carries (its addresses are retired only after the hand-over).
    */
-  async function carry(payload, { from = null } = {}) {
+  async function carry(payload, { from = null, exclude = [] } = {}) {
     if (!payload || typeof payload.subtype !== 'string' || !payload.subtype) {
       return { attempted: 0, skipped: 'not-a-lane-payload', outcomes: [] };
     }
@@ -57,7 +59,8 @@ export function makeSiblingCarry({ siblings, sendToPeer, onWarn = null } = {}) {
     // What a SIBLING carried here has reached the whole set already — carrying it on would ping-pong
     // between a person's devices (the rails would dedupe it, but every hop is a send).
     if (from && addrs.includes(from)) return { attempted: 0, skipped: 'carried-by-a-sibling', outcomes: [] };
-    const targets = addrs.filter((a) => typeof a === 'string' && a && a !== from);
+    const out = new Set(Array.isArray(exclude) ? exclude : []);
+    const targets = addrs.filter((a) => typeof a === 'string' && a && a !== from && !out.has(a));
     const outcomes = await Promise.all(targets.map(async (to) => {
       try {
         const r = await sendToPeer(to, payload, { guarantee: 'hold-forward' });

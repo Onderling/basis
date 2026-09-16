@@ -796,6 +796,11 @@ export default function ChatScreen({
           globalThis.__onderlingKnownPeersKicked = true;
           setTimeout(() => { bundle.agent.knownPeersSync.requestFromSiblings().catch(() => {}); }, 2500);
         }
+        // The person key a ceremony rotated on another device while this one was off — web parity.
+        if (bundle?.agent?.personKeySync && !globalThis.__onderlingPersonKeyKicked) {
+          globalThis.__onderlingPersonKeyKicked = true;
+          setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
         // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
         // The SAME consume runs after a recovery-file import (the agent calls it: the file's peers are

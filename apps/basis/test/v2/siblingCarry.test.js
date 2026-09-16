@@ -181,3 +181,13 @@ describe('the three older sibling fans are callers of the one carry — same wir
     expect(sendToPeer.mock.calls[0][1]).toMatchObject({ subtype: KNOWN_PEERS_BROADCAST });
   });
 });
+
+describe('an explicit exclusion — the device a ceremony is revoking', () => {
+  it('the excluded sibling receives nothing; the others do', async () => {
+    const sendToPeer = vi.fn(async () => ({ delivered: true }));
+    const { carry } = makeSiblingCarry({ siblings: async () => SIBS, sendToPeer });
+    const r = await carry(chatPayload, { exclude: ['addr:box'] });
+    expect(r.attempted).toBe(1);
+    expect(sendToPeer.mock.calls.map((c) => c[0])).toEqual(['addr:laptop']);
+  });
+});

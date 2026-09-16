@@ -234,6 +234,9 @@ export function buildCircleLanes({
     // land here from a sibling (live, in full for a new device, or as a catch-up answer), and a
     // sibling's request is answered. Entries only — the agent owns the gate and the landing.
     ...(agent.knownPeersSync?.handlers ?? {}),
+    // The person key between the person's devices: the rotation ceremony's hand-over lands here from a
+    // sibling, and a sibling's request is answered. Entries only — the agent owns the gate and the store.
+    ...(agent.personKeySync?.handlers ?? {}),
   };
 
   return {

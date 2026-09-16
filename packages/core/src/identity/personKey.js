@@ -16,6 +16,8 @@ import nacl from 'tweetnacl';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
+import { AgentIdentity } from './AgentIdentity.js';
+import { VaultMemory } from '@onderling/vault';
 
 const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every person key).
@@ -55,6 +57,75 @@ export function personKeyAnnouncement(pk) {
   return { version: pk.version, pubKey: pk.pubKey };
 }
 
+const LINK_DOMAIN = 'onderling-person-key-link-v1';
+
+/** The bytes a chain link signs: version n+1 and its key, bound to the version that vouches for it. */
+export function personKeyLinkMessage({ version, pubKey, prevVersion }) {
+  return new TextEncoder().encode(`${LINK_DOMAIN}|${prevVersion}|${version}|${pubKey}`);
+}
+
+/**
+ * THE CHAIN — how someone who knew version n learns version n+1 without the root: each new version is vouched for
+ * by the one before it, signed with the previous seed at the rotation ceremony. A contact who holds version n
+ * verifies the links from n upward and arrives at the current key; a device that holds only the current seed
+ * cannot forge a link for a version it never held. Public material (keys and signatures), so it may be pulled by
+ * anyone who knows the person — but it is the PERSON's cross-circle identity, so it is handed to contacts, never
+ * fanned into circles (those learn the key root-revealed, per circle).
+ * @returns {{ version: number, pubKey: string, prevVersion: number, sig: string }}
+ */
+export function signPersonKeyLink(prevSeed, { version, pubKey, prevVersion }) {
+  if (!Number.isInteger(version) || !Number.isInteger(prevVersion) || prevVersion !== version - 1) throw new Error('signPersonKeyLink: version must follow prevVersion');
+  if (typeof pubKey !== 'string' || !pubKey) throw new Error('signPersonKeyLink: pubKey required');
+  return { version, pubKey, prevVersion, sig: signWithPersonKey(prevSeed, personKeyLinkMessage({ version, pubKey, prevVersion })) };
+}
+
+/**
+ * Walk the chain from what is KNOWN — `{ version, pubKey }` — to the highest version the links vouch for.
+ * Each link must be signed by the key of the version before it, starting from the known key. Returns the
+ * current `{ version, pubKey }` (the known one when no link applies), or null when a link in the way fails.
+ */
+export function verifyPersonKeyChain(links, known) {
+  if (!known || !Number.isInteger(known.version) || typeof known.pubKey !== 'string') return null;
+  const byVersion = new Map();
+  for (const l of Array.isArray(links) ? links : []) if (l && Number.isInteger(l.version)) byVersion.set(l.version, l);
+  let cur = { version: known.version, pubKey: known.pubKey };
+  for (;;) {
+    const next = byVersion.get(cur.version + 1);
+    if (!next) return cur;
+    if (typeof next.pubKey !== 'string' || !next.pubKey || typeof next.sig !== 'string' || next.prevVersion !== cur.version) return null;
+    let ok = false;
+    try { ok = nacl.sign.detached.verify(personKeyLinkMessage(next), b64decode(next.sig), b64decode(cur.pubKey)); } catch { ok = false; }
+    if (!ok) return null;
+    cur = { version: next.version, pubKey: next.pubKey };
+  }
+}
+
+/**
+ * SEAL to a person key — a direct message's content, boxed to the recipient's current person key from the sender's
+ * current person key (both Ed25519, converted to Curve25519 by the identity). What the transport carries stays
+ * sealed to the recipient DEVICE; this seals to the PERSON: a revoked device, which still holds the profile key and
+ * may still receive at the profile address, cannot open it.
+ * @param {Uint8Array} senderSeed  the sender's current person-key seed
+ * @param {string} recipientPubKey  the recipient's current person key (b64)
+ * @param {object} content  JSON-serialisable
+ * @returns {Promise<{ sealed: string, nonce: string }>}
+ */
+export async function sealToPersonKey(senderSeed, recipientPubKey, content) {
+  const id = await AgentIdentity.fromSeed(senderSeed, new VaultMemory());
+  const { nonce, ciphertext } = id.box(new TextEncoder().encode(JSON.stringify(content)), recipientPubKey);
+  return { sealed: b64encode(ciphertext), nonce: b64encode(nonce) };
+}
+
+/** Open what `sealToPersonKey` made: my seed for the version it was sealed to, the sender's key it names. Null when it does not open. */
+export async function openFromPersonKey(mySeed, senderPubKey, { sealed, nonce }) {
+  try {
+    const id = await AgentIdentity.fromSeed(mySeed, new VaultMemory());
+    const plain = id.unbox(b64decode(sealed), b64decode(nonce), senderPubKey);
+    if (!plain) return null;
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch { return null; }
+}
+
 /** Read the vault entry. Null when absent or malformed (an enrolled device from before person keys). */
 export async function loadPersonKey(vault) {
   let raw = null;
@@ -66,15 +137,31 @@ export async function loadPersonKey(vault) {
     const seed = b64decode(o.seed);
     if (!(seed instanceof Uint8Array) || seed.length !== 32) return null;
     const reveals = (o.reveals && typeof o.reveals === 'object') ? o.reveals : {};
-    return { version: o.version, seed, reveals };
+    const links = Array.isArray(o.links) ? o.links : [];
+    const previous = [];
+    for (const p of Array.isArray(o.previous) ? o.previous : []) {
+      try { const ps = b64decode(p.seed); if (Number.isInteger(p.version) && ps instanceof Uint8Array && ps.length === 32) previous.push({ version: p.version, seed: ps }); } catch { /* skip */ }
+    }
+    return { version: o.version, seed, reveals, links, previous };
   } catch { return null; }
 }
 
 /** Write the vault entry — only ever a HIGHER version than what is there (a ceremony never rolls a key back). */
-export async function storePersonKey(vault, { version, seed, reveals = {} }) {
+export async function storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [] }) {
   if (!Number.isInteger(version) || version < 1 || !(seed instanceof Uint8Array) || seed.length !== 32) throw new Error('storePersonKey: {version, seed} required');
   const have = await loadPersonKey(vault);
   if (have && have.version >= version) return false;
-  await vault.set(PERSON_KEY_VAULT_KEY, JSON.stringify({ version, seed: b64encode(seed), reveals: reveals && typeof reveals === 'object' ? reveals : {} }));
+  // Older versions stay openable: what was sealed to version n before the rotation still arrives after it.
+  const keep = new Map();
+  for (const p of [...(have?.previous ?? []), ...(have ? [{ version: have.version, seed: have.seed }] : []), ...previous]) {
+    if (p && Number.isInteger(p.version) && p.version < version && p.seed instanceof Uint8Array && p.seed.length === 32) keep.set(p.version, p.seed);
+  }
+  const allLinks = new Map();
+  for (const l of [...(have?.links ?? []), ...(Array.isArray(links) ? links : [])]) if (l && Number.isInteger(l.version)) allLinks.set(l.version, l);
+  await vault.set(PERSON_KEY_VAULT_KEY, JSON.stringify({
+    version, seed: b64encode(seed), reveals: reveals && typeof reveals === 'object' ? reveals : {},
+    links: [...allLinks.values()].sort((a, b) => a.version - b.version),
+    previous: [...keep.entries()].sort((a, b) => a[0] - b[0]).map(([v, sd]) => ({ version: v, seed: b64encode(sd) })),
+  }));
   return true;
 }

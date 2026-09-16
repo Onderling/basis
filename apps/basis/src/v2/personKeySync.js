@@ -56,14 +56,24 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
     return addrs.includes(fromAddr);
   }
   const wireOf = (k) => (k && k.reveals && Object.keys(k.reveals).length
-    ? { subtype: PERSON_KEY_CARRY, version: k.version, seed: b64encode(k.seed), reveals: k.reveals }
+    ? {
+      subtype: PERSON_KEY_CARRY, version: k.version, seed: b64encode(k.seed), reveals: k.reveals,
+      // the chain and the older seeds ride along: a survivor answers a contact's pull, and opens what was sealed to an older version
+      links: Array.isArray(k.links) ? k.links : [],
+      previous: (Array.isArray(k.previous) ? k.previous : []).map((p) => ({ version: p.version, seed: b64encode(p.seed) })),
+    }
     : null);
   const parse = (payload) => {
     if (!Number.isInteger(payload?.version) || payload.version < 1 || typeof payload?.seed !== 'string') return null;
     if (!payload.reveals || typeof payload.reveals !== 'object') return null;
     let seed = null;
     try { seed = b64decode(payload.seed); } catch { return null; }
-    return (seed instanceof Uint8Array && seed.length === 32) ? { version: payload.version, seed, reveals: payload.reveals } : null;
+    if (!(seed instanceof Uint8Array) || seed.length !== 32) return null;
+    const previous = [];
+    for (const p of Array.isArray(payload.previous) ? payload.previous : []) {
+      try { const ps = b64decode(p.seed); if (Number.isInteger(p.version) && ps instanceof Uint8Array && ps.length === 32) previous.push({ version: p.version, seed: ps }); } catch { /* skip */ }
+    }
+    return { version: payload.version, seed, reveals: payload.reveals, links: Array.isArray(payload.links) ? payload.links : [], previous };
   };
   /** ONE reveal that verifies against this person's own commitment in that circle admits the hand-over. */
   const rootSpoke = (k) => {

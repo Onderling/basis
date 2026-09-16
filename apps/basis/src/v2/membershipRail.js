@@ -202,15 +202,19 @@ export function makeMembershipEmitter({ rail, myRef, fan = null }) {
 
 /** Peer handler for `circle-membership-broadcast` → the rail's full ingest gate (verify + declared kind +
  *  key↔ref binding) before a fanned statement lands on this device's log. Signed-only, like governance. */
-export function makeMembershipPeerHandler({ rail, onChange = null } = {}) {
+/** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
+export function makeMembershipPeerHandler({ rail, onChange = null, onLanded = null } = {}) {
   if (!rail) throw new Error('makeMembershipPeerHandler: a membership rail is required');
-  return async function onCircleMembership(_fromPeerAddr, payload) {
+  return async function onCircleMembership(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== MEMBERSHIP_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
     try {
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
+      if (res?.ok && !res.existed && typeof onLanded === 'function') {
+        try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }
+      }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };
 }

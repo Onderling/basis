@@ -34,6 +34,7 @@
  */
 
 /** A row learned live on one device, carried to the others. */
+import { makeSiblingCarry } from './siblingCarry.js';
 export const KNOWN_PEERS_BROADCAST = 'device-known-peers';
 
 /** The catch-up pair: a sibling asks; a sibling answers with everything it knows. */
@@ -93,6 +94,9 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
 
   const refuse = (reason, fromAddr) => { try { onRefused?.(reason, fromAddr); } catch { /* observability never throws */ } };
   const warn = (msg) => { if (typeof console !== 'undefined') console.warn(`[own-devices] ${msg}`); };
+  // One caller of the ONE sibling carry (siblingCarry.js) for the live rows; the targeted push and the
+  // catch-up request stay what they are (one sibling, not the set).
+  const { carry } = makeSiblingCarry({ siblings, sendToPeer, onWarn: (m) => warn(`sync to my own device failed — that device will not know these until the next catch-up: ${m}`) });
 
   /** The gate every landing passes: one of the person's proven device addresses — never the profile
    *  address, which every device of theirs holds, a revoked one included (2026-09-14). */
@@ -204,9 +208,7 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
   };
 
   async function fanWire(wire) {
-    let addrs = [];
-    try { addrs = (await siblings()) ?? []; } catch { addrs = []; }
-    await Promise.all(addrs.map((addr) => sendWire(addr, KNOWN_PEERS_BROADCAST, wire)));
-    return { attempted: addrs.length };
+    const r = await carry({ subtype: KNOWN_PEERS_BROADCAST, ...wire });
+    return { attempted: r.attempted };
   }
 }

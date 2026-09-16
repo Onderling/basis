@@ -8196,7 +8196,7 @@ async function boot() {
           'circle-recipe-broadcast':  circleRecipeHandler,
           'circle-rules-broadcast':   circleRulesHandler,
           'circle-policy-broadcast':  circlePolicyHandler,
-          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => {
+          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.
             applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});

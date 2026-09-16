@@ -35,12 +35,13 @@ import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
 import { INBOX_KIND, isInboxItem } from '@onderling/item-types';
+import { makeRoleOf } from './roleOf.js';
 
 /**
  * @param {object} args
  * @param {(parts: Array, ctx?: object) => object | null} args.bundleResolver
  */
-export function buildWorkspaceSkills({ bundleResolver } = {}) {
+export function buildWorkspaceSkills({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildWorkspaceSkills: bundleResolver(parts, ctx) required');
   }
@@ -78,7 +79,7 @@ export function buildWorkspaceSkills({ bundleResolver } = {}) {
     defineSkill('listSubtaskRequests', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }

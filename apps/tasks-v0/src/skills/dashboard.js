@@ -23,6 +23,7 @@ import { defineSkill } from '@onderling/core';
 import { assigneesOf } from '@onderling/item-store';
 
 import { aggregateCircles } from '../dashboard/aggregator.js';
+import { makeRoleOf } from './roleOf.js';
 
 /**
  * Shared circle enumeration for the dashboard skills. Resolves the
@@ -31,7 +32,7 @@ import { aggregateCircles } from '../dashboard/aggregator.js';
  * circles where `from` holds a role. Returns `{ ctxCircle, eligible }`
  * or `{ error }` — identical to the (previously inline) getMyCircles gate.
  */
-function eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProvider }) {
+async function eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProvider, roleOf }) {
   const ctxCircle = bundleResolver(parts, { envelope, from });
   if (!ctxCircle) return { error: 'circleId required' };
   if (typeof from !== 'string' || !from) return { error: 'webid required' };
@@ -44,11 +45,14 @@ function eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProv
     ? ctxCircle._dashboardCirclesProvider
     : circlesProvider;
   const allCircles = [...(cp() ?? [])];
-  const eligible = allCircles.filter((cs) => {
-    const role = cs?.roles?.[from];
-    return typeof role === 'string' && role.length > 0;
-  });
-  return { ctxCircle, eligible };
+  // A circle counts for this caller when the head (or the declared map) gives them a role in it.
+  const eligible = [];
+  const roleIn = new Map();   // circleId → the caller's role, read once per circle
+  for (const cs of allCircles) {
+    const role = await roleOf(cs, from);
+    if (typeof role === 'string' && role.length > 0) { eligible.push(cs); roleIn.set(cs?.liveCircle?.circleId ?? cs?.circleId, role); }
+  }
+  return { ctxCircle, eligible, roleIn };
 }
 
 /**
@@ -63,7 +67,7 @@ function eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProv
  *   CircleState exposes `.liveCircle` + `.itemStore` + `.roles` so the
  *   aggregator can compute counts.
  */
-export function buildDashboardSkills({ bundleResolver, circlesProvider } = {}) {
+export function buildDashboardSkills({ bundleResolver, circlesProvider, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildDashboardSkills: bundleResolver(parts, ctx) required');
   }
@@ -73,9 +77,9 @@ export function buildDashboardSkills({ bundleResolver, circlesProvider } = {}) {
 
   return [
     defineSkill('getMyCircles', async ({ parts, from, envelope }) => {
-      const gate = eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProvider });
+      const gate = await eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProvider, roleOf });
       if (gate.error) return { error: gate.error };
-      const { eligible } = gate;
+      const { eligible, roleIn } = gate;
 
       const inputs = [];
       for (const cs of eligible) {
@@ -86,10 +90,8 @@ export function buildDashboardSkills({ bundleResolver, circlesProvider } = {}) {
       const circles = aggregateCircles({
         circles: inputs,
         actor: from,
-        roleOf: (actor, circle) => {
-          const cs = eligible.find((x) => x.liveCircle?.circleId === circle?.circleId);
-          return cs?.roles?.[actor];
-        },
+        // The aggregator asks for the CALLER's role per circle — read above, from the same source.
+        roleOf: (_actor, circle) => roleIn.get(circle?.circleId),
       });
       return { circles };
     }, {
@@ -109,7 +111,7 @@ export function buildDashboardSkills({ bundleResolver, circlesProvider } = {}) {
      * tasks are not surfaced — this is the actionable to-do list).
      */
     defineSkill('listMyTasksAcrossCircles', async ({ parts, from, envelope }) => {
-      const gate = eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProvider });
+      const gate = await eligibleCirclesFor({ parts, from, envelope, bundleResolver, circlesProvider, roleOf });
       if (gate.error) return { error: gate.error };
       const { eligible } = gate;
 

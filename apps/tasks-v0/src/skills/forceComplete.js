@@ -14,12 +14,13 @@
 import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
+import { makeRoleOf } from './roleOf.js';
 
 /**
  * @param {object} args
  * @param {(parts: Array, ctx?: object) => object | null} args.bundleResolver
  */
-export function buildForceCompleteSkill({ bundleResolver } = {}) {
+export function buildForceCompleteSkill({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildForceCompleteSkill: bundleResolver(parts, ctx) required');
   }
@@ -28,7 +29,7 @@ export function buildForceCompleteSkill({ bundleResolver } = {}) {
     defineSkill('forceCompleteTask', async ({ parts, from, envelope, actorDisplayName }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const a = argsFromParts(parts);
       if (typeof a.id !== 'string' || !a.id.trim()) {

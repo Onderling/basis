@@ -27,6 +27,7 @@
 import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
+import { makeRoleOf } from './roleOf.js';
 
 function liveBot(circle) {
   if (circle?.bot && typeof circle.bot === 'object') {
@@ -42,7 +43,7 @@ function liveBot(circle) {
  * @param {object} args
  * @param {(parts: Array, ctx?: object) => object | null} args.bundleResolver
  */
-export function buildBotBindingSkills({ bundleResolver } = {}) {
+export function buildBotBindingSkills({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildBotBindingSkills: bundleResolver(parts, ctx) required');
   }
@@ -51,7 +52,7 @@ export function buildBotBindingSkills({ bundleResolver } = {}) {
     defineSkill('getBotChatBindings', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }
@@ -95,7 +96,7 @@ export function buildBotBindingSkills({ bundleResolver } = {}) {
     defineSkill('setBotChatBinding', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
 
       const a = argsFromParts(parts);
@@ -127,7 +128,7 @@ export function buildBotBindingSkills({ bundleResolver } = {}) {
     defineSkill('removeBotChatBinding', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
 
       const a = argsFromParts(parts);
@@ -170,7 +171,7 @@ export function buildBotBindingSkills({ bundleResolver } = {}) {
     defineSkill('issueBotToken', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const botAgentRegistry = circle.botAgentRegistry;
       if (!botAgentRegistry) {
@@ -217,7 +218,7 @@ export function buildBotBindingSkills({ bundleResolver } = {}) {
     defineSkill('revokeBotToken', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const botAgentRegistry = circle.botAgentRegistry;
       if (!botAgentRegistry) {

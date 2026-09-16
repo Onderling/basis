@@ -41,6 +41,7 @@ import { depthOf, wouldCreateParentCycle } from '../dag-tree.js';
 import { argsFromParts } from '../bundleResolver.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isInboxItem } from '@onderling/item-types';
+import { makeRoleOf } from './roleOf.js';
 
 // ONE noun, two kinds — the vocabulary the manifest declares (`appliesTo: {type: 'inbox-item',
 // kind: …}`). These used to be written as bare types no registry knew, so the store refused them
@@ -62,7 +63,7 @@ const DEFAULT_ADMIN_APPROVAL_DEPTH = param({ key: 'tasksV0.adminApprovalDepth', 
  * @param {object} args
  * @param {(parts: Array, ctx?: object) => object | null} args.bundleResolver
  */
-export function buildSubtaskSkills({ bundleResolver } = {}) {
+export function buildSubtaskSkills({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildSubtaskSkills: bundleResolver(parts, ctx) required');
   }
@@ -90,7 +91,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       }
 
       // Authz: caller must be parent's assignee OR master OR admin/coord.
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       const isAdminish = role === 'admin' || role === 'coordinator';
       const allowed =
         isAdminish ||
@@ -185,7 +186,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
       const a = argsFromParts(parts);
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }
@@ -236,7 +237,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
       const a = argsFromParts(parts);
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }
@@ -293,7 +294,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       if (!parent.assignee) {
         return { error: 'parent has no assignee — propose-flow needs someone to consent' };
       }
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       const isAdminish = role === 'admin' || role === 'coordinator';
       const isMaster   = (parent.master ?? parent.addedBy) === from;
       if (!isAdminish && !isMaster) {
@@ -448,7 +449,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
     defineSkill('forceSpawnSubtask', async ({ parts, from, envelope, actorDisplayName }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const a = argsFromParts(parts);
       if (typeof a.parentTaskId !== 'string' || !a.parentTaskId) {

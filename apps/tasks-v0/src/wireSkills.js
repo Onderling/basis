@@ -49,6 +49,7 @@ import { buildPlannerSkills } from './skills/planner.js';
 import { buildDashboardSkills } from './skills/dashboard.js';
 import { buildForceCompleteSkill } from './skills/forceComplete.js';
 import { buildBotSkills } from './bot/skills.js';
+import { makeRoleOf } from './skills/roleOf.js';
 
 /**
  * @param {object} args
@@ -102,28 +103,31 @@ export function wireSkills({
     throw new TypeError('wireSkills: pass either `members` (single-circle) or `getBundle` (multi-circle) for identity skills');
   }
 
+  // ONE reader for every authority gate below: the host's membership head when injected, else the declared map.
+  const roleOf = makeRoleOf(circleRoleOf);
+
   const allBuilders = [
     buildIdentitySkills(idsArgs),
-    buildSkills({ bundleResolver, circlesProvider: cp, circleRoleOf }),
-    buildProfileSkills({ bundleResolver }),
-    buildAppealSkill({ bundleResolver }),
-    buildChatSkills({ bundleResolver }),
-    buildPushTokenSkills({ bundleResolver }),
-    buildSubtaskSkills({ bundleResolver }),
-    buildInboxSkills({ bundleResolver }),
-    buildWorkspaceSkills({ bundleResolver }),
-    buildBriefSummarySkill({ bundleResolver }),
-    buildObservabilitySkills({ bundleResolver, userSettings: us }),
-    buildCircleControlSkills({ bundleResolver }),
-    buildCustomRoleSkills({ bundleResolver }),
-    buildBotBindingSkills({ bundleResolver }),
-    buildCalendarEmissionSkills({ bundleResolver }),
-    buildInvoicingSkills({ bundleResolver }),
-    buildAvailabilitySkills({ bundleResolver }),
-    buildPlannerSkills({ bundleResolver }),
-    buildDashboardSkills({ bundleResolver, circlesProvider: cp }),
-    buildForceCompleteSkill({ bundleResolver }),
-    buildBotSkills({ bundleResolver }),
+    buildSkills({ bundleResolver, circlesProvider: cp, roleOf }),
+    buildProfileSkills({ bundleResolver, roleOf }),
+    buildAppealSkill({ bundleResolver, roleOf }),
+    buildChatSkills({ bundleResolver, roleOf }),
+    buildPushTokenSkills({ bundleResolver, roleOf }),
+    buildSubtaskSkills({ bundleResolver, roleOf }),
+    buildInboxSkills({ bundleResolver, roleOf }),
+    buildWorkspaceSkills({ bundleResolver, roleOf }),
+    buildBriefSummarySkill({ bundleResolver, roleOf }),
+    buildObservabilitySkills({ bundleResolver, userSettings: us, roleOf }),
+    buildCircleControlSkills({ bundleResolver, roleOf }),
+    buildCustomRoleSkills({ bundleResolver, roleOf }),
+    buildBotBindingSkills({ bundleResolver, roleOf }),
+    buildCalendarEmissionSkills({ bundleResolver, roleOf }),
+    buildInvoicingSkills({ bundleResolver, roleOf }),
+    buildAvailabilitySkills({ bundleResolver, roleOf }),
+    buildPlannerSkills({ bundleResolver, roleOf }),
+    buildDashboardSkills({ bundleResolver, circlesProvider: cp, roleOf }),
+    buildForceCompleteSkill({ bundleResolver, roleOf }),
+    buildBotSkills({ bundleResolver, roleOf }),
   ];
 
   const registered = [];

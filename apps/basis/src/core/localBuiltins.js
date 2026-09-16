@@ -17,6 +17,7 @@
  * `apps/basis/manifest.js`.
  */
 
+import { buildFileShareEnvelope } from './handlers/fileShare.js';
 import { describeFilter }    from '../filter.js';
 import { buildEmbed }        from '../embed.js';
 import { openExternalFlow }  from '../externalFlow.js';
@@ -435,9 +436,9 @@ async function sendFile(args, {
   }
 
   try {
-    const res = await agent.sendPeerMessage(peerAddr, {
-      type:    'p2p-chat',
-      subtype: 'file-share',
+    // Sealed to the PERSON when their current key is on record (the same seal as a text turn): the wire then
+    // carries a box and a stub, never the bytes. Without a key on record the bytes ride inline, as before.
+    const envelope = await buildFileShareEnvelope({
       file: {
         id:    `file-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         name:  file.name,
@@ -445,8 +446,10 @@ async function sendFile(args, {
         size:  file.size,
         dataB64,
       },
-      sentAt: Date.now(),
+      peerAddr,
+      sealFor: agent?.contactSeal?.sealFor ?? null,
     });
+    const res = await agent.sendPeerMessage(peerAddr, envelope);
     // Say what actually happened, not what was attempted. The façade's hold-forward answer
     // distinguishes delivered / held-for-later / given-up; reporting "sent" for all three is the
     // 2026-05-23 lesson repeating one layer up (sender-side OK, receiver never told otherwise).

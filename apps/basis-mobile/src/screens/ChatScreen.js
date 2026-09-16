@@ -645,12 +645,14 @@ export default function ChatScreen({
       // ContactThreadScreen through the same inbox every DM reply rides. It used to go to addMainBubble
       // → this screen's main thread — which v2 mounts but permanently hides.
       'file-share':            makeHandleFileShare({
-        deliverToThread: ({ contactId, fromAddr, file, messageId, ts }) => {
-          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file })
+        deliverToThread: ({ contactId, fromAddr, file, messageId, ts, sealed }) => {
+          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file, ...(sealed ? { sealed } : {}) })
             ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
-          pushContactReply({ fromAddr, threadId: contactId, text: '', file });
+          pushContactReply({ fromAddr, threadId: contactId, text: '', file, ...(sealed ? { sealed } : {}) });
         },
         identityOf: (addr) => agent?.identityOfAddress?.(addr) ?? addr,
+        // A file sealed to the person opens with my key for the version it names (the text turn's seal).
+        openFor: (sealed, fromAddr) => agent?.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
         // A first file makes the sender a contact row (the graph otherwise only learns at send time).
         notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
         publishEvent,

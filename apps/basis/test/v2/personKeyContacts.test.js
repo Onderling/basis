@@ -12,6 +12,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { bootRealAgentNode, connectNodesOverBus, until, teardown } from '../support/pairRealAgents.js';
 import { EventLog } from '../../src/eventLog.js';
+import { Bootstrap, derivePersonKeySeed, openFromPersonKey } from '@onderling/core';
+import { makeHandleFileShare, buildFileShareEnvelope } from '../../src/core/handlers/fileShare.js';
 
 const log = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
 const tapWire = (node) => {   // every contact-message payload as it arrives on the wire, before the channel opens it
@@ -79,5 +81,31 @@ describe('contacts seal direct messages to the person key', () => {
     await dm(B, A, 'mooi', 'b3');
     expect(await until(() => (landedAtA.some((t) => t.text === 'mooi') ? true : null), { timeout: 8000, step: 50 })).toBe(true);
     expect(rawAtA.find((p) => p.messageId === 'b3').sealed.to.version).toBe(2);
+  }, 60_000);
+
+  it('a FILE in a DM is sealed to the person like the text: the wire carries the box and a stub, never the bytes; the revoked device (seed 1) cannot open a file sealed after the rotation', async () => {
+    // Bea → Anna, who is at version 2 and known to Bea as such (the rotation above). The receive half is the
+    // shells' production handler with the agent's own `openFor`; the send half is the builtin's envelope builder.
+    const wireAtA = []; const delivered = [];
+    const priorA = A._routerRef.fn;
+    const onFile = makeHandleFileShare({ deliverToThread: (t) => delivered.push(t), openFor: A.agent.contactSeal.openFor, logger: { warn: () => {} } });
+    A._routerRef.fn = (env) => { if (env?.payload?.subtype === 'file-share') { wireAtA.push(env.payload); return onFile(env.from, env.payload); } return priorA?.(env); };
+    const file = { id: 'f-1', name: 'foto.jpg', mime: 'image/jpeg', size: 3, dataB64: Buffer.from('abc').toString('base64') };
+    const envelope = await buildFileShareEnvelope({ file, peerAddr: A.pubKey, sealFor: B.agent.contactSeal.sealFor, sentAt: 1234 });
+    expect(envelope.file.dataB64, 'the bytes left in the clear').toBeUndefined();
+    expect(envelope.sealed).toMatchObject({ to: { version: 2 }, from: { version: 1 } });
+    await B.agent.sendPeerMessage(A.pubKey, envelope);
+    expect(await until(() => (delivered.length ? true : null), { timeout: 8000, step: 50 }), 'the file never landed opened').toBe(true);
+    expect(delivered[0].file).toMatchObject({ id: 'f-1', name: 'foto.jpg', mime: 'image/jpeg', size: 3, dataB64: file.dataB64 });
+    expect(delivered[0].sealed).toMatchObject({ to: { version: 2 } });
+    expect(wireAtA[0].file.dataB64).toBeUndefined();
+    // THE THIEF: the lost device holds seed 1 (from the phrase it saw at its ceremony) — the box is sealed to version 2.
+    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    const seed1 = derivePersonKeySeed(Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), 1);
+    expect(await openFromPersonKey(seed1, wireAtA[0].sealed.from.pubKey, wireAtA[0].sealed), 'seed 1 opened a file sealed to version 2').toBe(null);
+    // And with NO key on record the file goes as before — bytes inline, transport-sealed only (the stated fallback).
+    const plain = await buildFileShareEnvelope({ file, peerAddr: 'nobody-on-record', sealFor: B.agent.contactSeal.sealFor });
+    expect(plain.sealed).toBeUndefined();
+    expect(plain.file.dataB64).toBe(file.dataB64);
   }, 60_000);
 });

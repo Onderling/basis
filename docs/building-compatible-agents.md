@@ -17,6 +17,10 @@ bot queries the card and calls ops directly. Target the waist, and both work.
 3. The functionality an `opId` names resolves *wherever it lives* — a local handler, an external agent, a model,
    the Solid pod, an MCP service — behind the same waist.
 
+This document is about talking to a Basis agent from *outside*. To run your code *inside* someone's Basis — on
+their data, under their control — see [`extending.md`](./extending.md); to replace a transport or a store and stay
+compatible, see [`conventions/ports.md`](./conventions/ports.md).
+
 ## 1. Discover — the A2A agent card
 
 A Onderling agent advertises itself as a standards-shaped **A2A agent card** (`name`, `description`, `skills`,

@@ -147,7 +147,7 @@ describe('the phone is lost, and there is a box', () => {
   it('5 · the replace ceremony on the new phone retires the lost phone — and the box — everywhere', async () => {
     const r = await newPhone.agent.callSkill('household', 'replaceDevice', { mnemonic: phrase, circleIds: [CIRCLE] });
     expect(r.ok, r.error).toBe(true);
-    expect(r.profileAddressRetired, 'the lost phone\'s profile-derived address is retired').toBe(true);
+    expect(r.firstDeviceRetired, 'the lost phone (the first device) is retired by derivation').toBe(true);
     // Bea's row for the person keeps ONLY the new phone's address.
     const mine = newPhone.agent.circleAddressFor(CIRCLE);
     const row = await until(async () => {

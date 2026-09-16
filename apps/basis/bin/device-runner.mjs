@@ -226,6 +226,9 @@ if (relayUrl) {
     sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     localActor: 'me',
+    // Direct messages are sealed to the PERSON's current key; an enrolled box holds it, handed over at enrol.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
     // A turn that arrives here is meant for the PERSON, so it goes on to their other devices.
     // …and the log says where it went: per device of the person's, delivered, held for its presence,
     // or failed. A revoked device's fan lands nowhere, and the log is where that is legible.
@@ -333,6 +336,7 @@ if (relayUrl) {
       circleIds,
       circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
       circlesForPoint,
       defaultRelayUrl: relayUrl,
       onError: (err, cid) => console.warn(`device-runner: circle-address register failed (${String(cid).slice(0, 12)}…):`, err?.message ?? err),
@@ -395,6 +399,7 @@ if (relayUrl) {
   kick(lanes.catchUps.membership, 'membership', 2500);
   kick(agent.grantsCatchUp, 'grants', 2500);
   kick(agent.knownPeersSync, 'known-peers', 2500);
+  kick(agent.personKeySync, 'person-key', 2500);
   kick(lanes.catchUps.task, 'tasks', 3000);
   kick(lanes.catchUps.chat, 'chat', 3500);
   kick(lanes.catchUps.key, 'keys', 3500);

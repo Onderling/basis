@@ -181,7 +181,9 @@ export async function clearEnrollOffer(storage) {
   try { await storage.removeItem(ENROLL_OFFER_STORAGE_KEY); } catch { /* best-effort */ }
 }
 
-const SEND = { guarantee: 'hold-forward' };
+// `asPerson`: these are the enrolling device's FIRST words to its sibling — its per-circle address is on nobody's
+// roster yet, so it speaks as the person's current key (never the static profile key, 2026-09-16).
+const SEND = { guarantee: 'hold-forward', asPerson: true };
 
 /**
  * The consume half — run by the shells once per boot, AFTER the agent is up and the transport is

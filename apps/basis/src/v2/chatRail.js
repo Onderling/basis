@@ -234,8 +234,9 @@ export function makeChatEmitter({ rail, fan = null }) {
   };
 }
 
-/** Peer handler for the signed chat fan → the rail's full ingest gate. `onLanded(circleId, entry)` is
- *  the side-effect seam (delivery receipts, the store-mirror bridge while it still exists). */
+/** Peer handler for the signed chat fan → the rail's full ingest gate. `onLanded(circleId, entry, fromPeerAddr,
+ *  statement)` is the side-effect seam (delivery receipts, the sibling carry — which re-sends the STATEMENT, so it
+ *  rides along beside the log entry). */
 export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null } = {}) {
   if (!rail) throw new Error('makeChatPeerHandler: a chat rail is required');
   return async function onCircleChatStatement(fromPeerAddr, payload) {
@@ -258,7 +259,7 @@ export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null }
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
         // fromPeerAddr rides along — the delivery receipt cannot answer a sender it was never told about.
-        try { await onLanded(circleId, res.entry, fromPeerAddr); } catch { /* side effects are best-effort */ }
+        try { await onLanded(circleId, res.entry, fromPeerAddr, statement); } catch { /* side effects are best-effort */ }
       }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };

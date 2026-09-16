@@ -37,20 +37,26 @@ export function rootPubKeyB64Of(rootSecret) {
   return b64encode(nacl.sign.keyPair.fromSeed(rootSecret).publicKey);
 }
 
-/** The statement a reveal signs — the binding facts of ONE revocation, so a reveal cannot be replayed onto another subject or circle. */
-export function ceremonyRevealMessage({ circleId, kind, subject, authorRef }) {
-  return `${REVEAL_DOMAIN}|${String(circleId)}|${String(kind)}|${String(subject)}|${String(authorRef)}`;
+/**
+ * The statement a reveal signs — the binding facts of ONE ceremony statement, so a reveal cannot be replayed
+ * onto another subject or circle. `facts` is the kind's OWN extra binding material (a person-key announcement
+ * covers the key it announces, else a device holding a valid reveal could attach it to a key of its choosing);
+ * absent for kinds whose subject is the whole fact (address-revoke).
+ */
+export function ceremonyRevealMessage({ circleId, kind, subject, authorRef, facts = null }) {
+  const base = `${REVEAL_DOMAIN}|${String(circleId)}|${String(kind)}|${String(subject)}|${String(authorRef)}`;
+  return typeof facts === 'string' && facts ? `${base}|${facts}` : base;
 }
 
 /**
  * Mint the reveal for a ceremony statement. Called where the root is transiently in hand.
  * @returns {{ rootPubKey: string, sig: string }}
  */
-export function signCeremonyReveal(rootSecret, { circleId, kind, subject, authorRef } = {}) {
+export function signCeremonyReveal(rootSecret, { circleId, kind, subject, authorRef, facts = null } = {}) {
   if (!(rootSecret instanceof Uint8Array) || rootSecret.length !== 32) throw new Error('signCeremonyReveal: rootSecret must be a 32-byte Uint8Array');
   if (!circleId || !kind || !subject || !authorRef) throw new Error('signCeremonyReveal: circleId, kind, subject and authorRef are required');
   const kp = nacl.sign.keyPair.fromSeed(rootSecret);
-  const msg = new TextEncoder().encode(ceremonyRevealMessage({ circleId, kind, subject, authorRef }));
+  const msg = new TextEncoder().encode(ceremonyRevealMessage({ circleId, kind, subject, authorRef, facts }));
   return { rootPubKey: b64encode(kp.publicKey), sig: b64encode(nacl.sign.detached(msg, kp.secretKey)) };
 }
 
@@ -58,12 +64,12 @@ export function signCeremonyReveal(rootSecret, { circleId, kind, subject, author
  * Verify a reveal against a row's commitment. Deny-by-default: no reveal, no commitment, a key that does not
  * hash to the commitment, or a signature that does not cover these exact facts → false.
  */
-export function verifyCeremonyReveal(reveal, { circleId, kind, subject, authorRef, commitment } = {}) {
+export function verifyCeremonyReveal(reveal, { circleId, kind, subject, authorRef, commitment, facts = null } = {}) {
   try {
     if (!reveal || typeof reveal.rootPubKey !== 'string' || typeof reveal.sig !== 'string') return false;
     if (typeof commitment !== 'string' || !commitment) return false;
     if (ceremonyCommitment(reveal.rootPubKey, circleId) !== commitment) return false;
-    const msg = new TextEncoder().encode(ceremonyRevealMessage({ circleId, kind, subject, authorRef }));
+    const msg = new TextEncoder().encode(ceremonyRevealMessage({ circleId, kind, subject, authorRef, facts }));
     const key = b64decode(reveal.rootPubKey);
     const sig = b64decode(reveal.sig);
     if (key.length !== 32 || sig.length !== 64) return false;

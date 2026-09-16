@@ -614,6 +614,7 @@ export async function bootAgentBundle(opts = {}) {
         circleIds: ids,
         circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
         circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+        alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
         circlesForPoint,
         // The relay this device connects to IS the deployment default — unmapped circles land here alone.
         defaultRelayUrl: relayUrl,
@@ -748,6 +749,9 @@ export async function bootAgentBundle(opts = {}) {
         ? agent.sendPeerMessage(addr, payload)
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
     itemStore:  () => getContactDmStore(),
+    // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
     localActor: 'me',
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them (web parity).
@@ -824,6 +828,7 @@ export async function bootAgentBundle(opts = {}) {
   const pendingPeerRedeems = new Map();
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
+    currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (web parity)
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // Identity 5B/C — present this device's per-circle address on the peer redeem path (parity with web).

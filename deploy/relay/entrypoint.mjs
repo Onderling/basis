@@ -31,6 +31,7 @@
  *                            (DEFAULT empty = NOBODY; a real deploy sets this)
  *
  *   -- push wake (enable by setting PUSH_PROVIDER=expo) --
+ *   PEER_DISCOVERY           '1' broadcasts the connected-address list to every client (OFF by default; disclose when on)
  *   PUSH_PROVIDER            'expo' to enable Expo push wake (else no push)
  *   EXPO_ACCESS_TOKEN        optional Expo enhanced-security access token
  *   PUSH_TOKENS_DB           sqlite path for the address↔token map; makes wakes survive a
@@ -122,6 +123,7 @@ let acceptedGroups;
 }
 
 const { port: boundPort, tls } = await startRelay({
+  peerDiscovery: process.env.PEER_DISCOVERY === '1',   // OFF by default — a presence + linkage oracle; disclose when on
   port,
   host,
   blobGate,

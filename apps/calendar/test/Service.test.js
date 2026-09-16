@@ -11,11 +11,14 @@ import { createCalendarService } from '../src/Service.js';
 
 // Each calendar handler returns `[DataPart({...})]`; read the first part's data.
 const data = (parts) => parts?.[0]?.data ?? {};
+// `listEvents` reads the UPCOMING window from now. A fixed date rots the moment the calendar passes it — these
+// tests went red on 2026-08-01 with nothing else changed — so the fixtures are always tomorrow and the day after.
+const soon = (days) => new Date(Date.now() + days * 86_400_000).toISOString();
 
 describe('createCalendarService — legacy callSkill (DataPart wrapper over registerCalendarSkills)', () => {
   it('wraps args in a single DataPart and reaches the real handler; unknown op throws', async () => {
     const svc = createCalendarService();
-    const added = data(await svc.callSkill('addEvent', { title: 'Standup', when: '2026-08-01T09:00:00Z' }));
+    const added = data(await svc.callSkill('addEvent', { title: 'Standup', when: soon(1) }));
     expect(added.ok).toBe(true);
     expect(typeof added.itemId).toBe('string');           // real handler ran + stored
     const listed = data(await svc.callSkill('listEvents', {}));
@@ -29,7 +32,7 @@ describe('createCalendarService — callCapability atom-dispatch over the real s
     const svc = createCalendarService();
 
     // add·calendar-event → addEvent (bespoke-first, really stores)
-    const added = await svc.callCapability('add', 'calendar-event', { title: 'Beer', when: '2026-08-02T18:00:00Z' });
+    const added = await svc.callCapability('add', 'calendar-event', { title: 'Beer', when: soon(2) });
     expect(added).toMatchObject({ ok: true, via: 'op', opId: 'addEvent' });
     const id = data(added.result).itemId;
     expect(typeof id).toBe('string');
@@ -60,7 +63,7 @@ describe('createCalendarService — callCapability atom-dispatch over the real s
 
   it('(b) an atom ALIAS canonicalises to the same op (create → add → addEvent, delete → remove → cancelEvent)', async () => {
     const svc = createCalendarService();
-    const added = await svc.callCapability('create', 'calendar-event', { title: 'Lunch', when: '2026-08-03T12:00:00Z' });
+    const added = await svc.callCapability('create', 'calendar-event', { title: 'Lunch', when: soon(3) });
     expect(added).toMatchObject({ ok: true, via: 'op', opId: 'addEvent' });
     const id = data(added.result).itemId;
     const removed = await svc.callCapability('delete', 'calendar-event', { id });   // alias of remove
@@ -76,7 +79,7 @@ describe('createCalendarService — callCapability atom-dispatch over the real s
 
   it('(d) backward-compat: the same op via the legacy callSkill path returns the same result as via callCapability', async () => {
     const svc = createCalendarService();
-    await svc.callSkill('addEvent', { title: 'Parity', when: '2026-08-04T10:00:00Z' });
+    await svc.callSkill('addEvent', { title: 'Parity', when: soon(4) });
     const legacy = data(await svc.callSkill('listEvents', {}));
     const viaCap = await svc.callCapability('list', 'calendar-event', {});
     expect(viaCap).toMatchObject({ ok: true, via: 'op', opId: 'listEvents' });

@@ -59,9 +59,13 @@
  * stops being accepted. Nothing has to be switched on, and no two devices have to agree on a date.
  *
  * OUR OWN canonical key is the one deliberate exception, and it is not one of these two cases at
- * all: `selfKeys` names the keys of ours that speak here, and our other devices share this profile
- * seed and may still be speaking canonically. Refusing ourselves is never the right answer, and no
- * unlinkability of ours is protected by us refusing to hear from us.
+ * all: `selfKeys` names the keys of ours that speak here. It used to say our other devices "may still
+ * be speaking canonically"; since the revoke walk of 2026-09-14 none of them do — every own-device lane
+ * speaks as its address in the circle it shares with its sibling. The canonical key is admitted for one
+ * reason only: a device that has JUST enrolled announces itself to its sibling before its address is on
+ * any roster, and the sibling's seed parcel comes back the same way. That is also the one door a revoked
+ * device — which keeps the canonical key forever — can still walk through, which is why the key that
+ * replaces it has to rotate. Until it does, this admission is the stated window, not a convenience.
  *
  * What is NOT allowed either way is a key belonging to a member of some OTHER circle — the snapshot
  * is per circle, so circle A's keys buy nothing in circle B.
@@ -77,6 +81,7 @@ export const SENDER_REASON = Object.freeze({
   MEMBER:            'on-the-roster-of-this-circle',
   STRANGER:          'not-on-the-roster-of-this-circle',
   CANONICAL_REFUSED: 'a-members-canonical-key-where-they-sign-per-circle',
+  OWN_KEY:           'our-own-current-person-key',
 });
 
 /**
@@ -107,6 +112,11 @@ export const SENDER_REASON = Object.freeze({
  */
 export function createCircleSenderAuthorization({
   onUnknownRoster = null, onRefused = null, onCanonicalOnlyMembers = null,
+  // The keys that are OURS right now, read live: the person's current (rotating) person key — held by every
+  // device of the person that took part in, or was handed the result of, the last ceremony, and by no revoked
+  // one. A message signed with it is ours in every circle, before any roster is consulted; the static profile key
+  // is NOT on this list any more (2026-09-16, binding-levels §10.5 step 4).
+  ownKeysLive = null,
 } = {}) {
   /** our per-circle address → { circleId, keys: Set<string> } */
   const byOwnAddress = new Map();
@@ -230,6 +240,11 @@ export function createCircleSenderAuthorization({
     // lets a stranger ever become a contact.
     if (typeof ownAddress !== 'string' || !ownAddress) {
       return allowSender(SENDER_REASON.NOT_CIRCLE_SCOPED);
+    }
+    if (typeof senderKey === 'string' && typeof ownKeysLive === 'function') {
+      let own = [];
+      try { own = ownKeysLive() ?? []; } catch { own = []; }
+      if (own.includes(senderKey)) return allowSender(SENDER_REASON.OWN_KEY);
     }
     const entry = byOwnAddress.get(ownAddress);
     if (!entry) {

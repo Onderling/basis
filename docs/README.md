@@ -13,6 +13,8 @@ this order.
    projectors, substrate, pod, circle, doorgeefluik, and the transport names.
 
 ## Reference
+- **[Extending Basis — the contract](./extending.md)** — what an extension is, what it may declare, what it can reach,
+  where it runs, how it is checked; every section marked built · designed · direction.
 - **[Architecture (deep dive)](./architecture.md)** — the full model: the thin waist, the end-to-end dispatch
   flow, the three layers, placement-by-trust, and where the project is heading. Read to understand the whole
   system; `CLAUDE.md` + the overview are the summary.

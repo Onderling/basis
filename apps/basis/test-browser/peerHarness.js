@@ -94,7 +94,7 @@ async function assertDevServerFreshOnce() {
 }
 
 export async function bootPeer(browser, label, opts = {}) {
-  const { lang = 'nl', transportMode, relayUrl, pod = 'no-pod', storageState } = opts;
+  const { lang = 'nl', transportMode, relayUrl, pod = 'no-pod', storageState, viewport = null } = opts;
 
   // Resolve the effective relay URL for this client's mode.
   // ARMING THE FIXTURE IS THE SWITCH (2026-08-02).
@@ -112,7 +112,12 @@ export async function bootPeer(browser, label, opts = {}) {
   const wantsRelay = effTransport === 'relay' || effTransport === 'both';
   const effRelay = relayUrl || (wantsRelay ? FIXTURE_RELAY : '');
 
-  const context = await browser.newContext(storageState ? { storageState } : {});
+  // `viewport` — a phone-sized context with touch (the alpha is web-only: "the phone" is this app in a
+  // phone's browser, which Playwright plays as a mobile viewport).
+  const context = await browser.newContext({
+    ...(storageState ? { storageState } : {}),
+    ...(viewport ? { viewport, isMobile: true, hasTouch: true } : {}),
+  });
   await context.addInitScript((seed) => {
     try {
       localStorage.setItem(seed.langKey, seed.lang);

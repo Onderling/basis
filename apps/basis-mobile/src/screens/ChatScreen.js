@@ -119,6 +119,7 @@ import { makeHandleSharedCopy } from '../../../basis/src/core/handlers/sharedCop
 // implementation, called by web (circleApp) and the mobile launcher too.
 import { feedHouseholdRoster } from '../../../basis/src/v2/householdRosterPairing.js';
 import { computeEmbedButtons } from '../../../basis/src/core/embedButtons.js';
+import { embedButtonText } from '../../../basis/src/v2/replyEmbeds.js';
 import { makeCalendarOutboundHook }
                                from '../../../basis/src/core/handlers/calendarOutbound.js';
 import { interceptButtonTap }       from '../core/buttonSpecials.js';
@@ -796,6 +797,11 @@ export default function ChatScreen({
           globalThis.__onderlingKnownPeersKicked = true;
           setTimeout(() => { bundle.agent.knownPeersSync.requestFromSiblings().catch(() => {}); }, 2500);
         }
+        // The person key a ceremony rotated on another device while this one was off — web parity.
+        if (bundle?.agent?.personKeySync && !globalThis.__onderlingPersonKeyKicked) {
+          globalThis.__onderlingPersonKeyKicked = true;
+          setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
         // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
         // The SAME consume runs after a recovery-file import (the agent calls it: the file's peers are
@@ -874,6 +880,7 @@ export default function ChatScreen({
             eventLog: eventLogRef.current,
             rail: govRail,
             onChange: govChanged,
+            onLanded: lanes.landedCarrier?.governance,   // a landed decision reaches my other devices (the one carry)
             // "A decision opened" is RENDERED from the statement on the log (governanceNotices.js via
             // chatRows) — the appended gov-notif nudge is retired, web parity.
           }),
@@ -2482,17 +2489,17 @@ function EmbedActionButtons({ msg, embed, buttons, enabled, onButtonTap }) {
           onPress={() => onButtonTap?.({
             opId:    btn.opId,
             itemId:  btn.itemId,
-            buttonLabel: btn.label,
+            buttonLabel: embedButtonText(btn, t),
             originMessageId: msg.id,
             embed,
           })}
           disabled={!enabled}
           style={[styles.embedBtn, !enabled && styles.embedBtnDisabled]}
           accessibilityRole="button"
-          accessibilityLabel={btn.label}
+          accessibilityLabel={embedButtonText(btn, t)}
           testID={`embed-btn-${btn.opId}-${btn.itemId}`}
         >
-          <Text style={styles.embedBtnText}>{btn.label}</Text>
+          <Text style={styles.embedBtnText}>{embedButtonText(btn, t)}</Text>
         </TouchableOpacity>
       ))}
     </View>

@@ -32,6 +32,7 @@ import {
 } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
+import { makeRoleOf } from './roleOf.js';
 
 /**
  * Re-register every custom role from a CircleConfig. Idempotent:
@@ -68,7 +69,7 @@ export function applyCustomRoles(customRoles) {
  * @param {object} args
  * @param {(parts: Array, ctx?: object) => object | null} args.bundleResolver
  */
-export function buildCustomRoleSkills({ bundleResolver } = {}) {
+export function buildCustomRoleSkills({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildCustomRoleSkills: bundleResolver(parts, ctx) required');
   }
@@ -101,7 +102,7 @@ export function buildCustomRoleSkills({ bundleResolver } = {}) {
     defineSkill('registerCircleCustomRole', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const a = argsFromParts(parts);
       const id = typeof a.roleId === 'string' ? a.roleId.trim() : '';
@@ -132,7 +133,7 @@ export function buildCustomRoleSkills({ bundleResolver } = {}) {
     defineSkill('unregisterCircleCustomRole', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const a = argsFromParts(parts);
       const id = typeof a.roleId === 'string' ? a.roleId.trim() : '';

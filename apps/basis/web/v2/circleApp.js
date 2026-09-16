@@ -943,6 +943,7 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
     // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
     // refused here and only here: the invariant-2 half of a change that landed on one shell.
     circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+    alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
     circlesForPoint,
     // The relay this device connects to IS the deployment default — unmapped circles land here alone.
     defaultRelayUrl: CIRCLE_RELAY_URL,
@@ -2162,6 +2163,9 @@ function buildCircleBot(agent) {
     // is now DURABLE (persisted + rehydratable), the G18 fix. Thunked so the
     // async-built store doesn't block channel construction; null → ephemeral.
     itemStore:  () => getContactDmStore(),
+    // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
     localActor: LOCAL_ACTOR,
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them.
@@ -7936,6 +7940,7 @@ async function boot() {
     // OBJ-2 — joiner-side peer-redeem sender (shared factory), correlated by circlePendingRedeems.
     circleSendPeerRedeem = makeSendGroupRedeemRequest({
       sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
+      currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (2026-09-16)
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingRedeems,
       // Identity 5B/C — present this device's per-circle address on the peer redeem path.
@@ -8195,7 +8200,7 @@ async function boot() {
           'circle-recipe-broadcast':  circleRecipeHandler,
           'circle-rules-broadcast':   circleRulesHandler,
           'circle-policy-broadcast':  circlePolicyHandler,
-          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => {
+          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.
             applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
@@ -8331,6 +8336,8 @@ async function boot() {
         // Who my other devices know — a greeting or a contact that landed there while this device
         // was off: bindings and contact rows, established here, never replacing what this device holds.
         agent.knownPeersSync?.requestFromSiblings().catch(() => {});
+        // The person key a ceremony rotated on another device while this one was off.
+        agent.personKeySync?.requestFromSiblings().catch(() => {});
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on

@@ -111,7 +111,7 @@ export const calendarManifest = {
         slash: { command: '/accept',
           // 'ik kom' dropped — it's a prefix of rsvpDecline's 'ik kom niet' (would eat the decline).
           match: { verbs: ['accept', ['accept', 'invite'], 'yes', 'accepteer', 'ja'], body: 'match', arg: 'id' } },
-        ui:    { control: 'button', label: 'Accept' },
+        ui:    { control: 'button', labelKey: 'circle.button.calendar.rsvpAccept', label: 'Accept' },
         chat:  { hint: 'accept an invitation' },
       },
     },
@@ -129,7 +129,7 @@ export const calendarManifest = {
         // Part C gate — keeps 'decline' (bare 'reject'/'afwijzen' belong to tasks.rejectTask).
         slash: { command: '/decline',
           match: { verbs: ['decline', ['decline', 'invite'], 'no', ['wijs', 'af'], 'nee', ['ik', 'kom', 'niet']], body: 'match', arg: 'id' } },
-        ui:    { control: 'button', label: 'Decline' },
+        ui:    { control: 'button', labelKey: 'circle.button.calendar.rsvpDecline', label: 'Decline' },
         chat:  { hint: 'decline an invitation' },
       },
     },
@@ -147,7 +147,7 @@ export const calendarManifest = {
         // Part C gate — "tentative/maybe X" → rsvpTentative{id}.
         slash: { command: '/tentative',
           match: { verbs: ['tentative', 'maybe', 'misschien', ['onder', 'voorbehoud']], body: 'match', arg: 'id' } },
-        ui:    { control: 'button', label: 'Tentative' },
+        ui:    { control: 'button', labelKey: 'circle.button.calendar.rsvpTentative', label: 'Tentative' },
         chat:  { hint: 'mark as tentative' },
       },
     },
@@ -166,7 +166,7 @@ export const calendarManifest = {
         slash: { command: '/cancelappt',
           match: { verbs: [['cancel', 'event'], ['cancel', 'appointment'], 'cancel', ['annuleer', 'afspraak'], 'annuleer', ['zeg', 'af']], body: 'match', arg: 'id' } },
         ui:    {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.calendar.cancelEvent',
           label:   'Cancel event',
           confirm: { severity: 'warn', message: 'Cancel this event?' },
         },

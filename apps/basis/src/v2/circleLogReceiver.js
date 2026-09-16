@@ -39,10 +39,10 @@ function makeIngestHandler({ eventLog, subtype, kind, idFor, onChange, notify, w
  *  rail's ingest — signature + chain + declared kind + the key↔ref binding — before it lands (P9: the gate
  *  binds at the receiver). A bare unsigned event is then REFUSED (no-backcompat: one path per type). Without
  *  a rail (legacy composition) the unsigned path stands unchanged. */
-export function makeCircleGovernancePeerHandler({ eventLog, onChange, notify, rail } = {}) {
+export function makeCircleGovernancePeerHandler({ eventLog, onChange, notify, rail, onLanded = null } = {}) {
   if (!rail) throw new Error('makeCircleGovernancePeerHandler: a governance rail is required — a fanned statement must verify before it lands');
   {
-    return async function onCircleGovernanceRail(_fromPeerAddr, payload) {
+    return async function onCircleGovernanceRail(fromPeerAddr, payload) {
       if (!payload || payload.subtype !== 'circle-governance-broadcast') return;
       const { circleId, event: statement } = payload;
       if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;   // signed-only
@@ -52,6 +52,8 @@ export function makeCircleGovernancePeerHandler({ eventLog, onChange, notify, ra
         const res = await rail.ingest(circleId, statement);
         if (!res?.ok) return;                     // refused: unverifiable — never lands, never notifies
         try { onChange?.(circleId); } catch { /* re-render is best-effort */ }
+        // a NEW statement goes on to the person's other devices (the one sibling carry's seam)
+        if (isNew && typeof onLanded === 'function') { try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* best-effort */ } }
         if (isNew && typeof notify === 'function' && statement.body.kind === 'propose') {
           // notify gets the flat event shape the legacy path passed (a decision OPENED nudge).
           const { authorRef, ...flat } = statement.body.payload ?? {};

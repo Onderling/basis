@@ -253,6 +253,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ? createContactThreadChannel({
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         itemStore:  createContactDmStore({ dataSource: null, localActor: pubKey }),
+        sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
+        openFor: agent.contactSeal?.openFor ?? null,
         localActor: pubKey,
         fanToOwnDevices: agent.contactTurnFan,
       })
@@ -367,6 +369,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Who the person knows, on every device of theirs (bindings + contact book) — the same entries the
     // shared lane table spreads into both shells.
     ...(agent.knownPeersSync?.handlers ?? {}),
+    ...(agent.personKeyChain?.handlers ?? {}),
+    ...(agent.personKeySync?.handlers ?? {}),
     // The contact thread, when a walk asked for it — the same three registrations both shells make:
     // a bot's reply, a person's DM, and a turn one of MY OWN devices carried here. All three land in
     // the durable thread through the channel, which is what makes `contactTurns` a real read of the
@@ -383,6 +387,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
     pendingMap,
+    currentPersonKey: () => agent.personKey?.() ?? null,   // as both shells: the first person key rides the join
     circleAddressFor: agent.circleAddressFor,
     // …and prove it (web ≡ mobile ≡ harness): a fresh per-circle address is signed with its own key.
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
@@ -572,6 +577,7 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
       circleIds: ids,
       circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],   // the person address, as the shells register it
     });
   }
 }

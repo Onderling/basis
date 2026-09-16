@@ -61,7 +61,7 @@ import {
   defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
-  verifyCeremonyReveal,
+  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
@@ -1038,9 +1038,14 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // CEREMONY statements (address-revoke) bind by their ROOT REVEAL against the row's ceremony commitment
     // (core ceremonyCommitment.js): only the owner root — present only inside a ceremony, never on a
     // device — can sign one. The author key is whichever device ran the ceremony; it need not be on the row.
-    const isCeremonyKind = body.kind === 'address-revoke';
-    const revealBinds = (commitment) => !!commitment && verifyCeremonyReveal(body.payload?.reveal, {
-      circleId: body.circleId, kind: body.kind, subject: body.subject, authorRef: claimed, commitment,
+    // The set of ceremony kinds and what each reveal must cover live in core (ceremonyKinds.js), so this
+    // door and the rail's verifier cannot disagree. A person-key announcement is SELF-SUBJECT and its
+    // reveal covers the announced key; a malformed one (no key, no version) binds nowhere.
+    const isCeremonyKind = isCeremonyStatementKind(body.kind);
+    const facts = isCeremonyKind ? ceremonyRevealFacts(body) : null;
+    const wellFormed = body.kind !== PERSON_KEY_KIND || (facts !== null && body.subject === claimed);
+    const revealBinds = (commitment) => !!commitment && wellFormed && verifyCeremonyReveal(body.payload?.reveal, {
+      circleId: body.circleId, kind: body.kind, subject: body.subject, authorRef: claimed, commitment, facts,
     });
     for (const it of forGroup) {
       const src = it?.source ?? {};
@@ -1296,6 +1301,8 @@ export function buildSkills({
   // rail's VERIFIED bodies for the roster fold. Absent → the legacy store-based spine path, unchanged.
   membershipEmit,
   membershipRead,
+  // The person key this device announces on a join or create (host-injected `() => {version, pubKey} | null`).
+  currentPersonKey = null,
   // THE RULES-UPDATE RIDER (host-injected): a rules-doc edit also appends + fans a signed
   // `rules-update` statement on the governance lane, so the new doc reaches every member
   // peer-to-peer (pod-free) and their stale-banner lights. Absent → store-local only, unchanged.
@@ -1411,6 +1418,27 @@ export function buildSkills({
   // claiming it was, was wrong). No signer at all → no emitter: the writer still records its typed item, just
   // no spine statement — additive, never a regression.
   const _spineSigner = bundle?.agent?.identity;
+
+  /**
+   * A contact's CURRENT person key. Nothing known yet → the claim is taken (the card is the person's own word, the
+   * same trust as the profile key on it). Something known → the claim must be reached by walking the chain of links
+   * from the known version; a claim the chain does not reach is ignored and the known key kept. Returns what is now
+   * on record, or null when nothing could be recorded.
+   */
+  const adoptContactPersonKey = async (webid, claimed, links) => {
+    if (!bundle?.contacts || !claimed || !Number.isInteger(claimed.version) || claimed.version < 1 || typeof claimed.pubKey !== 'string' || !claimed.pubKey) return null;
+    const existing = (await members?.resolveByWebid?.(webid))?.personKey ?? null;
+    let next = null;
+    if (!existing) next = { version: claimed.version, pubKey: claimed.pubKey };
+    else {
+      const reached = verifyPersonKeyChain(Array.isArray(links) ? links : [], existing);
+      if (reached && reached.version > existing.version) next = reached;
+      else if (reached && reached.version === claimed.version && reached.pubKey === claimed.pubKey) next = reached;
+      else return existing;   // nothing the chain vouches for beyond what is known — keep it
+    }
+    await bundle.contacts.addContact({ webid, personKey: next });
+    return next;
+  };
   const emitSpine = (typeof membershipEmit === 'function')
     // THE MEMBERSHIP RIDER: statements ride the device log's membership lane (signed, fanned, verified on
     // ingest, caught-up) — the store-based appender below is the legacy path for compositions without it.
@@ -2374,7 +2402,7 @@ export function buildSkills({
     defineSkill('createGroupWithRules', async ({ parts, from }) => {
       // Thin wrapper: the write lives in `@onderling/circles` (`createGroupWithRules`, §8c slice-a). Stoop
       // injects the store + its `_sync` producer and passes the parsed args + carrier.
-      return createGroupWithRules({ store, simulateSync, emitSpine }, { a: dataArgs(parts), from });
+      return createGroupWithRules({ store, simulateSync, emitSpine, currentPersonKey }, { a: dataArgs(parts), from });
     }, {
       description: 'Persist a group\'s governance rules (V1 admin wizard output).',
       visibility:  'authenticated',
@@ -2399,7 +2427,7 @@ export function buildSkills({
       // invite-ceiling clamp + cap, and a best-effort pod-routing policy push (the closure carries the
       // optional chain over an absent bundle — legacy/test setups where podRouting isn't wired).
       return createGroupV2({
-        store, members, metrics, simulateSync, emitSpine,
+        store, members, metrics, simulateSync, emitSpine, currentPersonKey,
         clampInviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
         validateStoragePolicy: _validateStoragePolicy,
         buildStoragePolicy:    _buildStoragePolicy,
@@ -2631,7 +2659,7 @@ export function buildSkills({
       // (`redeemMembershipCode`, §8c slice-b). Stoop injects the store + helpers and binds the trailing
       // group-key grant to `grantPodAccess(controlAgent, …)` (the key custodian stays here, not in circles).
       return redeemMembershipCodeCore({
-        store, members, metrics, simulateSync, emitSpine,
+        store, members, metrics, simulateSync, emitSpine, currentPersonKey,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
         codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
@@ -4649,6 +4677,10 @@ export function buildSkills({
         // hands in the primary by default and any extra the person ticked). A message to a contact
         // rides these before any kring's relay; two people who share no kring have no other route.
         ...(Array.isArray(a.relays) && a.relays.length ? { relays: a.relays.filter((u) => typeof u === 'string' && u) } : {}),
+        // The person's CURRENT (rotating) key and the chain that vouches for it from any earlier version — the Hi
+        // between persons is where a contact learns it (2026-09-16); circles learn it root-revealed, per circle.
+        ...(a.personKey && typeof a.personKey === 'object' ? { personKey: a.personKey } : {}),
+        ...(Array.isArray(a.personKeyLinks) && a.personKeyLinks.length ? { personKeyLinks: a.personKeyLinks } : {}),
       };
       return { payload: `onderling-contact://${_encodeQrPayload(card)}`, ...(card.relays ? { relays: card.relays } : {}) };
     }, {
@@ -4692,7 +4724,10 @@ export function buildSkills({
         trustLevel,
       });
       metrics?.record?.('contact-added-from-qr');
-      return { contact: m };
+      // The card's person key: the first one is taken on the card's word (the same trust as its profile key — the
+      // person handed it over); a later card must chain from the version already known.
+      const pk = card.personKey ? await adoptContactPersonKey(card.webid, card.personKey, card.personKeyLinks) : null;
+      return { contact: m, ...(pk ? { personKey: pk } : {}) };
     }, {
       description: 'Add a contact from a onderling-contact:// QR/URL payload.',
       visibility:  'authenticated',
@@ -5133,6 +5168,19 @@ export function buildSkills({
     }),
 
     /** setContactFlag({webid, flag, value}) */
+    defineSkill('setContactPersonKey', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.contacts) return { error: 'no-contacts' };
+      if (typeof a.webid !== 'string' || !a.webid) return { error: 'webid required' };
+      try {
+        const pk = await adoptContactPersonKey(a.webid, a.personKey, a.links);
+        return pk ? { ok: true, personKey: pk } : { ok: false, reason: 'not-adopted' };
+      } catch (err) { return { error: err?.message ?? String(err) }; }
+    }, {
+      description: "Record a contact's current person key: taken on first sight, or verified as a chain from the version already known.",
+      visibility:  'authenticated',
+    }),
+
     defineSkill('setContactFlag', async ({ parts }) => {
       const a = dataArgs(parts);
       if (!bundle?.contacts) return { error: 'no-contacts' };

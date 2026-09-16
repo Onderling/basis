@@ -23,6 +23,7 @@ import { defineSkill } from '@onderling/core';
 
 import { AvailabilityHints, isoWeekOf } from '../availability/AvailabilityHints.js';
 import { argsFromParts } from '../bundleResolver.js';
+import { makeRoleOf } from './roleOf.js';
 
 function hintPath(circleId, webid) {
   return `mem://tasks/circles/${encodeURIComponent(circleId)}/availability/${encodeURIComponent(webid)}.json`;
@@ -62,7 +63,7 @@ function isOptedIn(circle, webid) {
  * @param {object} args
  * @param {(parts: Array, ctx?: object) => object | null} args.bundleResolver
  */
-export function buildAvailabilitySkills({ bundleResolver } = {}) {
+export function buildAvailabilitySkills({ bundleResolver, roleOf = makeRoleOf(null) } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildAvailabilitySkills: bundleResolver(parts, ctx) required');
   }
@@ -71,7 +72,7 @@ export function buildAvailabilitySkills({ bundleResolver } = {}) {
     defineSkill('setAvailabilityEnabled', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin') return { error: 'admin required' };
       const a = argsFromParts(parts);
       if (typeof a.enabled !== 'boolean') return { error: 'enabled (boolean) required' };
@@ -162,7 +163,7 @@ export function buildAvailabilitySkills({ bundleResolver } = {}) {
     defineSkill('getCircleAvailability', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const role = circle.roles?.[from];
+      const role = await roleOf(circle, from);
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }

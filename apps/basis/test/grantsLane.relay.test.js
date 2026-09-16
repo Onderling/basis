@@ -18,7 +18,9 @@ import { CONNECTION_MANIFESTS } from '../src/v2/connectionManifests.js';
 import { EventLog } from '../src/eventLog.js';
 
 const GROUP = 'grants-relay-circle';
-const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
+// The laptop's first words to its sibling speak as the PERSON — its per-circle address is on nobody's roster yet
+// (as the production enrol consume does, `asPerson`, 2026-09-16).
+const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [], asPerson: true };
 
 describe('grants lane over a real relay — paired on the phone, revoked for the laptop too', () => {
   let relay; let relayUrl; let P; let L; let B; let V;

@@ -47,3 +47,24 @@ describe('the ceremony commitment — who may retire a device address', () => {
     expect(verifyCircleAddressAnnouncement(ownCircleAddressAnnouncementFromSeed({ derivationSeed: seed, circleId: 'a', memberWebid: 'webid:x' }), 'a')).toBeTruthy();
   });
 });
+
+describe('a reveal may cover the kind\'s own FACTS (the person-key announcement covers the key it announces)', () => {
+  it('a reveal minted over facts verifies only with the same facts — not without them, not with other facts', () => {
+    const base = { circleId: 'a', kind: 'person-key', subject: 'webid:x', authorRef: 'webid:x' };
+    const commitment = ceremonyCommitment(pub, 'a');
+    const reveal = signCeremonyReveal(root.secret, { ...base, facts: 'person-key|2|KEY-2' });
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment, facts: 'person-key|2|KEY-2' })).toBe(true);
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment }), 'the facts are part of what was signed').toBe(false);
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment, facts: 'person-key|2|KEY-OTHER' }), 'a swapped key fails').toBe(false);
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment, facts: 'person-key|3|KEY-2' }), 'a bumped version fails').toBe(false);
+  });
+  it('a reveal minted WITHOUT facts (address-revoke) is unchanged, and does not verify against facts', () => {
+    const base = { circleId: 'a', kind: 'address-revoke', subject: 'addr-1', authorRef: 'webid:x' };
+    const commitment = ceremonyCommitment(pub, 'a');
+    const reveal = signCeremonyReveal(root.secret, base);
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment })).toBe(true);
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment, facts: null })).toBe(true);
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment, facts: '' })).toBe(true);
+    expect(verifyCeremonyReveal(reveal, { ...base, commitment, facts: 'anything' })).toBe(false);
+  });
+});

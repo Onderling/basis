@@ -333,6 +333,7 @@ if (relayUrl) {
       circleIds,
       circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
       circlesForPoint,
       defaultRelayUrl: relayUrl,
       onError: (err, cid) => console.warn(`device-runner: circle-address register failed (${String(cid).slice(0, 12)}…):`, err?.message ?? err),

@@ -412,3 +412,25 @@ describe('our own roster row is ours even when its pubKey is a display-cache art
       'a key that is the same in every circle must not be allowed by a per-circle roster').toBe(false);
   });
 });
+
+describe('our own CURRENT person key is admitted live — before any roster, in every circle (2026-09-16)', () => {
+  it('a message signed with the current person key is ours; the static profile key is a stranger', () => {
+    let current = ['person-key-v1'];
+    const auth = createCircleSenderAuthorization({ ownKeysLive: () => current });
+    auth.recordCircleRoster({ circleId: 'k', ownAddress: OURS_IN_CIRCLE, members: [], selfKeys: ['our-circle-key'] });
+    expect(auth.authorizeSender({ senderKey: 'person-key-v1', ownAddress: OURS_IN_CIRCLE }))
+      .toEqual({ allow: true, reason: SENDER_REASON.OWN_KEY });
+    expect(auth.authorizeSender({ senderKey: 'our-canonical-key', ownAddress: OURS_IN_CIRCLE }).allow, 'the static profile key is not on the list').toBe(false);
+    // a rotation: the new version is ours at once, the old one no longer
+    current = ['person-key-v2'];
+    expect(auth.authorizeSender({ senderKey: 'person-key-v2', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: 'person-key-v1', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
+  });
+  it('a circle this device has no roster for still admits the person key, and a reader that throws admits nothing extra', () => {
+    const auth = createCircleSenderAuthorization({ ownKeysLive: () => ['pk'] });
+    expect(auth.authorizeSender({ senderKey: 'pk', ownAddress: 'ours-anywhere' }).reason).toBe(SENDER_REASON.OWN_KEY);
+    const broken = createCircleSenderAuthorization({ ownKeysLive: () => { throw new Error('vault'); } });
+    broken.recordCircleRoster({ circleId: 'k', ownAddress: OURS_IN_CIRCLE, members: [], selfKeys: ['our-circle-key'] });
+    expect(broken.authorizeSender({ senderKey: 'pk', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
+  });
+});

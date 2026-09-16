@@ -100,7 +100,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     // ── THE CEREMONY, on the new phone. ──
     const r = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: phrase, circleIds: [GROUP] });
     expect(r.ok, r.error).toBe(true);
-    expect(r.profileAddressRetired, "the first phone's profile-derived address is retired").toBe(true);
+    expect(r.firstDeviceRetired, "the first phone is retired by derivation — its id derives from the root, so the new phone never needed its record").toBe(true);
     expect(r.retiredIn.map((x) => x.address)).toContain(addrA);
     expect(r.historyKeys, 'the old key opened the chain; the keys came along').toBeGreaterThanOrEqual(1);
 

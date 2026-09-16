@@ -31,7 +31,9 @@ import { carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { EventLog } from '../../src/eventLog.js';
 
 const GROUP = 'anna-two-devices';
-const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
+// The enrolling device's first words to its sibling speak as the PERSON (its per-circle address is on nobody's roster
+// yet) — exactly what the production enrol consume does (`asPerson`, 2026-09-16).
+const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [], asPerson: true };
 const texts = (node) => node.chatEvents.map((e) => e.payload?.text).filter(Boolean);
 
 describe('L100 · the one sibling carry — Anna\'s always-on device follows the circle live', () => {

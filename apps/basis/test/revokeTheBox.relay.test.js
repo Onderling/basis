@@ -213,7 +213,9 @@ describe('the box is revoked while it holds the address', () => {
     expect(web.pubKey, 'the reloaded web app is the same person').toBe(webPubKey);
     expect(web.agent.isEnrolledDevice(), 'the reloaded web app is an enrolled device').toBe(true);
     const newWebAddr = web.agent.circleAddressFor(CIRCLE);
-    expect(newWebAddr, 'an enrolled device presents a fresh per-circle address').not.toBe(oldWebAddr);
+    // Since 2026-09-16 the first device mints its own delegation at first boot and derives from it from the start, so the
+    // ceremony's cutover keeps its address: nothing to re-announce, no window on an address nobody holds.
+    expect(newWebAddr, 'the reloaded web app keeps the per-circle address it always had').toBe(oldWebAddr);
     expect(await until(async () => ((await addressesOf(bea, web.pubKey)).includes(newWebAddr) ? true : null), { timeout: 45_000, step: 250 }),
       `Bea never learned the web app's new address — her row: ${JSON.stringify(await addressesOf(bea, web.pubKey))}`).toBe(true);
   }, 180_000);

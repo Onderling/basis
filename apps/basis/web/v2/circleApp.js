@@ -943,6 +943,7 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
     // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
     // refused here and only here: the invariant-2 half of a change that landed on one shell.
     circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+    alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
     circlesForPoint,
     // The relay this device connects to IS the deployment default — unmapped circles land here alone.
     defaultRelayUrl: CIRCLE_RELAY_URL,

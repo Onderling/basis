@@ -96,6 +96,21 @@ export function signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey }
  * @param {string} pubKeyB64  a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
  * @returns {string|null} the 16 hex-character fingerprint, or null.
  */
+/**
+ * The FIRST device's id, derived from the root. A person's first device mints its own delegation at first boot
+ * (2026-09-16) instead of deriving from the profile seed; giving it a root-derived id — rather than a random one —
+ * keeps the property the profile derivation had: a device that holds the phrase can re-derive the first device's
+ * seed without having seen its registry record, and so retire it and absorb what it sealed when it is lost. Only
+ * the first device is special; a device enrolled by a ceremony carries a random id in its root-signed record.
+ * @param {{ deriveAgentSeed: (label: string) => Uint8Array }} root  the owner root (Bootstrap)
+ * @returns {string}
+ */
+export function firstDeviceIdFor(root) {
+  const seed = root.deriveAgentSeed('first-device');
+  let hex = ''; for (const b of seed.subarray(0, 16)) hex += b.toString(16).padStart(2, '0');
+  return `first-${hex}`;
+}
+
 export function ownerRootFingerprint(pubKeyB64) {
   try {
     const key = b64decode(pubKeyB64);

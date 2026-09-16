@@ -22,7 +22,9 @@ import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/me
 import { EventLog } from '../../src/eventLog.js';
 
 const GROUP = 'anna-rotates';
-const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
+// The enrolling device's first words to its sibling speak as the PERSON (its per-circle address is on nobody's roster
+// yet) — exactly what the production enrol consume does (`asPerson`, 2026-09-16).
+const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [], asPerson: true };
 const log = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
 const rowFor = async (node, webid) => (await readRoster(node, GROUP)).find((m) => m.webid === webid) ?? null;
 
@@ -99,7 +101,7 @@ describe('the person key rotates in the revoke ceremony', () => {
     expect(v2.version).toBe(2);
     expect(v2.pubKey).not.toBe(v1.pubKey);
 
-    // A2 — handed the seed over the sibling carry
+    // the kept device — handed the seed over the sibling carry
     const got = await until(() => (A2.agent.personKey()?.version === 2 ? true : null), { timeout: 15000, step: 100 });
     expect(got, `A2 never received v2; holds ${JSON.stringify(A2.agent.personKey())}`).toBe(true);
     expect(A2.agent.personKey()).toEqual(v2);
@@ -110,7 +112,7 @@ describe('the person key rotates in the revoke ceremony', () => {
     // …and A's own roster
     expect((await rowFor(A, A.pubKey)).personKey).toEqual(v2);
 
-    // A3 — the lost device: retired, never handed the new seed, still on v1
+    // the lost device: retired, never handed the new seed, still on v1
     await new Promise((res) => setTimeout(res, 500));
     expect(A3.agent.personKey()).toEqual(v1);
     expect((await rowFor(B, A.pubKey)).circleAddresses ?? []).not.toContain(A3.agent.circleAddressFor(GROUP));

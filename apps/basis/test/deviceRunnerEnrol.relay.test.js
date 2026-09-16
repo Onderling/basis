@@ -105,7 +105,7 @@ describe('the box enrols from the phone\'s offer and the circle reaches it', () 
       const others = (mine?.circleAddresses ?? []).filter((a) => a !== own);
       return others.length ? others : null;
     }, { timeout: 30_000, step: 250 });
-    expect(grown, `the phone never learned the box's per-circle address — consume: ${JSON.stringify(consumed)}; runner:\n${box.out.slice(-1200)}`).toBeTruthy();
+    expect(grown, `the phone never learned the box's per-circle address — phone refusals: ${JSON.stringify(phone.agent.refusedInboundByReason?.())}; phone person address: ${String(phone.agent.personAddress?.()).slice(0, 8)}; consume: ${JSON.stringify(consumed)}; runner:\n${box.out.slice(-1200)}`).toBeTruthy();
     // THE claim: the circle's conversation from before the box existed is on the box — the consume's
     // content pull brought it from the phone, addressed to the box's per-circle address, which only
     // works when the box registered that address on the relay.

@@ -573,6 +573,7 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
       circleIds: ids,
       circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],   // the person address, as the shells register it
     });
   }
 }

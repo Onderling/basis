@@ -117,7 +117,7 @@ function depthOf(stmts) {
  *   independently — the statement stays on the log as evidence, the joiner lands on nobody's roster.
  *   Founders and seed members never fold via `join`, so the gate cannot touch them. Absent (the
  *   default), joins fold exactly as before — the projector opts in, the kernel stays pure.
- * @returns {{ members: string[], admins: string[], rulesAccepted: Record<string,string>,
+ * @returns {{ members: string[], admins: string[], rulesAccepted: Record<string,string>, handles: Record<string,string>,
  *   adminProvenance: Record<string,string>, caretakerAcknowledged: Record<string,string> }}
  *   sorted members/admins for a stable, comparable result, plus each member's latest accepted
  *   rules version (from the join's payload, superseded by later `rules-accept` statements — the
@@ -148,6 +148,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   const members = new Set([...founderSet, ...asKeys(seed?.members)]);
   const admins  = new Set([...founderSet, ...asKeys(seed?.admins)]);
   const rulesAccepted = Object.create(null);   // subject → latest accepted rules version (fold-ordered)
+  // subject → the handle they presented on their latest folded join. The redemption row that also carries it
+  // reaches only the device that admitted them; the join reaches every device, so this is where the others
+  // learn what to call a member (walked 2026-09-14: everyone but the admin saw `peer-…`).
+  const handles = Object.create(null);
 
   // ── HOW EACH ADMIN CAME TO BE ONE ──────────────────────────────────────────────────────────────
   // Three ways in, and until now all three rendered as the same word. `role: 'admin'` on a roster row
@@ -266,10 +270,12 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // The acceptance rides the join's signed payload — record it with the membership it establishes.
       const v = s.payload && typeof s.payload === 'object' ? s.payload.rulesAccepted : undefined;
       if (typeof v === 'string' && v) rulesAccepted[s.subject] = v;
+      const h = s.payload && typeof s.payload === 'object' ? s.payload.peerDisplay : undefined;
+      if (typeof h === 'string' && h) handles[s.subject] = h;
     }
 
     // Apply: removals win over same-depth joins/promotes (deny-wins).
-    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; }
+    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; }
     for (const x of joined)   if (!removed.has(x)) members.add(x);
     for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); adminVia.set(x, 'role'); }
     for (const x of demoted)  { admins.delete(x); adminVia.delete(x); }
@@ -352,7 +358,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
 
   const adminProvenance = Object.create(null);
   for (const a of [...admins].sort()) adminProvenance[a] = adminVia.get(a) ?? 'role';
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged };
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles };
 }
 
 export default foldRoster;

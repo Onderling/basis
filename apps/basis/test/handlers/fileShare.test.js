@@ -3,7 +3,7 @@
  * (decided 2026-09-02; it used to paint into a main thread mobile v2 permanently hides).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makeHandleFileShare } from '../../src/core/handlers/fileShare.js';
+import { makeHandleFileShare, buildFileShareEnvelope } from '../../src/core/handlers/fileShare.js';
 
 function deps(overrides = {}) {
   return {
@@ -65,5 +65,38 @@ describe('makeHandleFileShare', () => {
       file: { id: 'f2', name: 'foto.jpg', mime: 'image/jpeg', size: 9, dataB64: 'aGVsbG8=' },
     });
     expect(d.publishEvent).toHaveBeenCalled();
+  });
+
+  describe('sealed to the person (2026-09-17)', () => {
+    const file = { id: 'f3', name: 'foto.jpg', mime: 'image/jpeg', size: 3, dataB64: 'YWJj' };
+    it('the envelope: with a key on record the bytes are in the box and a stub travels; without one they ride inline', async () => {
+      const sealFor = vi.fn(async (peer, content) => (peer === 'known' ? { to: { version: 2, pubKey: 'K2' }, from: { version: 1, pubKey: 'K1' }, sealed: `box(${content.file.dataB64})`, nonce: 'n' } : null));
+      const boxed = await buildFileShareEnvelope({ file, peerAddr: 'known', sealFor, sentAt: 7 });
+      expect(boxed).toEqual({ type: 'p2p-chat', subtype: 'file-share', file: { id: 'f3', name: 'foto.jpg', mime: 'image/jpeg', size: 3 }, sealed: expect.objectContaining({ to: { version: 2, pubKey: 'K2' } }), sentAt: 7 });
+      expect(JSON.stringify(boxed)).not.toContain('"dataB64"');
+      const plain = await buildFileShareEnvelope({ file, peerAddr: 'stranger', sealFor, sentAt: 7 });
+      expect(plain).toEqual({ type: 'p2p-chat', subtype: 'file-share', file, sentAt: 7 });
+      expect((await buildFileShareEnvelope({ file, peerAddr: 'known', sealFor: async () => { throw new Error('boom'); } })).file.dataB64, 'a seal that throws falls back, never loses the file').toBe('YWJj');
+    });
+    it('the handler opens the box with the seal seam and delivers the bytes, recording what it was sealed to', async () => {
+      const d = deps({ openFor: vi.fn(async (sealed) => ({ file: { ...file, dataB64: sealed.sealed.slice(4, -1) } })) });
+      await makeHandleFileShare(d)('peer-A', { sentAt: 1, file: { id: 'f3', name: 'foto.jpg', mime: 'image/jpeg', size: 3 }, sealed: { to: { version: 2, pubKey: 'K2' }, from: { version: 1, pubKey: 'K1' }, sealed: 'box(YWJj)', nonce: 'n' } });
+      const turn = d.deliverToThread.mock.calls[0][0];
+      expect(turn.file).toEqual(file);
+      expect(turn.sealed).toEqual({ to: { version: 2, pubKey: 'K2' }, from: { version: 1, pubKey: 'K1' } });
+      expect(d.publishEvent).toHaveBeenCalled();
+    });
+    it('a box that does not open here is DROPPED and said — never delivered, never a notification', async () => {
+      const warn = vi.fn();
+      const d = deps({ openFor: async () => null, logger: { warn } });
+      await makeHandleFileShare(d)('peer-A', { file: { id: 'f3', name: 'foto.jpg', size: 3 }, sealed: { to: { version: 9 }, sealed: 'x', nonce: 'n' } });
+      expect(d.deliverToThread).not.toHaveBeenCalled();
+      expect(d.publishEvent).not.toHaveBeenCalled();
+      expect(warn.mock.calls.some(([m]) => /version 9 did not open/.test(String(m)))).toBe(true);
+      // and a sealed envelope with NO open seam wired is the same drop (a shell from before)
+      const d2 = deps({ logger: { warn: () => {} } });
+      await makeHandleFileShare(d2)('peer-A', { file: { id: 'f3', name: 'foto.jpg', size: 3 }, sealed: { to: { version: 2 }, sealed: 'x', nonce: 'n' } });
+      expect(d2.deliverToThread).not.toHaveBeenCalled();
+    });
   });
 });

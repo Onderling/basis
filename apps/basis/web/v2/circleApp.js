@@ -8231,10 +8231,12 @@ async function boot() {
           // circle happened to be open — a file from a person, announced by nobody's bot, in a room
           // the sender may not even be in.
           'file-share':              makeHandleFileShare({
-            deliverToThread: ({ contactId, fromAddr, file, messageId }) => {
-              onContactReply({ contactId, fromAddr, text: '', file, messageId });
+            deliverToThread: ({ contactId, fromAddr, file, messageId, sealed }) => {
+              onContactReply({ contactId, fromAddr, text: '', file, messageId, ...(sealed ? { sealed } : {}) });
             },
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+            // A file sealed to the person opens with my key for the version it names (the text turn's seal).
+            openFor: (sealed, fromAddr) => agent.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,

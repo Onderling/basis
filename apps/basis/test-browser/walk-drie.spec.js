@@ -5,7 +5,7 @@
  * makes the circle; B (the phone — the alpha is web-only, so B is this app in a phone-sized browser)
  * joins first and is the baseline C must not break; C joins later and is removed. Seven steps, and at
  * every step what each device must SHOW. Run against the real relay when the point is "real shells,
- * real wire" (2026-09-14, after PR #101 changed how every catch-up between members is sent):
+ * real wire" (2026-09-14, after every catch-up between members started going over the real wire):
  *
  *   PEER_TEST_RELAY=wss://relay.onderling.org npx playwright test --project=relay walk-drie
  *

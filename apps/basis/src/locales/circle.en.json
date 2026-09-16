@@ -4003,6 +4003,14 @@
     "presend_floor": {
       "text": "Personal details are removed on this device before your message is sent.",
       "doc": "Contact DM thread header note when the contact declared a pre-send redaction floor: the participant sees that structured personal data (id numbers, IBAN, phone, e-mail) is redacted locally before sending."
+    },
+    "sealed_person": {
+      "text": "Sealed to the person",
+      "doc": "Thread header of a direct message. This device holds the contact's current person key (from their card, or a shared circle), so each message is sealed to the person and a device they revoke cannot read it."
+    },
+    "sealed_device": {
+      "text": "Sealed to the device only",
+      "doc": "Thread header of a direct message. No person key on record for this contact yet: messages are sealed to the device that holds their address, as before. Their next card, or a circle you share, brings the key."
     }
   },
   "pairedDevices": {

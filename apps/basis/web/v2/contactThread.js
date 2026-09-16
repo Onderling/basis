@@ -49,6 +49,7 @@ export function renderContactThread(container, {
   floor = null,            // the contact's pre-send floor, when declared: { label } — said once under the header
   privacy = null,          // per-circle privacy indicator (§10c): { level:'quiet'|'sharing'|'risk', icon, label, pulse? }
   onPrivacyTap = null,     // tap the badge → the surface's why/change affordance (surface.showPrivacy)
+  sealed = null,           // what a direct message here is sealed to: { level:'person'|'device', label } (the shared contact seal mark); null = not decided yet
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactThread.js');
@@ -90,6 +91,21 @@ export function renderContactThread(container, {
     badge.addEventListener('click', () => { if (typeof onPrivacyTap === 'function') onPrivacyTap(); });
     header.appendChild(badge);
     if (privacy.pulse) _ensurePrivacyPulseKeyframes();
+  }
+  // What a direct message here is sealed to. Sealed to the PERSON: this device holds their current person key,
+  // so a device they revoke cannot read it. Sealed to the DEVICE only: no key on record yet — as before; their
+  // next card or a shared circle brings it. The host decides (the agent's own seal resolution); this paints.
+  if (sealed && (sealed.level === 'person' || sealed.level === 'device') && sealed.label) {
+    const mark = document.createElement('span');
+    mark.className = `cc-cthread__sealed cc-cthread__sealed--${sealed.level}`;
+    mark.dataset.level = sealed.level;
+    Object.assign(mark.style, {
+      marginLeft: '8px', fontSize: '12px', lineHeight: '1.4', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px',
+      color: sealed.level === 'person' ? '#2e7d4f' : '#5b5d55',   // the theme's STATUS green / inkSoft
+    });
+    mark.textContent = `${sealed.level === 'person' ? '🔐' : '🔒'} ${sealed.label}`;
+    mark.title = sealed.label;
+    header.appendChild(mark);
   }
   // language picker (feedback thread): the participant chooses the BOT's language; the whole thread re-renders.
   if ((langValue === 'nl' || langValue === 'en') && typeof onLangChange === 'function') {

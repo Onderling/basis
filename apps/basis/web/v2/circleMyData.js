@@ -32,6 +32,10 @@ export function renderCircleMyData(container, {
   onReplaceDevice,
   devices = [],
   onRevokeDevice,
+  // What THIS device keeps of what the owner's devices sync (sync-policy §11): `{ silos: {chat,tasks,contacts}: bool,
+  // fileBytes: 'full'|'description', kringenOff: Set<string>, kringen: [{id, name}] }` + `onSetSync({ silo?, value?, fileBytes?, kringId?, on? })`.
+  syncSelection = null,
+  onSetSync = null,
   onMakePrimary,
   // CONNECTIONS (gekoppelde apparaten) — screens that are yours, somewhere else. Rows come from the
   // shared `connectionRows` projection; the two columns are the whole product question (what it may
@@ -486,6 +490,58 @@ export function renderCircleMyData(container, {
     fallbackNote.textContent = tr('circle.nearbyScreen.delivery_fallback_note');
     sec.appendChild(fallbackNote);
 
+    container.appendChild(sec);
+  }
+
+  // ── what this device keeps (sync-policy §11, 2026-09-17) ───────────────────────────────────
+  // A device's own choice about itself, read live by every landing, pull and pairing; never on the wire.
+  if (typeof onSetSync === 'function' && syncSelection && typeof syncSelection === 'object') {
+    const sec = section(tr('circle.mydata.sync'));
+    const intro = document.createElement('p');
+    intro.className = 'cc-mydata__sync-intro';
+    intro.textContent = tr('circle.mydata.sync_intro');
+    sec.appendChild(intro);
+    const check = (cls, label, checked, onChange) => {
+      const row = document.createElement('label');
+      row.className = `cc-mydata__sync-row ${cls}`;
+      row.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
+      const box = document.createElement('input');
+      box.type = 'checkbox'; box.checked = !!checked;
+      box.addEventListener('change', () => onChange(box.checked));
+      row.appendChild(box);
+      const txt = document.createElement('span'); txt.textContent = label;
+      row.appendChild(txt);
+      return row;
+    };
+    for (const silo of ['chat', 'tasks', 'contacts']) {
+      sec.appendChild(check(`cc-mydata__sync-silo-${silo}`, tr(`circle.mydata.sync_silo_${silo}`), syncSelection.silos?.[silo] !== false, (on) => onSetSync({ silo, value: on })));
+    }
+    const files = document.createElement('div');
+    files.className = 'cc-mydata__sync-files';
+    files.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
+    const filesLabel = document.createElement('span'); filesLabel.textContent = tr('circle.mydata.sync_files');
+    const filesSel = document.createElement('select');
+    filesSel.className = 'cc-mydata__sync-files-mode';
+    for (const mode of ['full', 'description']) {
+      const o = document.createElement('option'); o.value = mode; o.textContent = tr(`circle.mydata.sync_files_${mode}`);
+      if ((syncSelection.fileBytes ?? 'full') === mode) o.selected = true;
+      filesSel.appendChild(o);
+    }
+    filesSel.addEventListener('change', () => onSetSync({ fileBytes: filesSel.value }));
+    files.appendChild(filesLabel); files.appendChild(filesSel);
+    sec.appendChild(files);
+    const kh = document.createElement('p'); kh.className = 'cc-mydata__sync-kringen-head'; kh.textContent = tr('circle.mydata.sync_kringen');
+    sec.appendChild(kh);
+    const kringen = Array.isArray(syncSelection.kringen) ? syncSelection.kringen : [];
+    if (!kringen.length) {
+      const none = document.createElement('p'); none.textContent = tr('circle.mydata.sync_kringen_none'); sec.appendChild(none);
+    }
+    const off = syncSelection.kringenOff instanceof Set ? syncSelection.kringenOff : new Set(syncSelection.kringenOff ?? []);
+    for (const k of kringen) {
+      const row = check('cc-mydata__sync-kring', k.name ?? k.id, !off.has(k.id), (on) => onSetSync({ kringId: k.id, on }));
+      row.dataset.kringId = k.id;
+      sec.appendChild(row);
+    }
     container.appendChild(sec);
   }
 

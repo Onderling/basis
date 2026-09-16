@@ -40,18 +40,16 @@ export const CONTACT_TURN_BROADCAST = 'device-contact-turn';
 export const TURN_DIRECTIONS = Object.freeze({ in: 'in', out: 'out' });
 
 /**
- * Strip a file down to what may cross the fan: its description, never its bytes.
- *
- * A received photo's bytes live in the receiving device's blob store, keyed by the file id; they are
- * already kept out of the durable thread item for the same reason they are kept out of here. A
- * sibling therefore learns that a file arrived and what it is, and opens it on the device that holds
- * it. Carrying the bytes would put a photo on the fan for every device the person owns; dropping the
- * turn entirely would lose the message, which is worse than a card you cannot open yet.
+ * A file crosses the fan WHOLE — bytes included (sync-policy §11.4 as amended, 2026-09-16). The carry forwards
+ * what landed; what a device KEEPS of a file is that device's own choice (`syncSelection`: full, or the
+ * description only), applied where the turn is stored. Until then the fan stripped the bytes here, which
+ * stranded them on whichever device the sender's fan reached — once the primary contact address is a box
+ * that keeps descriptions only, the phone would never see the photo. Nothing with neither bytes nor a
+ * description is a file.
  */
-function fileDescription(file) {
+function fileOnWire(file) {
   if (!file || typeof file !== 'object') return undefined;
-  const { dataB64, ...rest } = file;   // eslint-disable-line no-unused-vars
-  return rest;
+  return { ...file };
 }
 
 /**
@@ -68,7 +66,7 @@ export function contactTurnToWire(turn) {
   const direction = turn?.direction === TURN_DIRECTIONS.out ? TURN_DIRECTIONS.out : TURN_DIRECTIONS.in;
   const contactId = typeof turn?.contactId === 'string' && turn.contactId ? turn.contactId : null;
   if (!contactId) return null;
-  const file = fileDescription(turn.file);
+  const file = fileOnWire(turn.file);
   const text = typeof turn.text === 'string' ? turn.text : '';
   // A turn with neither words nor a file is nothing to show; the sibling would render an empty bubble.
   if (!text && !file) return null;

@@ -36,6 +36,7 @@ import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 // Shared contact/bot exposed-skill registry (feedback-extension) — web≡mobile core.
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
+import { makeSyncSelection } from '../../../basis/src/v2/syncSelection.js';
 import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
 import { createAttachmentBlobStoreRN } from './attachmentBlobStoreRN.js';
 import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';
@@ -756,6 +757,8 @@ export async function bootAgentBundle(opts = {}) {
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them (web parity).
     fanToOwnDevices: agent.contactTurnFan,
+    // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
+    selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
   });
   const coreAgent = agent.sa?.agent ?? null;   // discoverA2A's hello/native-upgrade target
 

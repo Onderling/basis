@@ -231,13 +231,22 @@ export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {
 
 /** Peer handler for `circle-task-broadcast` → the rail's full ingest gate + the head apply. */
 /** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
-export function makeTaskPeerHandler({ rail, onChange = null, onLanded = null } = {}) {
+export function makeTaskPeerHandler({ rail, onChange = null, onLanded = null, holds = null, onPassed = null } = {}) {
   if (!rail) throw new Error('makeTaskPeerHandler: a task rail is required');
   return async function onCircleTask(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== TASK_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
+    // This device's selection (sync-policy §11) — the same three answers as the chat handler: land · verify
+    // and pass on (hold nothing, still carry) · refuse (the kring is off here).
+    const h = typeof holds === 'function' ? holds(circleId) : true;
+    if (h === null) return;
     try {
+      if (h === false) {
+        const v = typeof rail.verify === 'function' ? await rail.verify(circleId, statement) : { ok: false };
+        if (v?.ok && typeof onPassed === 'function') { try { await onPassed(circleId, statement, fromPeerAddr); } catch { /* best-effort */ } }
+        return;
+      }
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
       if (res?.ok && !res.existed && typeof onLanded === 'function') {

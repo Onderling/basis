@@ -37,12 +37,12 @@ describe('the first person key rides the join', () => {
     const { joined } = await pairCircle(A, B, { groupId: GROUP, name: 'Sleutel', handle: 'bea' });
     expect(joined.ok).toBe(true);
     // The admin fans the join before the joiner has bound the admin's address keys (the redeem response binds
-    // them), so the fan is refused or held and CATCH-UP reconciles it in the shells. The harness kicks no
-    // catch-up; the stand-in below replays the admin's stored spine into the joiner's production handler,
-    // which is what a catch-up batch does. Stated, so the walk is not read as proving the fan's ordering.
-    for (const st of A.agent.membershipRail.storedStatements(GROUP)) {
-      await onMembership(A.agent.circleAddressFor(GROUP), { subtype: MEMBERSHIP_BROADCAST, circleId: GROUP, event: st });
-    }
+    // them), so the fan is refused or held — and the circle's `create` predates the join and is never fanned
+    // to a joiner at all. THE JOINER PULLS: the same `requestCircle` both shells run after a join
+    // (`makeCircleReachable`'s `pullLanes`, 2026-09-16), over the wire, answered by the admin's catch-up.
+    // Until then this walk replayed the admin's spine into the joiner by hand — proving the fold, not the shell.
+    const pulled = await B.membershipCatchUp.requestCircle(GROUP, { callSkill: (o, op, a) => B.agent.callSkill(o, op, a) });
+    expect(pulled.requested, 'the joiner found no member address to pull from').toBeGreaterThan(0);
     const settled = await until(async () => {
       const [ra, rb] = await Promise.all([readRoster(A, GROUP), readRoster(B, GROUP)]);
       const ok = rowOf(ra, B.pubKey)?.personKey && rowOf(rb, B.pubKey)?.personKey && rowOf(ra, A.pubKey)?.personKey && rowOf(rb, A.pubKey)?.personKey;
@@ -70,5 +70,12 @@ describe('the first person key rides the join', () => {
     A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
     expect(A2.pubKey).toBe(A.pubKey);
     expect(A2.agent.personKey(), 'handed the current version at the ceremony, sealed on the device').toEqual(A.agent.personKey());
+    // THE ENROL CARRIERS carry the link key's PUBLIC half and nothing that derives its seed: the enrolled device
+    // builds cards and answers pulls with the pub; only a ceremony (root in hand) can vouch for a rotation.
+    const chainA = A.agent.personKeyChainOf(), chainA2 = A2.agent.personKeyChainOf();
+    expect(typeof chainA.current.linkKeyPub).toBe('string');
+    expect(chainA2.current.linkKeyPub, 'the enrolled device carries the same pin').toBe(chainA.current.linkKeyPub);
+    // (the vault entry's exact key set — pub yes, link seed no — is pinned in core's personKey.test.js; the hand-over
+    // wire's in personKeySync.test.js; the delegation blob is `{ seed, deviceId, record, label? }` by construction)
   }, 60_000);
 });

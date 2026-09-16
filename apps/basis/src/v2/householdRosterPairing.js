@@ -181,9 +181,14 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
  * @param {(circleIds?: string[]) => any} [a.registerCirclePresence]
  *   the host's presence seam (mobile: `bundle.registerCirclePresence`). Called with no arguments so the host
  *   decides the full current circle list — this function knows about one circle, not all of them.
- * @returns {Promise<{registered: boolean, bound: number, skipped: number}>}
+ * @param {(circleId: string) => any} [a.pullLanes]
+ *   the host's catch-up seam for the circle's pull-all lanes (membership, governance, keys): a fresh joiner
+ *   holds only what was fanned to it AFTER its join — the circle's `create`, earlier joins, roles and
+ *   evictions live before that and reach it only by a pull. Runs after the binding, since the pull leaves as
+ *   this circle's identity and is answered to the addresses just bound (2026-09-16).
+ * @returns {Promise<{registered: boolean, bound: number, skipped: number, pulled: boolean}>}
  */
-export async function makeCircleReachable({ agent, circleId, registerCirclePresence } = {}) {
+export async function makeCircleReachable({ agent, circleId, registerCirclePresence, pullLanes } = {}) {
   let registered = false;
   if (typeof registerCirclePresence === 'function') {
     try { await registerCirclePresence(); registered = true; }
@@ -203,5 +208,12 @@ export async function makeCircleReachable({ agent, circleId, registerCirclePrese
   let bound = { bound: 0, skipped: 0 };
   try { bound = await bindCircleAddressKeysFor({ agent, circleId }); }
   catch { /* a roster read that fails must not undo the registration above */ }
-  return { registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0 };
+  let pulled = false;
+  if (typeof pullLanes === 'function') {
+    try { await pullLanes(circleId); pulled = true; }
+    catch (err) {
+      if (typeof console !== 'undefined') console.warn(`[circle] joined ${circleId} but could not pull its lanes — the roster fills in at the next reconnect: ${err?.message ?? err}`);
+    }
+  }
+  return { registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0, pulled };
 }

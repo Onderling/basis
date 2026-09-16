@@ -10,7 +10,12 @@
  * Version 1 is announced to a circle by the JOIN (or the circle's `create`), device-in-circle signed — the same
  * trust as the join itself (Frits 2026-09-16, option A): a thief who holds the device holds the current key anyway.
  * Every LATER version is announced by a root-revealed `person-key` statement (security/personKeyFold.js), which
- * a device cannot mint. The rotation ceremony is the next step; this module is the key and its two homes.
+ * a device cannot mint. A CONTACT (no circle, no commitment) learns a later version from the CHAIN below, vouched
+ * for by the LINK KEY — a second root-derived key, one per profile, whose seed exists only where the root does
+ * (a ceremony; boot on a root-custody device) and is never stored or handed to a device: an enrolled device is
+ * handed the current person-key seed and the link key's PUBLIC half, so it builds cards and answers pulls, but
+ * cannot vouch for a version. That is what closes the hole of 2026-09-16: a revoked device holds seed n and could
+ * sign "n vouches for n+1" itself; it cannot sign as the link key.
  */
 import nacl from 'tweetnacl';
 import { hkdf } from '@noble/hashes/hkdf.js';
@@ -23,7 +28,7 @@ const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every person key).
 const _PERSON_KEY_SALT = new TextEncoder().encode('onderling-person-key-v1');
 
-/** The sealed-vault entry a device keeps: `{ version, seed, reveals }` (seed b64; the ceremony's per-circle reveals, for the hand-over). */
+/** The sealed-vault entry a device keeps: `{ version, seed, reveals, links, previous, linkKeyPub }` (seeds b64; the ceremony's per-circle reveals, for the hand-over; the link key's PUBLIC half — its seed is never stored). */
 export const PERSON_KEY_VAULT_KEY = 'person-key';
 
 /**
@@ -39,7 +44,21 @@ export function derivePersonKeySeed(profileSeed, version) {
   return hkdf(sha256, profileSeed, _PERSON_KEY_SALT, info, 32);
 }
 
-/** The public key (b64) behind a person-key seed — what a circle learns. */
+/**
+ * The seed of the profile's LINK KEY — the key that vouches for every person-key rotation to contacts (the chain
+ * below). One per profile, never rotated (a new link key means a new Hi), derived from the same profile seed under
+ * its own info so it is never one of the person keys. Derive it only where the root is in hand and drop it after
+ * signing: nothing stores it, nothing carries it.
+ * @param {Uint8Array} profileSeed
+ * @returns {Uint8Array} 32 bytes
+ */
+export function derivePersonLinkKeySeed(profileSeed) {
+  if (!(profileSeed instanceof Uint8Array) || profileSeed.length !== 32) throw new Error('derivePersonLinkKeySeed: profileSeed must be a 32-byte Uint8Array');
+  const info = new TextEncoder().encode(`${HKDF_INFO_NS}person-key-links`);
+  return hkdf(sha256, profileSeed, _PERSON_KEY_SALT, info, 32);
+}
+
+/** The public key (b64) behind a person-key seed — what a circle learns. (Also the link key's public half from its seed.) */
 export function personKeyPubKeyB64(seed) {
   if (!(seed instanceof Uint8Array) || seed.length !== 32) throw new Error('personKeyPubKeyB64: seed must be a 32-byte Uint8Array');
   return b64encode(nacl.sign.keyPair.fromSeed(seed).publicKey);
@@ -66,37 +85,42 @@ export function personKeyLinkMessage({ version, pubKey, prevVersion }) {
 
 /**
  * THE CHAIN — how someone who knew version n learns version n+1 without the root: each new version is vouched for
- * by the one before it, signed with the previous seed at the rotation ceremony. A contact who holds version n
- * verifies the links from n upward and arrives at the current key; a device that holds only the current seed
- * cannot forge a link for a version it never held. Public material (keys and signatures), so it may be pulled by
- * anyone who knows the person — but it is the PERSON's cross-circle identity, so it is handed to contacts, never
- * fanned into circles (those learn the key root-revealed, per circle).
+ * by a link `{ version, pubKey, prevVersion, sig }` signed by the profile's LINK KEY (never by version n's seed: a
+ * revoked device holds that seed and would vouch for a key of its own). The contact pins the link key's public
+ * half from the card on first sight and walks the links from the version it holds. Not for circles — those learn
+ * the key root-revealed, per circle.
+ * @param {Uint8Array} linkSeed  `derivePersonLinkKeySeed(profileSeed)` — in hand only inside a ceremony
  * @returns {{ version: number, pubKey: string, prevVersion: number, sig: string }}
  */
-export function signPersonKeyLink(prevSeed, { version, pubKey, prevVersion }) {
+export function signPersonKeyLink(linkSeed, { version, pubKey, prevVersion }) {
   if (!Number.isInteger(version) || !Number.isInteger(prevVersion) || prevVersion !== version - 1) throw new Error('signPersonKeyLink: version must follow prevVersion');
   if (typeof pubKey !== 'string' || !pubKey) throw new Error('signPersonKeyLink: pubKey required');
-  return { version, pubKey, prevVersion, sig: signWithPersonKey(prevSeed, personKeyLinkMessage({ version, pubKey, prevVersion })) };
+  return { version, pubKey, prevVersion, sig: signWithPersonKey(linkSeed, personKeyLinkMessage({ version, pubKey, prevVersion })) };
 }
 
 /**
- * Walk the chain from what is KNOWN — `{ version, pubKey }` — to the highest version the links vouch for.
- * Each link must be signed by the key of the version before it, starting from the known key. Returns the
- * current `{ version, pubKey }` (the known one when no link applies), or null when a link in the way fails.
+ * Walk the chain from what is KNOWN — `{ version, pubKey, linkKeyPub }` — to the highest version the links vouch for.
+ * EVERY link must be signed by the pinned link key; the walk starts from the known version and follows contiguous
+ * links. Returns the current `{ version, pubKey, linkKeyPub }` (the known one when no link applies — and ALWAYS the
+ * known one when no link key is pinned: without it nothing can vouch, and the contact must re-take the card), or
+ * null when a link in the way fails.
  */
 export function verifyPersonKeyChain(links, known) {
   if (!known || !Number.isInteger(known.version) || typeof known.pubKey !== 'string') return null;
+  if (typeof known.linkKeyPub !== 'string' || !known.linkKeyPub) return { version: known.version, pubKey: known.pubKey };
+  let linkKey;
+  try { linkKey = b64decode(known.linkKeyPub); } catch { return null; }
   const byVersion = new Map();
   for (const l of Array.isArray(links) ? links : []) if (l && Number.isInteger(l.version)) byVersion.set(l.version, l);
-  let cur = { version: known.version, pubKey: known.pubKey };
+  let cur = { version: known.version, pubKey: known.pubKey, linkKeyPub: known.linkKeyPub };
   for (;;) {
     const next = byVersion.get(cur.version + 1);
     if (!next) return cur;
     if (typeof next.pubKey !== 'string' || !next.pubKey || typeof next.sig !== 'string' || next.prevVersion !== cur.version) return null;
     let ok = false;
-    try { ok = nacl.sign.detached.verify(personKeyLinkMessage(next), b64decode(next.sig), b64decode(cur.pubKey)); } catch { ok = false; }
+    try { ok = nacl.sign.detached.verify(personKeyLinkMessage(next), b64decode(next.sig), linkKey); } catch { ok = false; }
     if (!ok) return null;
-    cur = { version: next.version, pubKey: next.pubKey };
+    cur = { version: next.version, pubKey: next.pubKey, linkKeyPub: known.linkKeyPub };
   }
 }
 
@@ -142,15 +166,30 @@ export async function loadPersonKey(vault) {
     for (const p of Array.isArray(o.previous) ? o.previous : []) {
       try { const ps = b64decode(p.seed); if (Number.isInteger(p.version) && ps instanceof Uint8Array && ps.length === 32) previous.push({ version: p.version, seed: ps }); } catch { /* skip */ }
     }
-    return { version: o.version, seed, reveals, links, previous };
+    const linkKeyPub = (typeof o.linkKeyPub === 'string' && o.linkKeyPub) ? o.linkKeyPub : null;
+    return { version: o.version, seed, reveals, links, previous, linkKeyPub };
   } catch { return null; }
 }
 
-/** Write the vault entry — only ever a HIGHER version than what is there (a ceremony never rolls a key back). */
-export async function storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [] }) {
+/**
+ * Write the vault entry — only ever a HIGHER version than what is there (a ceremony never rolls a key back), with
+ * one exception: the SAME version may fill in the link key's public half when the entry has none (an entry from
+ * before link keys, on a device that then hears it from a sibling). A pub once there is never replaced. Returns
+ * true when the entry changed.
+ */
+export async function storePersonKey(vault, { version, seed, reveals = {}, links = [], previous = [], linkKeyPub = null }) {
   if (!Number.isInteger(version) || version < 1 || !(seed instanceof Uint8Array) || seed.length !== 32) throw new Error('storePersonKey: {version, seed} required');
   const have = await loadPersonKey(vault);
-  if (have && have.version >= version) return false;
+  const pub = (typeof linkKeyPub === 'string' && linkKeyPub) ? linkKeyPub : null;
+  if (have && have.version >= version) {
+    if (have.version === version && !have.linkKeyPub && pub) {
+      let raw = await vault.get(PERSON_KEY_VAULT_KEY);
+      raw = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      await vault.set(PERSON_KEY_VAULT_KEY, JSON.stringify({ ...raw, linkKeyPub: pub }));
+      return true;
+    }
+    return false;
+  }
   // Older versions stay openable: what was sealed to version n before the rotation still arrives after it.
   const keep = new Map();
   for (const p of [...(have?.previous ?? []), ...(have ? [{ version: have.version, seed: have.seed }] : []), ...previous]) {
@@ -162,6 +201,7 @@ export async function storePersonKey(vault, { version, seed, reveals = {}, links
     version, seed: b64encode(seed), reveals: reveals && typeof reveals === 'object' ? reveals : {},
     links: [...allLinks.values()].sort((a, b) => a.version - b.version),
     previous: [...keep.entries()].sort((a, b) => a[0] - b[0]).map(([v, sd]) => ({ version: v, seed: b64encode(sd) })),
+    linkKeyPub: have?.linkKeyPub ?? pub,   // pinned once; a later write never replaces it
   }));
   return true;
 }

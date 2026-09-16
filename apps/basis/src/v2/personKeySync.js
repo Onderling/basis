@@ -61,6 +61,8 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
       // the chain and the older seeds ride along: a survivor answers a contact's pull, and opens what was sealed to an older version
       links: Array.isArray(k.links) ? k.links : [],
       previous: (Array.isArray(k.previous) ? k.previous : []).map((p) => ({ version: p.version, seed: b64encode(p.seed) })),
+      // the link key's PUBLIC half — a sibling builds cards and answers pulls with it; its seed never travels
+      ...(typeof k.linkKeyPub === 'string' && k.linkKeyPub ? { linkKeyPub: k.linkKeyPub } : {}),
     }
     : null);
   const parse = (payload) => {
@@ -73,7 +75,10 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
     for (const p of Array.isArray(payload.previous) ? payload.previous : []) {
       try { const ps = b64decode(p.seed); if (Number.isInteger(p.version) && ps instanceof Uint8Array && ps.length === 32) previous.push({ version: p.version, seed: ps }); } catch { /* skip */ }
     }
-    return { version: payload.version, seed, reveals: payload.reveals, links: Array.isArray(payload.links) ? payload.links : [], previous };
+    return {
+      version: payload.version, seed, reveals: payload.reveals, links: Array.isArray(payload.links) ? payload.links : [], previous,
+      ...(typeof payload.linkKeyPub === 'string' && payload.linkKeyPub ? { linkKeyPub: payload.linkKeyPub } : {}),
+    };
   };
   /** ONE reveal that verifies against this person's own commitment in that circle admits the hand-over. */
   const rootSpoke = (k) => {

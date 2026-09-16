@@ -3,10 +3,12 @@
  *
  * Circles learn a member's person key root-revealed, per circle (the person-key statement). A contact who shares no
  * circle learns it from the card (the Hi between persons) and, after a rotation, by asking: "since version n, what
- * changed?" — answered with the chain of links from n up, each vouched for by the version before it, verified at the
- * asker's end from the version it already holds (core verifyPersonKeyChain). Pushing a new key to a bare address would
- * hand the rotation to whoever holds that address — a thief's relay registration included — which is why a contact
- * asks and verifies, and never takes a key on the wire's word.
+ * changed?" — answered with the chain of links from n up, each signed by the person's LINK KEY (root-derived, its seed
+ * in hand only inside a ceremony — never by version n's seed, which a revoked device holds), verified at the asker's
+ * end against the link key it PINNED from the card and from the version it already holds (core verifyPersonKeyChain).
+ * Pushing a new key to a bare address would hand the rotation to whoever holds that address — a thief's relay
+ * registration included — which is why a contact asks and verifies, and never takes a key on the wire's word. What
+ * a thief on that address can still do is stay silent: the asker then keeps the version it has (stated window).
  *
  * When to ask: a direct message arrives sealed FROM a version newer than the one on record for that contact. Then the
  * next message to them can seal to their current key. A request is answered only for a CONTACT (the asker's address

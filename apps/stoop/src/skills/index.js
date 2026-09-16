@@ -889,7 +889,13 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     const redeemers = new Set();
     for (const it of forGroup) {
       const src = it?.source ?? {};
-      if (typeof src.redeemedBy === 'string' && src.redeemedBy) redeemers.add(src.redeemedBy);
+      // A REDEEMER is someone the trail ADMITTED — never someone who wrote a row about themselves. A device
+      // announces its own per-circle address as a trail row with `redeemedBy = me` and no admitter, and
+      // counting that as a redemption subtracted every creator from their own founder set the moment they
+      // announced (the 08-27 lockout's second door, found 2026-09-16: the creator's admin-signed joins were
+      // then dropped as "someone else's join without a founder's authority", so a joiner's person key never
+      // reached the creator's roster). Admissions, not rows — the same rule `addGenesisFounders` states.
+      if (typeof src.redeemedBy === 'string' && src.redeemedBy && src.channel !== 'announce') redeemers.add(src.redeemedBy);
       if (typeof src.confirmedBy === 'string' && src.confirmedBy) admitters.add(src.confirmedBy);
     }
     for (const w of admitters) if (!redeemers.has(w)) founderWebids.add(w);
@@ -1420,21 +1426,35 @@ export function buildSkills({
   const _spineSigner = bundle?.agent?.identity;
 
   /**
-   * A contact's CURRENT person key. Nothing known yet → the claim is taken (the card is the person's own word, the
-   * same trust as the profile key on it). Something known → the claim must be reached by walking the chain of links
-   * from the known version; a claim the chain does not reach is ignored and the known key kept. Returns what is now
-   * on record, or null when nothing could be recorded.
+   * A contact's CURRENT person key — and the PIN of their link key. Nothing known yet → the claim is taken (the card
+   * is the person's own word, the same trust as the profile key on it), the link key's public half with it. Something
+   * known → the claim must be reached by walking the chain of links from the known version, every link signed by the
+   * PINNED link key; a claim the chain does not reach is ignored and the known key kept. The pin is never replaced:
+   * a card or reply carrying a different link key is refused (logged once per contact) — that is the whole point,
+   * since a revoked device still answers at the profile address and would otherwise serve a card of its own. A record
+   * from before link keys (a key, no pin) takes the first pin that arrives with the SAME key — a one-time TOFU.
+   * Returns what is now on record, or null when nothing could be recorded.
    */
+  const linkKeyRefusedFor = new Set();
   const adoptContactPersonKey = async (webid, claimed, links) => {
     if (!bundle?.contacts || !claimed || !Number.isInteger(claimed.version) || claimed.version < 1 || typeof claimed.pubKey !== 'string' || !claimed.pubKey) return null;
+    const claimedPin = (typeof claimed.linkKeyPub === 'string' && claimed.linkKeyPub) ? claimed.linkKeyPub : null;
     const existing = (await members?.resolveByWebid?.(webid))?.personKey ?? null;
     let next = null;
-    if (!existing) next = { version: claimed.version, pubKey: claimed.pubKey };
+    if (!existing) next = { version: claimed.version, pubKey: claimed.pubKey, ...(claimedPin ? { linkKeyPub: claimedPin } : {}) };
     else {
-      const reached = verifyPersonKeyChain(Array.isArray(links) ? links : [], existing);
+      if (existing.linkKeyPub && claimedPin && claimedPin !== existing.linkKeyPub) {
+        if (!linkKeyRefusedFor.has(webid)) { linkKeyRefusedFor.add(webid); console.warn(`[person-key] ${String(webid).slice(0, 24)}… presented a DIFFERENT link key — refused; the pinned one stands (a new link key means a new Hi)`); }
+        return existing;
+      }
+      const known = (!existing.linkKeyPub && claimedPin && existing.version === claimed.version && existing.pubKey === claimed.pubKey)
+        ? { ...existing, linkKeyPub: claimedPin }   // the one-time pin onto a record from before link keys
+        : existing;
+      const reached = verifyPersonKeyChain(Array.isArray(links) ? links : [], known);
       if (reached && reached.version > existing.version) next = reached;
       else if (reached && reached.version === claimed.version && reached.pubKey === claimed.pubKey) next = reached;
       else return existing;   // nothing the chain vouches for beyond what is known — keep it
+      if (next.version === existing.version && next.pubKey === existing.pubKey && (next.linkKeyPub ?? null) === (existing.linkKeyPub ?? null)) return existing;
     }
     await bundle.contacts.addContact({ webid, personKey: next });
     return next;

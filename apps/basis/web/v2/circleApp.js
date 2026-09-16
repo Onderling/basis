@@ -2163,6 +2163,9 @@ function buildCircleBot(agent) {
     // is now DURABLE (persisted + rehydratable), the G18 fix. Thunked so the
     // async-built store doesn't block channel construction; null → ephemeral.
     itemStore:  () => getContactDmStore(),
+    // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
     localActor: LOCAL_ACTOR,
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them.

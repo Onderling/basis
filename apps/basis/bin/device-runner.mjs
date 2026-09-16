@@ -226,6 +226,9 @@ if (relayUrl) {
     sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     localActor: 'me',
+    // Direct messages are sealed to the PERSON's current key; an enrolled box holds it, handed over at enrol.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
     // A turn that arrives here is meant for the PERSON, so it goes on to their other devices.
     // …and the log says where it went: per device of the person's, delivered, held for its presence,
     // or failed. A revoked device's fan lands nowhere, and the log is where that is legible.

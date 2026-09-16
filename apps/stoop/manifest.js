@@ -702,6 +702,24 @@ export const stoopManifest = {
       },
     },
     {
+      // A contact's CURRENT person key: taken on first sight (the card), else verified as a chain of links from the
+      // version already on record. Reached by the card scan and by the person-key chain lane — no surface of its own.
+      id:   'setContactPersonKey', group: 'data', verb: 'submit',
+      appliesTo: { type: 'contact' },
+      // Versions are monotonic and chain-verified at the receiver — two of my devices converge on the highest version
+      // the chain reaches; content, not a claim.
+      resolves: [{ field: 'personKey', policy: 'content' }],
+      params: [
+        { name: 'webid',     kind: 'webid',  required: true },
+        { name: 'personKey', kind: 'object', required: true },
+        { name: 'links',     kind: 'object', required: false },
+      ],
+      surfaces: {
+        chat: { reply: 'text', hint: "record a contact's current person key (from their card, or a verified chain)" },
+        ui:   { control: 'page' },   // reached from the contact page's card scan, as the address announcement is
+      },
+    },
+    {
       id:   'getContactShareQr', group: 'data', verb: 'list',
       params: [
         { name: 'trust', kind: 'enum', of: ['known', 'trusted'], required: false },

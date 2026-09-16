@@ -14,7 +14,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { CIRCLE_ADDRESS_ANNOUNCE_KIND, PERSON_KEY_KIND } from '@onderling/core';
+import { CIRCLE_ADDRESS_ANNOUNCE_KIND, PERSON_KEY_KIND, sealToPersonKey, AgentIdentity } from '@onderling/core';
+import { randomBytes } from 'node:crypto';
 import { bootRealAgentNode, connectNodesOverBus, pairCircle, bindCircleAddresses, readRoster, until, teardown } from '../support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../../src/v2/circleAddressAnnounce.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
@@ -105,6 +106,12 @@ describe('the person key rotates in the revoke ceremony', () => {
     const got = await until(() => (A2.agent.personKey()?.version === 2 ? true : null), { timeout: 15000, step: 100 });
     expect(got, `A2 never received v2; holds ${JSON.stringify(A2.agent.personKey())}`).toBe(true);
     expect(A2.agent.personKey()).toEqual(v2);
+    // …with the chain link (v1 vouches for v2) and the retired v1 seed: A2 answers a contact's pull and opens what was sealed to v1.
+    expect(A2.agent.personKeyChainOf().links.map((l) => [l.prevVersion, l.version])).toEqual([[1, 2]]);
+    const strangerSeed = randomBytes(32);
+    const box = await sealToPersonKey(strangerSeed, v1.pubKey, { text: 'sealed before the rotation' });
+    const opened = await A2.agent.contactSeal.openFor({ ...box, to: { version: 1, pubKey: v1.pubKey }, from: { version: 1, pubKey: AgentIdentity.pubKeyFromSeed(strangerSeed) } }, null);
+    expect(opened).toEqual({ text: 'sealed before the rotation' });
 
     // Bea — the root-revealed statement, folded
     expect(await until(async () => ((await rowFor(B, A.pubKey))?.personKey?.version === 2 ? true : null), { timeout: 15000, step: 100 }), 'Bea\'s row never showed v2').toBe(true);

@@ -28,7 +28,7 @@ import {
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, personKeyPubKeyB64, loadPersonKey , storePersonKey, PERSON_KEY_KIND, personKeyFacts , signWithPersonKey , firstDeviceIdFor } from '@onderling/core';
+  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
@@ -86,6 +86,7 @@ import {
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
+import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
 import { isRosterTrailItem } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
@@ -1900,7 +1901,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     current: () => personKey,
     store: async (k) => {
       const landed = await storePersonKey(chatVault, k);
-      if (landed) await adoptPersonKey(k);
+      if (landed) await adoptPersonKey((await loadPersonKey(chatVault)) ?? k);   // the merged entry: chain + older seeds
       return landed;
     },
     selfPubKey: chatId.pubKey,
@@ -1909,6 +1910,62 @@ export async function createRealHouseholdAgent(opts = {}) {
     onLanded: ({ version }) => console.info(`[person-key] version ${version} arrived from one of my devices`),
     onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
   });
+  /** My chain, for a contact's pull: the current key and the links that vouch for it from any earlier version. */
+  const personKeyChainOf = () => (personKey ? { current: currentPersonKey(), links: Array.isArray(personKey.links) ? personKey.links : [] } : null);
+  /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
+  const personSeedFor = (version) => (personKey?.version === version ? personKey.seed : (personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
+  /** A contact's row in the contact book, by their webid (the profile address a direct message goes to). */
+  const contactRecordOf = async (webid) => {
+    try { const r = await callSkill('stoop', 'listContacts', {}); return (r?.items ?? r?.contacts ?? []).find((c) => c?.webid === webid) ?? null; } catch { return null; }
+  };
+  /**
+   * A CONTACT's current person key: from a circle we share (their row's root-revealed key — a close contact is a
+   * two-member circle, and any shared circle serves), else from the contact book (the card, or a pulled chain).
+   */
+  const contactPersonKeyOf = async (webid) => {
+    let best = null;
+    for (const circleId of (opts.circlesForPeer?.(webid) ?? [])) {
+      try {
+        const row = ((await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === webid);
+        if (row?.personKey && (!best || row.personKey.version > best.version)) best = { version: row.personKey.version, pubKey: row.personKey.pubKey };
+      } catch { /* next circle */ }
+    }
+    if (best) return best;
+    const rec = await contactRecordOf(webid);
+    return rec?.personKey && Number.isInteger(rec.personKey.version) ? { version: rec.personKey.version, pubKey: rec.personKey.pubKey } : null;
+  };
+  const personKeyChain = createPersonKeyChain({
+    chain: personKeyChainOf,
+    isContact: async (addr) => !!(await contactRecordOf(addr)) || (opts.circlesForPeer?.(addr) ?? []).length > 0,
+    known: contactPersonKeyOf,
+    adopt: async (webid, current, links) => (await callSkill('stoop', 'setContactPersonKey', { webid, personKey: current, links }))?.personKey ?? null,
+    sendToPeer: (to, payload, o) => sendCircleScoped(to, payload, { guarantee: 'hold-forward', ...o }),
+    onRefused: ({ reason, from }) => console.info(`[person-key-chain] refused ${reason} from ${String(from).slice(0, 12)}…`),
+  });
+  const sealedWarned = new Set();
+  /** The direct-message seal: to the contact's current person key, from mine — or null (unsealed, as before) when either is unknown. */
+  const contactSeal = {
+    sealFor: async (peerAddr, content) => {
+      const to = personKey ? await contactPersonKeyOf(peerAddr) : null;
+      if (!to) {
+        if (personKey && !sealedWarned.has(peerAddr)) { sealedWarned.add(peerAddr); console.info(`[contact-seal] no person key on record for ${String(peerAddr).slice(0, 12)}… — this thread stays sealed to the device only until their card or a shared circle brings one`); }
+        return null;
+      }
+      const { sealed, nonce } = await sealToPersonKey(personKey.seed, to.pubKey, content);
+      return { to, from: currentPersonKey(), sealed, nonce };
+    },
+    openFor: async (s, fromAddr) => {
+      const seed = personSeedFor(s?.to?.version);
+      if (!seed) { console.warn(`[contact-seal] a message sealed to person-key version ${s?.to?.version} — this device holds no such version`); return null; }
+      const content = await openFromPersonKey(seed, s?.from?.pubKey, s);
+      if (content && fromAddr && Number.isInteger(s?.from?.version)) {
+        // sealed FROM a version newer than the one on record: pull their chain, so the next message seals to it
+        const known = await contactPersonKeyOf(fromAddr);
+        if (known && s.from.version > known.version) personKeyChain.requestFrom(fromAddr, known.version).catch(() => {});
+      }
+      return content;
+    },
+  };
   const contactTurnHandler = (applyTurn, onRefused = null) => makeContactTurnPeerHandler({
     siblings: ownDeviceSiblings,
     selfPubKey: chatId.pubKey,
@@ -2427,7 +2484,14 @@ export async function createRealHouseholdAgent(opts = {}) {
             facts: personKeyFacts({ version: nextVersion, pubKey }),
           });
         }
-        if (await storePersonKey(chatVault, { version: nextVersion, seed: nextSeed, reveals })) await adoptPersonKey({ version: nextVersion, seed: nextSeed, reveals });
+        // The chain link: version n vouches for n+1, signed with the seed being retired — what a contact who knew n
+        // verifies to learn n+1 without the root. Older seeds are kept, so a message sealed to n still opens.
+        const link = personKey ? signPersonKeyLink(personKey.seed, { version: nextVersion, pubKey, prevVersion: personKey.version }) : null;
+        // The seed being retired rides along explicitly: a root-custody device derived v1 at boot and never stored it.
+        const previous = personKey ? [...(personKey.previous ?? []), { version: personKey.version, seed: personKey.seed }] : [];
+        if (await storePersonKey(chatVault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous })) {
+          await adoptPersonKey((await loadPersonKey(chatVault)) ?? { version: nextVersion, seed: nextSeed, reveals });
+        }
         personKeyVersion = nextVersion;
         if (typeof membershipEmit === 'function') {
           for (const circleId of circleIds) {
@@ -3972,6 +4036,8 @@ export async function createRealHouseholdAgent(opts = {}) {
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
         );
         if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
+        // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
+        if (personKey) realArgs = { ...realArgs, personKey: currentPersonKey(), personKeyLinks: Array.isArray(personKey.links) ? personKey.links : [] };
         // WHERE I CAN BE FOUND (Frits, 2026-09-11): the primary relay by default; every extra relay this
         // device is on only when the person named it (`extraRelays`, off by default — relay diversity is
         // an unlinkability strategy, and a card listing every relay hands its holder a linkage across
@@ -4887,6 +4953,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           // the contact's stableId/webid.  ListItemRow forwards this
           // to buttonSpecials.startDm.
           peerAddr:    c.peerAddr ?? null,
+          personKey:   c.personKey ?? null,   // what a direct message to them is sealed to
         })),
         _sync: simulateSync(),
       };
@@ -5671,6 +5738,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     personKey: currentPersonKey,
     // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.
     personKeySync,
+    /** My person-key chain `{ current, links }` — what a contact pulls after a rotation. */
+    personKeyChain,
+    personKeyChainOf,
+    /** The direct-message seal to the person (`sealFor` / `openFor`) — the shells hand it to the contact channel. */
+    contactSeal,
+    /** A contact's current person key: a shared circle's row, else the contact book. */
+    contactPersonKeyOf,
     // The one sibling carry (L100): the lane table (`buildCircleLanes`) hands it every landed statement.
     siblingCarry,
     /** Inbound envelopes the security layer refused, per reason — the diagnostic read of the warning above. */

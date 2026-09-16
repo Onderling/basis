@@ -24,7 +24,7 @@ const typed = process.env.WALK_TEXT || 'De wachtlijst bij de GGZ is veel te lang
 
 const node = await bootRealAgentNode('walker');
 const replies = [];
-const channel = createContactThreadChannel({ sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload) });
+const channel = createContactThreadChannel({ sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload), sealFor: node.agent.contactSeal?.sealFor ?? null, openFor: node.agent.contactSeal?.openFor ?? null });
 const onReply = channel.replyHandler((r) => replies.push(r));
 await node.agent.connectPeerTransport({
   relayUrl, awaitRelayReady: true,

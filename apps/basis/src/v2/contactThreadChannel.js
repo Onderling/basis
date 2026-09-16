@@ -71,6 +71,10 @@ export const DEFAULT_CONTACT_SUBTYPES = { out: 'contact-msg', in: 'contact-reply
  */
 export function createContactThreadChannel({
   sendToPeer,
+  // THE PERSON SEAL (2026-09-16): `sealFor(peerAddr, content)` → `{ to, from, sealed, nonce }` or null; `openFor(sealed, fromAddr)` →
+  // the content or null. Absent, or null for a contact whose key is unknown, the turn goes as before — sealed to the device only.
+  sealFor = null,
+  openFor = null,
   subtypes = DEFAULT_CONTACT_SUBTYPES,
   now = () => Date.now(),
   genId,
@@ -128,6 +132,9 @@ export function createContactThreadChannel({
     };
     if (env.extras?.displayName) payload.displayName = env.extras.displayName;
     if (env.extras?.webid)       payload.webid       = env.extras.webid;
+    // Sealed to the PERSON: the wire carries the box and no text — a device that holds the profile key but not the
+    // person key (a revoked one) receives an envelope it cannot read.
+    if (env.extras?.sealed) { payload.sealed = env.extras.sealed; payload.text = ''; }
     return payload;
   }
 
@@ -174,7 +181,12 @@ export function createContactThreadChannel({
     // The fan rides the SEND's promise, after the turn has actually gone out and been stored — so a
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
-    const sent = Promise.resolve(core.deliver(envelope, { to: peerAddr })).then(async (res) => {
+    const sent = (async () => {
+      // Sealed to the PERSON when their current key is known — the wire carries the box, not the text.
+      if (typeof sealFor === 'function') {
+        try { const s = await sealFor(peerAddr, { text: floored.text }); if (s) envelope.extras.sealed = s; } catch { /* unsealed, as before */ }
+      }
+      const res = await core.deliver(envelope, { to: peerAddr });
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       if (!res?.deduped) {
@@ -184,7 +196,7 @@ export function createContactThreadChannel({
         });
       }
       return res;
-    });
+    })();
     return { messageId: id, sent, text: floored.text, redacted: floored.hits.length };
   }
 
@@ -341,13 +353,20 @@ export function createContactThreadChannel({
   }
 
   function makeInboundHandler(subtype, cb) {
-    return function onContactInbound(fromAddr, payload) {
+    return async function onContactInbound(fromAddr, payload) {
       if (!payload || payload.subtype !== subtype) return;   // not ours
       if (typeof cb !== 'function') return;
+      let text = payload.text ?? '';
+      if (payload.sealed && typeof payload.sealed === 'object') {
+        // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
+        const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
+        if (!content || typeof content.text !== 'string') return;
+        text = content.text;
+      }
       cb({
         fromAddr,
         threadId:  payload.threadId,
-        text:      payload.text ?? '',
+        text,
         buttons:   Array.isArray(payload.buttons) ? payload.buttons : undefined,
         replyTo:   payload.replyTo,
         messageId: payload.messageId,

@@ -195,7 +195,8 @@ with a named verifier; no lane signs with a static identity; every registered ki
 | the consent card, `NEVER_DELEGABLE` | built |
 | conformance harnesses for the ports | built |
 | the extension/app packaging split | designed |
-| presets `CONTENT · CLAIM · SPINE`; kinds columns `signs · subject · accepts · syncPolicy` | designed |
+| kinds columns `signs · subject · accepts · syncPolicy` (every row bound; `UNKNOWN_KIND` refuses; two lints in the aggregate) | built |
+| presets `CONTENT · CLAIM · SPINE` as the manifest's way to declare a kind | designed |
 | `hosts`, `hostRequirements`, `realm`, `lane` in the manifest | designed |
 | the realm transport + installer | designed |
 | the remit; template vs minted | designed |

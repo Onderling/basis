@@ -17,6 +17,9 @@
  *   PUSH_TOKENS_DB   sqlite path for the address↔token map; makes wakes survive a relay
  *                    restart (a sleeping device never reconnects to re-register). Memory-only
  *                    when unset.
+ *   PEER_DISCOVERY   '1' broadcasts the connected-address list to every registered client (and
+ *                    answers peer-list requests). OFF by default: it is a presence and linkage
+ *                    oracle (see server.js). An operator who turns it on must disclose it.
  *
  * Usage:
  *   npx @onderling/relay
@@ -72,6 +75,7 @@ const { tls } = await startRelay({
   acceptedGroups,
   pushSender,
   ...(pushTokenRegistry ? { pushTokenRegistry } : {}),
+  peerDiscovery: process.env.PEER_DISCOVERY === '1',
   log: true,
 });
 
@@ -83,6 +87,7 @@ console.log('');
 console.log('  @onderling/relay');
 console.log('  ─────────────────────────────────────');
 console.log(`  Local:    ${scheme}://localhost:${port}`);
+console.log(`  Peers:    ${process.env.PEER_DISCOVERY === '1' ? 'discovery ON — the connected-address list is broadcast to every client; disclose it' : 'discovery off (default) — no address list leaves this relay'}`);
 console.log(`  Push:     ${pushSender ? `expo wake enabled${process.env.PUSH_TOKENS_DB ? ` (tokens: ${process.env.PUSH_TOKENS_DB})` : ' (tokens: memory — lost on restart)'}` : 'off (no wake, no provider contact)'}`);
 if (lanIp) {
   console.log(`  Network:  ${scheme}://${lanIp}:${port}`);

@@ -72,7 +72,7 @@ describe('proof of possession on register', () => {
   let relay; let url;
 
   beforeEach(async () => {
-    relay = await startRelay({ port: 0 });
+    relay = await startRelay({ port: 0, peerDiscovery: true });   // one check below reads the list; discovery is off by default
     url = `ws://127.0.0.1:${relay.port}`;
   });
   afterEach(async () => { await relay.stop(); });

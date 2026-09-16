@@ -34,8 +34,16 @@
  *   Relay  → Client: { type: 'registered', address }
  *   Client → Relay: { type: 'send',  to: '<address>', envelope: { ... } [, topic: '<topic>'] }
  *   Relay  → Client: { type: 'message', envelope: { ... } }
- *   Client → Relay: { type: 'peer-list' }                          // request
- *   Relay  → Client: { type: 'peer-list', peers: ['...','...'] }    // response + broadcast
+ *   Client → Relay: { type: 'peer-list' }                          // request — answered ONLY when peer discovery is on
+ *   Relay  → Client: { type: 'peer-list', peers: ['...','...'] }    // response + broadcast — ONLY when peer discovery is on
+ *
+ *   PEER DISCOVERY IS OFF BY DEFAULT (2026-09-16). The list of every registered address, handed to every
+ *   registered client on every connect and disconnect, is a presence oracle wider than the one this relay
+ *   refuses (the queued-vs-delivered notice, see `tellSenderWeGaveUp`), and a linkage oracle: a device's
+ *   per-circle addresses register on one socket and so appear and vanish together, which lets any client
+ *   pair them across circles. An operator may turn it on (`peerDiscovery: true`, `PEER_DISCOVERY=1`) and
+ *   must say so where the relay describes itself; off, a `peer-list` request falls off the end of the
+ *   handler like an unknown frame — a lurker learns nothing, not even that the option exists.
  *   Relay  → Client: { type: 'error', message: '<reason>' }
  *
  * PROOF OF POSSESSION ON REGISTER (2026-07-31, DESIGN-boundary-authentication §7 — Decision 3):
@@ -333,6 +341,9 @@ export async function startRelay(opts = {}) {
     // null/undefined, the relay adds no routes and behaves byte-identically —
     // fully backward compatible with existing tests and deployments.
     blobGate                  = null,
+    // Peer discovery — the connected-address list, broadcast on every connect/disconnect and served on
+    // request. OFF by default (see the header); an operator turns it on knowingly and discloses it.
+    peerDiscovery             = false,
   } = opts;
 
   const effectiveQueueCapTotal = queueCapTotal ?? (queueCap * DEFAULT_QUEUE_CAP_RATIO);
@@ -806,7 +817,7 @@ export async function startRelay(opts = {}) {
           onEach: (envelope) => logHop({ kind: 'send-queued', from: '?', to: address, envelope }),
         });
 
-        _broadcastPeerList(clients);
+        if (peerDiscovery) _broadcastPeerList(clients);
         return;
       }
 
@@ -910,8 +921,8 @@ export async function startRelay(opts = {}) {
         return;
       }
 
-      // ── peer-list request ───────────────────────────────────────────────────
-      if (msg.type === 'peer-list') {
+      // ── peer-list request — answered only when the operator turned discovery on ─────────
+      if (msg.type === 'peer-list' && peerDiscovery) {
         socket.send(JSON.stringify({
           type:  'peer-list',
           peers: [...clients.keys()],
@@ -1022,7 +1033,7 @@ export async function startRelay(opts = {}) {
         for (const addr of registeredAddresses) groupByAddress.delete(addr);
         registeredAddresses.clear();
         logLine(`[relay] disconnected ${shortId(registeredAddress)}`);
-        _broadcastPeerList(clients);
+        if (peerDiscovery) _broadcastPeerList(clients);
       }
     });
 

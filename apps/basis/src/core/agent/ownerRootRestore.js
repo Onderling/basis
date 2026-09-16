@@ -29,7 +29,7 @@
  * install would be picked up on the next boot in preference to the restored one.
  */
 
-import { Bootstrap, deriveDeviceSeed, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey } from '@onderling/core';
+import { Bootstrap, deriveDeviceSeed, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, storePersonKey } from '@onderling/core';
 import { VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
@@ -124,6 +124,11 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
     const sealedChat = new VaultEncrypted({ backing: chatVault, key: atRestKey });
     const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
+    // 2b. The PERSON KEY (rotating, per profile): the one moment this device has the root, so it is handed
+    //     the current version's seed and keeps it sealed. Version 1 until the rotation ceremony exists; a
+    //     later ceremony only ever raises it.
+    try { await storePersonKey(sealedChat, { version: 1, seed: derivePersonKeySeed(root.deriveAgentSeed(DEFAULT_PROFILE), 1) }); }
+    catch (err) { console.warn(`[ceremony] the person key could not be stored — this device announces no key at joins: ${err?.message ?? err}`); }
 
     // 3. The delegation blob (the label carrier + the enrolled-boot signal for root-custody
     //    installs; under delegation custody the key door + marker are the boot authority).

@@ -824,6 +824,7 @@ export async function bootAgentBundle(opts = {}) {
   const pendingPeerRedeems = new Map();
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
+    currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (web parity)
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // Identity 5B/C — present this device's per-circle address on the peer redeem path (parity with web).

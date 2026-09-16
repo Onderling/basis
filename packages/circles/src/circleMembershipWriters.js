@@ -1,4 +1,5 @@
 import { hasHumanRules } from './circleRulesDoc.js';
+import { personKeyAnnouncement } from '@onderling/core';
 /**
  * Key-coupled membership WRITERS — pure-body lift out of stoop's `buildSkills` (the §8c migration, slice-b).
  * These persist a circle's membership STATE transitions as typed `store.addItems([{type}])` items
@@ -77,7 +78,7 @@ async function rulesAcceptanceRefusal(store, groupId, rulesAccepted) {
 }
 
 export async function redeemMembershipCode({
-  store, members, metrics, simulateSync, grantKey, emitSpine,
+  store, members, metrics, simulateSync, grantKey, emitSpine, currentPersonKey = null,
   codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink, deriveSealingKey = null,
 }, { a, from } = {}) {
   if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
@@ -202,11 +203,15 @@ export async function redeemMembershipCode({
   // unchanged. Optional — a caller that has not wired the spine simply skips it.
   // The join's authorization rides the SIGNED payload: the redemption row it stands on. The fold admits a
   // self-authored join only when that row exists (deny-favouring: a not-yet-arrived row defers, never forges).
+  const ownKey = personKeyAnnouncement(typeof currentPersonKey === 'function' ? currentPersonKey() : null);
   await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
     redemptionRef: item.id,
     // Rules acceptance rides the SIGNED join (task #80): the version the joiner accepted, or absent —
     // and absence is what a rules-gated fold refuses, on every receiving device.
     ...(typeof a.rulesAccepted === 'string' && a.rulesAccepted ? { rulesAccepted: a.rulesAccepted } : {}),
+    // The FIRST person key rides the join (Frits 2026-09-16): device-in-circle signed, the same trust as the
+    // join; every later version is announced root-revealed (the person-key statement).
+    ...(ownKey ? { personKey: ownKey } : {}),
   } });
   return {
     redemptionId: item.id,
@@ -380,12 +385,15 @@ export async function verifyMembershipCodeForPeer({
   // ADMIN's device confirming a REMOTE joiner, who is not here to sign — so the ADMIN signs `join` with their
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority
   // that validated the code + enforced the ceiling, and a join needs no authority in the fold anyway. Additive.
+  const joinerKey = personKeyAnnouncement(a.personKey);
   await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
     redemptionRef: item.id,
     // The remote joiner's acceptance, forwarded from the redeem request (task #80). The admin signs the
     // join; the acceptance value is the joiner's — recorded verbatim, refused-at-fold when absent on a
     // rules-gated circle.
     ...(typeof a.rulesAccepted === 'string' && a.rulesAccepted ? { rulesAccepted: a.rulesAccepted } : {}),
+    // The joiner's FIRST person key, forwarded from the redeem request the same way — recorded verbatim.
+    ...(joinerKey ? { personKey: joinerKey } : {}),
   } });
   return {
     redemptionId: item.id,

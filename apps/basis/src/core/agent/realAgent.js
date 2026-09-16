@@ -28,8 +28,7 @@ import {
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode,
-} from '@onderling/core';
+  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, personKeyPubKeyB64, loadPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail } from '../../v2/keyRail.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
@@ -519,6 +518,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The default profile's seed — the source for both the chat identity AND per-circle addresses
   // (step 5B/C). Kept so the returned agent can expose circleAddressFor(circleId).
   const defaultProfileSeed = ownerRoot ? ownerRoot.deriveAgentSeed('default') : null;
+  // THE PERSON KEY (rotating, per profile — identity/personKey.js). A root-custody device re-derives the
+  // current version each boot; an enrolled device was handed it at its ceremony and keeps it sealed. Absent
+  // on an enrolled device from before person keys: it announces no key at joins, and says so once.
+  const personKey = await (async () => {
+    try { const stored = await loadPersonKey(chatVault); if (stored) return stored; } catch { /* re-derive below */ }
+    if (defaultProfileSeed) return { version: 1, seed: derivePersonKeySeed(defaultProfileSeed, 1) };
+    console.warn('[realAgent] no person key on this enrolled device — it announces none at joins; a phrase ceremony on it hands it one');
+    return null;
+  })();
+  /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
+  const currentPersonKey = () => (personKey ? { version: personKey.version, pubKey: personKeyPubKeyB64(personKey.seed) } : null);
   let chatSeedReadable = false;
   try { chatSeedReadable = (await chatVault.get('agent-privkey')) != null; } catch { /* unreadable → reseed */ }
   if (!chatSeedReadable) {
@@ -3051,6 +3061,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: chatId.pubKey }),
     membershipEmit,
     membershipRead,
+    // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
+    currentPersonKey,
     rulesUpdateEmit,
     // One block set for the whole device. Blocking is a decision about a PERSON, so it cannot live
     // per-app: the boundary refuses their envelopes, and this app's ingest filter reads the same set
@@ -5495,6 +5507,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // shells spread `handlers` into the router and kick `requestFromSiblings` on connect; the
     // announce landing calls `pushTo` for a device of mine that just appeared.
     knownPeersSync,
+    /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */
+    personKey: currentPersonKey,
     /** Inbound envelopes the security layer refused, per reason — the diagnostic read of the warning above. */
     refusedInboundByReason: () => Object.fromEntries(refusedInbound),
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its

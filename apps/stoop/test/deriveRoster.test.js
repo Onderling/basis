@@ -498,3 +498,16 @@ describe('the roster row carries the member\'s CURRENT person key (the person-ke
     expect('personKey' in roster.find((m) => m.webid === 'C'), 'no announcement → no key on the row').toBe(false);
   });
 });
+
+describe('the FIRST person key rides the join (option A) — the row carries it before any ceremony', () => {
+  it('a join-carried key lands on the row; a root-revealed statement supersedes it', () => {
+    const base = { redemptions: [redemption({ redeemedBy: 'B', circleAddress: 'addrB' })] };
+    const fromJoin = deriveRoster({ ...base, spineStatements: [{ kind: 'join', author: 'B', subject: 'B', payload: { redemptionRef: 'r', personKey: { version: 1, pubKey: 'B-1' } } }] });
+    expect(fromJoin.find((m) => m.webid === 'B').personKey).toEqual({ version: 1, pubKey: 'B-1' });
+    const rotated = deriveRoster({ ...base, spineStatements: [
+      { kind: 'join', author: 'B', subject: 'B', payload: { redemptionRef: 'r', personKey: { version: 1, pubKey: 'B-1' } } },
+      { kind: 'person-key', author: 'B', subject: 'B', payload: { version: 2, pubKey: 'B-2' } },
+    ] });
+    expect(rotated.find((m) => m.webid === 'B').personKey).toEqual({ version: 2, pubKey: 'B-2' });
+  });
+});

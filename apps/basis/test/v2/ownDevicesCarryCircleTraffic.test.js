@@ -24,7 +24,7 @@ import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown,
 } from '../support/pairRealAgents.js';
-import { ownAnnouncementFor } from '../../src/v2/circleAddressAnnounce.js';
+import { makeThisDevicePrimary, ownAnnouncementFor } from '../../src/v2/circleAddressAnnounce.js';
 import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
 import { carryLandedStatement } from '../../src/v2/circleLanes.js';
@@ -131,6 +131,25 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     expect(carried.attempted, 'the production sibling set named the always-on device').toBe(1);
     expect(await until(() => (texts(A2).includes(text) ? true : null), { timeout: 10000 }), `the always-on device never received Anna's own message; it holds: ${JSON.stringify(texts(A2))}`).toBe(true);
     expect(await until(() => (texts(B).includes(text) ? true : null), { timeout: 10000 }), 'Bea received it').toBe(true);
+  });
+
+  it("the PRIMARY CONTACT ADDRESS is Anna's choice: enrolling the always-on device did not make it primary on Bea's roster; the tap on it does, over the production announce wire", async () => {
+    const rowOnB = async () => ((await B.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === A.pubKey);
+    const phone = A.agent.circleAddressFor(GROUP), box = A2.agent.circleAddressFor(GROUP);
+    let row = await rowOnB();
+    expect(row.circleAddress, "the phone joined, so the phone is primary — the box's announce only added itself").toBe(phone);
+    expect(row.circleAddresses).toEqual([phone, box]);
+    // "Make this my primary contact address", tapped on the always-on device — the same function both shells call.
+    const r = await makeThisDevicePrimary({ agent: A2.agent, circleIds: [GROUP], logger: { warn() {} } });
+    expect(r).toMatchObject({ circles: 1, announced: 1 });
+    expect(await until(async () => ((await rowOnB())?.circleAddress === box ? true : null), { timeout: 10000, step: 100 }), "Bea's roster never took the choice").toBe(true);
+    row = await rowOnB();
+    expect(row.circleAddresses, 'primary first, the phone kept behind it').toEqual([box, phone]);
+    // …and the choice is on Anna's own devices too (the fan reached the phone; the box recorded its own row).
+    expect(await until(async () => {
+      const res = await A.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      return (res?.members ?? []).find((m) => m.webid === A.pubKey)?.circleAddress === box ? true : null;
+    }, { timeout: 10000, step: 100 }), "the phone's own row never took the choice").toBe(true);
   });
 
   it("what Bea writes lands on ONE of Anna's devices and is on the other, live, with no catch-up — each once", async () => {

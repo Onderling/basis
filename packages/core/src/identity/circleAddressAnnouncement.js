@@ -75,7 +75,7 @@ export const CIRCLE_ADDRESS_ANNOUNCE_KIND = 'circle-address-announce';
  */
 export function circleAddressAnnouncement({
   circleId, memberWebid, circleAddress, circleAddressProof, personaProperties,
-  ceremonyCommitment, ceremonyCommitmentProof,
+  ceremonyCommitment, ceremonyCommitmentProof, primary,
 } = {}) {
   const s = (v) => (typeof v === 'string' ? v : '');
   const out = {
@@ -84,6 +84,10 @@ export function circleAddressAnnouncement({
     circleAddress:      s(circleAddress),
     circleAddressProof: s(circleAddressProof),
   };
+  // THE MEMBER'S CHOICE OF PRIMARY (sync-policy §12, 2026-09-17): `primary: true` says "deliver to me HERE first".
+  // Not covered by the address proof (the same roster-level trust as the release below): the worst a relaying
+  // carrier can do with it is put one of the member's own proven addresses first. Absent unless true.
+  if (primary === true) out.primary = true;
   // The member's CEREMONY COMMITMENT for this circle (who may retire this address: the owner root — see
   // ceremonyCommitment.js), declared by the device and signed with the circle key the address proves, so a
   // relaying carrier cannot substitute it. Optional on the wire; verified when present.
@@ -114,7 +118,7 @@ export function circleAddressAnnouncement({
  * @returns {{circleId, memberWebid, circleAddress, circleAddressProof}|null}
  */
 export function ownCircleAddressAnnouncement({
-  circleId, memberWebid, circleAddressFor, signCircleAddress, ceremonyCommitmentFor = null, signCeremonyCommitment = null,
+  circleId, memberWebid, circleAddressFor, signCircleAddress, ceremonyCommitmentFor = null, signCeremonyCommitment = null, primary = false,
 } = {}) {
   if (typeof circleAddressFor !== 'function' || typeof signCircleAddress !== 'function') return null;
   if (typeof circleId !== 'string' || !circleId) return null;
@@ -134,7 +138,7 @@ export function ownCircleAddressAnnouncement({
       } catch { commitment = null; commitmentProof = null; }
     }
     return circleAddressAnnouncement({
-      circleId, memberWebid, circleAddress, circleAddressProof,
+      circleId, memberWebid, circleAddress, circleAddressProof, primary,
       ...(commitment && commitmentProof ? { ceremonyCommitment: commitment, ceremonyCommitmentProof: commitmentProof } : {}),
     });
   } catch {

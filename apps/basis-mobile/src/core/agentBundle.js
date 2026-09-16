@@ -893,6 +893,7 @@ export async function bootAgentBundle(opts = {}) {
   // current instance (initially null, populated when the async
   // connect() resolves a tick later).  Callers should not cache the
   // returned value across renders.
+  const laneCatchUpsRef = { current: null };
   return {
     catalogue,
     manifestsByOrigin,
@@ -917,7 +918,16 @@ export async function bootAgentBundle(opts = {}) {
      */
     onCircleJoined: ({ circleId } = {}) => makeCircleReachable({
       agent, circleId, registerCirclePresence,
+      // The joiner pulls the circle's pull-all lanes (membership · governance · keys) from the members it
+      // now knows — the screen that builds the lane table fills `laneCatchUps` (ChatScreen); before it has,
+      // the reconnect kick covers it.
+      pullLanes: (cid) => Promise.allSettled(
+        ['membership', 'gov', 'key'].map((k) => laneCatchUpsRef.current?.[k]?.requestCircle?.(cid, { callSkill })),
+      ),
     }),
+    /** The lane table's catch-ups, set by the screen that builds them (`bundle.laneCatchUps = lanes.catchUps`). */
+    set laneCatchUps(v) { laneCatchUpsRef.current = v; },
+    get laneCatchUps() { return laneCatchUpsRef.current; },
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,

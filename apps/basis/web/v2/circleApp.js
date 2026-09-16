@@ -4332,6 +4332,11 @@ async function showJoinCircle(inviteArg) {
       circleId,
       // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
       registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
+      // The joiner PULLS the circle's pull-all lanes from the members it now knows: the `create`, earlier
+      // joins, roles, evictions and keys all predate its own join and are fanned to nobody after the fact.
+      pullLanes: (cid) => Promise.allSettled(
+        [memCatchUpShell, govCatchUpShell, keyCatchUpShell].map((c) => c?.requestCircle?.(cid, { callSkill: rawCallSkill })),
+      ),
     }),
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? reply?.joinedGroupId ?? null;

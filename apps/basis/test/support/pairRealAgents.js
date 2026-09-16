@@ -269,6 +269,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // (`circleLanes.js`), so a walk can pull a circle's conversation from a member by address the way
   // the enrol/restore consume does (`contentPulls`).
   const chatCatchUp = makeFrontierReplay({ rail: chatRail, sendToPeer: sendPeer, subtypes: CHAT_CATCHUP_SUBTYPES });
+  // The membership lane's catch-up pair (registered below when the node has the rail), exposed on the node so a
+  // walk can run the pull a fresh joiner makes (`requestCircle`) instead of replaying the admin's spine by hand.
+  const membershipCatchUp = agent.membershipRail
+    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES })
+    : null;
   const handlers = {
     [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
     [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
@@ -345,14 +350,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // both shells. Two walks (the replace ceremony, the lost phone) wired this by hand before an
     // address-revoke could reach the member it was fanned to; a node with the rail and no receiver is
     // the "two green tests flanking a dead seam" shape.
-    ...(agent.membershipRail ? (() => {
-      const cu = makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES });
-      return {
-        [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }),
-        [cu.subtypes.request]: cu.onRequest,
-        [cu.subtypes.batch]:   cu.onBatch,
-      };
-    })() : {}),
+    ...(membershipCatchUp ? {
+      [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }),
+      [membershipCatchUp.subtypes.request]: membershipCatchUp.onRequest,
+      [membershipCatchUp.subtypes.batch]:   membershipCatchUp.onBatch,
+    } : {}),
     // The grants lane (connections belong to the person) — the agent's ready-made receiver + its
     // catch-up pair, the same registration both shells make. A sibling device's grant/revoke lands
     // through the full ingest gate and refolds this node's door.
@@ -406,7 +408,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });

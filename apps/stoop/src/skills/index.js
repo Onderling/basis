@@ -889,7 +889,13 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     const redeemers = new Set();
     for (const it of forGroup) {
       const src = it?.source ?? {};
-      if (typeof src.redeemedBy === 'string' && src.redeemedBy) redeemers.add(src.redeemedBy);
+      // A REDEEMER is someone the trail ADMITTED — never someone who wrote a row about themselves. A device
+      // announces its own per-circle address as a trail row with `redeemedBy = me` and no admitter, and
+      // counting that as a redemption subtracted every creator from their own founder set the moment they
+      // announced (the 08-27 lockout's second door, found 2026-09-16: the creator's admin-signed joins were
+      // then dropped as "someone else's join without a founder's authority", so a joiner's person key never
+      // reached the creator's roster). Admissions, not rows — the same rule `addGenesisFounders` states.
+      if (typeof src.redeemedBy === 'string' && src.redeemedBy && src.channel !== 'announce') redeemers.add(src.redeemedBy);
       if (typeof src.confirmedBy === 'string' && src.confirmedBy) admitters.add(src.confirmedBy);
     }
     for (const w of admitters) if (!redeemers.has(w)) founderWebids.add(w);

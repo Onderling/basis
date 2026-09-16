@@ -88,6 +88,27 @@ describe('join wizard — consent-at-join', () => {
     const reply = onDispatched.mock.calls[0][0];
     expect(reply.capabilityOptOuts).toEqual(['tasks complete task']);
   });
+
+  it('the host\'s post-join step (`onJoined`) fires with the circle joined — BEFORE the success envelope (the RN wizard always did; this one dropped it, 2026-09-16)', async () => {
+    const el = mount();
+    const order = [];
+    const onDispatched = vi.fn(() => order.push('dispatched'));
+    const onJoined = vi.fn(async ({ circleId }) => order.push(`joined:${circleId}`));
+    const callSkill = vi.fn(async (_o, op) => (op === 'redeemMembershipCode' || op === 'redeemInvite' ? { ok: true, groupId: 'b1' } : { ok: true }));
+    renderJoinGroupWizard({ container: el, doc: document, args: { invite }, sources, callSkill, onClose: vi.fn(), onDispatched, onJoined });
+    const accept = el.querySelector('.cc-wizard-check input[type=checkbox]');
+    accept.checked = true; accept.dispatchEvent(new Event('change'));
+    clickByLabel(el, 'circle.join.wizard.next');
+    const privacy = el.querySelector('.cc-wizard-check input[type=checkbox]');
+    privacy.checked = true; privacy.dispatchEvent(new Event('change'));
+    clickByLabel(el, 'circle.join.wizard.next');
+    const handle = el.querySelector('.cc-wizard-handle-input');
+    handle.value = 'anne'; handle.dispatchEvent(new Event('input'));
+    clickByLabel(el, 'circle.join.wizard.join');
+    await vi.waitFor(() => expect(onDispatched).toHaveBeenCalled());
+    expect(onJoined).toHaveBeenCalledWith({ circleId: 'b1' });
+    expect(order).toEqual(['joined:b1', 'dispatched']);
+  });
 });
 
 function clickByLabel(root, label) {

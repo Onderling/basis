@@ -60,6 +60,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Done",
+          "labelKey": "circle.button.household.markComplete",
           "opId": "markComplete",
         },
         {
@@ -73,6 +74,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Remove",
+          "labelKey": "circle.button.household.removeItem",
           "opId": "removeItem",
         },
       ],
@@ -134,6 +136,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Done",
+          "labelKey": "circle.button.household.markComplete",
           "opId": "markComplete",
         },
         {
@@ -147,6 +150,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Remove",
+          "labelKey": "circle.button.household.removeItem",
           "opId": "removeItem",
         },
       ],
@@ -208,6 +212,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Done",
+          "labelKey": "circle.button.household.markComplete",
           "opId": "markComplete",
         },
         {
@@ -221,6 +226,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Remove",
+          "labelKey": "circle.button.household.removeItem",
           "opId": "removeItem",
         },
       ],
@@ -282,6 +288,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Done",
+          "labelKey": "circle.button.household.markComplete",
           "opId": "markComplete",
         },
         {
@@ -295,6 +302,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Remove",
+          "labelKey": "circle.button.household.removeItem",
           "opId": "removeItem",
         },
       ],
@@ -346,6 +354,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Done",
+          "labelKey": "circle.button.household.markComplete",
           "opId": "markComplete",
         },
         {
@@ -359,6 +368,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             ],
           },
           "label": "Remove",
+          "labelKey": "circle.button.household.removeItem",
           "opId": "removeItem",
         },
         {
@@ -369,6 +379,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
             "type": "task",
           },
           "label": "I'll do this",
+          "labelKey": "circle.button.household.claim",
           "opId": "claim",
         },
       ],

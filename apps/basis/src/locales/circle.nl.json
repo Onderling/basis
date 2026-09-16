@@ -6108,6 +6108,208 @@
       "doc": "Onderschrift bij een bericht met een fotokaart."
     }
   },
+  "button": {
+    "tasks": {
+      "claimTask": {
+        "text": "Oppakken",
+        "doc": "Row-action button for tasks:claimTask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "confirmClaim": {
+        "text": "Claim bevestigen",
+        "doc": "Row-action button for tasks:confirmClaim, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "completeTask": {
+        "text": "Markeer als klaar",
+        "doc": "Row-action button for tasks:completeTask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "submitTask": {
+        "text": "Indienen ter beoordeling",
+        "doc": "Row-action button for tasks:submitTask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "approveTask": {
+        "text": "Goedkeuren",
+        "doc": "Row-action button for tasks:approveTask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "rejectTask": {
+        "text": "Afwijzen",
+        "doc": "Row-action button for tasks:rejectTask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "revokeTask": {
+        "text": "Intrekken",
+        "doc": "Row-action button for tasks:revokeTask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "clearInboxItem": {
+        "text": "Negeren",
+        "doc": "Row-action button for tasks:clearInboxItem, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "approveSubtaskRequest": {
+        "text": "Goedkeuren",
+        "doc": "Row-action button for tasks:approveSubtaskRequest, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "declineSubtaskRequest": {
+        "text": "Afslaan",
+        "doc": "Row-action button for tasks:declineSubtaskRequest, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "approveSubtaskProposal": {
+        "text": "Aannemen",
+        "doc": "Row-action button for tasks:approveSubtaskProposal, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "declineSubtaskProposal": {
+        "text": "Afslaan",
+        "doc": "Row-action button for tasks:declineSubtaskProposal, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "clearInbox": {
+        "text": "Alles wissen",
+        "doc": "Row-action button for tasks:clearInbox, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "archiveCircle": {
+        "text": "Kring archiveren",
+        "doc": "Row-action button for tasks:archiveCircle, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "unarchiveCircle": {
+        "text": "Kring uit het archief halen",
+        "doc": "Row-action button for tasks:unarchiveCircle, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "editTask": {
+        "text": "Bewerken",
+        "doc": "Row-action button for tasks:editTask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "acceptSchedule": {
+        "text": "Kiezen",
+        "doc": "Row-action button for tasks:acceptSchedule, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "addSubtask": {
+        "text": "Subtaak toevoegen",
+        "doc": "Row-action button for tasks:addSubtask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "proposeSubtask": {
+        "text": "Subtaak voorstellen",
+        "doc": "Row-action button for tasks:proposeSubtask, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      }
+    },
+    "household": {
+      "markComplete": {
+        "text": "Klaar",
+        "doc": "Row-action button for household:markComplete, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "removeItem": {
+        "text": "Verwijderen",
+        "doc": "Row-action button for household:removeItem, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "claim": {
+        "text": "Ik doe dit",
+        "doc": "Row-action button for household:claim, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      }
+    },
+    "stoop": {
+      "respondToItem": {
+        "text": "Reageren",
+        "doc": "Row-action button for stoop:respondToItem, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "cancelRequest": {
+        "text": "Intrekken",
+        "doc": "Row-action button for stoop:cancelRequest, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "markReturned": {
+        "text": "Teruggebracht",
+        "doc": "Row-action button for stoop:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "reportPost": {
+        "text": "Melden",
+        "doc": "Row-action button for stoop:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "startDm": {
+        "text": "Bericht sturen",
+        "doc": "Row-action button for stoop:startDm, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "removeContact": {
+        "text": "Contact verwijderen",
+        "doc": "Row-action button for stoop:removeContact, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "conflictDisputeWizard": {
+        "text": "Bezwaar maken",
+        "doc": "Row-action button for stoop:conflictDisputeWizard, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      }
+    },
+    "folio": {
+      "deleteFromPod": {
+        "text": "Uit de pod verwijderen",
+        "doc": "Row-action button for folio:deleteFromPod, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "deleteLocally": {
+        "text": "Lokaal verwijderen",
+        "doc": "Row-action button for folio:deleteLocally, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "forceRepush": {
+        "text": "Opnieuw versturen",
+        "doc": "Row-action button for folio:forceRepush, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "syncOnce": {
+        "text": "Nu synchroniseren",
+        "doc": "Row-action button for folio:syncOnce, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "watchStart": {
+        "text": "Volgen",
+        "doc": "Row-action button for folio:watchStart, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "watchStop": {
+        "text": "Niet meer volgen",
+        "doc": "Row-action button for folio:watchStop, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "verifyPodState": {
+        "text": "Controleren op de pod",
+        "doc": "Row-action button for folio:verifyPodState, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "downloadFile": {
+        "text": "Downloaden",
+        "doc": "Row-action button for folio:downloadFile, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "saveToMyPod": {
+        "text": "In mijn pod bewaren",
+        "doc": "Row-action button for folio:saveToMyPod, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      }
+    },
+    "calendar": {
+      "rsvpAccept": {
+        "text": "Ik kom",
+        "doc": "Row-action button for calendar:rsvpAccept, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "rsvpDecline": {
+        "text": "Ik kom niet",
+        "doc": "Row-action button for calendar:rsvpDecline, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "rsvpTentative": {
+        "text": "Misschien",
+        "doc": "Row-action button for calendar:rsvpTentative, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "cancelEvent": {
+        "text": "Afspraak afzeggen",
+        "doc": "Row-action button for calendar:cancelEvent, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      }
+    },
+    "agents": {
+      "createProfile": {
+        "text": "Nieuw profiel",
+        "doc": "Row-action button for agents:createProfile, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "revokeAgent": {
+        "text": "Agent intrekken",
+        "doc": "Row-action button for agents:revokeAgent, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "purgeAgent": {
+        "text": "Agent wissen",
+        "doc": "Row-action button for agents:purgeAgent, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "installAgent": {
+        "text": "Agent installeren",
+        "doc": "Row-action button for agents:installAgent, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "restoreDataVersion": {
+        "text": "Versie terugzetten",
+        "doc": "Row-action button for agents:restoreDataVersion, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      }
+    }
+  },
   "item": {
     "share": {
       "text": "Deel hier",

@@ -167,7 +167,7 @@ export const tasksManifest = {
           // `getTaskSnapshot` skill below is the source.
           embed: { cardSnapshotSkill: 'getTaskSnapshot' },
         },
-        ui: { control: 'button', label: 'Claim' },
+        ui: { control: 'button', labelKey: 'circle.button.tasks.claimTask', label: 'Claim' },
       },
     },
     {
@@ -192,7 +192,7 @@ export const tasksManifest = {
             arg:   'id',
           } },
         chat: { hint: 'Confirm a pending claim so the claimant may decompose the task.' },
-        ui: { control: 'button', label: 'Confirm claim' },
+        ui: { control: 'button', labelKey: 'circle.button.tasks.confirmClaim', label: 'Confirm claim' },
       },
     },
     {
@@ -227,7 +227,7 @@ export const tasksManifest = {
           // same factory; lifecycle ops share the snapshot skill.
           embed: { cardSnapshotSkill: 'getTaskSnapshot' },
         },
-        ui:   { control: 'button', label: 'Mark complete' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.completeTask', label: 'Mark complete' },
       },
     },
     /**
@@ -330,7 +330,7 @@ export const tasksManifest = {
           // Part C gate — "submit X" → submitTask{id}; id already has pickerSource:listMine.
           match: { verbs: ['submit', ['hand', 'in'], 'indienen', 'inleveren', ['ter', 'review']], body: 'match', arg: 'id' } },
         chat: { reply: 'text', hint: 'Submit a claimed task for approval.' },
-        ui:   { control: 'button', label: 'Submit for review' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.submitTask', label: 'Submit for review' },
       },
     },
     {
@@ -350,7 +350,7 @@ export const tasksManifest = {
         slash: { command: '/approve',
           match: { verbs: ['approve', 'goedkeuren', 'akkoord'], body: 'match', arg: 'id' } },
         chat: { reply: 'text', hint: 'Approve a submitted task.' },
-        ui:   { control: 'button', label: 'Approve' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.approveTask', label: 'Approve' },
       },
     },
     {
@@ -375,7 +375,7 @@ export const tasksManifest = {
         slash: { command: '/reject', body: 'flags',
           match: { verbs: ['reject', 'afkeuren', 'afwijzen', 'weiger'], body: 'match', arg: 'id' } },
         chat: { reply: 'text', hint: 'Reject a submitted task with a mandatory note.' },
-        ui:   { control: 'button', label: 'Reject' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.rejectTask', label: 'Reject' },
       },
     },
     {
@@ -388,7 +388,7 @@ export const tasksManifest = {
       ],
       surfaces: {
         chat: { hint: 'Revoke an assignment with a mandatory reason (master only).' },
-        ui:   { control: 'button', label: 'Revoke' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.revokeTask', label: 'Revoke' },
       },
     },
     {
@@ -580,7 +580,7 @@ export const tasksManifest = {
       ],
       surfaces: {
         chat: { hint: 'Delete one inbox notification by id.' },
-        ui:   { control: 'button', label: 'Dismiss' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.clearInboxItem', label: 'Dismiss' },
       },
     },
 
@@ -616,7 +616,7 @@ export const tasksManifest = {
         // Part G (2026-06-17) — slash folded in from mockTasksManifest.
         slash: { command: '/approve-subtask-request' },
         chat: { hint: 'Approve a queued sub-task request (admin/coordinator only).' },
-        ui:   { control: 'button', label: 'Approve' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.approveSubtaskRequest', label: 'Approve' },
       },
     },
     {
@@ -631,7 +631,7 @@ export const tasksManifest = {
         // Part G (2026-06-17) — slash folded in from mockTasksManifest.
         slash: { command: '/decline-subtask-request', body: 'flags' },
         chat: { hint: 'Decline a queued sub-task request (admin/coordinator only).' },
-        ui:   { control: 'button', label: 'Decline' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.declineSubtaskRequest', label: 'Decline' },
       },
     },
     {
@@ -645,7 +645,7 @@ export const tasksManifest = {
         // Part G (2026-06-17) — slash folded in from mockTasksManifest.
         slash: { command: '/approve-subtask-proposal' },
         chat: { hint: 'Approve a sub-task proposal (parent assignee; rolls submission back to claimed).' },
-        ui:   { control: 'button', label: 'Accept' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.approveSubtaskProposal', label: 'Accept' },
       },
     },
     {
@@ -660,7 +660,7 @@ export const tasksManifest = {
         // Part G (2026-06-17) — slash folded in from mockTasksManifest.
         slash: { command: '/decline-subtask-proposal', body: 'flags' },
         chat: { hint: 'Decline a sub-task proposal (parent assignee; reason shown to proposer).' },
-        ui:   { control: 'button', label: 'Decline' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.declineSubtaskProposal', label: 'Decline' },
       },
     },
     {
@@ -676,7 +676,7 @@ export const tasksManifest = {
         // `section.sectionActions[]`, NOT in per-row itemActions[]
         // or app-shell globals[].
         ui:   {
-          control:   'button',
+          control:   'button', labelKey: 'circle.button.tasks.clearInbox',
           label:     'Clear all',
           placement: 'section-header',
           // adoption (2026-05-20) — Tier C consent gate.
@@ -749,7 +749,7 @@ export const tasksManifest = {
         slash: { command: '/archive-circle', body: 'flags' },
         chat: { reply: 'text', hint: 'Archive this circle — admin only. Hides it from active workflows; items are kept.' },
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.tasks.archiveCircle',
           label:   'Archive circle',
           confirm: {
             severity: 'warn',
@@ -768,7 +768,7 @@ export const tasksManifest = {
         slash: { command: '/unarchive-circle' },
         chat: { reply: 'text', hint: 'Unarchive this circle — admin only.  Resumes new-task creation.' },
         // No confirm — unarchive is the undo path; low-barrier reversal.
-        ui:   { control: 'button', label: 'Unarchive circle' },
+        ui:   { control: 'button', labelKey: 'circle.button.tasks.unarchiveCircle', label: 'Unarchive circle' },
       },
     },
 
@@ -808,7 +808,7 @@ export const tasksManifest = {
       ],
       surfaces: {
         slash: { command: '/edit-task', body: 'flags' },
-        ui:    { control: 'button', label: 'Edit' },
+        ui:    { control: 'button', labelKey: 'circle.button.tasks.editTask', label: 'Edit' },
         chat:  { reply: 'text', hint: 'patch fields on an existing task' },
       },
     },
@@ -903,7 +903,7 @@ export const tasksManifest = {
       surfaces: {
         slash: { command: '/accept-schedule' },
         chat:  { reply: 'text', hint: 'accept a scheduling suggestion' },
-        ui:    { control: 'button', label: 'Pick' },
+        ui:    { control: 'button', labelKey: 'circle.button.tasks.acceptSchedule', label: 'Pick' },
       },
     },
     /**
@@ -1029,7 +1029,7 @@ export const tasksManifest = {
       ],
       surfaces: {
         slash: { command: '/add-subtask', body: 'flags' },
-        ui:    { control: 'button', label: 'Add sub-task' },
+        ui:    { control: 'button', labelKey: 'circle.button.tasks.addSubtask', label: 'Add sub-task' },
         chat:  { reply: 'text', hint: 'spawn a child task under a parent' },
       },
     },
@@ -1046,7 +1046,7 @@ export const tasksManifest = {
       ],
       surfaces: {
         slash: { command: '/propose-subtask', body: 'flags' },
-        ui:    { control: 'button', label: 'Propose sub-task' },
+        ui:    { control: 'button', labelKey: 'circle.button.tasks.proposeSubtask', label: 'Propose sub-task' },
         chat:  { reply: 'text', hint: 'propose a sub-task on a submitted parent (needs assignee consent)' },
       },
     },

@@ -61,7 +61,7 @@ import {
   defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
-  verifyCeremonyReveal,
+  verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
@@ -1038,9 +1038,14 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // CEREMONY statements (address-revoke) bind by their ROOT REVEAL against the row's ceremony commitment
     // (core ceremonyCommitment.js): only the owner root — present only inside a ceremony, never on a
     // device — can sign one. The author key is whichever device ran the ceremony; it need not be on the row.
-    const isCeremonyKind = body.kind === 'address-revoke';
-    const revealBinds = (commitment) => !!commitment && verifyCeremonyReveal(body.payload?.reveal, {
-      circleId: body.circleId, kind: body.kind, subject: body.subject, authorRef: claimed, commitment,
+    // The set of ceremony kinds and what each reveal must cover live in core (ceremonyKinds.js), so this
+    // door and the rail's verifier cannot disagree. A person-key announcement is SELF-SUBJECT and its
+    // reveal covers the announced key; a malformed one (no key, no version) binds nowhere.
+    const isCeremonyKind = isCeremonyStatementKind(body.kind);
+    const facts = isCeremonyKind ? ceremonyRevealFacts(body) : null;
+    const wellFormed = body.kind !== PERSON_KEY_KIND || (facts !== null && body.subject === claimed);
+    const revealBinds = (commitment) => !!commitment && wellFormed && verifyCeremonyReveal(body.payload?.reveal, {
+      circleId: body.circleId, kind: body.kind, subject: body.subject, authorRef: claimed, commitment, facts,
     });
     for (const it of forGroup) {
       const src = it?.source ?? {};

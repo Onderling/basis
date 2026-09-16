@@ -184,6 +184,8 @@ export {
   ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
   signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
 } from './identity/ceremonyCommitment.js';   // who may retire a device address: the owner root, at a ceremony
+export { CEREMONY_KINDS, ADDRESS_REVOKE_KIND, isCeremonyKind, ceremonyRevealFacts } from './security/ceremonyKinds.js';   // the kinds only the root may make, and what each reveal covers
+export { PERSON_KEY_KIND, personKeyFacts, isSelfPersonKeyStatement, foldPersonKeys } from './security/personKeyFold.js';   // the person's current (rotating) key per circle — the person-key head
 export { encode as b64encode,
          decode as b64decode }         from './crypto/b64.js';
 

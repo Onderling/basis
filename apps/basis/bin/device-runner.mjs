@@ -395,6 +395,7 @@ if (relayUrl) {
   kick(lanes.catchUps.membership, 'membership', 2500);
   kick(agent.grantsCatchUp, 'grants', 2500);
   kick(agent.knownPeersSync, 'known-peers', 2500);
+  kick(agent.personKeySync, 'person-key', 2500);
   kick(lanes.catchUps.task, 'tasks', 3000);
   kick(lanes.catchUps.chat, 'chat', 3500);
   kick(lanes.catchUps.key, 'keys', 3500);

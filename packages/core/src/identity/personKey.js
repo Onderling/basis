@@ -21,7 +21,7 @@ const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every person key).
 const _PERSON_KEY_SALT = new TextEncoder().encode('onderling-person-key-v1');
 
-/** The sealed-vault entry an enrolled device keeps: `{ version, seed }` (seed b64). */
+/** The sealed-vault entry a device keeps: `{ version, seed, reveals }` (seed b64; the ceremony's per-circle reveals, for the hand-over). */
 export const PERSON_KEY_VAULT_KEY = 'person-key';
 
 /**
@@ -65,15 +65,16 @@ export async function loadPersonKey(vault) {
     if (!Number.isInteger(o?.version) || o.version < 1 || typeof o?.seed !== 'string') return null;
     const seed = b64decode(o.seed);
     if (!(seed instanceof Uint8Array) || seed.length !== 32) return null;
-    return { version: o.version, seed };
+    const reveals = (o.reveals && typeof o.reveals === 'object') ? o.reveals : {};
+    return { version: o.version, seed, reveals };
   } catch { return null; }
 }
 
 /** Write the vault entry — only ever a HIGHER version than what is there (a ceremony never rolls a key back). */
-export async function storePersonKey(vault, { version, seed }) {
+export async function storePersonKey(vault, { version, seed, reveals = {} }) {
   if (!Number.isInteger(version) || version < 1 || !(seed instanceof Uint8Array) || seed.length !== 32) throw new Error('storePersonKey: {version, seed} required');
   const have = await loadPersonKey(vault);
   if (have && have.version >= version) return false;
-  await vault.set(PERSON_KEY_VAULT_KEY, JSON.stringify({ version, seed: b64encode(seed) }));
+  await vault.set(PERSON_KEY_VAULT_KEY, JSON.stringify({ version, seed: b64encode(seed), reveals: reveals && typeof reveals === 'object' ? reveals : {} }));
   return true;
 }

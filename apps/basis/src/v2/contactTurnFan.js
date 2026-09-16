@@ -32,6 +32,8 @@
  */
 
 /** The wire subtype for a turn fanned to the owner's own devices. */
+import { makeSiblingCarry } from './siblingCarry.js';
+
 export const CONTACT_TURN_BROADCAST = 'device-contact-turn';
 
 /** A turn's direction as the ORIGINATING device saw it: one it received, or one it sent. */
@@ -98,21 +100,16 @@ export function contactTurnToWire(turn) {
 export function makeContactTurnFan({ siblings, sendToPeer }) {
   if (typeof siblings !== 'function') throw new Error('makeContactTurnFan: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('makeContactTurnFan: `sendToPeer` is required');
+  // One caller of the ONE sibling carry (siblingCarry.js): this fan only shapes the turn for the wire.
+  const { carry } = makeSiblingCarry({
+    siblings, sendToPeer,
+    onWarn: (m) => console.warn(`[contact-turns] fan to own device failed — that device's thread will be missing this turn: ${m}`),
+  });
   return async function fanContactTurn(turn) {
     const wire = contactTurnToWire(turn);
     if (!wire) return { attempted: 0, outcomes: [] };
-    let addrs = [];
-    try { addrs = (await siblings()) ?? []; } catch { addrs = []; }
-    const outcomes = await Promise.all(addrs.map(async (addr) => {
-      try {
-        const r = await sendToPeer(addr, { subtype: CONTACT_TURN_BROADCAST, turn: wire });
-        return { to: addr, delivered: r?.delivered === true || (r?.held !== true && r?.delivered !== false), held: r?.held === true, error: null };
-      } catch (err) {
-        console.warn(`[contact-turns] fan to own device failed — that device's thread will be missing this turn: ${err?.message ?? err}`);
-        return { to: addr, delivered: false, held: false, error: err?.message ?? String(err) };
-      }
-    }));
-    return { attempted: addrs.length, outcomes };
+    const { attempted, outcomes } = await carry({ subtype: CONTACT_TURN_BROADCAST, turn: wire });
+    return { attempted, outcomes };
   };
 }
 

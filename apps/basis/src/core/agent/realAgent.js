@@ -28,9 +28,9 @@ import {
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, personKeyPubKeyB64, loadPersonKey } from '@onderling/core';
+  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, personKeyPubKeyB64, loadPersonKey , storePersonKey, PERSON_KEY_KIND, personKeyFacts } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
-import { keyEventsFromRail } from '../../v2/keyRail.js';
+import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -53,9 +53,9 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
-import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
-import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
+import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
+import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
 
 /** The CATCH-UP REPLY subtypes — the legitimate reconnect bursts the rate limiter must not eat
@@ -84,6 +84,8 @@ import {
 // socket. This carries a landed turn to the person's other devices so the thread reads the same on all
 // of them — the grants lane's fan, pointed at conversation instead of authority.
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
+import { makeSiblingCarry } from '../../v2/siblingCarry.js';
+import { createPersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
 import { isRosterTrailItem } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
@@ -521,7 +523,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE PERSON KEY (rotating, per profile — identity/personKey.js). A root-custody device re-derives the
   // current version each boot; an enrolled device was handed it at its ceremony and keeps it sealed. Absent
   // on an enrolled device from before person keys: it announces no key at joins, and says so once.
-  const personKey = await (async () => {
+  let personKey = await (async () => {
     try { const stored = await loadPersonKey(chatVault); if (stored) return stored; } catch { /* re-derive below */ }
     if (defaultProfileSeed) return { version: 1, seed: derivePersonKeySeed(defaultProfileSeed, 1) };
     console.warn('[realAgent] no person key on this enrolled device — it announces none at joins; a phrase ceremony on it hands it one');
@@ -1824,6 +1826,30 @@ export async function createRealHouseholdAgent(opts = {}) {
     siblings: ownDeviceSiblings,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
+  // THE ONE SIBLING CARRY (L100): my other devices as a standing peer of every circle lane. The chat and task
+  // emitters hand it every statement this device WRITES (after the member fan); the lane table hands it every
+  // statement that LANDS here from a member. Same sibling set, same send, as the two fans above.
+  const siblingCarry = makeSiblingCarry({
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+  });
+  // THE PERSON KEY between my devices: the rotation ceremony hands the new version to the survivors over the
+  // same sibling set and send; a landed one is stored monotonically and takes effect at once.
+  const personKeySync = createPersonKeySync({
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    current: () => personKey,
+    store: async (k) => {
+      const landed = await storePersonKey(chatVault, k);
+      if (landed) personKey = k;
+      return landed;
+    },
+    selfPubKey: chatId.pubKey,
+    // My own commitment per circle, from the root's PUBLIC key every device of mine holds — no roster read.
+    ownCommitmentFor: (circleId) => (rootPubKeyB64 ? ceremonyCommitment(rootPubKeyB64, circleId) : null),
+    onLanded: ({ version }) => console.info(`[person-key] version ${version} arrived from one of my devices`),
+    onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
+  });
   const contactTurnHandler = (applyTurn, onRefused = null) => makeContactTurnPeerHandler({
     siblings: ownDeviceSiblings,
     selfPubKey: chatId.pubKey,
@@ -2315,6 +2341,45 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...Object.keys(await readSelfCircleMemberships().catch(() => ({}))),
         ...(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []),
       ]);
+      // THE PERSON KEY ROTATES (binding-levels §10.5): the revoked device holds the CURRENT person key, so the
+      // ceremony — the one moment the root is in hand — derives the next version, keeps it, announces it to every
+      // circle ROOT-REVEALED (the only way a person-key statement binds; a device cannot mint one), and hands the
+      // seed to the surviving devices over the sibling carry. BEFORE any address is retired: a survivor's gate
+      // admits the hand-over only from a sibling address it still holds, and this device's own address may be
+      // retired by the self-enrol migration below in the same breath (found 2026-09-16: the hand-over arrived
+      // after the retire and was refused as "not a sibling"). The revoked device is kept out EXPLICITLY instead —
+      // its addresses derive deterministically from the seed the ceremony is revoking.
+      let personKeyVersion = null;
+      try {
+        const nextVersion = (personKey?.version ?? 0) + 1;
+        const nextSeed = derivePersonKeySeed(root.deriveAgentSeed('default'), nextVersion);
+        const pubKey = personKeyPubKeyB64(nextSeed);
+        // The hand-over's reveals, one per circle: the root's word that THIS seed is version n of THIS person —
+        // what a survivor verifies against its own commitment (personKeySync.js). Kept beside the key so a
+        // sibling that asks later gets the same proof.
+        const reveals = {};
+        for (const circleId of circleIds) {
+          reveals[circleId] = signCeremonyReveal(root.secret, {
+            circleId, kind: PERSON_KEY_CARRY, subject: chatId.pubKey, authorRef: chatId.pubKey,
+            facts: personKeyFacts({ version: nextVersion, pubKey }),
+          });
+        }
+        if (await storePersonKey(chatVault, { version: nextVersion, seed: nextSeed, reveals })) personKey = { version: nextVersion, seed: nextSeed, reveals };
+        personKeyVersion = nextVersion;
+        if (typeof membershipEmit === 'function') {
+          for (const circleId of circleIds) {
+            try {
+              const reveal = signCeremonyReveal(root.secret, {
+                circleId, kind: PERSON_KEY_KIND, subject: chatId.pubKey, authorRef: chatId.pubKey,
+                facts: personKeyFacts({ version: nextVersion, pubKey }),
+              });
+              await membershipEmit({ kind: PERSON_KEY_KIND, circleId, subject: chatId.pubKey, payload: { version: nextVersion, pubKey, reveal }, actor: chatId.pubKey });
+            } catch (err) { console.warn(`[ceremony] person key v${nextVersion} not announced in ${circleId}: ${err?.message ?? err}`); }
+          }
+        }
+        // The hand-over to the survivors — the revoked device's addresses excluded by derivation (see above).
+        await personKeySync.carryCurrent({ exclude: [...circleIds].map((cid) => deriveCircleAddress(revokedSeed, cid)) });
+      } catch (err) { console.warn(`[ceremony] the person key did not rotate: ${err?.message ?? err}`); }
       const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
       // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
       // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
@@ -2399,6 +2464,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       return [DataPart({
         ok: true, deviceId, known, revokedIn, circles: revokedIn.length,
+        ...(personKeyVersion ? { personKeyVersion } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
@@ -2888,7 +2954,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: chatId.pubKey,
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
-      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+      }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
+        // my own write reaches my other devices by the one carry — after the member fan, never instead of it
+        .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     });
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
     // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
@@ -2915,6 +2983,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
+        // my own write reaches my other devices by the one carry — after the member fan, never instead of it
+        siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {});
         if (r?.error || (r?.errors?.length ?? 0) > 0 || (r?.sent ?? 0) < (r?.attempted ?? 0)) {
           console.warn(`[task-lane] fan under-delivered for ${circleId} ${statement.body.kind}`
             + ` hash=${statement.body.hash.slice(0, 8)}: sent=${r?.sent ?? 0}/${r?.attempted ?? 0}`
@@ -2941,7 +3011,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       rail: chatRail,
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleChatStatement', {
         groupId: circleId, event: statement, msgId: statement.body.subject, ts: Date.now(),
-      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+      }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
+        // my own write reaches my other devices by the one carry — after the member fan, never instead of it
+        .finally(() => siblingCarry.carry({ subtype: CHAT_STATEMENT_BROADCAST, circleId, event: statement, msgId: statement.body.subject, ts: Date.now() }).catch(() => {})),
     });
   }
   // THE KEY LANE (the recorded spine route for key rotations, implemented 2026-08-22): the
@@ -2957,7 +3029,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     myRef: chatId.pubKey,
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
   });
-  const keyEmit = makeKeyEmitter({ rail: keyRail });
+  // Every key statement this device writes — the shells' sinks and the revoke ceremony all emit through
+  // here — also reaches its other devices by the one carry, whichever caller fans it to the members.
+  const keyEmitBare = makeKeyEmitter({ rail: keyRail });
+  const keyEmit = keyEmitBare ? async (circleId, event) => {
+    const statement = await keyEmitBare(circleId, event);
+    if (statement) siblingCarry.carry({ subtype: KEY_STATEMENT_BROADCAST, circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now() }).catch(() => {});
+    return statement;
+  } : null;
   // THE RULES-UPDATE RIDER: `editGroupRules` also fans the new doc + version as a signed statement
   // on the governance lane (this rail instance shares the device log with the shells' receive-side
   // rail — same lane, same declaration, the multi-instance shape governance already has). Without
@@ -2973,7 +3052,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     }),
     fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
-    }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+    }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
+      .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan
@@ -5509,6 +5589,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     knownPeersSync,
     /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */
     personKey: currentPersonKey,
+    // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.
+    personKeySync,
+    // The one sibling carry (L100): the lane table (`buildCircleLanes`) hands it every landed statement.
+    siblingCarry,
     /** Inbound envelopes the security layer refused, per reason — the diagnostic read of the warning above. */
     refusedInboundByReason: () => Object.fromEntries(refusedInbound),
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its

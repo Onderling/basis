@@ -24,6 +24,7 @@ import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { grantsManifest, GRANTS_LANE, OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { makeGovernanceCatchUp } from './governanceCatchUp.js';
+import { makeSiblingCarry } from './siblingCarry.js';
 
 export { GRANTS_LANE, OWN_DEVICES_SCOPE };
 
@@ -199,16 +200,11 @@ export async function siblingDevices({ callSkill, selfPubKey, circleAddressFor, 
  * catch-up reconciles a miss either way, but the log says when it will have to.
  */
 export function makeGrantsFan({ siblings, sendToPeer }) {
+  // One caller of the ONE sibling carry (siblingCarry.js) — this lane no longer loops over the set itself.
+  const { carry } = makeSiblingCarry({ siblings, sendToPeer, onWarn: (m) => console.warn(m.replace('[sibling-carry]', '[grants-lane]')) });
   return async function fanGrantStatement(statement) {
-    let addrs = [];
-    try { addrs = (await siblings()) ?? []; } catch { addrs = []; }
-    await Promise.all(addrs.map(async (addr) => {
-      try { await sendToPeer(addr, { subtype: GRANTS_BROADCAST, event: statement }); }
-      catch (err) {
-        console.warn(`[grants-lane] fan to sibling failed (catch-up will reconcile): ${err?.message ?? err}`);
-      }
-    }));
-    return { attempted: addrs.length };
+    const r = await carry({ subtype: GRANTS_BROADCAST, event: statement });
+    return { attempted: r.attempted };
   };
 }
 

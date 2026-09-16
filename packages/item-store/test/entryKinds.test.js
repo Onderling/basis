@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  ENTRY_KINDS, LANE, RETAIN, UNKNOWN_KIND,
+  ENTRY_KINDS, LANE, RETAIN, UNKNOWN_KIND, SIGNS, SUBJECT, ACCEPTS, SYNC, bindingOf,
   entryKind, isSystemKind, isAuditKind, retentionOf, conversationKinds, kindWakes, governanceWakes,
 } from '../src/entryKinds.js';
 
@@ -35,7 +35,53 @@ describe('the table answers all four questions per kind', () => {
   });
 });
 
+describe('the table also answers WHO signs, WHAT it is about, HOW it is accepted, and whether own devices carry it', () => {
+  const inVocab = (vocab, v, label) => {
+    for (const x of Array.isArray(v) ? v : [v]) expect(Object.values(vocab), label).toContain(x);
+    if (Array.isArray(v)) expect(v.length, `${label} lists more than one level or is a scalar`).toBeGreaterThan(1);
+  };
+  it('every declared kind fills the four binding columns from the vocabularies', () => {
+    for (const [kind, d] of Object.entries(ENTRY_KINDS)) {
+      inVocab(SIGNS, d.signs, `${kind}.signs`);
+      inVocab(SUBJECT, d.subject, `${kind}.subject`);
+      expect(Object.values(ACCEPTS), `${kind}.accepts`).toContain(d.accepts);   // one verifier per kind, never a list
+      expect(Object.values(SYNC), `${kind}.syncPolicy`).toContain(d.syncPolicy);
+    }
+  });
+
+  it('a circle lane is signed per circle and folded with the roster rule; the spine kinds name their stricter rule', () => {
+    expect(bindingOf('chat-message')).toEqual({ signs: ['device-in-circle'], subject: ['none'], accepts: 'roster-binding', syncPolicy: 'circle-default' });
+    expect(bindingOf('task-statement').accepts).toBe('roster-binding');
+    expect(bindingOf('membership')).toEqual({ signs: ['device-in-circle', 'root'], subject: ['person', 'device'], accepts: 'membership-binding', syncPolicy: 'circle-default' });
+    expect(bindingOf('key-event').accepts).toBe('key-binding');
+    expect(bindingOf('grants')).toEqual({ signs: ['device', 'person'], subject: ['none'], accepts: 'device-set', syncPolicy: 'siblings' });
+  });
+
+  it('a local kind is never accepted from a peer and never carried — and "local" cannot be one of several signers', () => {
+    for (const [kind, d] of Object.entries(ENTRY_KINDS)) {
+      const b = bindingOf(kind);
+      if (!b.signs.includes(SIGNS.LOCAL)) continue;
+      expect(b, kind).toMatchObject({ signs: [SIGNS.LOCAL], accepts: ACCEPTS.NONE, syncPolicy: SYNC.NONE });
+      expect(d.subject, kind).toBe(SUBJECT.NONE);
+    }
+    expect(bindingOf('task').accepts).toBe(ACCEPTS.NONE);   // the derived human line, not the signed statement
+  });
+
+  it('bindingOf normalises the two list-capable columns and reads the unknown default for junk', () => {
+    expect(bindingOf('report').signs).toEqual([SIGNS.LOCAL]);
+    for (const bad of [null, undefined, 42, '', 'kind-from-2027']) {
+      expect(bindingOf(bad)).toEqual({ signs: ['local'], subject: ['none'], accepts: 'none', syncPolicy: 'none' });
+    }
+  });
+});
+
 describe('an unknown kind fails SAFE', () => {
+  it('is REFUSED from a peer by construction (accepts: none) and never carried', () => {
+    expect(UNKNOWN_KIND.accepts).toBe(ACCEPTS.NONE);
+    expect(UNKNOWN_KIND.syncPolicy).toBe(SYNC.NONE);
+    expect(UNKNOWN_KIND.signs).toBe(SIGNS.LOCAL);
+  });
+
   it('never wakes and never reads as conversation', () => {
     expect(entryKind('something-new-in-2027')).toEqual(UNKNOWN_KIND);
     expect(kindWakes('something-new-in-2027')).toBe(false);

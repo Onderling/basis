@@ -7,7 +7,7 @@
  * contact address") now also names the PRIMARY DEVICE: that device registers the profile address and the person
  * address on every relay as `primary`, the others register plainly and stand by (the relay delivers to a primary
  * socket while one lives, and falls to a standby when it is gone). Circle traffic is unchanged: it goes to the
- * primary per-circle address on the roster row (#128), where the same tap put it.
+ * primary per-circle address on the roster row, where the same tap put it.
  *
  * The choice is a PERSONAL fact of the person's device set — `{ deviceId, at }` — kept in the sealed chat vault and
  * carried to the siblings over the one sibling carry, sibling-gated like the grants lane: a device takes a claim

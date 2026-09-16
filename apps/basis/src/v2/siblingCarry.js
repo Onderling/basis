@@ -43,11 +43,13 @@ export function makeSiblingCarry({ siblings, sendToPeer, onWarn = null } = {}) {
 
   /**
    * Hand one lane payload to every sibling.
-   * @param {object} payload  the lane's own wire payload — `{ subtype, circleId, event, … }`, exactly what the member fan sends
+   * @param {object} payload  the lane's own wire payload — `{ subtype, circleId, event, … }` for a circle lane, exactly
+   *   what the member fan sends; `{ subtype, … }` for a PERSONAL channel (grants, contact turns, known peers), which
+   *   has no circle — the send picks the circle it shares with each sibling.
    * @param {{ from?: string|null }} [opts]  the address the statement ARRIVED from (a landed statement); absent for an own write
    */
   async function carry(payload, { from = null } = {}) {
-    if (!payload || typeof payload.subtype !== 'string' || typeof payload.circleId !== 'string' || !payload.circleId) {
+    if (!payload || typeof payload.subtype !== 'string' || !payload.subtype) {
       return { attempted: 0, skipped: 'not-a-lane-payload', outcomes: [] };
     }
     let addrs = [];
@@ -61,7 +63,7 @@ export function makeSiblingCarry({ siblings, sendToPeer, onWarn = null } = {}) {
         const r = await sendToPeer(to, payload, { guarantee: 'hold-forward' });
         return { to, delivered: r?.delivered === true || (r?.held !== true && r?.delivered !== false), held: r?.held === true, error: null };
       } catch (err) {
-        warn(`[sibling-carry] ${payload.subtype} for ${payload.circleId} did not reach own device ${String(to).slice(0, 12)}… — it follows by catch-up: ${err?.message ?? err}`);
+        warn(`[sibling-carry] ${payload.subtype}${payload.circleId ? ` for ${payload.circleId}` : ''} did not reach own device ${String(to).slice(0, 12)}… — it follows by catch-up: ${err?.message ?? err}`);
         return { to, delivered: false, held: false, error: err?.message ?? String(err) };
       }
     }));

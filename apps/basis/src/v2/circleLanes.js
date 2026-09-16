@@ -67,7 +67,7 @@ export function carryLandedStatement({ carry, subtype, circleId, statement, from
  *   `chatLanded({msgId, circleId, fromPeerAddr, source})` · `chatChange(circleId)` ·
  *   `chatCatchUpOffer({circleId, count, approxBytes, allow})` · `chatRefused({circleId, fromPeerAddr, reason})` ·
  *   `ownDeviceTurn(wire)`.
- * @returns {{ handlers: Object<string, Function>, catchUps: object, chatStatementHandler: object|null }}
+ * @returns {{ handlers: Object<string, Function>, catchUps: object, chatStatementHandler: object|null, landedCarrier: {governance: Function} }}
  *   `handlers` is spread into the router; `catchUps` holds `{gov, membership, key, task, chat, podChat}`
  *   for the connect-time kicks, each null when its rail is absent.
  */
@@ -176,8 +176,20 @@ export function buildCircleLanes({
   }) : null;
 
   const keyStatementHandler = agent.keyRail
-    ? makeKeyPeerHandler({ rail: agent.keyRail, onChange: keyChange })
+    ? makeKeyPeerHandler({
+      rail: agent.keyRail,
+      onChange: keyChange,
+      onLanded: (circleId, statement, fromPeerAddr) =>
+        carryLandedStatement({ carry, subtype: KEY_STATEMENT_BROADCAST, circleId, statement, fromPeerAddr, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject ?? ''}` }),
+    })
     : null;
+
+  // The governance statement handler is built by each shell (it needs the shell's rail and re-render);
+  // this is the reaction a shell hands it as `onLanded`, so the carry stays one function.
+  const landedCarrier = {
+    governance: (circleId, statement, fromPeerAddr) =>
+      carryLandedStatement({ carry, subtype: 'circle-governance-broadcast', circleId, statement, fromPeerAddr, msgId: `gov:${statement?.body?.hash ?? ''}` }),
+  };
 
   const catchUpEntries = (cu) => (cu ? {
     [cu.subtypes.request]: cu.onRequest,
@@ -197,7 +209,12 @@ export function buildCircleLanes({
     }) } : {}),
     ...catchUpEntries(task),
     ...(agent.membershipRail ? {
-      [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail, onChange: onMembership }),
+      [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({
+        rail: agent.membershipRail,
+        onChange: onMembership,
+        onLanded: (circleId, statement, fromPeerAddr) =>
+          carryLandedStatement({ carry, subtype: MEMBERSHIP_BROADCAST, circleId, statement, fromPeerAddr, msgId: `mem:${statement?.body?.hash ?? ''}` }),
+      }),
     } : {}),
     ...catchUpEntries(membership),
     ...catchUpEntries(gov),
@@ -224,5 +241,7 @@ export function buildCircleLanes({
     catchUps: { gov, membership, key, task, chat, podChat },
     chatStatementHandler,
     keyStatementHandler,
+    // the reaction a shell hands its own governance statement handler as `onLanded`
+    landedCarrier,
   };
 }

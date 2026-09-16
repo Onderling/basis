@@ -26,6 +26,7 @@ import {
 } from '../support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../../src/v2/circleAddressAnnounce.js';
 import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
+import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
 import { carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { EventLog } from '../../src/eventLog.js';
 
@@ -98,8 +99,19 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
         onLanded: (circleId, entry, fromPeerAddr, statement) =>
           carryLandedStatement({ carry: (p, o) => node.agent.siblingCarry.carry(p, o), subtype: CHAT_STATEMENT_BROADCAST, circleId, statement, fromPeerAddr, msgId: entry?.id }),
       });
+      // …and the membership lane's, the way the lane table wires it (a landed statement is carried on).
+      const membershipHalf = makeMembershipPeerHandler({
+        rail: node.agent.membershipRail,
+        onChange: (cid) => { try { node.agent.rosterReads?.invalidate(cid); } catch { /* cache */ } },
+        onLanded: (circleId, statement, fromPeerAddr) =>
+          carryLandedStatement({ carry: (p, o) => node.agent.siblingCarry.carry(p, o), subtype: MEMBERSHIP_BROADCAST, circleId, statement, fromPeerAddr, msgId: `mem:${statement?.body?.hash ?? ''}` }),
+      });
       const prior = node._routerRef.fn;
-      node._routerRef.fn = (env) => (env?.payload?.subtype === CHAT_STATEMENT_BROADCAST ? receivingHalf(env.from, env.payload) : prior?.(env));
+      node._routerRef.fn = (env) => {
+        if (env?.payload?.subtype === CHAT_STATEMENT_BROADCAST) return receivingHalf(env.from, env.payload);
+        if (env?.payload?.subtype === MEMBERSHIP_BROADCAST) return membershipHalf(env.from, env.payload);
+        return prior?.(env);
+      };
     }
   }, 180_000);
 
@@ -132,5 +144,14 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     await new Promise((r) => setTimeout(r, 300));
     expect(texts(A).filter((t) => t === text), 'the phone holds it exactly once').toHaveLength(1);
     expect(texts(A2).filter((t) => t === text), 'the always-on device holds it exactly once').toHaveLength(1);
+  });
+
+  it('a role change Anna makes on the phone is on the always-on device\'s roster, live — the membership lane rides the same carry', async () => {
+    const roleOn = async (node) => (await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members?.find((m) => m.webid === B.pubKey)?.role ?? null;
+    expect(await roleOn(A2)).toBe('member');
+    const r = await A.agent.callSkill('stoop', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: 'admin' });
+    expect(r?.ok ?? !r?.error, JSON.stringify(r)).toBe(true);
+    expect(await until(async () => ((await roleOn(A2)) === 'admin' ? true : null), { timeout: 10000, step: 200 }),
+      'the always-on device never saw the promotion Anna made on her phone').toBe(true);
   });
 });

@@ -7,6 +7,12 @@ import { makeSiblingCarry } from '../../src/v2/siblingCarry.js';
 import { buildCircleLanes, carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 import { TASK_BROADCAST } from '../../src/v2/taskRail.js';
+import { MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
+import { KEY_STATEMENT_BROADCAST } from '../../src/v2/keyRail.js';
+import { makeGrantsFan, GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
+import { makeContactTurnFan, CONTACT_TURN_BROADCAST } from '../../src/v2/contactTurnFan.js';
+import { createKnownPeersSync, KNOWN_PEERS_BROADCAST } from '../../src/v2/knownPeersSync.js';
+import { makeCircleGovernancePeerHandler } from '../../src/v2/circleLogReceiver.js';
 
 const SIBS = ['addr:box', 'addr:laptop'];
 const stmt = { body: { kind: 'chat', subject: 'm1', hash: 'h1' }, sig: 'sig' };
@@ -49,9 +55,11 @@ describe('makeSiblingCarry', () => {
     expect(onWarn).toHaveBeenCalledTimes(2);
   });
 
-  it('refuses what is not a lane payload', async () => {
-    const { carry } = makeSiblingCarry({ siblings: async () => SIBS, sendToPeer: vi.fn() });
-    for (const bad of [null, {}, { subtype: 'x' }, { circleId: 'k1' }]) expect((await carry(bad)).skipped).toBe('not-a-lane-payload');
+  it('refuses what is not a lane payload; a PERSONAL channel payload (no circle) is carried', async () => {
+    const sendToPeer = vi.fn(async () => ({ delivered: true }));
+    const { carry } = makeSiblingCarry({ siblings: async () => SIBS, sendToPeer });
+    for (const bad of [null, {}, { circleId: 'k1' }, { subtype: '' }]) expect((await carry(bad)).skipped).toBe('not-a-lane-payload');
+    expect((await carry({ subtype: GRANTS_BROADCAST, event: stmt })).attempted).toBe(2);
   });
 });
 
@@ -103,5 +111,73 @@ describe('the lane table hands every landed chat and task statement to the carry
     const { handlers } = buildCircleLanes({ agent });
     await expect(handlers[CHAT_STATEMENT_BROADCAST]('addr:x', chatPayload)).resolves.toBeUndefined();
     expect(await carryLandedStatement({ carry: null, subtype: CHAT_STATEMENT_BROADCAST, circleId: 'k1', statement: stmt })).toBe(null);
+  });
+});
+
+describe('the other lanes hand a landed statement to the same carry', () => {
+  const railStub = (ingest) => ({
+    ingest, hasEntry: () => false, storedStatements: () => [], statementsFor: () => [], frontier: () => ({}),
+    headsFor: () => ({}), serve: () => [], declaredKinds: [], newerThan: () => [], owed: () => [], readVerifiedBodies: () => [],
+  });
+  const landing = async () => ({ ok: true, existed: false, entry: { id: 'x' } });
+  const held = async () => ({ ok: true, existed: true, entry: { id: 'x' } });
+
+  it('membership + keys: carried once, keyed by the statement hash, never when the rail already held it', async () => {
+    const carry = vi.fn(async () => ({ attempted: 1 }));
+    const agent = { siblingCarry: { carry }, membershipRail: railStub(landing), keyRail: railStub(landing), rosterReads: { invalidate: () => {} }, sendPeerMessage: async () => ({}) };
+    const { handlers } = buildCircleLanes({ agent });
+    const mem = { body: { kind: 'role', subject: 'w:bob', hash: 'mh' }, sig: 's' };
+    const key = { body: { kind: 'key-rotate', subject: 'v2', hash: 'kh' }, sig: 's' };
+    await handlers[MEMBERSHIP_BROADCAST]('addr:bea', { subtype: MEMBERSHIP_BROADCAST, circleId: 'k1', event: mem });
+    await handlers[KEY_STATEMENT_BROADCAST]('addr:bea', { subtype: KEY_STATEMENT_BROADCAST, circleId: 'k1', event: key });
+    expect(carry.mock.calls.map((c) => [c[0].subtype, c[0].msgId, c[1].from])).toEqual([
+      [MEMBERSHIP_BROADCAST, 'mem:mh', 'addr:bea'], [KEY_STATEMENT_BROADCAST, 'key:kh', 'addr:bea'],
+    ]);
+    const quiet = vi.fn();
+    const again = buildCircleLanes({ agent: { ...agent, siblingCarry: { carry: quiet }, membershipRail: railStub(held), keyRail: railStub(held) } });
+    await again.handlers[MEMBERSHIP_BROADCAST]('addr:bea', { subtype: MEMBERSHIP_BROADCAST, circleId: 'k1', event: mem });
+    await again.handlers[KEY_STATEMENT_BROADCAST]('addr:bea', { subtype: KEY_STATEMENT_BROADCAST, circleId: 'k1', event: key });
+    expect(quiet).not.toHaveBeenCalled();
+  });
+
+  it('governance: the shells hand their handler the lane table\'s reaction; it fires for a NEW statement only', async () => {
+    const carry = vi.fn(async () => ({ attempted: 1 }));
+    const { landedCarrier } = buildCircleLanes({ agent: { siblingCarry: { carry }, sendPeerMessage: async () => ({}) } });
+    const gov = { body: { kind: 'vote', subject: 'p1', hash: 'gh', payload: {} }, sig: 's' };
+    const eventLog = { query: () => [] };
+    const handler = makeCircleGovernancePeerHandler({ eventLog, rail: { ingest: async () => ({ ok: true }) }, onLanded: landedCarrier.governance });
+    await handler('addr:bea', { subtype: 'circle-governance-broadcast', circleId: 'k1', event: gov });
+    expect(carry.mock.calls[0][0]).toMatchObject({ subtype: 'circle-governance-broadcast', circleId: 'k1', event: gov, msgId: 'gov:gh' });
+    expect(carry.mock.calls[0][1]).toEqual({ from: 'addr:bea' });
+    const seen = makeCircleGovernancePeerHandler({ eventLog: { query: () => [{ id: 'governance:gh' }] }, rail: { ingest: async () => ({ ok: true }) }, onLanded: landedCarrier.governance });
+    await seen('addr:bea', { subtype: 'circle-governance-broadcast', circleId: 'k1', event: gov });
+    expect(carry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the three older sibling fans are callers of the one carry — same wire, same set, no loop of their own', () => {
+  it('grants', async () => {
+    const sendToPeer = vi.fn(async () => ({ delivered: true }));
+    const fan = makeGrantsFan({ siblings: async () => SIBS, sendToPeer });
+    expect(await fan(stmt)).toEqual({ attempted: 2 });
+    expect(sendToPeer.mock.calls.map((c) => c[1])).toEqual([{ subtype: GRANTS_BROADCAST, event: stmt }, { subtype: GRANTS_BROADCAST, event: stmt }]);
+  });
+  it('contact turns', async () => {
+    const sendToPeer = vi.fn(async () => ({ held: true }));
+    const fan = makeContactTurnFan({ siblings: async () => SIBS, sendToPeer });
+    const r = await fan({ direction: 'out', contactId: 'c1', text: 'hoi', ts: 5 });
+    expect(r.attempted).toBe(2);
+    expect(r.outcomes.map((o) => o.held)).toEqual([true, true]);
+    expect(sendToPeer.mock.calls[0][1]).toEqual({ subtype: CONTACT_TURN_BROADCAST, turn: { direction: 'out', contactId: 'c1', text: 'hoi', ts: 5 } });
+    expect(await fan({ contactId: 'c1' })).toEqual({ attempted: 0, outcomes: [] });
+  });
+  it('known peers (the live rows)', async () => {
+    const sendToPeer = vi.fn(async () => ({ delivered: true }));
+    const sync = createKnownPeersSync({
+      siblings: async () => SIBS, selfPubKey: 'me', sendToPeer, snapshot: async () => ({ peers: [], contacts: [] }),
+      learnPeerKey: () => 'established', contacts: { has: async () => false, add: async () => {} },
+    });
+    expect(await sync.fanPeer({ address: 'addr:x', pubKey: 'PK' })).toEqual({ attempted: 2 });
+    expect(sendToPeer.mock.calls[0][1]).toMatchObject({ subtype: KNOWN_PEERS_BROADCAST });
   });
 });

@@ -874,6 +874,7 @@ export default function ChatScreen({
             eventLog: eventLogRef.current,
             rail: govRail,
             onChange: govChanged,
+            onLanded: lanes.landedCarrier?.governance,   // a landed decision reaches my other devices (the one carry)
             // "A decision opened" is RENDERED from the statement on the log (governanceNotices.js via
             // chatRows) — the appended gov-notif nudge is retired, web parity.
           }),

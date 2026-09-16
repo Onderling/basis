@@ -1301,6 +1301,8 @@ export function buildSkills({
   // rail's VERIFIED bodies for the roster fold. Absent → the legacy store-based spine path, unchanged.
   membershipEmit,
   membershipRead,
+  // The person key this device announces on a join or create (host-injected `() => {version, pubKey} | null`).
+  currentPersonKey = null,
   // THE RULES-UPDATE RIDER (host-injected): a rules-doc edit also appends + fans a signed
   // `rules-update` statement on the governance lane, so the new doc reaches every member
   // peer-to-peer (pod-free) and their stale-banner lights. Absent → store-local only, unchanged.
@@ -2379,7 +2381,7 @@ export function buildSkills({
     defineSkill('createGroupWithRules', async ({ parts, from }) => {
       // Thin wrapper: the write lives in `@onderling/circles` (`createGroupWithRules`, §8c slice-a). Stoop
       // injects the store + its `_sync` producer and passes the parsed args + carrier.
-      return createGroupWithRules({ store, simulateSync, emitSpine }, { a: dataArgs(parts), from });
+      return createGroupWithRules({ store, simulateSync, emitSpine, currentPersonKey }, { a: dataArgs(parts), from });
     }, {
       description: 'Persist a group\'s governance rules (V1 admin wizard output).',
       visibility:  'authenticated',
@@ -2404,7 +2406,7 @@ export function buildSkills({
       // invite-ceiling clamp + cap, and a best-effort pod-routing policy push (the closure carries the
       // optional chain over an absent bundle — legacy/test setups where podRouting isn't wired).
       return createGroupV2({
-        store, members, metrics, simulateSync, emitSpine,
+        store, members, metrics, simulateSync, emitSpine, currentPersonKey,
         clampInviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
         validateStoragePolicy: _validateStoragePolicy,
         buildStoragePolicy:    _buildStoragePolicy,
@@ -2636,7 +2638,7 @@ export function buildSkills({
       // (`redeemMembershipCode`, §8c slice-b). Stoop injects the store + helpers and binds the trailing
       // group-key grant to `grantPodAccess(controlAgent, …)` (the key custodian stays here, not in circles).
       return redeemMembershipCodeCore({
-        store, members, metrics, simulateSync, emitSpine,
+        store, members, metrics, simulateSync, emitSpine, currentPersonKey,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
         codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,

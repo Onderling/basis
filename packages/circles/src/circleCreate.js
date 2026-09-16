@@ -1,3 +1,4 @@
+import { personKeyAnnouncement } from '@onderling/core';
 /**
  * Zero-key membership writers — pure DI lift out of stoop's `buildSkills` (the §8c migration, slice-a). These
  * persist a circle's governance rules, and the join-time rules/privacy acceptance record; none touches key
@@ -16,7 +17,13 @@
  *
  * @returns {Promise<{rulesId, groupId, _sync}|{error:string}>}
  */
-export async function createGroupWithRules({ store, simulateSync, emitSpine = null }, { a, from } = {}) {
+/** The creator's FIRST person key rides the `create`, as a joiner's rides the join (Frits 2026-09-16, option A). */
+const createPayload = (currentPersonKey) => {
+  const k = personKeyAnnouncement(typeof currentPersonKey === 'function' ? currentPersonKey() : null);
+  return k ? { personKey: k } : {};
+};
+
+export async function createGroupWithRules({ store, simulateSync, emitSpine = null, currentPersonKey = null }, { a, from } = {}) {
   if (typeof a?.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
   if (typeof a?.name    !== 'string' || !a.name)    return { error: 'name required' };
   if (typeof a?.rules   !== 'object' || a.rules === null) return { error: 'rules object required' };
@@ -42,7 +49,7 @@ export async function createGroupWithRules({ store, simulateSync, emitSpine = nu
   // corroborates the author, or where it has no trail for the circle at all — which is exactly the
   // brand-new case. Best-effort, like every other spine hook here: the circle still exists without it.
   if (typeof emitSpine === 'function') {
-    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: {}, actor: from }); }
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: createPayload(currentPersonKey), actor: from }); }
     catch { /* the typed item is written; the statement can be re-derived by a later ceremony */ }
   }
   return { rulesId: item.id, groupId: a.groupId, _sync: simulateSync() };
@@ -92,6 +99,8 @@ export async function createGroupV2({
   // The circle's creation statement — see `createGroupWithRules` above for what it is and why a
   // receiver cannot be crowned by one.
   emitSpine = null,
+  // The creator's person key, announced on the create (`() => {version, pubKey} | null`).
+  currentPersonKey = null,
 }, { a, from } = {}) {
   if (typeof a?.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
   if (typeof a?.name    !== 'string' || !a.name)    return { error: 'name required' };
@@ -167,7 +176,7 @@ export async function createGroupV2({
   // `createGroupWithRules`: a receiver folds it as foundership only where its own trail corroborates
   // the author, or where it has no trail for the circle at all.
   if (typeof emitSpine === 'function') {
-    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: {}, actor: from }); }
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: createPayload(currentPersonKey), actor: from }); }
     catch { /* best-effort, like every spine hook here */ }
   }
   return {

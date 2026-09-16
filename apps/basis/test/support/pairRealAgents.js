@@ -383,6 +383,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
     pendingMap,
+    currentPersonKey: () => agent.personKey?.() ?? null,   // as both shells: the first person key rides the join
     circleAddressFor: agent.circleAddressFor,
     // …and prove it (web ≡ mobile ≡ harness): a fresh per-circle address is signed with its own key.
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,

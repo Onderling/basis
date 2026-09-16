@@ -77,8 +77,8 @@ describe('J-R2 — a relay learns nothing about a circle it does not host', () =
 
   beforeEach(async () => {
     sockets = [];
-    r1 = await startRelay({ port: 0 });
-    r2 = await startRelay({ port: 0 });
+    r1 = await startRelay({ port: 0, peerDiscovery: true });   // the LEAK SURFACE under test exists only with discovery on
+    r2 = await startRelay({ port: 0, peerDiscovery: true });
     anna = await AgentIdentity.generate(new VaultMemory());
   });
 
@@ -155,8 +155,8 @@ describe('J-R4 — a relay you left learns nothing more', () => {
 
   beforeEach(async () => {
     sockets = [];
-    r1 = await startRelay({ port: 0 });
-    r2 = await startRelay({ port: 0 });
+    r1 = await startRelay({ port: 0, peerDiscovery: true });   // the LEAK SURFACE under test exists only with discovery on
+    r2 = await startRelay({ port: 0, peerDiscovery: true });
     anna = await AgentIdentity.generate(new VaultMemory());
   });
   afterEach(async () => {

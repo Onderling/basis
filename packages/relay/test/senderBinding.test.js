@@ -39,7 +39,7 @@ describe('relay sender binding — a socket may only send as an address it regis
   let relay; let url; let anna; let bram;
 
   beforeEach(async () => {
-    relay = await startRelay({ port: 0 });
+    relay = await startRelay({ port: 0, peerDiscovery: true });   // this suite pings with peer-list; discovery is off by default
     url   = `ws://127.0.0.1:${relay.port}`;
     anna  = await openClient(url);
     bram  = await openClient(url);

@@ -434,9 +434,12 @@ export const DERIVABLE_FACTS = Object.freeze([
   },
   {
     id: 'peer-list',
-    fact: 'The set of addresses currently registered — which the relay broadcasts to every '
-        + 'registered client, so it is not even private to the operator. Only registered clients '
-        + 'receive it; an unregistered lurker learns nothing.',
+    fact: 'The set of addresses currently registered. Since 2026-09-16 the relay keeps this to itself '
+        + 'BY DEFAULT: the broadcast to every registered client (and the answer to a peer-list request) '
+        + 'exists only when the operator turns peer discovery on, and then it is a presence oracle wider '
+        + 'than the queued-vs-delivered notice this relay refuses, plus a linkage oracle (a device\'s '
+        + 'per-circle addresses register on one socket and so appear and vanish together). An operator '
+        + 'who turns it on must disclose it. `peerDiscoveryOff.test.js` pins the default.',
   },
   {
     id: 'refusal',

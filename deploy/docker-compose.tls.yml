@@ -51,6 +51,7 @@ services:
       R2_REGION: "${R2_REGION:-auto}"
       BLOB_GATE_UPLOADERS: "${BLOB_GATE_UPLOADERS:-}"
       PUSH_PROVIDER: "${PUSH_PROVIDER:-}"
+      PEER_DISCOVERY: "${PEER_DISCOVERY:-}"
       EXPO_ACCESS_TOKEN: "${EXPO_ACCESS_TOKEN:-}"
 
   # CSS bakes the base URL into every WebID → it MUST be the PUBLIC https domain.

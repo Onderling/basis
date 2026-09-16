@@ -157,7 +157,7 @@ describe('what a relay learns from a real multi-circle session', () => {
     // the relay with full logging"; this is full logging.
     setVerboseEnabled(true);
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    relay = await startRelay({ port: 0, log: true });
+    relay = await startRelay({ port: 0, log: true, peerDiscovery: true });   // the walk exercises the frame; the default is pinned in peerDiscoveryOff.test.js
     url = `ws://127.0.0.1:${relay.port}`;
     record = observe(relay);
   });

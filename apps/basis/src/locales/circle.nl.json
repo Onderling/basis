@@ -4596,6 +4596,46 @@
     "recovery_export": "Herstelbestand opslaan",
     "recovery_import": "Herstelbestand laden",
     "replace_device": "Mijn andere apparaten intrekken",
+    "sync": {
+      "text": "Wat dit apparaat bewaart",
+      "doc": "My data section: this device's own selection of what it holds of what the owner's devices sync (sync-policy §11). Per silo, per kring, and the file bytes. Never on the wire."
+    },
+    "sync_intro": {
+      "text": "Je apparaten houden hetzelfde bij. Hier kies je wat dít apparaat bewaart — wat het niet bewaart geeft het wel door aan je andere apparaten.",
+      "doc": "One line under the heading: hold nothing, still carry."
+    },
+    "sync_silo_chat": {
+      "text": "Gesprekken",
+      "doc": "Silo label."
+    },
+    "sync_silo_tasks": {
+      "text": "Taken",
+      "doc": "Silo label."
+    },
+    "sync_silo_contacts": {
+      "text": "Contacten",
+      "doc": "Silo label (direct messages)."
+    },
+    "sync_files": {
+      "text": "Bestanden",
+      "doc": "The bytes field: what this device keeps of a file."
+    },
+    "sync_files_full": {
+      "text": "Volledig bewaren",
+      "doc": "Bytes mode: full."
+    },
+    "sync_files_description": {
+      "text": "Alleen de beschrijving",
+      "doc": "Bytes mode: description only — the file opens on a device that holds it."
+    },
+    "sync_kringen": {
+      "text": "Kringen op dit apparaat",
+      "doc": "Per-kring list: on = this device holds this roster; off = off the roster here (no announce, no pairing, no pulls; what a sibling still carries is refused)."
+    },
+    "sync_kringen_none": {
+      "text": "Nog geen kringen.",
+      "doc": "Empty list."
+    },
     "devices": "Mijn apparaten",
     "connections": {
       "text": "Gekoppelde apparaten",

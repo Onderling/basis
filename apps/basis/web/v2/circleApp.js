@@ -137,6 +137,7 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
@@ -2166,6 +2167,8 @@ function buildCircleBot(agent) {
     // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
     sealFor: agent.contactSeal?.sealFor ?? null,
     openFor: agent.contactSeal?.openFor ?? null,
+    // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
+    selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
     localActor: LOCAL_ACTOR,
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them.
@@ -4177,6 +4180,29 @@ async function showMyData() {
     delivery: deliverySettingsCache,
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
+      rerender();
+    },
+    // What this device keeps (sync-policy §11) — read live from the register; written through set-param.
+    syncSelection: (() => {
+      const sel = makeSyncSelection({ getParamValue: (k) => circleHouseholdAgent?.getParamValue?.(k) });
+      return {
+        silos: Object.fromEntries(SYNC_SILOS.map((silo) => [silo, sel.siloOn(silo)])),
+        fileBytes: sel.fileBytes(),
+        kringenOff: sel.kringenOff(),
+        kringen: circleListForConnections(),
+      };
+    })(),
+    onSetSync: async ({ silo, value, fileBytes, kringId, on } = {}) => {
+      const set = (key, v) => circleHouseholdAgent.callSkill('params', 'set-param', { key, value: v });
+      try {
+        if (silo && SYNC_SILO_PARAM_KEYS[silo]) await set(SYNC_SILO_PARAM_KEYS[silo], value !== false);
+        if (fileBytes) await set(SYNC_FILE_BYTES_PARAM_KEY, fileBytes === 'description' ? 'description' : 'full');
+        if (kringId) {
+          const cur = parseKringenOff(circleHouseholdAgent?.getParamValue?.(SYNC_KRINGEN_OFF_PARAM_KEY));
+          if (on === false) cur.add(kringId); else cur.delete(kringId);
+          await set(SYNC_KRINGEN_OFF_PARAM_KEY, serializeKringenOff(cur));
+        }
+      } catch { /* the section re-reads */ }
       rerender();
     },
     shareNknAddress: circleHouseholdAgent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false,

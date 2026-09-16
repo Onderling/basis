@@ -2,7 +2,7 @@
  * feedHouseholdRoster — turn a circle's member roster into no-pod household-sync peers.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { feedHouseholdRoster, bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
+import { feedHouseholdRoster, bindCircleAddressKeysFor, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
 
 function mkAgent({ members = [], selfAddr = 'me', skill, paired = [] } = {}) {
   const added = [];
@@ -120,5 +120,34 @@ describe('bindCircleAddressKeysFor — the peer → kringen index is complete at
     const agent = mkIndexAgent([{ addr: 'anna' }]);
     agent._circleGroupsIndex = { add: () => { throw new Error('boom'); } };
     await expect(bindCircleAddressKeysFor({ agent, circleId: 'k1' })).resolves.toMatchObject({ members: [{ addr: 'anna' }] });
+  });
+});
+
+describe('makeCircleReachable — a fresh joiner PULLS the circle\'s lanes (2026-09-16)', () => {
+  const mk = () => ({
+    identity: { pubKey: 'me' },
+    registerPeerAddress: () => {},
+    callSkill: async (_app, op) => (op === 'listGroupMembers' ? { members: [{ addr: 'anna' }] } : {}),
+    _circleGroupsIndex: { add: () => {} },
+  });
+  it('runs the host\'s pull seam for the circle AFTER registering and binding, and reports it', async () => {
+    const order = [];
+    const r = await makeCircleReachable({
+      agent: mk(), circleId: 'k1',
+      registerCirclePresence: async () => { order.push('register'); },
+      pullLanes: async (cid) => { order.push(`pull:${cid}`); },
+    });
+    expect(order).toEqual(['register', 'pull:k1']);
+    expect(r).toMatchObject({ registered: true, pulled: true });
+  });
+  it('a pull that fails costs the join nothing — stated, not swallowed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const r = await makeCircleReachable({ agent: mk(), circleId: 'k1', pullLanes: async () => { throw new Error('no peer'); } });
+    expect(r.pulled).toBe(false);
+    expect(warn.mock.calls.some(([m]) => /could not pull its lanes/.test(String(m)))).toBe(true);
+    warn.mockRestore();
+  });
+  it('without a pull seam nothing is pulled and nothing breaks (a host from before)', async () => {
+    expect((await makeCircleReachable({ agent: mk(), circleId: 'k1' })).pulled).toBe(false);
   });
 });

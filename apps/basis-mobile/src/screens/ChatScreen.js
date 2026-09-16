@@ -775,6 +775,8 @@ export default function ChatScreen({
         });
         const { gov: govCatchUp, membership: memCatchUp, key: keyCatchUp,
                 task: taskCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
+        // Hand the bundle the catch-ups, so a join made from any screen pulls the circle's lanes (`onCircleJoined`).
+        try { if (bundle) bundle.laneCatchUps = lanes.catchUps; } catch { /* a bundle without the slot */ }
         const grantsCatchUp = bundle?.agent?.grantsCatchUp ?? null;
 
         // The reconnect kicks — once per app launch each; after that the LIVE fan keeps the log current.

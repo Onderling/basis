@@ -302,7 +302,7 @@ import { deviceDelegationsOf } from '@onderling/agent-registry';
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
-  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { isFeatureEnabled, defaultViewModeFromPolicy } from '../../src/v2/circlePolicy.js';
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
@@ -4067,6 +4067,12 @@ async function showMyData() {
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
   // The replace ceremony: retire every other device in one act, after a restore.
   const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
+  // "Make this device my primary contact address": announce this device's address in every circle with the
+  // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
+  const onMakePrimary = async () => {
+    const r = await makeThisDevicePrimary({ agent: _peerAgent }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
+    try { window.alert(t('circle.mydata.make_primary_done', { count: r.announced })); } catch { /* headless */ }
+  };
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
   // reflects reality; toggling subscribes/unsubscribes + tells stoop.
@@ -4149,7 +4155,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.

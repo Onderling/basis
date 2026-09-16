@@ -17,7 +17,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { deriveCircleAddress, signCircleLinkFromSeed } from '@onderling/core';
 import {
   announceOwnCircleAddress, announceOwnCircleAddressIfChanged, announcementsFromRoster,
-  propagateCircleAddressesAfterJoin, makeCircleAddressAnnouncePeerHandler,
+  propagateCircleAddressesAfterJoin, makeCircleAddressAnnouncePeerHandler, makeThisDevicePrimary,
   isValidCircleAddressAnnounceEnvelope, CIRCLE_ADDRESS_ANNOUNCE_KIND,
 } from '../../src/v2/circleAddressAnnounce.js';
 
@@ -146,6 +146,23 @@ describe('announcing my own per-circle address', () => {
     expect(again.announced).toBe(true);
   });
 
+  it('a boot announce carries NO primary flag; "make this my primary contact address" announces with it, in every circle, and records it locally with the flag', async () => {
+    const rows = [{ webid: ME, pubKey: ME }];
+    const { agent, log } = fakeAgent({ rows });
+    agent.callSkill = ((orig) => async (app, op, args) => (op === 'listMyCircles' ? { circles: [CIRCLE, 'circle-43'] } : orig(app, op, args)))(agent.callSkill);
+    await announceOwnCircleAddress({ agent, circleId: CIRCLE, logger: QUIET });
+    const boot = log.skills.find((s) => s.op === 'broadcastCircleAddresses');
+    expect(boot.args.announcements[0].primary, 'a boot announce must never move the primary slot').toBeUndefined();
+    log.skills.length = 0;
+    const r = await makeThisDevicePrimary({ agent, logger: QUIET });
+    expect(r).toEqual({ circles: 2, announced: 2, failed: [] });
+    const fans = log.skills.filter((s) => s.op === 'broadcastCircleAddresses');
+    expect(fans.map((f) => f.args.groupId)).toEqual([CIRCLE, 'circle-43']);
+    expect(fans.every((f) => f.args.announcements[0].primary === true)).toBe(true);
+    const recs = log.skills.filter((s) => s.op === 'recordCircleAddressAnnouncement');
+    expect(recs.every((f) => f.args.primary === true), 'my own row takes the choice too').toBe(true);
+  });
+
   it('a device that cannot prove an address announces nothing', async () => {
     const { log } = fakeAgent();
     const agent = { identity: { chat: { pubKey: ME } }, callSkill: async () => ({}), circleAddressFor: () => null };
@@ -184,6 +201,17 @@ describe('receiving an announcement', () => {
 
     // ONE roster read backs both, not two.
     expect(opsCalled(log).filter((op) => op === 'listGroupMembers')).toHaveLength(1);
+  });
+
+  it('a received announcement carrying the primary flag is recorded WITH it', async () => {
+    const rows = [{ webid: BRAM, pubKey: BRAM }];
+    const { agent, log } = fakeAgent({ rows });
+    const handle = makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET });
+    await handle(BRAM, { subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: CIRCLE, announcements: [
+      { circleId: CIRCLE, memberWebid: BRAM, circleAddress: addressOf(3), circleAddressProof: proofOf(3), primary: true },
+    ] });
+    const rec = log.skills.find((s) => s.op === 'recordCircleAddressAnnouncement');
+    expect(rec.args.primary).toBe(true);
   });
 
   it('an unprovable announcement writes nothing and refreshes nothing', async () => {

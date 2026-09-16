@@ -155,7 +155,7 @@ describe('announcing my own per-circle address', () => {
     expect(boot.args.announcements[0].primary, 'a boot announce must never move the primary slot').toBeUndefined();
     log.skills.length = 0;
     const r = await makeThisDevicePrimary({ agent, logger: QUIET });
-    expect(r).toEqual({ circles: 2, announced: 2, failed: [] });
+    expect(r).toMatchObject({ circles: 2, announced: 2, failed: [] });
     const fans = log.skills.filter((s) => s.op === 'broadcastCircleAddresses');
     expect(fans.map((f) => f.args.groupId)).toEqual([CIRCLE, 'circle-43']);
     expect(fans.every((f) => f.args.announcements[0].primary === true)).toBe(true);

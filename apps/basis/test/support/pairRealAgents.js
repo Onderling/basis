@@ -373,6 +373,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ...(agent.knownPeersSync?.handlers ?? {}),
     ...(agent.personKeyChain?.handlers ?? {}),
     ...(agent.personKeySync?.handlers ?? {}),
+    ...(agent.primaryDevice?.handlers ?? {}),
     // The contact thread, when a walk asked for it — the same three registrations both shells make:
     // a bot's reply, a person's DM, and a turn one of MY OWN devices carried here. All three land in
     // the durable thread through the channel, which is what makes `contactTurns` a real read of the

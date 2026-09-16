@@ -175,8 +175,15 @@ export class Transport extends Emitter {
     if (typeof address !== 'string' || !address) return { ok: false, reason: 'invalid-address' };
     if (address === this.#address) return { ok: true };            // the primary is already ours
     if (!this.supportsAliases) return { ok: false, reason: 'aliases-unsupported' };
-    if (this.#aliases.has(address)) return { ok: true };            // idempotent
-    this.#aliases.set(address, { sign: opts?.sign ?? null });
+    if (this.#aliases.has(address)) {
+      // idempotent — unless the PRIMARY flag changed (the person's choice of device moved): rebind with it
+      const cur = this.#aliases.get(address);
+      if ((opts?.primary === true) === (cur.primary === true)) return { ok: true };
+      cur.primary = opts?.primary === true;
+      try { await this._bindAddress(address, cur); } catch (err) { return { ok: false, reason: err?.message ?? 'bind-failed' }; }
+      return { ok: true };
+    }
+    this.#aliases.set(address, { sign: opts?.sign ?? null, primary: opts?.primary === true });
     try { await this._bindAddress(address, this.#aliases.get(address)); } catch (err) {
       // Keep it in the set: a bind can fail because we are offline, and the replay on reconnect is
       // precisely what should fix that. Report so a caller is not told it worked.

@@ -141,7 +141,11 @@ export async function makeThisDevicePrimary({ agent, circleIds = null, logger = 
       if (r?.announced) announced += 1; else failed.push(circleId);
     } catch { failed.push(circleId); }
   }
-  return { circles: ids.length, announced, failed };
+  // …and the DM half (sync-policy §12, L104 option b): this device becomes the PRIMARY DEVICE — the one that
+  // registers the profile and person addresses as primary on every relay; the claim is carried to the siblings.
+  let device = null;
+  try { device = (await agent.claimPrimaryDevice?.()) ?? null; } catch { device = null; }
+  return { circles: ids.length, announced, failed, device };
 }
 
 /**

@@ -237,6 +237,8 @@ export function buildCircleLanes({
     // The person key between the person's devices: the rotation ceremony's hand-over lands here from a
     // sibling, and a sibling's request is answered. Entries only — the agent owns the gate and the store.
     ...(agent.personKeySync?.handlers ?? {}),
+    // Which of the person's devices is primary for direct messages: a sibling's claim lands here, a request is answered.
+    ...(agent.primaryDevice?.handlers ?? {}),
     // A contact pulls my person-key chain after a rotation; a reply lands on the contact book once it verifies.
     ...(agent.personKeyChain?.handlers ?? {}),
   };

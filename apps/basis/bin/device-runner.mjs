@@ -24,6 +24,11 @@
  *   TG_ALLOWED_CHAT_IDS      which chats may use it; unset/'*' is an OPEN DOOR
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            optional — the web app, so a printed enrolment offer is also a link
+ *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
+ *                            §12): it registers the profile and person addresses as primary on every relay, and
+ *                            its per-circle addresses take the primary slot on the roster, so a direct message
+ *                            lands HERE and not on the phone. The headless form of the tap on Mij / My data;
+ *                            enrolling alone never makes a box primary. Claimed once per start, carried to the siblings.
  *
  * Flags: --data-dir · --lang · --walk-log · --show-offer (print an add-a-device offer and exit) ·
  *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual)
@@ -374,7 +379,17 @@ if (relayUrl) {
     }
     return r;
   }).catch((err) => { console.warn('device-runner: the offer could not be consumed now — retried on the next start:', err?.message ?? err); });
-  agent.bootstrapFromStashedOffer();
+  agent.bootstrapFromStashedOffer().then(async () => {
+    // The operator's word that THIS box is the person's primary contact address — the tap, headless.
+    if (/^(1|true|yes)$/i.test(String(process.env.ONDERLING_PRIMARY_DEVICE ?? '').trim())) {
+      try {
+        const { makeThisDevicePrimary } = await import('../src/v2/circleAddressAnnounce.js');
+        const r = await makeThisDevicePrimary({ agent, logger: console });
+        walkLog({ kind: 'primary-device', circles: r.circles, announced: r.announced, claimed: r.device?.ok === true });
+        console.log(`device-runner: this device is the primary contact address (${r.announced}/${r.circles} circle(s) told; the relays re-registered).`);
+      } catch (err) { console.warn('device-runner: could not claim the primary contact address:', err?.message ?? err); }
+    }
+  });
 
   // Which lanes this device actually carries. Said out loud because a missing rail is invisible: the
   // device would run, receive nothing on that lane, and look like a quiet network rather than a

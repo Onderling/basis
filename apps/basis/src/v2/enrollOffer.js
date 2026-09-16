@@ -210,6 +210,7 @@ const SEND = { guarantee: 'hold-forward', asPerson: true };
  * so a half-failed boot retries on the next one. Returns an honest per-circle report.
  */
 export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, storage, registerCirclePresence = null, contentPulls = null } = {}) {
+  let claimedDevice = false;   // the DM half of the primary contact address: once per consume
   if (!agent || typeof callSkill !== 'function' || typeof sendPeerMessage !== 'function' || !storage) {
     return { consumed: false, reason: 'unwired' };
   }
@@ -347,6 +348,11 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
           const r = await announceOwnCircleAddress({ agent, circleId: c.id, primary: c.member === true });
           if (r?.announced) row.steps.push(c.member === true ? 'announce-roster-primary' : 'announce-roster');
         } catch { /* the next boot re-announces */ }
+        // …and a replacement is the primary DEVICE too (the DM half): claimed once, carried to any sibling left.
+        if (c.member === true && !claimedDevice) {
+          claimedDevice = true;
+          try { await agent.claimPrimaryDevice?.(); row.steps.push('primary-device'); } catch { /* the tap on Mij / My data does it */ }
+        }
       }
       // 4 — pull the circle's truth: membership, governance, and the KEY lane (the group-key chain
       // travels as signed statements like everything else — a sealed circle opens on this device once

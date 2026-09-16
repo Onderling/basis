@@ -254,6 +254,13 @@ describe('the box is revoked while it holds the address', () => {
     // store — a box on a rented machine restarts on every deploy, and until 2026-09-14 came back to none).
     const presence = await until(async () => walkLog(dataDir).slice(before).find((e) => e.kind === 'presence') ?? null, { timeout: 30_000, step: 250 });
     expect(presence?.circles, `the restarted box forgot its circle:\n${box.out.slice(-1500)}`).toBe(1);
+    // …and has REGISTERED the address again (its relay is up), before the person writes. Until 2026-09-17 the relay's
+    // close handler evicted whoever held an address when ANY socket that had registered it closed — so the web app
+    // lost the address the moment the box was killed, the message was held, and the box's re-registration drained
+    // it; the walk passed by that eviction. The relay releases an address only from the socket holding it now
+    // (the primary-registration change), so a message sent before the box is back lands, correctly, on the web app.
+    expect(await until(async () => (/relay connected/.test(box.out.slice(-20_000)) ? true : null), { timeout: 30_000, step: 250 }), 'the restarted box never reached the relay').toBe(true);
+    await new Promise((r) => setTimeout(r, 500));
     await person.contactThreadChannel.sendTurn({ peerAddr: web.pubKey, threadId: web.pubKey, text: 'en nu?', messageId: 'fb-3' }).sent;
     expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'en nu?') ?? null, { timeout: 30_000, step: 500 }),
       'the box did not take the address back — the window this walk states is not there').toBeTruthy();

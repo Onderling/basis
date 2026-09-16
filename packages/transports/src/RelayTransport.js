@@ -487,7 +487,13 @@ export class RelayTransport extends Transport {
       // The relay gave up on a message we sent: it was queued for an offline peer and the TTL or a cap
       // ended it. Surfaced as a REPORT, not an error — the send succeeded, the delivery did not.
       if (msg.type === 'undelivered' && msg.id) {
-        try { this.onUndelivered?.({ msgId: msg.id, reason: msg.reason ?? 'unknown' }); }
+        // The frame names the ENVELOPE (the only id the relay ever sees). The app's delivery state is keyed by
+        // the message id inside the payload — so report that one when this transport sent it, else the envelope
+        // id (an id-less payload is one the app never tracked). Until 2026-09-16 the envelope id was reported
+        // as `msgId`, and both shells' give-up consumers marked a message that did not exist: a message the
+        // relay threw away after 24 h kept looking fine.
+        const appId = this.appMessageIdFor(msg.id);
+        try { this.onUndelivered?.({ msgId: appId ?? msg.id, envelopeId: msg.id, reason: msg.reason ?? 'unknown' }); }
         catch { /* a consumer that throws must not take the socket down */ }
         return;
       }

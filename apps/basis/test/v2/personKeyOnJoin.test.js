@@ -70,5 +70,12 @@ describe('the first person key rides the join', () => {
     A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
     expect(A2.pubKey).toBe(A.pubKey);
     expect(A2.agent.personKey(), 'handed the current version at the ceremony, sealed on the device').toEqual(A.agent.personKey());
+    // THE ENROL CARRIERS carry the link key's PUBLIC half and nothing that derives its seed: the enrolled device
+    // builds cards and answers pulls with the pub; only a ceremony (root in hand) can vouch for a rotation.
+    const chainA = A.agent.personKeyChainOf(), chainA2 = A2.agent.personKeyChainOf();
+    expect(typeof chainA.current.linkKeyPub).toBe('string');
+    expect(chainA2.current.linkKeyPub, 'the enrolled device carries the same pin').toBe(chainA.current.linkKeyPub);
+    // (the vault entry's exact key set — pub yes, link seed no — is pinned in core's personKey.test.js; the hand-over
+    // wire's in personKeySync.test.js; the delegation blob is `{ seed, deviceId, record, label? }` by construction)
   }, 60_000);
 });

@@ -61,7 +61,7 @@ function wireMembershipReceiver(node) {
 function wireMembershipCatchUp(node) {
   const cu = makeGovernanceCatchUp({
     rail: node.agent.membershipRail,
-    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the circle scope rides through, as in the lane table
     subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
   });
   const inner = node._routerRef.fn;
@@ -83,7 +83,7 @@ function wireGovernanceCatchUp(node) {
   });
   const cu = makeGovernanceCatchUp({
     rail,
-    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the circle scope rides through, as in the lane table
     onChange: (cid) => applyRulesUpdates({
       rail, callSkill: (app, op, args) => node.agent.callSkill(app, op, args), circleId: cid,
     }).catch(() => {}),
@@ -106,13 +106,13 @@ function wireGovernanceCatchUp(node) {
 function wireContentCatchUp(node) {
   const taskCU = node.agent.taskRail ? makeFrontierReplay({
     rail: node.agent.taskRail,
-    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the circle scope rides through, as in the lane table
     subtypes: TASK_CATCHUP_SUBTYPES,
     statementsFor: (cid) => node.agent.taskRail.catchUpStatements(cid),
   }) : null;
   const chatCU = makeFrontierReplay({
     rail: node.chatRail,
-    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the circle scope rides through, as in the lane table
     subtypes: CHAT_CATCHUP_SUBTYPES,
   });
   const inner = node._routerRef.fn;

@@ -35,6 +35,9 @@ import { EventLog } from '../src/eventLog.js';
 
 const GROUP = 'contact-turn-fan-circle';
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
+// The enrolling device's first words to its sibling speak as the PERSON (its per-circle address is on nobody's roster
+// yet) — exactly what the production enrol consume does (`asPerson`, 2026-09-16). A stranger's send below stays plain.
+const SEND_AS_PERSON = { ...SEND, asPerson: true };
 
 /** The turns the durable thread with one contact holds on this device — what the thread UI reads. */
 const threadWith = async (node, contactId) => (await node.contactThreadChannel.rehydrate(contactId)) ?? [];
@@ -81,7 +84,7 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
         type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: GROUP,
         msgId: `announce-${from.label}`, ts: Date.now(),
         announcements: [ownAnnouncementFor({ agent: from.agent, circleId: GROUP })],
-      }, SEND);
+      }, SEND_AS_PERSON);
     };
     await announce(alwaysOn, phone);
     await announce(phone, alwaysOn);

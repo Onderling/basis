@@ -47,18 +47,17 @@ export const GRANTS_CATCHUP_SUBTYPES = Object.freeze({
  *   delegation custody carries it on the marker). Absent → carried records cannot bind (floor + registry only).
  * @param {(() => Promise<object>|object)|null} [a.lookupDelegations]  the owner's `{[deviceId]: record}`
  *   delegation map (best-effort; the registry). Source of the deny-wins tombstone and the no-record fallback.
- * @param {(() => Promise<boolean>|boolean)|null} [a.floorClosed]  the registry's grants-floor marker
- *   (`grantsFloorClosedOf`). Once the first device-revoke ceremony closes the floor, a statement
- *   signed with the shared PROFILE key no longer counts — the one signature a revoked-but-stolen
- *   device still holds (Frits' v1 ruling, 2026-08-23; L30's bounded closer). Absent/erroring →
- *   the floor stays open, matching the tombstone's best-effort registry semantics.
+ *   THE FLOOR IS GONE (2026-09-16, binding-levels §10.5 step 4): a statement signed with the shared PROFILE key —
+ *   the one signature every device of the person holds forever, a revoked one too — never binds here. It used to,
+ *   on an unenrolled first device, until the first revoke ceremony closed the floor; the first device now mints
+ *   its own root-signed delegation at first boot, so there is no device left that could only sign that way.
  * @param {((record: object) => Promise<void>|void)|null} [a.learnDelegation]  called with a CARRIED
  *   record that just bound (root-signed by THIS owner, not tombstoned) and that the registry does not
  *   hold. A device's registry is local until a pod mirrors it, so the first device never saw the
  *   ceremony that enrolled the second — and My data, which lists the registry, showed no device to
  *   revoke (the box, 2026-09-14). The record proves itself; keeping it is bookkeeping, best-effort.
  */
-export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, lookupDelegations = null, floorClosed = null, learnDelegation = null } = {}) {
+export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, lookupDelegations = null, learnDelegation = null } = {}) {
   if (typeof selfPubKey !== 'string' || !selfPubKey) {
     throw new Error('deviceSetBindingVerifier: selfPubKey required');
   }
@@ -68,12 +67,9 @@ export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, l
   return async ({ author, ref, payload }) => {
     // One person on this lane: every statement's ref IS the profile.
     if (ref !== selfPubKey) return false;
-    // The floor: the profile key itself — held only by the owner's devices (same-seed derivation),
-    // UNTIL the first revoke ceremony closes it (from then on, delegation-signed only).
-    if (author === selfPubKey) {
-      try { if (await floorClosed?.()) return false; } catch { /* registry degrade: the floor stays */ }
-      return true;
-    }
+    // The profile key itself never binds: every device of the person holds it, a revoked one too. Only a
+    // root-signed DEVICE delegation speaks on this lane (the floor that once admitted it is gone, 2026-09-16).
+    if (author === selfPubKey) return false;
 
     const map = await delegations();
     // The carried record: root-signed, self-certifying against this device's own root fingerprint.
@@ -97,7 +93,7 @@ export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, l
 
 /**
  * Build the grants rail over the device log. Mirrors `makeMembershipRail`, with a CONSTANT signer
- * (the device-derivation identity — delegation key when enrolled, the profile key on an unenrolled
+ * (the device-derivation identity — the delegation key, minted at enrolment or at first boot; formerly the profile key on an unenrolled
  * first device) and the device-set binding verifier.
  *
  * @param {object} a

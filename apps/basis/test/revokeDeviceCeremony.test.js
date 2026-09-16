@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { DEVICE_DELEGATIONS_KEY, GRANTS_FLOOR_KEY } from '@onderling/agent-registry';
+import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
 import { deviceSetBindingVerifier } from '../src/v2/grantsRail.js';
 import {
   bootRealAgentNode, connectNodesOverBus, pairCircle, until, teardown,
@@ -111,13 +111,12 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const unseen = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: 'never-enrolled-here' });
     expect(unseen.ok).toBe(true);
     expect(unseen.known).toBe(false);
-    // The first ceremony that proves the phrase on a root-custody device enrols it — once. It will present
-    // a fresh address after its reload, introduced here while it still speaks as the old one, which is
-    // retired in the same breath (2026-09-14). Later ceremonies in this session do not migrate it again.
-    expect(unseen.migrated, 'the first ceremony enrolled the first device').toBe(true);
-    const moved = unseen.introduced.find((x) => x.circleId === GROUP)?.address;
-    expect(moved, 'the ceremony introduced the address A moves to').toBeTruthy();
-    expect(moved).not.toBe(addrA);
+    // The first ceremony that proves the phrase on a root-custody device cuts its custody over — once. Since
+    // 2026-09-16 the first device already holds its own root-signed delegation from its first boot (the grants
+    // floor's retirement), so the cutover keeps its derivation seed and its addresses: nothing is introduced and
+    // nothing of A's is retired. Later ceremonies in this session do not migrate it again.
+    expect(unseen.migrated, 'the first ceremony cut the first device over').toBe(true);
+    expect(unseen.introduced ?? [], 'no address moves — the device was enrolled from its first boot').toEqual([]);
 
     // ── THE CEREMONY, on the surviving device. ──
     const r = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
@@ -132,13 +131,12 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     expect(rec?.revoked).toBe(true);
 
     expect(r.migrated, 'a second ceremony before the reload must not migrate the device again').toBeUndefined();
-    // A's OWN fold retires the address at once. The row names neither the thief's address nor the one A
-    // left behind at its self-enrolment — only the one A moves to.
+    // A's OWN fold retires the thief's address at once; A's own address stays (it was the device's from its
+    // first boot, and the cutover kept it).
     const aRow = await rowFor(A, A.pubKey);
     expect(aRow?.circleAddresses ?? []).not.toContain(addrA2);
-    expect(aRow?.circleAddresses ?? [], 'the address A leaves behind is retired').not.toContain(addrA);
-    expect(aRow?.circleAddresses).toContain(moved);
-    expect(aRow?.circleAddress).toBe(moved);
+    expect(aRow?.circleAddresses).toContain(addrA);
+    expect(aRow?.circleAddress).toBe(addrA);
     // …and B's follows over the wire, through the production ingest + fold.
     await until(async () => {
       const row = await rowFor(B, A.pubKey);
@@ -154,25 +152,13 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const again = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
     expect(again.ok).toBe(true);
 
-    // ── THE FLOOR CLOSES (the stolen-device grants-door journey flips here): the first revoke
-    //    ceremony writes the grants-floor marker, and from then on the device-set verifier
-    //    refuses a statement signed with the SHARED profile key — the one signature the stolen
-    //    device still holds. Peacetime is untouched: the floor stays open until a theft response
-    //    actually happens. ──
-    const props2 = (await A.agent.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {};
-    const floor = props2[GRANTS_FLOOR_KEY]?.value ?? props2[GRANTS_FLOOR_KEY];
-    expect(floor?.closed, 'the ceremony closed the grants floor').toBe(true);
-    // The verifier rule, pinned directly on the shared implementation: open floor admits the
-    // profile key; the marker refuses it; a foreign ref never binds either way.
-    let closed = false;
-    const verify = deviceSetBindingVerifier({ selfPubKey: 'profile-key', floorClosed: () => closed });
-    expect(await verify({ author: 'profile-key', ref: 'profile-key', payload: {} })).toBe(true);
-    closed = true;
-    expect(await verify({ author: 'profile-key', ref: 'profile-key', payload: {} }), 'closed floor refuses the shared signature').toBe(false);
+    // ── THE FLOOR IS GONE (2026-09-16): the SHARED profile key — the one signature the stolen device still
+    //    holds — never binds on the grants lane, in peacetime or after a theft. There is no marker to close
+    //    and nothing to open: every device signs with a root-signed delegation from its first boot. ──
+    const verify = deviceSetBindingVerifier({ selfPubKey: 'profile-key' });
+    expect(await verify({ author: 'profile-key', ref: 'profile-key', payload: {} }), 'the shared profile key never binds').toBe(false);
     expect(await verify({ author: 'profile-key', ref: 'someone-else', payload: {} })).toBe(false);
-    // A marker read that ERRORS keeps the floor (the tombstone's best-effort registry semantics).
-    const degraded = deviceSetBindingVerifier({ selfPubKey: 'profile-key', floorClosed: () => { throw new Error('registry down'); } });
-    expect(await degraded({ author: 'profile-key', ref: 'profile-key', payload: {} })).toBe(true);
+    expect(await verify({ author: 'some-device-key', ref: 'profile-key', payload: {} }), 'an unknown device key without a record does not bind either').toBe(false);
 
     // ── THE WAR-PROOF (custody): the stolen device CANNOT counter-revoke. The enrolled second
     //    device's circle key is delegation-derived, NOT the ceremony key; it forges an

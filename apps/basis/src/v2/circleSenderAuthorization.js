@@ -77,6 +77,7 @@ export const SENDER_REASON = Object.freeze({
   MEMBER:            'on-the-roster-of-this-circle',
   STRANGER:          'not-on-the-roster-of-this-circle',
   CANONICAL_REFUSED: 'a-members-canonical-key-where-they-sign-per-circle',
+  OWN_KEY:           'our-own-current-person-key',
 });
 
 /**
@@ -107,6 +108,11 @@ export const SENDER_REASON = Object.freeze({
  */
 export function createCircleSenderAuthorization({
   onUnknownRoster = null, onRefused = null, onCanonicalOnlyMembers = null,
+  // The keys that are OURS right now, read live: the person's current (rotating) person key — held by every
+  // device of the person that took part in, or was handed the result of, the last ceremony, and by no revoked
+  // one. A message signed with it is ours in every circle, before any roster is consulted; the static profile key
+  // is NOT on this list any more (2026-09-16, binding-levels §10.5 step 4).
+  ownKeysLive = null,
 } = {}) {
   /** our per-circle address → { circleId, keys: Set<string> } */
   const byOwnAddress = new Map();
@@ -230,6 +236,11 @@ export function createCircleSenderAuthorization({
     // lets a stranger ever become a contact.
     if (typeof ownAddress !== 'string' || !ownAddress) {
       return allowSender(SENDER_REASON.NOT_CIRCLE_SCOPED);
+    }
+    if (typeof senderKey === 'string' && typeof ownKeysLive === 'function') {
+      let own = [];
+      try { own = ownKeysLive() ?? []; } catch { own = []; }
+      if (own.includes(senderKey)) return allowSender(SENDER_REASON.OWN_KEY);
     }
     const entry = byOwnAddress.get(ownAddress);
     if (!entry) {

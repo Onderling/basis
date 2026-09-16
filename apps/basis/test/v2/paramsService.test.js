@@ -55,7 +55,10 @@ describe('the set-param op — the kind gate (decision D)', () => {
       'app.lang', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
       'history.restore.maxPerCircle', 'history.restore.recencyDays',
       'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
-      'privacy.shareNknAddress', 'relay.url', 'surface.pref', 'transport.mode', 'wake.nudges',
+      'privacy.shareNknAddress', 'relay.url', 'surface.pref',
+      // what THIS device keeps (sync-policy §11): three silos, the kringen off-list, the file bytes
+      'sync.files.bytes', 'sync.kringenOff', 'sync.silo.chat', 'sync.silo.contacts', 'sync.silo.tasks',
+      'transport.mode', 'wake.nudges',
     ]);
     // Both are kind:user; internal caps are never here.
     expect(params.every((p) => ['agent', 'device'].includes(p.scope))).toBe(true);

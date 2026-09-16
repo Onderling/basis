@@ -28,6 +28,7 @@
  * look at".
  */
 
+import { makeSyncSelection } from './syncSelection.js';
 import { bindCircleAddressKeysFor } from './householdRosterPairing.js';
 import { announceOwnCircleAddressIfChanged } from './circleAddressAnnounce.js';
 
@@ -152,9 +153,13 @@ export async function announceCircleAddresses({ agent, circleIds = null, onWarn 
     ? onWarn
     : (msg, err) => console.warn(`[circle-security] ${msg}`, err?.message ?? err ?? '');
 
-  const ids = Array.isArray(circleIds) && circleIds.length
+  const all = Array.isArray(circleIds) && circleIds.length
     ? [...new Set(circleIds.filter(Boolean))]
     : await knownCircleIds({ agent });
+  // A kring this device does not hold (sync-policy §11.2) is not announced into: this device stays off its
+  // roster, so no member — and no sibling — fans to it there.
+  const selection = typeof agent?.getParamValue === 'function' ? makeSyncSelection({ getParamValue: agent.getParamValue }) : null;
+  const ids = selection ? all.filter((id) => selection.kringOn(id)) : all;
   const out = { announced: 0, circleIds: ids };
   if (!ids.length) return out;
 

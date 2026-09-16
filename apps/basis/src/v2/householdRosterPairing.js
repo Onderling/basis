@@ -13,9 +13,12 @@
  * @returns {Promise<number>} how many peers were (re-)added (deduped by the agent).
  */
 
+import { makeSyncSelection } from './syncSelection.js';
 import { bindCircleAddressKeys } from './circleAddressKeys.js';
 export async function feedHouseholdRoster({ agent, circleId } = {}) {
   if (!agent || typeof agent.addCirclePeer !== 'function' || !circleId) return 0;
+  // A kring this device does not hold (sync-policy §11.2): no pairing — it is off the roster here.
+  if (typeof agent.getParamValue === 'function' && !makeSyncSelection({ getParamValue: agent.getParamValue }).kringOn(circleId)) return 0;
   // BEFORE pairing: make sure this circle can RECEIVE. The store↔mirror sync used to be wired lazily,
   // on the first wired household op for the circle — which for the inbound half is a race the receiver
   // always loses. Pairing tells the other device it may publish to us; if our listener is not up yet,

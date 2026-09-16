@@ -4596,6 +4596,46 @@
     "recovery_export": "Save a recovery file",
     "recovery_import": "Load a recovery file",
     "replace_device": "Retire my other devices",
+    "sync": {
+      "text": "What this device keeps",
+      "doc": "My data section: this device's own selection of what it holds of what the owner's devices sync (sync-policy §11). Per silo, per kring, and the file bytes. Never on the wire."
+    },
+    "sync_intro": {
+      "text": "Your devices keep the same things. Here you choose what this device keeps — what it does not keep it still passes on to your other devices.",
+      "doc": "One line under the heading: hold nothing, still carry."
+    },
+    "sync_silo_chat": {
+      "text": "Conversations",
+      "doc": "Silo label."
+    },
+    "sync_silo_tasks": {
+      "text": "Tasks",
+      "doc": "Silo label."
+    },
+    "sync_silo_contacts": {
+      "text": "Contacts",
+      "doc": "Silo label (direct messages)."
+    },
+    "sync_files": {
+      "text": "Files",
+      "doc": "The bytes field: what this device keeps of a file."
+    },
+    "sync_files_full": {
+      "text": "Keep in full",
+      "doc": "Bytes mode: full."
+    },
+    "sync_files_description": {
+      "text": "Description only",
+      "doc": "Bytes mode: description only — the file opens on a device that holds it."
+    },
+    "sync_kringen": {
+      "text": "Circles on this device",
+      "doc": "Per-kring list: on = this device holds this roster; off = off the roster here (no announce, no pairing, no pulls; what a sibling still carries is refused)."
+    },
+    "sync_kringen_none": {
+      "text": "No circles yet.",
+      "doc": "Empty list."
+    },
     "make_primary": {
       "text": "Make this device my primary contact address",
       "doc": "My data → keys: the member's CHOICE of which device others deliver to first (sync-policy §12, 2026-09-16). Announces this device's address in every circle with the primary flag; a boot announce never moves the slot."

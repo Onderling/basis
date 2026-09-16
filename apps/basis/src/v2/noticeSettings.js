@@ -17,7 +17,7 @@
 export const NOTICE_KINDS = Object.freeze(['removed', 'promoted', 'demoted', 'joined', 'decisionOpened']);
 
 /** A wording variant tells the same thing as its base kind and follows its setting. */
-const BASE_KIND = Object.freeze({ removedWithReason: 'removed' });
+export const BASE_KIND = Object.freeze({ removedWithReason: 'removed', memberPromoted: 'promoted', memberDemoted: 'demoted' });
 
 export const DEFAULT_NOTICES = Object.freeze(Object.fromEntries(NOTICE_KINDS.map((k) => [k, true])));
 

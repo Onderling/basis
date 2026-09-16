@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NOTICE_KINDS, wantsNotice, noticeWants, normalizeNotices, normalizeNoticeOverride, noticeRows, noticeOverrideRows } from '../../src/v2/noticeSettings.js';
+import { NOTICE_KINDS, BASE_KIND, wantsNotice, noticeWants, normalizeNotices, normalizeNoticeOverride, noticeRows, noticeOverrideRows } from '../../src/v2/noticeSettings.js';
 import { normalizeCirclePolicy, normalizeMemberOverride, mergeMemberOverride } from '../../src/v2/circlePolicy.js';
 import { chatRows } from '../../src/v2/circleStream.js';
 import { MEMBERSHIP_NOTICE_KEYS } from '../../src/v2/membershipNotices.js';
@@ -18,7 +18,7 @@ const proposal = (id, { author = 'admin', authorRef = 'webid:admin', action = 'r
 describe('decision 4 — the per-kind "tell me" setting', () => {
   it('every kind a projection can produce is offered, and defaults to ON', () => {
     // The list is a literal (a derived one would be an import cycle through circlePolicy); pin the agreement.
-    const produced = [...Object.keys(MEMBERSHIP_NOTICE_KEYS).filter((k) => k !== 'removedWithReason'), ...Object.keys(GOVERNANCE_NOTICE_KEYS)];
+    const produced = [...Object.keys(MEMBERSHIP_NOTICE_KEYS).filter((k) => !(k in BASE_KIND)), ...Object.keys(GOVERNANCE_NOTICE_KEYS)];
     expect([...NOTICE_KINDS].sort()).toEqual([...produced].sort());
     for (const k of NOTICE_KINDS) expect(wantsNotice(k)).toBe(true);
   });

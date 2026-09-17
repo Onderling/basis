@@ -86,6 +86,7 @@ import {
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
+import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
 import { isRosterTrailItem } from '@onderling/circles';
@@ -562,8 +563,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!sa2 || !sign) return;
     let list = [];
     try { list = sa2.relays?.list?.() ?? []; } catch { list = []; }
+    const primary = primaryDeviceRef.current?.isMine() === true;
     for (const rl of list) {
-      try { await rl.port?.addAddress?.(personAddress(), { sign }); } catch (err) { console.warn(`[person-key] relay did not take the person address: ${err?.message ?? err}`); }
+      try { await rl.port?.addAddress?.(personAddress(), { sign, primary }); } catch (err) { console.warn(`[person-key] relay did not take the person address: ${err?.message ?? err}`); }
     }
   };
   /** A new version arrived (a ceremony here, or a hand-over): keep it, and speak as it from now on. */
@@ -687,9 +689,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     : ((callerPolicyEngine && typeof callerPolicyEngine === 'object') ? callerPolicyEngine : null);
   const callerIsRevoked = (callerPolicyEngineOpts && callerPolicyEngineOpts.isRevoked) || null;
 
+  // THE PRIMARY DEVICE (sync-policy §12, the DM half): read lazily — the choice store is composed further down.
+  const primaryDeviceRef = { current: null };
   const sa = await createSecureMeshAgent({
     bus,
     vault:               chatVault,
+    primaryDevice:       () => primaryDeviceRef.current?.isMine() === true,
     identityVaultPrefix: 'cc-chat-id:',   // no effect when `vault` is supplied; documents the prefix
     muteListVaultKey:    'cc-mute',
     auditLog:            { vaultKey: 'cc-audit' },
@@ -1903,6 +1908,21 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   // THE PERSON KEY between my devices: the rotation ceremony hands the new version to the survivors over the
   // same sibling set and send; a landed one is stored monotonically and takes effect at once.
+  // WHICH DEVICE OTHERS' DIRECT MESSAGES LAND ON (sync-policy §12): the choice, kept sealed and carried to the
+  // siblings; when "is it me" flips, every relay socket re-registers the profile and person addresses with the flag.
+  const primaryDevice = createPrimaryDeviceChoice({
+    vault: chatVault,
+    myDeviceId: enrolledDevice?.deviceId ?? custody.deviceId ?? null,
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    onChanged: (mine) => {
+      Promise.resolve(secureAgentRef.current?.relays?.setPrimaryDevice?.(mine)).catch(() => {});
+      registerPersonAddressOnRelays().catch(() => {});
+      console.info(`[primary-device] this device is ${mine ? 'now' : 'no longer'} the primary contact address`);
+    },
+  });
+  primaryDeviceRef.current = primaryDevice;
+  await primaryDevice.load();
   const personKeySync = createPersonKeySync({
     siblings: ownDeviceSiblings,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
@@ -5750,6 +5770,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */
     personKey: currentPersonKey,
     // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.
+    /** The primary-device choice (sync-policy §12): `isMine()`, `claim()`, `requestFromSiblings()`, `handlers`. */
+    primaryDevice,
+    claimPrimaryDevice: () => primaryDevice.claim(),
     personKeySync,
     /** My person-key chain `{ current, links }` — what a contact pulls after a rotation. */
     personKeyChain,

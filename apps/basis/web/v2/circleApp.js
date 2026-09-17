@@ -8377,6 +8377,8 @@ async function boot() {
         agent.knownPeersSync?.requestFromSiblings().catch(() => {});
         // The person key a ceremony rotated on another device while this one was off.
         agent.personKeySync?.requestFromSiblings().catch(() => {});
+        // …and which of the person's devices is primary for direct messages (sync-policy §12).
+        agent.primaryDevice?.requestFromSiblings?.().catch(() => {});
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on

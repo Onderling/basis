@@ -879,6 +879,10 @@ export async function createSecureAgent(opts = {}) {
    * would lose the distinction the retry path needs.
    */
   const onUndelivered = typeof opts.onUndelivered === 'function' ? opts.onUndelivered : null;
+  // THE PRIMARY DEVICE (sync-policy §12, the DM half): is this device the one the person chose for direct messages?
+  // Read at every relay socket open; `relays.setPrimaryDevice` moves it at runtime. A function so the host's choice
+  // store answers live; absent → plain registrations, as before.
+  let primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
   /** address → consecutive failed delivery attempts. Cleared by a success or a presence signal. */
   const deliveryFailures = new Map();
 
@@ -1540,6 +1544,7 @@ export async function createSecureAgent(opts = {}) {
       const tx = new RelayTransport({
         identity,
         relayUrl,
+        primaryDevice: () => primaryDevice() === true,
         onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
       });
       makeReceiveHandler(tx);
@@ -1737,6 +1742,7 @@ export async function createSecureAgent(opts = {}) {
     const tx = new RelayTransport({
       identity,
       relayUrl: url,
+      primaryDevice: () => primaryDevice() === true,
       onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
     });
     makeReceiveHandler(tx);                 // the secure receive wiring — same as the primary
@@ -2641,7 +2647,17 @@ export async function createSecureAgent(opts = {}) {
         : Promise.resolve({ ok: false, reason: 'not-connected' })),
     },
     // Every relay this device is on: the primary first, then the ones its circles ride (2026-09-08).
-    relays: { add: addRelay, remove: removeRelay, list: listRelays, has: hasRelay },
+    relays: {
+      add: addRelay, remove: removeRelay, list: listRelays, has: hasRelay,
+      /** The person's choice of primary device moved: every relay socket re-registers its own address with the new flag. */
+      setPrimaryDevice: async (isPrimary) => {
+        primaryDevice = () => isPrimary === true;
+        const txs = [relayTransport, ...extraTransports.values()].filter((t) => t && typeof t.setPrimaryDevice === 'function');
+        const results = await Promise.all(txs.map((t) => t.setPrimaryDevice(isPrimary === true).catch((err) => ({ ok: false, reason: err?.message ?? String(err) }))));
+        return { ok: results.every((r) => r?.ok !== false), relays: results.length };
+      },
+      primaryDevice: () => primaryDevice() === true,
+    },
     get transportMode() { return transportMode; },
     setTransportMode,
     // Phase-2 · Piece-2 (B2 wiring) — attach (or replace) the peer registry on

@@ -137,6 +137,7 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
@@ -2868,6 +2869,9 @@ async function showContactThread(contactId) {
   // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
   // every turn, and said in the header so the participant knows before typing.
   const floor = presendFloorFor(row);
+  // What a direct message to this contact is sealed to — the agent's own seal resolution, painted in the header.
+  // Decided once per open, after the first paint: no mark until then, never a wrong one.
+  let sealedMark = null;
 
   // Phase 2 (C3 / the G18 fix): rehydrate the DURABLE thread on open so a reload
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
@@ -2941,6 +2945,7 @@ async function showContactThread(contactId) {
     })(),
     skills, busy, error, t,
     floor: floor ? { label: t('circle.contacts.presend_floor') } : null,
+    sealed: sealedMark,
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
     onButtonTap: async (b) => {
@@ -2984,6 +2989,15 @@ async function showContactThread(contactId) {
   });
   _activeContactThread = { contactId, rerender };
   rerender();
+  // The seal status is async (it may read shared circles' rosters): mark once it is known, if this thread is still the open one.
+  if (typeof _peerAgent?.contactSeal?.statusFor === 'function') {
+    _peerAgent.contactSeal.statusFor(peerAddr).then((status) => {
+      if (_activeContactThread?.contactId !== contactId) return;   // the participant has moved on
+      const mark = contactSealMark(status);
+      sealedMark = { level: mark.level, label: t(mark.key) };
+      rerender();
+    }).catch(() => { /* no mark rather than a wrong one */ });
+  }
 }
 
 // #13 — pull human-readable text out of a remote-skill result (the channel's

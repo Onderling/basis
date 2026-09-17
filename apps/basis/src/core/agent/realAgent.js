@@ -1942,15 +1942,31 @@ export async function createRealHouseholdAgent(opts = {}) {
   const personKeyChainOf = () => (personKey ? { current: personKeyForContacts(), links: Array.isArray(personKey.links) ? personKey.links : [] } : null);
   /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
   const personSeedFor = (version) => (personKey?.version === version ? personKey.seed : (personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
-  /** A contact's row in the contact book, by their webid (the profile address a direct message goes to). */
-  const contactRecordOf = async (webid) => {
-    try { const r = await callSkill('stoop', 'listContacts', {}); return (r?.items ?? r?.contacts ?? []).find((c) => c?.webid === webid) ?? null; } catch { return null; }
+  const contactRecords = async () => {
+    try { const r = await callSkill('stoop', 'listContacts', {}); return r?.items ?? r?.contacts ?? []; } catch { return []; }
+  };
+  /**
+   * The PERSON an address names: an address this device has bound to an identity (a per-circle or mesh alias) resolves
+   * through the same read the roster uses; a mesh address that only the contact record knows resolves through it;
+   * anything else is taken as the webid itself. A direct message may go to any of these, and the seal is to the person.
+   */
+  const webidFor = async (addr) => {
+    if (typeof addr !== 'string' || !addr) return addr;
+    try { const id = sa.resolver?.pubKeyForAddr?.(addr); if (id && id !== addr) return id; } catch { /* below */ }
+    return (await contactRecords()).find((c) => c?.peerAddr === addr)?.webid ?? addr;
+  };
+  /** A contact's row in the contact book, by their webid or by an address of theirs. */
+  const contactRecordOf = async (addr) => {
+    const webid = await webidFor(addr);
+    return (await contactRecords()).find((c) => c?.webid === webid) ?? null;
   };
   /**
    * A CONTACT's current person key: from a circle we share (their row's root-revealed key — a close contact is a
    * two-member circle, and any shared circle serves), else from the contact book (the card, or a pulled chain).
+   * Asked by any address of theirs; answered for the person.
    */
-  const contactPersonKeyOf = async (webid) => {
+  const contactPersonKeyOf = async (addr) => {
+    const webid = await webidFor(addr);
     let best = null;
     for (const circleId of (opts.circlesForPeer?.(webid) ?? [])) {
       try {
@@ -1964,17 +1980,24 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   const personKeyChain = createPersonKeyChain({
     chain: personKeyChainOf,
-    isContact: async (addr) => !!(await contactRecordOf(addr)) || (opts.circlesForPeer?.(addr) ?? []).length > 0,
+    isContact: async (addr) => !!(await contactRecordOf(addr)) || (opts.circlesForPeer?.(await webidFor(addr)) ?? []).length > 0,
     known: contactPersonKeyOf,
-    adopt: async (webid, current, links) => (await callSkill('stoop', 'setContactPersonKey', { webid, personKey: current, links }))?.personKey ?? null,
+    adopt: async (addr, current, links) => (await callSkill('stoop', 'setContactPersonKey', { webid: await webidFor(addr), personKey: current, links }))?.personKey ?? null,
     sendToPeer: (to, payload, o) => sendCircleScoped(to, payload, { guarantee: 'hold-forward', ...o }),
     onRefused: ({ reason, from }) => console.info(`[person-key-chain] refused ${reason} from ${String(from).slice(0, 12)}…`),
   });
   const sealedWarned = new Set();
   /** The direct-message seal: to the contact's current person key, from mine — or null (unsealed, as before) when either is unknown. */
+  /** The one resolution the seal uses: the contact's current key, when I hold a person key of my own to seal from. */
+  const sealTargetFor = async (peerAddr) => (personKey ? await contactPersonKeyOf(peerAddr) : null);
   const contactSeal = {
+    /** What a direct message to this contact is sealed to — what the thread header says. */
+    statusFor: async (peerAddr) => {
+      const to = await sealTargetFor(peerAddr);
+      return to ? { sealed: 'person', to } : { sealed: 'device' };
+    },
     sealFor: async (peerAddr, content) => {
-      const to = personKey ? await contactPersonKeyOf(peerAddr) : null;
+      const to = await sealTargetFor(peerAddr);
       if (!to) {
         if (personKey && !sealedWarned.has(peerAddr)) { sealedWarned.add(peerAddr); console.info(`[contact-seal] no person key on record for ${String(peerAddr).slice(0, 12)}… — this thread stays sealed to the device only until their card or a shared circle brings one`); }
         return null;

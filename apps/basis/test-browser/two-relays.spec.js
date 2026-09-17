@@ -82,7 +82,10 @@ async function sendDirectMessage(page, text) {
     } catch { /* fall through to the rendered log */ }
     return (document.querySelector('.cc-cthread__log')?.innerText ?? '').includes(t);
   }, text);
-  return { sent: kept, to, why: kept ? '' : 'the sender did not keep the turn — it never left this device' };
+  // The header's seal mark (person / device), decided async after the first paint — hence the wait.
+  let sealedTo = null;
+  try { sealedTo = await page.locator('.cc-cthread__sealed').first().getAttribute('data-level', { timeout: 8000 }); } catch { sealedTo = null; }
+  return { sent: kept, to, sealedTo, why: kept ? '' : 'the sender did not keep the turn — it never left this device' };
 }
 
 /** Poll the other side's contact threads until the text shows up in one. */
@@ -184,7 +187,14 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
     const sent = await sendDirectMessage(B.page, dm);
     expect(sent.sent, `B could not write to A: ${sent.why ?? ''}`).toBe(true);
     expect(await waitForContactMessage(A.page, dm), `a DM to ${sent.to} crossed no relay A is on`).toBe(true);
-    log('STEP4 a direct message', 'PASS', `B → A (${String(sent.to).slice(0, 12)}…) over the kring’s relay, not over B’s own`);
+    // The header says what the thread is sealed to. It reads "device" here today: on the web shell a kring member's
+    // person key does not reach the other member's roster (the join is dropped before the key fold on the admin, and
+    // the create never reaches the joiner) — recorded 2026-09-16 as a binding-levels finding. When that is fixed this
+    // must read "person"; until then the mark itself must be there and must not lie.
+    // "person", not merely present: both rosters carry the other's person key since the kring fix (STEP3b), so a DM
+    // between kring members is sealed to the PERSON on web — the mark must say so, or the fix regressed.
+    expect(sent.sealedTo, 'the thread header must mark the DM as sealed to the person').toBe('person');
+    log('STEP4 a direct message', 'PASS', `B → A (${String(sent.to).slice(0, 12)}…) over the kring’s relay, not over B’s own; header: sealed to the ${sent.sealedTo}`);
 
     // B reloads: the extra relay must come back from the recorded connection point, not from the join.
     await B.page.reload();

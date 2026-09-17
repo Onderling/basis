@@ -361,3 +361,76 @@ describe('leaving a circle', () => {
     expect(auth.snapshotFor('unknown')).toBeNull();
   });
 });
+
+/**
+ * OUR OWN ROW, WEARING SOMEBODY ELSE'S KEY — the `canonicalOnlyMembers` "lag", diagnosed.
+ *
+ * A freshly created circle with nobody in it reported one transitional member. It was never a member:
+ * it was the FOUNDER's own row. `deriveRoster` gives a founder no keys of their own, so the whole row
+ * comes from the display cache, and the `pubKey` that lands there is this device's STOOP agent identity
+ * — a key seeded once per device, constant across every circle, and not one of `selfKeys`.
+ *
+ * So the row failed the `mine.has(pubKey)` test, proved no address, and took the last branch: allow the
+ * canonical key. **That admitted a global, cross-circle-constant key onto a per-circle allow-list** —
+ * which is precisely the linkability the per-circle addressing exists to prevent, arriving through the
+ * gate meant to enforce it. And the count reported it as a member still speaking canonically, so the
+ * diagnostic pointed at a stranger who did not exist.
+ *
+ * The fix recognises our own row by WEBID as well as by key. Ours, so neither enforced nor counted —
+ * but the stray key is NOT admitted: `selfKeys` already names every key of ours that speaks here.
+ */
+describe('our own roster row is ours even when its pubKey is a display-cache artefact', () => {
+  const OWN_ADDRESS = 'relay:me.c1';
+  const MY_CHAT_KEY = 'chat-key-mine';
+  const MY_CIRCLE_KEY = 'circle-key-mine';
+  // The stoop agent's identity: one per DEVICE, identical in every circle. The linkable thing.
+  const STRAY_DEVICE_KEY = 'stoop-identity-constant-across-every-circle';
+
+  const record = () => {
+    const s = createCircleSenderAuthorization();
+    s.recordCircleRoster({
+      circleId: 'c1',
+      ownAddress: OWN_ADDRESS,
+      // The founder alone in the circle they just made, exactly as `deriveRoster` hands it over.
+      members: [{ webid: MY_CHAT_KEY, pubKey: STRAY_DEVICE_KEY, circleAddress: OWN_ADDRESS, role: 'admin' }],
+      selfKeys: [MY_CIRCLE_KEY, MY_CHAT_KEY],
+      selfWebid: MY_CHAT_KEY,
+    });
+    return s;
+  };
+
+  it('does not count the founder as a member still speaking canonically', () => {
+    expect(record().canonicalOnlyMembers,
+      'a circle with nobody in it cannot have a transitional member').toBe(0);
+  });
+
+  it('does not admit the device-wide stoop key onto this circle\'s allow-list', () => {
+    const verdict = record().authorizeSender({
+      circleId: 'c1', ownAddress: OWN_ADDRESS, senderKey: STRAY_DEVICE_KEY, from: 'relay:someone-else',
+    });
+    expect(verdict.allow,
+      'a key that is the same in every circle must not be allowed by a per-circle roster').toBe(false);
+  });
+});
+
+describe('our own CURRENT person key is admitted live — before any roster, in every circle (2026-09-16)', () => {
+  it('a message signed with the current person key is ours; the static profile key is a stranger', () => {
+    let current = ['person-key-v1'];
+    const auth = createCircleSenderAuthorization({ ownKeysLive: () => current });
+    auth.recordCircleRoster({ circleId: 'k', ownAddress: OURS_IN_CIRCLE, members: [], selfKeys: ['our-circle-key'] });
+    expect(auth.authorizeSender({ senderKey: 'person-key-v1', ownAddress: OURS_IN_CIRCLE }))
+      .toEqual({ allow: true, reason: SENDER_REASON.OWN_KEY });
+    expect(auth.authorizeSender({ senderKey: 'our-canonical-key', ownAddress: OURS_IN_CIRCLE }).allow, 'the static profile key is not on the list').toBe(false);
+    // a rotation: the new version is ours at once, the old one no longer
+    current = ['person-key-v2'];
+    expect(auth.authorizeSender({ senderKey: 'person-key-v2', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: 'person-key-v1', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
+  });
+  it('a circle this device has no roster for still admits the person key, and a reader that throws admits nothing extra', () => {
+    const auth = createCircleSenderAuthorization({ ownKeysLive: () => ['pk'] });
+    expect(auth.authorizeSender({ senderKey: 'pk', ownAddress: 'ours-anywhere' }).reason).toBe(SENDER_REASON.OWN_KEY);
+    const broken = createCircleSenderAuthorization({ ownKeysLive: () => { throw new Error('vault'); } });
+    broken.recordCircleRoster({ circleId: 'k', ownAddress: OURS_IN_CIRCLE, members: [], selfKeys: ['our-circle-key'] });
+    expect(broken.authorizeSender({ senderKey: 'pk', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
+  });
+});

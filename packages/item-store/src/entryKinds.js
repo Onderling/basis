@@ -42,7 +42,44 @@ export const RETAIN = Object.freeze({
   RECORD: 'record',
 });
 
-const K = (lane, wakes, retain, audit) => Object.freeze({ lane, wakes, retain, audit });
+/*
+ * ── The BINDING columns (declared 2026-09-15, read by nothing yet — the "shadow" step) ──────────────
+ *
+ * Beside the four questions above, a kind now answers four more: which key must have SIGNED it, what it is
+ * ABOUT, which verifier a receiver ACCEPTS it with, and whether a person's own devices carry it to each
+ * other. Today every rail chooses its verifier at wiring time and nothing declares which; on 2026-09-14 a
+ * lane's kind name disagreed with this table about its lane and every statement painted as a bubble. These
+ * columns are the declaration. They are pinned against the rails' real verifiers by a fitness test, and the
+ * rails will READ them in a later step; until then a wrong cell changes nothing at runtime and fails a test.
+ */
+
+/** Which key must have signed an entry of this kind. `local` = this device's own unsigned record, never carried. */
+export const SIGNS = Object.freeze({
+  ROOT: 'root',                   // the recovery phrase, inside a ceremony
+  PERSON: 'person',               // the person's key (today the static profile key; a rotating one is designed)
+  DEVICE: 'device',               // the device's root-signed delegation key
+  CIRCLE: 'device-in-circle',     // the per-circle address — the roster's proven set
+  AGENT_OWNER: 'agent-owner',     // a bot's owner key
+  LOCAL: 'local',                 // written by this device about itself; never leaves it
+});
+/** What an entry of this kind is ABOUT — the axis a revocation or eviction acts on. */
+export const SUBJECT = Object.freeze({ PERSON: 'person', DEVICE: 'device', NONE: 'none' });
+/** The named verifier a receiver folds the kind with. `none` = never accepted from a peer. */
+export const ACCEPTS = Object.freeze({
+  ROSTER: 'roster-binding',           // rosterBindingVerifier — the author is a proven per-circle address of a member
+  MEMBERSHIP: 'membership-binding',   // membershipBindingVerifier — the roster rule plus the ceremony rule
+  KEY: 'key-binding',                 // keyBindingVerifier — the roster rule plus the rotation class
+  DEVICE_SET: 'device-set',           // deviceSetBindingVerifier — the person's own root-signed devices
+  NONE: 'none',
+});
+/** Whether a person's own devices carry the kind to each other, and how. */
+export const SYNC = Object.freeze({ CIRCLE: 'circle-default', SIBLINGS: 'siblings', NONE: 'none' });
+
+const LOCAL_BINDING = Object.freeze({ signs: SIGNS.LOCAL, subject: SUBJECT.NONE, accepts: ACCEPTS.NONE, syncPolicy: SYNC.NONE });
+/** A circle lane's usual binding: signed per circle, about nothing in particular, folded with the roster rule. */
+const CIRCLE_BINDING = (over = {}) => Object.freeze({ signs: SIGNS.CIRCLE, subject: SUBJECT.NONE, accepts: ACCEPTS.ROSTER, syncPolicy: SYNC.CIRCLE, ...over });
+
+const K = (lane, wakes, retain, audit, binding = LOCAL_BINDING) => Object.freeze({ lane, wakes, retain, audit, ...binding });
 
 /**
  * The table. A kind absent from it is treated as `system / never wakes / short / not auditable` — the
@@ -50,34 +87,39 @@ const K = (lane, wakes, retain, audit) => Object.freeze({ lane, wakes, retain, a
  */
 export const ENTRY_KINDS = Object.freeze({
   // ── human-facing ──────────────────────────────────────────────────────────
-  'chat-message':    K(LANE.HUMAN, true,  RETAIN.RECORD, false),   // the conversation's RECORD — never drops
-  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),     // the store row is the durable head; entries age out
-  ask:             K(LANE.HUMAN, true,  RETAIN.CHAT, false),
-  offer:            K(LANE.HUMAN, true,  RETAIN.CHAT, false),
-  lend:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),
+  'chat-message':    K(LANE.HUMAN, true,  RETAIN.RECORD, false, CIRCLE_BINDING()),   // the conversation's RECORD — never drops
+  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),     // a task LINE in the conversation — derived from a head, never the statement itself
+  ask:               K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),   // legacy content kinds: demo seed + noticeboard intents, never a signed statement
+  offer:             K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),
+  lend:              K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),
 
   // ── system lane ───────────────────────────────────────────────────────────
   // `governance` carries ONE per-event exception, which stays explicit rather than becoming a second
   // table: a decision OPENING may wake (it needs a vote), individual votes and resolves must not.
   // See `governanceWakes()`.
-  governance:        K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
-  report:            K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
-  'roster-updated':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
-  'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
-  'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening
-  membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true),   // the roster refolds from these — never drops
-  grants:            K(LANE.SYSTEM, false, RETAIN.RECORD, true),   // the connection-grant set refolds from these — a revoke that compacts away silently re-admits a view
+  governance:        K(LANE.SYSTEM, false, RETAIN.AUDIT, true, CIRCLE_BINDING()),
+  report:            K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
+  // The task lane's signed statements: the carrier of a store head (a full-item snapshot, a removal), verified
+  // at the rail and merged into the circle's store. Plumbing — the head is what a screen reads and what a
+  // conversation line would be derived from; the statement itself must never paint. Same retention as the
+  // human task kind: the store row is the durable head, the statements age out and catch-up re-serves heads.
+  'task-statement':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING()),
+  'roster-updated':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
+  'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
+  'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true, CIRCLE_BINDING({ accepts: ACCEPTS.KEY })),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening
+  membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.CIRCLE, SIGNS.ROOT], subject: [SUBJECT.PERSON, SUBJECT.DEVICE], accepts: ACCEPTS.MEMBERSHIP, syncPolicy: SYNC.CIRCLE }),   // the roster refolds from these — never drops
+  grants:            K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.DEVICE, SIGNS.PERSON], subject: SUBJECT.NONE, accepts: ACCEPTS.DEVICE_SET, syncPolicy: SYNC.SIBLINGS }),   // the connection-grant set refolds from these — a revoke that compacts away silently re-admits a view
 
   // ── the agent trail (per-agent action log) ────────────────────────────────
-  'agent-action':    K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
-  'settings-change': K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
+  'agent-action':    K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
+  'settings-change': K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
 
   // ── compaction output ─────────────────────────────────────────────────────
   // What old audit entries FOLD into instead of being dropped (retention step D): `{from, to, counts,
   // actors, foldedCount}` — the shape of what happened survives, and says how much it folded. Auditable
   // itself so an external append cannot rewrite it (the log's own compactor merges internally, not via
   // append); never pruned — a summary that expires would be the silent forgetting it exists to prevent.
-  'audit-summary':   K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
+  'audit-summary':   K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
 });
 
 /**
@@ -89,7 +131,18 @@ export const ENTRY_KINDS = Object.freeze({
 export const VIEWER_FACING_SYSTEM_KINDS = Object.freeze(['membership', 'governance']);
 
 /** The conservative default for an unregistered kind — never wakes, never reads as conversation. */
-export const UNKNOWN_KIND = K(LANE.SYSTEM, false, RETAIN.SHORT, false);
+export const UNKNOWN_KIND = K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING);   // accepts: none — refused from a peer by construction
+
+/**
+ * The binding columns of a kind, with the two that may name several levels normalised to arrays: a
+ * membership statement is signed per circle, except a revocation, which the root signs in a ceremony.
+ * @returns {{ signs: string[], subject: string[], accepts: string, syncPolicy: string }}
+ */
+export function bindingOf(kind) {
+  const d = entryKind(kind);
+  const arr = (v) => (Array.isArray(v) ? v : [v]);
+  return { signs: arr(d.signs), subject: arr(d.subject), accepts: d.accepts, syncPolicy: d.syncPolicy };
+}
 
 /** Look a kind up. Always returns a descriptor. */
 export function entryKind(kind) {

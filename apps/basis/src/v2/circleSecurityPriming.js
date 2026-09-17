@@ -28,6 +28,7 @@
  * look at".
  */
 
+import { makeSyncSelection } from './syncSelection.js';
 import { bindCircleAddressKeysFor } from './householdRosterPairing.js';
 import { announceOwnCircleAddressIfChanged } from './circleAddressAnnounce.js';
 
@@ -112,7 +113,11 @@ export async function primeCircleSecurity({ agent, circleIds = null, onWarn = nu
     }
   });
 
-  // 3. …and say where WE answer (B2) — but ONLY when the caller says our alias is already bound.
+  // 3. …and saying where WE answer is NOT done here. It is `announceCircleAddresses`, exported below,
+  //    and the caller runs it after `registerCircleAddresses` has bound the alias. This block used to
+  //    describe a step in this function; the step moved and the description stayed, which is how a
+  //    comment comes to promise something the code beneath it does not do. Kept, rewritten, because the
+  //    REASON it moved is the part worth having:
   //
   //    ⚠ ORDER MATTERS, and getting it wrong is silent. An announcement sent before the per-circle alias
   //    is bound to the transport goes out signed by our CANONICAL key ("asked to send as … which this
@@ -148,9 +153,13 @@ export async function announceCircleAddresses({ agent, circleIds = null, onWarn 
     ? onWarn
     : (msg, err) => console.warn(`[circle-security] ${msg}`, err?.message ?? err ?? '');
 
-  const ids = Array.isArray(circleIds) && circleIds.length
+  const all = Array.isArray(circleIds) && circleIds.length
     ? [...new Set(circleIds.filter(Boolean))]
     : await knownCircleIds({ agent });
+  // A kring this device does not hold (sync-policy §11.2) is not announced into: this device stays off its
+  // roster, so no member — and no sibling — fans to it there.
+  const selection = typeof agent?.getParamValue === 'function' ? makeSyncSelection({ getParamValue: agent.getParamValue }) : null;
+  const ids = selection ? all.filter((id) => selection.kringOn(id)) : all;
   const out = { announced: 0, circleIds: ids };
   if (!ids.length) return out;
 

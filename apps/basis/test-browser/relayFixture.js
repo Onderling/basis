@@ -56,11 +56,62 @@ async function waitForPort(host, port, tries = 40) {
   return false;
 }
 
-export default async function globalSetup() {
+export default async function globalSetup(config) {
   // A second relay (PEER_TEST_RELAY_2) arms the two-relay stories: a device on its own relay joining a
   // circle that rides another. Same rules: attach if listening, spawn only on this machine (2026-09-08).
   await startOne(process.env.PEER_TEST_RELAY, PID_FILE);
   await startOne(process.env.PEER_TEST_RELAY_2, PID_FILE_2);
+  await warmAndCheckEveryServer(config);
+}
+
+/**
+ * Warm each project's dev server and prove it is serving THIS tree — once, here, before any test.
+ *
+ * Playwright starts the web servers before globalSetup, so this is the first moment they exist. Two
+ * things happen per server, for two reasons found on 2026-09-10/11:
+ *
+ * WARM. A dev server's readiness check only says the port answers. The first real page load then makes
+ * vite compile the whole module graph, which for this app takes long enough to blow the first test's
+ * action timeout — so the first test in every cold run (every CI run) failed on a click that had nothing
+ * to do with it. Loading the app once here pays that cost where it belongs, outside any test's budget.
+ *
+ * CHECK. The freshness guard was called only from `peerHarness.js`, so the nine single-context specs never
+ * checked that the server they hit was serving the working tree — and a stale vite is how a whole day
+ * went into a defect that was not there. Checking once per server covers every spec of both projects.
+ * (`peerHarness` still checks per boot; that catches a server going stale MID-run, which this cannot.)
+ */
+async function warmAndCheckEveryServer(config) {
+  const bases = [...new Set((config?.projects ?? []).map((p) => p?.use?.baseURL).filter(Boolean))];
+  if (!bases.length) return;
+  const { chromium } = await import('@playwright/test');
+  const { assertDevServerIsFresh } = await import('./devServerFreshness.js');
+  const browser = await chromium.launch();
+  try {
+    for (const base of bases) {
+      const t0 = Date.now();
+      // Two attempts, not one. Vite's first compile of the whole module graph on a cold runner is the
+      // slowest thing in the suite, and one shard lost a whole run to it on 2026-09-13 (180 s, no test
+      // ever started). A second page load after the first timeout hits a server that has finished
+      // compiling; only two failures in a row say the server is really not coming up.
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const page = await browser.newPage();
+        try {
+          await page.goto(base, { waitUntil: 'load', timeout: 180_000 });
+          // The app is up when its root has painted something — the same signal every spec waits for.
+          await page.waitForSelector('#circle-root :first-child', { timeout: 180_000 });
+          lastErr = null;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.warn(`[dev-server] ${base} not warm after attempt ${attempt} (${Math.round((Date.now() - t0) / 1000)}s): ${err?.message?.split('\n')[0] ?? err}`);
+        } finally { await page.close(); }
+      }
+      if (lastErr) throw lastErr;
+      await assertDevServerIsFresh(base);
+      console.log(`[dev-server] ${base} warm and serving this tree (${Math.round((Date.now() - t0) / 1000)}s).`);
+    }
+  } finally { await browser.close(); }
 }
 
 async function startOne(url, pidFile) {

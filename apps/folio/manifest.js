@@ -112,7 +112,7 @@ export const folioManifest = {
         // `buildToolDescriptors` chat-surface filter then hides this op
         // from the model; it stays reachable via the UI (button+confirm).
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.folio.deleteFromPod',
           label:   'Delete from pod',
           confirm: {
             severity: 'danger',
@@ -135,7 +135,7 @@ export const folioManifest = {
       surfaces: {
         // Part G curation (2026-06-11): NO chat surface (destructive — withheld from the circle LLM).
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.folio.deleteLocally',
           label:   'Delete locally',
           confirm: {
             severity: 'info',
@@ -162,7 +162,7 @@ export const folioManifest = {
       surfaces: {
         // Part G curation (2026-06-11): NO chat surface (destructive — withheld from the circle LLM).
         ui: {
-          control:   'button',
+          control:   'button', labelKey: 'circle.button.folio.forceRepush',
           label:     'Force re-push',
           placement: 'section-header',
           confirm: {
@@ -192,7 +192,7 @@ export const folioManifest = {
           match: { verbs: ['sync', 'synchroniseer', 'synchroniseren'], body: 'none' } },
         chat: { reply: 'text', hint: 'force a one-shot sync (sidecar only)' },
         ui: {
-          control:   'button',
+          control:   'button', labelKey: 'circle.button.folio.syncOnce',
           label:     'Sync now',
           placement: 'section-header',
         },
@@ -212,7 +212,7 @@ export const folioManifest = {
           match: { verbs: ['watch', ['watch', 'folder'], ['let', 'op'], 'bewaak', ['bewaak', 'map']], body: 'none' } },
         chat: { reply: 'text', hint: 'start the folder watcher (sidecar only)' },
         ui: {
-          control:   'button',
+          control:   'button', labelKey: 'circle.button.folio.watchStart',
           label:     'Start watching',
           placement: 'section-header',
         },
@@ -230,7 +230,7 @@ export const folioManifest = {
       surfaces: {
         chat: { hint: 'Stop the local-folder watcher.  Future edits no longer auto-sync; manual sync still works.' },
         ui: {
-          control:   'button',
+          control:   'button', labelKey: 'circle.button.folio.watchStop',
           label:     'Stop watching',
           placement: 'section-header',
         },
@@ -249,7 +249,7 @@ export const folioManifest = {
       ],
       surfaces: {
         chat: { hint: 'Check whether a local file matches its pod counterpart (existence + sha + size).' },
-        ui:   { control: 'button', label: 'Verify on pod' },
+        ui:   { control: 'button', labelKey: 'circle.button.folio.verifyPodState', label: 'Verify on pod' },
       },
     },
 
@@ -316,7 +316,7 @@ export const folioManifest = {
       surfaces: {
         // Part C gate — "download X" → downloadFile{path}.
         slash: { match: { verbs: ['download', 'haal', ['haal', 'op'], ['download', 'bestand']], body: 'match', arg: 'path' } },
-        ui:   { control: 'button', label: 'Download' },
+        ui:   { control: 'button', labelKey: 'circle.button.folio.downloadFile', label: 'Download' },
         // Declare `reply: 'text'` so the chat-shell renders the
         // skill's `{ok, message}` reply as text — without this the
         // verb:'list' default renders as an empty list ('(no items)').
@@ -340,7 +340,7 @@ export const folioManifest = {
       surfaces: {
         // Part C gate — "save X [to my pod]" → saveToMyPod{path}.
         slash: { match: { verbs: ['save', 'bewaar', ['save', 'to', 'my', 'pod'], 'opslaan', ['bewaar', 'in', 'mijn', 'pod']], body: 'match', arg: 'path' } },
-        ui:   { control: 'button', label: 'Save to my pod' },
+        ui:   { control: 'button', labelKey: 'circle.button.folio.saveToMyPod', label: 'Save to my pod' },
         chat: { hint: 'save a shared file to your own pod' },
       },
     },

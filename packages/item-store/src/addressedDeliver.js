@@ -179,10 +179,15 @@ export function createAddressedDeliver({
    * Send the Envelope to the one peer, then persist the outbound turn.
    * @returns {Promise<{ sent: any, itemId: string|null, deduped?: boolean }>}
    */
-  async function deliver(envelope, { to } = {}) {
+  /**
+   * `to` is the PEER the thread is about (persisted as such); `deliverTo` is the wire address the envelope actually
+   * goes to when that differs — a contact with a pair roster is written to at their per-circle address there,
+   * not at the profile address the thread is keyed by — and `sendOpts` rides to the injected send (a circle id).
+   */
+  async function deliver(envelope, { to, deliverTo = null, sendOpts = null } = {}) {
     if (!to) throw new Error('deliver: `to` (peer address) is required');
     const wire = typeof toWire === 'function' ? toWire(envelope, to) : envelope;
-    const sent = await send(to, wire);
+    const sent = sendOpts ? await send(deliverTo ?? to, wire, sendOpts) : await send(deliverTo ?? to, wire);
     const { itemId, deduped } = await persistTurn(envelope, { to, direction: 'out' });
     return { sent, itemId, ...(deduped ? { deduped: true } : {}) };
   }

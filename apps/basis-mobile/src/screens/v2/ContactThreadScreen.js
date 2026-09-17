@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
+import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
@@ -26,6 +27,16 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
   // The pre-send floor this contact declared (its card → the roster row): the channel applies it on
   // every turn; the header says so before the person types. web≡mobile with contactThread.js.
   const floor = useMemo(() => presendFloorFor(contact), [contact]);
+  // What a direct message to this contact is sealed to — the agent's own seal resolution, painted in the header
+  // (web parity — showContactThread does the same). Decided async after the first paint: no mark until then.
+  const [sealedMark, setSealedMark] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const statusFor = bundle?.agent?.contactSeal?.statusFor;
+    if (typeof statusFor !== 'function' || !peerAddr) { setSealedMark(null); return undefined; }
+    statusFor(peerAddr).then((status) => { if (live) setSealedMark(contactSealMark(status)); }).catch(() => { /* no mark rather than a wrong one */ });
+    return () => { live = false; };
+  }, [bundle, peerAddr]);
   // the bot's skills, shown as in-thread quick actions (dispatched to
   // the bot via the registry, distinct from a conversational turn).
   const skills = registry?.skillsFor?.(contactId) ?? [];
@@ -141,6 +152,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
           <Text style={styles.back}>{t('circle.contacts.back')}</Text>
         </Pressable>
         <Text style={styles.title}>{t('circle.contacts.thread_title', { name })}</Text>
+        {sealedMark ? (
+          <Text style={[styles.sealed, sealedMark.level === 'person' ? styles.sealedPerson : null]} testID="contact-thread-sealed" accessibilityLabel={t(sealedMark.key)}>
+            {`${sealedMark.level === 'person' ? '🔐' : '🔒'} ${t(sealedMark.key)}`}
+          </Text>
+        ) : null}
       </View>
       {floor ? (
         <Text style={styles.floor} testID="contact-thread-floor">{`🛡 ${t('circle.contacts.presend_floor')}`}</Text>
@@ -277,6 +293,8 @@ const makeStyles = (theme) => StyleSheet.create({
   wrap: { flex: 1, padding: 16, backgroundColor: theme.color.paper },
   header: { flexDirection: 'row', alignItems: 'baseline', gap: 12, marginBottom: 8 },
   floor: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingVertical: 4 },
+  sealed: { fontSize: 12, color: theme.color.inkSoft },
+  sealedPerson: { color: theme.color.green },   // STATUS colour: sealed to the person
   back: { fontSize: 13, color: theme.color.inkSoft },
   title: { fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },
   log: { flex: 1 },

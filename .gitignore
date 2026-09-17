@@ -111,3 +111,8 @@ _archive/
 # publish targets hold host/user/path of real web hosts — never committed
 deploy/web/targets/*.env
 !deploy/web/targets/example.env
+
+# The relay fixture writes these while a browser run is up and deletes them on teardown — runtime
+# state, never source. One was tracked, so every run showed a deletion in `git status` and one guard
+# reported it as a file it could not read (2026-09-10).
+apps/basis/test-browser/.relay-fixture*.pid

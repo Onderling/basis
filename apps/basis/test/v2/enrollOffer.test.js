@@ -71,6 +71,16 @@ function wireMembershipCatchUp(node) {
 }
 
 describe('the enroll offer — encode/parse', () => {
+  it('carries the MEMBER marker and the other members for a recovery-file circle, and reads them back; absent means a sibling', () => {
+    const uri = encodeEnrollOffer({ relays: ['wss://r'], circles: [
+      { id: 'c1', address: 'bea-webid', member: true, others: ['cas-webid', '', 7] },
+      { id: 'c2', address: 'sib-addr' },
+    ] });
+    const parsed = parseEnrollOffer(uri);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.circles.map((c) => [c.id, c.member, c.others])).toEqual([['c1', true, ['cas-webid']], ['c2', false, []]]);
+  });
+
   it('round-trips, and every failure is a typed reason', () => {
     const uri = encodeEnrollOffer({
       relays: ['ws://relay.example'],
@@ -81,8 +91,8 @@ describe('the enroll offer — encode/parse', () => {
     expect(p.ok).toBe(true);
     expect(p.relays).toEqual(['ws://relay.example']);
     expect(p.circles).toEqual([
-      { id: 'c1', handle: 'anna', address: 'addr-1' },
-      { id: 'c2', handle: null, address: 'addr-2' },
+      { id: 'c1', handle: 'anna', address: 'addr-1', member: false, others: [] },
+      { id: 'c2', handle: null, address: 'addr-2', member: false, others: [] },
     ]);
 
     expect(parseEnrollOffer('onderling-connect://abc').reason).toBe('not-an-enroll-uri');
@@ -103,7 +113,7 @@ describe('the enroll offer — encode/parse', () => {
       const back = enrollOfferFromLink(input);
       expect(back.ok, input.slice(0, 40)).toBe(true);
       expect(back.uri).toBe(uri);
-      expect(back.circles[0]).toEqual({ id: 'c1', handle: 'anna', address: 'addr-1' });
+      expect(back.circles[0]).toEqual({ id: 'c1', handle: 'anna', address: 'addr-1', member: false, others: [] });
     }
     expect(enrollOfferLink('not-a-url', uri).reason).toBe('bad-app-url');
     expect(enrollOfferFromLink('https://app.example/#other=1').reason).toBe('not-an-enroll-link');
@@ -262,6 +272,9 @@ describe('the roster seed — the device-set gate, unit-level', () => {
       verifyDeviceSet: async ({ author }) => author === self.pubKey,   // the floor, stubbed
       selfPubKey: self.pubKey,
       sendToPeer: (to, payload) => { sent.push({ to, payload }); },
+      // The serving device's own address — INSIDE the parcel since 2026-09-13, so the requester holds it
+      // before it pulls anything this device signed (a second message let the pull race it).
+      ownAnnouncement: async (cid) => ({ circleId: cid, memberWebid: self.pubKey, circleAddress: 'self-in-c1', circleAddressProof: 'proof-1' }),
     });
 
     // The stranger: a WELL-FORMED, correctly SIGNED request — refused purely on the device set.
@@ -272,9 +285,10 @@ describe('the roster seed — the device-set gate, unit-level', () => {
     // The sibling: served, to the SIGNED replyTo, with the rows and a verifiable signature.
     const good = await buildRosterSeedRequest({ signer: { identity: self }, circleId: 'c1', replyTo: 'addr-new' });
     await server('x', good);
-    expect(sent).toHaveLength(1);
+    expect(sent, 'ONE message: the parcel carries the address; no second announce to race').toHaveLength(1);
     expect(sent[0].to).toBe('addr-new');
     expect(sent[0].payload.body.rows).toHaveLength(1);
+    expect(sent[0].payload.body.own, 'the parcel carries the serving device\'s own proven address').toMatchObject({ circleAddress: 'self-in-c1', circleAddressProof: 'proof-1' });
 
     // The receiver: an untampered parcel applies; a tampered one (rows swapped after signing) is
     // refused before any store write.
@@ -287,10 +301,16 @@ describe('the roster seed — the device-set gate, unit-level', () => {
     const tampered = { ...sent[0].payload, body: { ...sent[0].payload.body, rows: [{ id: 'evil' }] } };
     await receiver('x', tampered);
     expect(applied).toHaveLength(0);
+    const tamperedOwn = { ...sent[0].payload, body: { ...sent[0].payload.body, own: { ...sent[0].payload.body.own, circleAddress: 'evil-addr' } } };
+    await receiver('x', tamperedOwn);
+    expect(applied, 'the address rides under the parcel\'s signature — a swapped one kills the parcel').toHaveLength(0);
     await receiver('x', sent[0].payload);
-    expect(applied).toHaveLength(1);
-    expect(applied[0].op).toBe('recordRosterSeed');
+    // The rows land first, then the sibling's own address goes through the ANNOUNCE door — the proof
+    // verifies there or it is refused, exactly as if it had arrived on its own.
+    expect(applied.map((a) => a.op).filter((op) => op !== 'listOpen')).toEqual(['recordRosterSeed', 'recordCircleAddressAnnouncement']);
     expect(applied[0].args.rows).toHaveLength(1);
+    expect(applied[1].args).toMatchObject({ groupId: 'c1', memberWebid: self.pubKey, circleAddress: 'self-in-c1', circleAddressProof: 'proof-1' });
     expect(ROSTER_SEED_VERSION).toBe(sent[0].payload.body.v);
   });
+
 });

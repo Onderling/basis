@@ -34,16 +34,19 @@ describe('alphaSurface', () => {
     expect(alphaViewMode(undefined)).toBe('chat');
   });
 
-  it('the ⋯ menu is back · invite · settings on both shells; the manifest still declares the rest', () => {
+  it('the ⋯ menu is back · invite · settings · beheer on both shells; the manifest still declares the rest', () => {
     const web = circleActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
     const mobile = circleActionsMobile(basisManifest, { policy: DEFAULT_CIRCLE_POLICY }).map((a) => a.id);
-    expect(web).toEqual(['back', 'invite', 'settings']);
+    expect(web).toEqual(['back', 'invite', 'settings', 'admin']);   // beheer painted again since 2026-09-13
     expect(mobile).toEqual(web);
     const declared = circleActionRoster(basisManifest).map((a) => a.id);
     for (const id of HIDDEN_CIRCLE_ACTIONS) expect(declared).toContain(id);
     // the gates still work beneath the trim: what a shell would paint once the alpha widens
     expect(gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id)).toContain('viewAs');
-    expect(alphaActions([{ id: 'admin' }, { id: 'invite' }]).map((a) => a.id)).toEqual(['invite']);
+    // `admin` is PAINTED since 2026-09-13 — it is the only place an admin removes a member or changes a
+    // role, and hiding it left those reachable only through the assistant. `lists` stands in as the
+    // hidden example now.
+    expect(alphaActions([{ id: 'lists' }, { id: 'admin' }, { id: 'invite' }]).map((a) => a.id)).toEqual(['admin', 'invite']);
   });
 
   it('five settings stay in view; every other policy axis is behind the fold', () => {

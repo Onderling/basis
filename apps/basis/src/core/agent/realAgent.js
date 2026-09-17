@@ -28,10 +28,9 @@ import {
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode,
-} from '@onderling/core';
+  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
-import { keyEventsFromRail } from '../../v2/keyRail.js';
+import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -42,6 +41,10 @@ import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressS
 import { contactRelayScope } from '../../v2/connectionPoints.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
+import { contentSealStrategy } from '../../v2/contentAtRest.js';   // the device's content-at-rest key — a person's own words on their own disk
+import { createSealingBackend } from '@onderling/pseudo-pod';            // the seal above a blind local store
+import { setShellContentSeal } from '../../v2/localStoreSeal.js';        // hand the content key to the shell's own stores
+import { wireEventLogPersistence } from '../../v2/eventLogPersistence.js';   // the device log hydrates HERE, where the key is
 import {
   createHistoryMirror, hydrateHistory, exportHistoryArchive,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
@@ -50,9 +53,9 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
-import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
-import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
+import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
+import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
 
 /** The CATCH-UP REPLY subtypes — the legitimate reconnect bursts the rate limiter must not eat
@@ -74,13 +77,20 @@ import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.j
 // owner's own devices; the registry above is a projection of this lane.
 import {
   makeGrantsRail, makeGrantsFan, makeGrantsCatchUp, makeGrantsPeerHandler,
-  deviceSetBindingVerifier, siblingDeviceAddresses, GRANTS_CATCHUP_SUBTYPES,
+  deviceSetBindingVerifier, siblingDevices, OWN_DEVICES_SCOPE, GRANTS_CATCHUP_SUBTYPES,
 } from '../../v2/grantsRail.js';
 // A direct message is addressed to a PERSON but arrives at ONE device: the contact card carries the
 // profile address, which every device derives from the same seed, and a relay maps one address to one
 // socket. This carries a landed turn to the person's other devices so the thread reads the same on all
 // of them — the grants lane's fan, pointed at conversation instead of authority.
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
+import { makeSiblingCarry } from '../../v2/siblingCarry.js';
+import { createPersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
+import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
+import { pairRouteFor } from '../../v2/pairRoster.js';
+import { createPersonKeyChain } from '../../v2/personKeyChain.js';
+import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
+import { isRosterTrailItem } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
@@ -136,7 +146,6 @@ import {
   setCircleMembership as registrySetCircleMembership,
   circleMembershipsOf,
   deviceDelegationOf, deviceDelegationsOf, setDeviceDelegation as registrySetDeviceDelegation,
-  grantsFloorClosedOf, closeGrantsFloor,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -186,6 +195,9 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
+import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
+import { stashEnrollOffer } from '../../v2/enrollOffer.js';
+import { bindCircleAddressKeysFor } from '../../v2/householdRosterPairing.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
@@ -259,9 +271,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Default (undefined) → in-memory `MemorySource`, unchanged.  The actual
   // shell threading of `householdPersistDb` is a follow-up; realAgent just
   // accepts + wires it here.
-  const householdDataSource = opts.householdPersistDb
-    ? await buildHouseholdDataSource(opts.householdPersistDb)
-    : undefined;
+  // (BUILT BELOW, once the content-at-rest key exists — see `contentSeal`. It has to be sealed from its
+  // first write, and the key lives behind the identity vault, which this point in the boot is too early
+  // for. `getCircleScope` below closes over it and only runs at op time, long after.)
+  let householdDataSource;
   // Per-circle store registry (no-pod scoping). One shared DataSource; each circle gets an ItemStore
   // rooted at mem://household/circles/<id>/ so its list is its OWN. The legacy bucket ('household' /
   // no active circle) keeps the bare root, so the pre-partition pile stays reachable as a default.
@@ -295,10 +308,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // to the pod). The platform provisions it (`opts.provisionCircleMedium`, web-woven) at circle-open, keyed
   // here; `dataSourceFor` hands it to the store at build time. Absent injection → the shared local backing.
   const circleMedia = new Map();          // circleId → cache-mode PseudoPod medium (DataSource-shaped)
-  const householdService = householdApp.createHouseholdService({
-    dataSource: householdDataSource,
-    dataSourceFor: (id) => circleMedia.get(id) ?? null,
-  });
+  let householdService;   // built with `householdDataSource` below, for the same reason
   // The task lane (the content re-root) — ASSIGNED where the device log is handed over, further down; declared
   // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
   let taskRail = null;
@@ -444,6 +454,52 @@ export async function createRealHouseholdAgent(opts = {}) {
   // root is the one repair that keeps the person reachable at their roster addresses.
   const chatVaultBacking = opts.chatVault ?? makeBrowserVault('cc-chat-id:');
   const chatVault = await sealedVault(chatVaultBacking);
+
+  // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
+  // Key material was already sealed here; a person's own words were not. Their lists, messages and
+  // search index reached IndexedDB, AsyncStorage and disk in the clear. The content key rides INSIDE
+  // the sealed chat vault: exactly as durable as the identity (lose one and the other is gone anyway),
+  // and resealed by the custody ceremony along with every other sealed backing — so the key rotates
+  // while not one item byte is rewritten. See `v2/contentAtRest.js` for why it is not the vault key.
+  // UNCONDITIONAL. There is no opt-out and no setting: content on this device is sealed, for everyone
+  // (Frits, 2026-09-10 — *"it is just encrypted for everyone"*). An earlier version of this carried a
+  // per-device toggle, defaulting to sealed; it is gone, because a switch nobody should ever flip is a
+  // branch that has to stay correct forever in exchange for nothing.
+  const contentSeal = await contentSealStrategy(chatVault);
+  // The shells build their own stores (a circle's items, the search index, the device-log snapshot) and
+  // cannot reach into this boot for the key, so it is published for them here. Deliberately NOT read back
+  // by this agent: a test process boots several agents, and a shared holder would hand the second one's
+  // key to the first one's stores. See `v2/localStoreSeal.js`.
+  setShellContentSeal(contentSeal);
+
+  // ── THE DEVICE LOG HYDRATES HERE, and it has to be here ────────────────────────────────────────
+  //
+  // Both shells used to hydrate it themselves, as the first thing they did. That was correct until the
+  // snapshot became sealed, and then it was silently wrong: the read happened BEFORE this key existed,
+  // so the backend handed back the raw envelope, `JSON.parse` threw, and `wireEventLogPersistence`
+  // caught it and started empty — which is the right thing for a corrupt snapshot and the wrong thing
+  // for one that is merely locked. The WRITE, later, was sealed. Sealed on the way out, unreadable on
+  // the way back: every reload came up with no history at all, behind one console warning.
+  //
+  // So it moves in here, to the first moment the key exists — and still before anything appends (the
+  // first `deviceLog.append` is several hundred lines below). One place, both shells, by construction:
+  // a shell now hands over the storage and this decides when to read it.
+  if (opts.deviceLog && opts.deviceLogIo) {
+    try {
+      const { hydrated } = await wireEventLogPersistence({ eventLog: opts.deviceLog, io: opts.deviceLogIo });
+      if (hydrated && typeof console !== 'undefined') console.info(`[device-log] hydrated ${hydrated} persisted entries`);
+    } catch (err) {
+      if (typeof console !== 'undefined') console.warn('[device-log] persistence wiring failed — in-memory this session:', err?.message ?? err);
+    }
+  }
+  // Now the stores that hold content can be built, sealed from their first write.
+  householdDataSource = opts.householdPersistDb
+    ? await buildHouseholdDataSource(opts.householdPersistDb, { strategy: contentSeal })
+    : undefined;
+  householdService = householdApp.createHouseholdService({
+    dataSource: householdDataSource,
+    dataSourceFor: (id) => circleMedia.get(id) ?? null,
+  });
   // THE HISTORY KEYS (the replace ceremony's re-wrap, held locally): group-key versions this person is
   // entitled to that were wrapped to a RETIRED device's derivable sealing key. The ceremony unwraps them
   // with the old device's re-derived key and keeps the raw keys here, sealed at rest under this device's
@@ -466,6 +522,62 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The default profile's seed — the source for both the chat identity AND per-circle addresses
   // (step 5B/C). Kept so the returned agent can expose circleAddressFor(circleId).
   const defaultProfileSeed = ownerRoot ? ownerRoot.deriveAgentSeed('default') : null;
+  // THE PERSON KEY (rotating, per profile — identity/personKey.js). A root-custody device re-derives the
+  // current version each boot; an enrolled device was handed it at its ceremony and keeps it sealed. Absent
+  // on an enrolled device from before person keys: it announces no key at joins, and says so once.
+  // The LINK KEY's public half rides with it (personKey.js): root custody derives it; an enrolled device was handed
+  // it at its ceremony. The link SEED exists only inside a ceremony — it is what vouches for a rotation to a contact.
+  const derivedLinkKeyPub = defaultProfileSeed ? personKeyPubKeyB64(derivePersonLinkKeySeed(defaultProfileSeed)) : null;
+  let personKey = await (async () => {
+    try {
+      const stored = await loadPersonKey(chatVault);
+      if (stored) return (stored.linkKeyPub || !derivedLinkKeyPub) ? stored : { ...stored, linkKeyPub: derivedLinkKeyPub };
+    } catch { /* re-derive below */ }
+    if (defaultProfileSeed) return { version: 1, seed: derivePersonKeySeed(defaultProfileSeed, 1), linkKeyPub: derivedLinkKeyPub };
+    console.warn('[realAgent] no person key on this enrolled device — it announces none at joins; a phrase ceremony on it hands it one');
+    return null;
+  })();
+  /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
+  const currentPersonKey = () => (personKey ? { version: personKey.version, pubKey: personKeyPubKeyB64(personKey.seed) } : null);
+  /** The same, with the link key's public half — what a CARD and a chain reply carry, so a contact can pin it and verify rotations. */
+  const personKeyForContacts = () => (personKey ? { ...currentPersonKey(), ...(personKey.linkKeyPub ? { linkKeyPub: personKey.linkKeyPub } : {}) } : null);
+  // THE PERSON KEY ON THE WIRE (binding-levels §10.5 step 4): an identity the secure agent can sign envelopes with
+  // (`sendAs`), registered as OURS at the security layer and as an address on the relays. It is what a device
+  // speaks as when nothing else of it is known to the other end — the enrolling device's first requests to its
+  // sibling, the sibling's parcel back — and what the sender authorizer admits live as our own current key. The
+  // static profile key stops being spoken and stops being admitted; a rotation swaps this identity out.
+  let personIdentity = personKey ? await AgentIdentity.fromSeed(personKey.seed, new VaultMemory()) : null;
+  const personAddress = () => personIdentity?.pubKey ?? null;
+  /** The relay proof for the person address: the same challenge-signing contract as a per-circle alias. */
+  const personAddressSigner = () => (personKey ? (message) => signWithPersonKey(personKey.seed, new TextEncoder().encode(message)) : null);
+  /** `[{ address, sign }]` — what a shell hands its relay alias registration beside the per-circle addresses. */
+  const ownAddressBindings = () => (personAddress() ? [{ address: personAddress(), sign: personAddressSigner() }] : []);
+  const secureAgentRef = { current: null };   // late-bound: the secure agent is created further down this scope
+  const registerPersonIdentity = () => {
+    const sa2 = secureAgentRef.current;
+    if (!sa2 || !personIdentity) return;
+    try { sa2.registerSelfIdentity?.(personIdentity.pubKey, personIdentity); } catch { /* the send path falls back to canonical and says so */ }
+  };
+  const registerPersonAddressOnRelays = async () => {
+    const sa2 = secureAgentRef.current;
+    const sign = personAddressSigner();
+    if (!sa2 || !sign) return;
+    let list = [];
+    try { list = sa2.relays?.list?.() ?? []; } catch { list = []; }
+    const primary = primaryDeviceRef.current?.isMine() === true;
+    for (const rl of list) {
+      try { await rl.port?.addAddress?.(personAddress(), { sign, primary }); } catch (err) { console.warn(`[person-key] relay did not take the person address: ${err?.message ?? err}`); }
+    }
+  };
+  /** A new version arrived (a ceremony here, or a hand-over): keep it, and speak as it from now on. */
+  const adoptPersonKey = async (k) => {
+    const old = personAddress();
+    personKey = k;
+    personIdentity = await AgentIdentity.fromSeed(k.seed, new VaultMemory());
+    if (old && old !== personIdentity.pubKey) { try { secureAgentRef.current?.forgetSelfIdentity?.(old); } catch { /* best-effort */ } }
+    registerPersonIdentity();
+    await registerPersonAddressOnRelays();
+  };
   let chatSeedReadable = false;
   try { chatSeedReadable = (await chatVault.get('agent-privkey')) != null; } catch { /* unreadable → reseed */ }
   if (!chatSeedReadable) {
@@ -503,7 +615,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (decoded instanceof Uint8Array && decoded.length === 32) {
           deviceDerivationSeed = decoded;
           enrolledDevice = {
-            deviceId: blob.deviceId,
+            deviceId: blob.deviceId, selfMinted: blob.selfMinted === true,
             ...(blob.label ? { label: blob.label } : {}),
             ...(blob.record ? { record: blob.record } : {}),
           };
@@ -529,6 +641,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   // boot — and re-derived DIFFERENTLY after a self-enroll cutover, which is why enrollment ends in
   // a per-circle re-announce that lands the new addresses in every roster's set.
   const circleIdentities = new Map();   // circleId → Promise<AgentIdentity>
+  // THE FIRST DEVICE ENROLS ITSELF AT FIRST BOOT (2026-09-16, the grants floor's retirement): under root custody
+  // with no delegation blob, mint a device id, derive the device seed from the profile seed, sign the delegation
+  // record with the root (resident here), and keep the blob sealed — exactly what the enrol ceremony writes on a
+  // second device, minus the custody cutover (the root stays resident; the first ceremony still cuts over). From
+  // here every device of a person derives its per-circle addresses from a DEVICE seed and signs the grants lane
+  // with a root-signed delegation; the profile seed derives nothing a peer sees, and the profile key signs nothing.
+  if (ownerRoot && !enrolledDevice && defaultProfileSeed) {
+    try {
+      const deviceId = firstDeviceIdFor(ownerRoot);   // root-derived, so a later device holding the phrase can re-derive this one
+      const seed = deriveDeviceSeed(defaultProfileSeed, deviceId);
+      const record = signDeviceDelegation(ownerRoot.secret, { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(seed) });
+      await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, record, selfMinted: true }));
+      deviceDerivationSeed = seed;
+      enrolledDevice = { deviceId, record, selfMinted: true };
+    } catch (err) {
+      console.warn(`[realAgent] the first device could not mint its delegation — the grants lane will not sign until it does: ${err?.message ?? err}`);
+    }
+  }
+
   const circleIdentityFor = (circleId) => {
     if (!circleIdentities.has(circleId)) {
       circleIdentities.set(circleId, circleIdentity(deviceDerivationSeed, circleId, new VaultMemory()));
@@ -559,9 +690,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     : ((callerPolicyEngine && typeof callerPolicyEngine === 'object') ? callerPolicyEngine : null);
   const callerIsRevoked = (callerPolicyEngineOpts && callerPolicyEngineOpts.isRevoked) || null;
 
+  // THE PRIMARY DEVICE (sync-policy §12, the DM half): read lazily — the choice store is composed further down.
+  const primaryDeviceRef = { current: null };
   const sa = await createSecureMeshAgent({
     bus,
     vault:               chatVault,
+    primaryDevice:       () => primaryDeviceRef.current?.isMine() === true,
     identityVaultPrefix: 'cc-chat-id:',   // no effect when `vault` is supplied; documents the prefix
     muteListVaultKey:    'cc-mute',
     auditLog:            { vaultKey: 'cc-audit' },
@@ -575,22 +709,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The outbox (held messages + the dead-address verdict) on a DEVICE-LOCAL store, so neither resets
     // on every launch. Same builder as the settings store; never the pod — a held message is this
     // device's promise to try again, not the person's data.
-    holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource(opts.outboxPersistDb) : undefined,
+    holdStore:    opts.outboxPersistDb ? await buildHouseholdDataSource(opts.outboxPersistDb, { strategy: contentSeal }) : undefined,
     holdStoreUri: 'mem://basis/outbox.json',
     // onPeerMessage + nknLib supplied later via setPeerWiring().
     // Pass-through for extra factory opts (tests + future ops):
     // identityResolver, capabilityIssuer, policyEngine, groupManager,
     // a2aTls, rateLimit, usePerfectFwdSec, webidClaim, helloGate, …
     //
-    // ⚠ `rateLimit` is deliberately NOT enabled by default, and the reason is worth keeping (2026-07-30).
-    // It DROPS over-quota envelopes, and catch-up replay is a legitimate burst: a replay serve fetches
-    // up to 1000 items, while the limiter's per-peer bucket is burst 30 / refill 5-per-second. Turning it
-    // on at the default tuning would silently discard most of a catch-up — message loss on reconnect,
-    // which is worse than the flood it defends against.
+    // (`rateLimit` IS enabled — see the block further down, where it is configured with the catch-up
+    // exemption that made turning it on safe. A comment here used to say the opposite, kept from the
+    // period when it was off; it outlived the change by three weeks and put a finished item back on a
+    // go-live brief, which is a good argument for deleting a stale comment rather than leaving it.)
     //
-    // Flooding IS defended, at the layer that can afford to be strict: the nearby room's per-author ask
-    // budget (`createAskBudget`, nearbyRoom.js), which protects the expensive half — matching, which can
-    // call a language model. Enabling this one properly needs a catch-up exemption first.
+    // Flooding is defended in a second place too, at the layer that can afford to be strict: the nearby
+    // room's per-author ask budget (`createAskBudget`, nearbyRoom.js), which protects the expensive half —
+    // matching, which can call a language model.
     //
     // The INBOUND GATE on the externally reachable agent (2026-08-19). This agent is the one peers can
     // actually reach; the host agent that holds the skill registry runs on an InternalTransport and no
@@ -668,6 +801,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       },
     }),
   });
+  secureAgentRef.current = sa;
+  registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
 
@@ -700,7 +835,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // `opts.settingsDataSource` (a pod-backed store, or a SHARED one across a user's devices in a journey);
   // else in-memory (tests / transient).
   const settingsDataSource = opts.settingsDataSource
-    ?? (opts.settingsPersistDb ? await buildHouseholdDataSource(opts.settingsPersistDb) : memoryDataSource());
+    ?? (opts.settingsPersistDb ? await buildHouseholdDataSource(opts.settingsPersistDb, { strategy: contentSeal }) : memoryDataSource());
   // Pod-sync the settings store. The settings `CachingDataSource` starts LOCAL; when the shell can reach the
   // signed-in pod it hands a pod-backed inner (a self-sealed pod DataSource over the settings container) via
   // `opts.provisionSettingsMedium` — EXACT mirror of `opts.provisionCircleMedium` for circle stores. `attachInner`
@@ -780,6 +915,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * announces itself any other way.
    */
   const circleSenders = createCircleSenderAuthorization({
+    ownKeysLive: () => [personAddress()].filter(Boolean),
     onUnknownRoster: ({ ownAddress }) => console.warn(
       `[realAgent] no roster recorded for own circle address ${String(ownAddress).slice(0, 12)}… — `
       + 'traffic to it is ACCEPTED unchecked until this circle\'s membership has been read once.',
@@ -1007,7 +1143,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     for (const it of (Array.isArray(items) ? items : [])) {
       // Every head republishes as a signed lane snapshot (the receiver's rail verifies + causally
-      // merges — idempotent).
+      // merges — idempotent) — except a roster row, which travels by its own proof-keeping carriers
+      // and would otherwise overwrite the peer's proven addresses with this device's view of them.
+      if (isRosterTrailItem(it)) continue;
       try { if (it) taskEmit.snapshot(id, it); } catch { /* best-effort */ }
     }
   }
@@ -1175,7 +1313,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       const strategy = typeof opts.provisionRegistryMedium === 'function' ? settingsSealStrategyForIdentity(chatId) : null;
       const medium   = strategy ? await opts.provisionRegistryMedium(strategy) : null;
       const carrier  = createRegistryCarrier({
-        backend: opts.registryBackend ?? null, deviceId: chatId.pubKey,
+        // Sealed at rest: the registry holds who this device belongs to — the person's curated
+        // properties, their circle memberships, their device names — and it held all of it in the clear.
+        // The pod MIRROR was already sealed (`provisionRegistryMedium`); the LOCAL copy was not, so the
+        // copy on the disk in the room was the readable one. Same content key as every other local store.
+        backend: opts.registryBackend
+          ? createSealingBackend({ backend: opts.registryBackend, getStrategy: () => contentSeal })
+          : null,
+        deviceId: chatId.pubKey,
         medium, name: medium ? registryPodName(chatId) : null,
         onKeyMismatch: () => opts.onRegistryKeyMismatch?.(),
         warn: (m) => { if (typeof console !== 'undefined') console.warn(m); },
@@ -1641,13 +1786,16 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The lane's signer: the device-derivation identity — the delegation key on an enrolled device
   // (per-device, revocable), the profile key itself on an unenrolled first device (the floor).
   const grantsSignerPromise = (async () => {
+    // The device delegation key, always: minted at enrolment or at first boot. There is no profile-key
+    // fallback any more (the floor, 2026-09-16) — a device without a delegation signs nothing on this lane.
     try {
-      if (deviceDerivationSeed) {
+      if (enrolledDevice && deviceDerivationSeed) {
         const id = await AgentIdentity.fromSeed(deviceDerivationSeed, new VaultMemory());
         return { identity: id, ref: chatId.pubKey };
       }
-    } catch { /* degrade to the profile key below */ }
-    return { identity: chatId, ref: chatId.pubKey };
+    } catch { /* falls through to the refusal below */ }
+    console.warn('[realAgent] no device delegation — the grants lane has no signer on this device');
+    return { identity: null, ref: chatId.pubKey };
   })();
   // ONE device-set verifier instance — the trust base shared by every "my own devices" consumer
   // (the grants lane, and the roster seed below). A second instance would be a second place for
@@ -1661,7 +1809,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     lookupDelegations: async () => deviceDelegationsOf(await agentsRegistryRef?.lookup('default')),
     // The grants-floor marker (L30's closer): the first device-revoke ceremony closes the shared
     // profile-key floor — from then on only delegation-signed statements count on this lane.
-    floorClosed: async () => grantsFloorClosedOf(await agentsRegistryRef?.lookup('default')),
+    // A sibling that proved a root-signed delegation this registry does not hold is written down —
+    // the row My data lists, and the one the revoke door acts on. Not a trust decision (the record
+    // bound above on its own signature); the registry is just where this device keeps what it knows
+    // of the person's devices.
+    learnDelegation: async (rec) => {
+      const cur = await agentsRegistryRef?.lookup?.('default');
+      if (!cur || deviceDelegationOf(cur, rec.deviceId)) return;
+      await agentsRegistryRef.register({ ...cur, properties: registrySetDeviceDelegation(cur.properties ?? {}, rec.deviceId, rec) });
+    },
   });
   const grantsRail = makeGrantsRail({
     eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
@@ -1672,14 +1828,40 @@ export async function createRealHouseholdAgent(opts = {}) {
   // and the contact-thread fan today. Two lookups would be two places for "who am I, elsewhere" to
   // drift apart, and they must answer the same set or a revoke and a message would disagree about
   // which devices are mine.
-  const ownDeviceSiblings = () => siblingDeviceAddresses({
+  const ownDeviceSiblingRows = () => siblingDevices({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
     circleAddressFor,
+    // Both sources of "my circles", as the enrol offer reads them: the registry's memberships (what a
+    // restore brings back) and the item store's (what a join or a create wrote here).
+    circleIds: async () => {
+      const ids = new Set(Object.keys(await readSelfCircleMemberships().catch(() => ({}))));
+      try {
+        for (const c of ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])) {
+          const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
+          if (typeof id === 'string' && id) ids.add(id);
+        }
+      } catch { /* the registry's list alone still serves */ }
+      return [...ids].filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId);
+    },
   });
+  const ownDeviceSiblings = async () => (await ownDeviceSiblingRows()).map((d) => d.address);
+  // A DEVICE SPEAKS TO ITS SIBLING IN THE CIRCLE THEY SHARE — as this device's own address there, to
+  // the sibling's. Never as the profile key: every device of the person holds it, a revoked one too,
+  // and on a relay the profile address is whichever device registered it last, so a greeting answered
+  // to it can land on the wrong device while the send waits out its timeout and is held (both found by
+  // the revoke walk, 2026-09-14). The circle comes from the sibling table; a caller that knows it
+  // already — a seed reply to a device not yet on any roster — names it in the payload.
+  const sendToSibling = async (to, payload, o = {}) => {
+    let circleId = typeof payload?.circleId === 'string' && payload.circleId !== OWN_DEVICES_SCOPE ? payload.circleId : null;
+    if (!circleId) circleId = (await ownDeviceSiblingRows()).find((d) => d.address === to)?.circleId ?? null;
+    if (!circleId) throw new Error(`not a device of mine on any circle: ${String(to).slice(0, 12)}…`);
+    const { circleId: _ignored, ...rest } = o;   // eslint-disable-line no-unused-vars
+    return sendCircleScoped(to, payload, { ...rest, circleId });
+  };
   const grantsFan = makeGrantsFan({
     siblings: ownDeviceSiblings,
-    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
   const surfaceGrants = createSurfaceGrants({
     identity: chatId,
@@ -1702,7 +1884,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // landed batch refolds the projection, which is what makes an offline revoke bind before serving.
   const grantsCatchUp = makeGrantsCatchUp({
     rail: grantsRail,
-    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     siblings: ownDeviceSiblings,
     selfPubKey: chatId.pubKey,
     onChange: () => surfaceGrants.recompute(),
@@ -1716,13 +1898,224 @@ export async function createRealHouseholdAgent(opts = {}) {
   // receive half: the shell says what to do with a landed turn, this side says who may send one.
   const contactTurnFan = makeContactTurnFan({
     siblings: ownDeviceSiblings,
-    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
+  // THE ONE SIBLING CARRY (L100): my other devices as a standing peer of every circle lane. The chat and task
+  // emitters hand it every statement this device WRITES (after the member fan); the lane table hands it every
+  // statement that LANDS here from a member. Same sibling set, same send, as the two fans above.
+  const siblingCarry = makeSiblingCarry({
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+  });
+  // THE PERSON KEY between my devices: the rotation ceremony hands the new version to the survivors over the
+  // same sibling set and send; a landed one is stored monotonically and takes effect at once.
+  // WHICH DEVICE OTHERS' DIRECT MESSAGES LAND ON (sync-policy §12): the choice, kept sealed and carried to the
+  // siblings; when "is it me" flips, every relay socket re-registers the profile and person addresses with the flag.
+  const primaryDevice = createPrimaryDeviceChoice({
+    vault: chatVault,
+    myDeviceId: enrolledDevice?.deviceId ?? custody.deviceId ?? null,
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    onChanged: (mine) => {
+      Promise.resolve(secureAgentRef.current?.relays?.setPrimaryDevice?.(mine)).catch(() => {});
+      registerPersonAddressOnRelays().catch(() => {});
+      console.info(`[primary-device] this device is ${mine ? 'now' : 'no longer'} the primary contact address`);
+    },
+  });
+  primaryDeviceRef.current = primaryDevice;
+  await primaryDevice.load();
+  const personKeySync = createPersonKeySync({
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    current: () => personKey,
+    store: async (k) => {
+      const landed = await storePersonKey(chatVault, k);
+      if (landed) await adoptPersonKey((await loadPersonKey(chatVault)) ?? k);   // the merged entry: chain + older seeds
+      return landed;
+    },
+    selfPubKey: chatId.pubKey,
+    // My own commitment per circle, from the root's PUBLIC key every device of mine holds — no roster read.
+    ownCommitmentFor: (circleId) => (rootPubKeyB64 ? ceremonyCommitment(rootPubKeyB64, circleId) : null),
+    onLanded: ({ version }) => console.info(`[person-key] version ${version} arrived from one of my devices`),
+    onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
+  });
+  /** My chain, for a contact's pull: the current key and the links that vouch for it from any earlier version. */
+  const personKeyChainOf = () => (personKey ? { current: personKeyForContacts(), links: Array.isArray(personKey.links) ? personKey.links : [] } : null);
+  /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
+  const personSeedFor = (version) => (personKey?.version === version ? personKey.seed : (personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
+  const contactRecords = async () => {
+    try { const r = await callSkill('stoop', 'listContacts', {}); return r?.items ?? r?.contacts ?? []; } catch { return []; }
+  };
+  /**
+   * The PERSON an address names: an address this device has bound to an identity (a per-circle or mesh alias) resolves
+   * through the same read the roster uses; a mesh address that only the contact record knows resolves through it;
+   * anything else is taken as the webid itself. A direct message may go to any of these, and the seal is to the person.
+   */
+  const webidFor = async (addr) => {
+    if (typeof addr !== 'string' || !addr) return addr;
+    try { const id = sa.resolver?.pubKeyForAddr?.(addr); if (id && id !== addr) return id; } catch { /* below */ }
+    return (await contactRecords()).find((c) => c?.peerAddr === addr)?.webid ?? addr;
+  };
+  /** A contact's row in the contact book, by their webid or by an address of theirs. */
+  const contactRecordOf = async (addr) => {
+    const webid = await webidFor(addr);
+    return (await contactRecords()).find((c) => c?.webid === webid) ?? null;
+  };
+  /**
+   * A CONTACT's current person key: from a circle we share (their row's root-revealed key — a close contact is a
+   * two-member circle, and any shared circle serves), else from the contact book (the card, or a pulled chain).
+   * Asked by any address of theirs; answered for the person.
+   */
+  const contactPersonKeyOf = async (addr) => {
+    const webid = await webidFor(addr);
+    let best = null;
+    for (const circleId of (opts.circlesForPeer?.(webid) ?? [])) {
+      try {
+        const row = ((await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === webid);
+        if (row?.personKey && (!best || row.personKey.version > best.version)) best = { version: row.personKey.version, pubKey: row.personKey.pubKey };
+      } catch { /* next circle */ }
+    }
+    if (best) return best;
+    const rec = await contactRecordOf(webid);
+    return rec?.personKey && Number.isInteger(rec.personKey.version) ? { version: rec.personKey.version, pubKey: rec.personKey.pubKey } : null;
+  };
+  const personKeyChain = createPersonKeyChain({
+    chain: personKeyChainOf,
+    isContact: async (addr) => !!(await contactRecordOf(addr)) || (opts.circlesForPeer?.(await webidFor(addr)) ?? []).length > 0,
+    known: contactPersonKeyOf,
+    adopt: async (addr, current, links) => (await callSkill('stoop', 'setContactPersonKey', { webid: await webidFor(addr), personKey: current, links }))?.personKey ?? null,
+    sendToPeer: (to, payload, o) => sendCircleScoped(to, payload, { guarantee: 'hold-forward', ...o }),
+    onRefused: ({ reason, from }) => console.info(`[person-key-chain] refused ${reason} from ${String(from).slice(0, 12)}…`),
+  });
+  const sealedWarned = new Set();
+  /** The direct-message seal: to the contact's current person key, from mine — or null (unsealed, as before) when either is unknown. */
+  /** The one resolution the seal uses: the contact's current key, when I hold a person key of my own to seal from. */
+  const sealTargetFor = async (peerAddr) => (personKey ? await contactPersonKeyOf(peerAddr) : null);
+  const contactSeal = {
+    /** What a direct message to this contact is sealed to — what the thread header says. */
+    statusFor: async (peerAddr) => {
+      const to = await sealTargetFor(peerAddr);
+      return to ? { sealed: 'person', to } : { sealed: 'device' };
+    },
+    sealFor: async (peerAddr, content) => {
+      const to = await sealTargetFor(peerAddr);
+      if (!to) {
+        if (personKey && !sealedWarned.has(peerAddr)) { sealedWarned.add(peerAddr); console.info(`[contact-seal] no person key on record for ${String(peerAddr).slice(0, 12)}… — this thread stays sealed to the device only until their card or a shared circle brings one`); }
+        return null;
+      }
+      const { sealed, nonce } = await sealToPersonKey(personKey.seed, to.pubKey, content);
+      return { to, from: currentPersonKey(), sealed, nonce };
+    },
+    openFor: async (s, fromAddr) => {
+      const seed = personSeedFor(s?.to?.version);
+      if (!seed) { console.warn(`[contact-seal] a message sealed to person-key version ${s?.to?.version} — this device holds no such version`); return null; }
+      const content = await openFromPersonKey(seed, s?.from?.pubKey, s);
+      if (content && fromAddr && Number.isInteger(s?.from?.version)) {
+        // sealed FROM a version newer than the one on record: pull their chain, so the next message seals to it
+        const known = await contactPersonKeyOf(fromAddr);
+        if (known && s.from.version > known.version) personKeyChain.requestFrom(fromAddr, known.version).catch(() => {});
+      }
+      return content;
+    },
+  };
   const contactTurnHandler = (applyTurn, onRefused = null) => makeContactTurnPeerHandler({
     siblings: ownDeviceSiblings,
     selfPubKey: chatId.pubKey,
     applyTurn,
     onRefused,
+  });
+  // WHO I KNOW, on every device of mine: the security layer's bindings and the contact book ride the
+  // same sibling set. A greeting binds a key on the ONE device it landed on, and a card scanned on the
+  // phone is a contact on the phone — this carries both to the person's other devices, live, to a
+  // newly announced sibling in full, and on request. The contact book is read and written RAW here
+  // (the stoop agent directly, not the waist), because the waist's add is what fans a row out and a
+  // landed row must not fan back.
+  const stoopAgentRef = { current: null };   // late-bound: the stoop agent is created further down this scope
+  const rawStoop = async (opId, args = {}) => {
+    const result = await chatAgent.invoke(stoopAgentRef.current.address, opId, [DataPart(args)]);
+    return (Array.isArray(result) ? result[0] : null)?.data ?? null;
+  };
+  const rawContacts = async () => (await rawStoop('listContacts', {}))?.contacts ?? [];
+  // WHO GREETED THIS DEVICE survives a reload. The security layer's bindings — "this key is Bea",
+  // established by her greeting — lived in memory only, so a reload (every web session) or a restart
+  // (every deploy of a box) forgot every contact, and their next message was refused as a stranger's,
+  // silently: a sender greets once per session of ITS own, so nothing on their side sends the greeting
+  // again. Walked 2026-09-14 (the revoke story: the reloaded web app refused the person who had been
+  // writing to it all along). The snapshot is public keys, kept in the sealed chat vault like every
+  // other fact about who this device knows; restored establish-never-replace, so a proof-verified
+  // roster row is still the last word on any address it covers.
+  const PEER_BINDINGS_VAULT_KEY = 'peer-bindings';
+  let peerBindingsSaveTimer = null;
+  // Frozen once this session's vaults have been resealed under the key the NEXT boot will hold (the
+  // revoke ceremony's self-enrolment): this wrapper still writes under the old key, and a write after
+  // the reseal would replace the carried-over snapshot with one the next boot cannot open. The ceremony
+  // writes the snapshot once, just before it reseals; nothing learned in the minutes before the reload
+  // is worth that. (CI, 2026-09-14: the person's binding arrived late, was saved late, and was gone.)
+  let peerBindingsFrozen = false;
+  const writePeerBindings = async () => {
+    try { await chatVault.set(PEER_BINDINGS_VAULT_KEY, JSON.stringify(sa.agent.security?.peerBindings?.() ?? [])); }
+    catch (err) { if (typeof console !== 'undefined') console.warn('[security] could not keep the peer bindings:', err?.message ?? err); }
+  };
+  const savePeerBindings = () => {
+    if (peerBindingsSaveTimer || peerBindingsFrozen) return;
+    peerBindingsSaveTimer = setTimeout(async () => {
+      peerBindingsSaveTimer = null;
+      if (!peerBindingsFrozen) await writePeerBindings();
+    }, 250);
+  };
+  const freezePeerBindings = async () => {
+    if (peerBindingsSaveTimer) { clearTimeout(peerBindingsSaveTimer); peerBindingsSaveTimer = null; }
+    await writePeerBindings();
+    peerBindingsFrozen = true;
+  };
+  try {
+    const raw = await chatVault.get(PEER_BINDINGS_VAULT_KEY);
+    const kept = raw ? JSON.parse(typeof raw === 'string' ? raw : String(raw)) : [];
+    for (const b of Array.isArray(kept) ? kept : []) {
+      if (typeof b?.address === 'string' && typeof b?.pubKey === 'string') sa.agent.security?.learnPeerKey?.(b.address, b.pubKey);
+    }
+  } catch { /* nothing kept, or unreadable — greetings establish afresh */ }
+  const knownPeersSync = createKnownPeersSync({
+    siblings: ownDeviceSiblings,
+    selfPubKey: chatId.pubKey,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    snapshot: async () => ({
+      peers: sa.agent.security?.peerBindings?.() ?? [],
+      contacts: await rawContacts(),
+    }),
+    learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
+    contacts: {
+      has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
+      add: (contact) => rawStoop('addContact', contact),
+    },
+    onLanded: () => savePeerBindings(),
+  });
+  // LIVE, the key half: a greeting that passed the hello gate just bound a key here. The core agent
+  // says so (`peer`) for the initial HI and for the ack alike, so both directions of first contact
+  // reach the siblings — and the vault.
+  sa.agent.on?.('peer', ({ address }) => {
+    const pubKey = sa.agent.security?.getPeerKey?.(address);
+    if (typeof address === 'string' && address && pubKey) knownPeersSync.fanPeer({ address, pubKey }).catch(() => {});
+    savePeerBindings();
+  });
+  // A REFUSED envelope says so, once per sender and reason. The security layer refuses silently
+  // toward the sender by design (an attacker learns nothing), and until now silently toward US too:
+  // the wire transports re-emit their `security-error` on the agent and nothing listened, so a
+  // person whose greeting reached one device and whose message reached another simply saw nothing
+  // arrive. Counted per reason, so a diagnostic can read it; warned once per pair, so a log stays
+  // readable under a storm.
+  const refusedInbound = new Map();
+  const refusedInboundWarned = new Set();
+  sa.agent.on?.('security-error', (err, raw) => {
+    const code = err?.code ?? 'SECURITY_ERROR';
+    refusedInbound.set(code, (refusedInbound.get(code) ?? 0) + 1);
+    const from = typeof raw?._from === 'string' ? raw._from : '?';
+    const key = `${code}:${from}`;
+    if (refusedInboundWarned.has(key)) return;
+    refusedInboundWarned.add(key);
+    if (typeof console !== 'undefined') {
+      console.warn(`[security] refused an inbound envelope from ${from.slice(0, 12)}… (${code}) — ${String(err?.message ?? err).slice(0, 160)}`);
+    }
   });
 
 
@@ -1743,7 +2136,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       delegationRecord: enrolledDevice?.record ?? null,
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
-      sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+      // The ONE own-device message that speaks as the person: the requester has no roster yet, so its
+      // sender gate admits nothing but the person's own keys until this parcel lands — and the parcel is
+      // what it verifies by, root-signed delegation and all. "As the person" is the current PERSON KEY
+      // (2026-09-16), never the static profile key. Everything after it speaks per-circle.
+      sendToPeer: async (to, payload) => {
+        if (personAddress()) await registerPersonAddressOnRelays();   // the relay must hold the person address before it speaks
+        return sa.peer.sendTo(to, payload, { guarantee: 'hold-forward', ...(personAddress() ? { sendAs: personAddress() } : {}) });
+      },
       // The introduce-back (see the serve): the fresh sibling can only bind statements THIS
       // device signs once it holds this device's per-circle address as a proven fact.
       ownAnnouncement: (cid) => ownCircleAddressAnnouncement({
@@ -1758,6 +2158,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       callSkill: (...a) => callSkill(...a),
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
+      // `api` is this agent's surface, composed further down this scope; the handler only runs once it is.
+      refreshBindings: (cid) => bindCircleAddressKeysFor({ agent: api, circleId: cid }),
     }),
   };
 
@@ -1887,6 +2289,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * `address-revoke` with the ROOT REVEAL (core ceremonyCommitment.js), fanned to every member, plus the
    * producer-side key rotation when this device holds the circle's producer. `tombstoneDevice` — the
    * registry record flipped (or minted already revoked) and the grants floor closed. */
+  let selfEnrolledThisSession = false;   // the revoke ceremony migrated this root-custody device; a reload is pending
   const verifyOwnerPhrase = (mnemonic) => {
     let root;
     try { root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim()); }
@@ -1901,12 +2304,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return { ok: true, root };
   };
-  const retireAddresses = async ({ root, addressFor, circleIds }) => {
+  const retireAddresses = async ({ root, addressFor, circleIds, includeOwn = false }) => {
     const revokedIn = [];
     for (const circleId of circleIds) {
       if (typeof membershipEmit !== 'function') break;
       const address = addressFor(circleId);
-      if (!address || address === circleAddressFor(circleId)) continue;   // never retire the address this device presents
+      // Never retire the address this device presents — except at the one moment it is leaving it
+      // (the self-enrol migration, which has already introduced the address it moves to).
+      if (!address || (!includeOwn && address === circleAddressFor(circleId))) continue;
       const reveal = signCeremonyReveal(root.secret, { circleId, kind: 'address-revoke', subject: address, authorRef: chatId.pubKey });
       const stmt = await membershipEmit({
         kind: 'address-revoke', circleId, subject: address,
@@ -1937,7 +2342,6 @@ export async function createRealHouseholdAgent(opts = {}) {
           props = registrySetDeviceDelegation(props, deviceId, { revoked: true });
         }
       }
-      if (!grantsFloorClosedOf(cur)) props = closeGrantsFloor(props, { closedAt: new Date().toISOString() });
       if (props !== (cur.properties ?? {})) await bounded(agentsRegistryRef.register({ ...cur, properties: props }));
     } catch { /* tombstones are best-effort bookkeeping — the statements are the enforcement */ }
     return known;
@@ -1946,7 +2350,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('replaceDevice', async ({ parts }) => {
     // THE REPLACE CEREMONY (one ceremony for both restore intents): this — the NEW — device, restored
     // with the phrase and holding the registry again, retires every other device the registry lists,
-    // plus the unenrolled first device's profile-derived address, in every circle it belongs to. Before
+    // plus the first device (its id derives from the root, so it needs no record), in every circle it belongs to. Before
     // each retirement it unwraps the group-key chain with the retired device's re-derived sealing key and
     // keeps the raw keys in the history sidecar, so sealed history opens here with nobody else online.
     // Where this device is an admin, the circle's group key is then rotated to the survivors (this device
@@ -1968,8 +2372,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           retired.push({ deviceId, seed: deriveDeviceSeed(profileSeed, deviceId) });
         }
       } catch { /* no registry → only the profile address can be retired */ }
-      const mineIsProfile = deviceDerivationSeed.length === profileSeed.length && deviceDerivationSeed.every((v, i) => v === profileSeed[i]);
-      if (!mineIsProfile) retired.push({ deviceId: null, seed: profileSeed });
+      // The FIRST device (its id derives from the root — identity/deviceDelegation.js): retired by derivation even
+      // when this device never saw its registry record, exactly as its profile-derived address used to be.
+      const firstId = firstDeviceIdFor(root);
+      if (myDeviceId !== firstId && !retired.some((r) => r.deviceId === firstId)) {
+        retired.push({ deviceId: firstId, seed: deriveDeviceSeed(profileSeed, firstId) });
+      }
 
       const circleIds = Object.keys(await readSelfCircleMemberships().catch(() => ({})))
         .concat(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []);
@@ -2030,7 +2438,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       return [DataPart({
         ok: true, outcome: 'ok',
         retiredDevices: retired.map((r) => r.deviceId).filter(Boolean),
-        profileAddressRetired: !mineIsProfile,
+        firstDeviceRetired: retired.some((r) => r.deviceId === firstId),
         retiredIn: retiredAddresses, circles: retiredAddresses.length, historyKeys, rotated, known,
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'replace-failed' })]; }
@@ -2096,9 +2504,6 @@ export async function createRealHouseholdAgent(opts = {}) {
           // custody, so every legitimate device now signs with a revocable delegation key — the
           // shared profile-key signature, the one thing the stolen device still holds, stops
           // counting on the grants lane from here on. Closed is forever.
-          if (!grantsFloorClosedOf(cur)) {
-            props = closeGrantsFloor(props, { closedAt: new Date().toISOString() });
-          }
           if (props !== (cur.properties ?? {})) {
             await bounded(agentsRegistryRef.register({ ...cur, properties: props }));
           }
@@ -2108,6 +2513,57 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...Object.keys(await readSelfCircleMemberships().catch(() => ({}))),
         ...(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []),
       ]);
+      // THE PERSON KEY ROTATES (binding-levels §10.5): the revoked device holds the CURRENT person key, so the
+      // ceremony — the one moment the root is in hand — derives the next version, keeps it, announces it to every
+      // circle ROOT-REVEALED (the only way a person-key statement binds; a device cannot mint one), and hands the
+      // seed to the surviving devices over the sibling carry. BEFORE any address is retired: a survivor's gate
+      // admits the hand-over only from a sibling address it still holds, and this device's own address may be
+      // retired by the self-enrol migration below in the same breath (found 2026-09-16: the hand-over arrived
+      // after the retire and was refused as "not a sibling"). The revoked device is kept out EXPLICITLY instead —
+      // its addresses derive deterministically from the seed the ceremony is revoking.
+      let personKeyVersion = null;
+      try {
+        const nextVersion = (personKey?.version ?? 0) + 1;
+        const profileSeedNow = root.deriveAgentSeed('default');
+        const nextSeed = derivePersonKeySeed(profileSeedNow, nextVersion);
+        const pubKey = personKeyPubKeyB64(nextSeed);
+        // The link key: derived here, used once, dropped — its public half is what every device of mine keeps.
+        const linkSeed = derivePersonLinkKeySeed(profileSeedNow);
+        const linkKeyPub = personKeyPubKeyB64(linkSeed);
+        // The hand-over's reveals, one per circle: the root's word that THIS seed is version n of THIS person —
+        // what a survivor verifies against its own commitment (personKeySync.js). Kept beside the key so a
+        // sibling that asks later gets the same proof.
+        const reveals = {};
+        for (const circleId of circleIds) {
+          reveals[circleId] = signCeremonyReveal(root.secret, {
+            circleId, kind: PERSON_KEY_CARRY, subject: chatId.pubKey, authorRef: chatId.pubKey,
+            facts: personKeyFacts({ version: nextVersion, pubKey }),
+          });
+        }
+        // The chain link: the LINK KEY vouches that n+1 follows n — what a contact who knew n verifies to learn n+1
+        // without the root. Never signed with the seed being retired: the revoked device holds that seed and would
+        // vouch for a key of its own (the hole of 2026-09-16). Older seeds are kept, so a message sealed to n still opens.
+        const link = personKey ? signPersonKeyLink(linkSeed, { version: nextVersion, pubKey, prevVersion: personKey.version }) : null;
+        // The seed being retired rides along explicitly: a root-custody device derived v1 at boot and never stored it.
+        const previous = personKey ? [...(personKey.previous ?? []), { version: personKey.version, seed: personKey.seed }] : [];
+        if (await storePersonKey(chatVault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub })) {
+          await adoptPersonKey((await loadPersonKey(chatVault)) ?? { version: nextVersion, seed: nextSeed, reveals, linkKeyPub });
+        }
+        personKeyVersion = nextVersion;
+        if (typeof membershipEmit === 'function') {
+          for (const circleId of circleIds) {
+            try {
+              const reveal = signCeremonyReveal(root.secret, {
+                circleId, kind: PERSON_KEY_KIND, subject: chatId.pubKey, authorRef: chatId.pubKey,
+                facts: personKeyFacts({ version: nextVersion, pubKey }),
+              });
+              await membershipEmit({ kind: PERSON_KEY_KIND, circleId, subject: chatId.pubKey, payload: { version: nextVersion, pubKey, reveal }, actor: chatId.pubKey });
+            } catch (err) { console.warn(`[ceremony] person key v${nextVersion} not announced in ${circleId}: ${err?.message ?? err}`); }
+          }
+        }
+        // The hand-over to the survivors — the revoked device's addresses excluded by derivation (see above).
+        await personKeySync.carryCurrent({ exclude: [...circleIds].map((cid) => deriveCircleAddress(revokedSeed, cid)) });
+      } catch (err) { console.warn(`[ceremony] the person key did not rotate: ${err?.message ?? err}`); }
       const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
       // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
       // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
@@ -2115,7 +2571,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       // included), and flip the key door + marker. The running agent still holds the old key in
       // its wrappers, so the reply asks for a reload; the next boot is a delegation boot.
       let migrated = false;
-      if (ownerRoot) {
+      const introduced = [];
+      // Once per session: the migration leaves this running agent waiting for its reload (the vaults
+      // are resealed, the addresses introduced and retired); a second ceremony before that reload
+      // must not migrate it again onto yet another device id.
+      if (ownerRoot && !selfEnrolledThisSession) {
         try {
           const selfDeviceId = enrolledDevice?.deviceId
             ?? ((typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -2124,6 +2584,9 @@ export async function createRealHouseholdAgent(opts = {}) {
             ? deviceDerivationSeed
             : deriveDeviceSeed(root.deriveAgentSeed('default'), selfDeviceId);
           const newKey = deriveVaultAtRestKeyFrom(selfSeed);
+          // The last snapshot of who this device knows, written under the key the reseal below will
+          // carry over — and no write after it (see `freezePeerBindings`).
+          await freezePeerBindings();
           for (const backing of sealedBackings) {
             await resealVault({ backing, oldKey: atRestKey, newKey });
           }
@@ -2138,11 +2601,55 @@ export async function createRealHouseholdAgent(opts = {}) {
             rootKeyStore, markerVault: ownerRootVault,
             delegationSeed: selfSeed, deviceId: selfDeviceId, fingerprint: ownerRoot.fingerprint(),
           });
+          // INTRODUCE THE ADDRESSES THIS DEVICE WILL HAVE — now, while it still speaks as the ones it
+          // has. A migrated device presents a fresh address per circle, and the next boot's re-announce
+          // arrives signed by a key no member's roster holds: authorized nowhere, refused everywhere,
+          // and the first device is a stranger in its own circles from the reload on (walked
+          // 2026-09-14). So the ceremony fans each new address, with its own proof, from the address
+          // every roster still authorizes — the same introduction a sibling makes for a device that
+          // enrols — and records it here so the next boot finds its row current. Then the address
+          // this device is leaving behind is retired, with the root it holds this once: nothing will
+          // hold that key after the cutover, and a row that keeps naming it is a fan held for nobody.
+          if (migrated && !enrolledDevice) {
+            const rowsBefore = {};
+            for (const cid of circleIds) {
+              try {
+                const ann = ownCircleAddressAnnouncement({
+                  circleId: cid, memberWebid: chatId.pubKey,
+                  circleAddressFor: (c) => deriveCircleAddress(selfSeed, c),
+                  signCircleAddress: (c, address) => signCircleLinkFromSeed(selfSeed, c, c, address),
+                  ceremonyCommitmentFor,
+                  signCeremonyCommitment: (c, address, commitment) =>
+                    signCeremonyCommitmentFromSeed(deriveCircleSeed(selfSeed, c), { circleId: c, circleAddress: address, commitment }),
+                });
+                if (!ann) continue;
+                await callSkill('stoop', 'broadcastCircleAddresses', { groupId: cid, announcements: [ann] });
+                await callSkill('stoop', 'recordCircleAddressAnnouncement', {
+                  groupId: cid, memberWebid: ann.memberWebid, circleAddress: ann.circleAddress, circleAddressProof: ann.circleAddressProof,
+                  ...(ann.ceremonyCommitment ? { ceremonyCommitment: ann.ceremonyCommitment, ceremonyCommitmentProof: ann.ceremonyCommitmentProof } : {}),
+                });
+                rowsBefore[cid] = circleAddressFor(cid);
+                introduced.push({ circleId: cid, address: ann.circleAddress });
+              } catch (err) { console.warn(`[custody] could not introduce this device's new address for ${cid}:`, err?.message ?? err); }
+            }
+            const leaving = Object.entries(rowsBefore);
+            if (leaving.length) {
+              const retired = await retireAddresses({
+                root, circleIds: leaving.map(([cid]) => cid),
+                addressFor: (cid) => rowsBefore[cid] ?? null,
+                // The address this device presents is exactly the one being retired here.
+                includeOwn: true,
+              });
+              revokedIn.push(...retired.map((r) => ({ ...r, migrating: true })));
+            }
+          }
+          if (migrated) selfEnrolledThisSession = true;
         } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
       }
       return [DataPart({
         ok: true, deviceId, known, revokedIn, circles: revokedIn.length,
-        ...(migrated ? { migrated: true, reloadRequired: true } : {}),
+        ...(personKeyVersion ? { personKeyVersion } : {}),
+        ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'trusted' });   // retires a device's keys everywhere: owner-only, phrase-proven
@@ -2152,16 +2659,63 @@ export async function createRealHouseholdAgent(opts = {}) {
    * so the phrase is the only secret; import opens it with this device's key and upserts every entry
    * through the registry handle, then runs the boot re-open loop. A file sealed by someone else's
    * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
-  hostAgent.register('exportRecoveryFile', async () => {
+  hostAgent.register('exportRecoveryFile', async ({ parts }) => {
     try {
       const strategy = settingsSealStrategyForIdentity(chatId);
       if (!strategy) return [DataPart({ ok: false, error: 'no-identity' })];
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
-      const circles = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {})).length;
-      return [DataPart({ ok: true, file: sealRecoveryFile({ strategy, body }), circles })];
+      const circleIds = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {}));
+      // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): the file
+      // carries each ticked circle's roster — the trail rows and the member rows, the same a sibling
+      // would serve as a seed — for every circle the person ticked; all of them unless the caller says
+      // otherwise (`rosters`: the ticked circle ids). Without it a restored device gets the circle's
+      // name and nobody to reach (`recoveryBootstrap.js`). The device's own registry is not changed —
+      // the choice belongs to the file being written.
+      const ticked = Array.isArray(parts?.[0]?.data?.rosters) ? new Set(parts[0].data.rosters) : null;
+      const rosters = {};
+      const carried = {};
+      for (const circleId of circleIds) {
+        if (ticked && !ticked.has(circleId)) { carried[circleId] = null; continue; }
+        let rows = [];
+        let members = [];
+        try {
+          const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+          const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
+          rows = items.filter((it) => it?.source?.groupId === circleId);
+        } catch { rows = []; }
+        try { members = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
+        const snap = rosterSnapshot({
+          rows, members,
+          // This device's proven address in the circle — the same announcement the seed serve introduces
+          // itself back with (`rosterSeed`), minted while this device still holds the key.
+          ownAnnouncement: ownCircleAddressAnnouncement({
+            circleId, memberWebid: chatId.pubKey, circleAddressFor,
+            signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
+            ceremonyCommitmentFor, signCeremonyCommitment,
+          }),
+        });
+        rosters[circleId] = snap;
+        carried[circleId] = snap ? snap.members.filter((m) => m.webid !== chatId.pubKey).length : null;
+      }
+      const file = sealRecoveryFile({ strategy, body: bodyWithRosters({ body, rosters }) });
+      return [DataPart({ ok: true, file, circles: circleIds.length, rosters: carried })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'export-failed' })]; }
   }, { visibility: 'trusted' });   // the sealed circle list: owner-only
+
+  /** The circles a recovery file would carry — what the export door lists with its per-circle choice. */
+  hostAgent.register('listRecoveryCircles', async () => {
+    try {
+      const memberships = await readSelfCircleMemberships().catch(() => ({}));
+      let rows = [];
+      try { rows = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { rows = []; }
+      const nameOf = new Map(rows.map((c) => [typeof c === 'string' ? c : (c?.groupId ?? c?.id), typeof c === 'string' ? null : (c?.name ?? null)]));
+      const circles = Object.keys(memberships)
+        .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household')
+        .map((id) => ({ id, name: nameOf.get(id) ?? null }));
+      return [DataPart({ ok: true, circles })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
+  }, { visibility: 'trusted' });
 
   const importRecoveryFileText = async (file) => {
     if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
@@ -2179,7 +2733,47 @@ export async function createRealHouseholdAgent(opts = {}) {
         agents += 1;
       }
       const { reopened } = await reopenMemberCircles();
-      return { ok: true, agents, circles: reopened };
+      // THE ROSTERS the file carried land through the seed's own ingest (id-preserved, first-write-wins),
+      // so the circles have members before anything is asked of anyone.
+      let landed = 0;
+      for (const [circleId, snap] of Object.entries(rostersOf(body))) {
+        try {
+          const r = await callSkill('stoop', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members });
+          if (r && !r.error) landed += 1;
+          // The owner's own proven address from before the wipe — through the announce's receive door,
+          // proof re-verified, so what the owner said with it binds on this device too.
+          if (snap.own) {
+            await callSkill('stoop', 'recordCircleAddressAnnouncement', {
+              groupId: circleId, memberWebid: snap.own.memberWebid, circleAddress: snap.own.circleAddress,
+              circleAddressProof: snap.own.circleAddressProof,
+              ...(snap.own.ceremonyCommitment ? { ceremonyCommitment: snap.own.ceremonyCommitment, ceremonyCommitmentProof: snap.own.ceremonyCommitmentProof } : {}),
+            });
+          }
+        } catch (err) { if (typeof console !== 'undefined') console.warn(`[restore] ${String(circleId).slice(0, 12)}…: the file's roster did not land: ${err?.message ?? err}`); }
+      }
+      // THE BOOTSTRAP: the members the file named become an enrol offer — the same artefact the
+      // add-a-device path consumes (announce this device's fresh address to every member, pull every
+      // lane from them; the roster itself is already here, so no seed is asked). Stashed where the
+      // shell's boot-time consume looks, when the shell handed that storage in, so it also retries on
+      // the next launch; returned as well, so the shell can consume it NOW rather than after a relaunch.
+      let bootstrap = null;
+      try {
+        const entry = body.agents.find((a) => a?.agentId === 'default') ?? null;
+        const made = bootstrapOfferFromRosters({ body, selfPubKey: chatId.pubKey, memberships: circleMembershipsOf(entry ?? {}) });
+        if (made) {
+          let stashed = false;
+          if (opts.enrollOfferStorage) {
+            try { stashed = (await stashEnrollOffer(opts.enrollOfferStorage, made.offer)).ok === true; } catch { stashed = false; }
+          }
+          bootstrap = { ...made, rosters: landed, stashed };
+          // Consume it NOW, through the shell's own consume (it attaches `bootstrapFromStashedOffer`
+          // at connect, with its presence registration and content pulls): a restored device should
+          // hear its circles again on this launch, not the next. After the reply, so the door paints
+          // the circles that came back while the announce and the pulls go out.
+          if (stashed) setTimeout(() => { try { selfAgent?.bootstrapFromStashedOffer?.(); } catch { /* retried at the next boot from the stash */ } }, 0);
+        }
+      } catch { bootstrap = null; }
+      return { ok: true, agents, circles: reopened, bootstrap };
     } catch (e) { return { ok: false, error: e?.message ?? 'import-failed' }; }
   };
   hostAgent.register('importRecoveryFile', async ({ parts }) => [DataPart(await importRecoveryFileText(parts?.[0]?.data?.file))],
@@ -2369,6 +2963,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // 4 demo tasks (the data-loss bug behind the
     // `cc.firstBootSeeded.v1` workaround in App.js).
     persistDb: opts.tasksPersistDb,
+    contentSeal,                       // its list is content too — sealed on the way to disk
     label: 'TasksCircle(cc)',
     // One-store-per-circle (G-C1) — hand every tasks circle its household
     // CircleItemStore instead of tasks-v0 constructing a second one. Tasks then
@@ -2543,7 +3138,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: chatId.pubKey,
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
-      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+      }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
+        // my own write reaches my other devices by the one carry — after the member fan, never instead of it
+        .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     });
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
     // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
@@ -2570,6 +3167,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
+        // my own write reaches my other devices by the one carry — after the member fan, never instead of it
+        siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {});
         if (r?.error || (r?.errors?.length ?? 0) > 0 || (r?.sent ?? 0) < (r?.attempted ?? 0)) {
           console.warn(`[task-lane] fan under-delivered for ${circleId} ${statement.body.kind}`
             + ` hash=${statement.body.hash.slice(0, 8)}: sent=${r?.sent ?? 0}/${r?.attempted ?? 0}`
@@ -2596,7 +3195,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       rail: chatRail,
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleChatStatement', {
         groupId: circleId, event: statement, msgId: statement.body.subject, ts: Date.now(),
-      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+      }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
+        // my own write reaches my other devices by the one carry — after the member fan, never instead of it
+        .finally(() => siblingCarry.carry({ subtype: CHAT_STATEMENT_BROADCAST, circleId, event: statement, msgId: statement.body.subject, ts: Date.now() }).catch(() => {})),
     });
   }
   // THE KEY LANE (the recorded spine route for key rotations, implemented 2026-08-22): the
@@ -2612,7 +3213,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     myRef: chatId.pubKey,
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
   });
-  const keyEmit = makeKeyEmitter({ rail: keyRail });
+  // Every key statement this device writes — the shells' sinks and the revoke ceremony all emit through
+  // here — also reaches its other devices by the one carry, whichever caller fans it to the members.
+  const keyEmitBare = makeKeyEmitter({ rail: keyRail });
+  const keyEmit = keyEmitBare ? async (circleId, event) => {
+    const statement = await keyEmitBare(circleId, event);
+    if (statement) siblingCarry.carry({ subtype: KEY_STATEMENT_BROADCAST, circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now() }).catch(() => {});
+    return statement;
+  } : null;
   // THE RULES-UPDATE RIDER: `editGroupRules` also fans the new doc + version as a signed statement
   // on the governance lane (this rail instance shares the device log with the shells' receive-side
   // rail — same lane, same declaration, the multi-instance shape governance already has). Without
@@ -2628,7 +3236,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     }),
     fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
-    }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+    }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
+      .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan
@@ -2644,11 +3253,19 @@ export async function createRealHouseholdAgent(opts = {}) {
    * per-circle alias, so the unlinkability the circle path protects is not in play — and leaving it off
    * keeps NKN eligible, which is what an unscoped send could always use.
    */
-  const contactScope = (to) => contactRelayScope({
+  const contactScope = (to, contactPoints = []) => contactRelayScope({
     to,
     circlesForPeer:  (addr) => opts.circlesForPeer?.(addr) ?? [],
     circlePointsFor: (cid) => opts.circlePointsFor?.(cid) ?? [],
+    contactPoints,
   });
+  /** The points the person's own card named, kept on their contact — by any address of theirs. */
+  const contactPointsFor = async (to) => {
+    try {
+      const c = (await rawContacts()).find((x) => x && (x.webid === to || x.pubKey === to || x.peerAddr === to));
+      return Array.isArray(c?.points) ? c.points : [];
+    } catch { return []; }
+  };
 
   async function sendCircleScoped(to, envelope, sendOpts = {}) {
     // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
@@ -2667,7 +3284,18 @@ export async function createRealHouseholdAgent(opts = {}) {
       // kringen, so their device dialled those relays — so that is where they are. An explicit scope from
       // the caller always wins (the join's redeem names the relay its invite carried), and when we share no
       // kring with a recorded relay there is nothing to narrow to and the send stays exactly as it was.
-      const scope = rest.scope ?? contactScope(to);
+      const scope = rest.scope ?? contactScope(to, await contactPointsFor(to));
+      // "Contact reveals, so contact is minimised": the fewest points that reach them. A relay this
+      // device is already on wins; only when it is on NONE of the person's points does it come beside
+      // the first one the card named — dialling a relay registers this device there, which is the
+      // one disclosure a card the person handed out asks for.
+      if (scope?.points?.length) {
+        const on = (() => { try { return sa.relays.list().map((r) => r.url); } catch { return []; } })();
+        if (!scope.points.some((u) => on.includes(u))) {
+          try { await sa.relays.add(scope.points[0], { awaitReady: true }); }
+          catch (err) { if (typeof console !== 'undefined') console.warn(`[realAgent] could not come beside ${scope.points[0]} for a contact: ${err?.message ?? err}`); }
+        }
+      }
       return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest, ...(scope ? { scope } : {}) });
     }
     const points = opts.circlePointsFor?.(circleId) ?? [];
@@ -2697,6 +3325,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: chatId.pubKey }),
     membershipEmit,
     membershipRead,
+    // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
+    currentPersonKey,
     rulesUpdateEmit,
     // One block set for the whole device. Blocking is a decision about a PERSON, so it cannot live
     // per-app: the boundary refuses their envelopes, and this app's ingest filter reads the same set
@@ -2718,6 +3348,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       ] : []),
     ],
     persistDb:  opts.stoopPersistDb,   // browser IDB; opt-in via caller
+    contentSeal,                       // its posts are content too — sealed on the way to disk
     // S4 — per-circle control-agent router: redeem→addMember / leave→removeMember route
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent
     // → membership hooks no-op (the pre-S4 behaviour).
@@ -2749,6 +3380,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     allowAddressFallback: opts.allowAddressFallback,
     label:      'StoopAgent(cc)',
   });
+  stoopAgentRef.current = stoopAgent;   // the raw contact-book reads above may run from here on
   // Every noticeboard item the stoop store ACCEPTS fans to its circle — a request, an offer, an
   // announcement, and the next kind — through the one `circle-post` door (`noticeboardFan.js` decides from
   // the item; a received item never echoes). Installed on the store event, so no op has to remember.
@@ -3461,6 +4093,22 @@ export async function createRealHouseholdAgent(opts = {}) {
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
         );
         if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
+        // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
+        if (personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(personKey.links) ? personKey.links : [] };
+        // WHERE I CAN BE FOUND (Frits, 2026-09-11): the primary relay by default; every extra relay this
+        // device is on only when the person named it (`extraRelays`, off by default — relay diversity is
+        // an unlinkability strategy, and a card listing every relay hands its holder a linkage across
+        // them). Never mDNS. An extra relay this device is NOT on is not put on the card: a card must
+        // not name a place the person cannot be reached. Under the same publication lock as the address.
+        if (myPeerAddr) {
+          const on = (() => { try { return sa.relays.list().map((r) => r.url).filter(Boolean); } catch { return []; } })();
+          const primary = sa.relay?.url ?? on[0] ?? null;
+          const wanted = String(realArgs.extraRelays ?? realArgs['extra-relays'] ?? '').split(',').map((u) => u.trim()).filter(Boolean);
+          const relays = [];
+          if (primary) relays.push(primary);
+          for (const u of wanted) if (on.includes(u) && !relays.includes(u)) relays.push(u);
+          if (relays.length) realArgs = { ...realArgs, relays };
+        }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
@@ -3536,11 +4184,13 @@ export async function createRealHouseholdAgent(opts = {}) {
           note:        'Multi-circle support requires multi-agent topology — separate slice.',
         };
       }
+      let rawReply = null;   // the stoop reply before shaping — the own-devices fan below reads the contact row
       const runStoop = async () => {
         const parts = [DataPart(realArgs)];
         const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts);
         const first  = Array.isArray(result) ? result[0] : null;
         const reply  = first?.data ?? null;
+        rawReply = reply;
         // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the stoop
         // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
         return adaptStoopReply(opId, reply, realArgs);
@@ -3551,6 +4201,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runStoop);
       const out = await runStoop();
       rosterReads.afterWrite(realOpId);
+      // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
+      // is a contact on the person's other devices too. Best-effort and after success.
+      if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
+        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
       // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
       //
       // Joining wrote this record (the join wizard, after the redeem) and creating never did, so the
@@ -4355,6 +5010,8 @@ export async function createRealHouseholdAgent(opts = {}) {
           // the contact's stableId/webid.  ListItemRow forwards this
           // to buttonSpecials.startDm.
           peerAddr:    c.peerAddr ?? null,
+          personKey:   c.personKey ?? null,   // what a direct message to them is sealed to
+          pairCircleId: c.pairCircleId ?? null,   // the pair roster, once it exists (the row says "verbonden")
         })),
         _sync: simulateSync(),
       };
@@ -4393,6 +5050,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         title:    'Share your contact card',
         trust:    args?.trustOffer ?? args?.trust ?? 'bekend',
         payload:  data.payload,
+        // Where the card says this person can be found — surfaced so the person sees what they hand out.
+        ...(Array.isArray(data.relays) ? { relays: data.relays } : {}),
         message:  'Copy the payload above + paste into any QR generator.  The receiver scans + uses /add-contact to add you with the proposed trust level.',
       };
     }
@@ -4768,6 +5427,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       host: { pubKey: hostId.pubKey, stableId: hostId.stableId },
       chat: { pubKey: chatId.pubKey, stableId: chatId.stableId },
     },
+    /** Whether this install is an ENROLLED device (a delegation under the owner root) — read by a
+     *  headless operator command that must refuse to enrol an install twice. */
+    // ENROLLED means "by a ceremony" — the delegation the first device mints for itself at first boot (2026-09-16) does
+    // not make it an enrolled device: the runner's `--enrol` and the add-a-device flows still apply to it.
+    isEnrolledDevice: () => !!enrolledDevice && enrolledDevice.selfMinted !== true,
 
     // Cross-peer state (delegates to sa.peer).  Same surface main.js
     // already consumes: peer.address / peer.status / peer.error.
@@ -5019,8 +5683,23 @@ export async function createRealHouseholdAgent(opts = {}) {
      * (returns a `{ held: true, ... }` result rather than throwing).
      */
     async sendPeerMessage(targetAddress, payload, opts = {}) {
+      // `asPerson`: speak as the current PERSON key — for the own-device messages the other end cannot yet
+      // place (an enrolling device's first requests). Without a person key the send speaks as it always did.
+      if (opts?.asPerson) {
+        const { asPerson, ...rest } = opts;   // eslint-disable-line no-unused-vars
+        const pa = personAddress();
+        // The relay refuses a frame from an address this socket has not registered — and tells only the relay's
+        // log, the sender still sees "delivered". So the person address is (re)registered right before the first
+        // person-speaking send, whatever a shell's boot order (found on the runner's enrol walk, 2026-09-16).
+        if (pa) await registerPersonAddressOnRelays();
+        return sendCircleScoped(targetAddress, payload, { ...rest, ...(pa ? { sendAs: pa } : {}) });
+      }
       return sendCircleScoped(targetAddress, payload, opts);
     },
+    /** The current person key's wire address (b64 pubKey), or null. */
+    personAddress,
+    /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */
+    ownAddressBindings,
 
     /**
      * Presence hook for the delivery guarantee — call when a peer becomes
@@ -5109,6 +5788,30 @@ export async function createRealHouseholdAgent(opts = {}) {
     contactTurnFan,
     contactTurnHandler,
     contactTurnBroadcast: CONTACT_TURN_BROADCAST,
+    // Who this device knows, carried to the person's other devices (bindings + contact book): the
+    // shells spread `handlers` into the router and kick `requestFromSiblings` on connect; the
+    // announce landing calls `pushTo` for a device of mine that just appeared.
+    knownPeersSync,
+    /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */
+    personKey: currentPersonKey,
+    // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.
+    /** The primary-device choice (sync-policy §12): `isMine()`, `claim()`, `requestFromSiblings()`, `handlers`. */
+    primaryDevice,
+    /** Where a message to a contact goes once their pair roster exists (`pairRoster.js`): `{ to, circleId, personKey }` or null. */
+    pairRouteFor: (contactWebid) => pairRouteFor({ callSkill: (a, o, g) => callSkill(a, o, g), selfWebid: chatId.pubKey, contactWebid }),
+    claimPrimaryDevice: () => primaryDevice.claim(),
+    personKeySync,
+    /** My person-key chain `{ current, links }` — what a contact pulls after a rotation. */
+    personKeyChain,
+    personKeyChainOf,
+    /** The direct-message seal to the person (`sealFor` / `openFor`) — the shells hand it to the contact channel. */
+    contactSeal,
+    /** A contact's current person key: a shared circle's row, else the contact book. */
+    contactPersonKeyOf,
+    // The one sibling carry (L100): the lane table (`buildCircleLanes`) hands it every landed statement.
+    siblingCarry,
+    /** Inbound envelopes the security layer refused, per reason — the diagnostic read of the warning above. */
+    refusedInboundByReason: () => Object.fromEntries(refusedInbound),
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its
     // subtypes; `consumeEnrollOffer` sends `buildRequest` to the sibling.
     rosterSeed,
@@ -5179,10 +5882,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleId,
         ownAddress,
         members,
-        // Our own two keys: what we sign this circle's traffic with, and our canonical identity —
-        // the second because our OTHER devices share this profile seed and may still be speaking
-        // canonically, and refusing ourselves is never the right answer.
-        selfKeys: [selfCircleKey, chatId.pubKey].filter(Boolean),
+        // Our per-circle signing key. The static profile key is NOT admitted any more (2026-09-16): no own-device
+        // lane speaks as it, and the one that had to — the enrolling device's first requests — speaks as the
+        // person key now, which the authorizer admits live (`ownKeysLive`), rotation and all.
+        selfKeys: [selfCircleKey].filter(Boolean),
+        // …and our WEBID, because a founder's own row can carry a pubKey that is neither of those:
+        // `deriveRoster` gives a founder no keys, so the row comes from the display cache and brings
+        // this device's stoop identity with it. Without this the row reads as a stranger's.
+        selfWebid: chatId.pubKey,
       });
     },
     /** Drop a circle's authorize snapshot — the circle was left. */

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 32
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 36
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -23,18 +23,22 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `disclosure-exit` | G-A1 | the Agent membrane's disclosure gate is the ONLY exit for identity |
 | `doc-refs` | — | Fitness function for the task #66 file-org model |
 | `duplicate-vocab` | — | a shared VOCABULARY is defined in exactly ONE place |
+| `entry-kinds-complete` | — | every entry kind declares all four BINDING cells from the vocabularies, the unknown |
 | `hardcoded-strings` | — | CLAIM: every word a person reads on a shipping surface comes from a locale |
 | `integration-index` | — | the integration index stays in sync with reality |
 | `journeys-reach-users` | — | a journey walks a corridor a PERSON can walk |
 | `kind-appenders` | — | every declared entry kind must have a production APPENDER |
+| `lanes-sign-per-circle` | — | a lane module never names the profile identity — a statement on a lane signs with the |
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
+| `rails-named-verifier` | — | every signed rail is constructed with a NAMED binding verifier, and the name agrees |
 | `register-bypass` | — | a settable value has ONE home, and it is the register |
 | `resolution-policy` | G-L23 | the DECLARATION LAYER is complete + has no SECOND ordering mechanism |
 | `retired-modules` | — | a RETIRED module must stay dead (the legacy-deletion-after-cutover discipline) |
 | `revocation-resolver` | — | a revocation resolver is taken at CONSTRUCTION; nothing may replace one later |
 | `scope-leaks` | — | no CROSS-SCOPE REFERENCE LEAKS in the RN shell screens |
+| `sealed-at-rest` | — | every local store a shell builds is sealed on the way to disk |
 | `searchable-sources` | — | every source file must be findable by search |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |

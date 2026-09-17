@@ -249,3 +249,49 @@ describe('persistOutbound — our side of a reply that went out by another path'
     expect(await ch.rehydrate('poster-A')).toHaveLength(1);
   });
 });
+
+describe('this device\'s selection (sync-policy §11): hold nothing still carry; the bytes as chosen', () => {
+  const rig = (selection) => {
+    const store = memItemStore();
+    const blobs = new Map();
+    const fanned = [];
+    const ch = createContactThreadChannel({
+      sendToPeer: vi.fn(async () => ({})),
+      itemStore: store,
+      blobStore: { put: async (id, b64) => { blobs.set(id, b64); }, get: async (id) => blobs.get(id) ?? null },
+      fanToOwnDevices: async (turn) => { fanned.push(turn); },
+      selection,
+    });
+    return { ch, store, blobs, fanned };
+  };
+  const file = { id: 'f1', name: 'foto.jpg', mime: 'image/jpeg', size: 3, dataB64: 'YWJj' };
+
+  it('contacts OFF: a received turn is stored NOWHERE and still fanned to the siblings — bytes included', async () => {
+    const { ch, store, blobs, fanned } = rig({ holds: (silo) => silo !== 'contacts', keepsBytes: () => true });
+    const res = await ch.persistInbound({ contactId: 'peer-A', fromAddr: 'peer-A', text: 'hoi', messageId: 'm1', ts: 1, file });
+    expect(res.itemId).toBe(null);
+    expect(store.addItems).not.toHaveBeenCalled();
+    expect(blobs.size).toBe(0);
+    expect(fanned).toHaveLength(1);
+    expect(fanned[0].file.dataB64, 'the carry forwards the bytes').toBe('YWJj');
+    // an outbound turn is not kept either
+    await ch.persistOutbound({ contactId: 'peer-A', peerAddr: 'peer-A', text: 'dag', messageId: 'm2', ts: 2 });
+    expect(store.addItems).not.toHaveBeenCalled();
+    expect(fanned).toHaveLength(2);
+  });
+  it('bytes = description: the turn is kept, the file without its bytes; the fan still carries them whole', async () => {
+    const { ch, store, blobs, fanned } = rig({ holds: () => true, keepsBytes: () => false });
+    await ch.persistInbound({ contactId: 'peer-A', fromAddr: 'peer-A', text: '', messageId: 'm1', ts: 1, file });
+    expect(store.addItems).toHaveBeenCalledTimes(1);
+    expect(store.addItems.mock.calls[0][0][0].source.file).toMatchObject({ id: 'f1', name: 'foto.jpg' });
+    expect(blobs.size, 'no bytes kept on this device').toBe(0);
+    expect(fanned[0].file.dataB64).toBe('YWJj');
+  });
+  it('a turn that arrived FROM a sibling is stored per this device\'s choice and never fanned back', async () => {
+    const { ch, store, blobs, fanned } = rig({ holds: () => true, keepsBytes: () => true });
+    await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'peer-A', fromAddr: 'peer-A', text: '', messageId: 'm1', ts: 1, file });
+    expect(store.addItems).toHaveBeenCalledTimes(1);
+    expect(blobs.get('f1')).toBe('YWJj');
+    expect(fanned).toHaveLength(0);
+  });
+});

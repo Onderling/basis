@@ -68,6 +68,7 @@ import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '..
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer } from '../../../basis/src/v2/enrollOffer.js';
+import { seedContactCard }    from '../../../basis/src/v2/seededContact.js';
 import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
@@ -118,6 +119,7 @@ import { makeHandleSharedCopy } from '../../../basis/src/core/handlers/sharedCop
 // implementation, called by web (circleApp) and the mobile launcher too.
 import { feedHouseholdRoster } from '../../../basis/src/v2/householdRosterPairing.js';
 import { computeEmbedButtons } from '../../../basis/src/core/embedButtons.js';
+import { embedButtonText } from '../../../basis/src/v2/replyEmbeds.js';
 import { makeCalendarOutboundHook }
                                from '../../../basis/src/core/handlers/calendarOutbound.js';
 import { interceptButtonTap }       from '../core/buttonSpecials.js';
@@ -580,6 +582,8 @@ export default function ChatScreen({
       'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),
       'group-redeem-request':  makeHandleGroupRedeemRequest({
         callSkill, sendPeer, publishEvent,
+        // a member admitted into a PAIR circle is its co-admin (the pair roster's rule; web parity)
+        onAdmitted: (a) => bundle?.pairRoster?.onAdmitted?.(a),
         // …and return OUR per-circle address for the circle being joined, proven the same way the joiner
         // proves theirs, so per-circle addressing works in both directions from the join on (web parity).
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
@@ -643,12 +647,14 @@ export default function ChatScreen({
       // ContactThreadScreen through the same inbox every DM reply rides. It used to go to addMainBubble
       // → this screen's main thread — which v2 mounts but permanently hides.
       'file-share':            makeHandleFileShare({
-        deliverToThread: ({ contactId, fromAddr, file, messageId, ts }) => {
-          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file })
+        deliverToThread: ({ contactId, fromAddr, file, messageId, ts, sealed }) => {
+          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file, ...(sealed ? { sealed } : {}) })
             ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
-          pushContactReply({ fromAddr, threadId: contactId, text: '', file });
+          pushContactReply({ fromAddr, threadId: contactId, text: '', file, ...(sealed ? { sealed } : {}) });
         },
         identityOf: (addr) => agent?.identityOfAddress?.(addr) ?? addr,
+        // A file sealed to the person opens with my key for the version it names (the text turn's seal).
+        openFor: (sealed, fromAddr) => agent?.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
         // A first file makes the sender a contact row (the graph otherwise only learns at send time).
         notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
         publishEvent,
@@ -773,6 +779,8 @@ export default function ChatScreen({
         });
         const { gov: govCatchUp, membership: memCatchUp, key: keyCatchUp,
                 task: taskCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
+        // Hand the bundle the catch-ups, so a join made from any screen pulls the circle's lanes (`onCircleJoined`).
+        try { if (bundle) bundle.laneCatchUps = lanes.catchUps; } catch { /* a bundle without the slot */ }
         const grantsCatchUp = bundle?.agent?.grantsCatchUp ?? null;
 
         // The reconnect kicks — once per app launch each; after that the LIVE fan keeps the log current.
@@ -790,27 +798,52 @@ export default function ChatScreen({
           globalThis.__onderlingGrantsCatchUpKicked = true;
           setTimeout(() => { grantsCatchUp.requestFromSiblings().catch(() => {}); }, 2500);
         }
+        // Who my other devices know (bindings + contact rows) — web parity with the kick above.
+        if (bundle?.agent?.knownPeersSync && !globalThis.__onderlingKnownPeersKicked) {
+          globalThis.__onderlingKnownPeersKicked = true;
+          setTimeout(() => { bundle.agent.knownPeersSync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
+        // The person key a ceremony rotated on another device while this one was off — web parity.
+        if (bundle?.agent?.personKeySync && !globalThis.__onderlingPersonKeyKicked) {
+          globalThis.__onderlingPersonKeyKicked = true;
+          setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
+        // …and which of the person's devices is primary for direct messages (sync-policy §12), web parity.
+        if (bundle?.agent?.primaryDevice && !globalThis.__onderlingPrimaryDeviceKicked) {
+          globalThis.__onderlingPrimaryDeviceKicked = true;
+          setTimeout(() => { bundle.agent.primaryDevice.requestFromSiblings().catch(() => {}); }, 2600);
+        }
         // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.
+        // The SAME consume runs after a recovery-file import (the agent calls it: the file's peers are
+        // stashed as an offer), so a restored phone hears its circles again on this launch.
         if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {
           globalThis.__onderlingEnrollOfferConsumed = true;
-          setTimeout(() => {
-            consumeEnrollOffer({
-              agent: bundle.agent,
-              callSkill: bundle.callSkill,
-              sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
-              storage: AsyncStorage,
-              registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
-              // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
-              // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
-              contentPulls: (circleId, siblingAddress) => Promise.allSettled([
-                taskCatchUp?.requestFrom(siblingAddress, circleId),
-                chatCatchUp?.requestFrom(siblingAddress, circleId),
-              ]),
-            }).then((r) => {
-              if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
-            }).catch(() => { /* retried next launch — the stash only clears on full success */ });
-          }, 3000);
+          bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+            agent: bundle.agent,
+            callSkill: bundle.callSkill,
+            sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
+            storage: AsyncStorage,
+            registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
+            // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
+            // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
+            contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+              taskCatchUp?.requestFrom(siblingAddress, circleId),
+              chatCatchUp?.requestFrom(siblingAddress, circleId),
+            ]),
+          }).then((r) => {
+            if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+            return r;
+          }).catch(() => { /* retried next launch — the stash only clears on full success */ });
+          setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);
+        }
+        // The shipped contact, once per launch (web parity): added through the scanned-card path if the
+        // build-time card is set and the person is not in the book yet.
+        if (bundle?.callSkill && !globalThis.__onderlingSeededContactKicked) {
+          globalThis.__onderlingSeededContactKicked = true;
+          seedContactCard({ payload: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD, callSkill: bundle.callSkill })
+            .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
+            .catch(() => { /* an install without it is not an error state */ });
         }
         if (taskCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
           globalThis.__onderlingTaskCatchUpKicked = true;
@@ -858,6 +891,7 @@ export default function ChatScreen({
             eventLog: eventLogRef.current,
             rail: govRail,
             onChange: govChanged,
+            onLanded: lanes.landedCarrier?.governance,   // a landed decision reaches my other devices (the one carry)
             // "A decision opened" is RENDERED from the statement on the log (governanceNotices.js via
             // chatRows) — the appended gov-notif nudge is retired, web parity.
           }),
@@ -2466,17 +2500,17 @@ function EmbedActionButtons({ msg, embed, buttons, enabled, onButtonTap }) {
           onPress={() => onButtonTap?.({
             opId:    btn.opId,
             itemId:  btn.itemId,
-            buttonLabel: btn.label,
+            buttonLabel: embedButtonText(btn, t),
             originMessageId: msg.id,
             embed,
           })}
           disabled={!enabled}
           style={[styles.embedBtn, !enabled && styles.embedBtnDisabled]}
           accessibilityRole="button"
-          accessibilityLabel={btn.label}
+          accessibilityLabel={embedButtonText(btn, t)}
           testID={`embed-btn-${btn.opId}-${btn.itemId}`}
         >
-          <Text style={styles.embedBtnText}>{btn.label}</Text>
+          <Text style={styles.embedBtnText}>{embedButtonText(btn, t)}</Text>
         </TouchableOpacity>
       ))}
     </View>

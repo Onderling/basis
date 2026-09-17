@@ -28,10 +28,11 @@ describe('circle detail bar — projected from manifest.actions', () => {
     renderCircleDetail(el, { circle: { id: 'g1', name: 'Selwerd' }, items: [], t, policy: DEFAULT_CIRCLE_POLICY });
     const projected = circleActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' });
     expect(barActions(el)).toEqual(projected.map((a) => a.id));
-    // The alpha trims the bar to back · invite · settings (alphaSurface.js). The gates beneath it are
-    // unchanged and observable through `gatedActions`: memberDirectory + houseRules on → viewAs + rules;
-    // lists + notes off → files hidden; share is mobile-only → absent on web.
-    expect(barActions(el)).toEqual(['back', 'invite', 'settings']);
+    // The alpha trims the bar to back · invite · settings · admin (alphaSurface.js; Beheer is back since
+    // 2026-09-13 — an admin removes and promotes from the UI). The gates beneath it are unchanged and
+    // observable through `gatedActions`: memberDirectory + houseRules on → viewAs + rules; lists + notes
+    // off → files hidden; share is mobile-only → absent on web.
+    expect(barActions(el)).toEqual(['back', 'invite', 'settings', 'admin']);
     const gated = gatedActions(basisManifest, { policy: DEFAULT_CIRCLE_POLICY, platform: 'web' }).map((a) => a.id);
     expect(gated).toContain('viewAs');
     expect(gated).toContain('rules');

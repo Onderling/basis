@@ -64,7 +64,11 @@ function danglingImports() {
 
   const bad = [];
   for (const f of files) {
-    const src = strip(readFileSync(path.join(ROOT, f), 'utf8'));
+    // `git ls-files` reads the INDEX, which still lists a file that has been deleted but not staged.
+    // Reading it then throws ENOENT and the failure reads as a dangling import, which is a confusing
+    // way to be told "you have not run `git add` yet". Skip it: a file that is not there imports nothing.
+    let src;
+    try { src = strip(readFileSync(path.join(ROOT, f), 'utf8')); } catch { continue; }
     for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"](\.[^'"]*)['"]/g)) {
       const names = exportsOf(path.resolve(path.dirname(path.join(ROOT, f)), m[2]));
       if (!names || names === '*') continue;

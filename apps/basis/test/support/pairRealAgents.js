@@ -55,6 +55,10 @@ import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
 // The contact-thread channel + its own-devices fan — composed here ONLY when a walk asks for it
 // (`contactChannel: true`), so every existing node keeps sending contact turns to `received`.
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { createPairRoster } from '../../src/v2/pairRoster.js';
+import { announceOwnCircleAddress } from '../../src/v2/circleAddressAnnounce.js';
+import { makeCircleGroupsIndex } from '../../src/v2/circleMembrane.js';
+import { makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import {
   makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, projectKeyEventsIntoStore,
@@ -72,10 +76,11 @@ import {
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
+import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeTaskPeerHandler, TASK_BROADCAST } from '../../src/v2/taskRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
-import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
+import { rosterBindingVerifier, makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
@@ -129,9 +134,12 @@ const LIVE_NODES = new Set();
  * stolen-device walk's strict-verify equilibrium once before (reverted, three-party-walk session). Tests
  * that need items to CROSS between agents ask for the lane; tests probing verify/eviction equilibrium
  * keep the minimal composition. Same shape as `verifyChatBinding`: the harness offers the production
- * wiring, the test decides it needs it.
+ * wiring, the test decides it needs it. (Since 2026-09-14 a node that HAS the rail also gets the
+ * membership lane's receive half and catch-up pair registered — the same entries the shared lane table
+ * makes — so an address-revoke fanned to it lands; two walks had wired that by hand. The full suite
+ * stayed green: the equilibrium tests keep the minimal composition, which has no rail.)
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, taskLane = false, contactChannel = false } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, taskLane = false, contactChannel = false, pairRoster: wantPairRoster = true } = {}) {
   const routerRef = { fn: null };
   // The device log the lane rides. Handed to the factory below exactly as both shells hand theirs.
   const deviceLog = taskLane ? new EventLog({ initial: [], muted: [] }) : null;
@@ -152,7 +160,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const circlePods = new Map();
   const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
 
+  // The peer → kringen index the shells keep (`circleGroupsIndex`): which circles this device shares with a peer —
+  // what the DM seal reads a contact's root-revealed key from, and what the pair roster's route needs.
+  const groupsIndex = makeCircleGroupsIndex();
   const agent = await createRealHouseholdAgent({
+    circlesForPeer: (addr) => groupsIndex.groupsFor(addr),
     // Test-only seam: the browser wires this inside connectPeerTransport; in node
     // we hand it in via the existing secureAgentOpts pass-through. Ref-indirected
     // so the router can be built after boot with the live callSkill/sendPeerMessage.
@@ -174,8 +186,10 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   });
 
   const pubKey = agent.identity.chat.pubKey;
+  agent._circleGroupsIndex = groupsIndex;   // the roster feed fills it (householdRosterPairing), as the shells do
   const callSkill = (app, op, args) => agent.callSkill(app, op, args);
-  const sendPeer = (addr, payload) => agent.sendPeerMessage(addr, payload);
+  // The options travel: a lane's `circleId` is what makes its request leave as the circle identity.
+  const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
 
   const pendingMap = new Map();
   const propagateMeshIntros = makePropagateMeshIntros({ callSkill, sendPeer, logger: QUIET });
@@ -244,25 +258,77 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // the others, and this is the composition that exercises it end to end.
   const contactTurnsSeen = [];       // turns that arrived from one of MY OWN devices
   const contactTurnsRefused = [];    // fanned turns this node refused, with the reason
+  // the pair roster (L105), composed as both shells do — the redeem sender is built below, late-bound
+  const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
+  const pairRoster = createPairRoster({
+    selfWebid: pubKey,
+    callSkill: (app, op, args) => callSkill(app, op, args),
+    sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    // the post-join step as the shells run it: register, bind, and PULL the circle's lanes (the join statement that
+    // carries this device's own key, the founder's create) — the catch-up is built below, late-bound
+    onJoined: async ({ circleId }) => {
+      const r = await makeCircleReachable({
+        agent, circleId,
+        // the presence half as the shells run it: this device's per-circle address (and the person address) bound on
+        // its transport, so a message to it over the pair roster can land — `bindCircleAddresses`, for this node
+        registerCirclePresence: () => pairSeams.bindSelf?.(circleId),
+        pullLanes: (cid) => pairSeams.membershipCatchUp?.requestCircle(cid, { callSkill: (a, o, g) => callSkill(a, o, g) }),
+      });
+      // …and ANNOUNCE (the shells' presence step does: prime, then announce) — this device's address with its ceremony
+      // commitment, which is what lets the other side fold this person's rotations
+      try { await announceOwnCircleAddress({ agent, circleId, logger: QUIET }); } catch { /* the next boot re-announces */ }
+      return r;
+    },
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid, logger: QUIET }),
+    myHandle: () => label.toLowerCase(),
+    logger: process.env.PAIR_ROSTER_LOUD ? console : QUIET,
+  });
   const contactThreadChannel = contactChannel
     ? createContactThreadChannel({
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
         itemStore:  createContactDmStore({ dataSource: null, localActor: pubKey }),
+        sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
+        openFor: agent.contactSeal?.openFor ?? null,
         localActor: pubKey,
         fanToOwnDevices: agent.contactTurnFan,
+        // the pair roster (L105), composed as both shells do. A walk of the CARD-ONLY path (the chain pull after a
+        // rotation, the profile address) switches it off.
+        ...(wantPairRoster ? { pair: pairRoster } : {}),
       })
     : null;
   /** A turn that arrived DIRECTLY (a contact's DM or a bot's reply): store it, which also fans it. */
   const landContactTurn = ({ fromAddr, text, messageId, replyTo, ts, buttons }) => {
-    contactThreadChannel?.persistInbound({ contactId: fromAddr, fromAddr, text, messageId, replyTo, ts, buttons })
+    // the thread is keyed by IDENTITY (the shells' `identityOf`): a turn over the pair roster arrives from the
+    // contact's per-circle address there, and must land in the same thread as one from their profile address
+    const contactId = agent.identityOfAddress?.(fromAddr) ?? fromAddr;
+    contactThreadChannel?.persistInbound({ contactId, fromAddr, text, messageId, replyTo, ts, buttons })
       ?.catch?.(() => { /* durability is best-effort here, as in the shells */ });
   };
 
+  // The chat lane's catch-up — the same frontier replay the shared lane table builds for both shells
+  // (`circleLanes.js`), so a walk can pull a circle's conversation from a member by address the way
+  // the enrol/restore consume does (`contentPulls`).
+  const chatCatchUp = makeFrontierReplay({ rail: chatRail, sendToPeer: sendPeer, subtypes: CHAT_CATCHUP_SUBTYPES });
+  // The membership lane's catch-up pair (registered below when the node has the rail), exposed on the node so a
+  // walk can run the pull a fresh joiner makes (`requestCircle`) instead of replaying the admin's spine by hand.
+  const membershipCatchUp = agent.membershipRail
+    ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES })
+    : null;
+  pairSeams.membershipCatchUp = membershipCatchUp;
+  pairSeams.bindSelf = (circleId) => bindCircleAddresses([nodeRef.current], circleId);
+  const nodeRef = { current: null };
   const handlers = {
     [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
+    [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
+    [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
+    [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,
     // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
     'group-redeem-request': makeHandleGroupRedeemRequest({
       callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
+      onAdmitted: (a) => pairRoster.onAdmitted(a),
       // The ADMIN half of per-circle addressing (web ≡ mobile ≡ harness): the reply carries OUR proven
       // per-circle address, so the joiner records it instead of knowing us only by our global key.
       circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
@@ -289,7 +355,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       const refresh = (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: keyEventStore, circleId: cid }).catch(() => {});
       const keyCU = makeGovernanceCatchUp({
         rail: agent.keyRail,
-        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        sendToPeer: sendPeer,
         subtypes: KEY_CATCHUP_SUBTYPES,
         onChange: refresh,
       });
@@ -326,6 +392,16 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // the statement and causally merges the item snapshot into the circle's store head, which is what
     // makes an item written on A appear in B's store.
     ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
+    // The MEMBERSHIP lane, when this node has a device log (the factory builds the rail off it): the
+    // fan's receive half and the catch-up pair, the same registration the shared lane table makes for
+    // both shells. Two walks (the replace ceremony, the lost phone) wired this by hand before an
+    // address-revoke could reach the member it was fanned to; a node with the rail and no receiver is
+    // the "two green tests flanking a dead seam" shape.
+    ...(membershipCatchUp ? {
+      [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }),
+      [membershipCatchUp.subtypes.request]: membershipCatchUp.onRequest,
+      [membershipCatchUp.subtypes.batch]:   membershipCatchUp.onBatch,
+    } : {}),
     // The grants lane (connections belong to the person) — the agent's ready-made receiver + its
     // catch-up pair, the same registration both shells make. A sibling device's grant/revoke lands
     // through the full ingest gate and refolds this node's door.
@@ -339,6 +415,12 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
     } : {}),
+    // Who the person knows, on every device of theirs (bindings + contact book) — the same entries the
+    // shared lane table spreads into both shells.
+    ...(agent.knownPeersSync?.handlers ?? {}),
+    ...(agent.personKeyChain?.handlers ?? {}),
+    ...(agent.personKeySync?.handlers ?? {}),
+    ...(agent.primaryDevice?.handlers ?? {}),
     // The contact thread, when a walk asked for it — the same three registrations both shells make:
     // a bot's reply, a person's DM, and a turn one of MY OWN devices carried here. All three land in
     // the durable thread through the channel, which is what makes `contactTurns` a real read of the
@@ -355,6 +437,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
     pendingMap,
+    currentPersonKey: () => agent.personKey?.() ?? null,   // as both shells: the first person key rides the join
     circleAddressFor: agent.circleAddressFor,
     // …and prove it (web ≡ mobile ≡ harness): a fresh per-circle address is signed with its own key.
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
@@ -365,6 +448,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     timeoutMs: redeemTimeoutMs,
     logger: QUIET,
   });
+  pairSeams.sendPeerRedeem = sendPeerRedeem;
 
   routerRef.fn = makePeerRouter({
     handlers,
@@ -373,7 +457,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
+  nodeRef.current = node;
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });
@@ -544,6 +629,7 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
       circleIds: ids,
       circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],   // the person address, as the shells register it
     });
   }
 }

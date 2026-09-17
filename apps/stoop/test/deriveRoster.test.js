@@ -359,6 +359,25 @@ describe('deriveRoster', () => {
       });
       expect(roster.map((m) => m.webid).sort()).toEqual(['B', 'NEW-MEMBER']);   // admitted, B kept
     });
+
+    it('the join-time handle rides the spine onto the row of a device that holds NO trail for the joiner', async () => {
+      // B's device folds C's join from the spine; C's redemption row lives in the admin's store and never
+      // arrives here. Before this, C rendered as `peer-…` on every device but the admin's (walked 2026-09-14).
+      const joiner = await AgentIdentity.generate(new VaultMemory());
+      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const roster = deriveRoster({ redemptions: [], spineStatements: [join], foldAuthoritative: true });
+      expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee');
+    });
+
+    it('a handle the MemberMap holds NOW (a rename) still wins over the join-time one', async () => {
+      const joiner = await AgentIdentity.generate(new VaultMemory());
+      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const roster = deriveRoster({
+        redemptions: [], spineStatements: [join], foldAuthoritative: true,
+        memberMapForDisplay: [{ webid: 'NEW-MEMBER', handle: 'cee-renamed' }],
+      });
+      expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee-renamed');
+    });
   });
 
   // ── HOW an admin came to be one, carried onto the row (`adminVia`) ────────────────────────────────
@@ -481,5 +500,33 @@ describe('W10 — a person\'s chosen handle reaches BOTH rosters (2026-08-29)', 
       memberMapForDisplay: [{ webid: 'B', handle: 'current-handle' }],
     });
     expect(roster.find((m) => m.webid === 'B')?.handle).toBe('current-handle');
+  });
+});
+
+describe('the roster row carries the member\'s CURRENT person key (the person-key head)', () => {
+  it('a verified person-key statement lands on the row; the highest version is current; nobody announces for another', () => {
+    const roster = deriveRoster({
+      redemptions: [redemption({ redeemedBy: 'B', circleAddress: 'addrB' }), redemption({ redeemedBy: 'C', circleAddress: 'addrC' })],
+      spineStatements: [
+        { kind: 'person-key', author: 'B', subject: 'B', payload: { version: 1, pubKey: 'B-1' } },
+        { kind: 'person-key', author: 'B', subject: 'B', payload: { version: 2, pubKey: 'B-2' } },
+        { kind: 'person-key', author: 'C', subject: 'B', payload: { version: 9, pubKey: 'FORGED' } },   // self-subject: ignored
+      ],
+    });
+    expect(roster.find((m) => m.webid === 'B').personKey).toEqual({ version: 2, pubKey: 'B-2' });
+    expect('personKey' in roster.find((m) => m.webid === 'C'), 'no announcement → no key on the row').toBe(false);
+  });
+});
+
+describe('the FIRST person key rides the join (option A) — the row carries it before any ceremony', () => {
+  it('a join-carried key lands on the row; a root-revealed statement supersedes it', () => {
+    const base = { redemptions: [redemption({ redeemedBy: 'B', circleAddress: 'addrB' })] };
+    const fromJoin = deriveRoster({ ...base, spineStatements: [{ kind: 'join', author: 'B', subject: 'B', payload: { redemptionRef: 'r', personKey: { version: 1, pubKey: 'B-1' } } }] });
+    expect(fromJoin.find((m) => m.webid === 'B').personKey).toEqual({ version: 1, pubKey: 'B-1' });
+    const rotated = deriveRoster({ ...base, spineStatements: [
+      { kind: 'join', author: 'B', subject: 'B', payload: { redemptionRef: 'r', personKey: { version: 1, pubKey: 'B-1' } } },
+      { kind: 'person-key', author: 'B', subject: 'B', payload: { version: 2, pubKey: 'B-2' } },
+    ] });
+    expect(rotated.find((m) => m.webid === 'B').personKey).toEqual({ version: 2, pubKey: 'B-2' });
   });
 });

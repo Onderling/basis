@@ -31,7 +31,6 @@
  * offer itself). The parcel is idempotent at ingest (first-write-wins by item id).
  */
 import { canonicalize, AgentIdentity, b64encode } from '@onderling/core';
-import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from './circleAddressAnnounce.js';
 
 export const ROSTER_SEED_SUBTYPES = Object.freeze({
   request: 'roster-seed-request',
@@ -124,7 +123,23 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
       } catch { memberRows = []; }
       const identity = (await signerPromise)?.identity ?? (await signerPromise);
       if (!identity?.pubKey) return;
-      const parcelBody = { v: ROSTER_SEED_VERSION, kind: 'seed', circleId: body.circleId, replyTo: body.replyTo, rows, members: memberRows, at: Date.now() };
+      // INTRODUCE THIS DEVICE, IN THE PARCEL. A device never records its OWN per-circle address into
+      // the shared person-row — siblings learn it by ANNOUNCE, and this device announced long before
+      // the requester existed. Without it the fresh device holds the person's row addressless and
+      // refuses every task/chat statement this device signs as unbindable (found live 2026-08-21).
+      // It rode as a SECOND message after the parcel until 2026-09-13, which let the requester's
+      // content pull race it: the conversation pulled from this device arrived before the address
+      // that binds it and was refused (the box's enrol walk, one run in four). Inside the parcel the
+      // order is by construction — rows, then this address, then the requester pulls. The receiver
+      // still records it through the announce's own door, proof re-verified; the parcel is a carrier.
+      let own = null;
+      if (typeof ownAnnouncement === 'function') {
+        try { own = (await ownAnnouncement(body.circleId)) ?? null; } catch { own = null; }
+      }
+      const parcelBody = {
+        v: ROSTER_SEED_VERSION, kind: 'seed', circleId: body.circleId, replyTo: body.replyTo, rows, members: memberRows, at: Date.now(),
+        ...(own ? { own } : {}),
+      };
       await sendToPeer(body.replyTo, {
         subtype: ROSTER_SEED_SUBTYPES.batch,
         circleId: body.circleId,
@@ -133,22 +148,6 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
         by: identity.pubKey,
         ...(delegationRecord ? { delegation: delegationRecord } : {}),
       });
-      // INTRODUCE THIS DEVICE BACK. A device never records its OWN per-circle address into the
-      // shared person-row — siblings learn it by ANNOUNCE, and this device announced long before
-      // the requester existed. Without this, the fresh device holds the person's row addressless
-      // and refuses every task/chat statement this device signs as unbindable (found live
-      // 2026-08-21). Same production door as any announce: the proof re-verifies at the ingest.
-      if (typeof ownAnnouncement === 'function') {
-        try {
-          const mine = await ownAnnouncement(body.circleId);
-          if (mine) {
-            await sendToPeer(body.replyTo, {
-              type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: body.circleId,
-              msgId: `roster-seed-announce-${body.circleId}`, ts: Date.now(), announcements: [mine],
-            });
-          }
-        } catch { /* the announce also rides this device's next boot re-announce */ }
-      }
       // (The 2026-08-21 key-chain REPLAY that briefly lived here is RETIRED: key events are now
       // signed statements on the key LANE, and the enrolled device pulls that lane through the
       // standing catch-up exactly like membership and governance — one route, no side-channel.)
@@ -166,8 +165,10 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
  * @param {Function} a.verifyDeviceSet   the same verifier instance as the serve half
  * @param {string} a.selfPubKey
  * @param {(circleId:string, result:object) => void} [a.onApplied]
+ * @param {(circleId:string) => Promise<any>} [a.refreshBindings]  re-read the seeded roster into the
+ *   sealing binding + the sender gate (`bindCircleAddressKeysFor`) — the announce door's own refresh
  */
-export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey, onApplied = null } = {}) {
+export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey, onApplied = null, refreshBindings = null } = {}) {
   return async function onRosterSeedBatch(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== ROSTER_SEED_SUBTYPES.batch) return;
     const { body, sig, by } = payload;
@@ -183,6 +184,39 @@ export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey,
         groupId: body.circleId, rows: body.rows,
         ...(Array.isArray(body.members) ? { members: body.members } : {}),
       });
+      // The sibling's own address, through the announce's door — its proof verifies there or it is
+      // refused, exactly as if it had arrived on its own. Recorded AFTER the rows, so the row it
+      // patches exists, and BEFORE this device pulls anything the sibling signed.
+      if (body.own && typeof body.own === 'object' && typeof body.own.circleAddress === 'string') {
+        try {
+          const a = await callSkill('stoop', 'recordCircleAddressAnnouncement', {
+            groupId: body.circleId, memberWebid: body.own.memberWebid, circleAddress: body.own.circleAddress,
+            circleAddressProof: body.own.circleAddressProof,
+            ...(body.own.ceremonyCommitment ? { ceremonyCommitment: body.own.ceremonyCommitment, ceremonyCommitmentProof: body.own.ceremonyCommitmentProof } : {}),
+            ...(body.own.personaProperties ? { personaProperties: body.own.personaProperties } : {}),
+          });
+          // A refusal here is worth a line: the sibling's own address did not bind, so everything it
+          // signed will be refused until its next boot re-announce lands.
+          if (a && a.ok === false && typeof console !== 'undefined') console.warn(`[roster-seed] the sibling's own address was not recorded for ${String(body.circleId).slice(0, 12)}…: ${a.reason ?? 'refused'}`);
+          else if (typeof console !== 'undefined') {
+            let rowsNow = null;
+            try {
+              const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+              const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
+              rowsNow = items.filter((it) => it?.source?.groupId === body.circleId).map((it) => ({ id: String(it.id).slice(0, 10), by: String(it.source?.redeemedBy ?? '').slice(0, 6), addr: String(it.source?.circleAddress ?? '').slice(0, 6), proof: !!it.source?.circleAddressProof, set: (it.source?.circleAddresses ?? []).map((p) => `${String(p?.address).slice(0, 6)}${p?.proof ? '+p' : '-p'}`) }));
+            } catch { rowsNow = null; }
+            console.info(`[roster-seed] sibling address ${String(body.own.circleAddress).slice(0, 8)}… for ${String(body.circleId).slice(0, 12)}…: ${JSON.stringify({ ok: a?.ok, patched: a?.patched, created: a?.created, unchanged: a?.unchanged, reason: a?.reason })} rows=${JSON.stringify(rowsNow)}`);
+          }
+        } catch (err) { if (typeof console !== 'undefined') console.warn(`[roster-seed] the sibling's own address could not be recorded: ${err?.message ?? err}`); }
+      }
+      // The refresh the announce's own door does after recording — not optional here either: the rows
+      // just landed name the members and the sibling, and until the sealing binding and the sender
+      // gate are re-read from them, every envelope those members send is a stranger's. Found the day
+      // the sibling's replies started arriving as its per-circle address (2026-09-14).
+      if (typeof refreshBindings === 'function') {
+        try { await refreshBindings(body.circleId); }
+        catch (err) { if (typeof console !== 'undefined') console.warn(`[roster-seed] could not refresh the bindings for ${String(body.circleId).slice(0, 12)}…: ${err?.message ?? err}`); }
+      }
       if (typeof onApplied === 'function') { try { onApplied(body.circleId, r); } catch { /* observer only */ } }
     } catch { /* ingest is best-effort — the next boot's request retries */ }
   };

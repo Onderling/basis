@@ -36,6 +36,9 @@ import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 // Shared contact/bot exposed-skill registry (feedback-extension) — web≡mobile core.
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
+import { createPairRoster } from '../../../basis/src/v2/pairRoster.js';
+import { announceOwnCircleAddress } from '../../../basis/src/v2/circleAddressAnnounce.js';
+import { makeSyncSelection } from '../../../basis/src/v2/syncSelection.js';
 import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
 import { createAttachmentBlobStoreRN } from './attachmentBlobStoreRN.js';
 import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';
@@ -335,6 +338,7 @@ export async function bootAgentBundle(opts = {}) {
       onSettingsConflicts: opts.onSettingsConflicts,
       // The membership rider: the device log (the shells' EventLog) — membership statements ride its lane.
       deviceLog: opts.deviceLog,
+      deviceLogIo: opts.deviceLogIo,   // hydrated inside the agent, once the content key exists
       // The A2A surface (web parity): these manifests' ops become kernel skills a granted agent can
       // invoke, each gated by a CapabilityToken naming exactly that op. The list is the SHARED one the
       // connection menu paints from, so what this shell offers is what it exposes — and matches web.
@@ -351,6 +355,9 @@ export async function bootAgentBundle(opts = {}) {
       // …and the peer → kringen half of the same map, so a DM reaches someone on a relay of a kring we
       // share rather than only on mine. App.js owns the index (the membrane enforces with it).
       circlesForPeer: opts.circlesForPeer,
+      // Where a scanned add-a-device offer waits out the ceremony reload (web parity): a recovery-file
+      // import stashes the bootstrap it builds here, where the boot-time consume reads.
+      enrollOfferStorage: AsyncStorage,
       publishEvent:     opts.publishEvent,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (RN twin of web's
@@ -610,6 +617,7 @@ export async function bootAgentBundle(opts = {}) {
         circleIds: ids,
         circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
         circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+        alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
         circlesForPoint,
         // The relay this device connects to IS the deployment default — unmapped circles land here alone.
         defaultRelayUrl: relayUrl,
@@ -737,17 +745,39 @@ export async function bootAgentBundle(opts = {}) {
   // A received file's BYTES go to the FILESYSTEM (2026-09-03), never into the DM thread's
   // AsyncStorage snapshot. Per-key AsyncStorage would not help: one photo is still one oversized row.
   const contactAttachmentBlobs = createAttachmentBlobStoreRN();
+  // THE PAIR ROSTER (L105, web parity): the roster a contact lacks, made automatically on the first exchange from
+  // the circle mechanics. The redeem sender and the post-join step are composed further down — late-bound here.
+  const pairSeams = { sendPeerRedeem: null, onJoined: null };
+  const pairRoster = createPairRoster({
+    selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
+    callSkill: (app, op, args) => agent.callSkill(app, op, args),
+    sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    onJoined: (a) => pairSeams.onJoined?.(a),
+    announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid }),
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
+    relayUrl: () => { try { return agent?.relays?.list?.()?.[0]?.url ?? _activeRelayUrl ?? null; } catch { return _activeRelayUrl ?? null; } },
+  });
   const contactChannel = createContactThreadChannel({
     blobStore: contactAttachmentBlobs,
-    sendToPeer: (addr, payload) =>
+    pair: pairRoster,
+    // the route (a contact with a pair roster) rides as send options (web parity)
+    sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'
-        ? agent.sendPeerMessage(addr, payload)
+        ? (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload))
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
     itemStore:  () => getContactDmStore(),
+    // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
     localActor: 'me',
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them (web parity).
     fanToOwnDevices: agent.contactTurnFan,
+    // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
+    selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
   });
   const coreAgent = agent.sa?.agent ?? null;   // discoverA2A's hello/native-upgrade target
 
@@ -820,6 +850,7 @@ export async function bootAgentBundle(opts = {}) {
   const pendingPeerRedeems = new Map();
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
+    currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (web parity)
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // Identity 5B/C — present this device's per-circle address on the peer redeem path (parity with web).
@@ -828,6 +859,7 @@ export async function bootAgentBundle(opts = {}) {
     // circle being joined), so the admin records it instead of dropping it as unproven.
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
   });
+  pairSeams.sendPeerRedeem = sendPeerRedeem;
 
   // personas#2 — post-join persona-property push: ONE shared pending-map + sender (parity with the
   // redeem pair). ChatScreen wires the update+ack handlers against this map; the About-me screen uses
@@ -884,6 +916,13 @@ export async function bootAgentBundle(opts = {}) {
   // current instance (initially null, populated when the async
   // connect() resolves a tick later).  Callers should not cache the
   // returned value across renders.
+  const laneCatchUpsRef = { current: null };
+  pairSeams.onJoined = ({ circleId } = {}) => makeCircleReachable({
+    agent, circleId, registerCirclePresence,
+    pullLanes: (cid) => Promise.allSettled(
+      ['membership', 'gov', 'key'].map((k) => laneCatchUpsRef.current?.[k]?.requestCircle?.(cid, { callSkill })),
+    ),
+  });
   return {
     catalogue,
     manifestsByOrigin,
@@ -908,7 +947,18 @@ export async function bootAgentBundle(opts = {}) {
      */
     onCircleJoined: ({ circleId } = {}) => makeCircleReachable({
       agent, circleId, registerCirclePresence,
+      // The joiner pulls the circle's pull-all lanes (membership · governance · keys) from the members it
+      // now knows — the screen that builds the lane table fills `laneCatchUps` (ChatScreen); before it has,
+      // the reconnect kick covers it.
+      pullLanes: (cid) => Promise.allSettled(
+        ['membership', 'gov', 'key'].map((k) => laneCatchUpsRef.current?.[k]?.requestCircle?.(cid, { callSkill })),
+      ),
     }),
+    /** The pair roster for contacts (L105): the screen's redeem handler hands it every admission. */
+    pairRoster,
+    /** The lane table's catch-ups, set by the screen that builds them (`bundle.laneCatchUps = lanes.catchUps`). */
+    set laneCatchUps(v) { laneCatchUpsRef.current = v; },
+    get laneCatchUps() { return laneCatchUpsRef.current; },
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,

@@ -82,7 +82,10 @@ async function sendDirectMessage(page, text) {
     } catch { /* fall through to the rendered log */ }
     return (document.querySelector('.cc-cthread__log')?.innerText ?? '').includes(t);
   }, text);
-  return { sent: kept, to, why: kept ? '' : 'the sender did not keep the turn — it never left this device' };
+  // The header's seal mark (person / device), decided async after the first paint — hence the wait.
+  let sealedTo = null;
+  try { sealedTo = await page.locator('.cc-cthread__sealed').first().getAttribute('data-level', { timeout: 8000 }); } catch { sealedTo = null; }
+  return { sent: kept, to, sealedTo, why: kept ? '' : 'the sender did not keep the turn — it never left this device' };
 }
 
 /** Poll the other side's contact threads until the text shows up in one. */
@@ -131,8 +134,10 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
   const A = await bootPeer(browser, 'A', { transportMode: 'relay', relayUrl: R1 });
   const B = await bootPeer(browser, 'B', { transportMode: 'relay', relayUrl: R2 });
   try {
-    expect((await waitForRelays(A.page, (l) => l.some((r) => r.connected))).map((r) => r.url)).toEqual([R1]);
-    expect((await waitForRelays(B.page, (l) => l.some((r) => r.connected))).map((r) => r.url)).toEqual([R2]);
+    // A is the FIRST page a cold dev server serves: on an edited tree its module graph takes 10–20 s to
+    // compile, so A's relay comes up late — 40 tries, not 20 (a harness cost, not a product finding).
+    expect((await waitForRelays(A.page, (l) => l.some((r) => r.connected), { tries: 40 })).map((r) => r.url)).toEqual([R1]);
+    expect((await waitForRelays(B.page, (l) => l.some((r) => r.connected), { tries: 40 })).map((r) => r.url)).toEqual([R2]);
     log('STEP1 boot', 'PASS', `A on ${R1}, B on ${R2}`);
 
     const { joined, joinerHasTile, outcome } = await pair(A, B, { name: 'Twee relays', re: /twee.?relays/i, handle: 'bram' });
@@ -151,6 +156,29 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
     expect(await waitForBubble(A.page, 'terug vanaf relay twee')).toBe(true);
     log('STEP3 messages cross', 'PASS', 'both directions');
 
+    // BOTH ROSTERS CARRY THE OTHER'S PERSON KEY, in the real shell (2026-09-16: they did not — the creator's own
+    // announce row cost them their foundership, so their admin-signed join was dropped before the key fold; and
+    // the joiner never pulled the `create`). Read through the same skill the DM seal reads.
+    const rosterKeys = (page) => page.evaluate(async () => {
+      const mine = await window.onderlingCall('stoop', 'listMyCircles', {});
+      const ids = mine?.circles ?? [];
+      const gid = ids.find((g) => /twee.?relays/i.test(mine?.names?.[g] ?? '')) ?? ids[0];
+      const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: gid });
+      return (r?.members ?? []).map((m) => ({ role: m.role, personKey: m.personKey ?? null }));
+    });
+    const keyed = async (page, role) => {
+      for (let i = 0; i < 20; i++) {
+        const rows = await rosterKeys(page);
+        if (rows.find((m) => m.role === role)?.personKey?.pubKey) return rows;
+        await page.waitForTimeout(500);
+      }
+      return rosterKeys(page);
+    };
+    const onA = await keyed(A.page, 'member'), onB = await keyed(B.page, 'admin');
+    expect(onA.find((m) => m.role === 'member')?.personKey?.pubKey, `A's roster has no person key for the joiner: ${JSON.stringify(onA)}`).toBeTruthy();
+    expect(onB.find((m) => m.role === 'admin')?.personKey?.pubKey, `B's roster has no person key for the creator: ${JSON.stringify(onB)}`).toBeTruthy();
+    log('STEP3b person keys on both rosters', 'PASS', 'the joiner\'s from the admin-signed join, the creator\'s from the joiner\'s pull');
+
     // A DIRECT message, the other way round: B is on relay 2, A is on relay 1 only, and a DM carries no
     // circle. Until 2026-09-08 that meant "this device's own relay" — B would have sent it to relay 2,
     // where A is not registered, and with NKN off in this run it would simply never arrive. B knows which
@@ -159,7 +187,14 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
     const sent = await sendDirectMessage(B.page, dm);
     expect(sent.sent, `B could not write to A: ${sent.why ?? ''}`).toBe(true);
     expect(await waitForContactMessage(A.page, dm), `a DM to ${sent.to} crossed no relay A is on`).toBe(true);
-    log('STEP4 a direct message', 'PASS', `B → A (${String(sent.to).slice(0, 12)}…) over the kring’s relay, not over B’s own`);
+    // The header says what the thread is sealed to. It reads "device" here today: on the web shell a kring member's
+    // person key does not reach the other member's roster (the join is dropped before the key fold on the admin, and
+    // the create never reaches the joiner) — recorded 2026-09-16 as a binding-levels finding. When that is fixed this
+    // must read "person"; until then the mark itself must be there and must not lie.
+    // "person", not merely present: both rosters carry the other's person key since the kring fix (STEP3b), so a DM
+    // between kring members is sealed to the PERSON on web — the mark must say so, or the fix regressed.
+    expect(sent.sealedTo, 'the thread header must mark the DM as sealed to the person').toBe('person');
+    log('STEP4 a direct message', 'PASS', `B → A (${String(sent.to).slice(0, 12)}…) over the kring’s relay, not over B’s own; header: sealed to the ${sent.sealedTo}`);
 
     // B reloads: the extra relay must come back from the recorded connection point, not from the join.
     await B.page.reload();

@@ -62,7 +62,22 @@ export async function run({ relayUrl }) {
 
     const uri = String(offer?.uri ?? '');
     check('the offer carries NO part of the recovery phrase', !uri.includes(first.mnemonic));
-    const leaked = words.filter((w) => w.length >= 5 && uri.toLowerCase().includes(w.toLowerCase()));
+    // Scan the PAYLOAD, and scan it DECODED.
+    //
+    // Two things were wrong here, and the second is the one worth keeping. First, the scan covered the
+    // whole URI including `onderling-enroll://` — a fixed prefix this code writes itself — and "enroll"
+    // is a BIP39 word, so any run whose random phrase happened to contain it failed, reporting a leak of
+    // a word that was never in the offer. That cost a CI run on 2026-09-10.
+    //
+    // Second, and worse: the payload is base64, so a word leaking INSIDE it was never a literal substring
+    // and this check could not have caught the thing it exists to catch. It would have gone green through
+    // a real leak. So the decoded body is scanned too, and the raw text as well — a leak appended in the
+    // clear (a query parameter, a debug hint) is just as bad and shows up only there.
+    const payload = uri.slice(uri.indexOf('://') + 3);
+    let decoded = '';
+    try { decoded = Buffer.from(payload.split(/[?#]/)[0], 'base64').toString('utf8'); } catch { decoded = ''; }
+    const haystack = `${payload}\n${decoded}`.toLowerCase();
+    const leaked = words.filter((w) => w.length >= 5 && haystack.includes(w.toLowerCase()));
     check('…not even one of its words', leaked.length === 0, leaked.join(' '));
     check('the offer does carry the circle the new device must reach', (offer?.circles ?? 0) >= 1);
 

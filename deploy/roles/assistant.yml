@@ -20,6 +20,10 @@ services:
       # The wire. Without it the device still runs, but only locally — it joins no relay, so nothing
       # reaches it and it reaches nobody.
       ONDERLING_RELAY_URL: "${COMPANION_RELAY_URL:-}"
+      # Is this box the person's PRIMARY contact address (direct messages land here, not on the phone)? The
+      # headless form of the tap on Mij / My data; enrolling alone never makes it primary. Default on for a
+      # personal box: a feedback box is meant to take the feedback.
+      ONDERLING_PRIMARY_DEVICE: "${ONDERLING_PRIMARY_DEVICE:-1}"
       # Telegram is OPTIONAL now: no token simply means this box is a device and not also a bot.
       TG_BOT_TOKEN: "${TG_BOT_TOKEN:-}"
       TG_ALLOWED_CHAT_IDS: "${TG_ALLOWED_CHAT_IDS:-}"

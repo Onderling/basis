@@ -78,6 +78,34 @@ const append = (dev, n, prefix = 'n') => Promise.all(
   Array.from({ length: n }, (_, i) => dev.rail.append(CIRCLE, { kind: 'note', subject: `${prefix}${i}`, payload: { i } })),
 );
 
+describe('frontierReplay — a statement refused at verify is re-ingested once, moments later', () => {
+  it('a binding that folds a moment after the batch lands is not a lost statement', async () => {
+    // The provider's author is UNKNOWN to the receiver when the batch arrives (its address has not folded
+    // yet — the box's enrol walk, where the sibling's announce-back races the content pull), and known
+    // two seconds later. Without the deferred re-ingest the batch is dropped and only the next pull
+    // brings it back; with it, the statement lands and the change is reported.
+    const bindings = new Map();
+    const a = await device('ref-a', bindings);
+    const b = await device('ref-b', bindings);
+    await append(a, 2, 'late');
+    const known = bindings.get(a.cid.pubKey);
+    bindings.delete(a.cid.pubKey);                     // b cannot bind a's statements — yet
+    const changes = [];
+    const refused = [];
+    const { rb, wires, drain } = connect(a, b, { onChange: (cid) => changes.push(cid), onRefused: (r) => refused.push(r.reason) });
+    await rb.requestFrom('peer:a', CIRCLE);
+    await drain();
+    expect(b.eventLog.entries.length, 'refused now — the binding is not there').toBe(0);
+    expect(refused.length).toBe(2);
+    expect(changes).toEqual([]);
+    bindings.set(a.cid.pubKey, known);                 // the fact folds
+    await new Promise((r) => setTimeout(r, 2300));
+    expect(b.eventLog.entries.length, 'the deferred re-ingest landed what verifies now').toBe(2);
+    expect(changes).toEqual([CIRCLE]);
+    void wires;
+  }, 10_000);
+});
+
 describe('frontierReplay — the windowed lane catch-up', () => {
   it('serves ONLY what the receiver is missing (frontier diff), and the receiver converges', async () => {
     const bindings = new Map();

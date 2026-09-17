@@ -103,6 +103,12 @@ export class Transport extends Emitter {
   #securityLayer        = null;
   #receiveHandler       = null;
   #pending              = new Map();  // envelopeId → { resolve, reject, timer }
+  // envelope _id → the APPLICATION's message id (payload.msgId), for what a transport reports about a send
+  // AFTER the fact — the relay's give-up names the envelope, the app's delivery state is keyed by the msgId, and
+  // nothing else ever holds both. Bounded FIFO: a give-up arrives within the relay's queue TTL, and an entry
+  // that outlives the cap belonged to a message long since settled either way.
+  #appMessageIds        = new Map();
+  static #APP_MESSAGE_IDS_CAP = 2000;
   #envelopeSubscribers  = null;       // Set<(payload, rawEnvelope) => void> — Phase 50.7
 
   /**
@@ -169,8 +175,15 @@ export class Transport extends Emitter {
     if (typeof address !== 'string' || !address) return { ok: false, reason: 'invalid-address' };
     if (address === this.#address) return { ok: true };            // the primary is already ours
     if (!this.supportsAliases) return { ok: false, reason: 'aliases-unsupported' };
-    if (this.#aliases.has(address)) return { ok: true };            // idempotent
-    this.#aliases.set(address, { sign: opts?.sign ?? null });
+    if (this.#aliases.has(address)) {
+      // idempotent — unless the PRIMARY flag changed (the person's choice of device moved): rebind with it
+      const cur = this.#aliases.get(address);
+      if ((opts?.primary === true) === (cur.primary === true)) return { ok: true };
+      cur.primary = opts?.primary === true;
+      try { await this._bindAddress(address, cur); } catch (err) { return { ok: false, reason: err?.message ?? 'bind-failed' }; }
+      return { ok: true };
+    }
+    this.#aliases.set(address, { sign: opts?.sign ?? null, primary: opts?.primary === true });
     try { await this._bindAddress(address, this.#aliases.get(address)); } catch (err) {
       // Keep it in the set: a bind can fail because we are offline, and the replay on reconnect is
       // precisely what should fix that. Report so a caller is not told it worked.
@@ -658,8 +671,29 @@ export class Transport extends Emitter {
 
   // ── Internals ───────────────────────────────────────────────────────────────
 
+  /**
+   * The application's message id behind an outgoing envelope id, if the payload carried one (`msgId`).
+   * Read by a transport that learns something about a send later — the relay's `undelivered` frame — so
+   * it can report the id the app knows rather than the one only the wire knows. Null when unknown.
+   * @param {string} envelopeId
+   * @returns {string|null}
+   */
+  appMessageIdFor(envelopeId) {
+    return (typeof envelopeId === 'string' && this.#appMessageIds.get(envelopeId)) || null;
+  }
+
+  #noteAppMessageId(envelope) {
+    const msgId = envelope?.payload?.msgId;
+    if (typeof envelope?._id !== 'string' || typeof msgId !== 'string' || !msgId) return;
+    if (this.#appMessageIds.size >= Transport.#APP_MESSAGE_IDS_CAP) {
+      this.#appMessageIds.delete(this.#appMessageIds.keys().next().value);   // the oldest — Map keeps insertion order
+    }
+    this.#appMessageIds.set(envelope._id, msgId);
+  }
+
   /** Apply SecurityLayer (if set) and call _put. */
   async _send(to, envelope) {
+    this.#noteAppMessageId(envelope);   // before encryption — the payload is opaque after it
     const outgoing = this.#securityLayer
       ? this.#securityLayer.encrypt(envelope)
       : envelope;

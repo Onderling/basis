@@ -429,6 +429,15 @@ describe how a *request* travels; this is what it travels **to**: one sentence, 
 `CircleItemStore` (`packages/item-store`), rooted per circle. "Which circle" is not a filter applied to a
 shared pile — it is which store you are holding. Two stores for one circle is a defect, not a design.
 
+One row in that store is not synced like the others, on purpose: the roster's **trail row** (the
+`membership-redemption` item a circle's membership is projected from). Its addresses enter the projection
+only proven, it is patched in place by the announce receive path, and it reaches other devices by carriers
+that keep that trust — the join statements on the membership lane, the announces, the roster seed between
+a person's own devices. The task lane, which carries a store's rows as causally merged snapshots, neither
+serves nor applies a roster row (`packages/circles/src/rosterTrail.js`): two devices of one person each
+hold "the person's row" with a different primary address, and a snapshot of one replacing the other is how
+a device came to refuse everything its sibling signed (2026-09-13).
+
 **Store → items.** Items are typed, and the types are declared, not implied — `packages/item-types`
 carries a schema per canonical type:
 
@@ -729,8 +738,15 @@ environment or a key file, never from code. The assistant a door talks to is one
 last turns of the thread re-sent with every call (the model is stateless), and the interpreter when a route is
 configured — the Telegram shell runs on it. Basis has a third shell beside
 web and mobile, and it is not a shell so much as a DEVICE: `bin/device-runner.mjs` boots the same agent
-headless on a machine that stays on, joins the relay, holds its owner's circles, and hands each contact-thread
-turn to their other devices. With a Telegram token present the same process also answers there — that is the
+headless on a machine that stays on, joins the relay, registers its per-circle addresses there and announces
+them (the same three acts a shell performs on connect), holds its owner's circles, and hands each contact-thread
+turn to their other devices. It is enrolled from the owner's other device — for the alpha, the web app —
+(`--enrol`, once: that device's offer pasted, the phrase typed with echo off and never written; the next
+start consumes the offer the way a shell consumes a scanned one); the other direction, the box created
+first and handing its offer out (`--show-offer`), waits on a registry the box and the web app share (the
+pod mirror), because a circle created on one device reaches a sibling only that way. What it does not do is follow a
+circle's traffic live: the circle fan delivers to one address per member and never to the sender's own other
+devices, so the box holds a circle by catch-up at connect. With a Telegram token present the same process also answers there — that is the
 **Telegram shell** (`apps/basis/src/telegram/runner.js`), where a
 `MessagingBridge` turn goes through the same compilers (`parseInput → resolveDispatch → runDispatch → renderReply`)
 and, for free text, the circle composer's engine (`createCircleDispatch` with the deterministic gate); a button
@@ -938,7 +954,16 @@ phrase is the authority, it is typed on the device that is *gaining* it, and it 
   the device's delegation and, per circle, retires that device's address: senders stop accepting its
   statements, delivery stops trying it, and sealed circles rotate their key to the surviving devices. The
   revocation binds only by the root's reveal against the row's commitment, so a stolen device can neither
-  revoke you nor counter-revoke — it holds no root.
+  revoke you nor counter-revoke — it holds no root. The first such ceremony on an unenrolled first device
+  enrols that device too (every legitimate device then signs with a revocable key), and a migrated device
+  presents fresh per-circle addresses after its reload: the ceremony introduces them to every roster
+  while it still speaks as the old ones, then retires the old ones with the root it holds this once —
+  nothing will hold those keys after the cutover (2026-09-14). **What a revoked device can still do,
+  stated plainly:** it holds the profile's chat key, which is one per person and no ceremony retires; on a
+  relay it can register the profile address again and take the person's direct messages until a live
+  device registers it back, and nothing it says reaches the person's devices — but what a person sends
+  to that address in the meantime lands on it. A compromised box is stopped, not only revoked; a stolen
+  phone's window closes only with a new phrase. The relay's registration knows nothing of revocation.
 - **Replace a device.** Restoring onto a new phone is the *add* case: the replacement enrolls with its own
   keys, and then one ceremony on it, with the phrase, retires every other device the registry lists — the
   registry that came back from the pod or the recovery file. Before retiring, the ceremony unwraps the
@@ -952,8 +977,21 @@ the *list* of circles those keys belong to. That list lives in the owner's regis
 device-local store unless it is mirrored to a pod, so a person whose only device is gone comes back as
 provably themselves with nothing to re-open. The honest paths out are a registry that survives the device
 (mirrored to the owner's pod — sealed to the owner, which is the part that has to be built, since this
-resource carries no sealing of its own) or an offer from another device they still hold; a
-recovery screen that promises more than that is promising the wrong thing.
+resource carries no sealing of its own), the **recovery file** (the registry sealed to the phrase, exported
+by the person), or an offer from another device they still hold; a recovery screen that promises more
+than that is promising the wrong thing.
+
+**The recovery file also carries each circle's member list** (2026-09-13). The list of circles alone
+gave a restored device a circle's name and nobody to reach: restore enrols the new device, so its
+per-circle addresses are fresh and no roster names them, and its own roster is empty because the trail
+lived on the lost phone. So the export offers, per circle and on by default, to carry that circle's
+roster — the trail rows and the member rows, the same a sibling would serve as a seed — together with
+the device's own proven address announcement, minted while it still holds the key. The person chooses
+when the artefact is written; the file is sealed to the phrase. The import lands the rows through the
+seed's own ingest and the announcement through the announce's own receive door (proof re-verified),
+then runs the add-a-device consume: announce the fresh address to every member, pull every lane from
+them. The snapshot is as old as the file; what happened since folds on top as signed statements as
+soon as one member is online. No new trust admission anywhere.
 
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,
@@ -1200,6 +1238,58 @@ re-grant loses to the revoke it never saw, and re-admitting the view is a delibe
 after the merge. One honest edge: a person in no circles has no live fan target between their
 devices — restore-time (the log itself) is the designed floor there.
 
+**Who you know belongs to the person too** (2026-09-13). A greeting binds a key on the ONE device it
+landed on, and a card scanned on the phone is a contact on the phone; on a relay the person's address
+maps to one socket, so the next message from that contact can land on a device that has never heard
+of them — and be refused as a stranger's. So a device's bindings (the security layer's, read-only)
+and its contact rows ride the same sibling set as the grants lane, over hold-forward
+(`apps/basis/src/v2/knownPeersSync.js`): live as a greeting lands or a contact is added, in full to a
+device of yours that just announced its address (the enrol moment), and on request at connect. A
+sibling's row ESTABLISHES a binding and never replaces one (`learnPeerKey`), and adds a contact it
+lacks without touching one it has. The same gate as the contact-thread fan admits it: a proven
+sibling address. Two substrate facts this made true: the secure agent's transports now say `peer` on
+an accepted greeting (they never handed a HI to the kernel's dispatch, so the kernel's event never
+fired on the wire), and their `security-error` reaches the agent, where basis counts it per reason and
+warns once per sender — a refused envelope is no longer indistinguishable from one that never arrived.
+**And the bindings survive a reload** (2026-09-14): they lived in memory only, so every web session and
+every restart of a box forgot every contact, and their next message was refused as a stranger's —
+silently, since a sender greets once per session of its own. The snapshot (public keys) is kept in the
+sealed chat vault and restored establish-never-replace; a proof-verified roster row is still the last
+word on any address it covers.
+
+**A device speaks to its sibling in the circle they share** (2026-09-14, the revoke walk). Every
+own-device message — the grants fan and its catch-up, the contact-thread fan, who-you-know, the
+introductions — leaves as this device's per-circle address in a circle both devices are in, addressed
+to the sibling's proven address there; and every circle lane's catch-up request and reply leaves the
+same way. Until then all of it left as the profile key, and that had three failures. A revoked device
+holds the profile key forever (it is one per person, derived from the phrase, and revocation retires
+per-circle addresses only), so it went on speaking as one of the person's devices and pulling every
+lane from its former siblings. On a relay the profile address belongs to whichever device registered it
+last, so a greeting answered to it landed on the wrong device — as often as not the sender's own
+sibling — while the send waited out its timeout and was held. And a member's catch-up request, signed
+by the canonical key, was refused at every member's sender gate (a member who has proved a per-circle
+address is refused by their canonical key on purpose): the pull-all catch-ups between members had never
+served once. The profile address is therefore not a device of the person's on any own-device lane. Two
+messages still speak as the person, deliberately: an enrolling device's first announcement to its
+sibling, and the sibling's roster seed back — the fresh device's gate knows nobody until that parcel
+lands, and the parcel is what it verifies by (the root-signed delegation). The roster seed's landing
+refreshes the receiver's sealing bindings and sender gate from the rows it just took, as the announce
+door does; and a device that verified a sibling's carried delegation keeps the record in its registry,
+which is what My data lists and the revoke door acts on.
+
+**An enrolled device is introduced to its circles by its sibling** (2026-09-14). A fresh device's own
+announcement cannot reach the other members: they authorize a circle-scoped envelope by the key that
+signed it, and its key is on nobody's roster yet — the announce that would put it there is refused as a
+stranger's. So the sibling that recorded the announcement fans it on (the proof inside is the new
+device's own, re-verified by every receiver), the same shape as the admin introducing a joiner. Until
+then a second device was a member of its circles toward its sibling only, and nobody else ever fanned
+to it. The enrol consume runs in this order for the same reason: bind the sibling's address the offer
+named (an address is its key, so the first send needs no greeting), announce to the sibling, ask for the
+seed and wait for it, then announce to every member the seeded roster names and pull the sibling's
+who-you-know and grants. A box keeps on disk what a shell keeps in IndexedDB — registry, item stores,
+settings, outbox — so a restart, which a rented machine has on every deploy, is a restart and not a new
+device.
+
 ### The Connectivity home
 
 *How agents reach each other: transports are adapters behind one surface, and every hop is designed
@@ -1214,7 +1304,11 @@ the price of first-contact verifiability.
 
 **Contact reveals, so contact is minimised.** A sender uses the *fewest* connection points that achieve
 delivery — sequential fallback, sticky on what worked, backing off from what fails — never race-them-all,
-because every point tried is an extra observer. A member may sit on one point or several (resilience is
+because every point tried is an extra observer. A message with no circle (a direct message) rides the
+points the person's own **contact card** named first (the card carries the sharer's primary relay by
+default and an extra relay only when they named it; never the local network), then the relays of the
+kringen the two share; the sender comes beside a card's relay only when it is on none of them. Two people
+who met by card and share no kring have no other route. A member may sit on one point or several (resilience is
 a member's choice, not a circle-wide tax), and "I could not reach them" is a real outcome the UI is
 allowed to say. The relay holds messages 24 hours — an agreement pinned by a test that reads both the
 relay's and the app's value, so the two cannot silently disagree.
@@ -1280,5 +1374,7 @@ Two directions are settled and already shaping the work described above:
   for deriving a design fork from them. Read it first when a decision needs a value, not a mechanism.
 - [`CLAUDE.md`](../CLAUDE.md) — the working conventions + the invariants, for agents editing code here.
 - [`conventions/`](./conventions/) — the detailed project-wide rules.
+- [`extending.md`](./extending.md) — the contract for adding functionality: extensions, what they may declare and
+  reach, where they run, how they are checked (each section marked built · designed · direction).
 - [`glossary.md`](./glossary.md) — every term used above, defined.
 - [project overview](../README.md) — the apps, the status, how to run things.

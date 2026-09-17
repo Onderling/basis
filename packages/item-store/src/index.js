@@ -134,4 +134,5 @@ export {
   ENTRY_KINDS, VIEWER_FACING_SYSTEM_KINDS, LANE, RETAIN, UNKNOWN_KIND, RETENTION_DEFAULTS,
   entryKind, isSystemKind, isAuditKind, retentionOf, retentionWindowFor,
   conversationKinds, kindWakes, governanceWakes,
+  SIGNS, SUBJECT, ACCEPTS, SYNC, bindingOf,   // the binding columns — declared 2026-09-15, read by a fitness test until the rails read them
 } from './entryKinds.js';

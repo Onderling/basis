@@ -120,14 +120,18 @@ export function makeKeyEmitter({ rail }) {
 }
 
 /** The receive half: verify-and-land a fanned key statement at the rail. Mirrors the other lanes. */
-export function makeKeyPeerHandler({ rail, onChange = null }) {
-  return async function handleKeyStatement(_fromAddr, payload) {
+/** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
+export function makeKeyPeerHandler({ rail, onChange = null, onLanded = null }) {
+  return async function handleKeyStatement(fromAddr, payload) {
     if (!payload || payload.subtype !== KEY_STATEMENT_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement) return;
     try {
       const r = await rail.ingest(circleId, statement);
       if (r?.ok && !r.existed && typeof onChange === 'function') { try { onChange(circleId); } catch { /* observer */ } }
+      if (r?.ok && !r.existed && typeof onLanded === 'function') {
+        try { await onLanded(circleId, statement, fromAddr); } catch { /* side effects are best-effort */ }
+      }
     } catch { /* refusal is silent — catch-up reconciles */ }
   };
 }

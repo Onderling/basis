@@ -50,6 +50,7 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
+import { sealedLocalBackend, sealedLocalVault } from '../../src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
 // session routes a sealed circle to the user's REAL pod; otherwise the in-memory pseudo-pod.
@@ -136,6 +137,9 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { createPairRoster } from '../../src/v2/pairRoster.js';
+import { contactSealMark } from '../../src/v2/contactSealMark.js';
+import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
@@ -186,7 +190,8 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
-import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
+import { seedContactCard } from '../../src/v2/seededContact.js';
+import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
 import { noticeWants } from '../../src/v2/noticeSettings.js';
@@ -300,7 +305,7 @@ import { deviceDelegationsOf } from '@onderling/agent-registry';
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
-  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, announceOwnCircleAddress,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { isFeatureEnabled, defaultViewModeFromPolicy } from '../../src/v2/circlePolicy.js';
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
@@ -941,6 +946,7 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
     // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
     // refused here and only here: the invariant-2 half of a change that landed on one shell.
     circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+    alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
     circlesForPoint,
     // The relay this device connects to IS the deployment default — unmapped circles land here alone.
     defaultRelayUrl: CIRCLE_RELAY_URL,
@@ -1313,6 +1319,23 @@ let resolveSkill = null; // (opId, args) => Promise<object|null>
 // code), which would wipe a boot parameter such as `?addbot` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
+/**
+ * The post-join step every join runs (the wizard's, the pair roster's): register THIS device's per-circle address,
+ * bind the other members' addresses, and PULL the circle's pull-all lanes — the `create`, earlier joins, roles,
+ * evictions and keys all predate the join and are fanned to nobody after the fact.
+ */
+function circleOnJoined({ circleId }) {
+  return makeCircleReachable({
+    agent: _peerAgent,
+    circleId,
+    // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
+    registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
+    pullLanes: (cid) => Promise.allSettled(
+      [memCatchUpShell, govCatchUpShell, keyCatchUpShell].map((c) => c?.requestCircle?.(cid, { callSkill: rawCallSkill })),
+    ),
+  });
+}
+let circlePairRoster = null;     // the pair roster for contacts (L105) — composed with the contact channel
 // The restore boot hooks fire DURING boot, before rawCallSkill is bound — the flow panel's first
 // act is a waist call, so launching it straight from the hook would race the binding. The hook
 // only raises this flag; the boot-completion block (where rawCallSkill is assigned) launches.
@@ -1369,6 +1392,9 @@ const CIRCLE_EMBED_APIKEY  = import.meta.env?.VITE_CIRCLE_EMBED_APIKEY ?? CIRCLE
 // configurable without a rebuild. localStorage is sync, so resolve it here at module-init — before the
 // boot-time tryConnectPeerTransport reads it. Empty setting ⇒ env fallback. `applyRelayUrl` reconnects live.
 const CIRCLE_RELAY_ENV     = import.meta.env?.VITE_CIRCLE_RELAY_URL ?? null;
+// The contact the app ships with (the alpha's feedback path: Frits himself, as a person in Contacten).
+// A build-time card beside the app-native relay; absent ⇒ no seeded contact (seededContact.js).
+const SEEDED_CONTACT_CARD  = import.meta.env?.VITE_SEEDED_CONTACT_CARD ?? null;
 const relayPrefStore       = createRelayPrefStore(localStorageRelayIo());
 // The two delivery settings, and the per-message state map they govern the display of.
 const deliverySettingsStore = createDeliverySettingsStore(localStorageDeliveryIo());
@@ -1712,10 +1738,12 @@ let feedHouseholdRosterForCircle = null;
 // a dedicated vault for per-circle sealing identities + controller keys + the
 // persisted group-key resource (durability). IndexedDB-backed so a sealed circle's keys
 // survive reloads; falls back to in-memory where IndexedDB is unavailable.
-const circleVault = (() => {
+// SEALED at rest: it holds two private keys per circle. It is built here rather than in `realAgent`,
+// which is why `sealedVault()` never reached it and its rows sat readable — see `sealedLocalVault`.
+const circleVault = sealedLocalVault((() => {
   try { return new VaultIndexedDB({ dbName: 'cc-circle-pod' }); }
   catch { return new VaultMemory(); }
-})();
+})());
 const circlePods = new Map();    // circleId → per-circle pod producer (sealing identity + control agent)
 let circleRealPodRouting = null; // S4 circle OIDC — set when signed in; routes sealed circles to the real pod
 const circleSealStrategies = new Map();   // circleId → resolved {seal,open} content strategy (or null for p0/p1)
@@ -1837,7 +1865,7 @@ async function resolveCircleMediaComposition(circleId, policy) {
  * reload; falls back to in-memory under SSR / tests (no `indexedDB`) — see `pickWebBackend`. */
 function makeCirclePodClient(circleId) {
   const deviceId = `circle-${circleId}`;
-  const backend  = pickWebBackend(`cc-circle-${circleId}`);
+  const backend  = sealedLocalBackend(pickWebBackend(`cc-circle-${circleId}`));
   // versioning: displaced bytes (overwrites · peer-updates · dropped
   // concurrent forks · deletes) land in `versions/` on the SAME backend —
   // the substrate under the my-data restore ops. Best-effort by design
@@ -1984,7 +2012,7 @@ const circleInputHistory = createInputHistory();
 // #7). Same @onderling/pseudo-pod substrate the circle pods run on. Objective L:
 // browser-PERSISTENT (IndexedDB) so embedded vectors survive a reload instead of
 // re-embedding; falls back to in-memory under SSR / tests (no `indexedDB`).
-const circleSearchVectorStore = pickWebBackend('cc-circle-rag');
+const circleSearchVectorStore = sealedLocalBackend(pickWebBackend('cc-circle-rag'));
 
 function buildCircleBot(agent) {
   // Merged catalogue (the LLM tool list + dispatch catalogue) — mirrors main.js.
@@ -2145,16 +2173,39 @@ function buildCircleBot(agent) {
   // thread's snapshot item. A snapshot store holds one serialised value; a photo inside it is what
   // takes the whole thread down on a device with a per-row read ceiling.
   const circleAttachmentBlobs = createAttachmentBlobStore();
+  // THE PAIR ROSTER (L105): the roster a contact lacks, made automatically on the first exchange from the circle
+  // mechanics — the invite rides the turn, the join is the shared path, the founder is the webid that sorts first.
+  circlePairRoster = createPairRoster({
+    selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
+    callSkill: (app, op, args) => rawCallSkill ? rawCallSkill(app, op, args) : agent.callSkill(app, op, args),
+    sendPeerRedeem: (...a) => (circleSendPeerRedeem ? circleSendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    onJoined: circleOnJoined,
+    announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid }),
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
+    relayUrl: () => connectedRelayUrls()?.[0] ?? null,
+    activeEndpointUrl: () => connectedRelayUrls(),
+  });
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,
-    sendToPeer: (addr, payload) =>
+    pair: circlePairRoster,
+    // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
+    // this device's per-circle address there, which is the only key the pair roster admits
+    sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'
-        ? agent.sendPeerMessage(addr, payload)
+        ? (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload))
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
     // Phase 2 (C3): route through the shared persisted `deliver` — a contact DM
     // is now DURABLE (persisted + rehydratable), the G18 fix. Thunked so the
     // async-built store doesn't block channel construction; null → ephemeral.
     itemStore:  () => getContactDmStore(),
+    // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
+    // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
+    selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
     localActor: LOCAL_ACTOR,
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them.
@@ -2666,7 +2717,8 @@ async function loadStoopContacts() {
 }
 async function loadAllContacts() {
   const [peerRows, stoopRows] = await Promise.all([
-    listContacts(circlePeerGraph).catch(() => []),
+    // A member's per-circle address is where they are reached in one circle, never a second contact.
+    listContacts(circlePeerGraph, { identityOf: (a) => _peerAgent?.identityOfAddress?.(a) ?? null }).catch(() => []),
     loadStoopContacts(),
   ]);
   return mergeContacts(peerRows, stoopRows);
@@ -2853,6 +2905,9 @@ async function showContactThread(contactId) {
   // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
   // every turn, and said in the header so the participant knows before typing.
   const floor = presendFloorFor(row);
+  // What a direct message to this contact is sealed to — the agent's own seal resolution, painted in the header.
+  // Decided once per open, after the first paint: no mark until then, never a wrong one.
+  let sealedMark = null;
 
   // Phase 2 (C3 / the G18 fix): rehydrate the DURABLE thread on open so a reload
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
@@ -2926,6 +2981,7 @@ async function showContactThread(contactId) {
     })(),
     skills, busy, error, t,
     floor: floor ? { label: t('circle.contacts.presend_floor') } : null,
+    sealed: sealedMark,
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
     onButtonTap: async (b) => {
@@ -2969,6 +3025,15 @@ async function showContactThread(contactId) {
   });
   _activeContactThread = { contactId, rerender };
   rerender();
+  // The seal status is async (it may read shared circles' rosters): mark once it is known, if this thread is still the open one.
+  if (typeof _peerAgent?.contactSeal?.statusFor === 'function') {
+    _peerAgent.contactSeal.statusFor(peerAddr).then((status) => {
+      if (_activeContactThread?.contactId !== contactId) return;   // the participant has moved on
+      const mark = contactSealMark(status);
+      sealedMark = { level: mark.level, label: t(mark.key) };
+      rerender();
+    }).catch(() => { /* no mark rather than a wrong one */ });
+  }
 }
 
 // #13 — pull human-readable text out of a remote-skill result (the channel's
@@ -4055,6 +4120,12 @@ async function showMyData() {
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
   // The replace ceremony: retire every other device in one act, after a restore.
   const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
+  // "Make this device my primary contact address": announce this device's address in every circle with the
+  // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
+  const onMakePrimary = async () => {
+    const r = await makeThisDevicePrimary({ agent: _peerAgent }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
+    try { window.alert(t('circle.mydata.make_primary_done', { count: r.announced })); } catch { /* headless */ }
+  };
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
   // reflects reality; toggling subscribes/unsubscribes + tells stoop.
@@ -4137,7 +4208,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -4165,6 +4236,29 @@ async function showMyData() {
     delivery: deliverySettingsCache,
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
+      rerender();
+    },
+    // What this device keeps (sync-policy §11) — read live from the register; written through set-param.
+    syncSelection: (() => {
+      const sel = makeSyncSelection({ getParamValue: (k) => circleHouseholdAgent?.getParamValue?.(k) });
+      return {
+        silos: Object.fromEntries(SYNC_SILOS.map((silo) => [silo, sel.siloOn(silo)])),
+        fileBytes: sel.fileBytes(),
+        kringenOff: sel.kringenOff(),
+        kringen: circleListForConnections(),
+      };
+    })(),
+    onSetSync: async ({ silo, value, fileBytes, kringId, on } = {}) => {
+      const set = (key, v) => circleHouseholdAgent.callSkill('params', 'set-param', { key, value: v });
+      try {
+        if (silo && SYNC_SILO_PARAM_KEYS[silo]) await set(SYNC_SILO_PARAM_KEYS[silo], value !== false);
+        if (fileBytes) await set(SYNC_FILE_BYTES_PARAM_KEY, fileBytes === 'description' ? 'description' : 'full');
+        if (kringId) {
+          const cur = parseKringenOff(circleHouseholdAgent?.getParamValue?.(SYNC_KRINGEN_OFF_PARAM_KEY));
+          if (on === false) cur.add(kringId); else cur.delete(kringId);
+          await set(SYNC_KRINGEN_OFF_PARAM_KEY, serializeKringenOff(cur));
+        }
+      } catch { /* the section re-reads */ }
       rerender();
     },
     shareNknAddress: circleHouseholdAgent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false,
@@ -4315,12 +4409,7 @@ async function showJoinCircle(inviteArg) {
     // the circle, and bind the other members' addresses to their keys from the roster. `onDispatched` below
     // did the second and never the first, so the circle just joined was missing from the relay until the
     // next circles load.
-    onJoined: ({ circleId }) => makeCircleReachable({
-      agent: _peerAgent,
-      circleId,
-      // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
-      registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
-    }),
+    onJoined: circleOnJoined,
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? reply?.joinedGroupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
@@ -7698,12 +7787,10 @@ async function boot() {
   // anything appends, then late-bind the debounced save. Without this every reload wiped the log and the
   // legacy chat store quietly stayed the real record — the inverse of the decided hierarchy. Best-effort:
   // a blocked IndexedDB degrades to the old in-memory behaviour, never a broken boot.
-  try {
-    const { hydrated } = await wireEventLogPersistence({
-      eventLog, io: backendSnapshotIo(pickWebBackend('cc-device-log')),
-    });
-    if (hydrated) console.info(`[device-log] hydrated ${hydrated} persisted entries`);
-  } catch (err) { console.warn('[device-log] persistence wiring failed — in-memory this session:', err?.message ?? err); }
+  // Hydration happens INSIDE the agent now, at the first moment the content key exists — see the note
+  // there. Reading it here, before that, handed back a sealed envelope and started the log empty on
+  // every reload. The shell's job is the storage; when to read it is the agent's.
+  const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log')));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.
@@ -7752,6 +7839,7 @@ async function boot() {
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
       deviceLog: eventLog,
+      deviceLogIo,          // the agent hydrates it once the content key exists — see the note there
       // The A2A surface: these manifests' ops become kernel skills another agent can invoke, each
       // gated by a CapabilityToken naming exactly that op, with the escalation family refused
       // outright. Same list the connection DO menu is built from — see CONNECTION_MANIFESTS.
@@ -7785,6 +7873,10 @@ async function boot() {
       // …and which kringen I share with a PERSON, so a message with no circle (a DM, a receipt) can ride a
       // relay they are actually on. The index is the roster feed's own (`householdRosterPairing` fills it).
       circlesForPeer: (addr) => circleGroupsIndex.groupsFor(addr),
+      // Where a scanned add-a-device offer waits out the ceremony reload — handed to the agent too, so a
+      // recovery-file import can stash the bootstrap it builds in the SAME place the boot-time consume
+      // reads (it retries there on the next launch; the import result also runs it right away).
+      enrollOfferStorage: window.localStorage,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (see circleVersioning.js).
       versionStoreFor: getCircleVersionStore,
@@ -7818,6 +7910,8 @@ async function boot() {
       },
       // The owner's REGISTRY survives the device: a persistent local backend, and when signed in
       // a sealed mirror on the user's own pod under an opaque name. Same shape as the settings medium.
+      // NOT wrapped here on purpose: realAgent seals the registry itself, because it also owns the pod
+      // mirror's strategy and the two must be the same key. Wrapping it again would seal twice.
       registryBackend: pickWebBackend('cc-agent-registry'),
       provisionRegistryMedium: async (strategy) => {
         try {
@@ -7858,7 +7952,7 @@ async function boot() {
           console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy.pod ?? null)} → ${mode}`);   // web ≡ mobile
           if (mode !== 'cache') return null;   // no-pod → shared local backing
           const medium = createCircleCacheMedium({
-            localBackend: pickWebBackend(`cc-circle-cache-${circleId}`),
+            localBackend: sealedLocalBackend(pickWebBackend(`cc-circle-cache-${circleId}`)),
             deviceId:     `circle-cache-${circleId}`,
             resolvePod:   () => resolveCirclePodCustody(circleId),
           });
@@ -7923,6 +8017,7 @@ async function boot() {
     // OBJ-2 — joiner-side peer-redeem sender (shared factory), correlated by circlePendingRedeems.
     circleSendPeerRedeem = makeSendGroupRedeemRequest({
       sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
+      currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (2026-09-16)
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingRedeems,
       // Identity 5B/C — present this device's per-circle address on the peer redeem path.
@@ -8182,7 +8277,7 @@ async function boot() {
           'circle-recipe-broadcast':  circleRecipeHandler,
           'circle-rules-broadcast':   circleRulesHandler,
           'circle-policy-broadcast':  circlePolicyHandler,
-          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => {
+          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.
             applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
@@ -8208,10 +8303,12 @@ async function boot() {
           // circle happened to be open — a file from a person, announced by nobody's bot, in a room
           // the sender may not even be in.
           'file-share':              makeHandleFileShare({
-            deliverToThread: ({ contactId, fromAddr, file, messageId }) => {
-              onContactReply({ contactId, fromAddr, text: '', file, messageId });
+            deliverToThread: ({ contactId, fromAddr, file, messageId, sealed }) => {
+              onContactReply({ contactId, fromAddr, text: '', file, messageId, ...(sealed ? { sealed } : {}) });
             },
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+            // A file sealed to the person opens with my key for the version it names (the text turn's seal).
+            openFor: (sealed, fromAddr) => agent.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
@@ -8236,6 +8333,8 @@ async function boot() {
           // admin verifies an incoming redeem + replies; joiner resolves the pending request on response.
           'group-redeem-request':    makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
+            // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
+            onAdmitted: (a) => circlePairRoster?.onAdmitted?.(a),
             sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
             publishEvent: publishEventToLog,
             // …and return OUR per-circle address for the circle being joined, proven the same way the
@@ -8315,6 +8414,13 @@ async function boot() {
         // The grants lane's pull: my own devices — a revoke made elsewhere while this device was
         // offline binds at this door now, before a stale view is served.
         agent.grantsCatchUp?.requestFromSiblings().catch(() => {});
+        // Who my other devices know — a greeting or a contact that landed there while this device
+        // was off: bindings and contact rows, established here, never replacing what this device holds.
+        agent.knownPeersSync?.requestFromSiblings().catch(() => {});
+        // The person key a ceremony rotated on another device while this one was off.
+        agent.personKeySync?.requestFromSiblings().catch(() => {});
+        // …and which of the person's devices is primary for direct messages (sync-policy §12).
+        agent.primaryDevice?.requestFromSiblings?.().catch(() => {});
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on
@@ -8333,8 +8439,10 @@ async function boot() {
         } catch { /* a malformed hash is not an error state */ }
         // The enroll-offer consume (once per boot, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the scanned offer — the
-        // registry membership record, the announce to the sibling, the catch-up pulls.
-        consumeEnrollOffer({
+        // registry membership record, the announce to the sibling, the catch-up pulls. The SAME
+        // consume runs after a recovery-file import: the file's peers are stashed as an offer, and
+        // the import door calls this rather than waiting for the next launch.
+        agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
           agent,
           callSkill: rawCallSkill,
           sendPeerMessage: (to, payload, opts2) => agent.sendPeerMessage(to, payload, opts2),
@@ -8348,9 +8456,16 @@ async function boot() {
           ]),
         }).then((r) => {
           if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+          return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
+        agent.bootstrapFromStashedOffer();
         taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        // The shipped contact, once: added through the scanned-card path if the card is set and the
+        // person is not in the book yet.
+        seedContactCard({ payload: SEEDED_CONTACT_CARD, callSkill: rawCallSkill })
+          .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
+          .catch(() => { /* an install without it is not an error state */ });
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {

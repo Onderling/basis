@@ -131,6 +131,16 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
       return (r?.circleAddresses?.includes(addrL)) ? r : null;
     }, { timeout: 15000, step: 50 });
     expect(row, 'P never learned L\'s proven address').toBeTruthy();
+    // …and P's reaches L: a device speaks to its sibling as its own address in the circle they share
+    // (2026-09-14), so L must hold P's proven address to admit P's fan — in production the roster seed
+    // carries it; here it is hand-aimed like L's.
+    await announce(P, addrL);
+    const rowL = await until(async () => {
+      const res = await L.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const r = (res?.members ?? []).find((m) => m.webid === P.pubKey);
+      return (r?.circleAddresses?.includes(addrP)) ? r : null;
+    }, { timeout: 15000, step: 50 });
+    expect(rowL, 'L never learned P\'s proven address').toBeTruthy();
   }, 120_000);
 
   afterAll(async () => {
@@ -300,7 +310,19 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
 
     // The pull: N asks a sibling for the grants lane (the shells kick this on connect; the fresh
     // device learns the sibling address the way it learns the circle — the registry/QR hand-off).
-    await N.agent.sendPeerMessage(addrP, { subtype: GRANTS_CATCHUP_SUBTYPES.request, circleId: OWN_DEVICES_SCOPE }, SEND);
+    // A device speaks to its sibling as its address in the circle they share, and a sibling is one the
+    // roster names (2026-09-14): so N announces itself to P and holds P's proven address first — the
+    // enrol consume's own order — then asks, scoped to the circle.
+    await bindCircleAddresses([N], GROUP);
+    const addrN = N.agent.circleAddressFor(GROUP);
+    await announce(N, P.pubKey);
+    await announce(P, addrN);
+    await until(async () => {
+      const onP = ((await P.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === P.pubKey)?.circleAddresses?.includes(addrN);
+      const onN = ((await N.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === P.pubKey)?.circleAddresses?.includes(addrP);
+      return (onP && onN) ? true : null;
+    }, { timeout: 15000, step: 50 });
+    await N.agent.sendPeerMessage(addrP, { subtype: GRANTS_CATCHUP_SUBTYPES.request, circleId: OWN_DEVICES_SCOPE }, { ...SEND, circleId: GROUP });
 
     const inherited = await until(async () => {
       const g = await listGrants(N);

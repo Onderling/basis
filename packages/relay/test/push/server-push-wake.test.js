@@ -36,6 +36,7 @@ describe('relay — push wake (E2c)', () => {
     pushSender = new FakePushSender();
     registry   = new PushTokenRegistry();
     relay = await startRelay({
+      peerDiscovery: true,   // this suite pings liveness with peer-list; discovery is off by default
       port:              0,
       pushSender,
       pushTokenRegistry: registry,

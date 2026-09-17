@@ -24,12 +24,18 @@
  *   TG_ALLOWED_CHAT_IDS      which chats may use it; unset/'*' is an OPEN DOOR
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            optional — the web app, so a printed enrolment offer is also a link
+ *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
+ *                            §12): it registers the profile and person addresses as primary on every relay, and
+ *                            its per-circle addresses take the primary slot on the roster, so a direct message
+ *                            lands HERE and not on the phone. The headless form of the tap on Mij / My data;
+ *                            enrolling alone never makes a box primary. Claimed once per start, carried to the siblings.
  *
- * Flags: --data-dir · --lang · --walk-log · --show-offer (print an add-a-device offer and exit)
+ * Flags: --data-dir · --lang · --walk-log · --show-offer (print an add-a-device offer and exit) ·
+ *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual)
  *
  * The recovery phrase is NEVER read from the environment or a file here. A device is enrolled by a
- * ceremony that asks for it, once; storing it beside the machine that runs unattended would hand the
- * whole account to anyone who reads that machine's disk.
+ * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
+ * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
@@ -51,9 +57,13 @@ import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/p
 import { listsManifest } from '../../lists/manifest.js';
 
 import { EventLog } from '../src/eventLog.js';
-import { wireEventLogPersistence, fileSnapshotIo } from '../src/v2/eventLogPersistence.js';
+import { wireEventLogPersistence, fileSnapshotIo, fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
+import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
+import { registerCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
 import { buildCircleLanes } from '../src/v2/circleLanes.js';
+import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
@@ -67,6 +77,7 @@ const { values } = parseArgs({ options: {
   lang:         { type: 'string',  default: 'nl' },
   'walk-log':   { type: 'string' },
   'show-offer': { type: 'boolean', default: false },
+  enrol:        { type: 'boolean', default: false },
 } });
 
 const dataDir = path.resolve(values['data-dir']);
@@ -86,6 +97,14 @@ function vaultPassphrase() {
 }
 
 const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase());
+// The CHAT-side vault, durable, because on a box there is no browser storage to fall back to.
+//
+// Without this the factory falls back to a MEMORY vault (`makeBrowserVault` has no `localStorage` here),
+// and this device forgets, every restart, everything that lives on the chat side: the delegation blob
+// that says which device it is, and — since content became sealed at rest — the key its own stored items
+// are sealed under. A box is the one device that is expected to run for months untouched, so it is the
+// worst possible host for a vault that only exists until the process does.
+const chatVault = new VaultNodeFs(path.join(dataDir, 'chat-vault.json'), vaultPassphrase());
 
 // The device log is the record every lane rides, so it is hydrated from disk BEFORE the agent boots:
 // a device that forgets its log on restart would re-admit a connection its owner revoked, and would
@@ -95,12 +114,28 @@ const { hydrated } = await wireEventLogPersistence({
   eventLog: deviceLog, io: fileSnapshotIo(path.join(dataDir, 'device-log.json')),
 });
 
+// Where an add-a-device offer waits between the enrol ceremony and the next start — the node shape of
+// what the shells keep in plain storage. Public data (the offer grants nothing without the phrase).
+const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
+
+// EVERYTHING A SHELL KEEPS, this device keeps — on disk, under the data dir, sealed like the shells seal
+// it. Until 2026-09-14 only the household items and the log were kept; the registry (which circles this
+// device is in, which devices the person has), the item store (rosters, contacts, the trail) and the
+// settings were memory, and a restart — every deploy of a box — came back to no circles at all. The
+// same descriptors the web app passes, with a file where it has an IndexedDB store.
 const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
+  chatVault,
+  registryBackend: createNodeFsBackend({ dir: path.join(dataDir, 'registry') }),
+  stoopPersistDb:     { path: path.join(dataDir, 'stoop-items.json') },
   householdPersistDb: { path: path.join(dataDir, 'household-items.json') },
+  tasksPersistDb:     { path: path.join(dataDir, 'tasks-items.json') },
+  settingsPersistDb:  { path: path.join(dataDir, 'settings.json') },
+  outboxPersistDb:    { path: path.join(dataDir, 'outbox.json') },
   deviceLog,
   seedDemoData: false,
   seedHousehold: false,
+  enrollOfferStorage: offerStash,
 });
 const callSkill = (app, op, args) => agent.callSkill(app, op, args);
 
@@ -134,6 +169,58 @@ async function printEnrollOffer() {
 
 if (values['show-offer']) { await printEnrollOffer(); process.exit(0); }
 
+// ── The enrol ceremony, phone-first ─────────────────────────────────────────────────────────────
+// The phone already has the circles and shows an add-a-device offer. Run ONCE with `--enrol`: the offer
+// is pasted (stashed for the next start — public data), the phrase is typed (used for the ceremony and
+// never written anywhere), and the process exits. The next ordinary start consumes the offer the way
+// both shells do after a scanned one. Two lines on stdin, in this order, so a pipe can drive it too.
+async function enrolOnce() {
+  const { createInterface } = await import('node:readline/promises');
+  const tty = process.stdin.isTTY === true;
+  const rl = createInterface({ input: process.stdin, output: tty ? process.stdout : undefined, terminal: tty });
+  const ask = async (label, { hidden = false } = {}) => {
+    if (!tty) { const line = (await rl[Symbol.asyncIterator]().next()).value; return String(line ?? '').trim(); }
+    if (hidden) {
+      // Echo off for the phrase: the readline writes nothing while the person types it.
+      const orig = rl._writeToOutput;
+      rl._writeToOutput = () => {};
+      process.stdout.write(label);
+      const line = await rl.question('');
+      rl._writeToOutput = orig;
+      process.stdout.write('\n');
+      return String(line ?? '').trim();
+    }
+    return String((await rl.question(label)) ?? '').trim();
+  };
+  try {
+    // An install enrols ONCE. Its vault is re-keyed to the enrolled root at the ceremony, so a second
+    // ceremony in the same data dir cannot open it ("wrong unlock secret") — and after a replace
+    // ceremony on the owner's new phone this device IS the retired one: its keys are gone from every
+    // roster. The way back is a fresh data dir; its contact threads are on the owner's other devices by
+    // the fan. Said here, before the phrase is asked for.
+    if (agent.isEnrolledDevice?.()) {
+      console.error('device-runner: this install is already an enrolled device. To enrol it again (after a replace ceremony on');
+      console.error('  your new phone, say), start it with a fresh --data-dir; the old one keeps its threads sealed, and your');
+      console.error('  other devices hold them anyway.');
+      return 2;
+    }
+    const offerLine = await ask('The offer from your phone (onderling-enroll://… or the link): ');
+    const stashed = await stashEnrollOffer(offerStash, offerLine);
+    if (!stashed.ok) { console.error(`device-runner: that is not an add-a-device offer (${stashed.reason}).`); return 2; }
+    const mnemonic = await ask('Your recovery phrase (24 words, not shown): ', { hidden: true });
+    const r = await callSkill('household', 'enrollDevice', { mnemonic, label: 'box' });
+    if (!r?.ok) {
+      await offerStash.removeItem('onderling.enrollOffer').catch(() => {});
+      console.error(`device-runner: not enrolled — ${r?.outcome === 'invalid-phrase' ? 'that is not a valid recovery phrase' : (r?.error ?? 'the ceremony failed')}.`);
+      return 2;
+    }
+    console.log(`device-runner: enrolled as device ${String(r.deviceId ?? '').slice(0, 12)}… for ${stashed.circles.length} circle(s).`);
+    console.log('  Now start the runner as usual; on that start it joins the circles the offer names.');
+    return 0;
+  } finally { rl.close(); }
+}
+if (values.enrol) { process.exit(await enrolOnce()); }
+
 // ── The wire ────────────────────────────────────────────────────────────────────────────────────
 let contactChannel = null;
 if (relayUrl) {
@@ -144,8 +231,17 @@ if (relayUrl) {
     sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     localActor: 'me',
+    // Direct messages are sealed to the PERSON's current key; an enrolled box holds it, handed over at enrol.
+    sealFor: agent.contactSeal?.sealFor ?? null,
+    openFor: agent.contactSeal?.openFor ?? null,
     // A turn that arrives here is meant for the PERSON, so it goes on to their other devices.
-    fanToOwnDevices: agent.contactTurnFan,
+    // …and the log says where it went: per device of the person's, delivered, held for its presence,
+    // or failed. A revoked device's fan lands nowhere, and the log is where that is legible.
+    fanToOwnDevices: async (turn) => {
+      const r = await agent.contactTurnFan(turn);
+      walkLog({ kind: 'own-device-fan', attempted: r?.attempted ?? 0, outcomes: (r?.outcomes ?? []).map((o) => ({ ...o, to: String(o.to).slice(0, 12) })) });
+      return r;
+    },
   });
 
   // What a shell would repaint, this device only stores. Every reaction below is that substitution and
@@ -169,6 +265,29 @@ if (relayUrl) {
         Promise.resolve(allow()).catch(() => {});
       },
       ownDeviceTurn: (wire) => contactChannel.applyOwnDeviceTurn(wire).catch(() => {}),
+      // A circle message landed. Nothing to paint — but said in the log, because "did the circle reach
+      // this device" is the one question an operator (and the walk) has.
+      chatLanded: ({ msgId, circleId, source }) => walkLog({ kind: 'chat-landed', msgId, circleId, source: source ?? null }),
+      // …and a catch-up that brought statements in (the pull at connect, the enrol consume's content pull).
+      chatChange: (circleId) => walkLog({ kind: 'chat-change', circleId }),
+      // …and one it could NOT take: a pulled statement refused at the rail is dropped, and only a later
+      // pull brings it back — said in the log with its reason, so "behind" is never a mystery.
+      chatRefused: async ({ circleId, fromPeerAddr, reason, statement }) => {
+        // With the roster as this device holds it at that moment: a refusal is almost always "the
+        // author's address is not on the row yet", and the row says whether that is so.
+        let roster = null;
+        try {
+          const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+          roster = (r?.members ?? []).map((m) => ({ webid: String(m.webid).slice(0, 8), primary: m.circleAddress ? String(m.circleAddress).slice(0, 8) : null, set: (m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)) }));
+        } catch { roster = null; }
+        let trail = null;
+        try {
+          const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+          const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
+          trail = items.filter((it) => it?.source?.groupId === circleId).map((it) => ({ id: String(it.id).slice(0, 10), by: String(it.source?.redeemedBy ?? it.source?.confirmedBy ?? '').slice(0, 8), addr: it.source?.circleAddress ? String(it.source.circleAddress).slice(0, 8) : null, set: (it.source?.circleAddresses ?? []).map((p) => String(p?.address ?? p).slice(0, 8)), etag: it.etag ?? it._etag ?? null }));
+        } catch { trail = null; }
+        walkLog({ kind: 'chat-refused', circleId, from: String(fromPeerAddr).slice(0, 12), reason, author: String(statement?.body?.author ?? statement?.author ?? '').slice(0, 8), roster, trail });
+      },
     },
   });
 
@@ -202,6 +321,76 @@ if (relayUrl) {
 
   await agent.connectPeerTransport({ relayUrl, onPeerMessage: (env) => router(env) });
 
+  // ── Presence in every circle: the per-circle addresses on the relay, then the announce ─────────
+  // The same three acts both shells perform on connect (`registerCirclePresence`): prime the signing
+  // identities and the sender authorization, register each per-circle address on the relay (signed —
+  // an address IS a key), and only then announce. Without this the box was reachable at its profile
+  // address alone: a circle's fan to its per-circle address went to a relay that had never heard of
+  // it, and "a full member of your circles" was true of the lanes and false of the wire.
+  const registerCirclePresence = async (extraCircleIds = []) => {
+    let ids = [];
+    try { ids = ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean); } catch { ids = []; }
+    const circleIds = [...new Set([...ids, ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : [])])];
+    if (circleIds.length === 0) return;
+    await primeCircleSecurity({ agent, circleIds }).catch((err) => console.warn('device-runner: circle security priming failed:', err?.message ?? err));
+    if (!agent.relay?.supportsAliases) return;
+    const circlesForPoint = () => circleIds;   // one relay here: every circle rides it
+    circlesForPoint.pointsFor = () => [relayUrl];
+    await registerCircleAddressesOnRelays({
+      relays: agent.relays?.list?.() ?? [],
+      circleIds,
+      circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+      circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+      circlesForPoint,
+      defaultRelayUrl: relayUrl,
+      onError: (err, cid) => console.warn(`device-runner: circle-address register failed (${String(cid).slice(0, 12)}…):`, err?.message ?? err),
+    }).then(() => announceCircleAddresses({ agent, circleIds }))
+      .catch((err) => console.warn('device-runner: circle-address registration failed:', err?.message ?? err));
+    // …and the rosters as this device holds them now — who is in each circle and at which addresses.
+    // A box that fans to nobody, or to an address nobody holds, is read from this line.
+    const rosters = {};
+    for (const cid of circleIds) {
+      try {
+        const r = await callSkill('stoop', 'listGroupMembers', { groupId: cid });
+        rosters[cid] = (r?.members ?? []).map((m) => ({ who: String(m.webid ?? '').slice(0, 8), set: (m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)) }));
+      } catch { rosters[cid] = null; }
+    }
+    walkLog({ kind: 'presence', circles: circleIds.length, rosters });
+  };
+  await registerCirclePresence();
+
+  // The stashed offer (from `--enrol`, or a re-try from an earlier start): consumed exactly as both
+  // shells consume a scanned one — registry record, presence, the roster seed from the sibling, the
+  // announce, every lane's catch-up. No-op when nothing is stashed.
+  agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+    agent, callSkill,
+    sendPeerMessage: (to, payload, o) => agent.sendPeerMessage(to, payload, o),
+    storage: offerStash,
+    registerCirclePresence: (ids) => registerCirclePresence(ids),
+    contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+      lanes.catchUps.task?.requestFrom(siblingAddress, circleId),
+      lanes.catchUps.chat?.requestFrom(siblingAddress, circleId),
+    ]),
+  }).then((r) => {
+    if (r?.consumed) {
+      walkLog({ kind: 'enroll-offer', cleared: r.cleared, circles: r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps })) });
+      console.log(`device-runner: joined ${r.circles?.filter((c) => c.ok).length ?? 0} circle(s) from the offer${r.cleared ? '' : ' — some did not complete; retried on the next start'}.`);
+    }
+    return r;
+  }).catch((err) => { console.warn('device-runner: the offer could not be consumed now — retried on the next start:', err?.message ?? err); });
+  agent.bootstrapFromStashedOffer().then(async () => {
+    // The operator's word that THIS box is the person's primary contact address — the tap, headless.
+    if (/^(1|true|yes)$/i.test(String(process.env.ONDERLING_PRIMARY_DEVICE ?? '').trim())) {
+      try {
+        const { makeThisDevicePrimary } = await import('../src/v2/circleAddressAnnounce.js');
+        const r = await makeThisDevicePrimary({ agent, logger: console });
+        walkLog({ kind: 'primary-device', circles: r.circles, announced: r.announced, claimed: r.device?.ok === true });
+        console.log(`device-runner: this device is the primary contact address (${r.announced}/${r.circles} circle(s) told; the relays re-registered).`);
+      } catch (err) { console.warn('device-runner: could not claim the primary contact address:', err?.message ?? err); }
+    }
+  });
+
   // Which lanes this device actually carries. Said out loud because a missing rail is invisible: the
   // device would run, receive nothing on that lane, and look like a quiet network rather than a
   // half-composed agent.
@@ -224,6 +413,8 @@ if (relayUrl) {
   kick(lanes.catchUps.gov, 'governance', 2000);
   kick(lanes.catchUps.membership, 'membership', 2500);
   kick(agent.grantsCatchUp, 'grants', 2500);
+  kick(agent.knownPeersSync, 'known-peers', 2500);
+  kick(agent.personKeySync, 'person-key', 2500);
   kick(lanes.catchUps.task, 'tasks', 3000);
   kick(lanes.catchUps.chat, 'chat', 3500);
   kick(lanes.catchUps.key, 'keys', 3500);
@@ -276,6 +467,12 @@ console.log(`  walk log  ${walkLogFile}\n`);
 
 const stop = async () => {
   try { await tgRunner?.stop?.(); } catch { /* stopping is best-effort */ }
+  // The stores write behind a short debounce (200 ms in the file adapters, 400 ms for the device log,
+  // whose timer is unref'd and would not hold the process either). A stop that exits inside that window
+  // loses the last change — a roster row learned a moment before a deploy's restart, and the box came
+  // back not knowing a device it had just met (2026-09-14). The stores expose no flush through the
+  // agent yet; until they do, the window is waited out, with margin for the write itself.
+  await new Promise((resolve) => { setTimeout(resolve, 700); });
   process.exit(0);
 };
 process.on('SIGINT', stop);

@@ -61,6 +61,8 @@ export function stoopContactToRow(c) {
     source:     'contact',                       // marks a ContactBook person (vs a discovered peer)
     trustLevel: c.trustLevel ?? null,            // 'bekend' | 'vertrouwd' | null
     tags:       Array.isArray(c.tags) ? c.tags : [],
+    // The pair roster (L105): once it exists the row says "verbonden"; before, nothing.
+    pairCircleId: typeof c.pairCircleId === 'string' && c.pairCircleId ? c.pairCircleId : null,
   };
 }
 
@@ -85,7 +87,12 @@ function sortContactRows(rows) {
 export function mergeContacts(peerRows = [], stoopRows = []) {
   const byId = new Map();
   for (const r of stoopRows) if (r?.contactId) byId.set(r.contactId, r);
-  for (const r of peerRows)  if (r?.contactId) byId.set(r.contactId, r);   // peer wins
+  for (const r of peerRows) {
+    if (!r?.contactId) continue;
+    // peer wins — but what only the contact book knows (the trust level, the pair roster) rides along
+    const book = byId.get(r.contactId);
+    byId.set(r.contactId, book ? { ...r, ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}), ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}) } : r);
+  }
   return sortContactRows([...byId.values()]);
 }
 
@@ -94,13 +101,31 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
  * journey A), then by name; deterministic so the screen doesn't reshuffle on
  * every refresh.
  *
+ * A PER-CIRCLE ADDRESS IS NOT A CONTACT. Every send populates the graph with the address it reached —
+ * including a member's per-circle address, which the circle fan reaches constantly — so without this
+ * the roster showed a member twice: once as themselves, once as a raw key that is where they are
+ * reached in one circle. A direct message to that second row is signed as the person and refused on
+ * arrival as a member's canonical key inside a circle (by design), and which of the two rows sorted
+ * first depended on the key bytes — the "flaky DM" of 2026-09-10/13 in `two-relays.spec.js` STEP4,
+ * seen in the trace as `refused a validly-signed envelope … canonical identity`. The shell hands in
+ * the device's own address→person read (`agent.identityOfAddress`, the one place that links a
+ * person's per-circle addresses back to one person — Frits, 2026-09-03: a surface that names a person
+ * keys on it); an address that resolves to someone else is skipped.
+ *
  * @param {{ all: () => Promise<object[]> } | null} peerGraph  the agent's `peers`
+ * @param {object} [opts]
+ * @param {(address: string) => string|null} [opts.identityOf]  the person behind an address (itself, or null, when it is nobody's alias)
  * @returns {Promise<Array<object>>}
  */
-export async function listContacts(peerGraph) {
+export async function listContacts(peerGraph, { identityOf = null } = {}) {
   if (!peerGraph || typeof peerGraph.all !== 'function') return [];
   let peers = [];
   try { peers = await peerGraph.all(); } catch { return []; }
-  const rows = peers.map(peerToContactRow).filter(Boolean);
+  const isAlias = (peer) => {
+    if (typeof identityOf !== 'function' || typeof peer?.pubKey !== 'string') return false;
+    try { const owner = identityOf(peer.pubKey); return typeof owner === 'string' && owner !== '' && owner !== peer.pubKey; }
+    catch { return false; }
+  };
+  const rows = peers.filter((p) => !isAlias(p)).map(peerToContactRow).filter(Boolean);
   return sortContactRows(rows);
 }

@@ -13,6 +13,7 @@
  */
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
+import { sealedLocalBackend, sealedLocalVault } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { PodClient, generateKeypair as podGenerateKeypair, SolidOidcAuth,
   createSealedPodDataSource, podGroupPrefix,
@@ -64,7 +65,9 @@ const circleSealStrategies = new Map();       // circleId → {seal,open} | null
 export function initCirclePods(asyncStorage) {
   if (asyncStorage) asyncStorageRef = asyncStorage;
   if (asyncStorage && !circleVault) {
-    circleVault = new VaultAsyncStorage({ prefix: 'cc-circle-pod:', asyncStorage });
+    // SEALED at rest: it holds two private keys per circle. Built here rather than in `realAgent`,
+    // which is why `sealedVault()` never reached it and its rows sat readable — see `sealedLocalVault`.
+    circleVault = sealedLocalVault(new VaultAsyncStorage({ prefix: 'cc-circle-pod:', asyncStorage }));
   }
 }
 
@@ -210,7 +213,7 @@ export function getActiveRealPodRouting() {
 function makeCirclePodClient(circleId) {
   const deviceId = `circle-${circleId}`;
   const backend = asyncStorageRef
-    ? createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-${circleId}` })
+    ? sealedLocalBackend(createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-${circleId}` }))
     : createMemoryBackend();
   // versioning: displaced bytes (overwrites · peer-updates · dropped
   // concurrent forks · deletes) land in `versions/` on the SAME backend —
@@ -539,7 +542,7 @@ export async function provisionCircleMedium(circleId) {
     if (typeof console !== 'undefined') console.info(`[cache-medium] ${circleId}: posture=${JSON.stringify(policy?.pod ?? null)} → ${mode}`);
     if (mode !== 'cache') return null;   // no-pod → shared local backing
     const localBackend = asyncStorageRef
-      ? createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-cache-${circleId}` })
+      ? sealedLocalBackend(createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-cache-${circleId}` }))
       : createMemoryBackend();
     const medium = createCircleCacheMedium({
       localBackend,

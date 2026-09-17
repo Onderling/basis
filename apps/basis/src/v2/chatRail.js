@@ -150,6 +150,24 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
    * INGEST — the full gate, then the render append. Returns `{ok, entry, existed}` (frontierReplay's
    * progress guard reads `existed`), or `{ok:false, reason}`.
    */
+  /**
+   * VERIFY without landing — the gate `ingest` applies up to the roster binding (signature, declared kind,
+   * author↔ref binding, which doubles as the eviction gate) and nothing appended. What a device that does not
+   * HOLD chat runs before it carries a statement on (sync-policy §11.3: hold nothing, still carry).
+   */
+  async function verify(circleId, statement) {
+    const v = statement && safeVerify(statement, circleId);
+    if (!v || !v.ok) return { ok: false, reason: v?.reason ?? 'malformed' };
+    const b = v.body;
+    if (!CHAT_RAIL_KINDS.includes(b.kind)) return { ok: false, reason: `undeclared kind: ${b.kind}` };
+    const ref = b.payload?.authorRef;
+    if (typeof ref !== 'string' || !ref) return { ok: false, reason: 'missing authorRef' };
+    if (!(await bindingOk(b.author, ref, circleId))) return { ok: false, reason: 'unverifiable key-ref binding' };
+    return { ok: true, body: b };
+  }
+  // NOTE (2026-09-17): `ingest` repeats `verify`'s gate inline rather than awaiting it. Routing it through the
+  // extra await made the own-devices relay walk go red (the carry to the always-on device was refused at its
+  // sender gate — measured, not understood); the two gates must stay identical, and a test pins that.
   async function ingest(circleId, statement) {
     const v = statement && safeVerify(statement, circleId);
     if (!v || !v.ok) return { ok: false, reason: v?.reason ?? 'malformed' };
@@ -215,7 +233,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
     return !!e && e.payload?.circleId === circleId;
   };
 
-  return { appendMessage, signEntry, ingest, storedStatements, hasEntry };
+  return { appendMessage, signEntry, ingest, verify, storedStatements, hasEntry };
 }
 
 /**
@@ -234,14 +252,20 @@ export function makeChatEmitter({ rail, fan = null }) {
   };
 }
 
-/** Peer handler for the signed chat fan → the rail's full ingest gate. `onLanded(circleId, entry)` is
- *  the side-effect seam (delivery receipts, the store-mirror bridge while it still exists). */
-export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null } = {}) {
+/** Peer handler for the signed chat fan → the rail's full ingest gate. `onLanded(circleId, entry, fromPeerAddr,
+ *  statement)` is the side-effect seam (delivery receipts, the sibling carry — which re-sends the STATEMENT, so it
+ *  rides along beside the log entry). */
+export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null, holds = null, onPassed = null } = {}) {
   if (!rail) throw new Error('makeChatPeerHandler: a chat rail is required');
   return async function onCircleChatStatement(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== CHAT_STATEMENT_BROADCAST) return;
     const { circleId } = payload;
     if (typeof circleId !== 'string' || !circleId) return;
+    // THIS DEVICE'S SELECTION (sync-policy §11): `holds(circleId)` → true (land it), false (this device holds
+    // no chat for this circle: VERIFY, hand it on to the siblings through `onPassed`, keep nothing), or null
+    // (this device holds this KRING not at all: refused on landing, nothing carried — the stale case).
+    const h = typeof holds === 'function' ? holds(circleId) : true;
+    if (h === null) return;
     try {
       // Two carriages, one subtype: the statement INLINE (`payload.event` — the peer fan and catch-up
       // batches), or a POD REF (`payload.ref`, a pod-signal circle's row pointer) resolved through the
@@ -255,10 +279,16 @@ export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null }
         statement = row?.event ?? null;
       }
       if (!statement?.body || !statement?.sig) return;
+      if (h === false) {
+        // hold nothing, still carry — and never carry what did not verify (a carrier is not an authority)
+        const v = typeof rail.verify === 'function' ? await rail.verify(circleId, statement) : { ok: false };
+        if (v?.ok && typeof onPassed === 'function') { try { await onPassed(circleId, statement, fromPeerAddr); } catch { /* best-effort */ } }
+        return;
+      }
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
         // fromPeerAddr rides along — the delivery receipt cannot answer a sender it was never told about.
-        try { await onLanded(circleId, res.entry, fromPeerAddr); } catch { /* side effects are best-effort */ }
+        try { await onLanded(circleId, res.entry, fromPeerAddr, statement); } catch { /* side effects are best-effort */ }
       }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };

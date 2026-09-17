@@ -8,7 +8,7 @@
  * the pull-all catch-up. `deriveRoster` folds the rail's VERIFIED bodies (author resolved to ref) as the
  * AUTHORITATIVE membership — the wall-clock exit path retires with this rider.
  */
-import { verifyCeremonyReveal } from '@onderling/core';
+import { verifyCeremonyReveal, isCeremonyKind, ceremonyRevealFacts, PERSON_KEY_KIND } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { membershipManifest, MEMBERSHIP_LANE } from './membershipManifest.js';
@@ -112,11 +112,15 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
     try {
       // THE CEREMONY RULE, first and without a self-binding shortcut: even my own device's revoke must
       // carry the root's reveal, or my local fold would accept what every other member refuses.
-      if (kind === 'address-revoke') {
+      if (isCeremonyKind(kind)) {
+        // A person announces only their OWN key: the statement's subject is the author's ref, or nothing binds.
+        if (kind === PERSON_KEY_KIND && subject !== ref) return false;
+        const facts = ceremonyRevealFacts({ kind, payload });
+        if (kind === PERSON_KEY_KIND && facts === null) return false;   // malformed announcement — no key, no version
         const r = await spinelessRoster(circleId);
         const row = (Array.isArray(r?.members) ? r.members : []).find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
         return !!row && verifyCeremonyReveal(payload?.reveal, {
-          circleId, kind, subject, authorRef: ref, commitment: row.ceremonyCommitment,
+          circleId, kind, subject, authorRef: ref, commitment: row.ceremonyCommitment, facts,
         });
       }
       // SELF-BINDING — a device can always verify its OWN key, with no roster involved. This is the
@@ -198,15 +202,19 @@ export function makeMembershipEmitter({ rail, myRef, fan = null }) {
 
 /** Peer handler for `circle-membership-broadcast` → the rail's full ingest gate (verify + declared kind +
  *  key↔ref binding) before a fanned statement lands on this device's log. Signed-only, like governance. */
-export function makeMembershipPeerHandler({ rail, onChange = null } = {}) {
+/** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
+export function makeMembershipPeerHandler({ rail, onChange = null, onLanded = null } = {}) {
   if (!rail) throw new Error('makeMembershipPeerHandler: a membership rail is required');
-  return async function onCircleMembership(_fromPeerAddr, payload) {
+  return async function onCircleMembership(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== MEMBERSHIP_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
     try {
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
+      if (res?.ok && !res.existed && typeof onLanded === 'function') {
+        try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }
+      }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };
 }

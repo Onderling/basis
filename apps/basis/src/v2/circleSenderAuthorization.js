@@ -59,9 +59,13 @@
  * stops being accepted. Nothing has to be switched on, and no two devices have to agree on a date.
  *
  * OUR OWN canonical key is the one deliberate exception, and it is not one of these two cases at
- * all: `selfKeys` names the keys of ours that speak here, and our other devices share this profile
- * seed and may still be speaking canonically. Refusing ourselves is never the right answer, and no
- * unlinkability of ours is protected by us refusing to hear from us.
+ * all: `selfKeys` names the keys of ours that speak here. It used to say our other devices "may still
+ * be speaking canonically"; since the revoke walk of 2026-09-14 none of them do — every own-device lane
+ * speaks as its address in the circle it shares with its sibling. The canonical key is admitted for one
+ * reason only: a device that has JUST enrolled announces itself to its sibling before its address is on
+ * any roster, and the sibling's seed parcel comes back the same way. That is also the one door a revoked
+ * device — which keeps the canonical key forever — can still walk through, which is why the key that
+ * replaces it has to rotate. Until it does, this admission is the stated window, not a convenience.
  *
  * What is NOT allowed either way is a key belonging to a member of some OTHER circle — the snapshot
  * is per circle, so circle A's keys buy nothing in circle B.
@@ -77,6 +81,7 @@ export const SENDER_REASON = Object.freeze({
   MEMBER:            'on-the-roster-of-this-circle',
   STRANGER:          'not-on-the-roster-of-this-circle',
   CANONICAL_REFUSED: 'a-members-canonical-key-where-they-sign-per-circle',
+  OWN_KEY:           'our-own-current-person-key',
 });
 
 /**
@@ -107,6 +112,11 @@ export const SENDER_REASON = Object.freeze({
  */
 export function createCircleSenderAuthorization({
   onUnknownRoster = null, onRefused = null, onCanonicalOnlyMembers = null,
+  // The keys that are OURS right now, read live: the person's current (rotating) person key — held by every
+  // device of the person that took part in, or was handed the result of, the last ceremony, and by no revoked
+  // one. A message signed with it is ours in every circle, before any roster is consulted; the static profile key
+  // is NOT on this list any more (2026-09-16, binding-levels §10.5 step 4).
+  ownKeysLive = null,
 } = {}) {
   /** our per-circle address → { circleId, keys: Set<string> } */
   const byOwnAddress = new Map();
@@ -133,11 +143,14 @@ export function createCircleSenderAuthorization({
    * @param {string} a.ownAddress          this device's per-circle address in that circle
    * @param {Array<object>} a.members      roster rows (`stoop listGroupMembers`)
    * @param {string[]} [a.selfKeys]        keys of OURS that speak in this circle
+   * @param {string|null} [a.selfWebid]     OUR webid on this roster — how our own row is recognised when
+   *   its `pubKey` is a display-cache artefact rather than a key of ours (see the branch below).
    * @returns {number} how many distinct keys are now allowed
    */
-  function recordCircleRoster({ circleId, ownAddress, members, selfKeys = [] } = {}) {
+  function recordCircleRoster({ circleId, ownAddress, members, selfKeys = [], selfWebid = null } = {}) {
     if (typeof ownAddress !== 'string' || !ownAddress) return 0;
     const mine = new Set((Array.isArray(selfKeys) ? selfKeys : []).filter((k) => typeof k === 'string' && k));
+    const myWebid = (typeof selfWebid === 'string' && selfWebid) ? selfWebid : null;
     const keys = new Set();
     /** canonical keys deliberately EXCLUDED — members who have proved they can sign per-circle. */
     const refusedCanonical = new Set();
@@ -155,6 +168,19 @@ export function createCircleSenderAuthorization({
       for (const extra of Array.isArray(m?.circleAddresses) ? m.circleAddresses : []) {
         if (typeof extra === 'string' && extra) keys.add(extra);
       }
+      // OUR OWN ROW, IDENTIFIED BY WEBID — and its key is NOT admitted.
+      //
+      // A founder gets no keys of their own from `deriveRoster`, so their whole row comes from the
+      // display cache, and the `pubKey` that lands there is this device's STOOP agent identity: seeded
+      // once per device, identical in every circle, and not one of `selfKeys`. Recognised only by key,
+      // that row fell past the branch below and was ALLOWED — admitting a global, cross-circle constant
+      // onto a per-circle allow-list, which is exactly the linkability this gate exists to prevent. It
+      // also counted itself as one member still speaking canonically, so the diagnostic pointed at a
+      // stranger who did not exist: a circle with nobody in it, reporting one.
+      //
+      // Ours, so neither enforced nor counted — but `continue` WITHOUT adding the key, because
+      // `selfKeys` already names every key of ours that speaks here, and this is not one of them.
+      if (myWebid && typeof m?.webid === 'string' && m.webid === myWebid) continue;
       if (!canonical) continue;
       // Our own row is neither enforced nor counted: `selfKeys` already decides which keys of ours
       // speak here, and our other devices may still be speaking canonically (see the header).
@@ -214,6 +240,11 @@ export function createCircleSenderAuthorization({
     // lets a stranger ever become a contact.
     if (typeof ownAddress !== 'string' || !ownAddress) {
       return allowSender(SENDER_REASON.NOT_CIRCLE_SCOPED);
+    }
+    if (typeof senderKey === 'string' && typeof ownKeysLive === 'function') {
+      let own = [];
+      try { own = ownKeysLive() ?? []; } catch { own = []; }
+      if (own.includes(senderKey)) return allowSender(SENDER_REASON.OWN_KEY);
     }
     const entry = byOwnAddress.get(ownAddress);
     if (!entry) {

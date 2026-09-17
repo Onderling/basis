@@ -61,6 +61,23 @@ describe('listContacts', () => {
     expect(await listContacts(null)).toEqual([]);
     expect(await listContacts({})).toEqual([]);
   });
+
+  it('a member\'s PER-CIRCLE address is not a second contact — an alias is skipped, the person stays (2026-09-13)', async () => {
+    // Every send populates the graph with the address it reached, so a member's per-circle address
+    // arrives as a bare record beside their own. Shown, it is a raw key named as a person, and a DM to
+    // it is refused on arrival (the sender's canonical key inside a circle). Which of the two rows came
+    // first depended on the key bytes: the flaky DM of two-relays STEP4.
+    const peers = new PeerGraph();
+    await peers.upsert({ type: 'native', pubKey: 'k-ann', name: 'Ann' });
+    await peers.upsert({ pubKey: 'ann-in-huis', transports: { relay: { address: 'ann-in-huis' } } });   // reached, never introduced
+    await peers.upsert({ pubKey: 'k-cas' });   // a bare person the device only ever greeted: still a person
+    const identityOf = (a) => (a === 'ann-in-huis' ? 'k-ann' : null);
+    expect((await listContacts(peers, { identityOf })).map((r) => r.contactId)).toEqual(['k-ann', 'k-cas']);
+    // Without the read, nothing is hidden — the roster cannot guess which record is an alias.
+    expect((await listContacts(peers)).map((r) => r.contactId).sort()).toEqual(['ann-in-huis', 'k-ann', 'k-cas']);
+    // A read that throws hides nothing either.
+    expect((await listContacts(peers, { identityOf: () => { throw new Error('x'); } })).length).toBe(3);
+  });
 });
 
 describe('stoopContactToRow (S1 #2 — member directory)', () => {

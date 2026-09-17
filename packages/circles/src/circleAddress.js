@@ -93,15 +93,19 @@ export async function recordCircleAddress(
 
   let patched = 0;
   let unchanged = 0;
-  // A newly proven address must not EVICT the one already on the row: both belong to the member (a
-  // second device, a restored profile) and delivery + sender authorization must keep accepting the
-  // set. The freshly proven address becomes the primary slot; every PRIOR proven {address, proof}
-  // pair is retained under the plural key. Only pairs carrying their proof survive the demotion —
-  // an address that cannot be re-proven downstream never enters the set (deny-by-default, the same
-  // rule `deriveRoster` applies when it folds the set).
-  const demote = (pairs, newPrimary) => {
+  // THE PRIMARY CONTACT ADDRESS IS THE MEMBER'S CHOICE (2026-09-17, sync-policy §12). A newly proven address
+  // never EVICTS one already on the row — both belong to the member (a second device, a restored profile) and
+  // delivery + sender authorization keep accepting the whole set — and it never DISPLACES the primary either:
+  // until then the last device to announce (every boot re-announces) took the primary slot, so enrolling a
+  // box made the box the primary the moment it booted. Now the primary slot changes hands only when the
+  // announcement says so (`primary: true` — the member tapped "make this my primary contact address" on that
+  // device) or when the row has no proven primary yet (the address that joined). A plain announce ADDS its
+  // address behind the primary, in announce order. Only pairs carrying their proof survive — an address that
+  // cannot be re-proven downstream never enters the set (deny-by-default, the same rule `deriveRoster` applies).
+  const choosePrimary = a.primary === true;
+  const orderSet = (pairs, first) => {
     const kept = [];
-    const seen = new Set([newPrimary]);
+    const seen = new Set([first]);
     for (const p of pairs) {
       if (!p || typeof p.address !== 'string' || !p.address) continue;
       if (typeof p.proof !== 'string' || !p.proof) continue;
@@ -110,6 +114,17 @@ export async function recordCircleAddress(
       kept.push({ address: p.address, proof: p.proof });
     }
     return kept;
+  };
+  /** The next `{ primary, primaryProof, rest }` for a row holding `{ primary, primaryProof, rest }` — or null when nothing moves. */
+  const placeAddress = (curPrimary, curPrimaryProof, curRest) => {
+    const have = [{ address: curPrimary, proof: curPrimaryProof }, ...(Array.isArray(curRest) ? curRest : [])];
+    const known = have.some((p) => p?.address === proven.circleAddress && p?.proof === proven.circleAddressProof);
+    if (choosePrimary || !curPrimary) {
+      if (curPrimary === proven.circleAddress && curPrimaryProof === proven.circleAddressProof) return null;
+      return { primary: proven.circleAddress, primaryProof: proven.circleAddressProof, rest: orderSet(have, proven.circleAddress) };
+    }
+    if (known) return null;
+    return { primary: curPrimary, primaryProof: curPrimaryProof, rest: [...orderSet(have, curPrimary), { address: proven.circleAddress, proof: proven.circleAddressProof }] };
   };
   for (const it of forGroup) {
     const src = it.source ?? {};
@@ -121,16 +136,12 @@ export async function recordCircleAddress(
       const releaseChanged = !!releasedProps
         && JSON.stringify(src.personaProperties ?? null) !== JSON.stringify(releasedProps);
       const commitmentNew = !!proven.ceremonyCommitment && !src.ceremonyCommitment;
-      if (src.circleAddress === proven.circleAddress
-        && src.circleAddressProof === proven.circleAddressProof
-        && !releaseChanged && !commitmentNew) { unchanged += 1; continue; }
-      const kept = demote([
-        { address: src.circleAddress, proof: src.circleAddressProof },
-        ...(Array.isArray(src.circleAddresses) ? src.circleAddresses : []),
-      ], proven.circleAddress);
+      const placed = placeAddress(src.circleAddress, src.circleAddressProof, src.circleAddresses);
+      if (!placed && !releaseChanged && !commitmentNew) { unchanged += 1; continue; }
+      const kept = placed ? placed.rest : orderSet([...(Array.isArray(src.circleAddresses) ? src.circleAddresses : [])], src.circleAddress);
       next = {
-        circleAddress:      proven.circleAddress,
-        circleAddressProof: proven.circleAddressProof,
+        circleAddress:      placed ? placed.primary : src.circleAddress,
+        circleAddressProof: placed ? placed.primaryProof : src.circleAddressProof,
         // THE CEREMONY COMMITMENT: who may retire this member's addresses — their owner root, at a
         // ceremony (core `ceremonyCommitment.js`). Declared and circle-key-signed in the announcement,
         // verified before this point. First-write-wins: a member's root does not change.
@@ -147,16 +158,13 @@ export async function recordCircleAddress(
         ...(releasedProps ? { personaProperties: releasedProps } : {}),
       };
     } else if (src.confirmedBy === webid && src.channel === 'peer') {
-      if (src.confirmedByCircleAddress === proven.circleAddress
-        && src.confirmedByCircleAddressProof === proven.circleAddressProof
-        && !(proven.ceremonyCommitment && !src.confirmedByCeremonyCommitment)) { unchanged += 1; continue; }
-      const kept = demote([
-        { address: src.confirmedByCircleAddress, proof: src.confirmedByCircleAddressProof },
-        ...(Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : []),
-      ], proven.circleAddress);
+      const placed = placeAddress(src.confirmedByCircleAddress, src.confirmedByCircleAddressProof, src.confirmedByCircleAddresses);
+      const mirrorCommitmentNew = !!proven.ceremonyCommitment && !src.confirmedByCeremonyCommitment;
+      if (!placed && !mirrorCommitmentNew) { unchanged += 1; continue; }
+      const kept = placed ? placed.rest : orderSet([...(Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : [])], src.confirmedByCircleAddress);
       next = {
-        confirmedByCircleAddress:      proven.circleAddress,
-        confirmedByCircleAddressProof: proven.circleAddressProof,
+        confirmedByCircleAddress:      placed ? placed.primary : src.confirmedByCircleAddress,
+        confirmedByCircleAddressProof: placed ? placed.primaryProof : src.confirmedByCircleAddressProof,
         ...((!src.confirmedByCeremonyCommitment && proven.ceremonyCommitment) ? { confirmedByCeremonyCommitment: proven.ceremonyCommitment } : {}),
         ...((kept.length || src.confirmedByCircleAddresses) ? { confirmedByCircleAddresses: kept } : {}),
       };

@@ -170,7 +170,7 @@ export const agentsManifest = {
         // Front-end (step 4/5 app) — a plain button on the agents surface. Creating your OWN profile
         // isn't destructive, so no consent gate (unlike installAgent, which adds a third party).
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.agents.createProfile',
           label:   'New profile',
         },
       },
@@ -307,7 +307,7 @@ export const agentsManifest = {
         // Tier C consent gate — disabling an agent cuts off every
         // delegation it holds.  'danger' → adapter shows a red confirm.
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.agents.revokeAgent',
           label:   'Revoke agent',
           confirm: {
             severity: 'danger',
@@ -418,7 +418,7 @@ export const agentsManifest = {
                + 'already-revoked agent; idempotent when the entry is absent.',
         },
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.agents.purgeAgent',
           label:   'Purge agent',
           confirm: {
             severity: 'danger',
@@ -485,7 +485,7 @@ export const agentsManifest = {
         // Install adds authority — a Tier-C consent gate (same red confirm
         // as the other capability-changing control ops).
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.agents.installAgent',
           label:   'Install agent',
           confirm: {
             severity: 'warn',
@@ -543,7 +543,7 @@ export const agentsManifest = {
         // Overwrites live content (undoably) — red confirm, same tier
         // as revokeAgent.
         ui: {
-          control: 'button',
+          control: 'button', labelKey: 'circle.button.agents.restoreDataVersion',
           label:   'Restore version',
           confirm: {
             severity: 'danger',

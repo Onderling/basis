@@ -38,10 +38,20 @@ test('Tab accepts the highlighted suggestion (full command + trailing space)', a
   const input = page.locator('.circle-view__composer-input');
   await input.fill('/comp');
   await input.dispatchEvent('input');
-  await expect(page.locator('.circle-view__suggest')).toBeVisible();
+  const suggest = page.locator('.circle-view__suggest');
+  await expect(suggest).toBeVisible();
+  // Read WHICH suggestion is highlighted, then assert Tab accepts THAT one. This used to hardcode
+  // `/complete-task` — which was the first match until the offerings work added `/complete-lend`, and
+  // `lend` sorts before `task`. The test's own title says what it is for: Tab accepts the highlighted
+  // suggestion, whichever it is. Hardcoding the winner made it a test of the command list's alphabet.
+  // The active row is `.circle-view__suggest-item.is-active`; the command alone lives in its
+  // `.circle-view__suggest-cmd` child (the hint sits beside it with no whitespace between, so the row's
+  // textContent runs them together — `/complete-lendcomplete…`).
+  const command = (await suggest.locator('.circle-view__suggest-item.is-active .circle-view__suggest-cmd').first().textContent()).trim();
+  expect(command, 'no highlighted suggestion to accept').toMatch(/^\/comp/);
   await input.press('Tab');
-  expect(await input.inputValue()).toBe('/complete-task ');
-  await expect(page.locator('.circle-view__suggest')).toBeHidden();
+  expect(await input.inputValue()).toBe(`${command} `);
+  await expect(suggest).toBeHidden();
 });
 
 test('Escape dismisses the dropdown without accepting', async ({ page }) => {

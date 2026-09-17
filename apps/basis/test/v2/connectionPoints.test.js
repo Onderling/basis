@@ -497,4 +497,17 @@ describe('contactRelayScope — a message to a PERSON rides the relays of the kr
     expect(contactRelayScope({ to: 'anna' })).toBeNull();        // no index wired
     expect(contactRelayScope({ circlesForPeer: () => ['k1'], circlePointsFor: (c) => points[c] })).toBeNull();
   });
+
+  it('the points the person\u2019s own CARD named come first, then the kringen\u2019s; a card alone is a route (2026-09-13)', () => {
+    const withCard = (to, contactPoints) => contactRelayScope({
+      to, contactPoints, circlesForPeer: (a) => circles[a] ?? [], circlePointsFor: (c) => points[c] ?? [],
+    });
+    // Their own word first; a relay both name is not listed twice.
+    expect(withCard('anna', ['ws://card:9', 'ws://theirs:2'])).toEqual({ points: ['ws://card:9', 'ws://theirs:2', 'ws://mine:1'] });
+    // No kring in common, but a card: that IS the route — the case that had none before.
+    expect(withCard('carla', ['wss://card.example'])).toEqual({ points: ['wss://card.example'] });
+    // A card naming nothing usable (a pod url, junk) adds nothing.
+    expect(withCard('carla', ['https://pod.example', '', null])).toBeNull();
+    expect(withCard('anna', ['nonsense'])).toEqual({ points: ['ws://mine:1', 'ws://theirs:2'] });
+  });
 });

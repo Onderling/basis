@@ -34,6 +34,9 @@ import { chunkItems, DEFAULT_CHUNK_SIZE } from './chunking.js';
 
 /** The most statements one replay round serves. The window a long-offline device converges through —
  *  several rounds page through a bigger backlog. `param()` returns the default (200). */
+/** One deferred re-ingest for statements refused at verify — the governance catch-up's number, for the
+ *  same race (a sibling's proven address folding a moment after the statement that needs it). */
+const RETRY_REFUSED_MS = 2000;
 const REPLAY_WINDOW_LIMIT = param({ key: 'replay.windowLimit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 200 });
 /** Above this many missing statements the PROVIDER answers with a size signal (an OFFER) instead of
  *  streaming, and serves only after the receiver re-requests with an explicit allowance. */
@@ -62,6 +65,7 @@ export function makeFrontierReplay({
   rail, sendToPeer, subtypes, statementsFor = null, onChange = null, mayServe = null,
   limit = REPLAY_WINDOW_LIMIT, chunkSize = DEFAULT_CHUNK_SIZE,
   offerThreshold = REPLAY_OFFER_THRESHOLD, autoAllow = REPLAY_AUTO_ALLOW, onOffer: offerSeam = null,
+  onRefused = null,
 } = {}) {
   if (!rail || typeof rail.storedStatements !== 'function' || typeof rail.ingest !== 'function') {
     throw new Error('frontierReplay: a rail (storedStatements + ingest) is required');
@@ -126,7 +130,7 @@ export function makeFrontierReplay({
       if (missing.length > offerThreshold && allowance === 0) {
         await sendToPeer(fromPeerAddr, {
           subtype: OFFER, circleId, count: missing.length, approxBytes: approxBytesOf(missing),
-        });
+        }, { circleId });
         return;
       }
       // An allowance AUTHORIZES the transfer; it does not change the round size — the window + paging
@@ -140,7 +144,7 @@ export function makeFrontierReplay({
         await sendToPeer(fromPeerAddr, {
           subtype: BATCH, circleId, statements: chunks[i],
           seq: i, done: i === chunks.length - 1, more,
-        });
+        }, { circleId });
       }
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }
   }
@@ -152,10 +156,35 @@ export function makeFrontierReplay({
     const { circleId, statements } = payload;
     if (typeof circleId !== 'string' || !circleId || !Array.isArray(statements)) return;
     let landed = 0;
+    const refused = [];
     for (const s of statements) {
       // Only a NEW statement counts as progress — a re-delivered duplicate (`existed`) must not feed the
       // paging guard, or a provider that can no longer relate to our frontier would loop us forever.
-      try { const r = await rail.ingest(circleId, s); if (r?.ok && !r.existed) landed += 1; } catch { /* one bad statement never blocks the rest */ }
+      try {
+        const r = await rail.ingest(circleId, s);
+        if (r?.ok && !r.existed) landed += 1;
+        // A refusal is silent to the sender by design and must not be silent here: said through the
+        // seam, so a device can log why it is behind.
+        else if (r && !r.ok) { refused.push(s); try { onRefused?.({ circleId, fromPeerAddr, reason: r.reason ?? 'refused', statement: s }); } catch { /* observer only */ } }
+      } catch { /* one bad statement never blocks the rest */ }
+    }
+    // ONE deferred re-ingest for refusals — the governance catch-up's own posture, for the same reason:
+    // a pull-burst's batches race each other, and a statement whose binding needs a fact another
+    // batch is still folding (a sibling's proven address, arriving by its announce-back a moment after
+    // the seed) fails now and verifies moments later. Seen 2026-09-13 on the box's enrol walk: the
+    // circle's conversation pulled from the phone was refused as unbindable, dropped, and nothing
+    // pulled it again until the next connect. A forged statement stays refused — this retries the
+    // VERIFY, it never weakens it.
+    if (refused.length > 0) {
+      setTimeout(async () => {
+        let relanded = 0;
+        for (const s of refused) {
+          try { const r = await rail.ingest(circleId, s); if (r?.ok && !r.existed) relanded += 1; } catch { /* still refused → next pull */ }
+        }
+        if (relanded > 0 && typeof onChange === 'function') {
+          try { onChange(circleId); } catch { /* re-render is best-effort */ }
+        }
+      }, RETRY_REFUSED_MS);
     }
     if (landed > 0 && typeof onChange === 'function') {
       try { onChange(circleId); } catch { /* re-render is best-effort */ }
@@ -164,7 +193,7 @@ export function makeFrontierReplay({
       // The no-progress guard: only page on when this round landed something new.
       try { await requestFrom(fromPeerAddr, circleId); } catch { /* next reconnect retries */ }
     }
-    return { landed };
+    return { landed, refused: refused.length };
   }
 
   /** RECEIVE AN OFFER — the provider says the backlog is big. Up to the auto-allow ceiling, consent is
@@ -191,10 +220,12 @@ export function makeFrontierReplay({
     const allowance = granted.get(`${peerAddr}|${circleId}`) ?? 0;
     // One slot per lane per circle: a request held for an offline peer is superseded by the next boot's,
     // never stacked — the frontier in the newest is the only one worth answering.
+    // Spoken as this circle's identity — see `governanceCatchUp.requestFrom` for why a canonical request
+    // was refused at every member's sender gate.
     return sendToPeer(peerAddr, {
       subtype: REQ, circleId, frontier: localFrontier(circleId), limit,
       ...(allowance > 0 ? { allowance } : {}),
-    }, { holdKey: `${REQ}:${circleId}` });
+    }, { holdKey: `${REQ}:${circleId}`, circleId });
   };
 
   /** The reconnect kick — same roster walk as the pull-all catch-up (any ONE complete peer suffices). */

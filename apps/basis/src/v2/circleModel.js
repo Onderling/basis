@@ -11,6 +11,8 @@
  */
 
 /** Normalise one circle-like raw item to a launcher tile, or null if it has no id. */
+import { isPairCircleId } from './pairCircleId.js';
+
 export function normalizeCircle(raw = {}) {
   const id = raw.id ?? raw.circleId ?? raw.circleId ?? raw.groupId ?? null;
   if (!id) return null;
@@ -74,7 +76,8 @@ export async function loadCircles({ fetchTasksCircles, fetchGroups, fetchCircles
     safe(fetchGroups),
     safe(fetchCircles),
   ]);
-  return mergeCircles(tasksCircles, groups, circles).sort(byActivityThenName);
+  // A pair roster (a contact's, made automatically — `pairRoster.js`) is never a tile.
+  return mergeCircles(tasksCircles, groups, circles).filter((c) => !isPairCircleId(c?.id)).sort(byActivityThenName);
 }
 
 async function safe(fn) {

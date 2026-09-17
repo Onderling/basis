@@ -66,7 +66,7 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
         } catch { /* the durable-head read is best-effort */ }
       }
       if (statements.length === 0) return;   // nothing to serve — silence, not an empty batch
-      await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements });
+      await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements }, { circleId });
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }
   }
 
@@ -109,7 +109,12 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
 
   /** Ask one peer for one circle's governance statements. */
   // One held request per lane per circle (see frontierReplay): the newest supersedes, never stacks.
-  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: REQ, circleId }, { holdKey: `${REQ}:${circleId}` });
+  // SPOKEN AS THIS CIRCLE'S IDENTITY (`circleId` in the send options): a request that left as the
+  // canonical self was refused at every member — their sender gate admits a circle's traffic only from
+  // a key on that circle's roster, and a member who has proved a per-circle address is refused by their
+  // canonical key on purpose. Nine refusals per reconnect, silently, measured 2026-09-14: the pull-all
+  // catch-ups between members had never served once. The reply below is scoped the same way.
+  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: REQ, circleId }, { holdKey: `${REQ}:${circleId}`, circleId });
 
   /**
    * The reconnect kick: request every circle's governance statements from that circle's reachable members
@@ -127,18 +132,31 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
       // for every lane, on both shells. Same branch `circleSecurityPriming` and `realAgent` use.
       const circleId = typeof b === 'string' ? b : (b?.groupId ?? b?.id);
       if (typeof circleId !== 'string' || !circleId) continue;
-      let members = [];
-      try { members = (await callSkill('stoop', 'listGroupRoster', { groupId: circleId }))?.members ?? []; } catch { continue; }
-      for (const m of members) {
-        const addr = m?.addr ?? m?.circleAddress ?? null;
-        if (typeof addr !== 'string' || !addr) continue;
-        try { await requestFrom(addr, circleId); requested += 1; } catch { /* next peer */ }
-      }
+      requested += (await requestCircle(circleId, { callSkill })).requested;
     }
     return { requested };
   }
 
-  return { onRequest, onBatch, requestFrom, requestAll, subtypes: { request: REQ, batch: BATCH } };
+  /**
+   * ONE circle's pull-all, from every member address this device's roster holds for it. The reconnect kick
+   * above is this over every circle; a FRESH JOIN is this for the circle just joined — until 2026-09-16 a
+   * joiner pulled nothing until its next boot, so the circle's `create` (and every statement older than its
+   * own join: earlier joins, roles, evictions) never reached it, and the creator's row on the joiner had no
+   * person key. Best-effort per peer; any one complete peer suffices (idempotent ingest).
+   */
+  async function requestCircle(circleId, { callSkill }) {
+    let members = [];
+    try { members = (await callSkill('stoop', 'listGroupRoster', { groupId: circleId }))?.members ?? []; } catch { return { requested: 0 }; }
+    let requested = 0;
+    for (const m of members) {
+      const addr = m?.addr ?? m?.circleAddress ?? null;
+      if (typeof addr !== 'string' || !addr) continue;
+      try { await requestFrom(addr, circleId); requested += 1; } catch { /* next peer */ }
+    }
+    return { requested };
+  }
+
+  return { onRequest, onBatch, requestFrom, requestAll, requestCircle, subtypes: { request: REQ, batch: BATCH } };
 }
 
 /** True when a folded proposal list still has open decisions — the caller may nudge (propose-only wakes). */

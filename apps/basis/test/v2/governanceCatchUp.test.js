@@ -144,4 +144,15 @@ describe('governance catch-up — the offline third device converges (pull-all, 
     expect(requested).toBe(2);                                       // one reachable member × two circles
     expect(sent.every((s) => s.subtype === GOV_CATCHUP_REQUEST)).toBe(true);
   });
+
+  it('requestCircle asks every reachable member of ONE circle — what a fresh joiner runs for the circle it just joined', async () => {
+    const sent = [];
+    const rail = { storedStatements: () => [], ingest: async () => ({ ok: false }) };
+    const cu = makeGovernanceCatchUp({ rail, sendToPeer: (addr, payload) => sent.push({ addr, circleId: payload.circleId }) });
+    const callSkill = async (o, op, a) => (op === 'listGroupRoster' && a.groupId === 'c1'
+      ? { members: [{ webid: 'w1', addr: 'addr:1' }, { webid: 'w2', circleAddress: 'addr:2' }, { webid: 'w3' }] } : {});
+    expect((await cu.requestCircle('c1', { callSkill })).requested).toBe(2);
+    expect(sent).toEqual([{ addr: 'addr:1', circleId: 'c1' }, { addr: 'addr:2', circleId: 'c1' }]);
+    expect((await cu.requestCircle('c9', { callSkill })).requested, 'a circle with no roster here asks nobody').toBe(0);
+  });
 });

@@ -203,3 +203,25 @@ describe('the membership rider — statements on the device log, roster folds th
     expect(await bare({ ...args, author: 'dev-2-addr', payload: { reveal } })).toBe(false);
   });
 });
+
+describe('the founder\'s own ANNOUNCE row does not cost them their foundership (the 08-27 lockout, second door — found 2026-09-16 in the two-relays walk)', () => {
+  it('with an announce row + one admission on the trail, the creator is a founder, and their admin-signed join carries the joiner\'s person key onto the roster', async () => {
+    const rosterAll = [{ webid: FOUNDER, role: 'admin' }, { webid: 'webid:bea', role: 'member' }];
+    const wire = [];
+    const admin = await device(FOUNDER, rosterAll, wire);
+    // The trail exactly as the real shell writes it on the creator's device: the creator's own per-circle
+    // address announce (redeemedBy = me, no admitter) and the joiner's peer redemption confirmed by me.
+    const rows = [
+      { id: 'ann-1', source: { groupId: CIRCLE, redeemedBy: FOUNDER, signingPublicKey: FOUNDER, channel: 'announce', announcedAt: 900 } },
+      { id: 'red-1', source: { groupId: CIRCLE, redeemedBy: 'webid:bea', confirmedBy: FOUNDER, channel: 'peer', redeemedAt: 1000 } },
+    ];
+    const beaKey = { version: 1, pubKey: 'BEA-PERSON-KEY' };
+    await admin.emit({ kind: 'create', circleId: CIRCLE, subject: FOUNDER, payload: { personKey: { version: 1, pubKey: 'ADMIN-PERSON-KEY' } } });
+    await admin.emit({ kind: 'join', circleId: CIRCLE, subject: 'webid:bea', payload: { redemptionRef: 'red-1', personKey: beaKey } });
+    const roster = await rosterOf(admin, rows, [{ webid: FOUNDER, role: 'admin' }]);
+    const me = roster.find((r) => r.webid === FOUNDER), bea = roster.find((r) => r.webid === 'webid:bea');
+    expect(me?.adminVia, 'the creator lost foundership to their own announce row').toBe('founder');
+    expect(bea?.personKey, 'the admin-signed join was dropped before the key fold').toEqual(beaKey);
+    expect(me?.personKey).toEqual({ version: 1, pubKey: 'ADMIN-PERSON-KEY' });
+  });
+});

@@ -44,14 +44,37 @@ describe('the relay tells the sender it gave up', () => {
 
     // nobody has ever registered this address, so both sends queue
     const absent = (await AgentIdentity.generate(throwawayVault())).pubKey;
-    await tx.sendOneWay(absent, { hello: 1 });
-    await tx.sendOneWay(absent, { hello: 2 });
+    await tx.sendOneWay(absent, { hello: 1, msgId: 'chat-msg-1' });
+    await tx.sendOneWay(absent, { hello: 2, msgId: 'chat-msg-2' });
     await settle();
 
     expect(seen.length).toBeGreaterThanOrEqual(1);
     expect(seen[0]).toMatchObject({ reason: 'bucket-full' });
-    expect(typeof seen[0].msgId).toBe('string');
+    // THE id the app can act on — the payload's msgId, which is what the delivery state is keyed by — not
+    // the envelope's, which only the wire ever knew. The envelope id rides along, named as such.
+    expect(seen[0].msgId).toBe('chat-msg-1');
+    expect(typeof seen[0].envelopeId).toBe('string');
+    expect(seen[0].envelopeId).not.toBe('chat-msg-1');
 
+    await tx.disconnect?.();
+  }, 20_000);
+});
+
+describe('an id-less payload is reported by its envelope id — the app never tracked it, so nothing else names it', () => {
+  it('falls back to the envelope id', async () => {
+    const relay = await startRelay({ port: 0, host: '127.0.0.1', queueCap: 1, queueCapTotal: 1 });
+    stop = () => relay.close?.();
+    const identity = await AgentIdentity.generate(throwawayVault());
+    const seen = [];
+    const tx = new RelayTransport({ identity, relayUrl: `ws://127.0.0.1:${relay.port}`, onUndelivered: (i) => seen.push(i) });
+    await tx.connect();
+    await settle();
+    const absent = (await AgentIdentity.generate(throwawayVault())).pubKey;
+    await tx.sendOneWay(absent, { hello: 1 });
+    await tx.sendOneWay(absent, { hello: 2 });
+    await settle();
+    expect(seen.length).toBeGreaterThanOrEqual(1);
+    expect(seen[0].msgId).toBe(seen[0].envelopeId);
     await tx.disconnect?.();
   }, 20_000);
 });

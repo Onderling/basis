@@ -105,6 +105,8 @@ COMPANION_MANAGE_OWNER_PUBKEY=
 # personal: the assistant's Telegram bot + who may talk to it
 TG_BOT_TOKEN=$TG_BOT_TOKEN
 TG_ALLOWED_CHAT_IDS=$TG_ALLOWED_CHAT_IDS
+# personal: this box is the person's PRIMARY contact address (1 = direct messages land here, not on the phone; the phone gets them by the carry)
+ONDERLING_PRIMARY_DEVICE=1
 # backups (role backup): interval in seconds; targets in data/backup-targets/*.env
 BACKUP_INTERVAL=86400
 # feedback-project: hostnames, the bots' Privatemode key, the chatId→pseudonym secret, the pod the bots write to

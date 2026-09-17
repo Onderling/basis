@@ -38,6 +38,7 @@ import { POINT_KIND } from './connectionPoints.js';
  * @returns {Promise<{registered: string[], skippedOffRelay: string[], noAddress: string[], failed: string[]}>}
  */
 export async function registerCircleAddresses({
+  alsoAddresses = [],   // [{ address, sign }] — the person address (see below)
   transport,
   relayUrl,
   circleIds = [],
@@ -94,6 +95,16 @@ export async function registerCircleAddresses({
       out.failed.push(circleId);
       report(onError, err, circleId);
     }
+  }
+  // The person's own address(es) beside the per-circle ones — the current person key (2026-09-16), which the
+  // enrolling device speaks as before any per-circle address of it is known. Same proof contract.
+  for (const b of Array.isArray(alsoAddresses) ? alsoAddresses : []) {
+    if (!b || typeof b.address !== 'string' || !b.address || typeof b.sign !== 'function') continue;
+    try {
+      const r = await transport.addAddress(b.address, { sign: b.sign });
+      (r?.ok ? out.registered : out.failed).push(b.address);
+      if (!r?.ok) report(onError, new Error(r?.reason ?? 'bind-failed'), b.address);
+    } catch (err) { out.failed.push(b.address); report(onError, err, b.address); }
   }
   return out;
 }

@@ -71,13 +71,18 @@ export async function createCircleViaWizard(page, name) {
  * "That isn't turned on for this circle" and no task is ever created. Three specs assumed tasks-on because
  * they used to inherit whatever circle they happened to land in.
  */
-export async function enableTasksFeature(page) {
+export async function enableTasksFeature(page, on = true) {
   await page.locator('.circle-view__more').click();
   await page.locator('.circle-view__more-item[data-action="settings"]').click();
   await page.waitForTimeout(800);
   const box = page.locator('input[data-feature="tasks"]');
   await expect(box).toBeVisible({ timeout: 5000 });
-  if (!(await box.isChecked())) await box.check();
+  // Both directions. A gate is only proven by watching it CLOSE as well as open, and which way a
+  // feature happens to start is a product decision that moves (tasks went on by default on 2026-09-08).
+  // A test that reads the default as if it were the rule goes stale every time someone changes their
+  // mind; one that toggles proves the mechanism whatever the default is.
+  if (on && !(await box.isChecked())) await box.check();
+  if (!on && (await box.isChecked())) await box.uncheck();
   await page.locator('.circle-settings__save').click();   // the toggle alone only edits local state
   await page.waitForTimeout(800);
   const back = page.locator('.circle-settings__back');
@@ -107,8 +112,15 @@ export async function bootCircle(page, circleName = 'Test Circle', { tasks = fal
   if (await mine.count() === 0) await createCircleViaWizard(page, circleName);
   await mine.first().click();
   await page.waitForTimeout(2500);
-  await page.locator('.circle-view__view-toggle-btn', { hasText: 'Chat' }).click();
-  await page.waitForTimeout(1200);
+  // The chat/scherm pill is GONE from the shipping surface — `ALPHA_VIEW_MODES` is `['chat']`, and
+  // `circleView` paints the toggle only when there is more than one mode. Clicking it unguarded made
+  // 17 specs fail with `waiting for locator('.circle-view__view-toggle-btn')` on a circle that was
+  // open, with its composer visible: the app was fine and the harness was reaching for a control the
+  // alpha cut removed (PR #68, 2026-09-08). Ten lines up, `enableTasksFeature` already guards the same
+  // click with `.count()` — this one did not, which is why the walk specs were unaffected and these
+  // were not. Guarded the same way, so it works whether or not the pill comes back.
+  const chatPill = page.locator('.circle-view__view-toggle-btn', { hasText: 'Chat' });
+  if (await chatPill.count()) { await chatPill.click(); await page.waitForTimeout(1200); }
   await expect(page.locator('.circle-view__composer-input')).toBeVisible();
   if (tasks) await enableTasksFeature(page);
 }

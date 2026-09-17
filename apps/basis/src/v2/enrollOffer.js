@@ -28,7 +28,7 @@
  *                                              announce own address to the sibling
  *                                              pull membership + governance catch-up from it
  */
-import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor } from './circleAddressAnnounce.js';
+import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor, announceOwnCircleAddress } from './circleAddressAnnounce.js';
 import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
@@ -69,7 +69,17 @@ const b64url = {
 export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
   const c = (Array.isArray(circles) ? circles : [])
     .filter((x) => x && typeof x.id === 'string' && x.id && typeof x.address === 'string' && x.address)
-    .map((x) => ({ id: x.id, ...(typeof x.handle === 'string' && x.handle ? { h: x.handle } : {}), a: x.address }));
+    .map((x) => ({
+      id: x.id,
+      ...(typeof x.handle === 'string' && x.handle ? { h: x.handle } : {}),
+      a: x.address,
+      // `m` — the address is ANOTHER MEMBER's, not a sibling's (the recovery file's bootstrap): the
+      // roster came with the file, so there is nothing to seed; the device announces itself to the
+      // members and pulls the lanes from them. `o` — the other members, for the same. Absent = a
+      // sibling, as before.
+      ...(x.member === true ? { m: 1 } : {}),
+      ...(Array.isArray(x.others) && x.others.length ? { o: x.others.filter((u) => typeof u === 'string' && u) } : {}),
+    }));
   if (c.length === 0) throw new Error('encodeEnrollOffer: at least one circle with an address is required');
   const r = (Array.isArray(relays) ? relays : []).filter((u) => typeof u === 'string' && u);
   return ENROLL_SCHEME + b64url.encode({ v: 1, ...(r.length ? { r } : {}), c });
@@ -78,7 +88,7 @@ export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
 /**
  * Parse an offer. Deny-safe: every failure is a REASON, never a partial object.
  * @param {string} uri
- * @returns {{ok:true, relays:string[], circles:Array<{id:string, handle:?string, address:string}>}
+ * @returns {{ok:true, relays:string[], circles:Array<{id:string, handle:?string, address:string, member:boolean, others:string[]}>}
  *          |{ok:false, reason:'not-an-enroll-uri'|'unreadable'|'wrong-version'|'incomplete'}}
  */
 export function parseEnrollOffer(uri) {
@@ -90,7 +100,13 @@ export function parseEnrollOffer(uri) {
   if (body.v !== 1) return { ok: false, reason: 'wrong-version' };
   const circles = (Array.isArray(body.c) ? body.c : [])
     .filter((x) => x && typeof x.id === 'string' && x.id && typeof x.a === 'string' && x.a)
-    .map((x) => ({ id: x.id, handle: typeof x.h === 'string' && x.h ? x.h : null, address: x.a }));
+    .map((x) => ({
+      id: x.id,
+      handle: typeof x.h === 'string' && x.h ? x.h : null,
+      address: x.a,
+      member: x.m === 1,
+      others: (Array.isArray(x.o) ? x.o : []).filter((u) => typeof u === 'string' && u),
+    }));
   if (circles.length === 0) return { ok: false, reason: 'incomplete' };
   const relays = (Array.isArray(body.r) ? body.r : []).filter((u) => typeof u === 'string' && u);
   return { ok: true, relays, circles };
@@ -165,7 +181,9 @@ export async function clearEnrollOffer(storage) {
   try { await storage.removeItem(ENROLL_OFFER_STORAGE_KEY); } catch { /* best-effort */ }
 }
 
-const SEND = { guarantee: 'hold-forward' };
+// `asPerson`: these are the enrolling device's FIRST words to its sibling — its per-circle address is on nobody's
+// roster yet, so it speaks as the person's current key (never the static profile key, 2026-09-16).
+const SEND = { guarantee: 'hold-forward', asPerson: true };
 
 /**
  * The consume half — run by the shells once per boot, AFTER the agent is up and the transport is
@@ -175,9 +193,12 @@ const SEND = { guarantee: 'hold-forward' };
  *      the waist — the standing reopenMemberCircles then owns every future boot;
  *   2. install the per-circle signing identity + open the circle STORE (this boot — what the
  *      restore path does on every later one), so pulled content merges into the head instead of
- *      parking on the log until the next launch;
+ *      parking on the log until the next launch; bind the sibling's address the offer named (an
+ *      address is its key) so the first send needs no greeting;
  *   3. announce this device's own per-circle address to the SIBLING — the roster-set growth that
- *      makes this device reachable (the boot re-announce reaches the rest as the roster hydrates);
+ *      makes this device reachable, and what binds this address at the sibling's end before the
+ *      seed reply needs it; then ask the sibling for the ROSTER SEED and wait for it; then announce
+ *      to every member the seeded roster names (a device enrolled today is a member today);
  *   4. pull membership + governance catch-up from the sibling — the roster folds in, and the
  *      rules doc arrives (live or from the preserved head);
  *   5. pull the CONTENT lanes (`contentPulls` — the shells hand in their task frontier-replay and
@@ -189,12 +210,21 @@ const SEND = { guarantee: 'hold-forward' };
  * so a half-failed boot retries on the next one. Returns an honest per-circle report.
  */
 export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, storage, registerCirclePresence = null, contentPulls = null } = {}) {
+  let claimedDevice = false;   // the DM half of the primary contact address: once per consume
   if (!agent || typeof callSkill !== 'function' || typeof sendPeerMessage !== 'function' || !storage) {
     return { consumed: false, reason: 'unwired' };
   }
   const offer = await pendingEnrollOffer(storage);
   if (!offer) return { consumed: false, reason: 'nothing-pending' };
 
+  // Be where the offer says the circles are, before asking anyone anything. The offer's relays were
+  // recorded on the registry record (step 1) and, until 2026-09-13, dialled by nobody — right on a
+  // one-relay alpha, wrong the day a person's circle rides another relay: the seed request below
+  // would leave over a socket the sibling is not on. Best-effort per url; the primary stays what it is.
+  for (const url of offer.relays) {
+    try { if (!agent.relays?.has?.(url)) await agent.addRelay?.(url, { awaitReady: true }); }
+    catch { /* an unreachable relay must not stop the circles that ride the one we are on */ }
+  }
   const report = [];
   let allOk = true;
   for (const c of offer.circles) {
@@ -220,20 +250,53 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // The content rails' storeFor only PEEKS: without an open store the pulled task snapshots
       // park on the device log until the next launch instead of merging into the visible head.
       try { await agent.ensureCircleSync?.(c.id); row.steps.push('store-open'); } catch { /* parked statements merge next boot */ }
+      // 2c — THE OFFER INTRODUCES THE SIBLING. Its per-circle address IS its signing key, and the
+      // owner handed this device the offer — so it is bound here as the roster binds every proven
+      // address, before the first send. Without it that send opened with a greeting, and the sibling's
+      // answer went to the PROFILE address, which every device of the person registers and the relay
+      // maps to whichever registered last: this device, as often as not, greeting itself while the
+      // send waited out its five seconds and was held (2026-09-14).
+      const me = agent.identity?.chat?.pubKey ?? null;
+      if (me && typeof agent.registerPeerAddress === 'function') {
+        try { agent.registerPeerAddress(c.address, me, { signingKey: c.address }); } catch { /* the greeting still works when the relay maps our way */ }
+      }
+      // 3 — announce our fresh per-circle address to the sibling (the proven-set growth) — BEFORE the
+      // seed request, because landing it is what binds this address's key at the sibling's end, and the
+      // seed reply needs that key: sent before it was bound, the reply opened with a greeting that the
+      // relay handed to whichever device of ours held the profile address, and came ten seconds late.
+      // A MEMBER entry (the file's bootstrap) announces to every member the file named.
+      const targets = [c.address, ...(Array.isArray(c.others) ? c.others : [])];
+      const mine = ownAnnouncementFor({ agent, circleId: c.id });
+      if (mine) {
+        for (const to of targets) {
+          await sendPeerMessage(to, {
+            type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
+            msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
+          }, SEND);
+        }
+        row.steps.push('announce');
+      }
+      let derivedHere = c.member === true;   // a member entry brought its roster in the file
       // 2b — THE ROSTER SEED (pod-less enroll S1): ask the sibling for the circle's trail rows —
       // without them this device cannot project a roster, and the rails refuse every fanned
       // statement for want of binding rows. Then WAIT (briefly) for the roster to derive before
       // sending the pulls below, so the served statements bind on arrival instead of being
       // refused and re-pulled on some later reconnect. Best-effort with a bounded wait: a seed
       // that never comes must not hang the boot.
-      if (agent.rosterSeed && ownAddress) {
+      // The roster seed is a SIBLING's to give (device-set trust). A MEMBER entry — the recovery file's
+      // bootstrap — brought the roster in the file, so there is nothing to ask for here.
+      if (agent.rosterSeed && ownAddress && c.member !== true) {
         try {
           const req = await agent.rosterSeed.buildRequest(c.id, ownAddress);
           if (req) {
             await sendPeerMessage(c.address, req, SEND);
             row.steps.push('seed-requested');
-            // Wait for the roster to DERIVE (the seed applied and the projection has its head),
-            // not merely for any rows — the fallback display list also answers, addressless.
+            // Wait for the SIBLING'S ADDRESS to be on my own row — the seed applied, and the sibling's
+            // own announcement (it rides inside the parcel) recorded. That is the one fact the pulls
+            // below depend on: every statement the sibling signed binds against it, and a pull that
+            // leaves before it is refused. "Any member has an address" was the test until 2026-09-13,
+            // and this device's OWN address satisfied it before the parcel had even arrived — so the
+            // content pull raced the seed and lost, one enrol in four (the box's walk).
             // RE-SEND the request while waiting: a single packet on a busy boot is exactly the
             // kind of loss the first-write-wins ingest makes free to retry.
             const deadline = Date.now() + 10000;
@@ -242,7 +305,10 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
             while (Date.now() < deadline) {
               try {
                 const r = await callSkill('stoop', 'listGroupMembers', { groupId: c.id });
-                if ((Array.isArray(r?.members) ? r.members : []).some((m) => m?.circleAddress || m?.circleAddresses?.length)) {
+                const rows = Array.isArray(r?.members) ? r.members : [];
+                const mine = me ? rows.find((m) => m?.webid === me) : null;
+                const siblingKnown = !!mine && (mine.circleAddress === c.address || (Array.isArray(mine.circleAddresses) && mine.circleAddresses.includes(c.address)));
+                if (siblingKnown || (!me && rows.some((m) => m?.circleAddress || m?.circleAddresses?.length))) {
                   derived = true;
                   break;
                 }
@@ -253,31 +319,58 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
               }
               await new Promise((resolve) => setTimeout(resolve, 250));
             }
-            if (derived) row.steps.push('roster-derived');
+            if (derived) { row.steps.push('roster-derived'); derivedHere = true; }
           }
         } catch { /* the pulls below still go out; the next boot retries the seed */ }
       }
-      // 3 — announce our fresh per-circle address to the sibling (the proven-set growth).
-      const mine = ownAnnouncementFor({ agent, circleId: c.id });
-      if (mine) {
-        await sendPeerMessage(c.address, {
-          type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
-          msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
-        }, SEND);
-        row.steps.push('announce');
+      // 3a — now that this device knows who its sibling is, ask it what IT knows: the bindings and
+      // contacts the person has, and the grants. The sibling's own push on the announce (its live half)
+      // reached this device before the seed had landed, when its gate still knew nobody — refused as a
+      // stranger's, as it must be. The pull, after the roster, is the half that lands (2026-09-14).
+      // Kicked, not awaited: a sibling the roster still names but that is gone (a lost phone's, before
+      // the ceremony that retires it) costs a greeting's timeout per lane, and this boot must not wait on it.
+      if (derivedHere) {
+        try { Promise.resolve(agent.knownPeersSync?.requestFromSiblings?.()).catch(() => {}); row.steps.push('known-peers'); } catch { /* the reconnect kick retries */ }
+        try { Promise.resolve(agent.grantsCatchUp?.requestFromSiblings?.()).catch(() => {}); } catch { /* the reconnect kick retries */ }
       }
-      // 4 — pull the circle's truth from the sibling: membership, governance, and the KEY lane
-      // (the group-key chain travels as signed statements like everything else — a sealed circle
-      // opens on this device once the chain folds; no side-channel replay).
-      for (const subtype of [MEMBERSHIP_CATCHUP_SUBTYPES.request, GOV_CATCHUP_REQUEST, KEY_CATCHUP_SUBTYPES.request]) {
-        // held per lane per circle — a sibling that is offline meets one request, not one per attempt
-        await sendPeerMessage(c.address, { subtype, circleId: c.id }, { ...SEND, holdKey: `${subtype}:${c.id}` });
+      // 3b — …and announce to everyone the seeded roster names. The offer named ONE device of mine
+      // (the file, the members it listed); the circle is everyone on the roster, and a member who never
+      // hears this address never fans to it — Bea's messages went to the sibling only, and this device
+      // was a member of the circle on every lane but the wire. The boot re-announce closed that on the
+      // NEXT start; a device enrolled today is a member today (2026-09-14). Idempotent at every receiver.
+      // A RESTORE (the offer came from the recovery file, `member`) is a replacement: the device it replaces is
+      // gone, so this one announces itself as the PRIMARY contact address — or every member would keep
+      // delivering to the lost phone's queue (held counts as delivered) until the replace ceremony retires it.
+      // A device added from a sibling's offer (a box) announces plainly: enrolling does not make it primary
+      // by itself (sync-policy §12.3); that is the tap on Mij / My data.
+      if (mine) {
+        try {
+          const r = await announceOwnCircleAddress({ agent, circleId: c.id, primary: c.member === true });
+          if (r?.announced) row.steps.push(c.member === true ? 'announce-roster-primary' : 'announce-roster');
+        } catch { /* the next boot re-announces */ }
+        // …and a replacement is the primary DEVICE too (the DM half): claimed once, carried to any sibling left.
+        if (c.member === true && !claimedDevice) {
+          claimedDevice = true;
+          try { await agent.claimPrimaryDevice?.(); row.steps.push('primary-device'); } catch { /* the tap on Mij / My data does it */ }
+        }
+      }
+      // 4 — pull the circle's truth: membership, governance, and the KEY lane (the group-key chain
+      // travels as signed statements like everything else — a sealed circle opens on this device once
+      // the chain folds; no side-channel replay).
+      for (const to of targets) {
+        for (const subtype of [MEMBERSHIP_CATCHUP_SUBTYPES.request, GOV_CATCHUP_REQUEST, KEY_CATCHUP_SUBTYPES.request]) {
+          // held per lane per circle per peer — one that is offline meets one request, not one per attempt
+          await sendPeerMessage(to, { subtype, circleId: c.id }, { ...SEND, holdKey: `${subtype}:${c.id}:${to}` });
+        }
       }
       row.steps.push('catch-up');
-      // 5 — the CONTENT pulls (tasks + chat), targeted at the sibling — see the header. Best-effort:
-      // the statements bind against the freshly seeded roster; the reconnect requestAll retries.
+      // 5 — the CONTENT pulls (tasks + chat), targeted by address — see the header. Best-effort: the
+      // statements bind against the roster; the reconnect requestAll retries.
       if (typeof contentPulls === 'function') {
-        try { await contentPulls(c.id, c.address); row.steps.push('content'); } catch { /* reconnect retries */ }
+        for (const to of targets) {
+          try { await contentPulls(c.id, to); } catch { /* reconnect retries */ }
+        }
+        row.steps.push('content');
       }
     } catch (err) {
       row.ok = false;

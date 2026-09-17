@@ -52,7 +52,7 @@ export const householdManifest = {
   domainVerbs: [
     'help', 'register',
     'enroll-device', 'revoke-device', 'reveal-owner-phrase', 'restore-owner-phrase',
-    'replace-device', 'export-recovery-file', 'import-recovery-file', 'restore-status', 'restore-source', 'restore-intent',
+    'replace-device', 'list-recovery-circles', 'export-recovery-file', 'import-recovery-file', 'restore-status', 'restore-source', 'restore-intent',
     'grant-surface', 'revoke-surface', 'list-surface-grants',
   ],
 
@@ -148,7 +148,7 @@ export const householdManifest = {
             onEmpty:    { skillId: 'help', args: {} },
           },
         },
-        ui: { control: 'button', label: 'Done' },   // web surface
+        ui: { control: 'button', labelKey: 'circle.button.household.markComplete', label: 'Done' },   // web surface
       },
     },
     {
@@ -170,7 +170,7 @@ export const householdManifest = {
             onEmpty:    { skillId: 'help', args: {} },
           },
         },
-        ui: { control: 'button', label: 'Remove' },  // web surface
+        ui: { control: 'button', labelKey: 'circle.button.household.removeItem', label: 'Remove' },  // web surface
       },
     },
     {
@@ -254,7 +254,7 @@ export const householdManifest = {
             onEmpty: { skillId: 'help', args: {} },
           },
         },
-        ui:    { control: 'button', label: "I'll do this" },
+        ui:    { control: 'button', labelKey: 'circle.button.household.claim', label: "I'll do this" },
       },
     },
     {
@@ -308,12 +308,24 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'listRecoveryCircles', group: 'device',
+      verb: 'list-recovery-circles',
+      // The circles a recovery file would carry, with their names — what the export door lists with its
+      // per-circle choice (carry the member list so a new device can find the circle again).
+      params: [],
+      surfaces: {},
+    },
+    {
       id:   'exportRecoveryFile', group: 'device',
       verb: 'export-recovery-file',
       // THE RECOVERY FILE, out: the registry (circles, devices, wrapped-key refs) sealed exactly as the pod
       // mirror seals it — to the profile-derived key the phrase re-derives — so the phrase is the only
       // secret. Reached from My data → "Save a recovery file" (both shells); no chat/slash surface.
-      params: [],
+      // `rosters`: the circle ids whose MEMBER LIST the file carries (the per-circle choice, default all)
+      // — a restored device lands it, announces itself to every member and pulls the lanes from them.
+      params: [
+        { name: 'rosters', kind: 'string', required: false },
+      ],
       surfaces: {},
     },
     {

@@ -73,6 +73,19 @@ describe('Stoop V2 Phase 24 — ContactBook', () => {
     expect(r.contact.handle).toBe('klusclub-bob');
   });
 
+  it('the op\'s `name` is the contact\'s displayName — what every list shows (2026-09-14)', async () => {
+    // `/add-contact --name Bea` sent `name`, the member map's whitelist dropped it, and the contact showed
+    // its key. The op maps the manifest's word onto the book's field; an explicit displayName still wins.
+    const { bundle } = await buildBundle();
+    const r = await callSkill(bundle.agent, 'addContact', { webid: 'https://id.example/bea', name: 'Bea' });
+    expect(r.contact.displayName).toBe('Bea');
+    expect(r.contact.name, 'nothing rides under the unkept field').toBeUndefined();
+    const listed = (await callSkill(bundle.agent, 'listContacts', {})).contacts.find((c) => c.webid === 'https://id.example/bea');
+    expect(listed?.displayName).toBe('Bea');
+    const r2 = await callSkill(bundle.agent, 'addContact', { webid: 'https://id.example/cas', name: 'ignored', displayName: 'Cas' });
+    expect(r2.contact.displayName).toBe('Cas');
+  });
+
   it('removeContact drops the entry + cleans lists', async () => {
     const { bundle } = await buildBundle();
     await callSkill(bundle.agent, 'addContact', { webid: BOB, trustLevel: 'bekend' });
@@ -211,6 +224,29 @@ describe('Stoop V2 Phase 24 — QR contact-share', () => {
     expect(Object.keys(card).filter((k) => card[k] != null).sort())
       .toEqual(expect.arrayContaining(['handle', 'peerAddr', 'pubKey', 'webid']));
     expect(card.pubKey).toBe(srcId.pubKey);
+  });
+
+  it('the card says WHERE to find the sharer — its relays become the contact\'s points (2026-09-13)', async () => {
+    // A message to a contact rides the points their own card named before any kring's relay; two people
+    // who share no kring have no other route. The caller (basis) chooses which relays go on the card —
+    // the primary by default, extras only when the person ticked them — and hands them in as `relays`.
+    const { bundle: srcBundle } = await buildBundle(ANNE);
+    const dst = await buildBundle('https://id.example/dst4');
+    const r = await callSkill(srcBundle.agent, 'getContactShareQr', { peerAddr: 'peer-anne', relays: ['wss://relay-one.example', '', 7] });
+    expect(r.relays, 'the reply says what the card carries — malformed entries dropped').toEqual(['wss://relay-one.example']);
+    const add = await callSkill(dst.bundle.agent, 'addContactFromQr', { payload: r.payload }, 'https://id.example/dst4');
+    expect(add.contact.points).toEqual(['wss://relay-one.example']);
+    const listed = (await callSkill(dst.bundle.agent, 'listContacts', {}, 'https://id.example/dst4')).contacts;
+    expect(listed.find((c) => c.webid === ANNE)?.points, 'the points survive the store\'s whitelist').toEqual(['wss://relay-one.example']);
+    // A card with no relays makes a contact with no points — never a phantom route. (On a fresh book:
+    // the add is an upsert, so re-scanning a bare card KEEPS the points an earlier card gave.)
+    const bare = await callSkill(srcBundle.agent, 'getContactShareQr', { peerAddr: 'peer-anne' });
+    expect(bare.relays).toBeUndefined();
+    const dst2 = await buildBundle('https://id.example/dst5');
+    const add2 = await callSkill(dst2.bundle.agent, 'addContactFromQr', { payload: bare.payload }, 'https://id.example/dst5');
+    expect(add2.contact.points).toEqual([]);
+    const again = await callSkill(dst.bundle.agent, 'addContactFromQr', { payload: bare.payload }, 'https://id.example/dst4');
+    expect(again.contact.points, 'a later bare card does not erase what an earlier one said').toEqual(['wss://relay-one.example']);
   });
 
   it('addContactFromQr rejects malformed payload', async () => {

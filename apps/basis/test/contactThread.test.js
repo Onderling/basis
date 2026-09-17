@@ -89,6 +89,18 @@ describe('renderContactThread', () => {
     expect(badge.classList.contains('is-pulse')).toBe(true);
   });
 
+  it('marks in the header what a direct message is sealed to — the person, or the device only — from the shared mark', () => {
+    const person = renderContactThread(document.createElement('div'), { name: 'Bea', t, sealed: { level: 'person', label: 'circle.contacts.sealed_person' } });
+    const mark = person.querySelector('.cc-cthread__header .cc-cthread__sealed');
+    expect(mark?.textContent).toContain('circle.contacts.sealed_person');
+    expect(mark?.dataset.level).toBe('person');
+    const device = renderContactThread(document.createElement('div'), { name: 'Bea', t, sealed: { level: 'device', label: 'circle.contacts.sealed_device' } });
+    expect(device.querySelector('.cc-cthread__sealed')?.dataset.level).toBe('device');
+    expect(device.querySelector('.cc-cthread__sealed')?.textContent).toContain('circle.contacts.sealed_device');
+    // a host that has not decided yet (the status is async) paints no mark rather than a wrong one
+    expect(renderContactThread(document.createElement('div'), { name: 'Bea', t }).querySelector('.cc-cthread__sealed')).toBeNull();
+  });
+
   it('says the pre-send floor under the header when the contact declared one, and nothing otherwise', () => {
     const el = renderContactThread(document.createElement('div'), { name: 'Bot', t, floor: { label: 'circle.contacts.presend_floor' } });
     expect(el.querySelector('.cc-cthread__floor').textContent).toContain('circle.contacts.presend_floor');

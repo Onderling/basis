@@ -18,7 +18,9 @@
 import { test, expect } from '@playwright/test';
 import { createCircleViaWizard } from './helpers.js';
 
-const SHOTS = '/home/frits/.claude/jobs/c6a31a12/tmp/verify-shots';
+// Screenshots land in Playwright's own output directory for this test — never a path from one
+// machine. (A hardcoded home directory here failed every run of this story in CI, 2026-09-13.)
+const shot = (page, name) => page.screenshot({ path: test.info().outputPath(`${name}.png`) });
 
 test.setTimeout(420_000);
 
@@ -170,7 +172,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
   }
   const codeEl = a.locator('.cc-mydata-modal code, .cc-mydata-modal__card code');
   const inviteUri = (await codeEl.count()) ? (await codeEl.first().innerText()).trim() : null;
-  await a.screenshot({ path: `${SHOTS}/twopeer-A-invite.png` });
+  await shot(a, 'twopeer-A-invite');
   await a.mouse.click(5, 5).catch(() => {});   // dismiss modal
   await a.waitForTimeout(500);
   console.log('A invite URI:', inviteUri ? inviteUri.slice(0, 70) + '…' : '(none)');
@@ -184,7 +186,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
   await b.waitForTimeout(2500);
 
   const card = b.locator('.cc-mydata-modal__card');
-  await b.screenshot({ path: `${SHOTS}/twopeer-B-wizard-step1.png` });
+  await shot(b, 'twopeer-B-wizard-step1');
   // Step 1 — rules
   const rulesCheck = card.locator('.cc-wizard-check input[type="checkbox"]').first();
   if (await rulesCheck.count()) { await rulesCheck.check().catch(() => {}); await b.waitForTimeout(400); }
@@ -198,7 +200,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
   // Step 3 — handle + submit
   const handleInput = card.locator('.cc-wizard-handle-input');
   if (await handleInput.count()) { await handleInput.fill('peerbee'); await b.waitForTimeout(400); }
-  await b.screenshot({ path: `${SHOTS}/twopeer-B-wizard-step3.png` });
+  await shot(b, 'twopeer-B-wizard-step3');
   const submitBtn = card.locator('.cc-wizard-submit');
   if (await submitBtn.count()) await submitBtn.first().click().catch(() => {});
 
@@ -214,7 +216,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
     if (i % 4 === 0) console.log(`B join wait ${i}: open=${stillOpen} err=${JSON.stringify(errTxt)}`);
   }
   console.log('B join outcome:', joinOutcome);
-  await b.screenshot({ path: `${SHOTS}/twopeer-B-join-result.png` });
+  await shot(b, 'twopeer-B-join-result');
 
   // Confirm co-membership: (1) B's launcher shows the joined circle tile;
   // (2) the admin roster on BOTH sides lists 2 members.
@@ -239,8 +241,8 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
   const paired = bHasCircle && (aTwo || bTwo);
   log('STEP3 pairing (CRUX)', paired ? 'PASS' : (bHasCircle ? 'PARTIAL' : 'BLOCKED'),
     `B joined-circle tile=${bHasCircle}; A roster count=${aRoster.count} ${JSON.stringify(aRoster.names)}; B roster count=${bRoster.count} ${JSON.stringify(bRoster.names)}; joinOutcome=${joinOutcome}`);
-  await a.screenshot({ path: `${SHOTS}/twopeer-A-members.png` });
-  await b.screenshot({ path: `${SHOTS}/twopeer-B-members.png` });
+  await shot(a, 'twopeer-A-members');
+  await shot(b, 'twopeer-B-members');
 
   if (!bHasCircle) { log('COLLAB', 'SKIPPED', 'B did not join — nothing to collaborate on'); await teardown(A, B); return; }
 
@@ -262,8 +264,8 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
       if ((await bubbles(b)).some((s) => s.includes(msg))) { got = true; break; }
     }
     console.log('B bubbles tail:', JSON.stringify((await bubbles(b)).slice(-5)));
-    await b.screenshot({ path: `${SHOTS}/twopeer-msg-B.png` });
-    await a.screenshot({ path: `${SHOTS}/twopeer-msg-A.png` });
+    await shot(b, 'twopeer-msg-B');
+    await shot(a, 'twopeer-msg-A');
     log('STEP4a chat A→B', got ? 'PASS' : 'FAIL', `sent ${JSON.stringify(msg)}; B ${got ? 'RECEIVED it' : 'did NOT show it'}`);
   } catch (e) { log('STEP4a chat A→B', 'FAIL', `threw: ${e.message.split('\n')[0]}`); }
 
@@ -291,7 +293,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
       }
       console.log('B Taken first row:', JSON.stringify(rowText));
     }
-    await b.screenshot({ path: `${SHOTS}/twopeer-task-B.png` });
+    await shot(b, 'twopeer-task-B');
     log('STEP4b task A→B', seen ? 'PASS' : (takenIdx < 0 ? 'BLOCKED' : 'FAIL'), `B Taken tab: ${JSON.stringify(rowText)}`);
   } catch (e) { log('STEP4b task A→B', 'FAIL', `threw: ${e.message.split('\n')[0]}`); }
 
@@ -310,7 +312,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
     }
     const ec = await entrust.count();
     console.log('A entrust action count:', ec);
-    if (!ec) { await a.screenshot({ path: `${SHOTS}/twopeer-mandate-A.png` }); log('STEP4c mandate', 'BLOCKED', 'no Toevertrouwen action on the task row'); await teardown(A, B); return; }
+    if (!ec) { await shot(a, 'twopeer-mandate-A'); log('STEP4c mandate', 'BLOCKED', 'no Toevertrouwen action on the task row'); await teardown(A, B); return; }
 
     await entrust.first().click();
     await a.waitForTimeout(2000);
@@ -320,7 +322,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
     const emptyNote = await a.locator('.cc-mandate-picker__empty').count();
     const ptxt = (await picker.count()) ? (await picker.first().innerText()).replace(/\s+/g, ' ').trim() : '(picker not found)';
     console.log('A mandate picker WHO count:', whoCount, 'empty-note:', emptyNote, 'text:', JSON.stringify(ptxt.slice(0, 300)));
-    await a.screenshot({ path: `${SHOTS}/twopeer-mandate-A.png` });
+    await shot(a, 'twopeer-mandate-A');
 
     const listsB = whoCount >= 1 && emptyNote === 0;
     if (listsB) {
@@ -332,7 +334,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
       const confirm = a.locator('.cc-mandate-picker__confirm');
       const cDisabled = (await confirm.count()) ? await confirm.first().isDisabled() : true;
       console.log('A confirm present/disabled:', await confirm.count(), cDisabled);
-      await a.screenshot({ path: `${SHOTS}/twopeer-mandate-A-selected.png` });
+      await shot(a, 'twopeer-mandate-A-selected');
       // the confirm routes through the shared confirm-gate ("weet je het zeker?") — accept it too
       if (await confirm.count() && !cDisabled) {
         await confirm.first().click();
@@ -341,7 +343,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
         if (await gate.count()) { await gate.first().click().catch(() => {}); await a.waitForTimeout(2000); }
       }
       await a.waitForTimeout(1500);
-      await a.screenshot({ path: `${SHOTS}/twopeer-mandate-A-result.png` });
+      await shot(a, 'twopeer-mandate-A-result');
       log('STEP4c mandate WIE lists B + entrust', 'PASS',
         `WHO list has ${whoCount} member(s), no "niemand anders"; picked B + confirmed. picker text: ${JSON.stringify(ptxt.slice(0, 160))}`);
     } else {

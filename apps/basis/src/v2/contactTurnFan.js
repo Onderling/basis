@@ -20,8 +20,9 @@
  * it, that signature must verify against exactly that key, and the key must be the one already bound
  * to the sender's address (an unbound address is refused outright unless it is a first-contact
  * greeting). A per-circle address IS its signing key. So "this came from one of my own device
- * addresses" is a cryptographic statement, not a hint — and the profile address itself qualifies,
- * because only devices grown from the owner's seed can sign as it.
+ * addresses" is a cryptographic statement, not a hint. The profile address does NOT qualify: every
+ * device grown from the owner's seed can sign as it — a revoked one too — and a revocation retires
+ * per-circle addresses, never that key. So a sibling speaks as its address in a circle we share.
  *
  * What this does NOT do, said plainly: there is no pull to reconcile a device that was off longer
  * than the relay holds. The fan is hold-forward and that is the whole durability story here.
@@ -31,24 +32,24 @@
  */
 
 /** The wire subtype for a turn fanned to the owner's own devices. */
+import { makeSiblingCarry } from './siblingCarry.js';
+
 export const CONTACT_TURN_BROADCAST = 'device-contact-turn';
 
 /** A turn's direction as the ORIGINATING device saw it: one it received, or one it sent. */
 export const TURN_DIRECTIONS = Object.freeze({ in: 'in', out: 'out' });
 
 /**
- * Strip a file down to what may cross the fan: its description, never its bytes.
- *
- * A received photo's bytes live in the receiving device's blob store, keyed by the file id; they are
- * already kept out of the durable thread item for the same reason they are kept out of here. A
- * sibling therefore learns that a file arrived and what it is, and opens it on the device that holds
- * it. Carrying the bytes would put a photo on the fan for every device the person owns; dropping the
- * turn entirely would lose the message, which is worse than a card you cannot open yet.
+ * A file crosses the fan WHOLE — bytes included (sync-policy §11.4 as amended, 2026-09-16). The carry forwards
+ * what landed; what a device KEEPS of a file is that device's own choice (`syncSelection`: full, or the
+ * description only), applied where the turn is stored. Until then the fan stripped the bytes here, which
+ * stranded them on whichever device the sender's fan reached — once the primary contact address is a box
+ * that keeps descriptions only, the phone would never see the photo. Nothing with neither bytes nor a
+ * description is a file.
  */
-function fileDescription(file) {
+function fileOnWire(file) {
   if (!file || typeof file !== 'object') return undefined;
-  const { dataB64, ...rest } = file;   // eslint-disable-line no-unused-vars
-  return rest;
+  return { ...file };
 }
 
 /**
@@ -65,7 +66,7 @@ export function contactTurnToWire(turn) {
   const direction = turn?.direction === TURN_DIRECTIONS.out ? TURN_DIRECTIONS.out : TURN_DIRECTIONS.in;
   const contactId = typeof turn?.contactId === 'string' && turn.contactId ? turn.contactId : null;
   if (!contactId) return null;
-  const file = fileDescription(turn.file);
+  const file = fileOnWire(turn.file);
   const text = typeof turn.text === 'string' ? turn.text : '';
   // A turn with neither words nor a file is nothing to show; the sibling would render an empty bubble.
   if (!text && !file) return null;
@@ -90,23 +91,23 @@ export function contactTurnToWire(turn) {
  * @param {object} a
  * @param {() => Promise<string[]>} a.siblings   the owner's other device addresses
  * @param {(addr: string, payload: object) => any} a.sendToPeer  hold-forward send
- * @returns {(turn: object) => Promise<{ attempted: number }>}
+ * @returns {(turn: object) => Promise<{ attempted: number, outcomes: Array<{to: string, delivered: boolean, held: boolean, error: string|null}> }>}
+ *   per sibling, what the send reported: delivered now, held for its presence, or failed — so a device
+ *   log can say which, rather than a thread quietly missing a turn.
  */
 export function makeContactTurnFan({ siblings, sendToPeer }) {
   if (typeof siblings !== 'function') throw new Error('makeContactTurnFan: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('makeContactTurnFan: `sendToPeer` is required');
+  // One caller of the ONE sibling carry (siblingCarry.js): this fan only shapes the turn for the wire.
+  const { carry } = makeSiblingCarry({
+    siblings, sendToPeer,
+    onWarn: (m) => console.warn(`[contact-turns] fan to own device failed — that device's thread will be missing this turn: ${m}`),
+  });
   return async function fanContactTurn(turn) {
     const wire = contactTurnToWire(turn);
-    if (!wire) return { attempted: 0 };
-    let addrs = [];
-    try { addrs = (await siblings()) ?? []; } catch { addrs = []; }
-    await Promise.all(addrs.map(async (addr) => {
-      try { await sendToPeer(addr, { subtype: CONTACT_TURN_BROADCAST, turn: wire }); }
-      catch (err) {
-        console.warn(`[contact-turns] fan to own device failed — that device's thread will be missing this turn: ${err?.message ?? err}`);
-      }
-    }));
-    return { attempted: addrs.length };
+    if (!wire) return { attempted: 0, outcomes: [] };
+    const { attempted, outcomes } = await carry({ subtype: CONTACT_TURN_BROADCAST, turn: wire });
+    return { attempted, outcomes };
   };
 }
 
@@ -137,11 +138,12 @@ export function makeContactTurnPeerHandler({ siblings, selfPubKey, applyTurn, on
     if (!payload || payload.subtype !== CONTACT_TURN_BROADCAST) return;   // not ours
     const wire = contactTurnToWire(payload.turn);
     if (!wire) { refuse('malformed', fromAddr); return; }
-    if (fromAddr !== selfPubKey) {
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { refuse('siblings-unavailable', fromAddr); return; }
-      if (!addrs.includes(fromAddr)) { refuse('not-a-sibling', fromAddr); return; }
-    }
+    // The profile address is NOT one of my devices here: every device of the person speaks as it, a
+    // revoked one included, and revocation retires per-circle addresses only. A turn from one of my
+    // own devices arrives from that device's proven address in a circle we share (2026-09-14).
+    let addrs = [];
+    try { addrs = (await siblings()) ?? []; } catch { refuse('siblings-unavailable', fromAddr); return; }
+    if (!addrs.includes(fromAddr)) { refuse('not-a-sibling', fromAddr); return; }
     try { await applyTurn(wire, { fromAddr }); } catch { /* a landed turn never throws into the router */ }
   };
 }

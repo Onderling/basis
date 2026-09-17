@@ -16,6 +16,7 @@
  */
 
 import { computeEmbedButtons } from '../core/embedButtons.js';
+import { translatorOr } from '../locales/translatorOr.js';
 // B · (4c) — apply the per-capability consequence (grey/hide/limit) to inline affordances.
 import { affordanceTreatment, canonicalAtom } from '@onderling/app-manifest';
 
@@ -115,10 +116,33 @@ export function embedButtonsForReply({ reply, appOrigin, manifestsByOrigin, maxB
       if (treatment === 'hide') continue;
       out.push({
         id: key, label: `${b.label} · ${clip(snap.label)}`, opId: b.opId, itemId: b.itemId,
+        // The key rides beside the literal so a shell can paint the translation (`embedButtonText`); the item's
+        // name rides separately so the translated verb keeps its subject.
+        ...(typeof b.labelKey === 'string' && b.labelKey ? { labelKey: b.labelKey } : {}),
+        itemLabel: clip(snap.label),
         ...(treatment === 'grey' ? { disabled: true } : {}),
       });
       if (out.length >= maxButtons) return out;
     }
   }
   return out;
+}
+
+/**
+ * What a shell paints on an inline button — ONE place for both shells (invariant 1). The translated key
+ * when the button has one and the translator knows it, with the item's name after it; otherwise the
+ * literal label the builder composed; never a bare key. Walked 2026-09-14: "Claim · brood halen" and
+ * "circle.item.share · brood halen" were the literal composition painted with no translation at all.
+ *
+ * @param {object} b   a button from `embedButtonsForReply` / `computeEmbedButtons` (or a screen/action button)
+ * @param {(key:string)=>string} t   the shell's translator (a missing key comes back as the key)
+ * @returns {string}
+ */
+export function embedButtonText(b, t) {
+  const tr = translatorOr(t, 'replyEmbeds.js');
+  if (typeof b?.labelKey === 'string' && b.labelKey) {
+    const v = tr(b.labelKey);
+    if (typeof v === 'string' && v && v !== b.labelKey) return b.itemLabel ? `${v} · ${b.itemLabel}` : v;
+  }
+  return b?.label ?? b?.opId ?? b?.screen ?? b?.action ?? '';
 }

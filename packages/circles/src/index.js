@@ -36,6 +36,7 @@ export { createCircleFanOut } from './circleFanOut.js';
 // half (`fanCircleAddresses`). Pure DI lift out of stoop; the caller injects the
 // store, the core verify helpers, the announce kind, and the fan.
 export { recordCircleAddress, fanCircleAddresses } from './circleAddress.js';
+export { isRosterTrailItem } from './rosterTrail.js';
 
 // Roster read / persona-property write / roster-updated fan, plus the full member
 // roster read (`listCircleMembers` — the read with the per-peer ALLOWLIST projection).

@@ -50,7 +50,7 @@ import { buildCircleInviteUri, joinCircleFromInvite } from '../basis/src/v2/circ
 import { quickCreateCircle } from '../basis/src/v2/circleCreate.js';
 // The two halves of what a shell does on connect and after every join (`registerCirclePresence` in
 // web/v2/circleApp.js): prime each circle's security state, then register its address on the relay.
-import { primeCircleSecurity } from '../basis/src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../basis/src/v2/circleSecurityPriming.js';
 import { announceOwnCircleAddress } from '../basis/src/v2/circleAddressAnnounce.js';
 import { registerCircleAddresses } from '../basis/src/v2/circleAddressRegistration.js';
 
@@ -365,7 +365,24 @@ async function main() {
     } catch (err) {
       console.log('[walk-peer] circle-address registration failed:', err?.message ?? err);
     }
-    return { circleIds, primed, ...out };
+    // …and say where we answer, which both shells do here and this harness did not.
+    //
+    // It is the third thing a shell does on connect (`circleApp.js`, `agentBundle.js`), and only after
+    // the alias is bound — an announcement sent earlier goes out signed by the canonical key and every
+    // recipient now refuses it. Without this call every device driven through this harness left its own
+    // roster row unproven, so the sender-authorization snapshot counted it as a member still speaking
+    // canonically. A walk was reporting a defect the harness had created: the exact shape CLAUDE.md
+    // means by "prove the harness before you blame the product".
+    let announced = null;
+    try {
+      announced = await announceCircleAddresses({
+        agent: me.agent, circleIds,
+        onWarn: (m, e) => console.log(`[walk-peer] ${m}: ${e?.message ?? e ?? ''}`),
+      });
+    } catch (err) {
+      console.log('[walk-peer] circle-address announce failed:', err?.message ?? err);
+    }
+    return { circleIds, primed, announced, ...out };
   }
 
   async function listCircles() {

@@ -284,7 +284,7 @@ export const stoopManifest = {
         },
         // appliesTo-gated row button on /feed posts.  Click → form
         // prompts for body, then dispatches.
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.respondToItem' },
       },
     },
     {
@@ -325,7 +325,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'cancelRequest', args: {} },
           },
         },
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.cancelRequest' },
       },
     },
 
@@ -385,7 +385,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'markReturned', args: {} },
           },
         },
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.markReturned' },
       },
     },
 
@@ -417,7 +417,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'reportPost', args: {} },
           },
         },
-        ui: { control: 'button' },
+        ui: { control: 'button', labelKey: 'circle.button.stoop.reportPost' },
       },
     },
     // ── Profile / reveals ───────────────────────────────────────────
@@ -624,7 +624,7 @@ export const stoopManifest = {
       params: [{ name: 'webid', kind: 'string', required: true }],
       surfaces: {
         chat: { reply: 'text', hint: 'open a DM with this peer' },
-        ui:   { control: 'button' },
+        ui:   { control: 'button', labelKey: 'circle.button.stoop.startDm' },
       },
     },
 
@@ -686,7 +686,7 @@ export const stoopManifest = {
       surfaces: {
         slash: { command: '/remove-contact' },
         chat:  { reply: 'text', hint: 'remove a contact' },
-        ui:    { control: 'button' },
+        ui:    { control: 'button', labelKey: 'circle.button.stoop.removeContact' },
       },
     },
     {
@@ -702,9 +702,30 @@ export const stoopManifest = {
       },
     },
     {
+      // A contact's CURRENT person key: taken on first sight (the card), else verified as a chain of links from the
+      // version already on record. Reached by the card scan and by the person-key chain lane — no surface of its own.
+      id:   'setContactPersonKey', group: 'data', verb: 'submit',
+      appliesTo: { type: 'contact' },
+      // Versions are monotonic and chain-verified at the receiver — two of my devices converge on the highest version
+      // the chain reaches; content, not a claim.
+      resolves: [{ field: 'personKey', policy: 'content' }],
+      params: [
+        { name: 'webid',     kind: 'webid',  required: true },
+        { name: 'personKey', kind: 'object', required: true },
+        { name: 'links',     kind: 'object', required: false },
+      ],
+      surfaces: {
+        chat: { reply: 'text', hint: "record a contact's current person key (from their card, or a verified chain)" },
+        ui:   { control: 'page' },   // reached from the contact page's card scan, as the address announcement is
+      },
+    },
+    {
       id:   'getContactShareQr', group: 'data', verb: 'list',
       params: [
         { name: 'trust', kind: 'enum', of: ['known', 'trusted'], required: false },
+        // The card carries the sharer's PRIMARY relay by default; every EXTRA relay this device is on
+        // goes on the card only when named here (comma-separated urls) — off by default, per relay.
+        { name: 'extra-relays', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/share-my-contact', body: 'flags' },
@@ -735,7 +756,7 @@ export const stoopManifest = {
         slash: { command: '/dispute', body: 'flags' },
         chat:  { hint: 'raise a conflict-resolution dispute in your circle' },
         page:  { kind: 'side-panel', title: 'Raise a dispute' },
-        ui:    { control: 'button' },
+        ui:    { control: 'button', labelKey: 'circle.button.stoop.conflictDisputeWizard' },
       },
     },
     {

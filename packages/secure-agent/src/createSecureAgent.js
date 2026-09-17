@@ -879,6 +879,10 @@ export async function createSecureAgent(opts = {}) {
    * would lose the distinction the retry path needs.
    */
   const onUndelivered = typeof opts.onUndelivered === 'function' ? opts.onUndelivered : null;
+  // THE PRIMARY DEVICE (sync-policy §12, the DM half): is this device the one the person chose for direct messages?
+  // Read at every relay socket open; `relays.setPrimaryDevice` moves it at runtime. A function so the host's choice
+  // store answers live; absent → plain registrations, as before.
+  let primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
   /** address → consecutive failed delivery attempts. Cleared by a success or a presence signal. */
   const deliveryFailures = new Map();
 
@@ -1174,6 +1178,11 @@ export async function createSecureAgent(opts = {}) {
   let transportMode = opts.transportMode ?? 'nkn';
   // T5.2a — extra transports added via addSecureTransport (mdns/ble injected by the RN app,
   // rendezvous by enableSecureRendezvous). Tracked for shutdown.
+  /** How long a SPECULATIVE relay attempt waits before the next one is tried (see `_sendWithFailover`).
+   *  Short on purpose: there is nothing to wait for on a relay the recipient never dialled, and the last
+   *  attempt in the sweep keeps the caller's own timeout so a slow peer is still given time. */
+  const SPECULATIVE_RELAY_TIMEOUT_MS = 700;
+
   const extraTransports = new Map();
 
   // (T2/T5.1 — `routing` is created above and shared with the core Agent; in transportMode:'both'
@@ -1221,6 +1230,14 @@ export async function createSecureAgent(opts = {}) {
     // + nacl.box encrypted with a per-peer shared secret.  HI stays
     // plaintext-but-signed so peers can bootstrap.
     tx.useSecurityLayer(agent.security);
+    // A refusal is silent on the wire by design; it must not be silent HERE. The kernel re-emits a
+    // transport's `security-error` on the agent when it owns the transport (`Agent.addTransport`);
+    // these transports are owned by this factory instead, so until now a refused envelope — an
+    // unknown sender, a bad signature, an oversize frame — reached no listener at all, and "refused"
+    // was indistinguishable from "never arrived". Same event, same place an app already listens.
+    tx.on('security-error', (err, raw) => {
+      try { agent.emit('security-error', err, raw); } catch { /* a listener that throws must not take the receive path down */ }
+    });
     // bilateral HI auto-handshake on receive.  When we
     // receive an envelope from a peer we haven't HI'd, send HI to
     // them so THEIR SecurityLayer registers our pubKey too.
@@ -1279,6 +1296,22 @@ export async function createSecureAgent(opts = {}) {
       // we don't want them to make us spam them in return).  The injected
       // exemption passes legitimate bursts (catch-up batches) untouched.
       if (rateLimiter && !(rateLimitExempt?.(env)) && !rateLimiter.check(env?._from)) return;
+      // A greeting that passed every gate above: say so, the way the kernel's own hello handler
+      // does (`peer`, same shape). The kernel never sees a HI on these transports — they hand
+      // envelopes here, not to its dispatch — so without this nothing above the substrate learns
+      // that a first contact happened, and a device cannot carry the binding it just made to the
+      // person's other devices.
+      if (env?._p === 'HI') {
+        try {
+          agent.emit('peer', {
+            address:      env._from,
+            pubKey:       env.payload?.pubKey ?? null,
+            label:        env.payload?.label ?? null,
+            ack:          !!env.payload?.ack,
+            capabilities: env.payload?.capabilities ?? null,
+          });
+        } catch { /* a listener that throws must not take the receive path down */ }
+      }
       // v0.7.cc — record for /debug-dump.  Size is the JSON-
       // serialised length of the envelope; matches the wire bytes
       // the transport actually received.
@@ -1511,9 +1544,16 @@ export async function createSecureAgent(opts = {}) {
       const tx = new RelayTransport({
         identity,
         relayUrl,
+        primaryDevice: () => primaryDevice() === true,
         onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
       });
       makeReceiveHandler(tx);
+      // A send made before this socket opened was HELD — nothing could carry it, and no peer event
+      // would ever flush it (presence flushes are per peer, on THEIR inbound). The socket opening is the
+      // event that makes those holds sendable, so it flushes them; whatever still cannot route re-holds.
+      // Same on every reconnect. Found 2026-09-13: a fresh install that wrote to its seeded contact in
+      // its first second parked the message until the contact happened to speak first.
+      tx.on('connect', () => { flushHeld().catch(() => { /* re-hold handled inside */ }); });
       await tx.connect();
       // `connect()` only REQUESTS the socket — it deliberately does not await it, so that
       // `agent.start()` never blocks on a relay that may be unreachable. That is right for boot and
@@ -1702,6 +1742,7 @@ export async function createSecureAgent(opts = {}) {
     const tx = new RelayTransport({
       identity,
       relayUrl: url,
+      primaryDevice: () => primaryDevice() === true,
       onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
     });
     makeReceiveHandler(tx);                 // the secure receive wiring — same as the primary
@@ -1716,6 +1757,25 @@ export async function createSecureAgent(opts = {}) {
     if (relayTransport && relayState.url === url) { await disconnectRelay(); return; }
     await removeSecureTransport(relayNameFor(url));
   }
+  /**
+   * Every relay socket this device holds, primary first — the candidates for a message that names none.
+   *
+   * A circle-scoped message carries its relay in the scope, because the alias it is addressed to was
+   * registered there. A DM and a receipt carry no circle, so nothing names a relay — and a relay socket
+   * cannot answer the question either: `RelayTransport.canReach` returns `connected`, not "that address
+   * is registered with me". Only the relay knows, and the sender has no way to ask.
+   *
+   * So the send tries them, rather than picking one and hoping. See `_sendWithFailover`.
+   */
+  function relaySweep() {
+    const out = [];
+    if (relayTransport) out.push({ name: 'relay', transport: relayTransport });
+    for (const [name, tx] of extraTransports) {
+      if (name.startsWith(RELAY_NAME_PREFIX)) out.push({ name, transport: tx });
+    }
+    return out.filter(({ transport }) => (typeof transport?.canReach !== 'function' || transport.canReach() !== false));
+  }
+
   function listRelays() {
     const out = [];
     if (relayTransport) out.push(relayEntry(relayState.url, relayTransport, true));
@@ -1955,7 +2015,13 @@ export async function createSecureAgent(opts = {}) {
         // offers the address-fallback trade — a trade that cannot help someone who is simply offline),
         // while a genuinely scoped-out send was held silently as `unreachable`, so the one offer that
         // WOULD have fixed it never appeared. Found by J-CS4/CS6/CS7.
-        const scopedOut = !!opts?.scope && (await hasLiveRoute(addr));
+        // …and "reachable in general" has to mean a transport that can reach them NOW: the unscoped
+        // route under a pinned transport mode names that transport whether or not its socket is open,
+        // so a send in the first second after boot — socket still opening — used to be labelled as
+        // scoped out (an offer to accept the address fallback, which cannot help) instead of offline.
+        const unscoped = await route(addr).catch(() => null);
+        const reachableNow = !!unscoped && (typeof unscoped.transport?.canReach !== 'function' || unscoped.transport.canReach(addr) === true);
+        const scopedOut = !!opts?.scope && reachableNow;
         return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
       }
       try {
@@ -2050,6 +2116,56 @@ export async function createSecureAgent(opts = {}) {
       : FAILOVER_ATTEMPT_BUDGET);
     const tried  = new Set();
     let   lastErr = null;
+
+    // ── A MESSAGE THAT NAMES NO RELAY, ON A DEVICE THAT HOLDS SEVERAL ─────────────────────────────
+    //
+    // `routeUnscoped` can only ever reach the PRIMARY relay and NKN: the extra relays are keyed by url
+    // and never appear in `TRANSPORT_PRIORITY`, so a circle-less message could not take one at all. Two
+    // people on different relays could talk inside a shared kring — the alias carries the route — and a
+    // DM between them went nowhere. Measured 2026-09-10: `{delivered: false, held: true}`, held on a
+    // device that was connected to the right relay the whole time.
+    //
+    // The sender cannot know which relay the recipient is on, so this TRIES them, primary first, and
+    // stops at the first that reports delivered. Not a fan: one delivery, no duplicate, and no envelope
+    // handed to a relay after the message has already arrived somewhere. A wrong relay costs one send
+    // timeout, which is why the ordering will matter once a contact card carries the person's own relays
+    // — then the first attempt is usually the right one and this becomes the fallback it should be.
+    //
+    // Only when NOTHING names a route: a scope with points is a route that is known, and it is used.
+    const routeNamed = Array.isArray(opts?.scope?.points) && opts.scope.points.length > 0;
+    const sweep = routeNamed ? [] : relaySweep();
+    if (sweep.length > 1) {
+      // ONE AT A TIME, and briefly.
+      //
+      // Concurrently was tried and is worse: two `_sendOverRoute` calls for the same peer at once
+      // interfere — the HI handshake and the hold queue are per peer — and the message arrives nowhere.
+      // So they go in turn, and the cost of a wrong relay is bounded instead of a full send timeout:
+      // every attempt but the last gets a short speculative window, because there is nothing to wait
+      // for on a relay the recipient never dialled. The last keeps the caller's own timeout, so a peer
+      // who is simply slow still gets the patience they would have had.
+      //
+      // Duplicates are handled where they arrive — the chat inbox dedupes on `msgId` (LRU, cap 256) and
+      // the hold queue keys on `id:<msgId>` — so a message that does reach two relays lands once.
+      let lastResult = null;
+      for (let k = 0; k < sweep.length; k++) {
+        const { name, transport } = sweep[k];
+        const last = k === sweep.length - 1;
+        const attemptOpts = last ? opts : { ...opts, firstSendTimeoutMs: SPECULATIVE_RELAY_TIMEOUT_MS };
+        let res;
+        try {
+          res = await _sendOverRoute(addr, payload, { name, transport, address: await addressFor(addr, name) }, attemptOpts);
+        } catch (err) {
+          if (isApplicationError(err)) throw err;   // a refusal is a refusal on every relay
+          lastErr = err; continue;
+        }
+        if (res?.delivered) return res;
+        lastResult = res ?? lastResult;
+      }
+      // Nobody acked: the peer is offline, or on a relay this device does not hold. The hold-forward
+      // queue already has it — once, by message id — so reporting that is more honest than falling
+      // through to try the primary a second time.
+      if (lastResult) return lastResult;
+    }
 
     for (let attempt = 0; attempt < budget; attempt++) {
       const sel = await route(addr, opts?.scope ?? null);
@@ -2531,7 +2647,17 @@ export async function createSecureAgent(opts = {}) {
         : Promise.resolve({ ok: false, reason: 'not-connected' })),
     },
     // Every relay this device is on: the primary first, then the ones its circles ride (2026-09-08).
-    relays: { add: addRelay, remove: removeRelay, list: listRelays, has: hasRelay },
+    relays: {
+      add: addRelay, remove: removeRelay, list: listRelays, has: hasRelay,
+      /** The person's choice of primary device moved: every relay socket re-registers its own address with the new flag. */
+      setPrimaryDevice: async (isPrimary) => {
+        primaryDevice = () => isPrimary === true;
+        const txs = [relayTransport, ...extraTransports.values()].filter((t) => t && typeof t.setPrimaryDevice === 'function');
+        const results = await Promise.all(txs.map((t) => t.setPrimaryDevice(isPrimary === true).catch((err) => ({ ok: false, reason: err?.message ?? String(err) }))));
+        return { ok: results.every((r) => r?.ok !== false), relays: results.length };
+      },
+      primaryDevice: () => primaryDevice() === true,
+    },
     get transportMode() { return transportMode; },
     setTransportMode,
     // Phase-2 · Piece-2 (B2 wiring) — attach (or replace) the peer registry on

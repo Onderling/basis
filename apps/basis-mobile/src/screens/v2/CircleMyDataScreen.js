@@ -33,6 +33,8 @@ import {
   connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant,
 } from '../../../../basis/src/v2/connections.js';
 import { parsePairingOffer } from '../../../../basis/src/v2/connectionPairing.js';
+import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../../../basis/src/v2/syncSelection.js';
+import { makeThisDevicePrimary } from '../../../../basis/src/v2/circleAddressAnnounce.js';
 import { CONNECTION_MANIFESTS } from '../../../../basis/src/v2/connectionManifests.js';
 import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
 import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
@@ -151,6 +153,22 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   // The address-sharing setting lives in the parameter register since the consolidation — the
   // read is the live enforced value, the write goes through the one kind-gated set-param.
   const shareNknAddress = agent ? agent.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false : null;
+  // What THIS device keeps (sync-policy §11) — read live from the register; written through the one set-param.
+  const [, setSyncTick] = useState(0);
+  const syncSel = agent ? makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }) : null;
+  const setSync = useCallback(async ({ silo, value, fileBytes, kringId, on } = {}) => {
+    const set = (key, v) => callSkill('params', 'set-param', { key, value: v });
+    try {
+      if (silo && SYNC_SILO_PARAM_KEYS[silo]) await set(SYNC_SILO_PARAM_KEYS[silo], value !== false);
+      if (fileBytes) await set(SYNC_FILE_BYTES_PARAM_KEY, fileBytes === 'description' ? 'description' : 'full');
+      if (kringId) {
+        const cur = parseKringenOff(agent?.getParamValue?.(SYNC_KRINGEN_OFF_PARAM_KEY));
+        if (on === false) cur.add(kringId); else cur.delete(kringId);
+        await set(SYNC_KRINGEN_OFF_PARAM_KEY, serializeKringenOff(cur));
+      }
+    } catch { /* the section re-reads */ }
+    setSyncTick((n) => n + 1);
+  }, [agent, callSkill]);
   const toggleShareAddress = useCallback(async () => {
     const next = !(shareNknAddress !== false);
     try { await callSkill('params', 'set-param', { key: SHARE_NKN_ADDRESS_PARAM_KEY, value: next }); } catch { /* the row re-reads */ }
@@ -189,6 +207,12 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     setPush(await getNativePushState());
   }, [push.granted, callSkill]);
 
+  // "Make this device my primary contact address" (sync-policy §12): announce this device's address in every
+  // circle with the primary flag, so others deliver here first. Said back with the count that took it.
+  const makePrimary = useCallback(async () => {
+    const r = await makeThisDevicePrimary({ agent: agent ?? { callSkill } }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
+    Alert.alert(t('circle.mydata.make_primary'), t('circle.mydata.make_primary_done', { count: r.announced }));
+  }, [agent, callSkill]);
   const revealMnemonic = useCallback(async () => {
     // The OWNER-ROOT phrase (host `revealOwnerPhrase`, step 1b) — re-derives every
     // profile incl. the feedback pseudonym. Was stoop `getMnemonicOnce` (wrong seed).
@@ -408,6 +432,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
         </Pressable>
+        {/* The member's choice of which device others deliver to first — their primary contact address. */}
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
+        </Pressable>
       </Section>
 
       {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
@@ -520,6 +548,34 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           );
         })()}
       </Section>
+
+      {/* What this device keeps (sync-policy §11, web parity): a device's own choice about itself; never on the wire. */}
+      {syncSel ? (
+        <Section title={t('circle.mydata.sync')}>
+          <Text style={styles.privacyBody}>{t('circle.mydata.sync_intro')}</Text>
+          {SYNC_SILOS.map((silo) => {
+            const on = syncSel.siloOn(silo);
+            return (
+              <Pressable key={silo} onPress={() => setSync({ silo, value: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-silo-${silo}`}>
+                <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${t(`circle.mydata.sync_silo_${silo}`)}`}</Text>
+              </Pressable>
+            );
+          })}
+          <Pressable onPress={() => setSync({ fileBytes: syncSel.fileBytes() === 'full' ? 'description' : 'full' })} accessibilityRole="button" style={styles.action} testID="sync-files-mode">
+            <Text style={styles.actionLabel}>{`${t('circle.mydata.sync_files')}: ${t(`circle.mydata.sync_files_${syncSel.fileBytes()}`)}`}</Text>
+          </Pressable>
+          <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen')}</Text>
+          {circlesForConnections.length === 0 ? <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen_none')}</Text> : null}
+          {circlesForConnections.map((k) => {
+            const on = syncSel.kringOn(k.id);
+            return (
+              <Pressable key={k.id} onPress={() => setSync({ kringId: k.id, on: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-kring-${k.id}`}>
+                <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${k.name}`}</Text>
+              </Pressable>
+            );
+          })}
+        </Section>
+      ) : null}
 
       {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
       {shareNknAddress != null ? (

@@ -103,7 +103,9 @@ describe('startRelay — ws://', () => {
     alice.close(); bob.close();
   });
 
-  it('broadcasts peer-list on connect and disconnect', async () => {
+  it('broadcasts peer-list on connect and disconnect — when the operator turned discovery ON', async () => {
+    await relay.stop();
+    relay = await startRelay({ port: 0, peerDiscovery: true });
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
     send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
@@ -127,7 +129,9 @@ describe('startRelay — ws://', () => {
     alice.close();
   });
 
-  it('responds to a peer-list request with the current client list', async () => {
+  it('responds to a peer-list request with the current client list — when discovery is ON', async () => {
+    await relay.stop();
+    relay = await startRelay({ port: 0, peerDiscovery: true });
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
     send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
@@ -437,7 +441,7 @@ describe('startRelay — per-connection address cap', () => {
   afterEach(async () => { if (relay) await relay.stop(); });
 
   it('refuses the over-cap register with TOO_MANY_ADDRESSES and keeps the socket usable', async () => {
-    relay = await startRelay({ port: 0, maxAddressesPerConnection: 2 });
+    relay = await startRelay({ port: 0, maxAddressesPerConnection: 2, peerDiscovery: true });   // reads the list to check the cap held
     const url = `ws://127.0.0.1:${relay.port}`;
 
     const anna = await openClient(url);

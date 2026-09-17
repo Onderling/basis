@@ -51,6 +51,9 @@ importers:
       '@onderling/chat-nav':
         specifier: workspace:*
         version: link:../../packages/chat-nav
+      '@onderling/circles':
+        specifier: workspace:*
+        version: link:../../packages/circles
       '@onderling/core':
         specifier: workspace:*
         version: link:../../packages/core

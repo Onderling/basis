@@ -35,6 +35,9 @@ import { EventLog } from '../src/eventLog.js';
 
 const GROUP = 'contact-turn-fan-circle';
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
+// The enrolling device's first words to its sibling speak as the PERSON (its per-circle address is on nobody's roster
+// yet) — exactly what the production enrol consume does (`asPerson`, 2026-09-16). A stranger's send below stays plain.
+const SEND_AS_PERSON = { ...SEND, asPerson: true };
 
 /** The turns the durable thread with one contact holds on this device — what the thread UI reads. */
 const threadWith = async (node, contactId) => (await node.contactThreadChannel.rehydrate(contactId)) ?? [];
@@ -81,7 +84,7 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
         type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: GROUP,
         msgId: `announce-${from.label}`, ts: Date.now(),
         announcements: [ownAnnouncementFor({ agent: from.agent, circleId: GROUP })],
-      }, SEND);
+      }, SEND_AS_PERSON);
     };
     await announce(alwaysOn, phone);
     await announce(phone, alwaysOn);
@@ -147,6 +150,31 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
     expect(other.contactTurnsSeen.at(-1).origin, 'a message FROM Bea is the other side of the thread').toBe('bot');
   }, 120_000);
 
+  it("THE PAIR ROSTER decides where a contact's DM lands (L105, the route): Bea's reply goes to the device ON the pair roster — the always-on one, which wrote first and made it — and reaches the phone by the carry; the primary-DEVICE choice governs the relay registration, not this", async () => {
+    // The always-on device sent the first DM ('anna-1'), so it founded/joined the pair roster with Bea; the phone is
+    // not on that roster (a circle made on one device reaches a sibling by the enrol seed or the pod mirror, not
+    // live — the standing gap for every circle). So Bea's reply travels over the pair roster to the always-on
+    // device's per-circle address there, and the phone gets it by the contact-turn carry.
+    const pairId = await until(async () => (await alwaysOn.agent.pairRouteFor?.(bea.pubKey))?.circleId ?? null, { timeout: 20000, step: 200 });
+    expect(pairId, 'the always-on device holds no pair roster with Bea').toMatch(/^pair-/);
+    expect(await bea.agent.pairRouteFor(phone.pubKey), 'Bea\'s route to Anna').toMatchObject({ to: alwaysOn.agent.circleAddressFor(pairId), circleId: pairId });
+    // The phone claims the primary DEVICE: the relay registrations move (the profile + person addresses); the pair
+    // roster's route does not — Bea's DM still lands on the always-on device, and the phone still gets it by the carry.
+    const claim = await phone.agent.claimPrimaryDevice();
+    expect(claim.ok, JSON.stringify(claim)).toBe(true);
+    expect(await until(() => (alwaysOn.agent.primaryDevice.current()?.deviceId === claim.claim.deviceId ? true : null), { timeout: 15000, step: 100 }), 'the always-on device never learned the claim').toBe(true);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(phone.agent.sa?.relays?.primaryDevice?.() ?? phone.agent.primaryDevice.isMine(), 'the phone registers as primary now').toBe(true);
+    await bea.contactThreadChannel.sendTurn({ peerAddr: phone.pubKey, threadId: bea.pubKey, text: 'op de telefoon dan', messageId: 'bea-2' }).sent;
+    const landedOn = await until(async () => {
+      if ((await textsIn(alwaysOn, bea.pubKey)).includes('op de telefoon dan')) return 'always-on';
+      if ((await textsIn(phone, bea.pubKey)).includes('op de telefoon dan')) return 'phone';
+      return null;
+    }, { timeout: 20000, step: 100 });
+    expect(landedOn, "Bea's reply did not go over the pair roster to the device on it").toBe('always-on');
+    expect(await until(async () => ((await textsIn(phone, bea.pubKey)).includes('op de telefoon dan') ? true : null), { timeout: 20000, step: 100 }), 'the phone never got it by the carry').toBe(true);
+  }, 120_000);
+
   it('the same turn arriving twice is stored once', async () => {
     const before = (await threadWith(phone, bea.pubKey)).length;
     const seenBefore = phone.contactTurnsSeen.length;
@@ -169,15 +197,16 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
       turn: { direction: 'in', contactId: 'someone-else', fromAddr: 'someone-else', text: 'ik ben jouw laptop', messageId: 'forged-1' },
     }, SEND);
 
+    // Bea's, by name: an own-device fan that arrives before its sibling is on the roster is refused the
+    // same way, so the first refusal on record is not necessarily hers.
     const refused = await until(async () => {
       for (const n of [phone, alwaysOn]) {
-        const hit = n.contactTurnsRefused.find((r) => r.reason === 'not-a-sibling');
+        const hit = n.contactTurnsRefused.find((r) => r.reason === 'not-a-sibling' && r.fromAddr === bea.pubKey);
         if (hit) return { node: n, hit };
       }
       return null;
     }, { timeout: 20000, step: 100 });
-    expect(refused, 'a stranger\'s fan was not refused').toBeTruthy();
-    expect(refused.hit.fromAddr).toBe(bea.pubKey);
+    expect(refused, `a stranger's fan was not refused — refusals: ${JSON.stringify([phone, alwaysOn].map((n) => n.contactTurnsRefused))}`).toBeTruthy();
     expect(await textsIn(refused.node, 'someone-else'), 'a refused turn still reached a thread').toEqual([]);
     expect(await textsIn(phone, bea.pubKey), 'a refused turn disturbed the real thread').toEqual(before);
   }, 60_000);

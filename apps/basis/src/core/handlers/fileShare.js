@@ -21,13 +21,46 @@
  */
 import { contactIdFor } from './threadedChat.js';
 
+/**
+ * THE PERSON SEAL on a file (2026-09-17): a file to a contact whose person key is on record travels as a box
+ * sealed to that key — the same `sealFor` the text turn uses — beside a stub `{ id, name, mime, size }`; the
+ * bytes are inside the box. A box the receiver cannot open is dropped and said, never handed up as a file.
+ * Without a key on record the bytes ride inline, sealed to the device only, exactly as before (the stated
+ * fallback through the alpha).
+ *
+ * The SEND half — the envelope `sendFile` puts on the wire. Pure apart from `sealFor`, so the builtin and a
+ * walk build the same thing.
+ * @param {{ file: { id, name, mime, size, dataB64 }, peerAddr: string, sealFor?: Function, sentAt?: number }} a
+ */
+export async function buildFileShareEnvelope({ file, peerAddr, sealFor, sentAt = Date.now() } = {}) {
+  const stub = { id: file.id, name: file.name, mime: file.mime || 'application/octet-stream', size: file.size };
+  let sealed = null;
+  if (typeof sealFor === 'function') {
+    try { sealed = await sealFor(peerAddr, { file: { ...stub, dataB64: file.dataB64 } }); } catch { sealed = null; }
+  }
+  return sealed
+    ? { type: 'p2p-chat', subtype: 'file-share', file: stub, sealed, sentAt }
+    : { type: 'p2p-chat', subtype: 'file-share', file: { ...stub, dataB64: file.dataB64 }, sentAt };
+}
+
 export function makeHandleFileShare({
-  deliverToThread, publishEvent, notePeer, identityOf, logger = console,
+  deliverToThread, publishEvent, notePeer, identityOf, openFor = null, logger = console,
 } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleFileShare: deliverToThread required');
 
-  return function handleFileShare(fromAddr, payload) {
-    const f = payload?.file;
+  return async function handleFileShare(fromAddr, payload) {
+    let f = payload?.file;
+    let sealedTo = null;
+    if (payload?.sealed && typeof payload.sealed === 'object') {
+      // Sealed to the person: the bytes are in the box. Open with my key for the version it names, or drop.
+      const content = typeof openFor === 'function' ? await Promise.resolve(openFor(payload.sealed, fromAddr)).catch(() => null) : null;
+      if (!content?.file?.dataB64) {
+        logger.warn?.(`[peer] a file sealed to person-key version ${payload.sealed?.to?.version ?? '?'} did not open here — dropped, not shown`);
+        return;
+      }
+      f = { ...(f ?? {}), ...content.file };
+      sealedTo = { to: payload.sealed.to ?? null, from: payload.sealed.from ?? null };
+    }
     if (!f?.id || !f?.name || !f?.dataB64) {
       logger.warn?.('[peer] file-share missing fields', payload);
       return;
@@ -51,6 +84,8 @@ export function makeHandleFileShare({
         // The sender's file id doubles as the dedup nonce, so a relay-replayed share never lands twice.
         messageId: `file-share-${f.id}`,
         ts: typeof payload?.sentAt === 'number' ? payload.sentAt : Date.now(),
+        // What the box was sealed to (versions + keys, never the box) — the thread's "sealed to" mark reads it.
+        ...(sealedTo ? { sealed: sealedTo } : {}),
       });
     } catch (err) {
       logger.warn?.('[peer] file-share delivery failed', err?.message ?? err);

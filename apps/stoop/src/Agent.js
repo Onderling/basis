@@ -30,6 +30,7 @@ import { CachingDataSource } from './lib/CachingDataSource.js';
 // caller asked for (FilePersist for Node, IndexedDBPersist for
 // browser).  See `lib/persistPicker.js`.
 import { pickPersist }       from './lib/persistPicker.js';
+import { sealedPersist }    from '@onderling/local-store';   // content is sealed on the way to disk, plaintext in the cache
 import { UsageMetrics }      from './lib/UsageMetrics.js';
 import { PushRegistry }      from './lib/PushRegistry.js';
 import { createProfile }     from './lib/InterestProfile.js';
@@ -121,6 +122,9 @@ export async function createNeighbourhoodAgent({
    * (integration plan 2026-05-23).
    */
   persistDb,
+  /** This device's content-seal strategy — what makes the persisted copy unreadable without the key.
+   *  Omit for the previous, plaintext behaviour. */
+  contentSeal =  null,
   notifier:      providedNotifier,
   reveals:       providedReveals,
   mutedSet:      providedMutedSet,
@@ -225,6 +229,7 @@ export async function createNeighbourhoodAgent({
   // The membership rider (host-injected): the device-log emitter + verified reader — see skills/index.js.
   membershipEmit,
   membershipRead,
+  currentPersonKey,
   // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
   // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
   rulesUpdateEmit,
@@ -302,7 +307,9 @@ export async function createNeighbourhoodAgent({
     if (persistArgs) {
       const picked = await pickPersist(persistArgs);
       if (picked) {
-        persist    = picked.persist;
+        // Sealed at rest: the adapter writes ciphertext, the cache above it stays plaintext so
+        // `query()` still parses and filters. Without a strategy the adapter is returned unchanged.
+        persist    = sealedPersist(picked.persist, contentSeal);
         initialMap = await persist.load();
       }
     }
@@ -609,6 +616,7 @@ export async function createNeighbourhoodAgent({
       circleSignerFor, // circle-scoped spine signing (principle 5) — absent → legacy global-identity signer
       membershipEmit,  // the membership rider's device-log emitter (absent → the store-based spine path)
       membershipRead,  // the rider's verified statement reader for the roster fold
+      currentPersonKey,
       rulesUpdateEmit, // the rules-update rider's governance-lane emitter (absent → store-local only)
       // The per-user address-fallback setting, when the host supplies one (absent → the skills'
       // own `true` default, unchanged).

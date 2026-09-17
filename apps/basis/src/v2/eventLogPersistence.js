@@ -98,6 +98,30 @@ export function backendSnapshotIo(backend, ref = REF) {
  *  degrades to an empty log rather than a broken boot. The write goes to a temporary neighbour first and
  *  is renamed over the target, which on every filesystem this runs on is atomic — so a process killed
  *  mid-save leaves the previous snapshot intact instead of a truncated one. */
+/** A `{getItem, setItem, removeItem}` store over one JSON file — the node shape of the shells' plain
+ *  storage (localStorage, AsyncStorage), for what a device on a machine stashes between two starts:
+ *  the add-a-device offer that waits out the enrol ceremony. Same write discipline as the snapshot io. */
+export function fileKeyValueStorage(filePath) {
+  const read = async () => {
+    const { readFile } = await import('node:fs/promises');
+    try { const v = JSON.parse(await readFile(filePath, 'utf8')); return (v && typeof v === 'object') ? v : {}; }
+    catch (err) { if (err?.code === 'ENOENT') return {}; throw err; }
+  };
+  const write = async (map) => {
+    const { writeFile, rename, mkdir } = await import('node:fs/promises');
+    const dir = filePath.slice(0, filePath.lastIndexOf('/'));
+    if (dir) await mkdir(dir, { recursive: true }).catch(() => { /* it usually exists */ });
+    const tmp = `${filePath}.tmp`;
+    await writeFile(tmp, JSON.stringify(map), { mode: 0o600 });
+    await rename(tmp, filePath);
+  };
+  return {
+    async getItem(key) { return (await read())[key] ?? null; },
+    async setItem(key, value) { const m = await read(); m[key] = String(value); await write(m); },
+    async removeItem(key) { const m = await read(); delete m[key]; await write(m); },
+  };
+}
+
 export function fileSnapshotIo(filePath) {
   return {
     async load() {
@@ -116,15 +140,3 @@ export function fileSnapshotIo(filePath) {
   };
 }
 
-/** Snapshot io over an AsyncStorage-shaped store (`getItem`/`setItem`) — the mobile shape. */
-export function asyncStorageSnapshotIo(storage, key = 'cc-device-log') {
-  return {
-    async load() {
-      const text = await storage.getItem(key);
-      return text ? JSON.parse(text) : null;
-    },
-    async save(events) {
-      await storage.setItem(key, JSON.stringify(events));
-    },
-  };
-}

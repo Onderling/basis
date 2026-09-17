@@ -21,7 +21,7 @@ far end — which is usually the case. Duplicate vocabularies are nearly always 
 
 | what | where | guard |
 |---|---|---|
-| **Entry kinds** — what a logged event IS (lane · wakes · retention · audit) | `packages/item-store/src/entryKinds.js` | one table; `conversationKinds()` derives from it |
+| **Entry kinds** — what a logged event IS (lane · wakes · retention · audit · signs · subject · accepts · syncPolicy) | `packages/item-store/src/entryKinds.js` | one table; `conversationKinds()` derives from it; the four binding columns are declaration only until the rails read them — `apps/basis/src/v2/laneBindings.js` + its test pin them against each rail's default verifier |
 | **Delivery states** — how far a message got | `apps/basis/src/v2/deliveryState.js` → labels in `circle.chat.delivery.*` | `deliveryState.test.js` asserts one namespace |
 | **Discoverability** — off / browse / browse+publish | `packages/core/src/transport/discoverability.js` | port property; adapters only say HOW |
 | **Roles / tiers** | `packages/core/src/permissions/Roles.js`, `routing/ReachabilityTier.js` | `PolicyEngine` fails closed on unknown |

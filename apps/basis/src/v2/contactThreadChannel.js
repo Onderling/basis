@@ -71,6 +71,10 @@ export const DEFAULT_CONTACT_SUBTYPES = { out: 'contact-msg', in: 'contact-reply
  */
 export function createContactThreadChannel({
   sendToPeer,
+  // THE PERSON SEAL (2026-09-16): `sealFor(peerAddr, content)` → `{ to, from, sealed, nonce }` or null; `openFor(sealed, fromAddr)` →
+  // the content or null. Absent, or null for a contact whose key is unknown, the turn goes as before — sealed to the device only.
+  sealFor = null,
+  openFor = null,
   subtypes = DEFAULT_CONTACT_SUBTYPES,
   now = () => Date.now(),
   genId,
@@ -80,7 +84,23 @@ export function createContactThreadChannel({
   blobStore = null,
   floorFor = null,
   fanToOwnDevices = null,
+  // THIS DEVICE'S SELECTION (sync-policy §11): `holds()` — does this device keep contact turns at all (off: hold
+  // nothing, still carry to the siblings); `keepsBytes()` — a received file's bytes in full, or its description.
+  selection = null,
+  // THE PAIR ROSTER (L105, `pairRoster.js`): `prepare(peerAddr)` says what this turn carries to make the roster
+  // (`{ pairInvite }` from the founder, `{ pairRequest }` from the other side, or nothing); `onInvite(fromAddr, uri)` /
+  // `onRequest(fromAddr)` land the other side's. Inside the seal when the turn is sealed; a turn with only the
+  // roster material and no text is consumed here and never shown.
+  pair = null,
 } = {}) {
+  const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
+  const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
+  const fileToKeep = (file) => {
+    if (!file || typeof file !== 'object') return file;
+    if (keepsBytes()) return file;
+    const { dataB64, ...description } = file;   // eslint-disable-line no-unused-vars
+    return description;
+  };
   const mkId = typeof genId === 'function'
     ? genId
     : () => `ct-${now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -109,7 +129,7 @@ export function createContactThreadChannel({
   const core = createAddressedDeliver({
     // The bytes of a received file go HERE, not into the thread's snapshot item.
     blobStore,
-    send:    (addr, payload) => sendToPeer(addr, payload),
+    send:    (addr, payload, sendOpts) => (sendOpts ? sendToPeer(addr, payload, sendOpts) : sendToPeer(addr, payload)),
     toWire:  (env) => buildContactWire(env),
     itemStore,
     localActor,
@@ -128,6 +148,12 @@ export function createContactThreadChannel({
     };
     if (env.extras?.displayName) payload.displayName = env.extras.displayName;
     if (env.extras?.webid)       payload.webid       = env.extras.webid;
+    // The pair roster's material rides in the clear only when the turn does (else it is inside the box below).
+    if (typeof env.extras?.pairInvite === 'string' && !env.extras?.sealed) payload.pairInvite = env.extras.pairInvite;
+    if (env.extras?.pairRequest === true && !env.extras?.sealed) payload.pairRequest = true;
+    // Sealed to the PERSON: the wire carries the box and no text — a device that holds the profile key but not the
+    // person key (a revoked one) receives an envelope it cannot read.
+    if (env.extras?.sealed) { payload.sealed = env.extras.sealed; payload.text = ''; }
     return payload;
   }
 
@@ -174,7 +200,28 @@ export function createContactThreadChannel({
     // The fan rides the SEND's promise, after the turn has actually gone out and been stored — so a
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
-    const sent = Promise.resolve(core.deliver(envelope, { to: peerAddr })).then(async (res) => {
+    const sent = (async () => {
+      // The pair roster: what THIS turn carries to make it (the founder's invite, or the other side's request).
+      if (pair && typeof pair.prepare === 'function') {
+        try {
+          const p = await pair.prepare(peerAddr, { name: sender?.displayName ?? null });
+          if (typeof p?.pairInvite === 'string') envelope.extras.pairInvite = p.pairInvite;
+          if (p?.pairRequest === true) envelope.extras.pairRequest = true;
+        } catch { /* the roster is made on a later turn; the message goes regardless */ }
+      }
+      // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
+      // pair roster's material with it: an invite is a join secret).
+      if (typeof sealFor === 'function') {
+        try {
+          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}) };
+          const s = await sealFor(peerAddr, content); if (s) envelope.extras.sealed = s;
+        } catch { /* unsealed, as before */ }
+      }
+      // THE ROUTE: a contact with a pair roster is written to at their primary per-circle address there, over the
+      // pair circle (as my per-circle address) — never at the profile address once the roster exists.
+      let route = null;
+      if (pair && typeof pair.routeFor === 'function') { try { route = await pair.routeFor(peerAddr); } catch { route = null; } }
+      const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       if (!res?.deduped) {
@@ -184,7 +231,7 @@ export function createContactThreadChannel({
         });
       }
       return res;
-    });
+    })();
     return { messageId: id, sent, text: floored.text, redacted: floored.hits.length };
   }
 
@@ -219,11 +266,15 @@ export function createContactThreadChannel({
         peerAddr:  fromAddr,
         replyTo,
         ...(Array.isArray(buttons) ? { buttons } : {}),
-        // A received peer-wire file (photo, document) — the thread is its durable home.
-        ...(file && typeof file === 'object' ? { file } : {}),
+        // A received peer-wire file (photo, document) — the thread is its durable home; the bytes as this
+        // device keeps them (full, or the description only — the file's own choice on Mij / My data).
+        ...(file && typeof file === 'object' ? { file: fileToKeep(file) } : {}),
       },
     };
-    return Promise.resolve(core.persistInbound(envelope, { to: fromAddr })).then(async (res) => {
+    // Hold nothing, still carry: a device that does not keep contact turns fans the turn (bytes included) to
+    // its siblings and stores nothing — the turn is not lost, it lives on the devices that hold the silo.
+    const persisted = holdsHere() ? Promise.resolve(core.persistInbound(envelope, { to: fromAddr })) : Promise.resolve({ itemId: null, held: false });
+    return persisted.then(async (res) => {
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
@@ -257,7 +308,8 @@ export function createContactThreadChannel({
       body:   text ?? '',
       extras: { threadId: contactId, threadKey: contactId, peerAddr, replyTo },
     };
-    return Promise.resolve(core.persistOutbound(envelope, { to: peerAddr ?? contactId })).then(async (res) => {
+    const persisted = holdsHere() ? Promise.resolve(core.persistOutbound(envelope, { to: peerAddr ?? contactId })) : Promise.resolve({ itemId: null, held: false });
+    return persisted.then(async (res) => {
       if (!viaOwnDevice && !res?.deduped) {
         await fanOwn({ direction: 'out', contactId, peerAddr, text, messageId: envelope.id, replyTo, ts: envelope.ts });
       }
@@ -340,14 +392,41 @@ export function createContactThreadChannel({
     return makeInboundHandler(subtypes.out, onMessage);
   }
 
+  /** The founder's answer to a pair request: a turn carrying the invite and no words (consumed, never shown). */
+  async function answerPairRequest(peerAddr, threadId, prepared) {
+    if (!prepared?.pairInvite) return;
+    const envelope = { id: mkId(), kind: subtypes.out, ts: now(), author: localActor, body: '', extras: { threadKey: peerAddr, threadId: threadId ?? peerAddr, peerAddr, pairInvite: prepared.pairInvite } };
+    try {
+      if (typeof sealFor === 'function') { const s = await sealFor(peerAddr, { text: '', pairInvite: prepared.pairInvite }); if (s) envelope.extras.sealed = s; }
+      await sendToPeer(peerAddr, buildContactWire(envelope));
+    } catch { /* the next turn carries it again */ }
+  }
+
   function makeInboundHandler(subtype, cb) {
-    return function onContactInbound(fromAddr, payload) {
+    return async function onContactInbound(fromAddr, payload) {
       if (!payload || payload.subtype !== subtype) return;   // not ours
       if (typeof cb !== 'function') return;
+      let text = payload.text ?? '';
+      let pairInvite = typeof payload.pairInvite === 'string' ? payload.pairInvite : null;
+      let pairRequest = payload.pairRequest === true;
+      if (payload.sealed && typeof payload.sealed === 'object') {
+        // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
+        const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
+        if (!content || typeof content.text !== 'string') return;
+        text = content.text;
+        if (typeof content.pairInvite === 'string') pairInvite = content.pairInvite;
+        if (content.pairRequest === true) pairRequest = true;
+      }
+      // The pair roster's material lands on its seam (never on the thread); the turn's words go on as always.
+      if (pair) {
+        if (pairInvite && typeof pair.onInvite === 'function') { Promise.resolve(pair.onInvite(fromAddr, pairInvite)).catch(() => {}); }
+        if (pairRequest && typeof pair.onRequest === 'function') { Promise.resolve(pair.onRequest(fromAddr, { name: payload.displayName ?? null })).then((r) => (r ? answerPairRequest(fromAddr, payload.threadId, r) : null)).catch(() => {}); }
+      }
+      if (!text && !Array.isArray(payload.buttons) && (pairInvite || pairRequest)) return;   // roster material only: nothing to show
       cb({
         fromAddr,
         threadId:  payload.threadId,
-        text:      payload.text ?? '',
+        text,
         buttons:   Array.isArray(payload.buttons) ? payload.buttons : undefined,
         replyTo:   payload.replyTo,
         messageId: payload.messageId,

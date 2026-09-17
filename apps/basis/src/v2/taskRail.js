@@ -13,6 +13,7 @@
  * This lane replaces the unsigned peer-mirror carry for task items (per-type one-path): the store's publish
  * hook routes every circle-content publish onto the lane — see `routeTaskMirror` (unsigned carry deleted).
  */
+import { isRosterTrailItem } from '@onderling/circles';
 import { signSpine, authorHead, frontier } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -69,6 +70,10 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     if (body.kind === 'snapshot') {
       const item = body.payload?.item;
       if (!item || typeof item.id !== 'string' || !item.id) return;
+      // A roster row never lands through this lane: its addresses are proven facts patched in place,
+      // and a peer's snapshot of "the person's row" is that peer's view, not this device's. Refused
+      // here whatever served it (`rosterTrail.js` says why).
+      if (isRosterTrailItem(item)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       await store.put(item, { sync: false, origin: true });
@@ -99,7 +104,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     }
     let rows = [];
     try { rows = (await store.list()) ?? []; } catch { return stored; }
-    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id));
+    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id) && !isRosterTrailItem(it));
     if (uncovered.length === 0) return stored;
     let resolved = null;
     try { resolved = await circleIdentityFor(circleId); } catch { return stored; }
@@ -225,15 +230,28 @@ export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {
 }
 
 /** Peer handler for `circle-task-broadcast` → the rail's full ingest gate + the head apply. */
-export function makeTaskPeerHandler({ rail, onChange = null } = {}) {
+/** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
+export function makeTaskPeerHandler({ rail, onChange = null, onLanded = null, holds = null, onPassed = null } = {}) {
   if (!rail) throw new Error('makeTaskPeerHandler: a task rail is required');
-  return async function onCircleTask(_fromPeerAddr, payload) {
+  return async function onCircleTask(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== TASK_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
+    // This device's selection (sync-policy §11) — the same three answers as the chat handler: land · verify
+    // and pass on (hold nothing, still carry) · refuse (the kring is off here).
+    const h = typeof holds === 'function' ? holds(circleId) : true;
+    if (h === null) return;
     try {
+      if (h === false) {
+        const v = typeof rail.verify === 'function' ? await rail.verify(circleId, statement) : { ok: false };
+        if (v?.ok && typeof onPassed === 'function') { try { await onPassed(circleId, statement, fromPeerAddr); } catch { /* best-effort */ } }
+        return;
+      }
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
+      if (res?.ok && !res.existed && typeof onLanded === 'function') {
+        try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }
+      }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };
 }

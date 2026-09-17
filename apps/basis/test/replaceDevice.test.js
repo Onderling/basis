@@ -39,16 +39,8 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     ]);
     await connectNodesOverBus([A, B]);
     await pairCircle(A, B, { groupId: GROUP, name: 'Replace walk', handle: 'bram' });
-    // B ingests membership + key statements through the production peer handlers (the shells' wiring).
-    const wire = (node) => {
-      const onMembership = makeMembershipPeerHandler({ rail: node.agent.membershipRail });
-      const prior = node._routerRef.fn;
-      node._routerRef.fn = (env) => {
-        if (env?.payload?.subtype === MEMBERSHIP_BROADCAST) return onMembership(env.from, env.payload);
-        return prior?.(env);
-      };
-    };
-    wire(B);
+    // B ingests membership statements through the production peer handler — the harness registers it
+    // for every node that has the rail (since 2026-09-14); the hand-wiring that lived here is gone.
 
     // The circle is SEALED through the real producer; A seals a message B reads — the pre-wipe history.
     await sealCircleViaProducer({ admin: A, members: [B], groupId: GROUP });
@@ -78,7 +70,6 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     await teardown(pre);
     A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, ...logOpts() } });
     await connectNodesOverBus([A, B, A2]);
-    wire(A2);
     expect(A2.pubKey, 'one person: the same webid').toBe(A.pubKey);
     const addrA = A.agent.circleAddressFor(GROUP);
     const addrA2 = A2.agent.circleAddressFor(GROUP);
@@ -109,7 +100,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     // ── THE CEREMONY, on the new phone. ──
     const r = await A2.agent.callSkill('household', 'replaceDevice', { mnemonic: phrase, circleIds: [GROUP] });
     expect(r.ok, r.error).toBe(true);
-    expect(r.profileAddressRetired, "the first phone's profile-derived address is retired").toBe(true);
+    expect(r.firstDeviceRetired, "the first phone is retired by derivation — its id derives from the root, so the new phone never needed its record").toBe(true);
     expect(r.retiredIn.map((x) => x.address)).toContain(addrA);
     expect(r.historyKeys, 'the old key opened the chain; the keys came along').toBeGreaterThanOrEqual(1);
 

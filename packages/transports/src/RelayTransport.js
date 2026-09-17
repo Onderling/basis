@@ -45,6 +45,9 @@ import {
 } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
+/** Error frames that refuse ONE frame (a send) rather than a registration — never a reason to fail a pending bind. */
+const PER_FRAME_REFUSALS = new Set(['SENDER_NOT_REGISTERED', 'OVER_RATE', 'OVER_QUOTA_MSGS_PER_DAY']);
+
 // Parameter register (#36) — reconnect backoff ceiling + push-ack timeout (scope:device, kind:internal).
 const MAX_BACKOFF_MS = param({ key: 'transports.maxBackoffMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 const PUSH_ACK_TIMEOUT_MS = param({ key: 'transports.pushAckTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5_000 });
@@ -78,6 +81,12 @@ export class RelayTransport extends Transport {
    */
   #asked             = new Set();
   #proved            = new Set();
+  /** Aliases the relay has ACKED on THIS socket — what an awaited `addAddress` promises. Cleared with every new socket. */
+  #bound             = new Set();
+  #primaryDevice = () => false;
+  #primaryAcked = false;
+  /** alias address → `primary: true` when it registers as the primary (from `addAddress`). */
+  #primaryFlags = new Map();
   /** alias address → the caller's `sign(message)` (from `addAddress`). The primary uses `identity`. */
   #signers           = new Map();
   /** Set once this relay has failed the audit — we do not reconnect to it, and say why. */
@@ -105,6 +114,11 @@ export class RelayTransport extends Transport {
     if (!opts?.identity)  throw new Error('RelayTransport requires identity');
     super({ address: opts.identity.pubKey, identity: opts.identity });
     this.#relayUrl = opts.relayUrl;
+    // THE PRIMARY REGISTRATION (sync-policy §12): is THIS device the one the person chose for direct messages? Read
+    // at every socket open (a function, so the choice can move without a new transport) and sent on the socket's
+    // own `register` as `primary: true`; the relay then delivers to this socket while it lives, and a plain
+    // registration by another of the person's devices stands by. Absent → plain, as before.
+    this.#primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
     // Called when the relay reports it gave up on a message we sent (see the 'undelivered' frame below).
     // A plain assignable property rather than an event emitter — this class has no emitter, and one
     // consumer is all this has ever needed.
@@ -121,6 +135,35 @@ export class RelayTransport extends Transport {
    *  which relay it is would be eligible for every circle (2026-09-08). */
   get url() { return this.#relayUrl; }
 
+  /**
+   * `addAddress` means "the relay agrees this address is ours ON THIS SOCKET" — for every caller, not only the
+   * first. The base is idempotent (a known alias answers ok at once) and a bind made while the socket was closed
+   * is replayed on connect; together they let a second caller read "ok" while the replay's proof was still in
+   * flight, send as the alias, and be refused as an unregistered sender (the runner's enrol walk, 2026-09-16).
+   * So a known alias that this socket has not acked yet waits for the ack — the in-flight one, or a fresh one.
+   */
+  async addAddress(address, opts = {}) {
+    const r = await super.addAddress(address, opts);
+    if (!r?.ok || address === this.address || !this.connected || this.#bound.has(address)) return r;
+    try { await this.#ensureBound(address); return { ok: true }; }
+    catch (err) { return { ok: false, reason: err?.message ?? 'bind-failed' }; }
+  }
+
+  /** Resolve once the relay has acked `address` on this socket: join the bind in flight, or start one. */
+  #ensureBound(address) {
+    if (this.#bound.has(address)) return Promise.resolve();
+    const pending = this.#pendingBinds.get(address);
+    if (pending) {
+      return new Promise((resolve, reject) => {
+        const { resolve: res0, reject: rej0 } = pending;
+        pending.resolve = () => { res0(); resolve(); };
+        pending.reject = (err) => { rej0(err); reject(err); };
+      });
+    }
+    this.#sendRegister(address, this.#primaryFlags.get(address) === true);
+    return this.#awaitBound(address);
+  }
+
   async _bindAddress(address, opts) {
     // Refuse locally what the relay would refuse anyway, and say which of the two it was. Without a
     // signer for this alias we cannot answer its challenge, so registering it is not something that
@@ -131,10 +174,27 @@ export class RelayTransport extends Transport {
         + 'prove possession to the relay');
     }
     this.#signers.set(address, opts.sign);
+    this.#primaryFlags.set(address, opts?.primary === true);
     if (!this.connected) return;      // replayed by `_rebindAddresses()` on the next connect
-    this.#sendRegister(address);
+    this.#bound.delete(address);      // a rebind (the flag moved) waits for the relay's fresh ack
+    this.#sendRegister(address, opts?.primary === true);
     await this.#awaitBound(address);
   }
+
+  /**
+   * The person's choice of primary device moved: re-register the socket's own address with the new flag now (a
+   * reconnect would read it anyway). Aliases keep their own flag (`addAddress(address, { sign, primary })`).
+   */
+  async setPrimaryDevice(isPrimary) {
+    this.#primaryDevice = () => isPrimary === true;
+    if (!this.connected) return { ok: true, pending: true };
+    this.#bound.delete(this.address);
+    this.#sendRegister(this.address, isPrimary === true);
+    try { await this.#awaitBound(this.address); return { ok: true }; }
+    catch (err) { return { ok: false, reason: err?.message ?? 'bind-failed' }; }
+  }
+  /** What this socket's own registration currently claims. */
+  get primaryDevice() { return this.#primaryDevice() === true; }
 
   /**
    * Resolve when the relay acks THIS address, reject if it never does.
@@ -172,6 +232,7 @@ export class RelayTransport extends Transport {
     this.#signers.delete(address);
     this.#proved.delete(address);
     this.#asked.delete(address);
+    this.#bound.delete(address);
   }
 
   /** True when the WebSocket is open and registered with the relay. */
@@ -234,6 +295,13 @@ export class RelayTransport extends Transport {
     // built via `publishOneWay`, lift its `_topic` into the wire frame so
     // the relay can bucket the offline buffer per-(addr, topic). Other
     // envelopes go through the legacy per-addr FIFO bucket.
+    // A frame sent AS an alias goes out only once the relay has acked that alias on THIS socket. Without this,
+    // a message held while the socket was closed flushed at open ahead of the alias's replayed bind, and the
+    // relay refused it as an unregistered sender — silently for the sender (the enrol walk, 2026-09-16).
+    const from = envelope?._from;
+    if (typeof from === 'string' && from !== this.address && this.#signers.has(from) && !this.#bound.has(from)) {
+      await this.#ensureBound(from);
+    }
     const frame = { type: 'send', to, envelope };
     if (envelope._topic) frame.topic = envelope._topic;
     this.#ws.send(JSON.stringify(frame));
@@ -277,10 +345,10 @@ export class RelayTransport extends Transport {
   // ── Private ───────────────────────────────────────────────────────────────
 
   /** Ask to register `address`; the relay answers with a challenge, never with a registration. */
-  #sendRegister(address) {
+  #sendRegister(address, primary = false) {
     this.#asked.add(address);
     this.#proved.delete(address);
-    this.#ws.send(JSON.stringify({ type: 'register', address }));
+    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}) }));
   }
 
   /** Sign the relay's nonce for `address` and send the proof. Silent about addresses we never asked for. */
@@ -427,7 +495,9 @@ export class RelayTransport extends Transport {
       // one.
       this.#asked.clear();
       this.#proved.clear();
-      this.#sendRegister(this.address);
+      this.#bound.clear();
+      this.#primaryAcked = false;
+      this.#sendRegister(this.address, this.#primaryDevice() === true);
       // Replay every alias — a new socket knows nothing about the last one.
       this._rebindAddresses();
     };
@@ -455,8 +525,12 @@ export class RelayTransport extends Transport {
         }
         // An alias landed: release whoever is awaiting `addAddress` for it. The connect promise
         // belongs to the primary, so an alias never resolves that one.
+        this.#bound.add(address);
         this.#settleBind(address);
         if (address !== this.address) return;
+        // the socket's own address, acked: 'connect' once per socket (a re-register with a moved primary flag acks again)
+        if (this.#primaryAcked) return;
+        this.#primaryAcked = true;
         this.emit('connect', { address: this.address });
         const res = this.#connectResolve;
         this.#connectResolve = null;
@@ -487,7 +561,13 @@ export class RelayTransport extends Transport {
       // The relay gave up on a message we sent: it was queued for an offline peer and the TTL or a cap
       // ended it. Surfaced as a REPORT, not an error — the send succeeded, the delivery did not.
       if (msg.type === 'undelivered' && msg.id) {
-        try { this.onUndelivered?.({ msgId: msg.id, reason: msg.reason ?? 'unknown' }); }
+        // The frame names the ENVELOPE (the only id the relay ever sees). The app's delivery state is keyed by
+        // the message id inside the payload — so report that one when this transport sent it, else the envelope
+        // id (an id-less payload is one the app never tracked). Until 2026-09-16 the envelope id was reported
+        // as `msgId`, and both shells' give-up consumers marked a message that did not exist: a message the
+        // relay threw away after 24 h kept looking fine.
+        const appId = this.appMessageIdFor(msg.id);
+        try { this.onUndelivered?.({ msgId: appId ?? msg.id, envelopeId: msg.id, reason: msg.reason ?? 'unknown' }); }
         catch { /* a consumer that throws must not take the socket down */ }
         return;
       }
@@ -498,9 +578,12 @@ export class RelayTransport extends Transport {
         // does not is taken to have refused whatever we last asked for, which is the safe reading
         // (it can only ever report a bind as failed that might later succeed, never the reverse).
         const refusal = new Error(`Relay: ${msg.message}`);
+        // A refusal of ONE FRAME (an unregistered sender, a rate or quota cap) says nothing about a registration in
+        // flight — settling the pending binds on it made a bind fail because a send was refused (2026-09-16).
+        const perFrame = PER_FRAME_REFUSALS.has(String(msg.message ?? ''));
         if (typeof msg.address === 'string' && this.#pendingBinds.has(msg.address)) {
           this.#settleBind(msg.address, refusal);
-        } else if (!msg.address && this.#pendingBinds.size > 0) {
+        } else if (!msg.address && !perFrame && this.#pendingBinds.size > 0) {
           this.#settleAllBinds(refusal);
         }
         // If a push-control call is in flight, reject it with the relay's

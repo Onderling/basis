@@ -51,12 +51,19 @@ export function alphaViewMode(mode) {
 export const ALPHA_FALLBACK_TAB = 'circles';
 
 /**
- * The circle's ⋯ menu, trimmed to what a member does weekly: back · invite · settings. The rest of the
- * manifest's actions (lists, contacts, view-as, advisor, skills, files, rules, recipes, admin, governance,
- * share, override) stay declared and stay reachable through their own screens the day they come back.
+ * The circle's ⋯ menu, trimmed to what a member does weekly: back · invite · settings · **beheer**. The
+ * rest of the manifest's actions (lists, contacts, view-as, advisor, skills, files, rules, recipes,
+ * governance, share, override) stay declared and stay reachable through their own screens the day they
+ * come back.
+ *
+ * `admin` (Beheer) came back on 2026-09-13. The cut had hidden it, and with it the only buttons that
+ * remove a member or change a role — so an admin could do those two things only by asking the assistant
+ * in words. Found while writing the three-member walk; Frits: "that shouldn't be the case." The panel
+ * already decides per viewer what it may change (`roleControlFor`, web ≡ mobile) and a non-admin's
+ * dispatch is refused server-side, so nothing about it needed gating first.
  */
 export const HIDDEN_CIRCLE_ACTIONS = Object.freeze([
-  'lists', 'contacts', 'override', 'viewAs', 'advisor', 'skills', 'files', 'rules', 'recipes', 'admin', 'governance', 'share',
+  'lists', 'contacts', 'override', 'viewAs', 'advisor', 'skills', 'files', 'rules', 'recipes', 'governance', 'share',
 ]);
 export function alphaActions(actions) {
   return (Array.isArray(actions) ? actions : []).filter((a) => !HIDDEN_CIRCLE_ACTIONS.includes(a?.id));

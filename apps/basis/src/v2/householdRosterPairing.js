@@ -13,9 +13,12 @@
  * @returns {Promise<number>} how many peers were (re-)added (deduped by the agent).
  */
 
+import { makeSyncSelection } from './syncSelection.js';
 import { bindCircleAddressKeys } from './circleAddressKeys.js';
 export async function feedHouseholdRoster({ agent, circleId } = {}) {
   if (!agent || typeof agent.addCirclePeer !== 'function' || !circleId) return 0;
+  // A kring this device does not hold (sync-policy §11.2): no pairing — it is off the roster here.
+  if (typeof agent.getParamValue === 'function' && !makeSyncSelection({ getParamValue: agent.getParamValue }).kringOn(circleId)) return 0;
   // BEFORE pairing: make sure this circle can RECEIVE. The store↔mirror sync used to be wired lazily,
   // on the first wired household op for the circle — which for the inbound half is a race the receiver
   // always loses. Pairing tells the other device it may publish to us; if our listener is not up yet,
@@ -38,7 +41,7 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
   for (const m of (Array.isArray(r?.members) ? r.members : [])) {
     // Per-circle (OBJ-2 Phase 6): pair the member into THIS circle's mirror, not a global roster.
     if (m?.addr && m.addr !== self) { want.add(m.addr); try { agent.addCirclePeer(circleId, m.addr); added += 1; } catch { /* */ } }
-    if (m?.addr && gidx) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break pairing */ } }
+    if (gidx) indexMember(gidx, circleId, m);
   }
 
   // ── AND UNPAIR WHOEVER THE ROSTER NO LONGER NAMES ───────────────────────────────────────────────
@@ -101,6 +104,28 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
  * @param {string} a.circleId
  * @returns {Promise<{bound: number, skipped: number, members: Array<object>}>}
  */
+/**
+ * Record a roster row in the peer → kringen index under BOTH keys a message can arrive by, or be sent to.
+ *
+ * The index is keyed by the PERSON (its own header: "webid → circleIds") — and the 2026-09-08 fill fed
+ * it the row's routing `addr` instead, which is the member's PER-CIRCLE address once they have proven
+ * one. After the signing enforcement that is every member after their first boot. So the index knew
+ * each person only by an address that a direct message never uses: a DM is addressed to the global key,
+ * `circlesForPeer(globalKey)` found nothing, the send fell back to "my own relay" — and the recipient
+ * was on the kring's relay, not mine. It worked exactly when the DM raced ahead of the announce, which
+ * is why the 09-08 walk saw five green steps and the 1.2-hour baseline did not (measured 2026-09-13, three
+ * runs: two misses, one hit, the hit being the run where the index still held the global key).
+ *
+ * Both keys, then. The membrane's inbound lookup needs both as well: circle traffic arrives FROM the
+ * per-circle address, a DM FROM the global key, and "which kringen am I in with this sender" must answer
+ * either. Idempotent, and the index never breaks priming or pairing.
+ */
+function indexMember(gidx, circleId, m) {
+  for (const key of new Set([m?.addr, m?.webid, m?.pubKey])) {
+    if (typeof key === 'string' && key) { try { gidx.add(circleId, key); } catch { /* never fatal */ } }
+  }
+}
+
 export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
   if (!agent || typeof agent.callSkill !== 'function' || !circleId) return { bound: 0, skipped: 0, members: [] };
   if (typeof agent.registerPeerAddress !== 'function') return { bound: 0, skipped: 0, members: [] };
@@ -121,11 +146,7 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
   // that kring. This runs for every circle at boot (`primeCircleSecurity`), off a read that already
   // happened, so the map is complete before anyone taps anything.
   const gidx = agent._circleGroupsIndex ?? null;
-  if (gidx) {
-    for (const m of members) {
-      if (m?.addr) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break priming */ } }
-    }
-  }
+  if (gidx) for (const m of members) indexMember(gidx, circleId, m);
   return {
     ...bindCircleAddressKeys({
       members,
@@ -163,9 +184,14 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
  * @param {(circleIds?: string[]) => any} [a.registerCirclePresence]
  *   the host's presence seam (mobile: `bundle.registerCirclePresence`). Called with no arguments so the host
  *   decides the full current circle list — this function knows about one circle, not all of them.
- * @returns {Promise<{registered: boolean, bound: number, skipped: number}>}
+ * @param {(circleId: string) => any} [a.pullLanes]
+ *   the host's catch-up seam for the circle's pull-all lanes (membership, governance, keys): a fresh joiner
+ *   holds only what was fanned to it AFTER its join — the circle's `create`, earlier joins, roles and
+ *   evictions live before that and reach it only by a pull. Runs after the binding, since the pull leaves as
+ *   this circle's identity and is answered to the addresses just bound (2026-09-16).
+ * @returns {Promise<{registered: boolean, bound: number, skipped: number, pulled: boolean}>}
  */
-export async function makeCircleReachable({ agent, circleId, registerCirclePresence } = {}) {
+export async function makeCircleReachable({ agent, circleId, registerCirclePresence, pullLanes } = {}) {
   let registered = false;
   if (typeof registerCirclePresence === 'function') {
     try { await registerCirclePresence(); registered = true; }
@@ -185,5 +211,12 @@ export async function makeCircleReachable({ agent, circleId, registerCirclePrese
   let bound = { bound: 0, skipped: 0 };
   try { bound = await bindCircleAddressKeysFor({ agent, circleId }); }
   catch { /* a roster read that fails must not undo the registration above */ }
-  return { registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0 };
+  let pulled = false;
+  if (typeof pullLanes === 'function') {
+    try { await pullLanes(circleId); pulled = true; }
+    catch (err) {
+      if (typeof console !== 'undefined') console.warn(`[circle] joined ${circleId} but could not pull its lanes — the roster fills in at the next reconnect: ${err?.message ?? err}`);
+    }
+  }
+  return { registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0, pulled };
 }

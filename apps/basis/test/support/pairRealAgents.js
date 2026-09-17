@@ -282,6 +282,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       return r;
     },
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid, logger: QUIET }),
     myHandle: () => label.toLowerCase(),
     logger: process.env.PAIR_ROSTER_LOUD ? console : QUIET,
   });

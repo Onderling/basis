@@ -42,7 +42,12 @@ export { PAIR_CIRCLE_PREFIX, pairCircleIdFor, isPairCircleId, pairFounderOf } fr
  */
 export function createPairRoster({
   selfWebid, callSkill, sendPeerRedeem, circleAddressFor = null, signCircleLink = null, onJoined = null,
-  myHandle = null, relayUrl = null, dialEndpoint = null, activeEndpointUrl = null, identityOf = null, logger = console,
+  myHandle = null, relayUrl = null, dialEndpoint = null, activeEndpointUrl = null, identityOf = null,
+  // `announceOwn(circleId)`: this device's own address announcement WITH its ceremony commitment (the shells'
+  // `announceOwnCircleAddress`). The admitting side runs it once the co-member is in: a row relayed by the admin
+  // carries the commitment without its proof, so the joiner must hear the founder's own announcement before the
+  // founder's rotations can fold there — the whole point of the pair roster.
+  announceOwn = null, logger = console,
 } = {}) {
   if (typeof selfWebid !== 'string' || !selfWebid) throw new Error('pairRoster: selfWebid required');
   if (typeof callSkill !== 'function') throw new Error('pairRoster: callSkill required');
@@ -178,6 +183,8 @@ export function createPairRoster({
       try { promoted = !!(await callSkill('stoop', 'setMemberRole', { groupId: circleId, memberWebid: newMemberWebid, role: 'admin' }))?.ok; }
       catch (err) { logger?.warn?.(`[pair-roster] could not promote the co-member: ${err?.message ?? err}`); }
       await recordOnContact(newMemberWebid, circleId);
+      // …and tell the co-member where I answer, with my commitment — the fan reaches them now that they are on the row.
+      if (typeof announceOwn === 'function') { try { await announceOwn(circleId); } catch { /* the next boot re-announces */ } }
       return { promoted };
     },
   };

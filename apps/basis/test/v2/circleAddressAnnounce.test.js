@@ -289,10 +289,7 @@ describe('the admin\'s post-join propagation', () => {
     expect(log.peerSends).toHaveLength(1);
     expect(log.peerSends[0].to).toBe(CATO);
     expect(log.peerSends[0].payload.subtype).toBe(CIRCLE_ADDRESS_ANNOUNCE_KIND);
-    // …the settled members off the roster, and the ADMIN'S OWN minted fresh (it carries the ceremony commitment WITH its
-    // proof, which a row cannot re-prove — the newcomer must hold it for the admin's rotations to fold, 2026-09-18)
-    expect(log.peerSends[0].payload.announcements.map((a) => a.memberWebid)).toEqual([BRAM, ME]);
-    expect(log.peerSends[0].payload.announcements[1].circleAddress).toBe(addressOf(MY_SEED));
+    expect(log.peerSends[0].payload.announcements.map((a) => a.memberWebid)).toEqual([BRAM]);
     // Housekeeping must never wake a phone.
     expect(log.peerSends[0].payload.noWake).toBe(true);
 

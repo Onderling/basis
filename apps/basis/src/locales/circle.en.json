@@ -3950,6 +3950,10 @@
       "text": "bot",
       "doc": "P5 — tag on a roster row that is an agent/bot (vs a person)."
     },
+    "connected": {
+      "text": "connected",
+      "doc": "The contact's PAIR ROSTER exists (L105): a hidden two-member circle made on the first exchange, so messages travel over a roster and a revoke reaches them. Before it exists: no label (Frits: no 'kaart')."
+    },
     "trust": {
       "bekend": {
         "text": "known",

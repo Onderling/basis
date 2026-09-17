@@ -137,6 +137,7 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { createPairRoster } from '../../src/v2/pairRoster.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
@@ -1318,6 +1319,23 @@ let resolveSkill = null; // (opId, args) => Promise<object|null>
 // code), which would wipe a boot parameter such as `?addbot` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
+/**
+ * The post-join step every join runs (the wizard's, the pair roster's): register THIS device's per-circle address,
+ * bind the other members' addresses, and PULL the circle's pull-all lanes — the `create`, earlier joins, roles,
+ * evictions and keys all predate the join and are fanned to nobody after the fact.
+ */
+function circleOnJoined({ circleId }) {
+  return makeCircleReachable({
+    agent: _peerAgent,
+    circleId,
+    // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
+    registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
+    pullLanes: (cid) => Promise.allSettled(
+      [memCatchUpShell, govCatchUpShell, keyCatchUpShell].map((c) => c?.requestCircle?.(cid, { callSkill: rawCallSkill })),
+    ),
+  });
+}
+let circlePairRoster = null;     // the pair roster for contacts (L105) — composed with the contact channel
 // The restore boot hooks fire DURING boot, before rawCallSkill is bound — the flow panel's first
 // act is a waist call, so launching it straight from the hook would race the binding. The hook
 // only raises this flag; the boot-completion block (where rawCallSkill is assigned) launches.
@@ -2155,8 +2173,23 @@ function buildCircleBot(agent) {
   // thread's snapshot item. A snapshot store holds one serialised value; a photo inside it is what
   // takes the whole thread down on a device with a per-row read ceiling.
   const circleAttachmentBlobs = createAttachmentBlobStore();
+  // THE PAIR ROSTER (L105): the roster a contact lacks, made automatically on the first exchange from the circle
+  // mechanics — the invite rides the turn, the join is the shared path, the founder is the webid that sorts first.
+  circlePairRoster = createPairRoster({
+    selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
+    callSkill: (app, op, args) => rawCallSkill ? rawCallSkill(app, op, args) : agent.callSkill(app, op, args),
+    sendPeerRedeem: (...a) => (circleSendPeerRedeem ? circleSendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    onJoined: circleOnJoined,
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
+    relayUrl: () => connectedRelayUrls()?.[0] ?? null,
+    activeEndpointUrl: () => connectedRelayUrls(),
+  });
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,
+    pair: circlePairRoster,
     sendToPeer: (addr, payload) =>
       (typeof agent.sendPeerMessage === 'function'
         ? agent.sendPeerMessage(addr, payload)
@@ -4373,17 +4406,7 @@ async function showJoinCircle(inviteArg) {
     // the circle, and bind the other members' addresses to their keys from the roster. `onDispatched` below
     // did the second and never the first, so the circle just joined was missing from the relay until the
     // next circles load.
-    onJoined: ({ circleId }) => makeCircleReachable({
-      agent: _peerAgent,
-      circleId,
-      // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
-      registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
-      // The joiner PULLS the circle's pull-all lanes from the members it now knows: the `create`, earlier
-      // joins, roles, evictions and keys all predate its own join and are fanned to nobody after the fact.
-      pullLanes: (cid) => Promise.allSettled(
-        [memCatchUpShell, govCatchUpShell, keyCatchUpShell].map((c) => c?.requestCircle?.(cid, { callSkill: rawCallSkill })),
-      ),
-    }),
+    onJoined: circleOnJoined,
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? reply?.joinedGroupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
@@ -8307,6 +8330,8 @@ async function boot() {
           // admin verifies an incoming redeem + replies; joiner resolves the pending request on response.
           'group-redeem-request':    makeHandleGroupRedeemRequest({
             callSkill: rawCallSkill,
+            // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
+            onAdmitted: (a) => circlePairRoster?.onAdmitted?.(a),
             sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
             publishEvent: publishEventToLog,
             // …and return OUR per-circle address for the circle being joined, proven the same way the

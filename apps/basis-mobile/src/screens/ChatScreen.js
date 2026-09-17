@@ -582,6 +582,8 @@ export default function ChatScreen({
       'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),
       'group-redeem-request':  makeHandleGroupRedeemRequest({
         callSkill, sendPeer, publishEvent,
+        // a member admitted into a PAIR circle is its co-admin (the pair roster's rule; web parity)
+        onAdmitted: (a) => bundle?.pairRoster?.onAdmitted?.(a),
         // …and return OUR per-circle address for the circle being joined, proven the same way the joiner
         // proves theirs, so per-circle addressing works in both directions from the join on (web parity).
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,

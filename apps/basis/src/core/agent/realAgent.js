@@ -5010,6 +5010,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           // to buttonSpecials.startDm.
           peerAddr:    c.peerAddr ?? null,
           personKey:   c.personKey ?? null,   // what a direct message to them is sealed to
+          pairCircleId: c.pairCircleId ?? null,   // the pair roster, once it exists (the row says "verbonden")
         })),
         _sync: simulateSync(),
       };

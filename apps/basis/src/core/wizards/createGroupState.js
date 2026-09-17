@@ -424,7 +424,7 @@ export async function finalSubmit({ state, callSkill }) {
   state.submitting  = true;
   state.submitError = null;
   try {
-    const rules  = buildRulesObjectFromState(state);
+    const rules  = { ...buildRulesObjectFromState(state), ...(state.rulesExtra && typeof state.rulesExtra === 'object' ? state.rulesExtra : {}) };
     const result = await callSkill('stoop', 'createGroupV2', {
       groupId:              state.groupId,
       name:                 state.name,

@@ -128,6 +128,7 @@ function rosterMeta(c) {
   if (c.isBot && c.skillCount > 0) bits.push(t('circle.contacts.skills', { count: c.skillCount }));
   // S1 #2 — a ContactBook person's trust level + tags.
   if (!c.isBot && c.trustLevel) bits.push(t(`circle.contacts.trust.${c.trustLevel}`));
+  if (c.pairCircleId) bits.push(t('circle.contacts.connected'));   // the pair roster exists (L105)
   if (!c.isBot && Array.isArray(c.tags) && c.tags.length) bits.push(c.tags.join(', '));
   if (!c.reachable) bits.push(t('circle.contacts.offline'));
   return bits.join(' · ');

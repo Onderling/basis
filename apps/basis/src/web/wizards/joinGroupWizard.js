@@ -71,7 +71,11 @@ export function renderJoinGroupWizard(opts) {
   const { container, doc, args, callSkill, onClose, onDispatched, sendPeerRedeem, sources, setCloseGuard,
     circles, circleAddressFor, signCircleLink,
     // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
-    dialEndpoint, activeEndpointUrl } = opts;
+    dialEndpoint, activeEndpointUrl,
+    // The host's post-join step (`makeCircleReachable`: register this device's address, bind the roster's,
+    // pull the circle's lanes). The RN wizard forwarded it from the start; this one dropped it on the floor,
+    // so a web join never pulled the circle's `create` — found 2026-09-16 in the two-relays walk.
+    onJoined } = opts;
 
   // Wizard state — kept in-scope, re-renders rebuild the DOM from it.
   const state = initialState();
@@ -125,6 +129,7 @@ export function renderJoinGroupWizard(opts) {
       rerender(); // show submitting state
       const { result } = await finalSubmit({
         state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
+        onJoined,
         onStage: () => rerender(),   // the second wait is the long one — repaint when it starts
       });
       if (result) {

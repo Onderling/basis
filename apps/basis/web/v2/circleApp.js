@@ -138,6 +138,7 @@ import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
+import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
 import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
@@ -303,7 +304,7 @@ import { deviceDelegationsOf } from '@onderling/agent-registry';
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
-  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { isFeatureEnabled, defaultViewModeFromPolicy } from '../../src/v2/circlePolicy.js';
 import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
@@ -2167,6 +2168,8 @@ function buildCircleBot(agent) {
     // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
     sealFor: agent.contactSeal?.sealFor ?? null,
     openFor: agent.contactSeal?.openFor ?? null,
+    // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
+    selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
     localActor: LOCAL_ACTOR,
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them.
@@ -4081,6 +4084,12 @@ async function showMyData() {
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
   // The replace ceremony: retire every other device in one act, after a restore.
   const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
+  // "Make this device my primary contact address": announce this device's address in every circle with the
+  // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
+  const onMakePrimary = async () => {
+    const r = await makeThisDevicePrimary({ agent: _peerAgent }).catch(() => ({ circles: 0, announced: 0, failed: [] }));
+    try { window.alert(t('circle.mydata.make_primary_done', { count: r.announced })); } catch { /* headless */ }
+  };
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
   // reflects reality; toggling subscribes/unsubscribes + tells stoop.
@@ -4163,7 +4172,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -4191,6 +4200,29 @@ async function showMyData() {
     delivery: deliverySettingsCache,
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
+      rerender();
+    },
+    // What this device keeps (sync-policy §11) — read live from the register; written through set-param.
+    syncSelection: (() => {
+      const sel = makeSyncSelection({ getParamValue: (k) => circleHouseholdAgent?.getParamValue?.(k) });
+      return {
+        silos: Object.fromEntries(SYNC_SILOS.map((silo) => [silo, sel.siloOn(silo)])),
+        fileBytes: sel.fileBytes(),
+        kringenOff: sel.kringenOff(),
+        kringen: circleListForConnections(),
+      };
+    })(),
+    onSetSync: async ({ silo, value, fileBytes, kringId, on } = {}) => {
+      const set = (key, v) => circleHouseholdAgent.callSkill('params', 'set-param', { key, value: v });
+      try {
+        if (silo && SYNC_SILO_PARAM_KEYS[silo]) await set(SYNC_SILO_PARAM_KEYS[silo], value !== false);
+        if (fileBytes) await set(SYNC_FILE_BYTES_PARAM_KEY, fileBytes === 'description' ? 'description' : 'full');
+        if (kringId) {
+          const cur = parseKringenOff(circleHouseholdAgent?.getParamValue?.(SYNC_KRINGEN_OFF_PARAM_KEY));
+          if (on === false) cur.add(kringId); else cur.delete(kringId);
+          await set(SYNC_KRINGEN_OFF_PARAM_KEY, serializeKringenOff(cur));
+        }
+      } catch { /* the section re-reads */ }
       rerender();
     },
     shareNknAddress: circleHouseholdAgent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false,
@@ -4346,6 +4378,11 @@ async function showJoinCircle(inviteArg) {
       circleId,
       // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
       registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
+      // The joiner PULLS the circle's pull-all lanes from the members it now knows: the `create`, earlier
+      // joins, roles, evictions and keys all predate its own join and are fanned to nobody after the fact.
+      pullLanes: (cid) => Promise.allSettled(
+        [memCatchUpShell, govCatchUpShell, keyCatchUpShell].map((c) => c?.requestCircle?.(cid, { callSkill: rawCallSkill })),
+      ),
     }),
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? reply?.joinedGroupId ?? null;
@@ -8240,10 +8277,12 @@ async function boot() {
           // circle happened to be open — a file from a person, announced by nobody's bot, in a room
           // the sender may not even be in.
           'file-share':              makeHandleFileShare({
-            deliverToThread: ({ contactId, fromAddr, file, messageId }) => {
-              onContactReply({ contactId, fromAddr, text: '', file, messageId });
+            deliverToThread: ({ contactId, fromAddr, file, messageId, sealed }) => {
+              onContactReply({ contactId, fromAddr, text: '', file, messageId, ...(sealed ? { sealed } : {}) });
             },
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+            // A file sealed to the person opens with my key for the version it names (the text turn's seal).
+            openFor: (sealed, fromAddr) => agent.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
             // A first file makes the sender a contact row (the graph otherwise only learns at send time).
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             publishEvent: publishEventToLog,
@@ -8352,6 +8391,8 @@ async function boot() {
         agent.knownPeersSync?.requestFromSiblings().catch(() => {});
         // The person key a ceremony rotated on another device while this one was off.
         agent.personKeySync?.requestFromSiblings().catch(() => {});
+        // …and which of the person's devices is primary for direct messages (sync-policy §12).
+        agent.primaryDevice?.requestFromSiblings?.().catch(() => {});
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on

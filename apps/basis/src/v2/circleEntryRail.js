@@ -139,13 +139,23 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     return serialised(circleId, () => ingestOne(circleId, statement));
   }
 
-  async function ingestOne(circleId, statement) {
+  /**
+   * VERIFY without landing — the same gate `ingest` applies (signature, declared kind, author↔ref binding) and
+   * nothing appended. What a device that does not HOLD this lane runs before it carries a statement on to its
+   * siblings (sync-policy §11.3: hold nothing, still carry — and never carry what did not verify).
+   */
+  async function verify(circleId, statement) {
     const v = statement && safeVerify(statement, circleId);
     if (!v || !v.ok) return { ok: false, reason: v?.reason ?? 'malformed' };
     if (!declaredKinds.includes(v.body.kind)) return { ok: false, reason: `undeclared kind: ${v.body.kind}` };
     const ref = v.body.payload?.authorRef;
     if (typeof ref !== 'string' || !ref) return { ok: false, reason: 'missing authorRef' };
     if (!(await bindingOk(v.body.author, ref, circleId, v.body.kind, v.body.payload, v.body.subject))) return { ok: false, reason: 'unverifiable key-ref binding' };
+    return { ok: true, body: v.body };
+  }
+  async function ingestOne(circleId, statement) {
+    const v = await verify(circleId, statement);
+    if (!v.ok) return v;
     // Report whether this statement is NEW here — a windowed catch-up's progress guard must not count a
     // re-delivered duplicate as progress (that is how two diverged peers would page forever).
     const id = entryId(statement);
@@ -238,7 +248,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     return { bodies, disputed };
   }
 
-  return { append, ingest, readVerified, readVerifiedBodies, storedStatements };
+  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements };
 }
 
 export default makeCircleEntryRail;

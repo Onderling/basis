@@ -645,12 +645,14 @@ export default function ChatScreen({
       // ContactThreadScreen through the same inbox every DM reply rides. It used to go to addMainBubble
       // → this screen's main thread — which v2 mounts but permanently hides.
       'file-share':            makeHandleFileShare({
-        deliverToThread: ({ contactId, fromAddr, file, messageId, ts }) => {
-          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file })
+        deliverToThread: ({ contactId, fromAddr, file, messageId, ts, sealed }) => {
+          contactChannel?.persistInbound?.({ contactId, fromAddr, text: '', messageId, ts, file, ...(sealed ? { sealed } : {}) })
             ?.catch?.(() => { /* durability is best-effort; the live push below still lands */ });
-          pushContactReply({ fromAddr, threadId: contactId, text: '', file });
+          pushContactReply({ fromAddr, threadId: contactId, text: '', file, ...(sealed ? { sealed } : {}) });
         },
         identityOf: (addr) => agent?.identityOfAddress?.(addr) ?? addr,
+        // A file sealed to the person opens with my key for the version it names (the text turn's seal).
+        openFor: (sealed, fromAddr) => agent?.contactSeal?.openFor?.(sealed, fromAddr) ?? null,
         // A first file makes the sender a contact row (the graph otherwise only learns at send time).
         notePeer: (addr) => bundle?.peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
         publishEvent,
@@ -775,6 +777,8 @@ export default function ChatScreen({
         });
         const { gov: govCatchUp, membership: memCatchUp, key: keyCatchUp,
                 task: taskCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
+        // Hand the bundle the catch-ups, so a join made from any screen pulls the circle's lanes (`onCircleJoined`).
+        try { if (bundle) bundle.laneCatchUps = lanes.catchUps; } catch { /* a bundle without the slot */ }
         const grantsCatchUp = bundle?.agent?.grantsCatchUp ?? null;
 
         // The reconnect kicks — once per app launch each; after that the LIVE fan keeps the log current.
@@ -801,6 +805,11 @@ export default function ChatScreen({
         if (bundle?.agent?.personKeySync && !globalThis.__onderlingPersonKeyKicked) {
           globalThis.__onderlingPersonKeyKicked = true;
           setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
+        // …and which of the person's devices is primary for direct messages (sync-policy §12), web parity.
+        if (bundle?.agent?.primaryDevice && !globalThis.__onderlingPrimaryDeviceKicked) {
+          globalThis.__onderlingPrimaryDeviceKicked = true;
+          setTimeout(() => { bundle.agent.primaryDevice.requestFromSiblings().catch(() => {}); }, 2600);
         }
         // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the accepted offer — web parity.

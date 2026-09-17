@@ -84,7 +84,18 @@ export function createContactThreadChannel({
   blobStore = null,
   floorFor = null,
   fanToOwnDevices = null,
+  // THIS DEVICE'S SELECTION (sync-policy §11): `holds()` — does this device keep contact turns at all (off: hold
+  // nothing, still carry to the siblings); `keepsBytes()` — a received file's bytes in full, or its description.
+  selection = null,
 } = {}) {
+  const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
+  const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
+  const fileToKeep = (file) => {
+    if (!file || typeof file !== 'object') return file;
+    if (keepsBytes()) return file;
+    const { dataB64, ...description } = file;   // eslint-disable-line no-unused-vars
+    return description;
+  };
   const mkId = typeof genId === 'function'
     ? genId
     : () => `ct-${now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -231,11 +242,15 @@ export function createContactThreadChannel({
         peerAddr:  fromAddr,
         replyTo,
         ...(Array.isArray(buttons) ? { buttons } : {}),
-        // A received peer-wire file (photo, document) — the thread is its durable home.
-        ...(file && typeof file === 'object' ? { file } : {}),
+        // A received peer-wire file (photo, document) — the thread is its durable home; the bytes as this
+        // device keeps them (full, or the description only — the file's own choice on Mij / My data).
+        ...(file && typeof file === 'object' ? { file: fileToKeep(file) } : {}),
       },
     };
-    return Promise.resolve(core.persistInbound(envelope, { to: fromAddr })).then(async (res) => {
+    // Hold nothing, still carry: a device that does not keep contact turns fans the turn (bytes included) to
+    // its siblings and stores nothing — the turn is not lost, it lives on the devices that hold the silo.
+    const persisted = holdsHere() ? Promise.resolve(core.persistInbound(envelope, { to: fromAddr })) : Promise.resolve({ itemId: null, held: false });
+    return persisted.then(async (res) => {
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
@@ -269,7 +284,8 @@ export function createContactThreadChannel({
       body:   text ?? '',
       extras: { threadId: contactId, threadKey: contactId, peerAddr, replyTo },
     };
-    return Promise.resolve(core.persistOutbound(envelope, { to: peerAddr ?? contactId })).then(async (res) => {
+    const persisted = holdsHere() ? Promise.resolve(core.persistOutbound(envelope, { to: peerAddr ?? contactId })) : Promise.resolve({ itemId: null, held: false });
+    return persisted.then(async (res) => {
       if (!viaOwnDevice && !res?.deduped) {
         await fanOwn({ direction: 'out', contactId, peerAddr, text, messageId: envelope.id, replyTo, ts: envelope.ts });
       }

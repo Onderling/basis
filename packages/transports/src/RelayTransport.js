@@ -83,6 +83,10 @@ export class RelayTransport extends Transport {
   #proved            = new Set();
   /** Aliases the relay has ACKED on THIS socket — what an awaited `addAddress` promises. Cleared with every new socket. */
   #bound             = new Set();
+  #primaryDevice = () => false;
+  #primaryAcked = false;
+  /** alias address → `primary: true` when it registers as the primary (from `addAddress`). */
+  #primaryFlags = new Map();
   /** alias address → the caller's `sign(message)` (from `addAddress`). The primary uses `identity`. */
   #signers           = new Map();
   /** Set once this relay has failed the audit — we do not reconnect to it, and say why. */
@@ -110,6 +114,11 @@ export class RelayTransport extends Transport {
     if (!opts?.identity)  throw new Error('RelayTransport requires identity');
     super({ address: opts.identity.pubKey, identity: opts.identity });
     this.#relayUrl = opts.relayUrl;
+    // THE PRIMARY REGISTRATION (sync-policy §12): is THIS device the one the person chose for direct messages? Read
+    // at every socket open (a function, so the choice can move without a new transport) and sent on the socket's
+    // own `register` as `primary: true`; the relay then delivers to this socket while it lives, and a plain
+    // registration by another of the person's devices stands by. Absent → plain, as before.
+    this.#primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
     // Called when the relay reports it gave up on a message we sent (see the 'undelivered' frame below).
     // A plain assignable property rather than an event emitter — this class has no emitter, and one
     // consumer is all this has ever needed.
@@ -151,7 +160,7 @@ export class RelayTransport extends Transport {
         pending.reject = (err) => { rej0(err); reject(err); };
       });
     }
-    this.#sendRegister(address);
+    this.#sendRegister(address, this.#primaryFlags.get(address) === true);
     return this.#awaitBound(address);
   }
 
@@ -165,10 +174,27 @@ export class RelayTransport extends Transport {
         + 'prove possession to the relay');
     }
     this.#signers.set(address, opts.sign);
+    this.#primaryFlags.set(address, opts?.primary === true);
     if (!this.connected) return;      // replayed by `_rebindAddresses()` on the next connect
-    this.#sendRegister(address);
+    this.#bound.delete(address);      // a rebind (the flag moved) waits for the relay's fresh ack
+    this.#sendRegister(address, opts?.primary === true);
     await this.#awaitBound(address);
   }
+
+  /**
+   * The person's choice of primary device moved: re-register the socket's own address with the new flag now (a
+   * reconnect would read it anyway). Aliases keep their own flag (`addAddress(address, { sign, primary })`).
+   */
+  async setPrimaryDevice(isPrimary) {
+    this.#primaryDevice = () => isPrimary === true;
+    if (!this.connected) return { ok: true, pending: true };
+    this.#bound.delete(this.address);
+    this.#sendRegister(this.address, isPrimary === true);
+    try { await this.#awaitBound(this.address); return { ok: true }; }
+    catch (err) { return { ok: false, reason: err?.message ?? 'bind-failed' }; }
+  }
+  /** What this socket's own registration currently claims. */
+  get primaryDevice() { return this.#primaryDevice() === true; }
 
   /**
    * Resolve when the relay acks THIS address, reject if it never does.
@@ -319,10 +345,10 @@ export class RelayTransport extends Transport {
   // ── Private ───────────────────────────────────────────────────────────────
 
   /** Ask to register `address`; the relay answers with a challenge, never with a registration. */
-  #sendRegister(address) {
+  #sendRegister(address, primary = false) {
     this.#asked.add(address);
     this.#proved.delete(address);
-    this.#ws.send(JSON.stringify({ type: 'register', address }));
+    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}) }));
   }
 
   /** Sign the relay's nonce for `address` and send the proof. Silent about addresses we never asked for. */
@@ -470,7 +496,8 @@ export class RelayTransport extends Transport {
       this.#asked.clear();
       this.#proved.clear();
       this.#bound.clear();
-      this.#sendRegister(this.address);
+      this.#primaryAcked = false;
+      this.#sendRegister(this.address, this.#primaryDevice() === true);
       // Replay every alias — a new socket knows nothing about the last one.
       this._rebindAddresses();
     };
@@ -501,6 +528,9 @@ export class RelayTransport extends Transport {
         this.#bound.add(address);
         this.#settleBind(address);
         if (address !== this.address) return;
+        // the socket's own address, acked: 'connect' once per socket (a re-register with a moved primary flag acks again)
+        if (this.#primaryAcked) return;
+        this.#primaryAcked = true;
         this.emit('connect', { address: this.address });
         const res = this.#connectResolve;
         this.#connectResolve = null;

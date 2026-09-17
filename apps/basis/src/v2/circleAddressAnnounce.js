@@ -97,9 +97,10 @@ export function announcementsFromRoster({ members, circleId, exceptWebid = null 
 }
 
 /** Mint THIS device's announcement for a circle, or `null` when it cannot prove an address. */
-export function ownAnnouncementFor({ agent, circleId } = {}) {
+export function ownAnnouncementFor({ agent, circleId, primary = false } = {}) {
   return ownCircleAddressAnnouncement({
     circleId,
+    primary,
     memberWebid:       selfWebidOf(agent),
     circleAddressFor:  (cid) => agent?.circleAddressFor?.(cid) ?? null,
     // The same signature the join and the redeem response already carry: signed by the key behind
@@ -110,6 +111,41 @@ export function ownAnnouncementFor({ agent, circleId } = {}) {
     ceremonyCommitmentFor: (cid) => agent?.ceremonyCommitmentFor?.(cid) ?? null,
     signCeremonyCommitment: (cid, address, commitment) => agent?.signCeremonyCommitment?.(cid, address, commitment) ?? null,
   });
+}
+
+/**
+ * "MAKE THIS MY PRIMARY CONTACT ADDRESS" (sync-policy §12, Frits 2026-09-16): the member's choice of which of
+ * their devices others deliver to first — the device is one reason to choose, not the name. A primary is a
+ * per-circle address, so the tap announces THIS device's address in every circle it is in with `primary: true`;
+ * every member folds it onto this member's row (the primary slot; the other proven addresses stay behind it,
+ * in order) and their fan delivers here first, falling to the next only when this one does not take the envelope.
+ * Announcing without the flag (every boot does) never moves the slot — enrolling a box does not make it primary.
+ *
+ * @param {object} a
+ * @param {object} a.agent
+ * @param {string[]} [a.circleIds]  defaults to every circle this device is in (`listMyCircles`)
+ * @returns {Promise<{ circles: number, announced: number, failed: string[] }>}
+ */
+export async function makeThisDevicePrimary({ agent, circleIds = null, logger = console } = {}) {
+  if (!agent || typeof agent.callSkill !== 'function') return { circles: 0, announced: 0, failed: [] };
+  let ids = Array.isArray(circleIds) ? circleIds : null;
+  if (!ids) {
+    try { ids = ((await agent.callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).filter((c) => typeof c === 'string' && c); }
+    catch { ids = []; }
+  }
+  let announced = 0;
+  const failed = [];
+  for (const circleId of ids) {
+    try {
+      const r = await announceOwnCircleAddress({ agent, circleId, primary: true, logger });
+      if (r?.announced) announced += 1; else failed.push(circleId);
+    } catch { failed.push(circleId); }
+  }
+  // …and the DM half (sync-policy §12, L104 option b): this device becomes the PRIMARY DEVICE — the one that
+  // registers the profile and person addresses as primary on every relay; the claim is carried to the siblings.
+  let device = null;
+  try { device = (await agent.claimPrimaryDevice?.()) ?? null; } catch { device = null; }
+  return { circles: ids.length, announced, failed, device };
 }
 
 /**
@@ -126,11 +162,11 @@ export function ownAnnouncementFor({ agent, circleId } = {}) {
  * @param {{warn?: Function, info?: Function}} [a.logger]
  * @returns {Promise<{announced: boolean, sent: number, reason?: string}>}
  */
-export async function announceOwnCircleAddress({ agent, circleId, logger = console } = {}) {
+export async function announceOwnCircleAddress({ agent, circleId, primary = false, logger = console } = {}) {
   if (!agent || typeof agent.callSkill !== 'function' || !circleId) {
     return { announced: false, sent: 0, reason: 'no-agent' };
   }
-  const announcement = ownAnnouncementFor({ agent, circleId });
+  const announcement = ownAnnouncementFor({ agent, circleId, primary });
   if (!announcement) return { announced: false, sent: 0, reason: 'no-provable-address' };
 
   let sent = 0;
@@ -170,6 +206,7 @@ export async function announceOwnCircleAddress({ agent, circleId, logger = conso
         memberWebid:        announcement.memberWebid,
         circleAddress:      announcement.circleAddress,
         circleAddressProof: announcement.circleAddressProof,
+        ...(announcement.primary ? { primary: true } : {}),
         ...(announcement.ceremonyCommitment ? { ceremonyCommitment: announcement.ceremonyCommitment, ceremonyCommitmentProof: announcement.ceremonyCommitmentProof } : {}),
       });
     } catch (err) {
@@ -226,8 +263,11 @@ export async function announceOwnCircleAddressIfChanged({
   const myRow = rows.find((m) => m?.webid === mine.memberWebid) ?? null;
   // Both halves have to be there: an address with no proof cannot be relayed on, so a row in that
   // state is not yet "known" for the purpose this exists to serve.
-  const rowIsCurrent = myRow?.circleAddress === mine.circleAddress
-    && typeof myRow?.circleAddressProof === 'string' && !!myRow.circleAddressProof;
+  // "Current" = my address is on my row WITH its proof — as the primary, or behind it in the proven set: the
+  // primary slot is the member's choice (sync-policy §12), so a device that is not the primary is still known.
+  const rowIsCurrent = (myRow?.circleAddress === mine.circleAddress
+    && typeof myRow?.circleAddressProof === 'string' && !!myRow.circleAddressProof)
+    || (Array.isArray(myRow?.circleAddresses) && myRow.circleAddresses.includes(mine.circleAddress));
 
   // ⚠ Our own row is NOT evidence that anyone else heard us.
   //
@@ -388,6 +428,8 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
           memberWebid:        one.memberWebid,
           circleAddress:      one.circleAddress,
           circleAddressProof: one.circleAddressProof,
+          // the member's choice of primary rides the announcement (sync-policy §12)
+          ...(one.primary ? { primary: true } : {}),
           ...(one.ceremonyCommitment ? { ceremonyCommitment: one.ceremonyCommitment, ceremonyCommitmentProof: one.ceremonyCommitmentProof } : {}),
           // The member's release rides along, completing the roster projection (a released name
           // reaches this device). Absent on a release-less announcement — carried only when present.

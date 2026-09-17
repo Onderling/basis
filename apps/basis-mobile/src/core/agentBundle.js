@@ -36,6 +36,7 @@ import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 // Shared contact/bot exposed-skill registry (feedback-extension) — web≡mobile core.
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
+import { makeSyncSelection } from '../../../basis/src/v2/syncSelection.js';
 import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
 import { createAttachmentBlobStoreRN } from './attachmentBlobStoreRN.js';
 import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';
@@ -756,6 +757,8 @@ export async function bootAgentBundle(opts = {}) {
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them (web parity).
     fanToOwnDevices: agent.contactTurnFan,
+    // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
+    selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
   });
   const coreAgent = agent.sa?.agent ?? null;   // discoverA2A's hello/native-upgrade target
 
@@ -893,6 +896,7 @@ export async function bootAgentBundle(opts = {}) {
   // current instance (initially null, populated when the async
   // connect() resolves a tick later).  Callers should not cache the
   // returned value across renders.
+  const laneCatchUpsRef = { current: null };
   return {
     catalogue,
     manifestsByOrigin,
@@ -917,7 +921,16 @@ export async function bootAgentBundle(opts = {}) {
      */
     onCircleJoined: ({ circleId } = {}) => makeCircleReachable({
       agent, circleId, registerCirclePresence,
+      // The joiner pulls the circle's pull-all lanes (membership · governance · keys) from the members it
+      // now knows — the screen that builds the lane table fills `laneCatchUps` (ChatScreen); before it has,
+      // the reconnect kick covers it.
+      pullLanes: (cid) => Promise.allSettled(
+        ['membership', 'gov', 'key'].map((k) => laneCatchUpsRef.current?.[k]?.requestCircle?.(cid, { callSkill })),
+      ),
     }),
+    /** The lane table's catch-ups, set by the screen that builds them (`bundle.laneCatchUps = lanes.catchUps`). */
+    set laneCatchUps(v) { laneCatchUpsRef.current = v; },
+    get laneCatchUps() { return laneCatchUpsRef.current; },
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,

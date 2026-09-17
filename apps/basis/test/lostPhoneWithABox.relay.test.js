@@ -173,7 +173,11 @@ describe('the phone is lost, and there is a box', () => {
     const freshDir = mkdtempSync(path.join(tmpdir(), 'basis-lost-phone-box2-'));
     dirs.push(freshDir);
     dataDir = freshDir;
-    box = await enrolBox(dataDir, { ...env, HOME: dataDir }, offer.uri, phrase);
+    // The operator's move, second half: the new phone RESTORED itself as the primary contact address (a replacement
+    // is), so a direct message would land there and reach the box only by the carry. The feedback box is meant to
+    // TAKE the feedback: the operator says so (`ONDERLING_PRIMARY_DEVICE=1`, the headless tap) — enrolling alone
+    // never makes a box primary (sync-policy §12.3).
+    box = await enrolBox(dataDir, { ...env, HOME: dataDir, ONDERLING_PRIMARY_DEVICE: '1' }, offer.uri, phrase);
     // The new phone learns the re-enrolled box's address — its own row grows again.
     const mine = newPhone.agent.circleAddressFor(CIRCLE);
     const grown = await until(async () => {

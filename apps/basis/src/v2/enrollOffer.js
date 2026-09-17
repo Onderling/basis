@@ -210,6 +210,7 @@ const SEND = { guarantee: 'hold-forward', asPerson: true };
  * so a half-failed boot retries on the next one. Returns an honest per-circle report.
  */
 export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, storage, registerCirclePresence = null, contentPulls = null } = {}) {
+  let claimedDevice = false;   // the DM half of the primary contact address: once per consume
   if (!agent || typeof callSkill !== 'function' || typeof sendPeerMessage !== 'function' || !storage) {
     return { consumed: false, reason: 'unwired' };
   }
@@ -337,11 +338,21 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // hears this address never fans to it — Bea's messages went to the sibling only, and this device
       // was a member of the circle on every lane but the wire. The boot re-announce closed that on the
       // NEXT start; a device enrolled today is a member today (2026-09-14). Idempotent at every receiver.
+      // A RESTORE (the offer came from the recovery file, `member`) is a replacement: the device it replaces is
+      // gone, so this one announces itself as the PRIMARY contact address — or every member would keep
+      // delivering to the lost phone's queue (held counts as delivered) until the replace ceremony retires it.
+      // A device added from a sibling's offer (a box) announces plainly: enrolling does not make it primary
+      // by itself (sync-policy §12.3); that is the tap on Mij / My data.
       if (mine) {
         try {
-          const r = await announceOwnCircleAddress({ agent, circleId: c.id });
-          if (r?.announced) row.steps.push('announce-roster');
+          const r = await announceOwnCircleAddress({ agent, circleId: c.id, primary: c.member === true });
+          if (r?.announced) row.steps.push(c.member === true ? 'announce-roster-primary' : 'announce-roster');
         } catch { /* the next boot re-announces */ }
+        // …and a replacement is the primary DEVICE too (the DM half): claimed once, carried to any sibling left.
+        if (c.member === true && !claimedDevice) {
+          claimedDevice = true;
+          try { await agent.claimPrimaryDevice?.(); row.steps.push('primary-device'); } catch { /* the tap on Mij / My data does it */ }
+        }
       }
       // 4 — pull the circle's truth: membership, governance, and the KEY lane (the group-key chain
       // travels as signed statements like everything else — a sealed circle opens on this device once

@@ -44,6 +44,16 @@ describe('the ceremony hands the current key to the survivors', () => {
     expect((await sync.carryCurrent({ exclude: ['addr:box'] })).attempted).toBe(1);
     expect(sent[0].to).toBe('addr:laptop');
   });
+  it('the hand-over carries the link key\'s PUBLIC half and never a link seed; a landed one keeps the pub', async () => {
+    const k = { ...keyAt(2), linkKeyPub: 'LINK-PUB' };
+    const { sync, sent } = rig({ current: k });
+    await sync.carryCurrent();
+    expect(sent[0].payload.linkKeyPub).toBe('LINK-PUB');
+    expect(Object.keys(sent[0].payload).sort()).toEqual(['linkKeyPub', 'links', 'previous', 'reveals', 'seed', 'subtype', 'version']);
+    const { sync: rx, stored } = rig({ current: keyAt(1) });
+    await rx.handlers[PERSON_KEY_CARRY]('addr:box', sent[0].payload);
+    expect(stored[0]?.linkKeyPub).toBe('LINK-PUB');
+  });
   it('a device with no key, or a re-derived key with no reveals, hands over nothing', async () => {
     expect((await rig({ current: null }).sync.carryCurrent()).skipped).toBe('no-key-or-no-reveals');
     expect((await rig({ current: { version: 1, seed: derivePersonKeySeed(profile, 1), reveals: {} } }).sync.carryCurrent()).skipped).toBe('no-key-or-no-reveals');

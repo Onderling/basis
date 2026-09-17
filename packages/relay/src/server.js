@@ -445,6 +445,43 @@ export async function startRelay(opts = {}) {
 
   /** address → WebSocket */
   const clients = new Map();
+  // THE PRIMARY REGISTRATION (sync-policy §12, 2026-09-17): a client may register an address as `primary`. While a
+  // primary socket holds the address, a plain registration for it STANDS BY instead of taking it over; the standby
+  // takes over when the primary socket closes (or steps down by re-registering plainly). With no primary the old
+  // rule holds — the last plain registration wins — so a client from before the flag sees no change. This orders
+  // a person's own HONEST devices (their choice of where a direct message lands); it binds no stolen device,
+  // which holds the same key and registers like any of them.
+  const primaryOf = new Map();     // address → the socket holding it as primary
+  const standbyOf = new Map();     // address → Set<socket> registered plainly while a primary held it
+  // Decides the ROLE only; the routing-table write (`clients.set`) stays at the one acceptance line in the
+  // register-proof branch, where the circle-blind fitness test reads it.
+  const takeAddress = (address, socket, primary) => {
+    const holder = primaryOf.get(address);
+    if (primary) {
+      primaryOf.set(address, socket);
+      standbyOf.get(address)?.delete(socket);
+      return 'primary';
+    }
+    if (holder === socket) primaryOf.delete(address);   // stepping down: plain again
+    const live = primaryOf.get(address);
+    if (live && live !== socket && live.readyState === 1) {
+      if (!standbyOf.has(address)) standbyOf.set(address, new Set());
+      standbyOf.get(address).add(socket);
+      return 'standby';
+    }
+    if (live && live.readyState !== 1) primaryOf.delete(address);
+    standbyOf.get(address)?.delete(socket);
+    return 'holder';
+  };
+  const releaseAddress = (address, socket) => {
+    if (primaryOf.get(address) === socket) primaryOf.delete(address);
+    standbyOf.get(address)?.delete(socket);
+    if (clients.get(address) !== socket) return;
+    clients.delete(address);
+    // the address falls to a standby, live — the person's other device, not a hold queue
+    const next = [...(standbyOf.get(address) ?? [])].reverse().find((s) => s.readyState === 1);
+    if (next) { standbyOf.get(address).delete(next); clients.set(address, next); }
+  };
   /**
    * Hold-and-forward for offline recipients — the single relay forward owner
    * shared with WsServerTransport. This broker's shape: topic-aware buckets
@@ -580,6 +617,7 @@ export async function startRelay(opts = {}) {
     // speaking in. `registeredAddresses` is the routing set.
     let registeredAddress = null;
     const registeredAddresses = new Set();
+    const pendingPrimary = new Map();   // address → the `primary` flag its register frame carried, read at proof time
     /**
      * nonce → { address, expiresAt, meterGroupId } — challenges this socket has been issued and
      * not yet answered (Decision 3). Per SOCKET, not global: a nonce is only answerable on the
@@ -674,6 +712,7 @@ export async function startRelay(opts = {}) {
       // it rather than trusting this comment.
       if (msg.type === 'register') {
         const { address, groupProof, rotationProof } = msg;
+        pendingPrimary.set(address, msg.primary === true);
         if (!address) {
           socket.send(JSON.stringify({ type: 'error', message: 'Missing address' }));
           return;
@@ -783,9 +822,11 @@ export async function startRelay(opts = {}) {
           return;
         }
 
-        if (registeredAddress === null) registeredAddress = address;   // first one is the primary
+        if (registeredAddress === null) registeredAddress = address;   // first one is the socket's own
         registeredAddresses.add(address);
-        clients.set(address, socket);
+        const role = takeAddress(address, socket, pendingPrimary.get(address) === true);
+        if (role === 'standby') logLine(`[relay] standby     ${shortId(address)} (a primary holds it)`);
+        else clients.set(address, socket);
 
         // Decision 2(a): a push token registered on this socket covers EVERY address it owns — including
         // ones registered later. Registering per-address would give N chances to forget one, and a
@@ -1026,8 +1067,9 @@ export async function startRelay(opts = {}) {
 
     socket.on('close', () => {
       if (registeredAddress) {
-        // Every address this socket owned goes with it — leaving one behind would route to a dead socket.
-        for (const addr of registeredAddresses) clients.delete(addr);
+        // Every address this socket owned goes with it — leaving one behind would route to a dead socket;
+        // an address another of the person's devices stands by for falls to that device, live.
+        for (const addr of registeredAddresses) releaseAddress(addr, socket);
         // Phase 2A — drop the address→group lookup so per-day-msg gating
         // doesn't leak stale slots.
         for (const addr of registeredAddresses) groupByAddress.delete(addr);

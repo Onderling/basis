@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { Bootstrap } from '../src/identity/Bootstrap.js';
-import { derivePersonKeySeed, personKeyPubKeyB64, personKeyAnnouncement, loadPersonKey, storePersonKey, signWithPersonKey, signPersonKeyLink, verifyPersonKeyChain, sealToPersonKey, openFromPersonKey } from '../src/identity/personKey.js';
+import { derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, personKeyAnnouncement, loadPersonKey, storePersonKey, signWithPersonKey, signPersonKeyLink, verifyPersonKeyChain, sealToPersonKey, openFromPersonKey } from '../src/identity/personKey.js';
 import { VaultMemory } from '@onderling/vault';
 import nacl from 'tweetnacl';
 import { decode as b64decode } from '../src/crypto/b64.js';
@@ -55,22 +55,43 @@ describe('the sealed-vault entry', () => {
   });
 });
 
-describe('the chain — version n vouches for n+1, so a contact who knew n learns the current key without the root', () => {
+describe('the chain — the root-derived LINK KEY vouches for every version, so a contact who knew n learns the current key without the root, and a revoked device (which holds seed n, never the root) cannot forge n+1', () => {
   const v = (n) => derivePersonKeySeed(profile, n);
   const pub = (n) => personKeyPubKeyB64(v(n));
-  it('links verify from the known version up to the current one; a broken or forged link stops the walk', () => {
-    const l2 = signPersonKeyLink(v(1), { version: 2, pubKey: pub(2), prevVersion: 1 });
-    const l3 = signPersonKeyLink(v(2), { version: 3, pubKey: pub(3), prevVersion: 2 });
-    expect(verifyPersonKeyChain([l2, l3], { version: 1, pubKey: pub(1) })).toEqual({ version: 3, pubKey: pub(3) });
-    expect(verifyPersonKeyChain([l3], { version: 2, pubKey: pub(2) })).toEqual({ version: 3, pubKey: pub(3) });
-    expect(verifyPersonKeyChain([], { version: 2, pubKey: pub(2) }), 'no link: what was known').toEqual({ version: 2, pubKey: pub(2) });
-    expect(verifyPersonKeyChain([l3], { version: 1, pubKey: pub(1) }), 'a gap: the walk stops at what is known').toEqual({ version: 1, pubKey: pub(1) });
-    const thief = signPersonKeyLink(v(9), { version: 2, pubKey: 'THIEF', prevVersion: 1 });   // signed by a key that never held v1
-    expect(verifyPersonKeyChain([thief], { version: 1, pubKey: pub(1) })).toBe(null);
-    expect(verifyPersonKeyChain([{ ...l2, pubKey: 'SWAPPED' }], { version: 1, pubKey: pub(1) })).toBe(null);
+  const linkSeed = derivePersonLinkKeySeed(profile);
+  const linkKeyPub = personKeyPubKeyB64(linkSeed);
+  const known = (n) => ({ version: n, pubKey: pub(n), linkKeyPub });
+  it('the link key is its own key: per profile, not per version, and never one of the person keys', () => {
+    expect(linkSeed).toHaveLength(32);
+    expect(derivePersonLinkKeySeed(profile)).toEqual(linkSeed);
+    for (const n of [1, 2, 3]) expect(linkKeyPub).not.toBe(pub(n));
+    expect(personKeyPubKeyB64(derivePersonLinkKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default')))).not.toBe(linkKeyPub);
+  });
+  it('links signed with the link key verify from the known version up to the current one', () => {
+    const l2 = signPersonKeyLink(linkSeed, { version: 2, pubKey: pub(2), prevVersion: 1 });
+    const l3 = signPersonKeyLink(linkSeed, { version: 3, pubKey: pub(3), prevVersion: 2 });
+    expect(verifyPersonKeyChain([l2, l3], known(1))).toEqual({ version: 3, pubKey: pub(3), linkKeyPub });
+    expect(verifyPersonKeyChain([l3], known(2))).toEqual({ version: 3, pubKey: pub(3), linkKeyPub });
+    expect(verifyPersonKeyChain([], known(2)), 'no link: what was known').toEqual(known(2));
+    expect(verifyPersonKeyChain([l3], known(1)), 'a gap: the walk stops at what is known').toEqual(known(1));
+    expect(verifyPersonKeyChain([{ ...l2, pubKey: 'SWAPPED' }], known(1))).toBe(null);
+  });
+  it('THE HOLE (2026-09-16): a link signed with seed n — what a revoked device holds — is REFUSED', () => {
+    const forged = signPersonKeyLink(v(1), { version: 2, pubKey: 'THIEF', prevVersion: 1 });
+    expect(verifyPersonKeyChain([forged], known(1))).toBe(null);
+    // even a link naming the GENUINE next key is refused when seed n signed it: only the link key vouches
+    const genuineKeyWrongSigner = signPersonKeyLink(v(1), { version: 2, pubKey: pub(2), prevVersion: 1 });
+    expect(verifyPersonKeyChain([genuineKeyWrongSigner], known(1))).toBe(null);
+    // a link key that is not the pinned one is a stranger's
+    const other = derivePersonLinkKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default'));
+    expect(verifyPersonKeyChain([signPersonKeyLink(other, { version: 2, pubKey: 'THIEF', prevVersion: 1 })], known(1))).toBe(null);
+  });
+  it('a known key WITHOUT a pinned link key never advances — the contact must re-take the card', () => {
+    const l2 = signPersonKeyLink(linkSeed, { version: 2, pubKey: pub(2), prevVersion: 1 });
+    expect(verifyPersonKeyChain([l2], { version: 1, pubKey: pub(1) })).toEqual({ version: 1, pubKey: pub(1) });
   });
   it('a link must follow its predecessor', () => {
-    expect(() => signPersonKeyLink(v(1), { version: 3, pubKey: pub(3), prevVersion: 1 })).toThrow();
+    expect(() => signPersonKeyLink(linkSeed, { version: 3, pubKey: pub(3), prevVersion: 1 })).toThrow();
   });
 });
 
@@ -84,20 +105,37 @@ describe('the direct-message seal — to the person, not the device', () => {
   });
 });
 
-describe('the vault entry keeps the chain and the older seeds', () => {
+describe('the vault entry keeps the chain, the older seeds and the link key\'s PUBLIC half — never its seed', () => {
+  const linkSeed = derivePersonLinkKeySeed(profile);
+  const linkKeyPub = personKeyPubKeyB64(linkSeed);
   it('a rotation keeps the previous seed and the links; a hand-over merges what it carries', async () => {
     const vault = new VaultMemory();
     const v1 = derivePersonKeySeed(profile, 1), v2 = derivePersonKeySeed(profile, 2), v3 = derivePersonKeySeed(profile, 3);
-    await storePersonKey(vault, { version: 1, seed: v1 });
-    const l2 = signPersonKeyLink(v1, { version: 2, pubKey: personKeyPubKeyB64(v2), prevVersion: 1 });
+    await storePersonKey(vault, { version: 1, seed: v1, linkKeyPub });
+    const l2 = signPersonKeyLink(linkSeed, { version: 2, pubKey: personKeyPubKeyB64(v2), prevVersion: 1 });
     await storePersonKey(vault, { version: 2, seed: v2, links: [l2] });
     let e = await loadPersonKey(vault);
     expect(e.previous).toEqual([{ version: 1, seed: v1 }]);
     expect(e.links).toEqual([l2]);
-    const l3 = signPersonKeyLink(v2, { version: 3, pubKey: personKeyPubKeyB64(v3), prevVersion: 2 });
+    expect(e.linkKeyPub, 'a later write without the pub keeps it').toBe(linkKeyPub);
+    const l3 = signPersonKeyLink(linkSeed, { version: 3, pubKey: personKeyPubKeyB64(v3), prevVersion: 2 });
     await storePersonKey(vault, { version: 3, seed: v3, links: [l2, l3], previous: [{ version: 1, seed: v1 }, { version: 2, seed: v2 }] });
     e = await loadPersonKey(vault);
     expect(e.previous.map((p) => p.version)).toEqual([1, 2]);
     expect(e.links.map((l) => l.version)).toEqual([2, 3]);
+  });
+  it('the entry carries the link key\'s public half and nothing that derives its seed; a same-version write may only fill the pub in', async () => {
+    const vault = new VaultMemory();
+    const v1 = derivePersonKeySeed(profile, 1);
+    expect(await storePersonKey(vault, { version: 1, seed: v1 })).toBe(true);
+    expect((await loadPersonKey(vault)).linkKeyPub).toBe(null);
+    expect(await storePersonKey(vault, { version: 1, seed: v1, linkKeyPub }), 'filling the pub in is a change').toBe(true);
+    expect((await loadPersonKey(vault)).linkKeyPub).toBe(linkKeyPub);
+    expect(await storePersonKey(vault, { version: 1, seed: v1, linkKeyPub }), 'the same again is not').toBe(false);
+    expect(await storePersonKey(vault, { version: 1, seed: v1, linkKeyPub: 'OTHER' }), 'a pinned pub is never replaced').toBe(false);
+    expect((await loadPersonKey(vault)).linkKeyPub).toBe(linkKeyPub);
+    const raw = JSON.parse(await vault.get('person-key'));
+    expect(Object.keys(raw).sort()).toEqual(['linkKeyPub', 'links', 'previous', 'reveals', 'seed', 'version']);
+    expect(raw.linkKeyPub).toBe(linkKeyPub);
   });
 });

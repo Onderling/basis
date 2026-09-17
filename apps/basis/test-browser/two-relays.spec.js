@@ -134,8 +134,10 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
   const A = await bootPeer(browser, 'A', { transportMode: 'relay', relayUrl: R1 });
   const B = await bootPeer(browser, 'B', { transportMode: 'relay', relayUrl: R2 });
   try {
-    expect((await waitForRelays(A.page, (l) => l.some((r) => r.connected))).map((r) => r.url)).toEqual([R1]);
-    expect((await waitForRelays(B.page, (l) => l.some((r) => r.connected))).map((r) => r.url)).toEqual([R2]);
+    // A is the FIRST page a cold dev server serves: on an edited tree its module graph takes 10–20 s to
+    // compile, so A's relay comes up late — 40 tries, not 20 (a harness cost, not a product finding).
+    expect((await waitForRelays(A.page, (l) => l.some((r) => r.connected), { tries: 40 })).map((r) => r.url)).toEqual([R1]);
+    expect((await waitForRelays(B.page, (l) => l.some((r) => r.connected), { tries: 40 })).map((r) => r.url)).toEqual([R2]);
     log('STEP1 boot', 'PASS', `A on ${R1}, B on ${R2}`);
 
     const { joined, joinerHasTile, outcome } = await pair(A, B, { name: 'Twee relays', re: /twee.?relays/i, handle: 'bram' });
@@ -153,6 +155,29 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
     await sendInCircle(B.page, 'terug vanaf relay twee');
     expect(await waitForBubble(A.page, 'terug vanaf relay twee')).toBe(true);
     log('STEP3 messages cross', 'PASS', 'both directions');
+
+    // BOTH ROSTERS CARRY THE OTHER'S PERSON KEY, in the real shell (2026-09-16: they did not — the creator's own
+    // announce row cost them their foundership, so their admin-signed join was dropped before the key fold; and
+    // the joiner never pulled the `create`). Read through the same skill the DM seal reads.
+    const rosterKeys = (page) => page.evaluate(async () => {
+      const mine = await window.onderlingCall('stoop', 'listMyCircles', {});
+      const ids = mine?.circles ?? [];
+      const gid = ids.find((g) => /twee.?relays/i.test(mine?.names?.[g] ?? '')) ?? ids[0];
+      const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: gid });
+      return (r?.members ?? []).map((m) => ({ role: m.role, personKey: m.personKey ?? null }));
+    });
+    const keyed = async (page, role) => {
+      for (let i = 0; i < 20; i++) {
+        const rows = await rosterKeys(page);
+        if (rows.find((m) => m.role === role)?.personKey?.pubKey) return rows;
+        await page.waitForTimeout(500);
+      }
+      return rosterKeys(page);
+    };
+    const onA = await keyed(A.page, 'member'), onB = await keyed(B.page, 'admin');
+    expect(onA.find((m) => m.role === 'member')?.personKey?.pubKey, `A's roster has no person key for the joiner: ${JSON.stringify(onA)}`).toBeTruthy();
+    expect(onB.find((m) => m.role === 'admin')?.personKey?.pubKey, `B's roster has no person key for the creator: ${JSON.stringify(onB)}`).toBeTruthy();
+    log('STEP3b person keys on both rosters', 'PASS', 'the joiner\'s from the admin-signed join, the creator\'s from the joiner\'s pull');
 
     // A DIRECT message, the other way round: B is on relay 2, A is on relay 1 only, and a DM carries no
     // circle. Until 2026-09-08 that meant "this device's own relay" — B would have sent it to relay 2,

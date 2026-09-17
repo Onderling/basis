@@ -55,6 +55,8 @@ export function makeHandleGroupRedeemRequest({
   ownDisplayFor = null,
   callSkill, sendPeer, propagateMeshIntros, propagateCircleAddresses, publishEvent,
   circleAddressFor, signCircleAddress, logger = console,
+  // After a member is ADMITTED: the pair roster promotes its co-member to admin (`pairRoster.js`); best-effort.
+  onAdmitted = null,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -139,6 +141,10 @@ export function makeHandleGroupRedeemRequest({
         // It only means someone keeps being reached the old way until the next announce.
         propagateCircleAddresses({ circleId: groupId, newMemberWebid: fromAddr })
           .catch((err) => logger.warn?.('[circle-address] post-join propagation failed', err));
+      }
+      if (reply.ok && typeof onAdmitted === 'function') {
+        Promise.resolve(onAdmitted({ circleId: groupId, newMemberWebid: fromAddr }))
+          .catch((err) => logger.warn?.('[pair-roster] post-admit step failed', err?.message ?? err));
       }
       if (reply.ok && typeof propagateMeshIntros === 'function') {
         propagateMeshIntros({

@@ -55,6 +55,8 @@ import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
 // The contact-thread channel + its own-devices fan — composed here ONLY when a walk asks for it
 // (`contactChannel: true`), so every existing node keeps sending contact turns to `received`.
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
+import { createPairRoster } from '../../src/v2/pairRoster.js';
+import { makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import {
   makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, projectKeyEventsIntoStore,
@@ -249,6 +251,21 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // the others, and this is the composition that exercises it end to end.
   const contactTurnsSeen = [];       // turns that arrived from one of MY OWN devices
   const contactTurnsRefused = [];    // fanned turns this node refused, with the reason
+  // the pair roster (L105), composed as both shells do — the redeem sender is built below, late-bound
+  const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
+  const pairRoster = createPairRoster({
+    selfWebid: pubKey,
+    callSkill: (app, op, args) => callSkill(app, op, args),
+    sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    // the post-join step as the shells run it: register, bind, and PULL the circle's lanes (the join statement that
+    // carries this device's own key, the founder's create) — the catch-up is built below, late-bound
+    onJoined: ({ circleId }) => makeCircleReachable({ agent, circleId, pullLanes: (cid) => pairSeams.membershipCatchUp?.requestCircle(cid, { callSkill: (a, o, g) => callSkill(a, o, g) }) }),
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    myHandle: () => label.toLowerCase(),
+    logger: process.env.PAIR_ROSTER_LOUD ? console : QUIET,
+  });
   const contactThreadChannel = contactChannel
     ? createContactThreadChannel({
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
@@ -257,6 +274,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         openFor: agent.contactSeal?.openFor ?? null,
         localActor: pubKey,
         fanToOwnDevices: agent.contactTurnFan,
+        pair: pairRoster,
       })
     : null;
   /** A turn that arrived DIRECTLY (a contact's DM or a bot's reply): store it, which also fans it. */
@@ -274,6 +292,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const membershipCatchUp = agent.membershipRail
     ? makeGovernanceCatchUp({ rail: agent.membershipRail, sendToPeer: sendPeer, subtypes: MEMBERSHIP_CATCHUP_SUBTYPES })
     : null;
+  pairSeams.membershipCatchUp = membershipCatchUp;
   const handlers = {
     [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
     [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
@@ -282,6 +301,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
     'group-redeem-request': makeHandleGroupRedeemRequest({
       callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
+      onAdmitted: (a) => pairRoster.onAdmitted(a),
       // The ADMIN half of per-circle addressing (web ≡ mobile ≡ harness): the reply carries OUR proven
       // per-circle address, so the joiner records it instead of knowing us only by our global key.
       circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
@@ -401,6 +421,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     timeoutMs: redeemTimeoutMs,
     logger: QUIET,
   });
+  pairSeams.sendPeerRedeem = sendPeerRedeem;
 
   routerRef.fn = makePeerRouter({
     handlers,
@@ -409,7 +430,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });

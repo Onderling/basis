@@ -61,6 +61,8 @@ export function stoopContactToRow(c) {
     source:     'contact',                       // marks a ContactBook person (vs a discovered peer)
     trustLevel: c.trustLevel ?? null,            // 'bekend' | 'vertrouwd' | null
     tags:       Array.isArray(c.tags) ? c.tags : [],
+    // The pair roster (L105): once it exists the row says "verbonden"; before, nothing.
+    pairCircleId: typeof c.pairCircleId === 'string' && c.pairCircleId ? c.pairCircleId : null,
   };
 }
 
@@ -85,7 +87,12 @@ function sortContactRows(rows) {
 export function mergeContacts(peerRows = [], stoopRows = []) {
   const byId = new Map();
   for (const r of stoopRows) if (r?.contactId) byId.set(r.contactId, r);
-  for (const r of peerRows)  if (r?.contactId) byId.set(r.contactId, r);   // peer wins
+  for (const r of peerRows) {
+    if (!r?.contactId) continue;
+    // peer wins — but what only the contact book knows (the trust level, the pair roster) rides along
+    const book = byId.get(r.contactId);
+    byId.set(r.contactId, book ? { ...r, ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}), ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}) } : r);
+  }
   return sortContactRows([...byId.values()]);
 }
 

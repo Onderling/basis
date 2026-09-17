@@ -42,11 +42,14 @@ function freshNonce() {
  * @param {string} [a.founderPubKey]    the creating device's identity key; the id is derived from it
  * @returns {Promise<object>} `{ groupId, code, expiresAt, … }`
  */
-export async function quickCreateCircle({ callSkill, name, id, founderPubKey } = {}) {
+export async function quickCreateCircle({ callSkill, name, id, founderPubKey, rulesExtra = null, inviteMaxRedemptions = null } = {}) {
   const clean = String(name ?? '').trim();
   if (!clean) throw new Error('circle name required');
   const state = initialState();
   state.name = clean;
+  // A caller may pin fields the wizard never asks (the pair roster: `rules.pair`, no apps, one place on its invite).
+  if (rulesExtra && typeof rulesExtra === 'object') state.rulesExtra = rulesExtra;
+  if (Number.isInteger(inviteMaxRedemptions) && inviteMaxRedemptions >= 1) state.inviteMaxRedemptions = inviteMaxRedemptions;
 
   if (typeof id === 'string' && id.trim()) {
     state.groupId = id.trim();                      // a system circle, pinned on purpose

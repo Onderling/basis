@@ -87,6 +87,11 @@ export function createContactThreadChannel({
   // THIS DEVICE'S SELECTION (sync-policy §11): `holds()` — does this device keep contact turns at all (off: hold
   // nothing, still carry to the siblings); `keepsBytes()` — a received file's bytes in full, or its description.
   selection = null,
+  // THE PAIR ROSTER (L105, `pairRoster.js`): `prepare(peerAddr)` says what this turn carries to make the roster
+  // (`{ pairInvite }` from the founder, `{ pairRequest }` from the other side, or nothing); `onInvite(fromAddr, uri)` /
+  // `onRequest(fromAddr)` land the other side's. Inside the seal when the turn is sealed; a turn with only the
+  // roster material and no text is consumed here and never shown.
+  pair = null,
 } = {}) {
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
@@ -143,6 +148,9 @@ export function createContactThreadChannel({
     };
     if (env.extras?.displayName) payload.displayName = env.extras.displayName;
     if (env.extras?.webid)       payload.webid       = env.extras.webid;
+    // The pair roster's material rides in the clear only when the turn does (else it is inside the box below).
+    if (typeof env.extras?.pairInvite === 'string' && !env.extras?.sealed) payload.pairInvite = env.extras.pairInvite;
+    if (env.extras?.pairRequest === true && !env.extras?.sealed) payload.pairRequest = true;
     // Sealed to the PERSON: the wire carries the box and no text — a device that holds the profile key but not the
     // person key (a revoked one) receives an envelope it cannot read.
     if (env.extras?.sealed) { payload.sealed = env.extras.sealed; payload.text = ''; }
@@ -193,9 +201,21 @@ export function createContactThreadChannel({
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
     const sent = (async () => {
-      // Sealed to the PERSON when their current key is known — the wire carries the box, not the text.
+      // The pair roster: what THIS turn carries to make it (the founder's invite, or the other side's request).
+      if (pair && typeof pair.prepare === 'function') {
+        try {
+          const p = await pair.prepare(peerAddr, { name: sender?.displayName ?? null });
+          if (typeof p?.pairInvite === 'string') envelope.extras.pairInvite = p.pairInvite;
+          if (p?.pairRequest === true) envelope.extras.pairRequest = true;
+        } catch { /* the roster is made on a later turn; the message goes regardless */ }
+      }
+      // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
+      // pair roster's material with it: an invite is a join secret).
       if (typeof sealFor === 'function') {
-        try { const s = await sealFor(peerAddr, { text: floored.text }); if (s) envelope.extras.sealed = s; } catch { /* unsealed, as before */ }
+        try {
+          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}) };
+          const s = await sealFor(peerAddr, content); if (s) envelope.extras.sealed = s;
+        } catch { /* unsealed, as before */ }
       }
       const res = await core.deliver(envelope, { to: peerAddr });
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
@@ -368,17 +388,37 @@ export function createContactThreadChannel({
     return makeInboundHandler(subtypes.out, onMessage);
   }
 
+  /** The founder's answer to a pair request: a turn carrying the invite and no words (consumed, never shown). */
+  async function answerPairRequest(peerAddr, threadId, prepared) {
+    if (!prepared?.pairInvite) return;
+    const envelope = { id: mkId(), kind: subtypes.out, ts: now(), author: localActor, body: '', extras: { threadKey: peerAddr, threadId: threadId ?? peerAddr, peerAddr, pairInvite: prepared.pairInvite } };
+    try {
+      if (typeof sealFor === 'function') { const s = await sealFor(peerAddr, { text: '', pairInvite: prepared.pairInvite }); if (s) envelope.extras.sealed = s; }
+      await sendToPeer(peerAddr, buildContactWire(envelope));
+    } catch { /* the next turn carries it again */ }
+  }
+
   function makeInboundHandler(subtype, cb) {
     return async function onContactInbound(fromAddr, payload) {
       if (!payload || payload.subtype !== subtype) return;   // not ours
       if (typeof cb !== 'function') return;
       let text = payload.text ?? '';
+      let pairInvite = typeof payload.pairInvite === 'string' ? payload.pairInvite : null;
+      let pairRequest = payload.pairRequest === true;
       if (payload.sealed && typeof payload.sealed === 'object') {
         // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
         const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
         if (!content || typeof content.text !== 'string') return;
         text = content.text;
+        if (typeof content.pairInvite === 'string') pairInvite = content.pairInvite;
+        if (content.pairRequest === true) pairRequest = true;
       }
+      // The pair roster's material lands on its seam (never on the thread); the turn's words go on as always.
+      if (pair) {
+        if (pairInvite && typeof pair.onInvite === 'function') { Promise.resolve(pair.onInvite(fromAddr, pairInvite)).catch(() => {}); }
+        if (pairRequest && typeof pair.onRequest === 'function') { Promise.resolve(pair.onRequest(fromAddr, { name: payload.displayName ?? null })).then((r) => (r ? answerPairRequest(fromAddr, payload.threadId, r) : null)).catch(() => {}); }
+      }
+      if (!text && !Array.isArray(payload.buttons) && (pairInvite || pairRequest)) return;   // roster material only: nothing to show
       cb({
         fromAddr,
         threadId:  payload.threadId,

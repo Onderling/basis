@@ -297,6 +297,9 @@ export class MemberMap extends Emitter {
       // personKey: the contact's CURRENT rotating person key `{version, pubKey, linkKeyPub?}` — from their card, or a
       // pulled chain (2026-09-16). What a direct message to them is sealed to; `linkKeyPub` is the PINNED public half
       // of the key that vouches for their rotations (never replaced once set). Same whitelist lesson: named here or dropped.
+      // pairCircleId: the contact's PAIR ROSTER (the hidden two-member circle made on the first exchange — the roster
+      // a contact lacks), once it exists. Same whitelist lesson: named here or dropped.
+      pairCircleId: (typeof m.pairCircleId === 'string' && m.pairCircleId) ? m.pairCircleId : null,
       personKey:   (m.personKey && Number.isInteger(m.personKey.version) && typeof m.personKey.pubKey === 'string')
         ? { version: m.personKey.version, pubKey: m.personKey.pubKey, ...((typeof m.personKey.linkKeyPub === 'string' && m.personKey.linkKeyPub) ? { linkKeyPub: m.personKey.linkKeyPub } : {}) }
         : null,

@@ -2190,9 +2190,11 @@ function buildCircleBot(agent) {
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,
     pair: circlePairRoster,
-    sendToPeer: (addr, payload) =>
+    // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
+    // this device's per-circle address there, which is the only key the pair roster admits
+    sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'
-        ? agent.sendPeerMessage(addr, payload)
+        ? (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload))
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
     // Phase 2 (C3): route through the shared persisted `deliver` — a contact DM
     // is now DURABLE (persisted + rehydratable), the G18 fix. Thunked so the

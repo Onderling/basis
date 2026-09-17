@@ -761,9 +761,10 @@ export async function bootAgentBundle(opts = {}) {
   const contactChannel = createContactThreadChannel({
     blobStore: contactAttachmentBlobs,
     pair: pairRoster,
-    sendToPeer: (addr, payload) =>
+    // the route (a contact with a pair roster) rides as send options (web parity)
+    sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'
-        ? agent.sendPeerMessage(addr, payload)
+        ? (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload))
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
     itemStore:  () => getContactDmStore(),
     // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.

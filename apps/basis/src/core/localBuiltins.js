@@ -449,7 +449,12 @@ async function sendFile(args, {
       peerAddr,
       sealFor: agent?.contactSeal?.sealFor ?? null,
     });
-    const res = await agent.sendPeerMessage(peerAddr, envelope);
+    // Over the pair roster when one exists (their primary per-circle address, as my per-circle address); else as before.
+    let route = null;
+    try { route = await agent.pairRouteFor?.(peerAddr); } catch { route = null; }
+    const res = route?.to
+      ? await agent.sendPeerMessage(route.to, envelope, { circleId: route.circleId })
+      : await agent.sendPeerMessage(peerAddr, envelope);
     // Say what actually happened, not what was attempted. The façade's hold-forward answer
     // distinguishes delivered / held-for-later / given-up; reporting "sent" for all three is the
     // 2026-05-23 lesson repeating one layer up (sender-side OK, receiver never told otherwise).

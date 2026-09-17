@@ -139,7 +139,11 @@ describe('the box is revoked while it holds the address', () => {
 
     // A person with the card writes; the box takes it (it holds the profile address as the last
     // registration) and hands it to the web app — the alpha's feedback path, as the baseline.
-    person = await bootRealAgentNode('person', { contactChannel: true });
+    // A CARD-ONLY contact on purpose (`pairRoster: false`): this walk states the window a card contact keeps — the
+    // profile address no ceremony retires. With the pair roster (the default since L105) the person's first message
+    // would make a roster with the web app's person and every later message would travel over it, where the
+    // ceremony retired the box — that closure is `pairRosterWalk.test.js`'s to prove.
+    person = await bootRealAgentNode('person', { contactChannel: true, pairRoster: false });
     await connectNodesOverRelay([person], { relayUrl });
     const card = cardFrom(box.out);
     expect(card, `the box printed no card:\n${box.out.slice(-800)}`).toBeTruthy();

@@ -33,8 +33,11 @@ describe('contacts seal direct messages to the person key', () => {
   let A; let B; let rawAtA; let rawAtB; let landedAtA; let landedAtB;
 
   beforeAll(async () => {
-    A = await bootRealAgentNode('A', { agentOpts: log(), contactChannel: true });
-    B = await bootRealAgentNode('B', { agentOpts: log(), contactChannel: true });
+    // CARD-ONLY contacts on purpose (`pairRoster: false`): this walk is the chain-pull path — a contact who shares no
+    // roster learns a rotation by pulling the chain. With the pair roster (the default since L105) the first DM makes
+    // a roster and the rotation arrives root-revealed with no pull; `pairRosterWalk.test.js` walks that.
+    A = await bootRealAgentNode('A', { agentOpts: log(), contactChannel: true, pairRoster: false });
+    B = await bootRealAgentNode('B', { agentOpts: log(), contactChannel: true, pairRoster: false });
     await connectNodesOverBus([A, B]);
     rawAtA = tapWire(A); rawAtB = tapWire(B); landedAtA = tapLanded(A); landedAtB = tapLanded(B);
     // The Hi: each takes the other's card.

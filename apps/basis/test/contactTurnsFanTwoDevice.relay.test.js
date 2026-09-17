@@ -150,43 +150,29 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
     expect(other.contactTurnsSeen.at(-1).origin, 'a message FROM Bea is the other side of the thread').toBe('bot');
   }, 120_000);
 
-  it("THE PRIMARY DEVICE (sync-policy §12, the DM half): Bea's next reply lands on the device Anna CHOSE, not on whichever registered last — and the choice moves with the tap, over the real relay", async () => {
-    // Today the always-on device registered last (it booted after the phone), so Bea's reply lands there. Anna
-    // taps "make this my primary contact address" on the PHONE: the phone re-registers the profile and person
-    // addresses as primary, the always-on device learns the claim over the carry and stands by.
-    expect(phone.agent.primaryDevice.isMine(), 'no choice yet').toBe(false);
+  it("THE PAIR ROSTER decides where a contact's DM lands (L105, the route): Bea's reply goes to the device ON the pair roster — the always-on one, which wrote first and made it — and reaches the phone by the carry; the primary-DEVICE choice governs the relay registration, not this", async () => {
+    // The always-on device sent the first DM ('anna-1'), so it founded/joined the pair roster with Bea; the phone is
+    // not on that roster (a circle made on one device reaches a sibling by the enrol seed or the pod mirror, not
+    // live — the standing gap for every circle). So Bea's reply travels over the pair roster to the always-on
+    // device's per-circle address there, and the phone gets it by the contact-turn carry.
+    const pairId = await until(async () => (await alwaysOn.agent.pairRouteFor?.(bea.pubKey))?.circleId ?? null, { timeout: 20000, step: 200 });
+    expect(pairId, 'the always-on device holds no pair roster with Bea').toMatch(/^pair-/);
+    expect(await bea.agent.pairRouteFor(phone.pubKey), 'Bea\'s route to Anna').toMatchObject({ to: alwaysOn.agent.circleAddressFor(pairId), circleId: pairId });
+    // The phone claims the primary DEVICE: the relay registrations move (the profile + person addresses); the pair
+    // roster's route does not — Bea's DM still lands on the always-on device, and the phone still gets it by the carry.
     const claim = await phone.agent.claimPrimaryDevice();
     expect(claim.ok, JSON.stringify(claim)).toBe(true);
-    expect(await until(() => (alwaysOn.agent.primaryDevice.current()?.deviceId === claim.claim.deviceId ? true : null), { timeout: 15000, step: 100 }),
-      'the always-on device never learned the claim').toBe(true);
-    expect(alwaysOn.agent.primaryDevice.isMine()).toBe(false);
-    // give both relay sockets a moment to re-register with their new flags
+    expect(await until(() => (alwaysOn.agent.primaryDevice.current()?.deviceId === claim.claim.deviceId ? true : null), { timeout: 15000, step: 100 }), 'the always-on device never learned the claim').toBe(true);
     await new Promise((r) => setTimeout(r, 1500));
+    expect(phone.agent.sa?.relays?.primaryDevice?.() ?? phone.agent.primaryDevice.isMine(), 'the phone registers as primary now').toBe(true);
     await bea.contactThreadChannel.sendTurn({ peerAddr: phone.pubKey, threadId: bea.pubKey, text: 'op de telefoon dan', messageId: 'bea-2' }).sent;
     const landedOn = await until(async () => {
-      if ((await textsIn(phone, bea.pubKey)).includes('op de telefoon dan')) return 'phone';
       if ((await textsIn(alwaysOn, bea.pubKey)).includes('op de telefoon dan')) return 'always-on';
+      if ((await textsIn(phone, bea.pubKey)).includes('op de telefoon dan')) return 'phone';
       return null;
     }, { timeout: 20000, step: 100 });
-    expect(landedOn, "Bea's reply did not land on the phone Anna chose").toBe('phone');
-    // …and the always-on device still gets it, by the carry
-    expect(await until(async () => ((await textsIn(alwaysOn, bea.pubKey)).includes('op de telefoon dan') ? true : null), { timeout: 20000, step: 100 })).toBe(true);
-
-    // The choice moves: the tap on the always-on device.
-    const moved = await alwaysOn.agent.claimPrimaryDevice();
-    expect(moved.ok).toBe(true);
-    expect(await until(() => (phone.agent.primaryDevice.current()?.deviceId === moved.claim.deviceId ? true : null), { timeout: 15000, step: 100 }), 'the phone never learned the new claim').toBe(true);
-    expect(phone.agent.primaryDevice.isMine()).toBe(false);
-    await new Promise((r) => setTimeout(r, 1500));
-    await bea.contactThreadChannel.sendTurn({ peerAddr: phone.pubKey, threadId: bea.pubKey, text: 'en nu op de box', messageId: 'bea-3' }).sent;
-    const landedOn2 = await until(async () => {
-      if ((await textsIn(alwaysOn, bea.pubKey)).includes('en nu op de box')) return 'always-on';
-      if ((await textsIn(phone, bea.pubKey)).includes('en nu op de box')) return 'phone';
-      return null;
-    }, { timeout: 20000, step: 100 });
-    expect(landedOn2, "Bea's reply did not follow the choice to the always-on device").toBe('always-on');
-    // …and let the carry to the phone settle before the next test counts its thread.
-    expect(await until(async () => ((await textsIn(phone, bea.pubKey)).includes('en nu op de box') ? true : null), { timeout: 20000, step: 100 })).toBe(true);
+    expect(landedOn, "Bea's reply did not go over the pair roster to the device on it").toBe('always-on');
+    expect(await until(async () => ((await textsIn(phone, bea.pubKey)).includes('op de telefoon dan') ? true : null), { timeout: 20000, step: 100 }), 'the phone never got it by the carry').toBe(true);
   }, 120_000);
 
   it('the same turn arriving twice is stored once', async () => {

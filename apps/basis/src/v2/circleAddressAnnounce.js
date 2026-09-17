@@ -329,7 +329,16 @@ export async function propagateCircleAddressesAfterJoin({
 
   const newcomer = announcementsFromRoster({ members, circleId })
     .filter((x) => x.memberWebid === newMemberWebid);
-  const others = announcementsFromRoster({ members, circleId, exceptWebid: newMemberWebid });
+  // The admin's OWN announcement is minted fresh, not read off the row: a row carries the ceremony commitment
+  // without its proof, and a relayed announcement cannot re-prove it — so the newcomer would hold the admin's
+  // address with no commitment, and the admin's next rotation (a root reveal against it) would not fold on the
+  // newcomer until the admin's next boot re-announced (2026-09-18, found by the pair roster's revoke walk).
+  const me = selfWebidOf(agent);
+  const mine = ownAnnouncementFor({ agent, circleId });
+  const others = [
+    ...announcementsFromRoster({ members, circleId, exceptWebid: newMemberWebid }).filter((x) => !mine || x.memberWebid !== me),
+    ...(mine ? [mine] : []),
+  ];
   out.announced = newcomer.length + others.length;
 
   // 1. The circle learns the newcomer — over the ordinary circle fan, i.e. at each member's own

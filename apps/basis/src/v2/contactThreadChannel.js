@@ -129,7 +129,7 @@ export function createContactThreadChannel({
   const core = createAddressedDeliver({
     // The bytes of a received file go HERE, not into the thread's snapshot item.
     blobStore,
-    send:    (addr, payload) => sendToPeer(addr, payload),
+    send:    (addr, payload, sendOpts) => (sendOpts ? sendToPeer(addr, payload, sendOpts) : sendToPeer(addr, payload)),
     toWire:  (env) => buildContactWire(env),
     itemStore,
     localActor,
@@ -217,7 +217,11 @@ export function createContactThreadChannel({
           const s = await sealFor(peerAddr, content); if (s) envelope.extras.sealed = s;
         } catch { /* unsealed, as before */ }
       }
-      const res = await core.deliver(envelope, { to: peerAddr });
+      // THE ROUTE: a contact with a pair roster is written to at their primary per-circle address there, over the
+      // pair circle (as my per-circle address) — never at the profile address once the roster exists.
+      let route = null;
+      if (pair && typeof pair.routeFor === 'function') { try { route = await pair.routeFor(peerAddr); } catch { route = null; } }
+      const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       if (!res?.deduped) {

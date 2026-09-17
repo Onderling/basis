@@ -87,6 +87,7 @@ import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST 
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
 import { createPersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
 import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
+import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
 import { isRosterTrailItem } from '@onderling/circles';
@@ -5796,6 +5797,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.
     /** The primary-device choice (sync-policy §12): `isMine()`, `claim()`, `requestFromSiblings()`, `handlers`. */
     primaryDevice,
+    /** Where a message to a contact goes once their pair roster exists (`pairRoster.js`): `{ to, circleId, personKey }` or null. */
+    pairRouteFor: (contactWebid) => pairRouteFor({ callSkill: (a, o, g) => callSkill(a, o, g), selfWebid: chatId.pubKey, contactWebid }),
     claimPrimaryDevice: () => primaryDevice.claim(),
     personKeySync,
     /** My person-key chain `{ current, links }` — what a contact pulls after a rotation. */

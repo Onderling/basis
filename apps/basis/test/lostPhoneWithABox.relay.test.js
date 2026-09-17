@@ -192,7 +192,7 @@ describe('the phone is lost, and there is a box', () => {
     // and hands it to the new phone.
     const card = cardFrom(box.out);
     expect(card, 'the re-enrolled box printed no card').toBeTruthy();
-    const person = await bootRealAgentNode('person', { contactChannel: true });
+    const person = await bootRealAgentNode('person', { contactChannel: true, pairRoster: false });
     try {
       await person.agent.connectPeerTransport({ relayUrl, onPeerMessage: (env2) => person._routerRef.fn?.(env2), awaitRelayReady: true });
       expect((await seedContactCard({ payload: card, callSkill: (a, o, g) => person.agent.callSkill(a, o, g) })).seeded).toBe(true);

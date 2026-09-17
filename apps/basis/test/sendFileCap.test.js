@@ -21,7 +21,7 @@ function harness({ openFilePicker }) {
   const agent = {
     identity: { chat: { pubKey: 'pk', stableId: 'sid' }, host: { webid: 'https://a/profile#me' } },
     peer:     { address: 'app.peer-addr', status: 'connected' },
-    sendPeerMessage: async (addr, msg) => { peerCalls.push({ addr, msg }); return { ok: true }; },
+    sendPeerMessage: async (addr, msg, opts) => { peerCalls.push({ addr, msg, opts }); return { ok: true }; },
   };
   const handlers = createLocalBuiltins({
     catalogue: [], t, threadStore: { get: () => null, upsert: () => {}, list: () => [] }, setActive: () => {},
@@ -45,5 +45,25 @@ describe('/send-file — the door\'s own size question, on the shared code', () 
     expect(r?.error).toBeUndefined();
     expect(h.peerCalls).toHaveLength(1);
     expect(h.peerCalls[0].msg?.file?.size).toBe(300 * 1024);
+  });
+
+  it('a file to a contact with a PAIR ROSTER goes over it — to their per-circle address there, with the circle id (the route, L105)', async () => {
+    const h = harness({ openFilePicker: async () => ({ name: 'foto.jpg', type: 'image/jpeg', size: 3, dataB64: 'YWJj' }) });
+    const seen = [];
+    const agent = {
+      identity: { chat: { pubKey: 'pk', stableId: 'sid' }, host: { webid: 'https://a/profile#me' } },
+      peer: { address: 'app.peer-addr', status: 'connected' },
+      sendPeerMessage: async (addr, msg, opts) => { seen.push({ addr, opts }); return { ok: true }; },
+      pairRouteFor: async (peer) => (peer === 'bea' ? { to: 'bea@pair', circleId: 'pair-x', personKey: null } : null),
+    };
+    const handlers = createLocalBuiltins({
+      catalogue: [], t, threadStore: { get: () => null, upsert: () => {}, list: () => [] }, setActive: () => {},
+      callSkill: async () => ({}), localActor: 'me', agent, openFilePicker: async () => ({ name: 'foto.jpg', type: 'image/jpeg', size: 3, dataB64: 'YWJj' }),
+    });
+    await handlers['send-file']({ peer: 'bea' });
+    expect(seen[0]).toEqual({ addr: 'bea@pair', opts: { circleId: 'pair-x' } });
+    await handlers['send-file']({ peer: 'cato' });
+    expect(seen[1]).toEqual({ addr: 'cato', opts: undefined });
+    expect(h.peerCalls).toHaveLength(0);
   });
 });

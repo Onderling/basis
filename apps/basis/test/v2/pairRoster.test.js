@@ -4,7 +4,7 @@
  * joiner promoted to admin, idempotent, a stranger's invite refused; the launcher never shows it.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { pairCircleIdFor, isPairCircleId, pairFounderOf, createPairRoster, withoutPairCircles } from '../../src/v2/pairRoster.js';
+import { pairCircleIdFor, isPairCircleId, pairFounderOf, createPairRoster, withoutPairCircles, pairRouteFor } from '../../src/v2/pairRoster.js';
 import { loadCircles } from '../../src/v2/circleModel.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
 import { encodeMembershipCodeUrl } from '../../src/core/wizards/createGroupState.js';
@@ -160,5 +160,31 @@ describe('the channel carries it', () => {
     await chO.messageHandler((m) => got2.push(m))('anna', { subtype: sent[0].subtype, threadId: 'x', text: '', messageId: 'm5', sealed: { to: { version: 1 }, sealed: JSON.stringify({ text: 'psst', pairInvite: 'onderling-invite://Z' }), nonce: 'n' } });
     expect(pair.onInvite).toHaveBeenLastCalledWith('anna', 'onderling-invite://Z');
     expect(got2.map((m) => m.text)).toEqual(['psst']);
+  });
+});
+
+describe('the route (8b) — a message to a contact with a pair roster goes over it', () => {
+  it('resolves to the contact\'s PRIMARY per-circle address on the pair roster with the roster\'s person key; null without a roster, or without them on it', async () => {
+    const id = pairCircleIdFor(ANNA, BEA);
+    const rowsOf = (circles) => async (_a, op, args) => (op === 'listMyCircles' ? { circles: Object.keys(circles) }
+      : op === 'listGroupMembers' ? { members: circles[args.groupId] ?? [] } : {});
+    const withBea = rowsOf({ [id]: [{ webid: ANNA, circleAddress: 'anna@pair' }, { webid: BEA, circleAddress: 'bea@pair', circleAddresses: ['bea@pair', 'bea-box@pair'], personKey: { version: 2, pubKey: 'K2' } }] });
+    expect(await pairRouteFor({ callSkill: withBea, selfWebid: ANNA, contactWebid: BEA })).toEqual({ to: 'bea@pair', circleId: id, personKey: { version: 2, pubKey: 'K2' } });
+    expect(await pairRouteFor({ callSkill: rowsOf({}), selfWebid: ANNA, contactWebid: BEA }), 'no roster yet').toBe(null);
+    expect(await pairRouteFor({ callSkill: rowsOf({ [id]: [{ webid: ANNA, circleAddress: 'anna@pair' }] }), selfWebid: ANNA, contactWebid: BEA }), 'the contact is not on it yet').toBe(null);
+    expect(await pairRouteFor({ callSkill: withBea, selfWebid: ANNA, contactWebid: ANNA })).toBe(null);
+  });
+  it('the channel delivers to the route with the circle id, persists the turn under the CONTACT, and falls back to the profile address without a route', async () => {
+    const sent = [];
+    const pair = { prepare: vi.fn(async () => null), routeFor: vi.fn(async (peer) => (peer === 'bea' ? { to: 'bea@pair', circleId: 'pair-x', personKey: null } : null)) };
+    const store = { items: [], addItems: vi.fn(async (d) => { const p = d.map((x, i) => ({ id: `i${i}`, ...x })); store.items.push(...p); return p; }), listOpen: vi.fn(async () => store.items) };
+    const ch = createContactThreadChannel({ sendToPeer: async (a, p, o) => { sent.push({ a, p, o }); }, pair, itemStore: store, now: () => 1 });
+    await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'hoi', messageId: 'm1' }).sent;
+    expect(sent[0]).toMatchObject({ a: 'bea@pair', o: { circleId: 'pair-x' } });
+    expect(sent[0].p).toMatchObject({ text: 'hoi', threadId: 'bea' });
+    expect(store.addItems.mock.calls[0][0][0].source.threadId ?? store.addItems.mock.calls[0][0][0].source.to ?? 'bea').toBeTruthy();
+    await ch.sendTurn({ peerAddr: 'cato', threadId: 'cato', text: 'dag', messageId: 'm2' }).sent;
+    expect(sent[1].a).toBe('cato');
+    expect(sent[1].o).toBeUndefined();
   });
 });

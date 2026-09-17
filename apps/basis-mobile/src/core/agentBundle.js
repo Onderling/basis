@@ -37,6 +37,7 @@ import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
 import { createPairRoster } from '../../../basis/src/v2/pairRoster.js';
+import { announceOwnCircleAddress } from '../../../basis/src/v2/circleAddressAnnounce.js';
 import { makeSyncSelection } from '../../../basis/src/v2/syncSelection.js';
 import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
 import { createAttachmentBlobStoreRN } from './attachmentBlobStoreRN.js';
@@ -754,6 +755,7 @@ export async function bootAgentBundle(opts = {}) {
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
     signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
     onJoined: (a) => pairSeams.onJoined?.(a),
+    announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => { try { return agent?.relays?.list?.()?.[0]?.url ?? _activeRelayUrl ?? null; } catch { return _activeRelayUrl ?? null; } },
@@ -761,9 +763,10 @@ export async function bootAgentBundle(opts = {}) {
   const contactChannel = createContactThreadChannel({
     blobStore: contactAttachmentBlobs,
     pair: pairRoster,
-    sendToPeer: (addr, payload) =>
+    // the route (a contact with a pair roster) rides as send options (web parity)
+    sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'
-        ? agent.sendPeerMessage(addr, payload)
+        ? (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload))
         : Promise.reject(new Error('agent.sendPeerMessage unavailable'))),
     itemStore:  () => getContactDmStore(),
     // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.

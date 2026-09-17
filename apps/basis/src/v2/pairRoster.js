@@ -42,7 +42,12 @@ export { PAIR_CIRCLE_PREFIX, pairCircleIdFor, isPairCircleId, pairFounderOf } fr
  */
 export function createPairRoster({
   selfWebid, callSkill, sendPeerRedeem, circleAddressFor = null, signCircleLink = null, onJoined = null,
-  myHandle = null, relayUrl = null, dialEndpoint = null, activeEndpointUrl = null, identityOf = null, logger = console,
+  myHandle = null, relayUrl = null, dialEndpoint = null, activeEndpointUrl = null, identityOf = null,
+  // `announceOwn(circleId)`: this device's own address announcement WITH its ceremony commitment (the shells'
+  // `announceOwnCircleAddress`). The admitting side runs it once the co-member is in: a row relayed by the admin
+  // carries the commitment without its proof, so the joiner must hear the founder's own announcement before the
+  // founder's rotations can fold there — the whole point of the pair roster.
+  announceOwn = null, logger = console,
 } = {}) {
   if (typeof selfWebid !== 'string' || !selfWebid) throw new Error('pairRoster: selfWebid required');
   if (typeof callSkill !== 'function') throw new Error('pairRoster: callSkill required');
@@ -97,11 +102,17 @@ export function createPairRoster({
       rulesExtra: { pair: true, apps: [] },
       inviteMaxRedemptions: 1,
     });
+    // The founder becomes reachable in its own circle at once (register this device's address there, announce
+    // with the commitment) — the create wizard's `onDispatched` does this for a circle a person makes by hand;
+    // a pair circle is made by the channel, so the same seam runs here.
+    if (typeof onJoined === 'function') { try { await onJoined({ circleId }); } catch { /* the next boot registers */ } }
     return { circleId, created: true };
   }
 
   return {
     pairCircleIdFor: (contactWebid) => pairCircleIdFor(selfWebid, contactWebid),
+    /** Where a message to this contact goes once the pair roster exists (see `pairRouteFor`). */
+    routeFor: (contactWebid) => pairRouteFor({ callSkill, selfWebid, contactWebid }),
     /**
      * What this side's next turn to `contactWebid` should carry: `{ pairInvite }` when this side founds and the
      * contact is not on the roster yet; `{ pairRequest: true }` when the other side founds and no roster exists here;
@@ -130,11 +141,21 @@ export function createPairRoster({
     },
     /** An invite arrived on a turn: join, if it is THE pair circle for these two and this side is not in it yet. */
     async onInvite(fromAddr, inviteUri) {
-      const webid = await webidOf(fromAddr);
-      if (webid === selfWebid) return { joined: false, reason: 'not-our-pair' };
-      const expected = pairCircleIdFor(selfWebid, webid);
       let invite = null;
       try { const st = {}; decodeInvite(inviteUri, st); invite = st.invite ?? null; } catch { invite = null; }
+      let webid = await webidOf(fromAddr);
+      // The sender may speak as a person address this side cannot place yet (they rotated; the contact book still
+      // holds the version before) — then the invite's own `adminPeerAddr` names the founder, and it counts only
+      // when it is a CONTACT of mine: the join is a redeem round-trip to that very contact, who alone holds the
+      // code, so a forged claim admits nobody anywhere.
+      if (webid === fromAddr && typeof invite?.adminPeerAddr === 'string' && invite.adminPeerAddr && invite.adminPeerAddr !== selfWebid) {
+        try {
+          const rows = ((r) => r?.items ?? r?.contacts ?? [])(await callSkill('stoop', 'listContacts', {}));
+          if (rows.some((c) => c?.webid === invite.adminPeerAddr)) webid = invite.adminPeerAddr;
+        } catch { /* the address stands */ }
+      }
+      if (webid === selfWebid) return { joined: false, reason: 'not-our-pair' };
+      const expected = pairCircleIdFor(selfWebid, webid);
       if (!invite || invite.groupId !== expected) { logger?.warn?.(`[pair-roster] refused an invite from ${String(fromAddr).slice(0, 12)}…: not the pair circle for these two`); return { joined: false, reason: 'not-our-pair' }; }
       if ((await myCircles()).has(expected)) { await recordOnContact(webid, expected); return { joined: false, reason: 'already-in', circleId: expected }; }
       if (inFlight.has(expected)) return inFlight.get(expected);
@@ -162,9 +183,33 @@ export function createPairRoster({
       try { promoted = !!(await callSkill('stoop', 'setMemberRole', { groupId: circleId, memberWebid: newMemberWebid, role: 'admin' }))?.ok; }
       catch (err) { logger?.warn?.(`[pair-roster] could not promote the co-member: ${err?.message ?? err}`); }
       await recordOnContact(newMemberWebid, circleId);
+      // …and tell the co-member where I answer, with my commitment — the fan reaches them now that they are on the row.
+      if (typeof announceOwn === 'function') { try { await announceOwn(circleId); } catch { /* the next boot re-announces */ } }
       return { promoted };
     },
   };
+}
+
+/**
+ * THE ROUTE (L105, the second half): where a message to `contactWebid` goes once the pair roster exists — their
+ * PRIMARY per-circle address on that roster (the slot the member chose, or the address that joined), over the pair
+ * circle (sent as MY per-circle address there), sealed to the person key the roster folded root-revealed. Null when
+ * no pair roster is here yet (the message goes to the profile address, as before) or the contact is not on it.
+ * This is what closes the window after a revoke for every contact written to: the ceremony retires a stolen
+ * device's address from the pair roster and announces the rotation there, and the profile address is not used.
+ */
+export async function pairRouteFor({ callSkill, selfWebid, contactWebid } = {}) {
+  if (typeof callSkill !== 'function' || typeof selfWebid !== 'string' || typeof contactWebid !== 'string' || !contactWebid || contactWebid === selfWebid) return null;
+  let circleId;
+  try { circleId = pairCircleIdFor(selfWebid, contactWebid); } catch { return null; }
+  try {
+    const mine = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [];
+    if (!mine.includes(circleId)) return null;
+    const row = ((await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === contactWebid);
+    const to = typeof row?.circleAddress === 'string' && row.circleAddress ? row.circleAddress : null;
+    if (!to) return null;
+    return { to, circleId, personKey: row.personKey ?? null };
+  } catch { return null; }
 }
 
 /** The launcher's filter: a pair roster is a contact's, never a tile. */

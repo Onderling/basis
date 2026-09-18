@@ -29,6 +29,26 @@ hostnames and the Privatemode key; clones the feedback repo at `live` beside thi
 certificate; asks the relay URL, the bot token, your chat id and the Privatemode key). `platform` and
 `feedback-project` also run the `backup` role.
 
+## One machine or two — which roles may share a box
+
+Roles share a box freely: `ROLES` in `box.conf` is a list, and the `platform` profile is exactly relay +
+pod + companion + caddy + backup on one machine. Adding a role to a running box is an edit, not an install:
+add `role@repo` to `ROLES`, put its `.env` keys in place, run `FORCE=1 update.sh` — the role is built, the
+stack comes up, the health gate runs, `state.json` records it. **Two boxes on one machine is not a thing**:
+a box is one directory, one compose project (`onderling`) and one timer, and a second one would collide on
+all three.
+
+Which roles SHOULD share a machine is a different question, and one pairing is wrong outside a test:
+**your own always-on device (`assistant`, the `personal` profile) does not belong on the machine that runs
+the public relay.** The relay box has 80 and 443 open to the world by design; the device holds the person's
+profile keys, their contacts' keys and the content of every circle they are in, and needs no open port at
+all — it only dials out. Putting the thing that holds the keys on the one machine that is exposed is the
+pairing to avoid; a second small VPS is the cheap fix. (A co-located device also rebuilds the whole app image
+on the relay's machine at every release that touches `apps/basis/`, which a relay-only box never does.)
+Reaching the relay from a role on the same box works by its public name (`wss://<relay-domain>`, measured
+2026-09-18 from inside a container: 8/8 smoke); the internal name `ws://relay:8787` also connects but is
+the URL the device would then ADVERTISE on its contact card, which nobody outside can dial — use the public name.
+
 ## The box directory (`/opt/onderling`)
 
 | file | what |

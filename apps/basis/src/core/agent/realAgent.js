@@ -5650,21 +5650,36 @@ export async function createRealHouseholdAgent(opts = {}) {
         catch { /* fall through to the shell router */ }
         return onPeerMessage?.(env);
       };
-      if (nknLib) {
-        await sa.peer.connect({ nknLib, onPeerMessage: routedOnPeerMessage });
-      }
-      // T3a (unification / OBJ-1) — when a relay is configured, bring it up too. With NKN also up the
+      // THE RELAY NEVER WAITS ON NKN (2026-09-18). This used to `await` NKN first and dial the relay after
+      // — so an unreachable NKN network (its fallback chain is minutes long, then it throws) meant the relay,
+      // the alpha's one default transport, was never dialled at all, while the settings panel said
+      // "connected". With a relay configured it comes up FIRST, and NKN is brought up beside it without
+      // being waited for: its outcome is a log line and, when it does connect, a wider route set. Without a
+      // relay, NKN is awaited as before — the NKN-only walks keep their contract.
+      let nknUp = false;
+      const bringNkn = async () => {
+        if (!nknLib) return;
+        try {
+          await sa.peer.connect({ nknLib, onPeerMessage: routedOnPeerMessage });
+          nknUp = true;
+        } catch (err) {
+          if (typeof console !== 'undefined') console.warn(`[realAgent] nkn connect failed${relayUrl ? ' (the relay carries on)' : ' (no cross-peer wire — nkn was the only transport)'}:`, err?.message ?? err);
+          if (!relayUrl) throw err;
+        }
+      };
+      // T3a (unification / OBJ-1) — when a relay is configured, bring it up. With NKN also up the
       // secure-agent's RoutingStrategy (T2) picks the BEST route per peer (relay > nkn by priority);
       // relay-ONLY pins transportMode to 'relay' so sends route over it. Best-effort: a relay failure
       // never blocks NKN — but if relay is the ONLY transport, its failure means no cross-peer wire.
-      if (relayUrl) {
+      const bringRelay = async () => {
+        if (!relayUrl) return;
         try {
           // `awaitRelayReady` — for callers who send on the next line (a join dialling the endpoint its
           // invite names). Boot leaves it off: blocking start-up behind a relay is what the transport's
           // non-blocking connect exists to avoid.
           await sa.relay.connect({ relayUrl, onPeerMessage: routedOnPeerMessage, awaitReady: awaitRelayReady });
-          sa.setTransportMode(nknLib ? 'both' : 'relay');
-          if (typeof console !== 'undefined') console.info(`[realAgent] relay connected — routing across {${nknLib ? 'nkn, relay' : 'relay'}}`);
+          sa.setTransportMode(nknUp ? 'both' : 'relay');
+          if (typeof console !== 'undefined') console.info(`[realAgent] relay connected — routing across {${nknUp ? 'nkn, relay' : 'relay'}}`);
           // The relays my circles ride, beside the primary (2026-09-08). Best-effort each: one relay that is
           // down must not cost the others. Boot does not wait for their sockets (same reason as above).
           for (const url of (Array.isArray(extraRelayUrls) ? extraRelayUrls : [])) {
@@ -5675,6 +5690,13 @@ export async function createRealHouseholdAgent(opts = {}) {
         } catch (err) {
           if (typeof console !== 'undefined') console.warn(`[realAgent] relay connect failed${nknLib ? ' (continuing on NKN)' : ' (no cross-peer wire — relay was the only transport)'}:`, err?.message ?? err);
         }
+      };
+      if (relayUrl) {
+        await bringRelay();
+        // NKN beside it, unawaited: when it connects later the router widens to both routes.
+        bringNkn().then(() => { if (nknUp && sa.relay?.status === 'connected') sa.setTransportMode('both'); }).catch(() => { /* said above */ });
+      } else {
+        await bringNkn();
       }
       // T5.2d — opt in to direct WebRTC rendezvous, signalled over whichever transport just
       // came up (peer/relay). Web needs no rtcLib (RendezvousTransport uses globalThis

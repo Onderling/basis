@@ -23,6 +23,8 @@ export function renderConnectionPoints(container, {
   removing = null,
   /** `agent.relays.list()` — which of these the device is on RIGHT NOW, and which one is its own. */
   relays = [],
+  /** Is the agent up? Then an empty `relays` is the truth (no socket), not "not up yet". */
+  agentUp = false,
   /** Add a relay by hand: `(url) => void`. Absent ⇒ no field (a shell with no agent to dial with). */
   onAdd = null,
   /** A locale key for what went wrong with the last add, or null. */
@@ -86,7 +88,7 @@ export function renderConnectionPoints(container, {
       sees.textContent = tr('circle.nearbyScreen.point_pod_host_sees');
       el.appendChild(sees);
     } else {
-      const status = pointStatus(point, relays);
+      const status = pointStatus(point, relays, { agentUp });
       live.className = `circle-points__live is-${status}`;
       live.textContent = tr(POINT_STATUS_LABELS[status]);
       el.appendChild(live);

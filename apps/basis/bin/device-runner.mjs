@@ -37,7 +37,7 @@
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
  * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -106,12 +106,25 @@ const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase(
 // worst possible host for a vault that only exists until the process does.
 const chatVault = new VaultNodeFs(path.join(dataDir, 'chat-vault.json'), vaultPassphrase());
 
+// The content this shell composes — named once, because the enrol ceremony needs the list: an install
+// that booted unenrolled first (every box does; the service starts before anyone can enrol it) holds the
+// content of a throwaway identity, and that content does not carry over.
+const contentPaths = {
+  registry:  path.join(dataDir, 'registry'),
+  stoop:     path.join(dataDir, 'stoop-items.json'),
+  household: path.join(dataDir, 'household-items.json'),
+  tasks:     path.join(dataDir, 'tasks-items.json'),
+  settings:  path.join(dataDir, 'settings.json'),
+  outbox:    path.join(dataDir, 'outbox.json'),
+  deviceLog: path.join(dataDir, 'device-log.json'),
+  contactDm: path.join(dataDir, 'contact-dm.json'),
+};
 // The device log is the record every lane rides, so it is hydrated from disk BEFORE the agent boots:
 // a device that forgets its log on restart would re-admit a connection its owner revoked, and would
 // come back to its circles as if it had never been in them.
 const deviceLog = new EventLog({ initial: [], muted: [] });
 const { hydrated } = await wireEventLogPersistence({
-  eventLog: deviceLog, io: fileSnapshotIo(path.join(dataDir, 'device-log.json')),
+  eventLog: deviceLog, io: fileSnapshotIo(contentPaths.deviceLog),
 });
 
 // Where an add-a-device offer waits between the enrol ceremony and the next start — the node shape of
@@ -126,12 +139,12 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
   chatVault,
-  registryBackend: createNodeFsBackend({ dir: path.join(dataDir, 'registry') }),
-  stoopPersistDb:     { path: path.join(dataDir, 'stoop-items.json') },
-  householdPersistDb: { path: path.join(dataDir, 'household-items.json') },
-  tasksPersistDb:     { path: path.join(dataDir, 'tasks-items.json') },
-  settingsPersistDb:  { path: path.join(dataDir, 'settings.json') },
-  outboxPersistDb:    { path: path.join(dataDir, 'outbox.json') },
+  registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
+  stoopPersistDb:     { path: contentPaths.stoop },
+  householdPersistDb: { path: contentPaths.household },
+  tasksPersistDb:     { path: contentPaths.tasks },
+  settingsPersistDb:  { path: contentPaths.settings },
+  outboxPersistDb:    { path: contentPaths.outbox },
   deviceLog,
   seedDemoData: false,
   seedHousehold: false,
@@ -140,10 +153,18 @@ const agent = await createRealHouseholdAgent({
 const callSkill = (app, op, args) => agent.callSkill(app, op, args);
 
 // The walk log — one JSON line per event, so a run can be read afterwards rather than retold.
+// `--walk-log` names a FILE (stamped before its extension) or a DIRECTORY (a trailing slash, or one that
+// exists) — the box says "/data/assistant/walks/", and the file goes in it under the runner's own name.
+// The directory is made: a log whose directory is missing is a log that is never written.
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
-const walkLogFile = values['walk-log']
-  ? values['walk-log'].replace(/(\.jsonl)?$/, `-${stamp}$1`)
-  : path.join(dataDir, `walk-log-${stamp}.jsonl`);
+const walkLogFile = (() => {
+  const given = values['walk-log'];
+  if (!given) return path.join(dataDir, `walk-log-${stamp}.jsonl`);
+  const isDir = /[\\/]$/.test(given) || (existsSync(given) && statSync(given).isDirectory());
+  if (isDir) return path.join(given, `walk-log-${stamp}.jsonl`);
+  return /\.jsonl$/.test(given) ? given.replace(/\.jsonl$/, `-${stamp}.jsonl`) : `${given}-${stamp}.jsonl`;
+})();
+try { mkdirSync(path.dirname(walkLogFile), { recursive: true }); } catch { /* said below, once, if the first write fails */ }
 const walkLog = (entry) => { try { appendFileSync(walkLogFile, JSON.stringify(entry) + '\n'); } catch { /* the log is not the product */ } };
 
 // ── The add-a-device offer ──────────────────────────────────────────────────────────────────────
@@ -214,6 +235,13 @@ async function enrolOnce() {
       console.error(`device-runner: not enrolled — ${r?.outcome === 'invalid-phrase' ? 'that is not a valid recovery phrase' : (r?.error ?? 'the ceremony failed')}.`);
       return 2;
     }
+    // This install was nobody's until now: it had booted unenrolled, as a throwaway profile of its own — the
+    // way every box comes up, since the service starts before anyone can enrol it. What that identity kept
+    // on this disk (its member map with itself in it, its registry record, its settings, held messages) is
+    // not the person's, and the ceremony's vault reset has already dropped the content key it was sealed
+    // under — left in place, the next boot would greet a former self in every circle and warn about rows it
+    // cannot open. So the content starts empty; the vaults the ceremony wrote and the offer stash stay.
+    for (const p of Object.values(contentPaths)) { try { rmSync(p, { recursive: true, force: true }); } catch { /* nothing there */ } }
     console.log(`device-runner: enrolled as device ${String(r.deviceId ?? '').slice(0, 12)}… for ${stashed.circles.length} circle(s).`);
     console.log('  Now start the runner as usual; on that start it joins the circles the offer names.');
     return 0;
@@ -226,7 +254,7 @@ let contactChannel = null;
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
   // constructor both shells use; only the backing differs, which is the whole of what a shell decides.
-  const dmSource = await buildHouseholdDataSource({ path: path.join(dataDir, 'contact-dm.json') }).catch(() => null);
+  const dmSource = await buildHouseholdDataSource({ path: contentPaths.contactDm }).catch(() => null);
   contactChannel = createContactThreadChannel({
     sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),

@@ -291,6 +291,9 @@ export async function createNeighbourhoodAgent({
   let cache = null;
   let dataSource;
   let persist = null;
+  // The map the debounced save last saw — what `flushLocal` writes NOW, for a caller that is about to
+  // exit and cannot wait out the debounce (a ceremony that ends in a process exit or a reload).
+  let lastLocalMap = null;
   if (useCache) {
     // Phase 15 (Stoop V1, 2026-05-06): when `persistPath` is set,
     // load any prior cache state from disk + auto-flush every change
@@ -316,7 +319,7 @@ export async function createNeighbourhoodAgent({
     cache = new CachingDataSource({
       inner:         itemBackend ?? null,
       localStore:    initialMap,
-      onLocalChange: persist ? (m) => persist.scheduleSave(m) : undefined,
+      onLocalChange: persist ? (m) => { lastLocalMap = m; persist.scheduleSave(m); } : undefined,
       // per-device settings + the migration marker
       // are local-only — they must never reach the pod (the pod is
       // shared by other installs of the same user).
@@ -508,6 +511,8 @@ export async function createNeighbourhoodAgent({
   // without circular construction.  We pass the same `bundle` ref
   // into `buildSkills` and finalise it just before returning.
   const bundle = {
+    /** Write the local cache to its persistence now, ahead of the debounce. No-op without a persist. */
+    flushLocal: async () => { if (persist && lastLocalMap && typeof persist.flush === 'function') await persist.flush(lastLocalMap); },
     agent,
     deviceId: id?.deviceId ?? null,    // Phase 33.1 — per-install id for device-scoped settings
     evictionRoster,                    // Phase 35 — auto-evict filter for stale memberships

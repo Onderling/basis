@@ -2260,6 +2260,24 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'offer-failed' })]; }
   }, { visibility: 'trusted' });   // enumerates the person's circles: owner-only
 
+  // A ceremony that hands this install a NEW identity (enrolling as someone's device, restoring a phrase)
+  // leaves the identity it ran under behind at the reload — but that identity's own row in the member map
+  // persists with the cache, and the circle fan's no-trail path reads the map. Measured on the first
+  // personal box (2026-09-18): the runner had booted once unenrolled, as a throwaway profile, and after
+  // the enrolment kept greeting that former self in every circle — three failed deliveries a boot, an
+  // address nobody holds. The row is retired here, at the moment the ceremony succeeds and the running
+  // identity is known to be the one going away. Best-effort: the map is a display cache, not a record.
+  const retireCurrentSelfRow = async () => {
+    const bundle = stoopAgentRef.current?.bundle;
+    const members = bundle?.members;
+    if (!members || typeof members.removeMember !== 'function') return;
+    try {
+      await members.removeMember(chatId.pubKey);
+      // Both ceremonies end in a reload or a process exit; the cache's debounced save would not make it.
+      await bundle.flushLocal?.();
+    } catch { /* a stale row is noise, not a failure of the ceremony */ }
+  };
+
   hostAgent.register('enrollDevice', async ({ parts }) => {
     // The ENROLLMENT CEREMONY (add-a-device): the phrase is typed on THIS — the NEW — device,
     // never on one that already has authority. Restore the owner root (the same one
@@ -2279,6 +2297,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         const outcome = (r.code === 'invalid' || r.code === 'empty') ? 'invalid-phrase' : 'error';
         return [DataPart({ ok: false, outcome, error: r.detail ?? r.code })];
       }
+      await retireCurrentSelfRow();
       return [DataPart({ ok: true, reloadRequired: true, deviceId: r.deviceId })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'enroll-failed' })]; }
   }, { visibility: 'trusted' });   // overwrites the owner root + enrolls: owner-only
@@ -2832,6 +2851,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // re-boots realAgent, which then finds this seed + owner root.
       const r = await restoreOwnerRoot({ mnemonic: root.toMnemonic(), rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault });
       if (!r.ok) return [DataPart({ ok: false, error: r.detail ?? r.code })];
+      await retireCurrentSelfRow();
       return [DataPart({ ok: true, reloadRequired: true })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'restore-failed' })]; }
   }, { visibility: 'trusted' });   // 2.4b — overwrites the owner root: owner-only

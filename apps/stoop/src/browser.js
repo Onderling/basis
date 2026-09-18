@@ -94,6 +94,10 @@ export async function createBrowserStoopAgent({
   // (absent → store-local only, the pre-propagation behaviour).
   rulesUpdateEmit,
   mutedSet,
+  // This device's content-seal strategy: the member map (the contact book, every roster row, the name a
+  // person shows) and the posts persist under it. Absent → the persisted copy is written in the clear,
+  // which is what happened until 2026-09-18 — the host handed it in and this factory dropped it here.
+  contentSeal = null,
 }) {
   if (!bus)           throw new TypeError('createBrowserStoopAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserStoopAgent: identityVault required');
@@ -130,6 +134,7 @@ export async function createBrowserStoopAgent({
     currentPersonKey,      // the person key announced on a join/create (absent → none announced)
     mutedSet,              // the SHELL's block set — this app reads it, never writes it
     rulesUpdateEmit,       // the rules-update rider's governance-lane emitter (absent → store-local only)
+    contentSeal,           // the persisted store is sealed under this device's content key
   });
 
   return {

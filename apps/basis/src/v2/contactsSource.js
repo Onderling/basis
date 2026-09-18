@@ -56,7 +56,12 @@ export function stoopContactToRow(c) {
     isBot:      false,
     skillCount: 0,
     reachable:  c.reachable !== false,
-    peerAddr:   c.pubKey ?? c.peerAddr ?? null,   // native address → DM channel
+    // WHERE THEY ARE WRITTEN TO: the address the card names (`peerAddr` — the person's profile address, which
+    // every device of theirs registers on the relay), and only for a book entry without one the `pubKey` — the
+    // mesh-era shape, where a contact's key WAS its address. A card from an ENROLLED device carries that device's
+    // own delegation key as `pubKey`, which is no address anywhere; taking it first sent every message to the
+    // seeded alpha contact to a key nobody held (2026-09-18: "sealed to the device only", a HI never answered).
+    peerAddr:   c.peerAddr ?? c.pubKey ?? null,
     url:        null,
     source:     'contact',                       // marks a ContactBook person (vs a discovered peer)
     trustLevel: c.trustLevel ?? null,            // 'bekend' | 'vertrouwd' | null

@@ -97,6 +97,19 @@ describe('stoopContactToRow (S1 #2 — member directory)', () => {
     expect(stoopContactToRow({ pubKey: 'k' }).name).toBe('k');
     expect(stoopContactToRow({})).toBeNull();
   });
+
+  it('a contact from a CARD is written to at the address the card names — never at their device key', () => {
+    // 2026-09-18, the seeded alpha contact: the card carries the person's address (`peerAddr`, the profile
+    // address every device of theirs registers on the relay) AND the sharing device's own key (`pubKey`, an
+    // enrolled device's delegation key, which is no address at all). The row took `pubKey` first — a habit
+    // from the days when a contact's pubKey WAS its mesh address — so every message to the seeded contact
+    // went to a key nobody holds on any relay, and sat "sealed to the device only" forever. Measured on the
+    // published app: the thread opened on `b5_-JbBf…` while the card said `LE1n…`.
+    const row = stoopContactToRow({ webid: 'LE1n', pubKey: 'b5_-JbBf-device-key', peerAddr: 'LE1n', displayName: 'Wilfred' });
+    expect(row.peerAddr, 'the address the card names').toBe('LE1n');
+    // A legacy book entry with only a pubKey (the mesh-era shape) still routes by it.
+    expect(stoopContactToRow({ webid: 'w2', pubKey: 'MESHKEY' }).peerAddr).toBe('MESHKEY');
+  });
 });
 
 describe('mergeContacts (S1 #2)', () => {

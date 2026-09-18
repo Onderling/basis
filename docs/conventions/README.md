@@ -3,6 +3,10 @@
 Project-wide rules every contributor follows. Read the ones relevant to what you're touching **before** you
 author code — several are load-bearing invariants, not style preferences.
 
+- **[verification-ladder.md](./verification-ladder.md)** — which check runs when, from a keystroke to `live`:
+  the one red-first test → the package suite + guards → the cheapest real thing → the CI gate (merge) → the
+  browser tail (after the merge; gates the release) → `npm run release:check` → the release. When the quick
+  route is enough and when it is not.
 - **[architectural-layering.md](./architectural-layering.md)** — the `apps → substrates → kernel` layering: what
   each layer owns and what is not acceptable. The core invariant.
 - **[app-readme-scheme.md](./app-readme-scheme.md)** — the README scheme every app under `apps/` follows from

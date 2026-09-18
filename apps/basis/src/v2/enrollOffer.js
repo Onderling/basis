@@ -320,6 +320,16 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
               await new Promise((resolve) => setTimeout(resolve, 250));
             }
             if (derived) { row.steps.push('roster-derived'); derivedHere = true; }
+            else {
+              // The seed never came: the sibling that holds it was not there (a phone asleep, a tab off
+              // the relay — the first personal box, 2026-09-18). "Requested" is not "received": without
+              // the seed this device knows no sibling to ask anything of, ever, so the offer must stay
+              // stashed and the next start must ask again. The pulls below still go out — they cost
+              // nothing and land if the sibling appears meanwhile — but this circle is not complete.
+              row.ok = false;
+              row.error = 'seed-not-received';
+              allOk = false;
+            }
           }
         } catch { /* the pulls below still go out; the next boot retries the seed */ }
       }

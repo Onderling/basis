@@ -5016,6 +5016,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         })));
       }
       return {
+        // The book's own rows, under the name both shells' Contacten roster reads (`stoopContactToRow` was
+        // written for this shape: displayName, the Dutch trust words). Until 2026-09-18 only the chat-shell
+        // `items` below were returned, so a person added from a card — the seeded contact included — was in
+        // the book and on no screen: the roster read `contacts`, found nothing, and said "No contacts yet".
+        contacts: data.contacts,
         items: data.contacts.map((c) => ({
           id:          c.webid,
           type:        'contact',

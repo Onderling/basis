@@ -461,6 +461,14 @@ describe('pointStatus — what a point IS now that several relays are live at on
     expect(pointStatus(P('ws://mine:1', { active: true }), [])).toBe('primary');
     expect(pointStatus(P('ws://other:2'), [])).toBe('offline');
   });
+
+  it('but once the agent IS up, an empty live list means exactly that: no socket, "offline" — never "in use"', () => {
+    // 2026-09-18: the relay was never dialled (NKN blocked it), the live list was empty, and the panel said
+    // the person's own relay was "Nu in gebruik" — the memory fallback, read as a live fact. The fallback
+    // is for a panel opened BEFORE the agent exists, and only then.
+    expect(pointStatus(P('ws://mine:1', { active: true }), [], { agentUp: true })).toBe('offline');
+    expect(pointStatus(P('ws://mine:1', { active: true }), [], { agentUp: false })).toBe('primary');
+  });
 });
 
 describe('relayUrlsForCircles — the union that turns shared kringen into reachable relays', () => {

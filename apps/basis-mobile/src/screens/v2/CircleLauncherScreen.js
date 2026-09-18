@@ -4764,6 +4764,7 @@ function ConnectionPointsHost({ bundle, onBack }) {
     <ConnectionPointsScreen
       points={points}
       relays={relays}
+      agentUp={!!bundle?.agent}
       onBack={onBack}
       onAdopt={(url) => storeRef.current?.adopt(url)}
       onRemove={(url) => setRemoving({ url, ...storeRef.current?.impactOfRemoving(url) })}
@@ -4790,7 +4791,7 @@ function ConnectionPointsHost({ bundle, onBack }) {
 // two separate statements, never one merged list of affected circles. Merging them is how someone clicks
 // through the warning that mattered.
 function ConnectionPointsScreen({
-  points = [], relays = [], onBack, onAdopt, onRemove, onConfirmRemove, onCancelRemove, removing,
+  points = [], relays = [], agentUp = false, onBack, onAdopt, onRemove, onConfirmRemove, onCancelRemove, removing,
   onAdd = null, addError = null,
 }) {
   const theme = useTheme();
@@ -4824,7 +4825,7 @@ function ConnectionPointsScreen({
                 </>
               ) : (
                 <Text style={styles.rowMeta} testID={`point-live-${point.url}`}>
-                  {t(POINT_STATUS_LABELS[pointStatus(point, relays)])}
+                  {t(POINT_STATUS_LABELS[pointStatus(point, relays, { agentUp })])}
                 </Text>
               )}
               <Text style={styles.rowMeta}>

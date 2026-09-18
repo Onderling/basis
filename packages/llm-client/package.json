@@ -28,7 +28,7 @@
     "vitest": "^2.1.0"
   },
   "optionalDependencies": {
-    "openai": "<8",
+    "openai": "^6",
     "privatemode-ai": "^1.55.0"
   }
 }

@@ -36,6 +36,22 @@
 #
 #   2. ⚠ STILL A MANUAL STEP ON GITHUB: marking these jobs required in branch
 #      protection. Until that is done this file reports and does not gate.
+#
+# GATE AND TAIL (2026-09-18). Measured on the trunk: every job but the browser shards finishes inside
+# 8 minutes; the browser suite ran 45 minutes on its slowest shard, on EVERY feature PR, and then again on
+# the release PR and again after the merge — the same bytes three times, an hour each. So the file now
+# has two tiers:
+#
+#   * THE GATE — guards, every unit/integration suite, the live-pod tier, the journeys. Runs on every
+#     pull request and on every push to the two long-lived branches. Required to merge. ~8 minutes.
+#   * THE TAIL — the browser suite (the only thing that tests a SHELL COMPOSITION). Runs AFTER a merge,
+#     on the push to `development` and to `live`, and by hand (workflow_dispatch) — never on a PR. A red
+#     tail blocks the next RELEASE, not the next merge: `live` moves only from a `development` head whose
+#     tail is green (`npm run release:check` reads exactly that). Eight shards, not four: the split is by
+#     test count and the slow walks all sat in one shard (45 min beside a 1.4-minute one).
+#
+# Feature branches run nothing until a PR is opened — a branch per feature ends in a PR here anyway, and
+# the push + pull_request pair used to run everything twice per push.
 # =============================================================================
 
 name: tests
@@ -43,11 +59,14 @@ name: tests
 on:
   pull_request:
   push:
-    branches: ['**']
+    branches: [development, live]
+  workflow_dispatch:
 
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a PR cancels the older run of that PR. A push to development or live is a merge and
+  # runs to the end: the tail's verdict on that commit is what a release reads, and a cancelled run has none.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Every job installs the same way. Kept here so the recipe cannot drift
@@ -190,13 +209,15 @@ jobs:
   # the config. ONE worker per job: tests that pass alone flake in parallel, so the parallelism is across
   # SHARDS — each shard is a full environment running its slice serially. Traces on failure only.
   browser:
-    name: browser (shard ${{ matrix.shard }}/4)
+    name: browser (shard ${{ matrix.shard }}/8)
+    # THE TAIL: after a merge (a push to development or live) and by hand — never on a pull request.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -217,8 +238,8 @@ jobs:
       # suite. A retry is a measurement of that flakiness, not a cure for it; the report names every test
       # that needed one. (The walks that ride the public NKN network are skipped under CI in their own
       # files — a retry did not help them; they pass alone and are run by hand.)
-      - name: Browser suite, shard ${{ matrix.shard }} of 4 (serial inside; two dev servers + two relays)
-        run: npx playwright test --shard=${{ matrix.shard }}/4 --workers=1 --retries=1
+      - name: Browser suite, shard ${{ matrix.shard }} of 8 (serial inside; two dev servers + two relays)
+        run: npx playwright test --shard=${{ matrix.shard }}/8 --workers=1 --retries=1
         working-directory: apps/basis
         env:
           CI: 'true'

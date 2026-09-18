@@ -3391,6 +3391,7 @@ function showConnectionPoints() {
     // The LIVE list decides what each row says. The store remembers points; only the agent knows which of
     // them have a socket right now, and since 2026-09-08 that is several at once.
     relays: _peerAgent?.relays?.list?.() ?? [],
+    agentUp: !!_peerAgent,
     onBack: showLauncher,
     onAdopt: (url) => { store.adopt(url); draw(); },
     // Ask before removing: the impact report is the point of this screen.

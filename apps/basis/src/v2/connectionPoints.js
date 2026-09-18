@@ -374,15 +374,19 @@ export function bootRelayUrl({ stored = null, list = [] } = {}) {
  *
  * @param {object} point                 a row from `list()`
  * @param {Array<{url: string, primary?: boolean, connected?: boolean}>} [relays]  `agent.relays.list()`
+ * @param {{ agentUp?: boolean }} [o]    is the agent up? An empty live list from an agent that IS up means
+ *   "no socket", and says so; the memory fallback below is only for a panel opened before the agent exists.
  * @returns {'pod'|'primary'|'connected'|'offline'}
  */
-export function pointStatus(point, relays = []) {
+export function pointStatus(point, relays = [], { agentUp = false } = {}) {
   if (point?.kind === POINT_KIND.POD) return 'pod';
   const live = (Array.isArray(relays) ? relays : []).find((r) => r?.url === point?.url);
   if (live) return live.connected === false ? 'offline' : (live.primary ? 'primary' : 'connected');
-  // No live list at all (the panel opened before the agent came up): fall back to what the store remembers
-  // about the primary. Everything else is honestly "not connected" — because nothing is, yet.
-  return relays?.length === 0 && point?.active ? 'primary' : 'offline';
+  // No live list at all and no agent yet (the panel opened before it came up): fall back to what the store
+  // remembers about the primary. With the agent up, an empty list is the truth — nothing is connected
+  // (2026-09-18: the relay was never dialled, and this fallback read as "Nu in gebruik"). Everything else is
+  // honestly "not connected".
+  return !agentUp && relays?.length === 0 && point?.active ? 'primary' : 'offline';
 }
 
 /**

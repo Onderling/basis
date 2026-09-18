@@ -52,8 +52,7 @@ import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
-import { LlmClient } from '@onderling/llm-client';
-import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/providers/privatemode';
+import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
 import { listsManifest } from '../../lists/manifest.js';
 
 import { EventLog } from '../src/eventLog.js';
@@ -462,11 +461,10 @@ if (tgToken) {
 
   const sources = [{ manifest: agent.manifest }, { manifest: listsManifest }];
   const catalogue = mergeManifests(sources);
-  let llm = null; let llmModel = null;
-  if (readPrivatemodeKey()) {
-    const provider = await privatemodeProvider({ model: process.env.PRIVATEMODE_MODEL || undefined, timeoutMs: 60_000 });
-    llm = new LlmClient({ provider }); llmModel = provider.model;
-  }
+  // The model is the optional half of this optional half: a key without its SDK is a warning and a
+  // Telegram that answers without a model, never a device that is not there.
+  const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
+  const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   tgRunner = createTelegramRunner({
     bridge: new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }),
     catalogue,

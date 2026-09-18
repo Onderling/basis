@@ -36,6 +36,10 @@ import { bootRealAgentNode, teardown } from '../support/pairRealAgents.js';
 const SECRET_ITEM   = 'zwijgplicht-broodbeleg-8821';
 const SECRET_CIRCLE = 'fluisterkring-4417';
 const SECRET_NAME   = 'Roosmarijn-Zonnebloem-9903';
+/** The name this person shows their circles — it lands in stoop's member map, the store the contact book
+ *  and every roster row live in. Measured 2026-09-18 on the first personal box: `stoop-items.json` in the
+ *  clear, member rows readable in `head`. `createBrowserStoopAgent` took the seal and never handed it on. */
+const SECRET_SHOWN  = 'Wilgenroosje-Dauwdruppel-7712';
 
 /** Every raw value a StorageBackend holds, as one blob to scan. */
 async function rawDump(backend) {
@@ -61,16 +65,18 @@ describe('content is sealed at rest — a person\'s words are nowhere on this di
   it('a household item and a circle name survive a round trip but never hit storage readable', async () => {
     dir = await mkdtemp(path.join(tmpdir(), 'at-rest-'));
     const householdFile = path.join(dir, 'household-items.json');
+    const stoopFile = path.join(dir, 'stoop-items.json');
     // Handed in RAW. The production composition is what must seal it; if the test sealed it, the test
     // would be proving its own wrapper and nothing about the app.
     const registryRaw = createMemoryBackend();
 
     node = await bootRealAgentNode('sealed', {
-      agentOpts: { householdPersistDb: { path: householdFile }, registryBackend: registryRaw },
+      agentOpts: { householdPersistDb: { path: householdFile }, stoopPersistDb: { path: stoopFile }, registryBackend: registryRaw },
     });
 
     await node.agent.callSkill('household', 'addItem', { type: 'shopping', text: SECRET_ITEM });
     await node.agent.callSkill('stoop', 'createGroupV2', { groupId: SECRET_CIRCLE, name: SECRET_CIRCLE });
+    await node.agent.callSkill('stoop', 'setMyDisplayName', { displayName: SECRET_SHOWN });
     // A property the PERSON curated, which lands in the agent registry — the second local family, and the
     // one holding who this device belongs to rather than what it was asked to remember.
     await node.agent.callSkill('agents', 'setProfileProperty', { id: 'default', key: 'place', value: SECRET_NAME });
@@ -86,6 +92,10 @@ describe('content is sealed at rest — a person\'s words are nowhere on this di
     // ── And the disk gives nothing away. ─────────────────────────────────────────────────────────────
     const onDisk = await readFile(householdFile, 'utf-8').catch(() => '');
     expect(onDisk, 'the household file holds the item body in the clear').not.toContain(SECRET_ITEM);
+    const stoopOnDisk = await readFile(stoopFile, 'utf-8').catch(() => '');
+    expect(stoopOnDisk.length, 'the stoop store probe read nothing — it cannot prove anything').toBeGreaterThan(0);
+    expect(stoopOnDisk, 'stoop\'s store holds the shown name in the clear').not.toContain(SECRET_SHOWN);
+    expect(stoopOnDisk, 'stoop\'s store holds the circle name in the clear').not.toContain(SECRET_CIRCLE);
 
     // The registry probe must be able to SEE something, or its "no plaintext" would be the empty
     // store passing vacuously — the failure mode where a guard goes green because it looked nowhere.

@@ -258,6 +258,81 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
   }, 120_000);
 });
 
+describe('the enroll offer — the sibling is not there when the new device first boots', () => {
+  // The first personal box, 2026-09-18: the web app that made the offer was not on the relay when the box
+  // consumed it. The seed request went out, nothing came back, and the consume reported every step ok
+  // and CLEARED the offer — "seed requested" counted as done. From then on the box knew no sibling to
+  // ask and the web app never heard of it; the way out was a wipe and a second ceremony. A phone asleep
+  // at the moment its box first boots is the normal case, not an edge: the offer must stay stashed until
+  // the seed has ARRIVED, and the next start must ask again.
+  let B; let A; let A2; let bus;
+  afterAll(async () => { await teardown(B, A, A2); });
+
+  it('no seed back → the offer stays stashed and the report says so; the sibling back → the next consume completes and clears', async () => {
+    [B, A] = await Promise.all([
+      bootRealAgentNode('B', { taskLane: true }),
+      bootRealAgentNode('A', { taskLane: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() } }),
+    ]);
+    bus = await connectNodesOverBus([B, A]);
+    for (const n of [B, A]) { wireMembershipReceiver(n); wireMembershipCatchUp(n); }
+    await createCircle(B, { groupId: CIRCLE, name: 'Enroll offer' });
+    const okJoin = await joinExistingCircle(B, A, { groupId: CIRCLE, handle: 'anna' });
+    expect(okJoin.joined?.ok, JSON.stringify(okJoin.joined)).toBe(true);
+    await bindCircleAddresses([B, A], CIRCLE);
+    await Promise.all([B, A].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: CIRCLE })));
+    for (const stmt of B.agent.membershipRail.storedStatements(CIRCLE)) await A.agent.membershipRail.ingest(CIRCLE, stmt);
+    const built = await A.agent.callSkill('household', 'buildEnrollOffer', { relayUrl: 'ws://relay.example' });
+    expect(built.ok, JSON.stringify(built)).toBe(true);
+    const storage = memStorage();
+    expect((await stashEnrollOffer(storage, built.uri)).ok).toBe(true);
+
+    const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
+    const pre = await bootRealAgentNode('A2-pre', { agentOpts: vaults });
+    const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'tablet' })).ok).toBe(true);
+    await teardown(pre);
+    A2 = await bootRealAgentNode('A2', { agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
+    expect(A2.pubKey).toBe(A.pubKey);
+
+    // THE SIBLING IS AWAY: A is off the bus while the new device consumes the offer for the first time.
+    await A.agent.sa.removeSecureTransport('relay');
+    const tx = new InternalTransport(bus, A2.pubKey);
+    await A2.agent.sa.addSecureTransport('relay', tx);
+    A2._busTransport = tx;
+    await bindCircleAddresses([A2], CIRCLE);
+    wireMembershipReceiver(A2);
+    wireMembershipCatchUp(A2);
+    const consume = () => consumeEnrollOffer({
+      agent: A2.agent,
+      callSkill: (app, op, args) => A2.agent.callSkill(app, op, args),
+      sendPeerMessage: (to, payload, opts) => A2.agent.sendPeerMessage(to, payload, opts),
+      storage,
+    });
+    const first = await consume();
+    expect(first.consumed).toBe(true);
+    const row1 = first.circles.find((c) => c.circleId === CIRCLE);
+    expect(row1.steps, 'the seed was asked for').toContain('seed-requested');
+    expect(row1.steps, 'nothing came back').not.toContain('roster-derived');
+    expect(row1.ok, 'a circle whose seed never arrived is NOT complete').toBe(false);
+    expect(first.cleared, 'the offer stays stashed until the seed has arrived').toBe(false);
+    expect(await pendingEnrollOffer(storage), 'still pending for the next start').not.toBeNull();
+
+    // THE SIBLING IS BACK; the next start consumes again — and this time it completes.
+    const txA = new InternalTransport(bus, A.pubKey);
+    await A.agent.sa.addSecureTransport('relay', txA);
+    A._busTransport = txA;
+    await bindCircleAddresses([A], CIRCLE);   // its per-circle address rides the new socket, as a reconnect registers it
+    const second = await consume();
+    const row2 = second.circles.find((c) => c.circleId === CIRCLE);
+    expect(row2.steps, JSON.stringify(row2)).toContain('roster-derived');
+    expect(row2.ok).toBe(true);
+    expect(second.cleared, 'now it clears').toBe(true);
+    expect(await pendingEnrollOffer(storage)).toBeNull();
+    const rows = (await A2.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    expect(rows.map((m) => m.webid ?? m.addr ?? m.ref), 'the other member derives once the seed lands').toContain(B.pubKey);
+  }, 150_000);
+});
+
 describe('the roster seed — the device-set gate, unit-level', () => {
   const mkIdentity = () => AgentIdentity.generate(new VaultMemory());
 

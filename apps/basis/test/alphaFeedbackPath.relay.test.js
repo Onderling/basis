@@ -110,9 +110,18 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     const callSkill = (app, op, args) => person.agent.callSkill(app, op, args);
     const seeded = await seedContactCard({ payload: card, callSkill });
     expect(seeded, 'the card did not seed').toEqual({ seeded: true, webid: phone.pubKey });
-    const row = (await callSkill('stoop', 'listContacts', {})).items.find((c) => c.webid === phone.pubKey);
+    const res = await callSkill('stoop', 'listContacts', {});
+    const row = res.items.find((c) => c.webid === phone.pubKey);
     expect(row, 'the maker is not in the book').toBeTruthy();
     expect(stoopContactToRow(row).isBot, 'the maker must be a person, never a bot').toBe(false);
+    // …and in CONTACTEN, which is what a tester sees. Both shells build the roster from `res.contacts` — the
+    // book's own rows, the shape `stoopContactToRow` was written for — while the reply had carried only the
+    // chat-shell `items`. So the seeded contact was in the book and on no screen (published 2026-09-18,
+    // measured in a headless browser: "No contacts yet"). The reply carries both.
+    const bookRow = (res.contacts ?? []).find((c) => c.webid === phone.pubKey);
+    expect(bookRow, 'the roster reads `contacts`; the reply must carry the book\'s rows under that name').toBeTruthy();
+    expect(stoopContactToRow(bookRow).name, 'the name testers see: the card\'s display name, else its handle, else the address').toBe(bookRow.displayName ?? bookRow.handle ?? bookRow.webid);
+    expect(bookRow.trustLevel, 'the book\'s own trust wording, not the chat translation').toMatch(/^(bekend|vertrouwd)$/);
   }, 30_000);
 
   it('what the person writes lands on the box, is on the phone, and the phone\'s answer reaches the person', async () => {

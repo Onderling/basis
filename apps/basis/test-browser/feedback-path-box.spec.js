@@ -126,11 +126,35 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     log('STEP4 the maker sees it', 'PASS', `row ${String(seen.contactId).slice(0, 12)}…, painted`);
 
     // ── The maker answers from that row; the visitor sees the answer. ───────────────────────────────────
+    // What the maker's send RETURNED — the route it took, the transport's verdict, the fallback — recorded on the
+    // page, because in CI this step was red with "found: false" and nothing said where the answer went.
+    await maker.page.evaluate(() => {
+      const ch = window.onderlingContactChannel; if (!ch) return;
+      window.__sendOutcomes = [];
+      const orig = ch.sendTurn.bind(ch);
+      ch.sendTurn = (turn) => {
+        const r = orig(turn);
+        const rec = { to: String(turn.peerAddr).slice(0, 12), thread: String(turn.threadId).slice(0, 12), text: String(turn.text).slice(0, 30) };
+        window.__sendOutcomes.push(rec);
+        Promise.resolve(r.sent).then((out) => { rec.out = JSON.parse(JSON.stringify(out ?? null)); }, (e) => { rec.error = String(e?.message ?? e); });
+        return r;
+      };
+    });
+    const visitorConsole = [];
+    visitor.page.on('console', (m) => { const t = m.text(); if (/contact|relay|secure-agent|refus|unhandled|HI|seal|pair|turn/i.test(t) && !/strict mode|listContacts/.test(t)) visitorConsole.push(t.slice(0, 220)); });
     const reply = `dank je, ik kijk ernaar ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });
     expect(answered.sent, `the maker could not answer: ${answered.why}`).toBe(true);
     const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 12, every: 3000 });
-    expect(back.painted, `the maker's answer never reached the visitor's screen (found: ${back.found})`).toBe(true);
+    if (!back.painted) {
+      const outcomes = await maker.page.evaluate(() => window.__sendOutcomes ?? null).catch((e) => String(e));
+      const visitorHolds = await visitor.page.evaluate(async (id) => {
+        try { return ((await window.onderlingContactChannel?.rehydrate?.(id)) ?? []).map((t) => `${t.origin}:${String(t.text).slice(0, 24)}`); } catch (e) { return String(e); }
+      }, added.contact.webid).catch((e) => String(e));
+      const boxTail = walkLog(dataDir).slice(-6);
+      console.log(`### STEP5 diagnostics\nmaker sent: ${JSON.stringify(outcomes)}\nvisitor holds (thread ${String(added.contact.webid).slice(0, 12)}): ${JSON.stringify(visitorHolds)}\nvisitor console:\n${visitorConsole.slice(-30).join('\n')}\nmaker console:\n${makerConsole.slice(-30).join('\n')}\nbox log tail: ${JSON.stringify(boxTail)}`);
+    }
+    expect(back.painted, `the maker's answer never reached the visitor's screen (found: ${back.found}) — see "STEP5 diagnostics" above`).toBe(true);
     log('STEP5 the answer', 'PASS', 'round trip complete');
 
     // ── The visitor hides Wilfred; the maker answers again; Wilfred is back, with the marker. (L106) ─────

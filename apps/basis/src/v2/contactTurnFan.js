@@ -81,6 +81,8 @@ export function contactTurnToWire(turn) {
     ...(typeof turn.ts === 'number' ? { ts: turn.ts } : {}),
     ...(Array.isArray(turn.buttons) ? { buttons: turn.buttons } : {}),
     ...(file ? { file } : {}),
+    // The turn that brought a hidden contact back (L106) says so on every device — the marker is painted from it.
+    ...(turn.returned === true ? { returned: true } : {}),
   };
 }
 

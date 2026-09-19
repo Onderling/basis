@@ -702,6 +702,24 @@ export const stoopManifest = {
       },
     },
     {
+      // Hidden, not deleted (L106, Frits 2026-09-19): the row stays — thread, pair roster, keys untouched, their
+      // circles untouched — Contacten folds it away, and the contact's next message brings them back. On every
+      // device of the person: the mark rides the own-devices carry, the newer change wins.
+      id:   'setContactHidden', group: 'admin', verb: 'submit',
+      appliesTo: { type: 'contact' },
+      resolves: [{ field: 'hidden', policy: 'content' }],   // a dropped hide heals on the next carry; the newer `hiddenAt` wins on landing
+      params: [
+        { name: 'webid',    kind: 'webid',   required: true },
+        { name: 'hidden',   kind: 'boolean', required: true },
+        { name: 'hiddenAt', kind: 'number',  required: false },   // a landing's time (a sibling's newer change); a tap has none
+      ],
+      surfaces: {
+        slash: { command: '/hide-contact', body: 'flags' },
+        chat:  { reply: 'text', hint: 'hide a contact from Contacten, or show them again' },
+        ui:    { control: 'button', labelKey: 'circle.button.stoop.setContactHidden' },
+      },
+    },
+    {
       // A contact's CURRENT person key: taken on first sight (the card), else verified as a chain of links from the
       // version already on record. Reached by the card scan and by the person-key chain lane — no surface of its own.
       id:   'setContactPersonKey', group: 'data', verb: 'submit',

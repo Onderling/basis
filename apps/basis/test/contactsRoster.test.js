@@ -75,3 +75,36 @@ describe('renderContactsRoster', () => {
     expect(onAdd).toHaveBeenCalled();
   });
 });
+
+describe('hidden contacts fold away (L106)', () => {
+  const rows = [
+    { contactId: 'W', name: 'Wilfred', isBot: false, skillCount: 0, reachable: true, hidden: true },
+    { contactId: 'A', name: 'Alice', isBot: false, skillCount: 0, reachable: true, hidden: false },
+    { contactId: 'B', name: 'Bot', isBot: true, skillCount: 1, reachable: true },
+  ];
+  it('the list shows the shown rows only; the fold names how many are hidden and opens them on tap', () => {
+    const onOpen = vi.fn();
+    const el = renderContactsRoster(document.createElement('div'), { contacts: rows, ...ctx(), onOpen });
+    const shown = [...el.querySelectorAll('.cc-contacts__list:not(.cc-contacts__hidden) > .cc-contacts__row')].map((r) => r.dataset.contactId);
+    expect(shown, 'Wilfred is not in the list').toEqual(['A', 'B']);
+    const fold = el.querySelector('.cc-contacts__fold');
+    expect(fold, 'a fold for the hidden').toBeTruthy();
+    expect(fold.textContent).toContain('circle.contacts.hidden_fold:{"count":1}');
+    expect(el.querySelector('.cc-contacts__hidden').hidden, 'folded away until tapped').toBe(true);
+    fold.click();
+    expect(el.querySelector('.cc-contacts__hidden').hidden).toBe(false);
+    expect(fold.getAttribute('aria-expanded')).toBe('true');
+    const hidden = [...el.querySelectorAll('.cc-contacts__hidden .cc-contacts__row')];
+    expect(hidden.map((r) => r.dataset.contactId)).toEqual(['W']);
+    expect(hidden[0].classList.contains('is-hidden')).toBe(true);
+    hidden[0].click();
+    expect(onOpen, 'a hidden row opens its thread like any other — opening does not unhide').toHaveBeenCalledWith('W');
+  });
+  it('no hidden rows → no fold; every row hidden → the empty state is NOT shown, the fold is', () => {
+    const none = renderContactsRoster(document.createElement('div'), { contacts: rows.filter((r) => !r.hidden), ...ctx() });
+    expect(none.querySelector('.cc-contacts__fold')).toBeNull();
+    const all = renderContactsRoster(document.createElement('div'), { contacts: [rows[0]], ...ctx() });
+    expect(all.querySelector('.cc-contacts__empty')).toBeNull();
+    expect(all.querySelector('.cc-contacts__fold')).toBeTruthy();
+  });
+});

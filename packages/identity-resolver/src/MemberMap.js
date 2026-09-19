@@ -332,6 +332,12 @@ export class MemberMap extends Emitter {
       // allowAutomatching: accept inbound auto-skillmatch hints from
       //   this contact?  Default true — silent-on-no-match by design.
       allowAutomatching: m.allowAutomatching === false ? false : true,
+      // hidden: the person took this contact out of their sight — the row stays (thread, pair roster, keys
+      //   untouched), Contacten folds it away, and the contact's next message brings them back (L106, 2026-09-19).
+      //   `hiddenAt` is WHEN the mark last changed, either way: two devices of the person keep the newer mark.
+      //   Same whitelist lesson: named here or dropped.
+      hidden:      m.hidden === true,
+      hiddenAt:    Number.isFinite(m.hiddenAt) ? m.hiddenAt : null,
       // location: optional coarse-grain location ({cell, label, source}).
       //   Phase 26 wires this; here only the slot exists for forward-compat.
       location:    m.location && typeof m.location === 'object'

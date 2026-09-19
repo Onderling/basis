@@ -342,3 +342,70 @@ describe('a carried turn lands in the thread THIS device keys by identity', () =
     expect(noted).toEqual(['visitor-profile']);
   });
 });
+
+describe('a hidden contact who writes again comes back (L106) — one seam, both paths', () => {
+  // Frits, 2026-09-19: hidden, not blocked — "requiring the other person to text you again to become activated
+  // again". The channel does not know the book; the shell hands in `isHidden(contactId)` and `onReturned(contactId)`.
+  // A turn that LANDS from a hidden contact — directly or carried by my own device — fires onReturned once; the
+  // shell unhides the row, paints the thread and its one-line marker. A visible contact fires nothing.
+  it('fires onReturned once for a hidden sender on the direct path', async () => {
+    const returned = [];
+    const hidden = new Set(['bob']);
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), isHidden: (id) => hidden.has(id), onReturned: (id) => { returned.push(id); hidden.delete(id); } });
+    await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'hoi', messageId: 'r1', ts: 1 });
+    expect(returned).toEqual(['bob']);
+    await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'nog eens', messageId: 'r2', ts: 2 });
+    expect(returned, 'shown now — a second message does not fire again').toEqual(['bob']);
+    await ch.persistInbound({ contactId: 'carl', fromAddr: 'carl', text: 'dag', messageId: 'r3', ts: 3 });
+    expect(returned, 'a visible contact fires nothing').toEqual(['bob']);
+  });
+  it('fires onReturned for a hidden sender on the CARRIED path, keyed by the identity the shell resolves', async () => {
+    const returned = [];
+    const hidden = new Set(['bob-profile']);
+    const identityOf = (a) => (a === 'bob-person-key' ? 'bob-profile' : a);
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), identityOf, isHidden: (id) => hidden.has(id), onReturned: (id) => { returned.push(id); hidden.delete(id); } });
+    await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'bob-person-key', fromAddr: 'bob-person-key', text: 'hoi', messageId: 'c1', ts: 1 });
+    expect(returned).toEqual(['bob-profile']);
+    // The same turn carried again (a second sibling) is deduped and fires nothing.
+    await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'bob-person-key', fromAddr: 'bob-person-key', text: 'hoi', messageId: 'c1', ts: 1 });
+    expect(returned).toEqual(['bob-profile']);
+    // My own outbound turn to a hidden contact (I wrote to them from another device) does not bring them back —
+    // only THEIR message does; writing to someone you hid is your own act, and Tonen is the word for it.
+    hidden.add('dave');
+    await ch.applyOwnDeviceTurn({ direction: 'out', contactId: 'dave', peerAddr: 'dave', text: 'hey', messageId: 'o1', ts: 2 });
+    expect(returned).toEqual(['bob-profile']);
+  });
+  it('the turn that brought them back is MARKED — stored, fanned, rehydrated — so every device paints the marker above it', async () => {
+    // Measured 2026-09-19 on three devices: the box (primary) unhid the row and fanned the mark; the laptop's row
+    // was shown before the carried turn arrived, so "is hidden?" said no there and the marker never painted. The
+    // fact belongs to the TURN, decided where it first lands, and rides with it.
+    const fanned = [];
+    const hidden = new Set(['bob']);
+    const ch = createContactThreadChannel({
+      sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(),
+      isHidden: (id) => hidden.has(id), onReturned: (id) => { hidden.delete(id); },
+      fanToOwnDevices: async (turn) => { fanned.push(turn); },
+    });
+    const res = await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'ben ik er nog?', messageId: 'r1', ts: 1 });
+    expect(res.returned).toBe(true);
+    expect(fanned[0]).toMatchObject({ direction: 'in', contactId: 'bob', messageId: 'r1', returned: true });
+    const later = await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'en nu?', messageId: 'r2', ts: 2 });
+    expect(later.returned, 'a message from a shown contact is not a return').toBeUndefined();
+    expect(fanned[1].returned).toBeUndefined();
+    const turns = await ch.rehydrate('bob');
+    expect(turns.map((t) => [t.messageId, t.returned === true])).toEqual([['r1', true], ['r2', false]]);
+
+    // The SIBLING side: the carried turn says `returned`, the row there is ALREADY shown (the mark got there
+    // first) — the landing still reports the return so the shell paints the marker, and still tells the shell
+    // (the roster repaints); a carried turn without the mark on a shown row says nothing.
+    const sibReturned = [];
+    const sib = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), isHidden: () => false, onReturned: (id) => { sibReturned.push(id); } });
+    const landed = await sib.applyOwnDeviceTurn(fanned[0]);
+    expect(landed.returned).toBe(true);
+    expect(sibReturned).toEqual(['bob']);
+    const plain = await sib.applyOwnDeviceTurn(fanned[1]);
+    expect(plain.returned).toBeUndefined();
+    expect(sibReturned).toEqual(['bob']);
+    expect((await sib.rehydrate('bob')).find((t) => t.messageId === 'r1')?.returned, 'the sibling stores the mark too').toBe(true);
+  });
+});

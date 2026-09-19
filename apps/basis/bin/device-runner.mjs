@@ -66,7 +66,10 @@ import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
-import { makeCircleAddressAnnouncePeerHandler } from '../src/v2/circleAddressAnnounce.js';
+import { makeCircleAddressAnnouncePeerHandler, announceOwnCircleAddress, propagateCircleAddressesAfterJoin } from '../src/v2/circleAddressAnnounce.js';
+import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../src/core/handlers/groupRedeem.js';
+import { createPairRoster } from '../src/v2/pairRoster.js';
+import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { makeRosterUpdatedPeerHandler } from '../src/v2/rosterUpdated.js';
 import { applyRulesUpdates } from '../src/v2/rulesUpdateLane.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
@@ -250,14 +253,47 @@ if (values.enrol) { process.exit(await enrolOnce()); }
 
 // ── The wire ────────────────────────────────────────────────────────────────────────────────────
 let contactChannel = null;
+let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
   // constructor both shells use; only the backing differs, which is the whole of what a shell decides.
   const dmSource = await buildHouseholdDataSource({ path: contentPaths.contactDm }).catch(() => null);
+  // THE PAIR ROSTER (L105), composed as both shells compose it: the hidden two-member circle every written-to
+  // contact gets, made on the first exchange from the circle mechanics — the redeem sender, the admitting side's
+  // hook, the post-join reachability. The box did not speak it until 2026-09-19: a visitor's second message rode
+  // the pair route to a per-circle address the box never registered (the shell-seams guard's first finding).
+  // The redeem sender and the post-join step are composed further down — late-bound here, as on mobile.
+  const pairSeams = { sendPeerRedeem: null, onJoined: null };
+  const pendingPeerRedeems = new Map();
+  pairRoster = createPairRoster({
+    selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
+    callSkill,
+    sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    onJoined: (a) => pairSeams.onJoined?.(a),
+    announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid }),
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    myHandle: async () => { try { return (await callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
+    relayUrl: () => relayUrl,
+  });
   contactChannel = createContactThreadChannel({
-    sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+    pair: pairRoster,
+    sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    // A contact the person hid (on any device — the mark rides the own-devices carry) who writes again comes
+    // back: here that is the book row unhidden, so the carry says so on every device; the screens paint the
+    // marker themselves when the turn reaches them. Hiding is Contacten only — the thread, the pair roster
+    // and their circles never change, so this device stores the turn exactly as it would any other.
+    isHidden: async (contactId) => {
+      const rows = (await callSkill('stoop', 'listContacts', {}))?.contacts ?? [];
+      return rows.some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true);
+    },
+    onReturned: async (contactId) => {
+      await callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false });
+      walkLog({ kind: 'contact-returned', contactId: String(contactId).slice(0, 12) });
+    },
     localActor: 'me',
     // Direct messages are sealed to the PERSON's current key; an enrolled box holds it, handed over at enrol.
     sealFor: agent.contactSeal?.sealFor ?? null,
@@ -330,11 +366,43 @@ if (relayUrl) {
       ?.catch(() => { /* durability is best-effort, as in the shells */ });
   };
 
+  // The redeem pair (the join's wire), as both shells wire it — here for the pair roster: the box founds or joins
+  // the hidden two-member circle with a contact, and admits the contact into one it founded.
+  const sendPeer = (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload));
+  pairSeams.sendPeerRedeem = makeSendGroupRedeemRequest({
+    sendPeer,
+    currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join
+    isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
+    pendingMap:      pendingPeerRedeems,
+    // this device's per-circle address on the redeem path, proven with its own key (source circle == the circle joined)
+    circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
+    signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+  });
+  // After a join: presence in the new circle (the per-circle address on the relay, the announce) and the lanes'
+  // catch-up — `registerCirclePresence` is defined below and runs at connect; a join later re-runs it for the one circle.
+  pairSeams.onJoined = ({ circleId } = {}) => makeCircleReachable({
+    agent, circleId,
+    registerCirclePresence: () => registerCirclePresence([circleId]),
+    pullLanes: (cid) => Promise.allSettled(['membership', 'gov', 'key'].map((k) => lanes.catchUps[k]?.requestCircle?.(cid, { callSkill }))),
+  });
+
   const router = makePeerRouter({
     handlers: {
       ...lanes.handlers,
       [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
       [contactChannel.subtypes.out]: contactChannel.messageHandler(landTurn),
+      // A join request — for the box, a contact joining the pair circle it founded: admit, promote to co-admin
+      // (the pair roster's rule), return the box's proven per-circle address, hand the circle the newcomer's.
+      'group-redeem-request': makeHandleGroupRedeemRequest({
+        callSkill, sendPeer,
+        publishEvent: (e) => walkLog({ kind: 'redeem', ...(e?.type ? { type: e.type } : {}), circleId: e?.circleId ?? e?.groupId ?? null }),
+        onAdmitted: (a) => pairRoster?.onAdmitted?.(a),
+        circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
+        signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+        propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
+        logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} },
+      }),
+      'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap: pendingPeerRedeems }),
       // A member — above all this owner's OTHER device — says where it answers in a circle. Without
       // this the box never learns a sibling's address, its sibling set stays empty, and the fan above
       // has nowhere to go: the one message this device exists to pass on would stop here.
@@ -418,7 +486,7 @@ if (relayUrl) {
       try {
         const { makeThisDevicePrimary } = await import('../src/v2/circleAddressAnnounce.js');
         const r = await makeThisDevicePrimary({ agent, logger: console });
-        walkLog({ kind: 'primary-device', circles: r.circles, announced: r.announced, claimed: r.device?.ok === true });
+        walkLog({ kind: 'primary-device', circles: r.circles, announced: r.announced, claimed: r.device?.ok === true, personAddress: String(agent.personAddress?.() ?? '').slice(0, 12), profile: String(agent.pubKey ?? '').slice(0, 12) });
         console.log(`device-runner: this device is the primary contact address (${r.announced}/${r.circles} circle(s) told; the relays re-registered).`);
       } catch (err) { console.warn('device-runner: could not claim the primary contact address:', err?.message ?? err); }
     }
@@ -447,6 +515,11 @@ if (relayUrl) {
   kick(lanes.catchUps.membership, 'membership', 2500);
   kick(agent.grantsCatchUp, 'grants', 2500);
   kick(agent.knownPeersSync, 'known-peers', 2500);
+  // A hidden mark set on another device of the person lands here and the log says so — the one way a walk
+  // (and a reader of this box's log) can see that "hidden on the phone" reached the box.
+  agent.knownPeersSync?.onLanded?.(({ hiddenChanged }) => {
+    for (const c of hiddenChanged ?? []) walkLog({ kind: 'contact-hidden', contactId: String(c.webid).slice(0, 12), hidden: c.hidden });
+  });
   kick(agent.personKeySync, 'person-key', 2500);
   // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and
   // at boot by asking, as both shells do. (Found by the shell-seams guard on its first run, 2026-09-19.)

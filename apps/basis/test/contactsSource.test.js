@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 
 import { PeerGraph } from '@onderling/core';
 import {
-  listContacts, peerToContactRow, stoopContactToRow, mergeContacts,
+  listContacts, peerToContactRow, stoopContactToRow, mergeContacts, splitShownHidden,
 } from '../src/v2/contactsSource.js';
 
 describe('peerToContactRow', () => {
@@ -78,6 +78,21 @@ describe('listContacts', () => {
     // A read that throws hides nothing either.
     expect((await listContacts(peers, { identityOf: () => { throw new Error('x'); } })).length).toBe(3);
   });
+  it('I am not my own contact: my person-key address, my profile key and my devices\' addresses are never rows (2026-09-19)', async () => {
+    // Measured in the feedback walk: the maker's own PERSON address (the one every device of theirs speaks as to
+    // its siblings — the box's roster-seed parcel, the carried turns) was a nameless row on the maker's Contacten,
+    // sorted by key bytes, and an answer sent to it went nowhere. Frits' phone: "a random string named contact".
+    const peers = new PeerGraph();
+    await peers.upsert({ type: 'native', pubKey: 'k-ann', name: 'Ann' });
+    await peers.upsert({ pubKey: 'me-as-person', transports: { relay: { address: 'me-as-person' } } });   // my own person address, greeted by my box
+    await peers.upsert({ pubKey: 'me-profile' });                                                         // my static profile key
+    await peers.upsert({ pubKey: 'my-box-in-thuis' });                                                    // my box's per-circle address, reached by the fan
+    const own = () => ['me-as-person', 'me-profile', 'my-box-in-thuis'];
+    expect((await listContacts(peers, { ownAddresses: own })).map((r) => r.contactId)).toEqual(['k-ann']);
+    // A device that cannot say what its own addresses are hides nothing (the honest degradation).
+    expect((await listContacts(peers)).length).toBe(4);
+    expect((await listContacts(peers, { ownAddresses: () => { throw new Error('x'); } })).length).toBe(4);
+  });
 });
 
 describe('stoopContactToRow (S1 #2 — member directory)', () => {
@@ -125,6 +140,26 @@ describe('mergeContacts — the peer graph wins the row, the book keeps the NAME
     // A peer row that HAS a name (a bot, a peer that introduced itself) keeps it.
     const [named] = mergeContacts([{ contactId: 'LE1n', name: 'Wil the bot', isBot: true }], stoopRows);
     expect(named.name).toBe('Wil the bot');
+  });
+});
+
+describe('a HIDDEN contact (L106) — the book\'s mark survives the merge, and the roster splits on it', () => {
+  it('the book\'s hidden mark rides the merged row, whatever the peer graph says', () => {
+    const stoopRows = [{ contactId: 'LE1n', name: 'Wilfred', isBot: false, source: 'contact', peerAddr: 'LE1n', hidden: true }];
+    const [row] = mergeContacts([{ contactId: 'LE1n', name: 'LE1n', isBot: false, peerAddr: 'LE1n' }], stoopRows);
+    expect(row.hidden, 'a graph row never un-hides what the book hid').toBe(true);
+    const [alone] = mergeContacts([], stoopRows);
+    expect(alone.hidden).toBe(true);
+    const [shown] = mergeContacts([], [{ ...stoopRows[0], hidden: false }]);
+    expect(shown.hidden).toBe(false);
+  });
+  it('stoopContactToRow carries the mark; splitShownHidden folds the hidden rows away', () => {
+    const row = stoopContactToRow({ webid: 'w', displayName: 'W', hidden: true, hiddenAt: 5 });
+    expect(row.hidden).toBe(true);
+    expect(stoopContactToRow({ webid: 'v', displayName: 'V' }).hidden).toBe(false);
+    const { shown, hidden } = splitShownHidden([row, { contactId: 'v', name: 'V', hidden: false }, { contactId: 'b', name: 'Bot', isBot: true }]);
+    expect(shown.map((r) => r.contactId)).toEqual(['v', 'b']);
+    expect(hidden.map((r) => r.contactId)).toEqual(['w']);
   });
 });
 

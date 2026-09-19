@@ -50,11 +50,15 @@ export function renderContactThread(container, {
   privacy = null,          // per-circle privacy indicator (§10c): { level:'quiet'|'sharing'|'risk', icon, label, pulse? }
   onPrivacyTap = null,     // tap the badge → the surface's why/change affordance (surface.showPrivacy)
   sealed = null,           // what a direct message here is sealed to: { level:'person'|'device', label } (the shared contact seal mark); null = not decided yet
+  hidden = null,           // L106: is this contact hidden from Contacten? true/false paints Verbergen/Tonen; null = not a person (a bot) → no control
+  onToggleHidden = null,   // (hidden: boolean) => void — the person's own act; a message from the contact does the same as `false`
+  contactId = null,        // the thread's key, on the root as data-contact-id — what a probe reads to name the open thread
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactThread.js');
   container.innerHTML = '';
   container.className = 'cc-cthread';
+  if (contactId) container.dataset.contactId = String(contactId);
 
   // ── header ────────────────────────────────────────────────────────────────
   const header = document.createElement('div');
@@ -122,7 +126,25 @@ export function renderContactThread(container, {
     }
     header.appendChild(toggle);
   }
+  // HIDE / SHOW (L106, Frits 2026-09-19): the person takes this contact out of their sight, or back. The row
+  // stays — their circles, this thread and the pair roster untouched — and a message from them brings them back;
+  // the note under the control says exactly that, so nobody hides someone expecting silence (that is Blokkeren).
+  if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
+    const hide = document.createElement('button');
+    hide.type = 'button';
+    hide.className = 'cc-cthread__hide';
+    hide.dataset.hidden = String(hidden);
+    hide.textContent = tr(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide');
+    hide.addEventListener('click', () => onToggleHidden(!hidden));
+    header.appendChild(hide);
+  }
   container.appendChild(header);
+  if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
+    const note = document.createElement('div');
+    note.className = 'cc-cthread__hide-note';
+    note.textContent = tr('circle.contacts.hide_note');
+    container.appendChild(note);
+  }
   // The pre-send floor, said where the participant reads before typing: personal details are removed on
   // this device before a message leaves it. Only for a contact that declared it.
   if (floor && floor.label) {
@@ -136,8 +158,18 @@ export function renderContactThread(container, {
   const log = document.createElement('div');
   log.className = 'cc-cthread__log';
   for (const m of messages) {
+    // The turn that brought a hidden contact back carries the mark (`returned`, decided where it first landed
+    // and stored with the turn): a SYSTEM line above its bubble — "Je had dit contact verborgen." — so the person
+    // understands why someone they removed is back in their list. Neither side's bubble.
+    if (m.returned === true) {
+      const sys = document.createElement('div');
+      sys.className = 'cc-cthread__system';
+      sys.textContent = tr('circle.contacts.returned_marker');
+      log.appendChild(sys);
+    }
     const row = document.createElement('div');
-    row.className = `cc-cthread__msg cc-cthread__msg--${m.origin === 'user' ? 'user' : 'bot'}`;
+    const side = m.origin === 'user' ? 'user' : 'bot';
+    row.className = `cc-cthread__msg cc-cthread__msg--${side}`;
     if (m.pending) row.classList.add('is-pending');
     const bubble = document.createElement('div');
     bubble.className = 'cc-cthread__bubble';

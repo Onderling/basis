@@ -1846,6 +1846,24 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
   });
   const ownDeviceSiblings = async () => (await ownDeviceSiblingRows()).map((d) => d.address);
+  // EVERY ADDRESS THIS PERSON'S DEVICES SPEAK AS — the person-key address (shared by all my devices), the static
+  // profile key, this device's per-circle addresses, my siblings' per-circle addresses. What a roster reads to
+  // keep me out of my own Contacten: each of these reaches the peer graph as "someone greeted/reached", and none
+  // resolves to a roster member (2026-09-19: the maker's own person address was a nameless row on their laptop).
+  const ownAddresses = async () => {
+    const out = new Set([personAddress(), chatId.pubKey].filter(Boolean));
+    let rows = [];
+    try { rows = await ownDeviceSiblingRows(); } catch { rows = []; }
+    for (const d of rows) { if (d?.address) out.add(d.address); if (d?.circleId) { const mine = circleAddressFor(d.circleId); if (mine) out.add(mine); } }
+    try {
+      for (const c of ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])) {
+        const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
+        const mine = id ? circleAddressFor(id) : null;
+        if (mine) out.add(mine);
+      }
+    } catch { /* the person and sibling addresses alone still serve */ }
+    return [...out];
+  };
   // A DEVICE SPEAKS TO ITS SIBLING IN THE CIRCLE THEY SHARE — as this device's own address there, to
   // the sibling's. Never as the profile key: every device of the person holds it, a revoked one too,
   // and on a relay the profile address is whichever device registered it last, so a greeting answered
@@ -2087,6 +2105,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     contacts: {
       has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
       add: (contact) => rawStoop('addContact', contact),
+      get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
+      // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
+      setHidden: (webid, hidden, hiddenAt) => rawStoop('setContactHidden', { webid, hidden, hiddenAt }),
     },
     onLanded: () => savePeerBindings(),
   });
@@ -4230,6 +4251,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
       }
+      // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
+      // next catch-up. The landing side keeps the newer mark, so a hide and a show that cross resolve the same
+      // way everywhere.
+      if (realOpId === 'setContactHidden' && rawReply?.contact) {
+        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
       // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
       //
       // Joining wrote this record (the join wizard, after the redeem) and creating never did, so the
@@ -5751,6 +5778,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     personAddress,
     /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */
     ownAddressBindings,
+    /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
+    ownAddresses,
 
     /**
      * Presence hook for the delivery guarantee — call when a peer becomes

@@ -28,6 +28,10 @@ export const SEAMS = Object.freeze([
   // the scoping is reviewed, not assumed.
   { id: 'contact-channel-notes-the-sender', pattern: /notePeer:/,               shells: ['web', 'mobile'], why: 'whoever writes to me becomes a row in Contacten — direct or carried (2026-09-18: a carried turn with no row)' },
   { id: 'contact-channel-keys-by-identity', pattern: /identityOf:\s*\(addr\)/,  why: 'a thread is keyed by the person, whatever address the message came from (2026-09-19: the box keyed by the wire address)' },
+  // Hiding a contact (L106) is on every device: the box must know who is hidden (it never carries a hidden row
+  // back as shown) and must unhide when they write, or the laptop and the phone would disagree with it.
+  { id: 'contact-channel-hidden',   pattern: /isHidden:/,                        why: 'a hidden contact who writes again comes back — the shell tells the channel who is hidden…' },
+  { id: 'contact-channel-returned', pattern: /onReturned:/,                      why: '…and what to do when one of them lands a turn: unhide the row (and, where there is a screen, mark the thread)' },
   { id: 'pair-roster',           pattern: /createPairRoster\(/,                 why: 'the hidden two-member circle every written-to contact gets; DMs ride it (L105)' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
   { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
@@ -45,10 +49,7 @@ export const SHELLS = Object.freeze([
 ]);
 
 /** Gaps a shell is known to have, each with what closes it. Remove the entry when the seam lands. */
-export const BASELINE = Object.freeze([
-  { shell: 'box', seam: 'pair-roster',        closes: 'plans/BRIEF-for-opus-2026-09-19.md §3 — the box speaks the pair roster' },
-  { shell: 'box', seam: 'pair-roster-admits', closes: 'plans/BRIEF-for-opus-2026-09-19.md §3 — the box speaks the pair roster' },
-]);
+export const BASELINE = Object.freeze([]);
 
 /** Source with comments removed — a comment that EXPLAINS a seam is not the seam. */
 export const code = (src) => String(src).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

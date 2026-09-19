@@ -142,9 +142,16 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     });
     const visitorConsole = [];
     visitor.page.on('console', (m) => { const t = m.text(); if (/contact|relay|secure-agent|refus|unhandled|HI|seal|pair|turn/i.test(t) && !/strict mode|listContacts/.test(t)) visitorConsole.push(t.slice(0, 220)); });
+    // What the maker's Contacten offers before answering: a second person row (an own device's per-circle
+    // address the resolver does not know) sorts by key bytes, and "the first person" is then a coin flip.
+    await gotoCircles(maker.page);
+    await maker.page.locator('[data-tab="contacten"]').first().click();
+    await maker.page.waitForTimeout(1500);
+    const makerRows = await maker.page.evaluate(() => [...document.querySelectorAll('.cc-contacts__row')].map((r) => `${r.dataset.contactId?.slice(0, 12)}${r.classList.contains('cc-contacts__row--bot') ? '(bot)' : ''}`)).catch(() => null);
     const reply = `dank je, ik kijk ernaar ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });
     expect(answered.sent, `the maker could not answer: ${answered.why}`).toBe(true);
+    log('STEP5a the maker answered', 'INFO', `to ${String(answered.to).slice(0, 12)}… (visitor ${String(visitorId).slice(0, 12)}…); Contacten rows: ${JSON.stringify(makerRows)}`);
     const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 12, every: 3000 });
     if (!back.painted) {
       const outcomes = await maker.page.evaluate(() => window.__sendOutcomes ?? null).catch((e) => String(e));

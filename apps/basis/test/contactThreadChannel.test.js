@@ -70,9 +70,28 @@ describe('createContactThreadChannel — replyHandler via the real peer router',
 
     expect(onReply).toHaveBeenCalledTimes(1);
     expect(onReply).toHaveBeenCalledWith({
-      fromAddr: 'bot-addr', threadId: 'thread-1', text: 'bedankt!',
+      fromAddr: 'bot-addr', contactId: 'bot-addr', threadId: 'thread-1', text: 'bedankt!',
       buttons: [{ id: 'send', label: 'Versturen' }], replyTo: 'm-1', messageId: 'r-1',
     });
+  });
+
+  it('names the PERSON behind the sender address (2026-09-19): a turn over the pair route arrives from a per-circle address, and the thread is theirs', async () => {
+    // Measured on real screens: two web users share contacts; B's first message (to A's profile address, from
+    // B's own) landed in the thread keyed by B; B's second rode the pair route from B's per-circle address and
+    // landed in a thread keyed by THAT address — which no row opens, since the roster folds it under B. Every
+    // message after the first was invisible. The channel resolves the sender through the shell's `identityOf`
+    // (the same read the carried path uses) and hands the shell `contactId` = the person; unknown ⇒ the address.
+    const identityOf = (a) => (a === 'bea-in-pair' ? 'bea' : a);
+    const onMsg = vi.fn();
+    const store = { items: [], addItems: vi.fn(async (d) => { const p = d.map((x, i) => ({ id: `i${store.items.length + i}`, ...x })); store.items.push(...p); return p; }), listOpen: vi.fn(async () => store.items) };
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, identityOf, itemStore: store });
+    const router = makePeerRouter({ handlers: { [ch.subtypes.out]: ch.messageHandler(onMsg) } });
+    await router({ from: 'bea-in-pair', payload: { subtype: ch.subtypes.out, threadId: 'me', text: 'tweede', messageId: 'm2' } });
+    expect(onMsg).toHaveBeenCalledWith(expect.objectContaining({ fromAddr: 'bea-in-pair', contactId: 'bea', text: 'tweede' }));
+    // …and a shell that persists with the ADDRESS as the key (the older shape) is corrected the same way
+    await ch.persistInbound({ contactId: 'bea-in-pair', fromAddr: 'bea-in-pair', text: 'tweede', messageId: 'm2', ts: 2 });
+    expect((await ch.rehydrate('bea')).map((t) => t.text), 'the turn is in the thread keyed by the person').toEqual(['tweede']);
+    expect(await ch.rehydrate('bea-in-pair')).toEqual([]);
   });
 
   it('ignores a foreign subtype (the handler is a no-op for non-matching payloads)', () => {

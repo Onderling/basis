@@ -91,6 +91,29 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(seen.found, 'B\'s message never reached A — see "STEP3 diagnostics"').toBe(true);
     expect(seen.painted, 'reached A but not painted').toBe(true);
     log('STEP3 B writes, A sees it', 'PASS', `row ${String(seen.contactId).slice(0, 12)}…`);
+
+    // ── B writes AGAIN, once the pair roster has formed: this one rides the pair route, from B's per-circle
+    // address. It must land in the SAME thread — the one keyed by B — not in one keyed by an address no row opens.
+    await B.page.waitForTimeout(6000);
+    const second = `en nog een, over de pair-route ${Date.now().toString(36)}`;
+    const sent2 = await sendDirectMessage(B.page, second, { to: aId });
+    expect(sent2.sent, `B could not write again: ${sent2.why}`).toBe(true);
+    const seen2 = await waitForContactMessageDetailed(A.page, second, { tries: 12, every: 3000 });
+    if (!seen2.painted) {
+      const outcomes = await B.page.evaluate(() => window.__sendOutcomes ?? null).catch((e) => String(e));
+      const aHolds = await A.page.evaluate(async (m) => {
+        const peers = ((await window.onderlingPeers?.all?.()) ?? []).map((p) => p.pubKey ?? p.id);
+        const threads = {};
+        for (const id of peers) { try { threads[String(id).slice(0, 12)] = ((await window.onderlingContactChannel?.rehydrate?.(id)) ?? []).map((t) => `${t.origin}:${String(t.text).slice(0, 20)}`); } catch (e) { threads[String(id).slice(0, 12)] = String(e); } }
+        const resolves = {}; for (const id of peers) resolves[String(id).slice(0, 12)] = String(window.onderlingIdentityOf?.(id) ?? null).slice(0, 12);
+        return { peers: peers.map((r) => String(r).slice(0, 12)), resolves, threads, m };
+      }, second).catch((e) => String(e));
+      console.log(`### STEP4 diagnostics\nB sent: ${JSON.stringify(outcomes)}\nA holds: ${JSON.stringify(aHolds)}`);
+    }
+    expect(seen2.found, 'B\'s second message (over the pair route) never reached A — see "STEP4 diagnostics"').toBe(true);
+    expect(seen2.painted, 'B\'s second message is on A\'s device but NOT on the screen — stored under an address no row opens (the direct path keyed by the sender address, not the person)').toBe(true);
+    expect(seen2.contactId, 'the same thread as the first message').toBe(seen.contactId);
+    log('STEP4 the second message', 'PASS', 'same thread, painted');
   } finally {
     await teardown([A, B].filter(Boolean));
   }

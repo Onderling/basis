@@ -2191,6 +2191,10 @@ function buildCircleBot(agent) {
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,
     pair: circlePairRoster,
+    // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included
+    notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
+    // a carried turn lands in the thread THIS device keys by identity, whatever address the sibling keyed it by
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
     // this device's per-circle address there, which is the only key the pair roster admits
     sendToPeer: (addr, payload, opts) =>

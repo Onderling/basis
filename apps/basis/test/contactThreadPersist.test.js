@@ -295,3 +295,50 @@ describe('this device\'s selection (sync-policy §11): hold nothing still carry;
     expect(fanned).toHaveLength(0);
   });
 });
+
+describe('a turn CARRIED by my own device from someone this device never met', () => {
+  // The alpha's feedback path, 2026-09-18: a fresh install wrote to the seeded contact; the box (the primary
+  // device) took it and carried it to the maker's web app, whose log said "delivered". The web app stored the
+  // turn — and showed nothing: Contacten lists the peer graph and the book, the direct-DM handlers put a new
+  // sender in the graph (`notePeer`), the carried path did not. A thread nobody can open is a message nobody
+  // reads. The channel now tells the shell about the sender the same way on both paths.
+  it('makes the sender a contact row — notePeer is called, once, with the sender\'s address', async () => {
+    const noted = [];
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), notePeer: (addr) => { noted.push(addr); } });
+    const landed = await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'visitor-K', fromAddr: 'visitor-K', text: 'hoi Wilfred', messageId: 'c1', ts: 1 });
+    expect(landed.deduped).toBe(false);
+    expect(noted, 'the carried sender becomes a contact row').toEqual(['visitor-K']);
+    // The same turn carried twice (two sibling devices fanned it) notes the sender once.
+    const again = await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'visitor-K', fromAddr: 'visitor-K', text: 'hoi Wilfred', messageId: 'c1', ts: 1 });
+    expect(again.deduped).toBe(true);
+    expect(noted).toEqual(['visitor-K']);
+    // My own outbound turn carried from another of my devices notes nobody: the contact is already mine.
+    await ch.applyOwnDeviceTurn({ direction: 'out', contactId: 'friend-F', peerAddr: 'friend-F', text: 'dag', messageId: 'o1', ts: 2 });
+    expect(noted).toEqual(['visitor-K']);
+  });
+
+  it('a directly received turn notes the sender through the same seam', async () => {
+    const noted = [];
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), notePeer: (addr) => { noted.push(addr); } });
+    await ch.persistInbound({ contactId: 'peer-B', fromAddr: 'peer-B', text: 'hallo', messageId: 'd1', ts: 3 });
+    expect(noted).toEqual(['peer-B']);
+  });
+});
+
+describe('a carried turn lands in the thread THIS device keys by identity', () => {
+  // Two devices of one person may key the same contact differently: the box keyed the visitor's thread by the
+  // wire address the message came from (the visitor's person-key address), the web app keys threads by
+  // identity (the visitor's profile address) — Frits' rule of 2026-09-03. The carried turn then landed on
+  // the web app under a key its Contacten row never opens (2026-09-19, the browser walk of the feedback
+  // path: "maker was handed contactId 58gT…, the row is 8Zcy…"). On landing, the channel resolves the
+  // sibling's key through the shell's `identityOf`, so every device of the person opens the same thread.
+  it('resolves the sibling\'s contactId through identityOf; notes the resolved person; rehydrates under it', async () => {
+    const noted = [];
+    const identityOf = (a) => (a === 'visitor-person-key-addr' ? 'visitor-profile' : a);
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), notePeer: (a) => { noted.push(a); }, identityOf });
+    const landed = await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'visitor-person-key-addr', fromAddr: 'visitor-person-key-addr', text: 'hoi Wilfred', messageId: 'k1', ts: 1 });
+    expect(landed.contactId, 'the landed turn names the identity-keyed thread').toBe('visitor-profile');
+    expect((await ch.rehydrate('visitor-profile')).map((t) => t.text)).toEqual(['hoi Wilfred']);
+    expect(noted).toEqual(['visitor-profile']);
+  });
+});

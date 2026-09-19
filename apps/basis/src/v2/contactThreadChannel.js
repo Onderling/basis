@@ -92,7 +92,18 @@ export function createContactThreadChannel({
   // `onRequest(fromAddr)` land the other side's. Inside the seal when the turn is sealed; a turn with only the
   // roster material and no text is consumed here and never shown.
   pair = null,
+  // THE SENDER BECOMES A CONTACT ROW: `(address) => void`, the shell's peer-graph upsert — what Contacten lists.
+  // Called for every inbound turn that lands, whether it arrived directly or CARRIED by one of my own devices.
+  // Until 2026-09-18 only the direct handlers did this, so a turn the box took and carried to the web app was
+  // stored under a sender the roster had no row for: a thread nobody could open, a message nobody read.
+  notePeer = null,
+  // THE THREAD KEY IS THE PERSON: `(address) => identity`, the shell's read of who is behind an address (its
+  // rosters, its contact book). A sibling may have keyed a thread by the wire address a message came from — the
+  // box, by the visitor's person-key address — while this device keys by identity (Frits, 2026-09-03); a carried
+  // turn is resolved through it on landing, so every device of the person opens the same thread (2026-09-19).
+  identityOf = null,
 } = {}) {
+  const resolveId = (id) => { if (typeof identityOf !== 'function' || !id) return id; try { return identityOf(id) || id; } catch { return id; } };
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
   const fileToKeep = (file) => {
@@ -275,6 +286,11 @@ export function createContactThreadChannel({
     // its siblings and stores nothing — the turn is not lost, it lives on the devices that hold the silo.
     const persisted = holdsHere() ? Promise.resolve(core.persistInbound(envelope, { to: fromAddr })) : Promise.resolve({ itemId: null, held: false });
     return persisted.then(async (res) => {
+      // A turn that landed makes its sender a row — once; a duplicate was noted when it first landed. The row
+      // is the PERSON (the thread's key), not whichever address the message came from.
+      if (!res?.deduped && typeof notePeer === 'function' && (contactId || fromAddr)) {
+        try { await notePeer(contactId || fromAddr); } catch { /* the row is a convenience; the turn is stored regardless */ }
+      }
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
@@ -332,7 +348,8 @@ export function createContactThreadChannel({
    *   fromAddr?: string }>}
    */
   async function applyOwnDeviceTurn(wire = {}) {
-    const { direction, contactId, peerAddr, fromAddr, text = '', messageId, replyTo, ts, buttons, file } = wire;
+    const { direction, peerAddr, fromAddr, text = '', messageId, replyTo, ts, buttons, file } = wire;
+    const contactId = resolveId(wire.contactId);
     const outbound = direction === 'out';
     const res = outbound
       ? await persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, viaOwnDevice: true })

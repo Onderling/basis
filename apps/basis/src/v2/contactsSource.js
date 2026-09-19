@@ -68,7 +68,22 @@ export function stoopContactToRow(c) {
     tags:       Array.isArray(c.tags) ? c.tags : [],
     // The pair roster (L105): once it exists the row says "verbonden"; before, nothing.
     pairCircleId: typeof c.pairCircleId === 'string' && c.pairCircleId ? c.pairCircleId : null,
+    // Hidden (L106): the person took this contact out of their sight. The row stays — their circles, the thread and
+    // the pair roster untouched — Contacten folds it away, and their next message brings them back.
+    hidden:     c.hidden === true,
   };
+}
+
+/**
+ * The roster in two: what Contacten lists, and what it folds away at the bottom ("verborgen (n)"). A bot is never
+ * hidden here (a bot is removed, not hidden — a different act with a different word).
+ * @param {Array<object>} rows
+ * @returns {{ shown: Array<object>, hidden: Array<object> }}
+ */
+export function splitShownHidden(rows = []) {
+  const shown = []; const hidden = [];
+  for (const r of rows ?? []) { if (r?.hidden === true && !r.isBot) hidden.push(r); else shown.push(r); }
+  return { shown, hidden };
 }
 
 /** Bots first, then people; alphabetical within each. Deterministic ordering. */
@@ -105,6 +120,8 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
       ...(nameless && book.name && book.name !== book.contactId ? { name: book.name } : {}),
       ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}),
       ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}),
+      // the hidden mark is the book's alone — a graph row (a greeting, a first message) never un-hides what the person hid
+      ...(book.hidden === true ? { hidden: true } : {}),
     } : r);
   }
   return sortContactRows([...byId.values()]);

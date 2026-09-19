@@ -144,3 +144,32 @@ describe('renderContactThread', () => {
     expect(el.querySelector('.cc-cthread__skills')).toBeNull();
   });
 });
+
+describe('Verbergen / Tonen in the thread header (L106)', () => {
+  it('a shown contact gets Verbergen and the scope note; the tap asks to hide', () => {
+    const onToggleHidden = vi.fn();
+    const el = renderContactThread(document.createElement('div'), { name: 'Wilfred', t, hidden: false, onToggleHidden });
+    const btn = el.querySelector('.cc-cthread__hide');
+    expect(btn.textContent).toBe('circle.contacts.hide');
+    expect(el.querySelector('.cc-cthread__hide-note').textContent, 'what hiding is and is not, said where the control is').toBe('circle.contacts.hide_note');
+    btn.click();
+    expect(onToggleHidden).toHaveBeenCalledWith(true);
+  });
+  it('a hidden contact gets Tonen; the tap asks to show', () => {
+    const onToggleHidden = vi.fn();
+    const el = renderContactThread(document.createElement('div'), { name: 'Wilfred', t, hidden: true, onToggleHidden });
+    const btn = el.querySelector('.cc-cthread__hide');
+    expect(btn.textContent).toBe('circle.contacts.unhide');
+    btn.click();
+    expect(onToggleHidden).toHaveBeenCalledWith(false);
+  });
+  it('a bot thread, or a caller without the seam, has no control', () => {
+    expect(renderContactThread(document.createElement('div'), { name: 'Bot', t }).querySelector('.cc-cthread__hide')).toBe(null);
+  });
+  it('the returned marker paints as a system line in the thread', () => {
+    const el = renderContactThread(document.createElement('div'), { name: 'W', t, messages: [{ origin: 'system', text: 'circle.contacts.returned_marker' }, { origin: 'bot', text: 'hoi' }] });
+    const sys = el.querySelector('.cc-cthread__msg--system');
+    expect(sys, 'a system line, not a bubble from either side').toBeTruthy();
+    expect(sys.textContent).toContain('circle.contacts.returned_marker');
+  });
+});

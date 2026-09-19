@@ -2087,6 +2087,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     contacts: {
       has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
       add: (contact) => rawStoop('addContact', contact),
+      get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
+      // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
+      setHidden: (webid, hidden, hiddenAt) => rawStoop('setContactHidden', { webid, hidden, hiddenAt }),
     },
     onLanded: () => savePeerBindings(),
   });
@@ -4228,6 +4231,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
       // is a contact on the person's other devices too. Best-effort and after success.
       if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
+        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
+      // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
+      // next catch-up. The landing side keeps the newer mark, so a hide and a show that cross resolve the same
+      // way everywhere.
+      if (realOpId === 'setContactHidden' && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
       }
       // MAKING a circle puts you in it, so it belongs in the list a restore reads back.

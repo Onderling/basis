@@ -342,3 +342,37 @@ describe('a carried turn lands in the thread THIS device keys by identity', () =
     expect(noted).toEqual(['visitor-profile']);
   });
 });
+
+describe('a hidden contact who writes again comes back (L106) — one seam, both paths', () => {
+  // Frits, 2026-09-19: hidden, not blocked — "requiring the other person to text you again to become activated
+  // again". The channel does not know the book; the shell hands in `isHidden(contactId)` and `onReturned(contactId)`.
+  // A turn that LANDS from a hidden contact — directly or carried by my own device — fires onReturned once; the
+  // shell unhides the row, paints the thread and its one-line marker. A visible contact fires nothing.
+  it('fires onReturned once for a hidden sender on the direct path', async () => {
+    const returned = [];
+    const hidden = new Set(['bob']);
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), isHidden: (id) => hidden.has(id), onReturned: (id) => { returned.push(id); hidden.delete(id); } });
+    await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'hoi', messageId: 'r1', ts: 1 });
+    expect(returned).toEqual(['bob']);
+    await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'nog eens', messageId: 'r2', ts: 2 });
+    expect(returned, 'shown now — a second message does not fire again').toEqual(['bob']);
+    await ch.persistInbound({ contactId: 'carl', fromAddr: 'carl', text: 'dag', messageId: 'r3', ts: 3 });
+    expect(returned, 'a visible contact fires nothing').toEqual(['bob']);
+  });
+  it('fires onReturned for a hidden sender on the CARRIED path, keyed by the identity the shell resolves', async () => {
+    const returned = [];
+    const hidden = new Set(['bob-profile']);
+    const identityOf = (a) => (a === 'bob-person-key' ? 'bob-profile' : a);
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), identityOf, isHidden: (id) => hidden.has(id), onReturned: (id) => { returned.push(id); hidden.delete(id); } });
+    await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'bob-person-key', fromAddr: 'bob-person-key', text: 'hoi', messageId: 'c1', ts: 1 });
+    expect(returned).toEqual(['bob-profile']);
+    // The same turn carried again (a second sibling) is deduped and fires nothing.
+    await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'bob-person-key', fromAddr: 'bob-person-key', text: 'hoi', messageId: 'c1', ts: 1 });
+    expect(returned).toEqual(['bob-profile']);
+    // My own outbound turn to a hidden contact (I wrote to them from another device) does not bring them back —
+    // only THEIR message does; writing to someone you hid is your own act, and Tonen is the word for it.
+    hidden.add('dave');
+    await ch.applyOwnDeviceTurn({ direction: 'out', contactId: 'dave', peerAddr: 'dave', text: 'hey', messageId: 'o1', ts: 2 });
+    expect(returned).toEqual(['bob-profile']);
+  });
+});

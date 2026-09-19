@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 
 import { PeerGraph } from '@onderling/core';
 import {
-  listContacts, peerToContactRow, stoopContactToRow, mergeContacts,
+  listContacts, peerToContactRow, stoopContactToRow, mergeContacts, splitShownHidden,
 } from '../src/v2/contactsSource.js';
 
 describe('peerToContactRow', () => {
@@ -125,6 +125,26 @@ describe('mergeContacts — the peer graph wins the row, the book keeps the NAME
     // A peer row that HAS a name (a bot, a peer that introduced itself) keeps it.
     const [named] = mergeContacts([{ contactId: 'LE1n', name: 'Wil the bot', isBot: true }], stoopRows);
     expect(named.name).toBe('Wil the bot');
+  });
+});
+
+describe('a HIDDEN contact (L106) — the book\'s mark survives the merge, and the roster splits on it', () => {
+  it('the book\'s hidden mark rides the merged row, whatever the peer graph says', () => {
+    const stoopRows = [{ contactId: 'LE1n', name: 'Wilfred', isBot: false, source: 'contact', peerAddr: 'LE1n', hidden: true }];
+    const [row] = mergeContacts([{ contactId: 'LE1n', name: 'LE1n', isBot: false, peerAddr: 'LE1n' }], stoopRows);
+    expect(row.hidden, 'a graph row never un-hides what the book hid').toBe(true);
+    const [alone] = mergeContacts([], stoopRows);
+    expect(alone.hidden).toBe(true);
+    const [shown] = mergeContacts([], [{ ...stoopRows[0], hidden: false }]);
+    expect(shown.hidden).toBe(false);
+  });
+  it('stoopContactToRow carries the mark; splitShownHidden folds the hidden rows away', () => {
+    const row = stoopContactToRow({ webid: 'w', displayName: 'W', hidden: true, hiddenAt: 5 });
+    expect(row.hidden).toBe(true);
+    expect(stoopContactToRow({ webid: 'v', displayName: 'V' }).hidden).toBe(false);
+    const { shown, hidden } = splitShownHidden([row, { contactId: 'v', name: 'V', hidden: false }, { contactId: 'b', name: 'Bot', isBot: true }]);
+    expect(shown.map((r) => r.contactId)).toEqual(['v', 'b']);
+    expect(hidden.map((r) => r.contactId)).toEqual(['w']);
   });
 });
 

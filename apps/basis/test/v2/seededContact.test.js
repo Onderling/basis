@@ -46,6 +46,21 @@ describe('the seeded contact', () => {
     expect(none.calls).toEqual([]);
   });
 
+  it('a HIDDEN seeded contact stays hidden across launches — the seed sees them in the book and adds nothing (L106)', async () => {
+    // Frits hides Wilfred; the next boot must not put Wilfred back. A hidden row is still a row in the book, so
+    // "already known" covers it — asserted here so a future "skip hidden rows in listContacts" cannot quietly
+    // reopen the seed. The seed reads the book through the roster's own fields.
+    const calls = [];
+    const callSkill = async (app, op, args) => {
+      calls.push({ app, op, args });
+      if (op === 'listContacts') return { items: [{ webid: 'frits-key', hidden: true }], contacts: [{ webid: 'frits-key', hidden: true, hiddenAt: 5 }] };
+      if (op === 'addContactFromQr') throw new Error('must not re-add a hidden contact');
+      return {};
+    };
+    expect(await seedContactCard({ payload: FRITS, callSkill })).toEqual({ seeded: false, reason: 'already-known', webid: 'frits-key' });
+    expect(calls.map((c) => c.op)).toEqual(['listContacts']);
+  });
+
   it('a refusal from the book is reported, not thrown', async () => {
     const r = rig();
     r.callSkill = async (app, op) => (op === 'listContacts' ? { items: [] } : { error: 'no-contacts' });

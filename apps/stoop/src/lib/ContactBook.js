@@ -123,6 +123,23 @@ export function createContactBook({ members, dataSource }) {
     return members.addMember({ ...existing, relation: 'contact', trustLevel: level });
   }
 
+  /**
+   * Hide a contact from sight, or show them again — the row stays either way (L106, 2026-09-19). A re-added
+   * card leaves the mark alone (`addContact` merges over the existing row); only this, or a message from them,
+   * changes it. `hiddenAt` records the change in both directions, so a device that learns of a newer change
+   * from a sibling can tell it is newer.
+   *
+   * @param {string} webid
+   * @param {boolean} hidden
+   */
+  async function setHidden(webid, hidden, hiddenAt = Date.now()) {
+    if (typeof hidden !== 'boolean') throw new TypeError('setHidden: hidden must be boolean');
+    if (!Number.isFinite(hiddenAt)) throw new TypeError('setHidden: hiddenAt must be a time');
+    const existing = await members.resolveByWebid(webid);
+    if (!existing) throw new Error('setHidden: contact not found');
+    return members.addMember({ ...existing, relation: 'contact', hidden, hiddenAt });
+  }
+
   async function setTags(webid, tags) {
     if (!Array.isArray(tags)) throw new TypeError('setTags: tags array required');
     const existing = await members.resolveByWebid(webid);
@@ -258,6 +275,7 @@ export function createContactBook({ members, dataSource }) {
     addContact,
     removeContact,
     setTrustLevel,
+    setHidden,
     setTags,
     setFlag,
     listContacts,

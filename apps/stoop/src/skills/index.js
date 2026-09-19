@@ -5172,6 +5172,22 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
+    /** setContactHidden({webid, hidden}) — hide a contact from sight, or show them again (L106). */
+    defineSkill('setContactHidden', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.contacts) return { error: 'no-contacts' };
+      try {
+        // `hiddenAt` is a landing's (a sibling's newer change carried here); a person's own tap has none and gets now.
+        const m = await bundle.contacts.setHidden(a.webid, a.hidden === true, Number.isFinite(a.hiddenAt) ? a.hiddenAt : Date.now());
+        return { contact: m };
+      } catch (err) {
+        return { error: err?.message ?? String(err) };
+      }
+    }, {
+      description: 'Hide a contact from Contacten (the row stays; their next message brings them back), or show them again.',
+      visibility:  'authenticated',
+    }),
+
     /** setContactTags({webid, tags: string[]}) */
     defineSkill('setContactTags', async ({ parts }) => {
       const a = dataArgs(parts);

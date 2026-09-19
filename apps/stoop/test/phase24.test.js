@@ -109,6 +109,31 @@ describe('Stoop V2 Phase 24 — ContactBook', () => {
     expect(c.tags).toEqual(['koor', 'familie']);
   });
 
+  it('setContactHidden marks the row, with WHEN, and a re-scan of their card leaves it hidden (L106, 2026-09-19)', async () => {
+    // Hidden, not deleted: the row stays (thread, pair roster, keys untouched), Contacten folds it away, and the
+    // contact's next message brings them back — the shells decide that; the book only holds the fact and its time
+    // (the time is what lets two devices of the person agree on the newer of two marks).
+    const { bundle } = await buildBundle();
+    await callSkill(bundle.agent, 'addContact', { webid: BOB });
+    const before = Date.now();
+    const r = await callSkill(bundle.agent, 'setContactHidden', { webid: BOB, hidden: true });
+    expect(r.contact.hidden).toBe(true);
+    expect(r.contact.hiddenAt).toBeGreaterThanOrEqual(before);
+    let c = (await callSkill(bundle.agent, 'listContacts', {})).contacts.find((x) => x.webid === BOB);
+    expect(c.hidden).toBe(true);
+    // A re-scan of their card is not a message from them: the row stays hidden.
+    await callSkill(bundle.agent, 'addContact', { webid: BOB, displayName: 'Bob again' });
+    c = (await callSkill(bundle.agent, 'listContacts', {})).contacts.find((x) => x.webid === BOB);
+    expect(c.hidden, 'adding an already-known contact again does not unhide them').toBe(true);
+    expect(c.displayName).toBe('Bob again');
+    // Shown again: the mark goes, the time stays as the moment of that change.
+    const shown = await callSkill(bundle.agent, 'setContactHidden', { webid: BOB, hidden: false });
+    expect(shown.contact.hidden).toBe(false);
+    expect(shown.contact.hiddenAt).toBeGreaterThanOrEqual(r.contact.hiddenAt);
+    // An unknown contact is an error, not a silent row.
+    expect((await callSkill(bundle.agent, 'setContactHidden', { webid: 'https://id.example/nobody', hidden: true })).error).toMatch(/not found/);
+  });
+
   it('listContacts({minTrust: vertrouwd}) filters', async () => {
     const { bundle } = await buildBundle();
     await callSkill(bundle.agent, 'addContact', { webid: 'https://id.example/c1', trustLevel: 'bekend' });

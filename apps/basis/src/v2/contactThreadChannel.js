@@ -102,7 +102,18 @@ export function createContactThreadChannel({
   // box, by the visitor's person-key address — while this device keys by identity (Frits, 2026-09-03); a carried
   // turn is resolved through it on landing, so every device of the person opens the same thread (2026-09-19).
   identityOf = null,
+  // A HIDDEN CONTACT WHO WRITES AGAIN COMES BACK (L106, Frits 2026-09-19: "requiring the other person to text you
+  // again to become activated again"). The channel does not know the book: the shell hands in `isHidden(contactId)`
+  // and `onReturned(contactId)`. A turn that LANDS from a hidden contact — directly, or carried by my own device —
+  // calls `onReturned` once; the shell unhides the row and paints the thread with its one-line marker. My own
+  // outbound turn to someone I hid brings nobody back: that is my act, and Tonen is its word.
+  isHidden = null,
+  onReturned = null,
 } = {}) {
+  const returnedIfHidden = async (contactId) => {
+    if (typeof isHidden !== 'function' || typeof onReturned !== 'function' || !contactId) return;
+    try { if (await isHidden(contactId)) await onReturned(contactId); } catch { /* the row is a convenience; the turn is stored regardless */ }
+  };
   const resolveId = (id) => { if (typeof identityOf !== 'function' || !id) return id; try { return identityOf(id) || id; } catch { return id; } };
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
@@ -291,6 +302,8 @@ export function createContactThreadChannel({
       if (!res?.deduped && typeof notePeer === 'function' && (contactId || fromAddr)) {
         try { await notePeer(contactId || fromAddr); } catch { /* the row is a convenience; the turn is stored regardless */ }
       }
+      // …and a landed turn from a contact the person had hidden brings that contact back (both paths share this).
+      if (!res?.deduped) await returnedIfHidden(contactId || fromAddr);
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {

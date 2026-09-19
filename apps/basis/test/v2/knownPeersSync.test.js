@@ -30,6 +30,8 @@ function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book =
     contacts: {
       has: async (webid) => book.has(webid),
       add: async (c) => { book.set(c.webid, c); },
+      get: async (webid) => book.get(webid) ?? null,
+      setHidden: async (webid, hidden, hiddenAt) => { book.set(webid, { ...book.get(webid), hidden, hiddenAt }); },
     },
     onLanded: (s) => landed.push(s),
     onRefused: (reason, from) => refused.push({ reason, from }),
@@ -38,6 +40,11 @@ function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book =
 }
 
 describe('the wire', () => {
+  it('the hidden mark and its time are contact fields that cross', () => {
+    const w = knownPeersToWire({ contacts: [{ webid: 'w', hidden: true, hiddenAt: 5, secret: 'no' }] });
+    expect(w.contacts[0]).toEqual({ webid: 'w', hidden: true, hiddenAt: 5 });
+  });
+
   it('carries bindings and the contact fields another device needs, and drops what is malformed', () => {
     const wire = knownPeersToWire({
       peers: [{ address: 'a', pubKey: 'k' }, { address: '', pubKey: 'k' }, null, { address: 'b' }],
@@ -77,6 +84,39 @@ describe('landing', () => {
     expect(r.book.get('w-old').displayName, 'each device\'s own edits stand').toBe('my edit');
     expect(r.landed[0]).toMatchObject({ established: 0, contactsAdded: 1 });
   });
+  it('a HIDDEN mark crosses, and the newer change wins — on every device of the person (L106, 2026-09-19)', async () => {
+    // Frits: "if I want to delete a contact from my GUI, that must be the case for all devices." The row stays
+    // add-if-absent for everything else; `hidden` + `hiddenAt` are the one field-pair a sibling may CHANGE on a
+    // row this device holds — when its change is newer. Older news never un-hides what this device hid later.
+    const r = rig();
+    r.book.set('w', { webid: 'w', displayName: 'Wilfred', hidden: false, hiddenAt: 1000 });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w', displayName: 'their edit', hidden: true, hiddenAt: 2000 }],
+    });
+    expect(r.book.get('w').hidden, 'the phone hid Wilfred; the laptop follows').toBe(true);
+    expect(r.book.get('w').hiddenAt).toBe(2000);
+    expect(r.book.get('w').displayName, 'only the mark crossed — the rest of the row is still this device\'s').toBe('Wilfred');
+    // Older news: a sibling that still thinks Wilfred is shown (its mark from 1500) does not un-hide him.
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w', hidden: false, hiddenAt: 1500 }],
+    });
+    expect(r.book.get('w').hidden).toBe(true);
+    // Newer news un-hides.
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w', hidden: false, hiddenAt: 3000 }],
+    });
+    expect(r.book.get('w').hidden).toBe(false);
+    // A row this device does not hold lands whole, mark included.
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w2', displayName: 'Bea', hidden: true, hiddenAt: 10 }],
+    });
+    expect(r.book.get('w2')).toMatchObject({ webid: 'w2', hidden: true, hiddenAt: 10 });
+  });
+
   it('never learns itself from a sibling', async () => {
     const r = rig();
     await r.sync.handlers[KNOWN_PEERS_BROADCAST](ME, {

@@ -45,7 +45,9 @@ export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
 
 /** The contact fields that cross: what another device needs to hold the same person. Never a blob. */
 const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr', 'points',
-  'shareLocation', 'allowHopThrough', 'allowAutomatching'];
+  'shareLocation', 'allowHopThrough', 'allowAutomatching',
+  // the hidden mark and WHEN it last changed — the one field-pair a sibling may change on a row this device holds (L106)
+  'hidden', 'hiddenAt'];
 
 function bindingToWire(b) {
   if (!b || typeof b !== 'object') return null;
@@ -80,7 +82,9 @@ export function knownPeersToWire(known) {
  * @param {(to: string, payload: object) => Promise<any>} a.sendToPeer   hold-forward, like every own-devices fan
  * @param {() => Promise<{peers: object[], contacts: object[]}>} a.snapshot   everything this device knows, for a new sibling or a catch-up
  * @param {(address: string, pubKey: string) => 'established'|'unchanged'|'refused'} a.learnPeerKey   the security layer's establish-never-replace setter
- * @param {{ has: (webid: string) => Promise<boolean>, add: (contact: object) => Promise<any> }} a.contacts   the contact book, raw (not through the waist — a landed row must not fan back out)
+ * @param {{ has: (webid: string) => Promise<boolean>, add: (contact: object) => Promise<any>, get?: (webid: string) => Promise<object|null>, setHidden?: (webid: string, hidden: boolean, hiddenAt: number) => Promise<any> }} a.contacts
+ *   the contact book, raw (not through the waist — a landed row must not fan back out). `get` + `setHidden` let a
+ *   sibling's NEWER hidden mark land on a row this device holds — the one change a sibling may make to it (L106).
  * @param {(summary: {from: string, established: number, contactsAdded: number}) => void} [a.onLanded]   observability seam
  * @param {(reason: string, fromAddr: string) => void} [a.onRefused]   observability seam
  */
@@ -117,7 +121,17 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
     for (const c of wire.contacts) {
       if (c.webid === selfPubKey) continue;
       try {
-        if (await contacts.has(c.webid)) continue;
+        if (await contacts.has(c.webid)) {
+          // Held here: the row is this device's, except the HIDDEN mark, where the person's newest choice on any
+          // of their devices wins (Frits, 2026-09-19: hidden on one device is hidden on all). Older news never
+          // un-hides what this device hid later; equal times leave this device's mark.
+          if (typeof c.hidden === 'boolean' && Number.isFinite(c.hiddenAt) && typeof contacts.get === 'function' && typeof contacts.setHidden === 'function') {
+            const mine = await contacts.get(c.webid);
+            const myAt = Number.isFinite(mine?.hiddenAt) ? mine.hiddenAt : -Infinity;
+            if (c.hiddenAt > myAt) await contacts.setHidden(c.webid, c.hidden, c.hiddenAt);   // the newer change, with its time
+          }
+          continue;
+        }
         await contacts.add(c);
         contactsAdded += 1;
       } catch (err) { warn(`a contact from my own device could not be added: ${err?.message ?? err}`); }
@@ -155,7 +169,7 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
       return fanWire(wire);
     },
 
-    /** LIVE: a contact was added here — carry the row to the other devices. */
+    /** LIVE: a contact was added here, or its hidden mark changed — carry the row to the other devices. */
     async fanContact(contact) {
       const wire = knownPeersToWire({ contacts: [contact] });
       if (!wire) return { attempted: 0 };

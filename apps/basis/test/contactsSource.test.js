@@ -78,6 +78,21 @@ describe('listContacts', () => {
     // A read that throws hides nothing either.
     expect((await listContacts(peers, { identityOf: () => { throw new Error('x'); } })).length).toBe(3);
   });
+  it('I am not my own contact: my person-key address, my profile key and my devices\' addresses are never rows (2026-09-19)', async () => {
+    // Measured in the feedback walk: the maker's own PERSON address (the one every device of theirs speaks as to
+    // its siblings — the box's roster-seed parcel, the carried turns) was a nameless row on the maker's Contacten,
+    // sorted by key bytes, and an answer sent to it went nowhere. Frits' phone: "a random string named contact".
+    const peers = new PeerGraph();
+    await peers.upsert({ type: 'native', pubKey: 'k-ann', name: 'Ann' });
+    await peers.upsert({ pubKey: 'me-as-person', transports: { relay: { address: 'me-as-person' } } });   // my own person address, greeted by my box
+    await peers.upsert({ pubKey: 'me-profile' });                                                         // my static profile key
+    await peers.upsert({ pubKey: 'my-box-in-thuis' });                                                    // my box's per-circle address, reached by the fan
+    const own = () => ['me-as-person', 'me-profile', 'my-box-in-thuis'];
+    expect((await listContacts(peers, { ownAddresses: own })).map((r) => r.contactId)).toEqual(['k-ann']);
+    // A device that cannot say what its own addresses are hides nothing (the honest degradation).
+    expect((await listContacts(peers)).length).toBe(4);
+    expect((await listContacts(peers, { ownAddresses: () => { throw new Error('x'); } })).length).toBe(4);
+  });
 });
 
 describe('stoopContactToRow (S1 #2 — member directory)', () => {

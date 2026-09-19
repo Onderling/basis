@@ -34,7 +34,8 @@ export default function ContactsScreen({ bundle, onOpen }) {
     try {
       const [peerRows, stoopRes] = await Promise.all([
         // A member's per-circle address is where they are reached in one circle, never a second contact.
-        listContacts(peerGraph, { identityOf: (a) => bundle?.agent?.identityOfAddress?.(a) ?? null }).catch(() => []),
+        // …and never me (web parity): my person address, my profile key, my devices' per-circle addresses are not contacts.
+        listContacts(peerGraph, { identityOf: (a) => bundle?.agent?.identityOfAddress?.(a) ?? null, ownAddresses: () => bundle?.agent?.ownAddresses?.() ?? [] }).catch(() => []),
         (typeof callSkill === 'function' ? callSkill('stoop', 'listContacts', {}) : Promise.resolve(null)).catch(() => null),
       ]);
       const stoopRows = (Array.isArray(stoopRes?.contacts) ? stoopRes.contacts : []).map(stoopContactToRow).filter(Boolean);

@@ -1198,7 +1198,7 @@ export default function CircleLauncherScreen({
   const loadShareContacts = useCallback(async () => {
     try {
       const [peerRows, stoopRes] = await Promise.all([
-        listContacts(bundle?.peerGraph ?? null, { identityOf: (a) => bundle?.agent?.identityOfAddress?.(a) ?? null }).catch(() => []),
+        listContacts(bundle?.peerGraph ?? null, { identityOf: (a) => bundle?.agent?.identityOfAddress?.(a) ?? null, ownAddresses: () => bundle?.agent?.ownAddresses?.() ?? [] }).catch(() => []),
         (typeof bundle?.callSkill === 'function' ? bundle.callSkill('stoop', 'listContacts', {}) : Promise.resolve(null)).catch(() => null),
       ]);
       const stoopRows = (Array.isArray(stoopRes?.contacts) ? stoopRes.contacts : []).map(stoopContactToRow).filter(Boolean);

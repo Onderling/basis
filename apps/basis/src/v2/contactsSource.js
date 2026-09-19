@@ -145,12 +145,21 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
  * person's per-circle addresses back to one person — Frits, 2026-09-03: a surface that names a person
  * keys on it); an address that resolves to someone else is skipped.
  *
+ * I AM NOT MY OWN CONTACT (2026-09-19). The graph also collects the addresses MY OWN DEVICES speak as: the person-key
+ * address every device of mine shares (the box greets the phone with it on enrol; the carried turns ride it), the
+ * static profile key, a sibling's per-circle address the fan reaches. None resolves to a roster member — a person
+ * is not on their own rosters as an alias — so each was a nameless row named by its key, sorted by key bytes.
+ * Measured in the feedback walk: the maker's own person address was the FIRST person row on the maker's Contacten,
+ * and an answer sent to it went nowhere; Frits' phone: "a random string named contact". The shell hands in what the
+ * device knows itself as (`ownAddresses`); an address in that set is skipped.
+ *
  * @param {{ all: () => Promise<object[]> } | null} peerGraph  the agent's `peers`
  * @param {object} [opts]
  * @param {(address: string) => string|null} [opts.identityOf]  the person behind an address (itself, or null, when it is nobody's alias)
+ * @param {() => (Array<string>|Promise<Array<string>>)} [opts.ownAddresses]  every address this person's devices speak as (person, profile, per-circle)
  * @returns {Promise<Array<object>>}
  */
-export async function listContacts(peerGraph, { identityOf = null } = {}) {
+export async function listContacts(peerGraph, { identityOf = null, ownAddresses = null } = {}) {
   if (!peerGraph || typeof peerGraph.all !== 'function') return [];
   let peers = [];
   try { peers = await peerGraph.all(); } catch { return []; }
@@ -159,6 +168,9 @@ export async function listContacts(peerGraph, { identityOf = null } = {}) {
     try { const owner = identityOf(peer.pubKey); return typeof owner === 'string' && owner !== '' && owner !== peer.pubKey; }
     catch { return false; }
   };
-  const rows = peers.filter((p) => !isAlias(p)).map(peerToContactRow).filter(Boolean);
+  let mine = new Set();
+  if (typeof ownAddresses === 'function') { try { mine = new Set(((await ownAddresses()) ?? []).filter((a) => typeof a === 'string' && a)); } catch { mine = new Set(); } }
+  const isMe = (peer) => mine.has(peer?.pubKey) || mine.has(peer?.url);
+  const rows = peers.filter((p) => !isMe(p) && !isAlias(p)).map(peerToContactRow).filter(Boolean);
   return sortContactRows(rows);
 }

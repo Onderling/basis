@@ -2752,7 +2752,8 @@ async function contactReturned(contactId) {
 async function loadAllContacts() {
   const [peerRows, stoopRows] = await Promise.all([
     // A member's per-circle address is where they are reached in one circle, never a second contact.
-    listContacts(circlePeerGraph, { identityOf: (a) => _peerAgent?.identityOfAddress?.(a) ?? null }).catch(() => []),
+    // …and never me: my person address, my profile key, my devices' per-circle addresses are not contacts.
+    listContacts(circlePeerGraph, { identityOf: (a) => _peerAgent?.identityOfAddress?.(a) ?? null, ownAddresses: () => _peerAgent?.ownAddresses?.() ?? [] }).catch(() => []),
     loadStoopContacts(),
   ]);
   return mergeContacts(peerRows, stoopRows);

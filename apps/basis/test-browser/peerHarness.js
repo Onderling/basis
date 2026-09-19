@@ -221,6 +221,9 @@ export async function gotoCircles(page) {
   // above, so it belongs in the same place: leaving a screen is a property of the PAGE (2026-09-08).
   const threadBack = page.locator('.cc-cthread__back');
   if (await threadBack.count()) { await threadBack.first().click(); await page.waitForTimeout(1200); }
+  // The Mij sub-screens (share my contact) hide the bar too, with a back of their own (2026-09-19).
+  const shareBack = page.locator('.cc-share__back');
+  if (await shareBack.count()) { await shareBack.first().click(); await page.waitForTimeout(1000); }
   const back = page.locator('.circle-view__back');
   if (await back.count()) { await back.first().click(); await page.waitForTimeout(1500); }
   const tab = page.locator('[data-tab="circles"]');

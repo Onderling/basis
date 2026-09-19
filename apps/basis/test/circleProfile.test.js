@@ -91,3 +91,15 @@ describe('renderCircleProfile — availability link', () => {
     expect(onAvailability).toHaveBeenCalled();
   });
 });
+
+describe('renderCircleProfile — share my contact (2026-09-19)', () => {
+  it('offers "share my contact" beside the other Mij links, and omits it without the seam', () => {
+    const onShareContact = vi.fn();
+    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, onShareContact });
+    const link = el.querySelector('.cc-profile__share-contact');
+    expect(link.textContent).toBe('circle.profile.share_contact');
+    link.click();
+    expect(onShareContact).toHaveBeenCalled();
+    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__share-contact')).toBeNull();
+  });
+});

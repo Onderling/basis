@@ -73,6 +73,16 @@ export function build(app, stamp, { appsDir = join(ROOT, 'apps'), log = console.
 export function stampDist(app, stamp, dist) {
   if (!existsSync(join(dist, 'index.html'))) throw new Error(`no build at ${dist}/index.html — run without --skip-build`);
   writeFileSync(join(dist, 'version.json'), JSON.stringify({ app, ...stamp }, null, 2));
+  // The two files that must never be served stale: the page (which names the hashed assets) and the stamp. Without a
+  // header a browser caches `index.html` heuristically — for days on a page whose Last-Modified is weeks old — and a
+  // tab keeps last week's build while the site serves today's (2026-09-19). Honoured by Apache hosts (.htaccess);
+  // ignored elsewhere, where the app's own version check (`src/v2/appVersion.js`) still says "reload".
+  writeFileSync(join(dist, '.htaccess'), [
+    '<FilesMatch "^(index\\.html|version\\.json)$">',
+    '  Header set Cache-Control "no-cache"',
+    '</FilesMatch>',
+    '',
+  ].join('\n'));
   return dist;
 }
 

@@ -4303,6 +4303,14 @@
     "blocked": {
       "text": "Geblokkeerd →",
       "doc": "De lijst met mensen die dit apparaat blokkeert — en de enige plek waar je een blokkade terugdraait."
+    },
+    "version": {
+      "text": "Versie {{tag}}",
+      "doc": "The build this tab runs, at the bottom of Mij — so \"which version are you on\" has an answer on screen. tag = the release tag (v0.1.13-alpha), or \"dev\"."
+    },
+    "version_dev": {
+      "text": "ontwikkelversie",
+      "doc": "What the version line says for a build with no tag (a dev server)."
     }
   },
   "blocked": {
@@ -6464,6 +6472,16 @@
     "list_schedule": {
       "text": "agenda",
       "doc": "Telegram runner: the \"schedule\" household list as a button label when the assistant asks which list."
+    }
+  },
+  "update": {
+    "available": {
+      "text": "Er is een nieuwere versie van Basis ({{tag}}).",
+      "doc": "The bar at the top when the site serves a newer build than this tab runs (checked at boot and when the tab regains focus). tag = the served tag."
+    },
+    "reload": {
+      "text": "Herladen",
+      "doc": "The bar's one action: reload the page to get the newer build."
     }
   }
 }

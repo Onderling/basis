@@ -190,6 +190,8 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
+import { createVersionWatch } from '../../src/v2/appVersion.js';
+import { renderUpdateBar } from './updateBar.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
@@ -1375,6 +1377,9 @@ const CIRCLE_LLM_MODEL     = import.meta.env?.VITE_CIRCLE_LLM_MODEL ?? undefined
 // but aborts a local model's cold-start (qwen2.5:7b warms up in 30–60s) → the bot silently
 // drops to "basic mode". Default generous (90s) for the local case; override via env.
 const CIRCLE_LLM_TIMEOUT_MS = Number(import.meta.env?.VITE_CIRCLE_LLM_TIMEOUT_MS ?? 90000) || 90000;
+// The build this tab runs — the tag the publish baked in ('' on a dev server). Shown under Mij; compared with the
+// site's version.json at boot and on every return to the tab, so a tab left open does not silently run last week.
+const APP_VERSION = String(import.meta.env?.VITE_APP_VERSION ?? '');
 // F-retrieve tier-2 embeddings — defaults to the LLM base (the enclave serves both
 // /v1/chat/completions + /v1/embeddings), so semantic RAG rides the same trust
 // boundary unless explicitly pointed elsewhere. Model defaults to the provider's
@@ -3928,6 +3933,7 @@ async function showMij() {
     onBlocked: showBlocked,
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: showAdvanced,
+    version: APP_VERSION,
   });
   rerender();
   load();
@@ -7846,6 +7852,18 @@ async function boot() {
   const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log')));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
+  // IS THIS TAB THE BUILD THE SITE SERVES? A page never updates itself: on 2026-09-19 a laptop ran the build from
+  // before the fix that made the phone's messages visible, while the site served the fix. Checked now and every time
+  // the tab regains focus; when the site is ahead, a bar at the top says so with one action. A dev build never nags.
+  if (APP_VERSION) {
+    const versionUrl = `${window.location.pathname.replace(/[^/]*$/, '')}version.json`;   // beside the app, whatever path it lives under
+    const watch = createVersionWatch({
+      running: APP_VERSION, versionUrl,
+      onUpdate: ({ served }) => renderUpdateBar(document.body, { served, t, onReload: () => window.location.reload() }),
+    });
+    watch.check().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') watch.check().catch(() => {}); });
+  }
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }

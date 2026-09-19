@@ -49,10 +49,7 @@ export const SHELLS = Object.freeze([
 ]);
 
 /** Gaps a shell is known to have, each with what closes it. Remove the entry when the seam lands. */
-export const BASELINE = Object.freeze([
-  { shell: 'box', seam: 'pair-roster',        closes: 'plans/BRIEF-for-opus-2026-09-19.md §3 — the box speaks the pair roster' },
-  { shell: 'box', seam: 'pair-roster-admits', closes: 'plans/BRIEF-for-opus-2026-09-19.md §3 — the box speaks the pair roster' },
-]);
+export const BASELINE = Object.freeze([]);
 
 /** Source with comments removed — a comment that EXPLAINS a seam is not the seam. */
 export const code = (src) => String(src).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

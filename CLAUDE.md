@@ -65,11 +65,14 @@ does NOT come back — this has cost multiple sessions.
    logic — that lives in shared `src/` (the basis app) or a substrate package. Writing logic in a shell that
    already exists in shared code → STOP and call the shared one. (This is exactly what the four "duplicated
    pairs" violated; see `apps/basis/docs/web-mobile-consolidation-plan.md`.)
-2. **web ≡ mobile.** Neither platform is the "primitive" one. A shared string/op/behaviour must exist in
-   BOTH — ideally **by construction** (one shared source both merge), not copied. New shared work lands in
-   `src/`; each shell injects only its adapter. An **empty grep on the other shell is a FINDING, not a
-   clearance** — wire the equivalent, or say in the same turn that there isn't one. (5× in July 2026: the
-   rule never failed, *noticing* the violation did.)
+2. **web ≡ mobile ≡ box.** No shell is the "primitive" one — the box (`apps/basis/bin/device-runner.mjs`) is a
+   third shell, the same composition minus the paint. A shared string/op/behaviour must exist in ALL — ideally
+   **by construction** (one shared source they merge), not copied. New shared work lands in `src/`; each shell
+   injects only its adapter. An **empty grep on another shell is a FINDING, not a clearance** — wire the
+   equivalent, or say in the same turn that there isn't one. (5× in July 2026: the rule never failed, *noticing*
+   the violation did; 2× on the box in September 2026, days after the seam landed on web and mobile.) The
+   seams every shell composes are declared once in `scripts/shell-seams.mjs`; `lint-shell-seams` (in
+   `npm run guards`) is red when one shell lacks one — a new seam goes in that list in the same PR.
 3. **No duplication.** A string/op/function is defined ONCE. Editing the same thing in two files (e.g. a
    locale key in the web *and* mobile bundle) is the signal to consolidate — then add a guard so it can't
    recur. (`circle.*` locale is now one shared source `apps/basis/src/locales/`; do the same for the rest.)

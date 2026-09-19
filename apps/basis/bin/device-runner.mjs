@@ -448,6 +448,12 @@ if (relayUrl) {
   kick(agent.grantsCatchUp, 'grants', 2500);
   kick(agent.knownPeersSync, 'known-peers', 2500);
   kick(agent.personKeySync, 'person-key', 2500);
+  // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and
+  // at boot by asking, as both shells do. (Found by the shell-seams guard on its first run, 2026-09-19.)
+  setTimeout(() => {
+    agent.primaryDevice?.requestFromSiblings?.().catch(() => { /* the carry brings a later claim either way */ });
+    walkLog({ kind: 'catch-up-kick', lane: 'primary-device' });
+  }, 2600);
   kick(lanes.catchUps.task, 'tasks', 3000);
   kick(lanes.catchUps.chat, 'chat', 3500);
   kick(lanes.catchUps.key, 'keys', 3500);

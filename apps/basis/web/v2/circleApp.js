@@ -192,6 +192,8 @@ import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rul
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
+import { contactCardLink, contactCardFromLink } from '../../src/v2/contactCardLink.js';
+import { renderShareMyContact } from './shareMyContact.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
@@ -2227,6 +2229,10 @@ function buildCircleBot(agent) {
   if (typeof window !== 'undefined') {
     window.onderlingContactChannel = circleContactChannel;
     window.onderlingPeers = circlePeerGraph;   // debug / e2e seam (roster + journey-A tests seed/inspect peers)
+    // e2e seam: what this device resolves an address to, and which addresses it counts as its own — the two reads
+    // that decide whether a peer-graph record is a row in Contacten (a walk's red names the filter, not a guess).
+    window.onderlingIdentityOf = (addr) => _peerAgent?.identityOfAddress?.(addr) ?? null;
+    window.onderlingOwnAddresses = () => _peerAgent?.ownAddresses?.() ?? [];
     window.onderlingAddBot = addBotFromInput;  // manual / programmatic add
     try {
       const params = new URLSearchParams(_bootSearch);
@@ -3934,9 +3940,23 @@ async function showMij() {
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: showAdvanced,
     version: APP_VERSION,
+    // This person's contact as a QR, a code and a link — the way to be reached without a circle.
+    onShareContact: showShareMyContact,
   });
   rerender();
   load();
+}
+
+// Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card stoop makes
+// (`getContactShareQr` — webid, key, name, the address I am written to, my relay), painted three ways. The LINK is
+// this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
+async function showShareMyContact() {
+  hideCircleTabBar(tabBarEl);
+  let payload = null;
+  try { payload = (await rawCallSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { payload = null; }
+  const here = `${window.location.origin}${window.location.pathname}`;
+  const link = payload ? contactCardLink(here, payload) : { ok: false };
+  renderShareMyContact(rootEl, { payload, link: link.ok ? link.link : null, t, onBack: showMij });
 }
 
 // SILENT out-of-circle delivery — the "shared with me" inbox (a Mij sub-screen). Reads the
@@ -8492,6 +8512,28 @@ async function boot() {
         agent.personKeySync?.requestFromSiblings().catch(() => {});
         // …and which of the person's devices is primary for direct messages (sync-policy §12).
         agent.primaryDevice?.requestFromSiblings?.().catch(() => {});
+        // AN ARRIVING CONTACT LINK (`…#contact=<payload>` — the clickable form of someone's contact QR): add the
+        // contact through the one decoder, scrub the card from the address bar, open Contacten so the new row is
+        // the first thing seen. A fragment never reached the server; scrubbing keeps it out of the history too.
+        // At boot, and on `hashchange`: a link pasted into an already-open tab changes only the fragment and
+        // reloads nothing — without the listener, nothing would happen at all.
+        const takeContactFromHash = () => {
+          try {
+            const fromLink = contactCardFromLink(window.location.hash);
+            if (!fromLink.ok) return;
+            try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
+            rawCallSkill('stoop', 'addContactFromQr', { payload: fromLink.payload })
+              .then((r) => {
+                const c = r?.contact;
+                if (!c || r?.error) { globalThis.alert?.(t('circle.contacts.add_failed')); return; }
+                globalThis.alert?.(t('circle.shareContact.opened_added', { name: c.displayName ?? c.handle ?? c.webid ?? '' }));
+                showContacts();
+              })
+              .catch(() => { globalThis.alert?.(t('circle.contacts.add_failed')); });
+          } catch { /* a malformed hash is not an error state */ }
+        };
+        takeContactFromHash();
+        window.addEventListener('hashchange', takeContactFromHash);
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on

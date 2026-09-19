@@ -112,7 +112,9 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
   // Route inbound replies for THIS thread (by threadId echo, else sender addr).
   useEffect(() => {
     return subscribeContactReplies((reply) => {
-      const forThis = (reply.threadId && reply.threadId === contactId) || reply.fromAddr === peerAddr;
+      // …by the PERSON the channel resolved (a turn over the pair route comes from their per-circle address), by
+      // the echoed thread id (a bot), or by the sender address (an older wire).
+      const forThis = reply.contactId === contactId || (reply.threadId && reply.threadId === contactId) || reply.fromAddr === peerAddr;
       if (!forThis) return;
       // The turn that brought a hidden contact back says so (`returned`, web parity): the row is shown again,
       // and the marker paints above this bubble. A DIRECT arrival is pushed before its persist decides that, so

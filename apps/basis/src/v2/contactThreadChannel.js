@@ -287,10 +287,11 @@ export function createContactThreadChannel({
     // so every device paints the one-line marker above THIS bubble, whether the row there was unhidden by the
     // turn itself or, moments earlier, by the carried mark. A transient signal here would have raced the mark's
     // own carry (measured 2026-09-19: the box unhid and fanned, the laptop's row was shown before the turn came).
-    const key = contactId || fromAddr;
-    // The book knows the PERSON: a turn over the pair route arrives from a per-circle address, and the hidden
-    // mark is on the identity behind it.
-    const who = resolveId(key);
+    // THE THREAD IS THE PERSON'S: whatever key the caller hands in — an older shell passing the wire address, a
+    // sibling's carry keyed as that device saw it — the turn is stored under the identity behind it, so the one
+    // thread a row opens holds every message, whichever address the sender used. Unknown ⇒ the key as given.
+    const who = resolveId(contactId || fromAddr);
+    const key = who;
     const isReturn = carriedReturned === true || (!viaOwnDevice && await hiddenNow(who));
     const envelope = {
       id:     messageId ?? mkId(),
@@ -299,7 +300,7 @@ export function createContactThreadChannel({
       author: fromAddr ?? null,
       body:   text ?? '',
       extras: {
-        threadKey: contactId,
+        threadKey: who,
         peerAddr:  fromAddr,
         replyTo,
         ...(Array.isArray(buttons) ? { buttons } : {}),
@@ -325,7 +326,7 @@ export function createContactThreadChannel({
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
-        await fanOwn({ direction: 'in', contactId, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}) });
+        await fanOwn({ direction: 'in', contactId: who, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}) });
       }
       return { ...res, ...(isReturn ? { returned: true } : {}) };
     });
@@ -474,6 +475,11 @@ export function createContactThreadChannel({
       if (!text && !Array.isArray(payload.buttons) && (pairInvite || pairRequest)) return;   // roster material only: nothing to show
       cb({
         fromAddr,
+        // THE PERSON behind the sender address — the thread's key (Frits 2026-09-03: threads are keyed by identity).
+        // A turn over the pair route arrives from the contact's per-circle address there; keyed by that address it
+        // sat in a thread no row opens, since the roster folds the address under the person (measured on two web
+        // apps, 2026-09-19: every message after the first was invisible). Unknown ⇒ the address, as before.
+        contactId: resolveId(fromAddr),
         threadId:  payload.threadId,
         text,
         buttons:   Array.isArray(payload.buttons) ? payload.buttons : undefined,

@@ -507,12 +507,13 @@ export default function ChatScreen({
     };
 
     // A DM that arrived DIRECTLY: store it, which is also what hands it to this person's other
-    // devices. Keyed on the SENDER's address, the same key `ContactThreadScreen`'s rehydrate already
-    // reads for an unsolicited inbound, and the same one web falls back to.
+    // devices. Keyed on the PERSON behind the sender (the channel's `contactId`), the key every row opens.
     // …and the persist decides whether THIS turn brought a hidden contact back (L106): the live push then
     // carries the mark, so an open thread paints the marker above the bubble (web parity).
-    const landContactTurn = ({ fromAddr, text, buttons, messageId, replyTo, ts }) => {
-      contactChannel?.persistInbound?.({ contactId: fromAddr, fromAddr, text, buttons, messageId, replyTo, ts })
+    const landContactTurn = ({ contactId, fromAddr, text, buttons, messageId, replyTo, ts }) => {
+      // keyed by the PERSON the channel resolved behind the sender address (a turn over the pair route comes
+      // from their per-circle address; keyed by that it sat in a thread no row opens — 2026-09-19)
+      contactChannel?.persistInbound?.({ contactId: contactId ?? fromAddr, fromAddr, text, buttons, messageId, replyTo, ts })
         ?.then?.((r) => { if (r?.returned) pushContactReply({ fromAddr, threadId: fromAddr, messageId, returned: true, markerOnly: true }); })
         ?.catch?.(() => { /* durability is best-effort; the live push still lands */ });
     };

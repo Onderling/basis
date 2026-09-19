@@ -803,6 +803,15 @@
 .cc-paired__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .cc-paired__peer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 8px; border-radius: var(--radius); background: var(--card); }
 .cc-paired__peeraddr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+/* Share my contact (a Mij sub-screen): the QR, then the code and the link, each copyable. */
+.cc-share { display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+.cc-share__back { align-self: flex-start; }
+.cc-share__title { font-size: 17px; font-weight: 700; color: var(--ink); margin: 0; }
+.cc-share__hint, .cc-share__error { font-size: 13px; color: var(--ink-soft); margin: 0; }
+.cc-share__error { color: var(--danger, #c0392b); }
+.cc-share__row { display: flex; gap: .4rem; align-items: center; }
+.cc-share__label { white-space: nowrap; font-size: 13px; color: var(--ink-soft); }
+.cc-share__value { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 12px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); color: var(--ink); }
 .cc-contacts__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .cc-contacts__row {
   display: flex; align-items: center; gap: 12px; cursor: pointer;

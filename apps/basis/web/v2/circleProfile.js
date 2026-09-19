@@ -47,6 +47,9 @@ export function renderCircleProfile(container, {
   onBlocked,
   // The advanced surface — surface-less ops + settable params. Absent ⇒ omitted.
   onAdvanced,
+  // Share my contact (2026-09-19) — the panel with this person's contact as a QR, a code and a link, so
+  // someone can be handed it without a circle. Absent ⇒ omitted, like its peers.
+  onShareContact,
   // D / consumer-switch — the projected PAGE surface for the `me` op
   // (renderWeb(manifest).pages[] entry, selected via pageForOp). When present,
   // the header label is derived from `page.labelKey` via t, making this
@@ -138,6 +141,9 @@ export function renderCircleProfile(container, {
   container.appendChild(locSection);
 
   // ── availability + my-data links ──────────────────────────────────────────
+  if (typeof onShareContact === 'function') {
+    container.appendChild(button(tr('circle.profile.share_contact'), 'cc-profile__share-contact', onShareContact));
+  }
   if (typeof onAvailability === 'function') {
     const avail = button(tr('circle.profile.availability'), 'cc-profile__availability', onAvailability);
     container.appendChild(avail);

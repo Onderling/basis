@@ -4303,6 +4303,10 @@
     "blocked": {
       "text": "Geblokkeerd →",
       "doc": "De lijst met mensen die dit apparaat blokkeert — en de enige plek waar je een blokkade terugdraait."
+    },
+    "share_contact": {
+      "text": "Mijn contact delen →",
+      "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
     }
   },
   "blocked": {
@@ -6464,6 +6468,36 @@
     "list_schedule": {
       "text": "agenda",
       "doc": "Telegram runner: the \"schedule\" household list as a button label when the assistant asks which list."
+    }
+  },
+  "shareContact": {
+    "title": {
+      "text": "Mijn contact delen",
+      "doc": "Heading of the share panel under Mij."
+    },
+    "hint": {
+      "text": "Laat de QR scannen, of stuur de link. Wie hem opent, heeft jou als contact en kan je direct een bericht sturen. Er staat geen geheim in.",
+      "doc": "What the QR/link does and does not do. Plain Dutch; no \"kaart\"."
+    },
+    "code_label": {
+      "text": "Code:",
+      "doc": "Label of the raw onderling-contact:// code (the QR's content), copyable."
+    },
+    "link_label": {
+      "text": "Link:",
+      "doc": "Label of the clickable link form (the app URL with the contact in the fragment), copyable."
+    },
+    "error": {
+      "text": "Je contact kon nu niet worden gemaakt.",
+      "doc": "When getContactShareQr fails (no identity yet)."
+    },
+    "back": {
+      "text": "← Mij",
+      "doc": "Back to the Mij screen."
+    },
+    "opened_added": {
+      "text": "{{name}} is toegevoegd aan je contacten.",
+      "doc": "After opening someone's contact link: the contact was added; name = their display name, handle or key."
     }
   }
 }

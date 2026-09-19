@@ -53,4 +53,12 @@ describe('deliver — the route first, the person when the route does not delive
     await d2.deliver(env('m4'), { to: 'person' });
     expect(plain, 'no route → one send, held is held (the person is offline everywhere)').toHaveBeenCalledTimes(1);
   });
+
+  it('a send with NO verdict (an injected sender that returns nothing) is taken as delivered — the route is not doubled', async () => {
+    const send = vi.fn(async () => undefined);
+    const d = createAddressedDeliver({ send, itemStore: memStore() });
+    const r = await d.deliver(env('m5'), { to: 'person', deliverTo: 'pair-addr', sendOpts: { circleId: 'pair-x' } });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(r.fallback).toBeUndefined();
+  });
 });

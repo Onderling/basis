@@ -199,8 +199,10 @@ export function createAddressedDeliver({
     let sent;
     try { sent = sendOpts ? await send(deliverTo ?? to, wire, sendOpts) : await send(deliverTo ?? to, wire); }
     catch (err) { if (!routed) throw err; sent = { delivered: false, held: false, error: err?.message ?? String(err) }; }
+    // Only a send that SAID it did not deliver (or threw) falls back: a send with no verdict at all — an
+    // injected sender that returns nothing — is taken as delivered, or every routed turn would go twice.
     let fallback;
-    if (routed && sent?.delivered !== true) {
+    if (routed && sent?.delivered === false) {
       fallback = await send(to, wire);
     }
     const { itemId, deduped } = await persistTurn(envelope, { to, direction: 'out' });

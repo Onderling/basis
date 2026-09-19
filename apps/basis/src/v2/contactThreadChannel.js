@@ -92,6 +92,11 @@ export function createContactThreadChannel({
   // `onRequest(fromAddr)` land the other side's. Inside the seal when the turn is sealed; a turn with only the
   // roster material and no text is consumed here and never shown.
   pair = null,
+  // THE SENDER BECOMES A CONTACT ROW: `(address) => void`, the shell's peer-graph upsert — what Contacten lists.
+  // Called for every inbound turn that lands, whether it arrived directly or CARRIED by one of my own devices.
+  // Until 2026-09-18 only the direct handlers did this, so a turn the box took and carried to the web app was
+  // stored under a sender the roster had no row for: a thread nobody could open, a message nobody read.
+  notePeer = null,
 } = {}) {
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
@@ -275,6 +280,10 @@ export function createContactThreadChannel({
     // its siblings and stores nothing — the turn is not lost, it lives on the devices that hold the silo.
     const persisted = holdsHere() ? Promise.resolve(core.persistInbound(envelope, { to: fromAddr })) : Promise.resolve({ itemId: null, held: false });
     return persisted.then(async (res) => {
+      // A turn that landed makes its sender a row — once; a duplicate was noted when it first landed.
+      if (!res?.deduped && typeof notePeer === 'function' && fromAddr) {
+        try { await notePeer(fromAddr); } catch { /* the row is a convenience; the turn is stored regardless */ }
+      }
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {

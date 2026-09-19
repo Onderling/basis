@@ -258,6 +258,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // the others, and this is the composition that exercises it end to end.
   const contactTurnsSeen = [];       // turns that arrived from one of MY OWN devices
   const contactTurnsRefused = [];    // fanned turns this node refused, with the reason
+  const notedPeers = new Set();      // senders the contact channel made a row of (the shells' peer-graph upsert)
   // the pair roster (L105), composed as both shells do — the redeem sender is built below, late-bound
   const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
   const pairRoster = createPairRoster({
@@ -290,6 +291,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ? createContactThreadChannel({
         sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
         itemStore:  createContactDmStore({ dataSource: null, localActor: pubKey }),
+        // the shells' peer-graph upsert, recorded: the senders this device would list in Contacten
+        notePeer:   (addr) => { notedPeers.add(addr); },
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,
         localActor: pubKey,
@@ -457,7 +460,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, _routerRef: routerRef };
   nodeRef.current = node;
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).

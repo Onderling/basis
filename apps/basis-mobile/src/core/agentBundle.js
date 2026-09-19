@@ -763,6 +763,8 @@ export async function bootAgentBundle(opts = {}) {
   const contactChannel = createContactThreadChannel({
     blobStore: contactAttachmentBlobs,
     pair: pairRoster,
+    // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included (web parity)
+    notePeer: (addr) => peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
     // the route (a contact with a pair roster) rides as send options (web parity)
     sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'

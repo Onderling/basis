@@ -104,6 +104,9 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     expect(onBox, `the box never recorded the first message:\n${box.out.slice(-1500)}`).toBeTruthy();
     const onWeb = await until(async () => ((await textsIn(web, visitor.pubKey)).includes('hoi Wilfred, eerste bericht') ? true : null), { timeout: 30_000, step: 500 });
     expect(onWeb, `the web device never got it — refused: ${JSON.stringify(web.contactTurnsRefused)}`).toBe(true);
+    // …and can SEE it: the sender is a row in the web device's Contacten. A carried turn from a stranger used to be
+    // stored under a sender the roster had no row for — the maker's laptop, 2026-09-18: "delivered", nothing on screen.
+    expect([...web.notedPeers], 'the visitor is a row on the web device — the carried turn noted its sender').toContain(visitor.pubKey);
   }, 90_000);
 
   it('a second message, after the pair roster had every chance to form, lands too', async () => {

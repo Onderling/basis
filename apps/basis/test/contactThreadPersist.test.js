@@ -375,4 +375,37 @@ describe('a hidden contact who writes again comes back (L106) — one seam, both
     await ch.applyOwnDeviceTurn({ direction: 'out', contactId: 'dave', peerAddr: 'dave', text: 'hey', messageId: 'o1', ts: 2 });
     expect(returned).toEqual(['bob-profile']);
   });
+  it('the turn that brought them back is MARKED — stored, fanned, rehydrated — so every device paints the marker above it', async () => {
+    // Measured 2026-09-19 on three devices: the box (primary) unhid the row and fanned the mark; the laptop's row
+    // was shown before the carried turn arrived, so "is hidden?" said no there and the marker never painted. The
+    // fact belongs to the TURN, decided where it first lands, and rides with it.
+    const fanned = [];
+    const hidden = new Set(['bob']);
+    const ch = createContactThreadChannel({
+      sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(),
+      isHidden: (id) => hidden.has(id), onReturned: (id) => { hidden.delete(id); },
+      fanToOwnDevices: async (turn) => { fanned.push(turn); },
+    });
+    const res = await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'ben ik er nog?', messageId: 'r1', ts: 1 });
+    expect(res.returned).toBe(true);
+    expect(fanned[0]).toMatchObject({ direction: 'in', contactId: 'bob', messageId: 'r1', returned: true });
+    const later = await ch.persistInbound({ contactId: 'bob', fromAddr: 'bob', text: 'en nu?', messageId: 'r2', ts: 2 });
+    expect(later.returned, 'a message from a shown contact is not a return').toBeUndefined();
+    expect(fanned[1].returned).toBeUndefined();
+    const turns = await ch.rehydrate('bob');
+    expect(turns.map((t) => [t.messageId, t.returned === true])).toEqual([['r1', true], ['r2', false]]);
+
+    // The SIBLING side: the carried turn says `returned`, the row there is ALREADY shown (the mark got there
+    // first) — the landing still reports the return so the shell paints the marker, and still tells the shell
+    // (the roster repaints); a carried turn without the mark on a shown row says nothing.
+    const sibReturned = [];
+    const sib = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), isHidden: () => false, onReturned: (id) => { sibReturned.push(id); } });
+    const landed = await sib.applyOwnDeviceTurn(fanned[0]);
+    expect(landed.returned).toBe(true);
+    expect(sibReturned).toEqual(['bob']);
+    const plain = await sib.applyOwnDeviceTurn(fanned[1]);
+    expect(plain.returned).toBeUndefined();
+    expect(sibReturned).toEqual(['bob']);
+    expect((await sib.rehydrate('bob')).find((t) => t.messageId === 'r1')?.returned, 'the sibling stores the mark too').toBe(true);
+  });
 });

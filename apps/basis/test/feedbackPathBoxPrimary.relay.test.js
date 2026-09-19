@@ -119,4 +119,34 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     const onWeb = await until(async () => ((await textsIn(web, visitor.pubKey)).includes('en het tweede bericht') ? true : null), { timeout: 30_000, step: 500 });
     expect(onWeb, 'the web device never got the second message').toBe(true);
   }, 90_000);
+
+  /** The book row for the visitor as a device holds it — `undefined` when the book does not know them. */
+  const bookRow = async (node) => ((await node.agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => (c.webid ?? c.pubKey) === visitor.pubKey);
+  // The box has no callSkill from here: what it holds is what its walk log says landed (`contact-hidden`, a sibling's
+  // mark) and what its channel did (`contact-returned`, the visitor's turn unhid the row).
+  const boxLogged = (kind, pred = () => true) => walkLog(dataDir).find((e) => e.kind === kind && pred(e)) ?? null;
+
+  it('the maker hides the visitor on the web → the box\'s row is hidden too → the visitor writes → both show them again (L106, on every device)', async () => {
+    // The maker hides the visitor from the WEB device (the tester who wrote is a peer-graph row there; hiding
+    // puts them in the book, hidden). The mark is carried live to the box — not at the next catch-up.
+    const hid = await web.agent.callSkill('stoop', 'setContactHidden', { webid: visitor.pubKey, hidden: true });
+    expect(hid?.contact?.hidden, JSON.stringify(hid)).toBe(true);
+    expect((await bookRow(web))?.hidden).toBe(true);
+    const onBoxHidden = await until(async () => boxLogged('contact-hidden', (e) => e.hidden === true), { timeout: 30_000, step: 500 });
+    expect(onBoxHidden, `the box never learned the visitor is hidden — the mark did not carry:\n${box.out.slice(-1500)}`).toBeTruthy();
+    // The visitor writes again. The turn lands on the box (the primary) — its row unhides there — and is carried
+    // to the web device, whose row unhides too, with the moment recorded for the marker.
+    await visitor.contactThreadChannel.sendTurn({ peerAddr: await rowAddress(), threadId: web.pubKey, text: 'ben ik er nog?', messageId: 'fb-third' }).sent;
+    const onBoxReturned = await until(async () => boxLogged('contact-returned'), { timeout: 30_000, step: 500 });
+    expect(onBoxReturned, `the box never unhid the visitor when they wrote:\n${box.out.slice(-1500)}`).toBeTruthy();
+    const onWeb = await until(async () => ((await textsIn(web, visitor.pubKey)).includes('ben ik er nog?') ? true : null), { timeout: 30_000, step: 500 });
+    expect(onWeb, 'the web device never got the third message').toBe(true);
+    expect(await until(async () => ((await bookRow(web))?.hidden === false ? true : null), { timeout: 15_000, step: 500 }), 'the web device\'s row is shown again').toBe(true);
+    // The web device knows WHICH turn brought them back — the mark rides the turn, so the thread paints its marker
+    // above that bubble whether the row there was unhidden by the turn or, moments earlier, by the carried mark.
+    const turns = await web.contactThreadChannel.rehydrate(visitor.pubKey);
+    expect(turns.find((t) => t.text === 'ben ik er nog?')?.returned, 'the returning turn is marked on the web device').toBe(true);
+    expect(turns.filter((t) => t.returned === true).length, 'only that turn').toBe(1);
+    expect(web.returned, 'and the web device was told, so the roster repaints').toContain(visitor.pubKey);
+  }, 120_000);
 });

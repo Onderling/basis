@@ -811,6 +811,13 @@
 }
 .cc-contacts__row:hover { border-color: var(--accent); }
 .cc-contacts__row.is-offline { opacity: 0.6; }
+/* Hidden contacts (L106): folded away at the bottom of Contacten, greyed when unfolded. */
+.cc-contacts__row.is-hidden { opacity: 0.5; }
+.cc-contacts__fold {
+  cursor: pointer; font: inherit; font-size: 13px; color: var(--ink-soft);
+  background: transparent; border: none; padding: 10px 0; text-decoration: underline; align-self: center;
+}
+.cc-contacts__hidden { margin-top: 8px; }
 .cc-contacts__icon { font-size: 22px; line-height: 1; }
 .cc-contacts__body { flex: 1 1 auto; min-width: 0; }
 .cc-contacts__name { font-weight: 600; color: var(--ink); }
@@ -849,6 +856,14 @@
   background: transparent; border: 1px solid var(--accent); color: var(--accent-ink);
 }
 .cc-cthread__floor { font-size: 12px; color: var(--ink-soft); padding: 4px 12px; border-bottom: 1px solid var(--line); }
+/* Verbergen / Tonen (L106) in the thread header, its note under it, and the one-line marker above the turn that
+   brought a hidden contact back — a system line, neither side's bubble. */
+.cc-cthread__hide {
+  cursor: pointer; font: inherit; font-size: 12px; color: var(--ink-soft);
+  background: transparent; border: none; padding: 4px 0; text-decoration: underline; flex: 0 0 auto;
+}
+.cc-cthread__hide-note { font-size: 12px; color: var(--ink-soft); padding: 0 12px 4px; }
+.cc-cthread__system { align-self: center; font-size: 12px; font-style: italic; color: var(--ink-soft); padding: 2px 8px; }
 .cc-cthread__sending { font-size: 12px; color: var(--ink-soft); font-style: italic; padding: 2px 4px; }
 .cc-cthread__skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .cc-cthread__skill {

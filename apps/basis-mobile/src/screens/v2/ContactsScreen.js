@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
-import { listContacts, mergeContacts, stoopContactToRow } from '../../../../basis/src/v2/contactsSource.js';
+import { listContacts, mergeContacts, stoopContactToRow, splitShownHidden } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 
 export default function ContactsScreen({ bundle, onOpen }) {
@@ -23,6 +23,10 @@ export default function ContactsScreen({ bundle, onOpen }) {
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState('');
   const [error, setError] = useState(false);
+  // Hidden contacts (L106, web parity with contactsRoster.js) fold away at the bottom: the row stays, out of
+  // sight, until they write again or the person shows them. A list of only hidden contacts is not empty.
+  const [foldOpen, setFoldOpen] = useState(false);
+  const { shown, hidden } = useMemo(() => splitShownHidden(contacts), [contacts]);
 
   // S1 #2 — the unified directory: PeerGraph bots/peers merged with the stoop
   // ContactBook (people the user added, with trust/tags). Same shared helpers as web.
@@ -67,6 +71,23 @@ export default function ContactsScreen({ bundle, onOpen }) {
     }
   }, [addText, peerGraph, bundle, callSkill, reload]);
 
+  const rowFor = (c, isHidden = false) => (
+    <Pressable
+      key={c.contactId}
+      style={[styles.row, !c.reachable && styles.rowOffline, isHidden && styles.rowHidden]}
+      onPress={() => onOpen?.(c)}
+      accessibilityRole="button"
+      testID={`contact-row-${c.contactId}`}
+    >
+      <Text style={styles.icon}>{c.isBot ? '🤖' : '👤'}</Text>
+      <View style={styles.body}>
+        <Text style={styles.name}>{c.name}</Text>
+        <Text style={styles.meta}>{rosterMeta(c)}</Text>
+      </View>
+      <Text style={styles.open}>{t('circle.contacts.open')}</Text>
+    </Pressable>
+  );
+
   return (
     <View style={styles.wrap} testID="contacts-screen">
       <View style={styles.head}>
@@ -100,22 +121,13 @@ export default function ContactsScreen({ bundle, onOpen }) {
         <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-          {contacts.map((c) => (
-            <Pressable
-              key={c.contactId}
-              style={[styles.row, !c.reachable && styles.rowOffline]}
-              onPress={() => onOpen?.(c)}
-              accessibilityRole="button"
-              testID={`contact-row-${c.contactId}`}
-            >
-              <Text style={styles.icon}>{c.isBot ? '🤖' : '👤'}</Text>
-              <View style={styles.body}>
-                <Text style={styles.name}>{c.name}</Text>
-                <Text style={styles.meta}>{rosterMeta(c)}</Text>
-              </View>
-              <Text style={styles.open}>{t('circle.contacts.open')}</Text>
+          {shown.map((c) => rowFor(c))}
+          {hidden.length > 0 ? (
+            <Pressable style={styles.fold} onPress={() => setFoldOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: foldOpen }} testID="contacts-hidden-fold">
+              <Text style={styles.foldText}>{t('circle.contacts.hidden_fold', { count: hidden.length })}</Text>
             </Pressable>
-          ))}
+          ) : null}
+          {foldOpen ? hidden.map((c) => rowFor(c, true)) : null}
         </ScrollView>
       )}
     </View>
@@ -148,6 +160,9 @@ const makeStyles = (theme) => StyleSheet.create({
   empty: { fontSize: 14, color: theme.color.inkSoft, paddingVertical: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md },
   rowOffline: { opacity: 0.6 },
+  rowHidden: { opacity: 0.5 },
+  fold: { paddingVertical: 10, alignItems: 'center' },
+  foldText: { fontSize: 13, color: theme.color.inkSoft, textDecorationLine: 'underline' },
   icon: { fontSize: 22 },
   body: { flex: 1 },
   name: { fontSize: 15, fontWeight: '600', color: theme.color.ink },

@@ -70,7 +70,7 @@ describe('landing', () => {
     });
     expect(r.bindings.get('new')).toBe('k1');
     expect(r.bindings.get('held'), 'a sibling cannot overrule a key this device holds').toBe('the-real-key');
-    expect(r.landed).toEqual([{ from: SIBLING, established: 1, contactsAdded: 0 }]);
+    expect(r.landed).toEqual([{ from: SIBLING, established: 1, contactsAdded: 0, hiddenChanged: [] }]);
   });
   it('adds a contact it lacks and leaves one it has untouched', async () => {
     const r = rig();
@@ -89,12 +89,15 @@ describe('landing', () => {
     // add-if-absent for everything else; `hidden` + `hiddenAt` are the one field-pair a sibling may CHANGE on a
     // row this device holds — when its change is newer. Older news never un-hides what this device hid later.
     const r = rig();
+    // What landed is observable — a shell repaints its roster from it, the box writes its log from it.
+    const landed = []; r.sync.onLanded((s) => landed.push(s.hiddenChanged));
     r.book.set('w', { webid: 'w', displayName: 'Wilfred', hidden: false, hiddenAt: 1000 });
     await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
       subtype: KNOWN_PEERS_BROADCAST, peers: [],
       contacts: [{ webid: 'w', displayName: 'their edit', hidden: true, hiddenAt: 2000 }],
     });
     expect(r.book.get('w').hidden, 'the phone hid Wilfred; the laptop follows').toBe(true);
+    expect(landed.at(-1)).toEqual([{ webid: 'w', hidden: true }]);
     expect(r.book.get('w').hiddenAt).toBe(2000);
     expect(r.book.get('w').displayName, 'only the mark crossed — the rest of the row is still this device\'s').toBe('Wilfred');
     // Older news: a sibling that still thinks Wilfred is shown (its mark from 1500) does not un-hide him.
@@ -115,6 +118,8 @@ describe('landing', () => {
       contacts: [{ webid: 'w2', displayName: 'Bea', hidden: true, hiddenAt: 10 }],
     });
     expect(r.book.get('w2')).toMatchObject({ webid: 'w2', hidden: true, hiddenAt: 10 });
+    expect(landed.at(-1), 'a row that arrives hidden is a change the listener hears').toEqual([{ webid: 'w2', hidden: true }]);
+    expect(landed[1], 'older news changed nothing, and said so').toEqual([]);
   });
 
   it('never learns itself from a sibling', async () => {

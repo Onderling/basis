@@ -132,6 +132,48 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 12, every: 3000 });
     expect(back.painted, `the maker's answer never reached the visitor's screen (found: ${back.found})`).toBe(true);
     log('STEP5 the answer', 'PASS', 'round trip complete');
+
+    // ── The visitor hides Wilfred; the maker answers again; Wilfred is back, with the marker. (L106) ─────
+    // The seeded contact is the first row every tester will want out of their list. Hidden, not deleted: the
+    // thread stays, the fold at the bottom says "verborgen (1)", and the next message FROM them brings them
+    // back — with the one line that says why they are back. Painted, not stored.
+    await gotoCircles(visitor.page);
+    await visitor.page.locator('[data-tab="contacten"]').first().click();
+    await visitor.page.waitForTimeout(1500);
+    await visitor.page.locator(`.cc-contacts__row[data-contact-id="${added.contact.webid}"]`).first().click();
+    await visitor.page.waitForTimeout(1500);
+    const hide = visitor.page.locator('.cc-cthread__hide');
+    expect(await hide.count(), 'the thread header offers Verbergen for a person').toBe(1);
+    expect(await hide.getAttribute('data-hidden')).toBe('false');
+    await hide.click();
+    await expect(hide, 'the control flips to Tonen once the book has the mark').toHaveAttribute('data-hidden', 'true');
+    await visitor.page.locator('.cc-cthread__back').first().click();
+    await visitor.page.waitForTimeout(1500);
+    const shownRows = visitor.page.locator(`.cc-contacts__list:not(.cc-contacts__hidden) .cc-contacts__row[data-contact-id="${added.contact.webid}"]`);
+    expect(await shownRows.count(), 'Wilfred is not in the list any more').toBe(0);
+    const fold = visitor.page.locator('.cc-contacts__fold');
+    expect(await fold.count(), 'the fold at the bottom holds the hidden row').toBe(1);
+    expect(await fold.textContent()).toContain('1');
+    log('STEP6a the visitor hides Wilfred', 'PASS', `fold: ${(await fold.textContent()).trim()}`);
+    const again = `nog even dit ${Date.now().toString(36)}`;
+    const answered2 = await sendDirectMessage(maker.page, again, { to: seen.contactId });
+    expect(answered2.sent, `the maker could not answer a second time: ${answered2.why}`).toBe(true);
+    const returned = await waitForContactMessageDetailed(visitor.page, again, { tries: 12, every: 3000 });
+    expect(returned.painted, `the second answer never reached the visitor's screen (found: ${returned.found}) — a hidden contact's message must land and bring them back`).toBe(true);
+    // The thread that is open now is Wilfred's: the marker sits above the turn that brought him back.
+    const returnedLine = visitor.page.locator('.cc-cthread__system');
+    expect(await returnedLine.count(), 'the one-line marker ("Je had dit contact verborgen.") is painted once').toBe(1);
+    const markerThenTurn = await visitor.page.evaluate((t) => {
+      const sys = document.querySelector('.cc-cthread__system');
+      return !!sys && (sys.nextElementSibling?.textContent ?? '').includes(t);
+    }, again);
+    expect(markerThenTurn, 'the marker sits right above the turn that brought Wilfred back').toBe(true);
+    expect(await visitor.page.locator('.cc-cthread__hide').getAttribute('data-hidden'), 'the header reads Verbergen again').toBe('false');
+    await visitor.page.locator('.cc-cthread__back').first().click();
+    await visitor.page.waitForTimeout(1500);
+    expect(await shownRows.count(), 'Wilfred is a row in the list again').toBe(1);
+    expect(await visitor.page.locator('.cc-contacts__fold').count(), 'nothing hidden any more — no fold').toBe(0);
+    log('STEP6 hidden, then back', 'PASS', 'the marker is painted above the returning turn');
   } finally {
     try { box?.child?.kill('SIGTERM'); } catch { /* */ }
     await teardown([maker, visitor].filter(Boolean));

@@ -166,10 +166,12 @@ describe('Verbergen / Tonen in the thread header (L106)', () => {
   it('a bot thread, or a caller without the seam, has no control', () => {
     expect(renderContactThread(document.createElement('div'), { name: 'Bot', t }).querySelector('.cc-cthread__hide')).toBe(null);
   });
-  it('the returned marker paints as a system line in the thread', () => {
-    const el = renderContactThread(document.createElement('div'), { name: 'W', t, messages: [{ origin: 'system', text: 'circle.contacts.returned_marker' }, { origin: 'bot', text: 'hoi' }] });
-    const sys = el.querySelector('.cc-cthread__msg--system');
-    expect(sys, 'a system line, not a bubble from either side').toBeTruthy();
-    expect(sys.textContent).toContain('circle.contacts.returned_marker');
+  it('the turn that brought a hidden contact back carries the marker: a system line ABOVE its bubble, from the locale', () => {
+    const el = renderContactThread(document.createElement('div'), { name: 'W', t, messages: [{ origin: 'bot', text: 'eerder' }, { origin: 'bot', text: 'ben ik er nog?', returned: true }] });
+    const sys = el.querySelectorAll('.cc-cthread__system');
+    expect(sys.length, 'one marker, for the one returning turn').toBe(1);
+    expect(sys[0].textContent).toBe('circle.contacts.returned_marker');
+    expect(sys[0].nextElementSibling?.textContent, 'the marker sits right above the turn that brought them back').toContain('ben ik er nog?');
+    expect(sys[0].closest('.cc-cthread__bubble'), 'a system line, not a bubble from either side').toBe(null);
   });
 });

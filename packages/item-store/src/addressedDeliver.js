@@ -117,6 +117,8 @@ export function createAddressedDeliver({
         // returns an EMPTY map that the next save writes back over the row. One photo would take the whole
         // thread store with it. The bytes go to `blobStore` under the file id (see `stripBytes`).
         ...(ex.file && typeof ex.file === 'object' ? { file: stripBytes(ex.file) } : {}),
+        // The turn that brought a hidden contact back: the thread's one-line marker is painted from this.
+        ...(ex.returned === true ? { returned: true } : {}),
         sentAt:       typeof envelope?.ts === 'number' ? envelope.ts : Date.now(),
         nonce:        envelope?.id ?? null,
       },
@@ -240,6 +242,7 @@ export function chatTurnsFromItems(items, { threadKey } = {}) {
       ...(s.replyTo ? { replyTo: s.replyTo } : {}),
       ...(Array.isArray(s.buttons) ? { buttons: s.buttons } : {}),
       ...(s.file && typeof s.file === 'object' ? { file: s.file } : {}),
+      ...(s.returned === true ? { returned: true } : {}),
     });
   }
   out.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));

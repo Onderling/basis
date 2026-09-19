@@ -258,6 +258,18 @@ if (relayUrl) {
     sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    // A contact the person hid (on any device — the mark rides the own-devices carry) who writes again comes
+    // back: here that is the book row unhidden, so the carry says so on every device; the screens paint the
+    // marker themselves when the turn reaches them. Hiding is Contacten only — the thread, the pair roster
+    // and their circles never change, so this device stores the turn exactly as it would any other.
+    isHidden: async (contactId) => {
+      const rows = (await callSkill('stoop', 'listContacts', {}))?.contacts ?? [];
+      return rows.some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true);
+    },
+    onReturned: async (contactId) => {
+      await callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false });
+      walkLog({ kind: 'contact-returned', contactId: String(contactId).slice(0, 12) });
+    },
     localActor: 'me',
     // Direct messages are sealed to the PERSON's current key; an enrolled box holds it, handed over at enrol.
     sealFor: agent.contactSeal?.sealFor ?? null,
@@ -447,6 +459,11 @@ if (relayUrl) {
   kick(lanes.catchUps.membership, 'membership', 2500);
   kick(agent.grantsCatchUp, 'grants', 2500);
   kick(agent.knownPeersSync, 'known-peers', 2500);
+  // A hidden mark set on another device of the person lands here and the log says so — the one way a walk
+  // (and a reader of this box's log) can see that "hidden on the phone" reached the box.
+  agent.knownPeersSync?.onLanded?.(({ hiddenChanged }) => {
+    for (const c of hiddenChanged ?? []) walkLog({ kind: 'contact-hidden', contactId: String(c.webid).slice(0, 12), hidden: c.hidden });
+  });
   kick(agent.personKeySync, 'person-key', 2500);
   // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and
   // at boot by asking, as both shells do. (Found by the shell-seams guard on its first run, 2026-09-19.)

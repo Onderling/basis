@@ -129,14 +129,18 @@ export function createContactBook({ members, dataSource }) {
    * changes it. `hiddenAt` records the change in both directions, so a device that learns of a newer change
    * from a sibling can tell it is newer.
    *
+   * Someone the book does not know yet — a stranger who wrote to me, a row Contacten shows from the peer graph
+   * — becomes a contact row by being hidden: the mark has to live where it carries to the person's other
+   * devices, and that is here. Their key is their address, the same value the graph keys them by.
+   *
    * @param {string} webid
    * @param {boolean} hidden
    */
   async function setHidden(webid, hidden, hiddenAt = Date.now()) {
+    if (!webid) throw new TypeError('setHidden: webid required');
     if (typeof hidden !== 'boolean') throw new TypeError('setHidden: hidden must be boolean');
     if (!Number.isFinite(hiddenAt)) throw new TypeError('setHidden: hiddenAt must be a time');
-    const existing = await members.resolveByWebid(webid);
-    if (!existing) throw new Error('setHidden: contact not found');
+    const existing = (await members.resolveByWebid(webid)) ?? { webid, pubKey: webid };
     return members.addMember({ ...existing, relation: 'contact', hidden, hiddenAt });
   }
 

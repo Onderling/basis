@@ -120,8 +120,10 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
       ...(nameless && book.name && book.name !== book.contactId ? { name: book.name } : {}),
       ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}),
       ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}),
-      // the hidden mark is the book's alone — a graph row (a greeting, a first message) never un-hides what the person hid
-      ...(book.hidden === true ? { hidden: true } : {}),
+      // the hidden mark is the book's alone — a graph row (a greeting, a first message) never un-hides what the person
+      // hid — and a row the book knows says so (`source`), which is what makes it hideable at all
+      source: 'contact',
+      hidden: book.hidden === true,
     } : r);
   }
   return sortContactRows([...byId.values()]);

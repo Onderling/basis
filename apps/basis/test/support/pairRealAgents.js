@@ -259,6 +259,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const contactTurnsSeen = [];       // turns that arrived from one of MY OWN devices
   const contactTurnsRefused = [];    // fanned turns this node refused, with the reason
   const notedPeers = new Set();      // senders the contact channel made a row of (the shells' peer-graph upsert)
+  const returned = [];               // hidden contacts a landed turn brought back (the shells' `onReturned`), in order
   // the pair roster (L105), composed as both shells do — the redeem sender is built below, late-bound
   const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
   const pairRoster = createPairRoster({
@@ -293,6 +294,12 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         itemStore:  createContactDmStore({ dataSource: null, localActor: pubKey }),
         // the shells' peer-graph upsert, recorded: the senders this device would list in Contacten
         notePeer:   (addr) => { notedPeers.add(addr); },
+        // a carried turn lands in the thread keyed by identity, as both shells and the box compose it
+        identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+        // a hidden contact who writes again comes back (L106), composed as the shells do: the book says who is
+        // hidden; the landing unhides the row. Recorded too, so a walk can assert the marker's moment.
+        isHidden: async (contactId) => ((await agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true),
+        onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); returned.push(contactId); },
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,
         localActor: pubKey,
@@ -460,7 +467,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).

@@ -118,6 +118,7 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
       try { if (learnPeerKey(b.address, b.pubKey) === 'established') established += 1; } catch { /* one bad row never blocks the rest */ }
     }
     let contactsAdded = 0;
+    const hiddenChanged = [];   // rows whose hidden mark a sibling's newer change set here: {webid, hidden}
     for (const c of wire.contacts) {
       if (c.webid === selfPubKey) continue;
       try {
@@ -128,17 +129,24 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
           if (typeof c.hidden === 'boolean' && Number.isFinite(c.hiddenAt) && typeof contacts.get === 'function' && typeof contacts.setHidden === 'function') {
             const mine = await contacts.get(c.webid);
             const myAt = Number.isFinite(mine?.hiddenAt) ? mine.hiddenAt : -Infinity;
-            if (c.hiddenAt > myAt) await contacts.setHidden(c.webid, c.hidden, c.hiddenAt);   // the newer change, with its time
+            if (c.hiddenAt > myAt) {
+              await contacts.setHidden(c.webid, c.hidden, c.hiddenAt);   // the newer change, with its time
+              if (mine?.hidden !== c.hidden) hiddenChanged.push({ webid: c.webid, hidden: c.hidden });
+            }
           }
           continue;
         }
         await contacts.add(c);
         contactsAdded += 1;
+        if (c.hidden === true) hiddenChanged.push({ webid: c.webid, hidden: true });   // a row that arrives hidden is a change too
       } catch (err) { warn(`a contact from my own device could not be added: ${err?.message ?? err}`); }
     }
-    try { onLanded?.({ from: fromAddr, established, contactsAdded }); } catch { /* observability never throws */ }
-    return { established, contactsAdded };
+    const summary = { from: fromAddr, established, contactsAdded, hiddenChanged };
+    try { onLanded?.(summary); } catch { /* observability never throws */ }
+    for (const fn of landedListeners) { try { fn(summary); } catch { /* observability never throws */ } }
+    return { established, contactsAdded, hiddenChanged };
   }
+  const landedListeners = new Set();
 
   async function sendWire(to, subtype, wire) {
     try { await sendToPeer(to, { subtype, ...wire }); return true; }
@@ -158,6 +166,9 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
 
   return {
     subtypes: { broadcast: KNOWN_PEERS_BROADCAST, ...KNOWN_PEERS_CATCHUP_SUBTYPES },
+
+    /** Observe what a sibling's wire changed here (a shell repaints its roster; the box writes its log). Returns the unsubscribe. */
+    onLanded(fn) { if (typeof fn === 'function') landedListeners.add(fn); return () => landedListeners.delete(fn); },
 
     /** LIVE: one binding just landed here (a greeting) — carry it to the other devices. */
     async fanPeer(binding) {

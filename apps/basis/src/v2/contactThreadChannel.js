@@ -105,14 +105,19 @@ export function createContactThreadChannel({
   // A HIDDEN CONTACT WHO WRITES AGAIN COMES BACK (L106, Frits 2026-09-19: "requiring the other person to text you
   // again to become activated again"). The channel does not know the book: the shell hands in `isHidden(contactId)`
   // and `onReturned(contactId)`. A turn that LANDS from a hidden contact — directly, or carried by my own device —
-  // calls `onReturned` once; the shell unhides the row and paints the thread with its one-line marker. My own
+  // calls `onReturned` once; the shell unhides the row. The turn itself carries `returned: true` from then on
+  // (stored, fanned, rehydrated), and the thread's one-line marker is painted from that, on every device. My own
   // outbound turn to someone I hid brings nobody back: that is my act, and Tonen is its word.
   isHidden = null,
   onReturned = null,
 } = {}) {
-  const returnedIfHidden = async (contactId) => {
-    if (typeof isHidden !== 'function' || typeof onReturned !== 'function' || !contactId) return;
-    try { if (await isHidden(contactId)) await onReturned(contactId); } catch { /* the row is a convenience; the turn is stored regardless */ }
+  const hiddenNow = async (contactId) => {
+    if (typeof isHidden !== 'function' || !contactId) return false;
+    try { return (await isHidden(contactId)) === true; } catch { return false; }
+  };
+  const returned = async (contactId) => {
+    if (typeof onReturned !== 'function' || !contactId) return;
+    try { await onReturned(contactId); } catch { /* the row is a convenience; the turn is stored regardless */ }
   };
   const resolveId = (id) => { if (typeof identityOf !== 'function' || !id) return id; try { return identityOf(id) || id; } catch { return id; } };
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
@@ -276,7 +281,17 @@ export function createContactThreadChannel({
    *   forth: each hand-off looks like a fresh arrival to the other.
    * @returns {Promise<{ itemId: string|null, deduped?: boolean }>}
    */
-  function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice = false } = {}) {
+  async function persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice = false, returned: carriedReturned = false } = {}) {
+    // THE TURN THAT BRINGS A HIDDEN CONTACT BACK IS MARKED AS SUCH (L106). Decided where the turn first lands
+    // (the contact is hidden here as it arrives), and then carried with the turn — stored, fanned, rehydrated —
+    // so every device paints the one-line marker above THIS bubble, whether the row there was unhidden by the
+    // turn itself or, moments earlier, by the carried mark. A transient signal here would have raced the mark's
+    // own carry (measured 2026-09-19: the box unhid and fanned, the laptop's row was shown before the turn came).
+    const key = contactId || fromAddr;
+    // The book knows the PERSON: a turn over the pair route arrives from a per-circle address, and the hidden
+    // mark is on the identity behind it.
+    const who = resolveId(key);
+    const isReturn = carriedReturned === true || (!viaOwnDevice && await hiddenNow(who));
     const envelope = {
       id:     messageId ?? mkId(),
       kind:   subtypes.in,
@@ -291,6 +306,7 @@ export function createContactThreadChannel({
         // A received peer-wire file (photo, document) — the thread is its durable home; the bytes as this
         // device keeps them (full, or the description only — the file's own choice on Mij / My data).
         ...(file && typeof file === 'object' ? { file: fileToKeep(file) } : {}),
+        ...(isReturn ? { returned: true } : {}),
       },
     };
     // Hold nothing, still carry: a device that does not keep contact turns fans the turn (bytes included) to
@@ -299,17 +315,19 @@ export function createContactThreadChannel({
     return persisted.then(async (res) => {
       // A turn that landed makes its sender a row — once; a duplicate was noted when it first landed. The row
       // is the PERSON (the thread's key), not whichever address the message came from.
-      if (!res?.deduped && typeof notePeer === 'function' && (contactId || fromAddr)) {
-        try { await notePeer(contactId || fromAddr); } catch { /* the row is a convenience; the turn is stored regardless */ }
+      if (!res?.deduped && typeof notePeer === 'function' && key) {
+        try { await notePeer(key); } catch { /* the row is a convenience; the turn is stored regardless */ }
       }
-      // …and a landed turn from a contact the person had hidden brings that contact back (both paths share this).
-      if (!res?.deduped) await returnedIfHidden(contactId || fromAddr);
+      // …and a landed turn from a contact the person had hidden brings that contact back (both paths share this):
+      // the shell unhides the row. A carried return whose row is already shown here (the mark got here first)
+      // still says so, so the roster repaints; the marker is the turn's own.
+      if (!res?.deduped && (isReturn || await hiddenNow(who))) await returned(who);
       // Only a turn that actually landed is worth fanning: a duplicate has already been fanned once,
       // and re-fanning it would put a second copy on every sibling's wire for nothing.
       if (!viaOwnDevice && !res?.deduped) {
-        await fanOwn({ direction: 'in', contactId, fromAddr, text, messageId, replyTo, ts, buttons, file });
+        await fanOwn({ direction: 'in', contactId, fromAddr, text, messageId, replyTo, ts, buttons, file, ...(isReturn ? { returned: true } : {}) });
       }
-      return res;
+      return { ...res, ...(isReturn ? { returned: true } : {}) };
     });
   }
 
@@ -366,13 +384,14 @@ export function createContactThreadChannel({
     const outbound = direction === 'out';
     const res = outbound
       ? await persistOutbound({ contactId, peerAddr, text, messageId, replyTo, ts, viaOwnDevice: true })
-      : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true });
+      : await persistInbound({ contactId, fromAddr, text, messageId, buttons, replyTo, ts, file, viaOwnDevice: true, returned: wire.returned === true });
     return {
       contactId,
       origin:  outbound ? 'user' : 'bot',
       deduped: res?.deduped === true,
       itemId:  res?.itemId ?? null,
       text, messageId, replyTo, ts, buttons, file, fromAddr, peerAddr,
+      ...(res?.returned === true ? { returned: true } : {}),
     };
   }
 

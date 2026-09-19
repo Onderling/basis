@@ -130,8 +130,13 @@ describe('Stoop V2 Phase 24 — ContactBook', () => {
     const shown = await callSkill(bundle.agent, 'setContactHidden', { webid: BOB, hidden: false });
     expect(shown.contact.hidden).toBe(false);
     expect(shown.contact.hiddenAt).toBeGreaterThanOrEqual(r.contact.hiddenAt);
-    // An unknown contact is an error, not a silent row.
-    expect((await callSkill(bundle.agent, 'setContactHidden', { webid: 'https://id.example/nobody', hidden: true })).error).toMatch(/not found/);
+    // Hiding someone the book does not know yet — a stranger who wrote to me, a row from the peer graph — PUTS
+    // them in the book, hidden: the mark has to live somewhere that carries to my other devices, and the book
+    // is that place. Their key is their address (the graph's row is keyed the same way).
+    const stranger = await callSkill(bundle.agent, 'setContactHidden', { webid: 'https://id.example/nobody', hidden: true });
+    expect(stranger.contact).toMatchObject({ webid: 'https://id.example/nobody', hidden: true, relation: 'contact' });
+    expect(stranger.contact.hiddenAt).toBeGreaterThanOrEqual(before);
+    expect((await callSkill(bundle.agent, 'listContacts', {})).contacts.find((x) => x.webid === 'https://id.example/nobody')?.hidden).toBe(true);
   });
 
   it('listContacts({minTrust: vertrouwd}) filters', async () => {

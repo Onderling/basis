@@ -185,13 +185,30 @@ export function createAddressedDeliver({
    * `to` is the PEER the thread is about (persisted as such); `deliverTo` is the wire address the envelope actually
    * goes to when that differs — a contact with a pair roster is written to at their per-circle address there,
    * not at the profile address the thread is keyed by — and `sendOpts` rides to the injected send (a circle id).
+   *
+   * A ROUTE THAT REACHES NOBODY FALLS BACK TO THE PERSON (2026-09-19). The route's address is one specific
+   * device's per-circle address; it may be on no relay yet (its registration is fire-and-forget on the web
+   * shell) or that device may be dark while the person's primary is up. Measured in CI: the answer to a visitor
+   * rode the pair route, the greeting timed out, the answer was held, the visitor's screen never showed it. So
+   * when the route does not deliver — held, refused, or thrown — the SAME envelope goes to `to`, plainly: the
+   * address every device of the person registers and the primary holds. The receiver dedups by id, so a route
+   * that delivers late costs one duplicate on the wire and none on the screen.
    */
   async function deliver(envelope, { to, deliverTo = null, sendOpts = null } = {}) {
     if (!to) throw new Error('deliver: `to` (peer address) is required');
     const wire = typeof toWire === 'function' ? toWire(envelope, to) : envelope;
-    const sent = sendOpts ? await send(deliverTo ?? to, wire, sendOpts) : await send(deliverTo ?? to, wire);
+    const routed = !!deliverTo && deliverTo !== to;
+    let sent;
+    try { sent = sendOpts ? await send(deliverTo ?? to, wire, sendOpts) : await send(deliverTo ?? to, wire); }
+    catch (err) { if (!routed) throw err; sent = { delivered: false, held: false, error: err?.message ?? String(err) }; }
+    // Only a send that SAID it did not deliver (or threw) falls back: a send with no verdict at all — an
+    // injected sender that returns nothing — is taken as delivered, or every routed turn would go twice.
+    let fallback;
+    if (routed && sent?.delivered === false) {
+      fallback = await send(to, wire);
+    }
     const { itemId, deduped } = await persistTurn(envelope, { to, direction: 'out' });
-    return { sent, itemId, ...(deduped ? { deduped: true } : {}) };
+    return { sent, itemId, ...(fallback !== undefined ? { fallback } : {}), ...(deduped ? { deduped: true } : {}) };
   }
 
   /**

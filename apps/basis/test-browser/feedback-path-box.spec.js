@@ -171,7 +171,9 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });
     expect(answered.sent, `the maker could not answer: ${answered.why}`).toBe(true);
     log('STEP5a the maker answered', 'INFO', `to ${String(answered.to).slice(0, 12)}…; visitor ${JSON.stringify(visitorWho)}; box card → ${String(added.contact.webid).slice(0, 12)}…; Contacten rows: ${JSON.stringify(makerRows)}; graph: ${JSON.stringify(makerGraph)}\n    maker rosters: ${JSON.stringify(makerRosters)}\n    visitor rosters: ${JSON.stringify(visitorRosters)}\n    box presence: ${JSON.stringify(boxPresence)}\n    box primary: ${JSON.stringify(boxPrimary)}`);
-    const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 12, every: 3000 });
+    // The answer may ride the pair route first and reach the visitor by the fallback after that route's greeting
+    // times out (~20 s in CI): the poll allows for it.
+    const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 20, every: 3000 });
     if (!back.painted) {
       const outcomes = await maker.page.evaluate(() => window.__sendOutcomes ?? null).catch((e) => String(e));
       const visitorHolds = await visitor.page.evaluate(async (id) => {

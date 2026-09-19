@@ -33,11 +33,13 @@ test('build + local swap upload: the stamp is baked in, version.json written, th
   const dist = build('tiny', stamp, { appsDir: join(root, 'apps'), log: () => {}, base: '/basis/' });
   assert.match(readFileSync(join(dist, 'index.html'), 'utf8'), /v v9\.9\.9-test base \/basis\//);
   assert.equal(JSON.parse(readFileSync(join(dist, 'version.json'), 'utf8')).tag, 'v9.9.9-test');
+  // the page and the stamp are never served stale (an Apache host honours this; the app's own check covers the rest)
+  assert.match(readFileSync(join(dist, '.htaccess'), 'utf8'), /index\\\.html\|version\\\.json[\s\S]*Cache-Control "no-cache"/);
 
   const www = join(root, 'www/site');
   mkdirSync(www, { recursive: true }); writeFileSync(join(www, 'stale.html'), 'old');
   upload(dist, parseTarget(`WEB_PATH=${www}\n`), { log: () => {} });
-  assert.ok(existsSync(join(www, 'index.html')) && existsSync(join(www, 'assets/a.js')));
+  assert.ok(existsSync(join(www, 'index.html')) && existsSync(join(www, 'assets/a.js')) && existsSync(join(www, '.htaccess')), 'dotfiles ride the upload too');
   assert.ok(!existsSync(join(www, 'stale.html')), 'the old folder is gone, not merged');
   assert.ok(!existsSync(`${www}.new`) && !existsSync(`${www}.old`));
 });

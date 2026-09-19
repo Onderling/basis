@@ -147,11 +147,24 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     await gotoCircles(maker.page);
     await maker.page.locator('[data-tab="contacten"]').first().click();
     await maker.page.waitForTimeout(1500);
-    const makerRows = await maker.page.evaluate(() => [...document.querySelectorAll('.cc-contacts__row')].map((r) => `${r.dataset.contactId?.slice(0, 12)}${r.classList.contains('cc-contacts__row--bot') ? '(bot)' : ''}`)).catch(() => null);
+    const makerRows = await maker.page.evaluate(() => [...document.querySelectorAll('.cc-contacts__row')].map((r) => `${r.dataset.contactId?.slice(0, 12)}${r.classList.contains('cc-contacts__row--bot') ? '(bot)' : ''}:${r.querySelector('.cc-contacts__name')?.textContent?.slice(0, 12)}`)).catch(() => null);
+    // …and who each row IS: the visitor's keys, the box's (the maker's own) — a row that is neither is a defect of its own.
+    const visitorWho = await visitor.page.evaluate(async () => { const w = await window.onderlingCall('stoop', 'whoAmI', {}); return { pubKey: String(w?.pubKey).slice(0, 12), webid: String(w?.webid).slice(0, 12), address: String(w?.address ?? w?.peerAddress ?? '').slice(0, 12) }; }).catch((e) => String(e));
+    const makerGraph = await maker.page.evaluate(async () => ((await window.onderlingPeers?.all?.()) ?? []).map((p) => `${String(p.pubKey ?? p.id).slice(0, 12)}:${p.name ?? ''}:${p.reachable}`)).catch((e) => String(e));
+    // …and the rosters each side holds (who, at which addresses) — an unresolved row is an address on no roster here.
+    const rostersOf = async (page) => page.evaluate(async () => {
+      const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+      const out = {};
+      for (const cid of ids) { try { const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: cid }); out[String(cid).slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}@[${(m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)).join(',')}]${m.circleAddress ? `*${String(m.circleAddress).slice(0, 8)}` : ''}`); } catch (e) { out[String(cid).slice(0, 14)] = String(e); } }
+      return out;
+    }).catch((e) => String(e));
+    const makerRosters = await rostersOf(maker.page);
+    const visitorRosters = await rostersOf(visitor.page);
+    const boxPresence = walkLog(dataDir).filter((e) => e.kind === 'presence').slice(-1)[0] ?? null;
     const reply = `dank je, ik kijk ernaar ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });
     expect(answered.sent, `the maker could not answer: ${answered.why}`).toBe(true);
-    log('STEP5a the maker answered', 'INFO', `to ${String(answered.to).slice(0, 12)}… (visitor ${String(visitorId).slice(0, 12)}…); Contacten rows: ${JSON.stringify(makerRows)}`);
+    log('STEP5a the maker answered', 'INFO', `to ${String(answered.to).slice(0, 12)}…; visitor ${JSON.stringify(visitorWho)}; box card → ${String(added.contact.webid).slice(0, 12)}…; Contacten rows: ${JSON.stringify(makerRows)}; graph: ${JSON.stringify(makerGraph)}\n    maker rosters: ${JSON.stringify(makerRosters)}\n    visitor rosters: ${JSON.stringify(visitorRosters)}\n    box presence: ${JSON.stringify(boxPresence)}`);
     const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 12, every: 3000 });
     if (!back.painted) {
       const outcomes = await maker.page.evaluate(() => window.__sendOutcomes ?? null).catch((e) => String(e));

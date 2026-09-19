@@ -152,3 +152,56 @@ describe('interop with the core hello protocol (its answer says `ack`, not `_re`
     await sa.shutdown();
   });
 });
+
+/**
+ * A HI that dialled one of our PER-CIRCLE addresses is answered AS that address (G13) — and never over a
+ * transport that cannot carry the address as the sender. Measured 2026-09-19 on two web apps: B's HI to A's
+ * pair-circle address arrived over the alias-blind transport (NKN); A answered on that same transport, which
+ * fell back to A's canonical address; the answer reached B's per-circle address signed by the person, and B
+ * refused it ("a member's canonical identity where they sign per-circle") — one refusal in every join's log,
+ * and a handshake that only completed on a later retry. The send path already has the rule ("on an alias-blind
+ * transport the person speaks to the person"); the answer must follow it: an alias answer goes over an
+ * alias-capable transport, or is not sent from the primary in the alias's name.
+ */
+describe('a HI to one of our per-circle addresses is answered as that address, over a transport that can carry it', () => {
+  const aliasBlind = () => ({ ...fakeTransport(), address: 'mesh.addr', supportsAliases: false });
+  const aliasCapable = () => ({ ...fakeTransport(), address: 'relay.addr', supportsAliases: true, canReach: () => true });
+
+  it('over the alias-capable transport when the dialled address is an alias — even if the HI arrived over the blind one', async () => {
+    const mesh = aliasBlind(); const relay = aliasCapable();
+    const sa = await createSecureAgent({ vault: new VaultMemory() });
+    await sa.addSecureTransport('nkn', mesh);
+    await sa.addSecureTransport('relay', relay);
+    // this device's per-circle identity, as `useCircleSigningIdentity` installs it
+    const { AgentIdentity } = await import('@onderling/core');
+    const circleId = await AgentIdentity.generate(new VaultMemory());
+    sa.registerSelfIdentity(circleId.pubKey, circleId);
+    // B dials the per-circle address; the envelope arrives over the mesh transport
+    await mesh.inbound({ ...HI('bea-in-pair'), _to: circleId.pubKey });
+    expect(mesh.hellos, 'no answer in the alias\'s name over a transport that would send it as the primary').toEqual([]);
+    expect(relay.hellos.length, 'the answer went over the transport that carries the alias').toBe(1);
+    expect(relay.hellos[0].opts.from, 'answered AS the address dialled').toBe(circleId.pubKey);
+    expect(relay.hellos[0].payload.pubKey, 'with the key that belongs to it').toBe(circleId.pubKey);
+  });
+
+  it('a HI to the canonical address is answered where it arrived, as before', async () => {
+    const mesh = aliasBlind(); const relay = aliasCapable();
+    const sa = await createSecureAgent({ vault: new VaultMemory() });
+    await sa.addSecureTransport('nkn', mesh);
+    await sa.addSecureTransport('relay', relay);
+    await mesh.inbound({ ...HI('cato'), _to: sa.pubKey ?? 'mesh.addr' });
+    expect(mesh.hellos.length).toBe(1);
+    expect(relay.hellos).toEqual([]);
+  });
+
+  it('with no alias-capable transport at all, the alias answer is not sent from the primary in the alias\'s name', async () => {
+    const mesh = aliasBlind();
+    const sa = await createSecureAgent({ vault: new VaultMemory() });
+    await sa.addSecureTransport('nkn', mesh);
+    const { AgentIdentity } = await import('@onderling/core');
+    const circleId = await AgentIdentity.generate(new VaultMemory());
+    sa.registerSelfIdentity(circleId.pubKey, circleId);
+    await mesh.inbound({ ...HI('bea-in-pair'), _to: circleId.pubKey });
+    expect(mesh.hellos, 'silence beats a canonical answer the peer refuses and files wrongly').toEqual([]);
+  });
+});

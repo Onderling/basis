@@ -41,6 +41,10 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     // ── B, a fresh app, opens the link: the contact is added, Contacten shows Anna ─────────────────
     B = await bootPeer(browser, 'B');
     B.page.on('dialog', (d) => d.dismiss().catch(() => {}));   // the "added" notice is an alert here
+    // What either side refuses inside the pair circle during the join — read at STEP5.
+    const refusedOnB = []; const refusedOnA = [];
+    B.page.on('console', (m) => { const t = m.text(); if (/refused a validly-signed envelope/.test(t)) refusedOnB.push(t.slice(0, 260)); });
+    A.page.on('console', (m) => { const t = m.text(); if (/refused a validly-signed envelope/.test(t)) refusedOnA.push(t.slice(0, 260)); });
     // The link as A painted it names A's origin; B's server is the same one — keep B's relay seed on the query.
     // Opened the way a person opens a link: a fresh page load (a tab of its own), not a fragment change.
     const dest = `${new URL(B.page.url()).pathname}${new URL(B.page.url()).search}${link.slice(link.indexOf('#'))}`;
@@ -91,6 +95,48 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(seen.found, 'B\'s message never reached A — see "STEP3 diagnostics"').toBe(true);
     expect(seen.painted, 'reached A but not painted').toBe(true);
     log('STEP3 B writes, A sees it', 'PASS', `row ${String(seen.contactId).slice(0, 12)}…`);
+
+    // ── B writes AGAIN, once the pair roster has formed: this one rides the pair route, from B's per-circle
+    // address. It must land in the SAME thread — the one keyed by B — not in one keyed by an address no row opens.
+    await B.page.waitForTimeout(6000);
+    const second = `en nog een, over de pair-route ${Date.now().toString(36)}`;
+    const sent2 = await sendDirectMessage(B.page, second, { to: aId });
+    expect(sent2.sent, `B could not write again: ${sent2.why}`).toBe(true);
+    const seen2 = await waitForContactMessageDetailed(A.page, second, { tries: 12, every: 3000 });
+    if (!seen2.painted) {
+      const outcomes = await B.page.evaluate(() => window.__sendOutcomes ?? null).catch((e) => String(e));
+      const aHolds = await A.page.evaluate(async (m) => {
+        const peers = ((await window.onderlingPeers?.all?.()) ?? []).map((p) => p.pubKey ?? p.id);
+        const threads = {};
+        for (const id of peers) { try { threads[String(id).slice(0, 12)] = ((await window.onderlingContactChannel?.rehydrate?.(id)) ?? []).map((t) => `${t.origin}:${String(t.text).slice(0, 20)}`); } catch (e) { threads[String(id).slice(0, 12)] = String(e); } }
+        const resolves = {}; for (const id of peers) resolves[String(id).slice(0, 12)] = String(window.onderlingIdentityOf?.(id) ?? null).slice(0, 12);
+        return { peers: peers.map((r) => String(r).slice(0, 12)), resolves, threads, m };
+      }, second).catch((e) => String(e));
+      console.log(`### STEP4 diagnostics\nB sent: ${JSON.stringify(outcomes)}\nA holds: ${JSON.stringify(aHolds)}`);
+    }
+    expect(seen2.found, 'B\'s second message (over the pair route) never reached A — see "STEP4 diagnostics"').toBe(true);
+    expect(seen2.painted, 'B\'s second message is on A\'s device but NOT on the screen — stored under an address no row opens (the direct path keyed by the sender address, not the person)').toBe(true);
+    expect(seen2.contactId, 'the same thread as the first message').toBe(seen.contactId);
+    log('STEP4 the second message', 'PASS', 'same thread, painted');
+    // What the join refused, if anything — LOGGED, not asserted (2026-09-19). One refusal per join remains in
+    // ~half the runs: the joiner's lane catch-up requests speak as its pair-circle address TO THE ADMIN'S GLOBAL
+    // address (its roster row has no per-circle address at that instant), so the admin — dialled at its canonical
+    // address — answers the HI canonically, to the joiner's per-circle address, which the joiner's gate rightly
+    // refuses. Nothing is lost (the handshake completes on the next envelope); the fix is the catch-up aiming
+    // circle traffic at the member's per-circle address, never the global one — its own item (ledger L110).
+    const pairRefusals = [...refusedOnB.map((t) => `B: ${t}`), ...refusedOnA.map((t) => `A: ${t}`)].filter((t) => /pair-/.test(t));
+    if (pairRefusals.length) console.log(`### NOTE: ${pairRefusals.length} envelope(s) refused in the pair circle during the join (L110):\n${pairRefusals.join('\n')}`);
+    // B holds the founder's per-circle address on the pair roster — the circle was learned, on the channel that works.
+    const bRoster = await B.page.evaluate(async (a) => {
+      const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-'));
+      if (!ids.length) return { pair: null };
+      const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: ids[0] });
+      const row = (r?.members ?? []).find((m) => m.webid === a);
+      return { pair: ids[0], founderAddress: row?.circleAddress ?? null };
+    }, aId);
+    expect(bRoster.pair, 'B is in the pair circle with A').toBeTruthy();
+    expect(bRoster.founderAddress, 'B holds A\'s proven per-circle address there').toBeTruthy();
+    log('STEP5 the circle was learned', 'PASS', `pair ${String(bRoster.pair).slice(0, 14)}…, founder at ${String(bRoster.founderAddress).slice(0, 12)}…`);
   } finally {
     await teardown([A, B].filter(Boolean));
   }

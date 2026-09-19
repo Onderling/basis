@@ -234,7 +234,7 @@ export function createCircleSenderAuthorization({
    *
    * @param {object} context  `{ senderKey, from, to, ownAddress, pattern }`
    */
-  function authorizeSender({ senderKey, from, ownAddress } = {}) {
+  function authorizeSender({ senderKey, from, ownAddress, pattern = null, answering = false } = {}) {
     // Not addressed to one of our per-circle identities ⇒ not circle traffic. Contact and pairing
     // live here, and trust-on-first-use is the right answer for them — it is the only answer that
     // lets a stranger ever become a contact.
@@ -266,14 +266,14 @@ export function createCircleSenderAuthorization({
       refusedCanonicalSigners += 1;
       try {
         onRefused?.({
-          ownAddress, circleId: entry.circleId, senderKey, from,
+          ownAddress, circleId: entry.circleId, senderKey, from, pattern, answering,
           reason: SENDER_REASON.CANONICAL_REFUSED,
         });
       } catch { /* diagnostics only */ }
       return refuseSender(SENDER_REASON.CANONICAL_REFUSED);
     }
     refusedStrangers += 1;
-    try { onRefused?.({ ownAddress, circleId: entry.circleId, senderKey, from, reason: SENDER_REASON.STRANGER }); }
+    try { onRefused?.({ ownAddress, circleId: entry.circleId, senderKey, from, pattern, answering, reason: SENDER_REASON.STRANGER }); }
     catch { /* diagnostics only */ }
     return refuseSender(SENDER_REASON.STRANGER);
   }

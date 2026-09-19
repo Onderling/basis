@@ -9,6 +9,7 @@
  */
 
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { splitShownHidden } from '../../src/v2/contactsSource.js';
 
 export function renderContactsRoster(container, { contacts = [], t, onOpen, onAdd } = {}) {
   if (!container) return container;
@@ -32,6 +33,9 @@ export function renderContactsRoster(container, { contacts = [], t, onOpen, onAd
   }
   container.appendChild(head);
 
+  // Hidden contacts (L106) fold away at the bottom: the row stays, out of sight, until they write again or
+  // the person shows them. A list of only hidden contacts is not empty — the fold says what is there.
+  const { shown, hidden } = splitShownHidden(contacts);
   if (!contacts.length) {
     const empty = document.createElement('p');
     empty.className = 'cc-contacts__empty';
@@ -40,13 +44,12 @@ export function renderContactsRoster(container, { contacts = [], t, onOpen, onAd
     return container;
   }
 
-  const list = document.createElement('ul');
-  list.className = 'cc-contacts__list';
-  for (const c of contacts) {
+  const rowFor = (c) => {
     const li = document.createElement('li');
     li.className = `cc-contacts__row${c.isBot ? ' cc-contacts__row--bot' : ''}`;
     li.dataset.contactId = c.contactId;
     if (!c.reachable) li.classList.add('is-offline');
+    if (c.hidden) li.classList.add('is-hidden');
 
     const icon = document.createElement('span');
     icon.className = 'cc-contacts__icon';
@@ -82,9 +85,27 @@ export function renderContactsRoster(container, { contacts = [], t, onOpen, onAd
     open.addEventListener('click', (e) => { e.stopPropagation(); fire(); });
     li.appendChild(open);
     li.addEventListener('click', fire);
+    return li;
+  };
 
-    list.appendChild(li);
-  }
+  const list = document.createElement('ul');
+  list.className = 'cc-contacts__list';
+  for (const c of shown) list.appendChild(rowFor(c));
   container.appendChild(list);
+
+  if (hidden.length) {
+    const fold = document.createElement('button');
+    fold.type = 'button';
+    fold.className = 'cc-contacts__fold';
+    fold.textContent = tr('circle.contacts.hidden_fold', { count: hidden.length });
+    fold.setAttribute('aria-expanded', 'false');
+    const folded = document.createElement('ul');
+    folded.className = 'cc-contacts__list cc-contacts__hidden';
+    folded.hidden = true;
+    for (const c of hidden) folded.appendChild(rowFor(c));
+    fold.addEventListener('click', () => { folded.hidden = !folded.hidden; fold.setAttribute('aria-expanded', String(!folded.hidden)); });
+    container.appendChild(fold);
+    container.appendChild(folded);
+  }
   return container;
 }

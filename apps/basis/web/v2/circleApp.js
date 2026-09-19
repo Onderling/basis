@@ -2191,6 +2191,14 @@ function buildCircleBot(agent) {
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,
     pair: circlePairRoster,
+    // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included
+    notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
+    // a carried turn lands in the thread THIS device keys by identity, whatever address the sibling keyed it by
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    // a hidden contact who writes again comes back (Frits 2026-09-19): the book says who is hidden; a landed turn
+    // from one of them — direct, or carried by my own device — unhides the row and marks the thread
+    isHidden: contactIsHidden,
+    onReturned: contactReturned,
     // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
     // this device's per-circle address there, which is the only key the pair roster admits
     sendToPeer: (addr, payload, opts) =>
@@ -2680,6 +2688,9 @@ function buildCircleBot(agent) {
 // Top-level tab bar (Circles / Stroom / Mij). Shown on the three top-level
 // surfaces; hidden inside a circle + its sub-screens.
 function showTabBar(active) {
+  // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
+  // it must not repaint the thread over whatever is showing.
+  _activeContactThread = null;
   renderCircleTabBar(tabBarEl, {
     active, t,
     onScreens: showScreens,
@@ -2715,10 +2726,34 @@ async function loadStoopContacts() {
     return (Array.isArray(res?.contacts) ? res.contacts : []).map(stoopContactToRow).filter(Boolean);
   } catch { return []; }
 }
+// Hiding a contact (L106): a mark on the BOOK row, never on the graph — so only the book can answer "is this
+// one hidden", and only the book's op changes it. Hiding is Contacten only: the thread, the pair roster, their
+// circles, roster rows and member cards are untouched. The mark rides the own-devices carry, so the act on any
+// device is the act on all of them.
+async function contactIsHidden(contactId) {
+  const rows = await loadStoopContacts();
+  return rows.some((r) => r.contactId === contactId && r.hidden === true);
+}
+async function setContactHidden(contactId, hidden) {
+  const res = await rawCallSkill('stoop', 'setContactHidden', { webid: contactId, hidden: hidden === true });
+  if (res?.error) throw new Error(res.error);
+  if (_activeContactThread?.contactId === contactId) _activeContactThread.setHidden?.(hidden === true);
+  return res;
+}
+// The contact the person had hidden wrote again: they are back in Contacten (the row unhidden here, carried to
+// the other devices), and the thread says why — the one-line marker rides the TURN that brought them back
+// (`returned`, painted by the thread renderer), not this call. For the seeded contact (Wilfred) this is only
+// ever a REPLY: the box never initiates, so a hidden Wilfred stays hidden until you write.
+async function contactReturned(contactId) {
+  await setContactHidden(contactId, false);
+  if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
+  else if (rootEl?.querySelector?.('.cc-contacts')) showContacts().catch(() => {});   // Contacten is showing: the row moves out of the fold
+}
 async function loadAllContacts() {
   const [peerRows, stoopRows] = await Promise.all([
     // A member's per-circle address is where they are reached in one circle, never a second contact.
-    listContacts(circlePeerGraph, { identityOf: (a) => _peerAgent?.identityOfAddress?.(a) ?? null }).catch(() => []),
+    // …and never me: my person address, my profile key, my devices' per-circle addresses are not contacts.
+    listContacts(circlePeerGraph, { identityOf: (a) => _peerAgent?.identityOfAddress?.(a) ?? null, ownAddresses: () => _peerAgent?.ownAddresses?.() ?? [] }).catch(() => []),
     loadStoopContacts(),
   ]);
   return mergeContacts(peerRows, stoopRows);
@@ -2908,6 +2943,10 @@ async function showContactThread(contactId) {
   // What a direct message to this contact is sealed to — the agent's own seal resolution, painted in the header.
   // Decided once per open, after the first paint: no mark until then, never a wrong one.
   let sealedMark = null;
+  // Verbergen / Tonen (L106): every person gets the control — a contact from the book, and a stranger who wrote
+  // to me (a peer-graph row; hiding them puts them in the book, hidden). A bot does not: a bot is removed, not
+  // hidden. `null` keeps the header without it.
+  let hidden = (row && !row.isBot) ? row.hidden === true : null;
 
   // Phase 2 (C3 / the G18 fix): rehydrate the DURABLE thread on open so a reload
   // shows the conversation history (best-effort; ephemeral mode / no history → no-op).
@@ -2934,6 +2973,7 @@ async function showContactThread(contactId) {
           ...(m.buttons ? { buttons: m.buttons } : {}),
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
+          ...(m.returned ? { returned: true } : {}),
         })).concat(notYetDurable);
       }
     } catch { /* best-effort — a rehydrate failure just shows an empty thread */ }
@@ -2982,6 +3022,11 @@ async function showContactThread(contactId) {
     skills, busy, error, t,
     floor: floor ? { label: t('circle.contacts.presend_floor') } : null,
     sealed: sealedMark,
+    contactId,
+    hidden,
+    onToggleHidden: async (next) => {
+      try { await setContactHidden(contactId, next); } catch { error = true; rerender(); }
+    },
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
     onButtonTap: async (b) => {
@@ -3023,7 +3068,7 @@ async function showContactThread(contactId) {
       }
     },
   });
-  _activeContactThread = { contactId, rerender };
+  _activeContactThread = { contactId, rerender, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
   rerender();
   // The seal status is async (it may read shared circles' rosters): mark once it is known, if this thread is still the open one.
   if (typeof _peerAgent?.contactSeal?.statusFor === 'function') {
@@ -3062,12 +3107,16 @@ function onContactReply({ contactId: keyedBy, fromAddr, threadId, text, buttons,
   // still routes by its echoed threadId; an unresolved sender still falls back to their address.
   const contactId = keyedBy
     ?? ((threadId && contactThreads.has(threadId)) ? threadId : fromAddr);
-  paintContactTurn({ contactId, fromAddr, origin: 'bot', text, buttons, messageId, replyTo, file });
+  const painted = paintContactTurn({ contactId, fromAddr, origin: 'bot', text, buttons, messageId, replyTo, file });
   // Phase 2 (C3 / the G18 fix): persist the inbound turn so the thread is durable
   // in BOTH directions (dedup on messageId is shared with sendTurn's outbound). Persisting is also
   // what hands the turn to my OTHER DEVICES, so their thread reads the same as this one.
-  try { circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, ts, file }); }
-  catch { /* best-effort — durability never blocks the live render */ }
+  // …and the persist decides whether THIS turn brought a hidden contact back: the bubble then carries the marker.
+  try {
+    circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, ts, file })
+      ?.then?.((r) => { if (r?.returned && painted) { painted.returned = true; if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender(); } })
+      ?.catch?.(() => {});
+  } catch { /* best-effort — durability never blocks the live render */ }
 }
 
 // A turn one of MY OWN DEVICES carried here (the sender was verified as mine before this runs). The
@@ -3082,18 +3131,20 @@ async function onOwnDeviceContactTurn(wire) {
     fromAddr:  landed.fromAddr ?? landed.peerAddr,
     origin:    landed.origin,
     text: landed.text, buttons: landed.buttons, messageId: landed.messageId,
-    replyTo: landed.replyTo, file: landed.file,
+    replyTo: landed.replyTo, file: landed.file, returned: landed.returned,
   });
 }
 
 // The render half every arriving turn shares: put the bubble in its thread, paint if that thread is
 // on screen, and give a thread nobody has named yet a real name when the directory can supply one.
-function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageId, replyTo, file }) {
+function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageId, replyTo, file, returned }) {
   let thread = contactThreads.get(contactId);
   const isNew = !thread;
   if (isNew) { thread = { name: contactId, peerAddr: fromAddr, messages: [] }; contactThreads.set(contactId, thread); }
   // `file` — a received peer-wire file (photo, document) rides the turn; the thread is its durable home.
-  thread.messages.push({ origin, text, buttons, messageId, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}) });
+  // `returned` — this turn brought a hidden contact back; the renderer paints the marker above it.
+  const bubble = { origin, text, buttons, messageId, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}), ...(returned ? { returned: true } : {}) };
+  thread.messages.push(bubble);
   if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
   // Resolve a friendlier name for an unsolicited inbound thread (fire-and-forget).
   if (isNew) {
@@ -3107,6 +3158,7 @@ function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageI
       })
       .catch(() => {});
   }
+  return bubble;
 }
 
 // seenAt persistence: bumped on showDetail(id) so unread counts

@@ -65,6 +65,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
           ...(m.buttons ? { buttons: m.buttons } : {}),
           ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.file ? { file: m.file } : {}),
+          ...(m.returned ? { returned: true } : {}),
         }))));
       } catch { /* best-effort — an empty thread is the honest fallback */ }
     })();
@@ -91,6 +92,21 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
     () => (input.startsWith('/') ? commands.suggest(input) : []), [commands, input]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  // Verbergen / Tonen (L106, web parity — contactThread.js's header control): every person gets the control — a
+  // contact from the book, and a stranger who wrote to me (hiding them puts them in the book, hidden). A bot
+  // does not: a bot is removed, not hidden. `null` keeps the header without it. The mark is the book's — the ONE
+  // stoop op changes it, on every device of the person; a message from the contact does the same as Tonen.
+  const hideable = !!contact && !contact.isBot;
+  const [hidden, setHidden] = useState(() => (hideable ? contact.hidden === true : null));
+  const toggleHidden = useCallback(async () => {
+    if (hidden === null || typeof bundle?.callSkill !== 'function') return;
+    const next = !hidden;
+    try {
+      const r = await bundle.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: next });
+      if (r?.error) throw new Error(r.error);
+      setHidden(next);
+    } catch { setError(true); }
+  }, [hidden, bundle, contactId]);
   const scrollRef = useRef(null);
 
   // Route inbound replies for THIS thread (by threadId echo, else sender addr).
@@ -98,10 +114,25 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
     return subscribeContactReplies((reply) => {
       const forThis = (reply.threadId && reply.threadId === contactId) || reply.fromAddr === peerAddr;
       if (!forThis) return;
+      // The turn that brought a hidden contact back says so (`returned`, web parity): the row is shown again,
+      // and the marker paints above this bubble. A DIRECT arrival is pushed before its persist decides that, so
+      // the decision follows as a marker-only push naming the same turn: mark the bubble already on screen.
+      if (reply.returned === true) setHidden((h) => (h === null ? null : false));
+      if (reply.markerOnly === true) {
+        setMessages((prev) => {
+          const i = reply.messageId ? prev.findIndex((m) => m.messageId === reply.messageId) : -1;
+          const at = i >= 0 ? i : prev.length - 1;
+          if (at < 0) return prev;
+          const next = prev.slice(); next[at] = { ...next[at], returned: true }; return next;
+        });
+        return;
+      }
       setMessages((prev) => [...prev, {
         id: mkId(), origin: reply.origin === 'user' ? 'user' : 'bot', text: reply.text ?? '', buttons: reply.buttons,
+        ...(reply.messageId ? { messageId: reply.messageId } : {}),
         ...(reply.replyTo ? { replyTo: reply.replyTo } : {}),
         ...(reply.file ? { file: reply.file } : {}),
+        ...(reply.returned === true ? { returned: true } : {}),
       }]);
     });
   }, [contactId, peerAddr]);
@@ -157,7 +188,15 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
             {`${sealedMark.level === 'person' ? '🔐' : '🔒'} ${t(sealedMark.key)}`}
           </Text>
         ) : null}
+        {hidden !== null ? (
+          <Pressable onPress={toggleHidden} accessibilityRole="button" testID="contact-thread-hide" style={styles.hide}>
+            <Text style={styles.hideText}>{t(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide')}</Text>
+          </Pressable>
+        ) : null}
       </View>
+      {hidden !== null ? (
+        <Text style={styles.hideNote} testID="contact-thread-hide-note">{t('circle.contacts.hide_note')}</Text>
+      ) : null}
       {floor ? (
         <Text style={styles.floor} testID="contact-thread-floor">{`🛡 ${t('circle.contacts.presend_floor')}`}</Text>
       ) : null}
@@ -169,7 +208,13 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
         onContentSizeChange={() => scrollRef.current?.scrollToEnd?.({ animated: true })}
       >
         {messages.map((m) => (
-          <View key={m.id} style={[styles.msg, m.origin === 'user' ? styles.msgUser : styles.msgBot]}>
+          <React.Fragment key={m.id}>
+          {/* The turn that brought a hidden contact back carries the mark: a SYSTEM line above its bubble —
+              "Je had dit contact verborgen." — neither side's bubble. web≡mobile with contactThread.js. */}
+          {m.returned === true ? (
+            <Text style={styles.system} testID={`contact-returned-${m.id}`}>{t('circle.contacts.returned_marker')}</Text>
+          ) : null}
+          <View style={[styles.msg, m.origin === 'user' ? styles.msgUser : styles.msgBot]}>
             <View style={[styles.bubble, m.origin === 'user' ? styles.bubbleUser : styles.bubbleBot]}>
               {/* A turn that answers a NOTICEBOARD POST says so — it lands here from a person the reader
                   may never have spoken to. web≡mobile with contactThread.js's reply marker. */}
@@ -198,6 +243,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
               ) : null}
             </View>
           </View>
+          </React.Fragment>
         ))}
         {busy && <Text style={styles.sending}>{t('circle.contacts.sending')}</Text>}
       </ScrollView>
@@ -295,6 +341,10 @@ const makeStyles = (theme) => StyleSheet.create({
   floor: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingVertical: 4 },
   sealed: { fontSize: 12, color: theme.color.inkSoft },
   sealedPerson: { color: theme.color.green },   // STATUS colour: sealed to the person
+  hide: { paddingHorizontal: 8, paddingVertical: 4 },
+  hideText: { fontSize: 13, color: theme.color.inkSoft, textDecorationLine: 'underline' },
+  hideNote: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingBottom: 4 },
+  system: { fontSize: 12, color: theme.color.inkSoft, textAlign: 'center', paddingVertical: 4, fontStyle: 'italic' },
   back: { fontSize: 13, color: theme.color.inkSoft },
   title: { fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },
   log: { flex: 1 },

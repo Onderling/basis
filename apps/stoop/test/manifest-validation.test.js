@@ -143,8 +143,8 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // verified from the version on record — what a direct message to them is sealed to) → 97.
   // This number is a snapshot on purpose: adding an op to the waist should be a deliberate act
   // that someone updates a count for, not something that slips in unremarked.
-  it('ships the full chat+slash surface (one stoop manifest, 97 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(97);
+  it('ships the full chat+slash surface (one stoop manifest, 98 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(98);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

@@ -144,3 +144,34 @@ describe('renderContactThread', () => {
     expect(el.querySelector('.cc-cthread__skills')).toBeNull();
   });
 });
+
+describe('Verbergen / Tonen in the thread header (L106)', () => {
+  it('a shown contact gets Verbergen and the scope note; the tap asks to hide', () => {
+    const onToggleHidden = vi.fn();
+    const el = renderContactThread(document.createElement('div'), { name: 'Wilfred', t, hidden: false, onToggleHidden });
+    const btn = el.querySelector('.cc-cthread__hide');
+    expect(btn.textContent).toBe('circle.contacts.hide');
+    expect(el.querySelector('.cc-cthread__hide-note').textContent, 'what hiding is and is not, said where the control is').toBe('circle.contacts.hide_note');
+    btn.click();
+    expect(onToggleHidden).toHaveBeenCalledWith(true);
+  });
+  it('a hidden contact gets Tonen; the tap asks to show', () => {
+    const onToggleHidden = vi.fn();
+    const el = renderContactThread(document.createElement('div'), { name: 'Wilfred', t, hidden: true, onToggleHidden });
+    const btn = el.querySelector('.cc-cthread__hide');
+    expect(btn.textContent).toBe('circle.contacts.unhide');
+    btn.click();
+    expect(onToggleHidden).toHaveBeenCalledWith(false);
+  });
+  it('a bot thread, or a caller without the seam, has no control', () => {
+    expect(renderContactThread(document.createElement('div'), { name: 'Bot', t }).querySelector('.cc-cthread__hide')).toBe(null);
+  });
+  it('the turn that brought a hidden contact back carries the marker: a system line ABOVE its bubble, from the locale', () => {
+    const el = renderContactThread(document.createElement('div'), { name: 'W', t, messages: [{ origin: 'bot', text: 'eerder' }, { origin: 'bot', text: 'ben ik er nog?', returned: true }] });
+    const sys = el.querySelectorAll('.cc-cthread__system');
+    expect(sys.length, 'one marker, for the one returning turn').toBe(1);
+    expect(sys[0].textContent).toBe('circle.contacts.returned_marker');
+    expect(sys[0].nextElementSibling?.textContent, 'the marker sits right above the turn that brought them back').toContain('ben ik er nog?');
+    expect(sys[0].closest('.cc-cthread__bubble'), 'a system line, not a bubble from either side').toBe(null);
+  });
+});

@@ -669,3 +669,91 @@ export async function openLedenTab(page) {
   await page.waitForTimeout(1500);
   return { present: true, labels };
 }
+
+/**
+ * Contacten → the first PERSON (never a bot) → type → send. Returns the contact it sent to, or a reason.
+ * Picking `.cc-contacts__row` blindly picks whatever sorted first — a bot, on a device that has one — and
+ * the DM then goes somewhere no assertion is looking.
+ */
+export async function sendDirectMessage(page, text, { to: wanted = null } = {}) {
+  await gotoCircles(page);
+  const tab = page.locator('[data-tab="contacten"]');
+  if (!(await tab.count())) return { sent: false, why: 'no Contacten tab' };
+  await tab.first().click();
+  await page.waitForTimeout(2000);
+  // A specific contact when the caller names one (a roster with several people); else the first person.
+  const rows = wanted
+    ? page.locator(`.cc-contacts__row[data-contact-id="${wanted}"]`)
+    : page.locator('.cc-contacts__row:not(.cc-contacts__row--bot)');
+  if (!(await rows.count())) {
+    const all = await page.locator('.cc-contacts__row').count();
+    return { sent: false, why: wanted ? `no row for ${wanted.slice(0, 12)}… (${all} row(s))` : `no person to write to (${all} row(s), all bots)` };
+  }
+  const to = await rows.first().getAttribute('data-contact-id');
+  await rows.first().click();
+  await page.waitForTimeout(2000);
+  const input = page.locator('.cc-cthread__input');
+  if (!(await input.count())) return { sent: false, why: `thread for ${to} did not open` };
+  await input.first().fill(text);
+  await page.locator('.cc-cthread__send').first().click();
+  await page.waitForTimeout(2500);
+  // Clicking send is not evidence that anything was sent. Ask the thread whether it kept the turn:
+  // the channel persists what actually left the device, so a turn that is there went out, and one that
+  // is not never did. Without this, a receive-side failure and a send-side failure look identical, and
+  // this probe reported both as `sent: true` (2026-09-09).
+  const kept = await page.evaluate(async (t) => {
+    try {
+      const rows = await window.onderlingContactChannel?.rehydrate?.(
+        document.querySelector('.cc-cthread')?.getAttribute('data-contact-id')
+        ?? window.__ccActiveThread ?? '',
+      );
+      if (Array.isArray(rows) && rows.some((r) => r.text === t)) return true;
+    } catch { /* fall through to the rendered log */ }
+    return (document.querySelector('.cc-cthread__log')?.innerText ?? '').includes(t);
+  }, text);
+  // The header's seal mark (person / device), decided async after the first paint — hence the wait.
+  let sealedTo = null;
+  try { sealedTo = await page.locator('.cc-cthread__sealed').first().getAttribute('data-level', { timeout: 8000 }); } catch { sealedTo = null; }
+  return { sent: kept, to, sealedTo, why: kept ? '' : 'the sender did not keep the turn — it never left this device' };
+}
+
+/** Poll the other side's contact threads until the text shows up in one. */
+export async function waitForContactMessage(page, text, opts = {}) {
+  return (await waitForContactMessageDetailed(page, text, opts)).found;
+}
+/**
+ * The same poll, telling PAINTED from STORED-ONLY: `{ found, painted, contactId }`. A turn that is in the durable
+ * thread but not on screen is a message nobody reads (2026-09-18: the maker's laptop had the visitor's message in
+ * storage and no row to open it from) — a spec that stands for a person's screen asserts `painted`.
+ */
+export async function waitForContactMessageDetailed(page, text, { tries = 10, every = 3000 } = {}) {
+  for (let i = 0; i < tries; i++) {
+    await gotoCircles(page);
+    const tab = page.locator('[data-tab="contacten"]');
+    if (await tab.count()) { await tab.first().click(); await page.waitForTimeout(1500); }
+    const rows = page.locator('.cc-contacts__row');
+    for (let r = 0; r < await rows.count(); r++) {
+      await rows.nth(r).click();
+      await page.waitForTimeout(1500);
+      const log_ = await page.evaluate(() => document.querySelector('.cc-cthread__log')?.innerText ?? '');
+      const contactId = await page.evaluate(() => document.querySelector('.cc-cthread')?.getAttribute('data-contact-id') ?? null);
+      if (log_.includes(text)) return { found: true, painted: true, contactId };
+      // The rendered log is one answer; the DURABLE thread is the other, and they can disagree. A turn
+      // that arrived while this pane was closed is stored before it is ever painted, so checking the
+      // store as well separates "never arrived" from "arrived and was not shown" — two different bugs
+      // that this probe used to report with the same red.
+      const stored = await page.evaluate(async (t) => {
+        try {
+          const id = document.querySelector('.cc-cthread')?.getAttribute('data-contact-id');
+          const rows = await window.onderlingContactChannel?.rehydrate?.(id ?? '');
+          return Array.isArray(rows) && rows.some((r) => r.text === t);
+        } catch { return false; }
+      }, text);
+      if (stored) { console.log('### NOTE: the turn is in the durable thread but was not painted'); return { found: true, painted: false, contactId }; }
+      const back = page.locator('.cc-cthread__back, .circle-view__back');
+      if (await back.count()) { await back.first().click(); await page.waitForTimeout(800); }
+    }
+    await page.waitForTimeout(every);
+  }
+  return { found: false, painted: false, contactId: null };
+}

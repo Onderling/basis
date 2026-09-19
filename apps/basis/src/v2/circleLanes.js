@@ -164,6 +164,7 @@ export function buildCircleLanes({
   // keep nothing) · null (the kring is off here: refused on landing, said once per circle).
   const selection = typeof agent.getParamValue === 'function' ? makeSyncSelection({ getParamValue: agent.getParamValue }) : HOLD_EVERYTHING;
   const refusedKringSaid = new Set();
+  const refusedCarrySaid = new Set();   // (reason, address) pairs already said — the log names a fact once
   const holdsFor = (silo) => (circleId) => {
     if (!selection.kringOn(circleId)) {
       if (!refusedKringSaid.has(circleId)) { refusedKringSaid.add(circleId); console.warn(`[sync] this device does not hold kring ${String(circleId).slice(0, 12)}… — what a sibling still carries for it is refused on landing`); }
@@ -268,7 +269,17 @@ export function buildCircleLanes({
       [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
     } : {}),
     ...((agent.contactTurnHandler && typeof ownDeviceTurn === 'function')
-      ? { [agent.contactTurnBroadcast]: agent.contactTurnHandler(ownDeviceTurn) }
+      ? {
+        // A carried turn that is refused says so — once per (reason, address). The gate used to drop it in
+        // silence on every shell but the test harness, which is how a message the box had "delivered" to the
+        // maker's web app vanished without a line (2026-09-19).
+        [agent.contactTurnBroadcast]: agent.contactTurnHandler(ownDeviceTurn, (reason, from) => {
+          const key = `${reason}\n${from}`;
+          if (refusedCarrySaid.has(key)) return;
+          refusedCarrySaid.add(key);
+          console.warn(`[own-devices] a contact turn carried from ${String(from).slice(0, 12)}… was refused: ${reason} — it is not on this device's sibling set (its per-circle address in a circle we share)`);
+        }),
+      }
       : {}),
     // Who the person knows, on every device of theirs: a greeting's binding and a contact-book row
     // land here from a sibling (live, in full for a new device, or as a catch-up answer), and a

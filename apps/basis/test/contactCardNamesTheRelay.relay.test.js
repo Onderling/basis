@@ -14,6 +14,7 @@
  * Bea is on relay 2 only. Before the build Bea's message had nowhere to go.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, until, teardown } from './support/pairRealAgents.js';
 
@@ -54,5 +55,46 @@ describe('a contact from a card is reached on the relay the card named', () => {
     expect(await until(async () => (textsAt(anna).includes('hoi Anna, via je kaart') ? true : null), { timeout: 15_000 }),
       'the message never reached Anna — the card named relay 1 and Bea did not go there').toBe(true);
     expect(bea.agent.relays.list().map((r) => r.url), 'Bea came beside the relay the card named; her own stays primary').toEqual([relay2.url, relay1.url]);
+  }, 60_000);
+});
+
+/** An nkn-sdk look-alike that connects at once — the browser with the CDN SDK loaded and the network reachable. */
+const nknThatConnects = (addr) => {
+  class Client extends EventEmitter {
+    constructor() { super(); this.addr = addr; setTimeout(() => this.emit('connect'), 5); }
+    send() { return Promise.resolve(); }
+    close() {}
+  }
+  return { Client, MultiClient: Client };
+};
+
+describe('with NKN up beside the relay, the card still names the RELAY address', () => {
+  // Frits' web app, 2026-09-18: the relay connected first (as it must), NKN came up behind it, and the
+  // card `/share-my-contact` produced named the NKN address — `peerAddr=d9b44acc…`, a hex mesh address —
+  // as where to write to him. That is the network that had been unreachable from his browser all
+  // morning. The alpha's default transport is the relay; the card carries the relay(s) anyway, so a
+  // change of relay is covered by that field, not by naming the mesh. The mesh address goes on the card
+  // only when it is the only address this device has.
+  let relay; let carl; let dana;
+  beforeAll(async () => {
+    relay = await startJourneyRelay();
+    [carl, dana] = await Promise.all([bootRealAgentNode('carl'), bootRealAgentNode('dana')]);
+    await carl.agent.connectPeerTransport({ nknLib: nknThatConnects('d9b44accfd2e0a52deadbeef00000000000000000000000000000000000000'), relayUrl: relay.url, onPeerMessage: (env) => carl._routerRef.fn?.(env), awaitRelayReady: true });
+    await dana.agent.connectPeerTransport({ relayUrl: relay.url, onPeerMessage: (env) => dana._routerRef.fn?.(env), awaitRelayReady: true });
+    await until(async () => (carl.agent.peer?.address ? true : null), { timeout: 10_000, step: 50 });
+  }, 60_000);
+  afterAll(async () => { await teardown(carl, dana); try { await relay?.close?.(); } catch { /* */ } });
+
+  it('the card names the address the relay reaches, and a message to it arrives over the relay', async () => {
+    expect(carl.agent.peer?.address, 'NKN is up on Carl (the shape of the finding)').toMatch(/^d9b44acc/);
+    const card = await carl.agent.callSkill('stoop', 'getContactShareQr', {});
+    const decoded = JSON.parse(Buffer.from(String(card.payload).replace(/^onderling-contact:\/\//, ''), 'base64').toString('utf8'));
+    expect(decoded.peerAddr, 'the card names the relay address, not the mesh one').toBe(carl.agent.relay?.address ?? carl.pubKey);
+    expect(decoded.relays).toEqual([relay.url]);
+    const added = await dana.agent.callSkill('stoop', 'addContactFromQr', { payload: card.payload });
+    expect(added?.contact?.peerAddr).toBe(decoded.peerAddr);
+    const sent = await dana.agent.sendPeerMessage(added.contact.peerAddr, { type: 'p2p-chat', msgId: 'dm-2', ts: Date.now(), text: 'hoi Carl, via je kaart' }, SEND);
+    expect(sent?.held).not.toBe(true);
+    expect(await until(async () => (textsAt(carl).includes('hoi Carl, via je kaart') ? true : null), { timeout: 15_000 })).toBe(true);
   }, 60_000);
 });

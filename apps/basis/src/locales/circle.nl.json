@@ -3954,6 +3954,26 @@
       "text": "verbonden",
       "doc": "The contact's PAIR ROSTER exists (L105): a hidden two-member circle made on the first exchange, so messages travel over a roster and a revoke reaches them. Before it exists: no label (Frits: no 'kaart')."
     },
+    "hide": {
+      "text": "Verbergen",
+      "doc": "L106 (Frits 2026-09-19): hide a contact from Contacten — the row stays (thread, pair roster, their circles untouched), it folds away at the bottom, and their next message brings them back. On every device of the person. The thread header's control when the contact is shown."
+    },
+    "unhide": {
+      "text": "Tonen",
+      "doc": "The thread header's control when the contact is hidden: show them in Contacten again (the person's own act; a message from them does the same)."
+    },
+    "hide_note": {
+      "text": "Alleen uit je lijst. Hun kringen en dit gesprek blijven; een bericht van hen brengt ze terug.",
+      "doc": "What hiding IS and is not, said under the control (amendment 3: Contacten only — their circles, roster row and member card are untouched). Never a notification."
+    },
+    "hidden_fold": {
+      "text": "Verborgen ({{count}})",
+      "doc": "The fold at the bottom of Contacten holding the hidden rows; tapping it shows them (greyed). count = how many."
+    },
+    "returned_marker": {
+      "text": "Je had dit contact verborgen.",
+      "doc": "The one-line marker painted in the thread when a hidden contact writes again and comes back — so the person understands why someone they removed is in their list. Wilfred (the seeded contact) never initiates, so for him it is only ever a reply."
+    },
     "trust": {
       "bekend": {
         "text": "bekend",
@@ -6281,6 +6301,10 @@
       "startDm": {
         "text": "Bericht sturen",
         "doc": "Row-action button for stoop:startDm, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "setContactHidden": {
+        "text": "Verbergen",
+        "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
       },
       "removeContact": {
         "text": "Contact verwijderen",

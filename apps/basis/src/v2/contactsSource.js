@@ -68,7 +68,22 @@ export function stoopContactToRow(c) {
     tags:       Array.isArray(c.tags) ? c.tags : [],
     // The pair roster (L105): once it exists the row says "verbonden"; before, nothing.
     pairCircleId: typeof c.pairCircleId === 'string' && c.pairCircleId ? c.pairCircleId : null,
+    // Hidden (L106): the person took this contact out of their sight. The row stays — their circles, the thread and
+    // the pair roster untouched — Contacten folds it away, and their next message brings them back.
+    hidden:     c.hidden === true,
   };
+}
+
+/**
+ * The roster in two: what Contacten lists, and what it folds away at the bottom ("verborgen (n)"). A bot is never
+ * hidden here (a bot is removed, not hidden — a different act with a different word).
+ * @param {Array<object>} rows
+ * @returns {{ shown: Array<object>, hidden: Array<object> }}
+ */
+export function splitShownHidden(rows = []) {
+  const shown = []; const hidden = [];
+  for (const r of rows ?? []) { if (r?.hidden === true && !r.isBot) hidden.push(r); else shown.push(r); }
+  return { shown, hidden };
 }
 
 /** Bots first, then people; alphabetical within each. Deterministic ordering. */
@@ -94,9 +109,22 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
   for (const r of stoopRows) if (r?.contactId) byId.set(r.contactId, r);
   for (const r of peerRows) {
     if (!r?.contactId) continue;
-    // peer wins — but what only the contact book knows (the trust level, the pair roster) rides along
+    // peer wins — but what only the contact book knows (the trust level, the pair roster) rides along, and so
+    // does the NAME when the graph has none: a peer row that only knows the address names itself by it, and
+    // letting that win renamed the seeded contact to a key the moment a first message put them in the graph
+    // (2026-09-19: "Wilfred is gone, a random-string contact instead").
     const book = byId.get(r.contactId);
-    byId.set(r.contactId, book ? { ...r, ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}), ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}) } : r);
+    const nameless = !r.name || r.name === r.contactId || r.name === r.peerAddr;
+    byId.set(r.contactId, book ? {
+      ...r,
+      ...(nameless && book.name && book.name !== book.contactId ? { name: book.name } : {}),
+      ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}),
+      ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}),
+      // the hidden mark is the book's alone — a graph row (a greeting, a first message) never un-hides what the person
+      // hid — and a row the book knows says so (`source`), which is what makes it hideable at all
+      source: 'contact',
+      hidden: book.hidden === true,
+    } : r);
   }
   return sortContactRows([...byId.values()]);
 }
@@ -117,12 +145,21 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
  * person's per-circle addresses back to one person — Frits, 2026-09-03: a surface that names a person
  * keys on it); an address that resolves to someone else is skipped.
  *
+ * I AM NOT MY OWN CONTACT (2026-09-19). The graph also collects the addresses MY OWN DEVICES speak as: the person-key
+ * address every device of mine shares (the box greets the phone with it on enrol; the carried turns ride it), the
+ * static profile key, a sibling's per-circle address the fan reaches. None resolves to a roster member — a person
+ * is not on their own rosters as an alias — so each was a nameless row named by its key, sorted by key bytes.
+ * Measured in the feedback walk: the maker's own person address was the FIRST person row on the maker's Contacten,
+ * and an answer sent to it went nowhere; Frits' phone: "a random string named contact". The shell hands in what the
+ * device knows itself as (`ownAddresses`); an address in that set is skipped.
+ *
  * @param {{ all: () => Promise<object[]> } | null} peerGraph  the agent's `peers`
  * @param {object} [opts]
  * @param {(address: string) => string|null} [opts.identityOf]  the person behind an address (itself, or null, when it is nobody's alias)
+ * @param {() => (Array<string>|Promise<Array<string>>)} [opts.ownAddresses]  every address this person's devices speak as (person, profile, per-circle)
  * @returns {Promise<Array<object>>}
  */
-export async function listContacts(peerGraph, { identityOf = null } = {}) {
+export async function listContacts(peerGraph, { identityOf = null, ownAddresses = null } = {}) {
   if (!peerGraph || typeof peerGraph.all !== 'function') return [];
   let peers = [];
   try { peers = await peerGraph.all(); } catch { return []; }
@@ -131,6 +168,9 @@ export async function listContacts(peerGraph, { identityOf = null } = {}) {
     try { const owner = identityOf(peer.pubKey); return typeof owner === 'string' && owner !== '' && owner !== peer.pubKey; }
     catch { return false; }
   };
-  const rows = peers.filter((p) => !isAlias(p)).map(peerToContactRow).filter(Boolean);
+  let mine = new Set();
+  if (typeof ownAddresses === 'function') { try { mine = new Set(((await ownAddresses()) ?? []).filter((a) => typeof a === 'string' && a)); } catch { mine = new Set(); } }
+  const isMe = (peer) => mine.has(peer?.pubKey) || mine.has(peer?.url);
+  const rows = peers.filter((p) => !isMe(p) && !isAlias(p)).map(peerToContactRow).filter(Boolean);
   return sortContactRows(rows);
 }

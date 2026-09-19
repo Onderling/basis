@@ -1846,6 +1846,24 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
   });
   const ownDeviceSiblings = async () => (await ownDeviceSiblingRows()).map((d) => d.address);
+  // EVERY ADDRESS THIS PERSON'S DEVICES SPEAK AS — the person-key address (shared by all my devices), the static
+  // profile key, this device's per-circle addresses, my siblings' per-circle addresses. What a roster reads to
+  // keep me out of my own Contacten: each of these reaches the peer graph as "someone greeted/reached", and none
+  // resolves to a roster member (2026-09-19: the maker's own person address was a nameless row on their laptop).
+  const ownAddresses = async () => {
+    const out = new Set([personAddress(), chatId.pubKey].filter(Boolean));
+    let rows = [];
+    try { rows = await ownDeviceSiblingRows(); } catch { rows = []; }
+    for (const d of rows) { if (d?.address) out.add(d.address); if (d?.circleId) { const mine = circleAddressFor(d.circleId); if (mine) out.add(mine); } }
+    try {
+      for (const c of ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])) {
+        const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
+        const mine = id ? circleAddressFor(id) : null;
+        if (mine) out.add(mine);
+      }
+    } catch { /* the person and sibling addresses alone still serve */ }
+    return [...out];
+  };
   // A DEVICE SPEAKS TO ITS SIBLING IN THE CIRCLE THEY SHARE — as this device's own address there, to
   // the sibling's. Never as the profile key: every device of the person holds it, a revoked one too,
   // and on a relay the profile address is whichever device registered it last, so a greeting answered
@@ -2087,6 +2105,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     contacts: {
       has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
       add: (contact) => rawStoop('addContact', contact),
+      get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
+      // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
+      setHidden: (webid, hidden, hiddenAt) => rawStoop('setContactHidden', { webid, hidden, hiddenAt }),
     },
     onLanded: () => savePeerBindings(),
   });
@@ -4100,14 +4121,18 @@ export async function createRealHouseholdAgent(opts = {}) {
         // …gated by the user's publication lock: a contact card is the single most travelled copy of
         // this address, so "never share my global address" has to hold here first. Off ⇒ the card simply
         // carries no peerAddr and the scanner reaches them by the other rungs.
-        // WHICHEVER address this device can actually be reached at. The mesh address first, because it
-        // survives a change of relay; the relay's otherwise, which is what a device with no mesh
-        // transport has — and until 2026-09-09 that case put NO address on the card at all, so a card
-        // shared by a relay-only device (every headless one, and a browser with the mesh off) named a
+        // WHICHEVER address this device can actually be reached at — the RELAY's first (2026-09-18). It
+        // was the mesh address first, "because it survives a change of relay"; but the card carries the
+        // relay(s) below, so a change of relay is covered by that field, and the alpha's one default
+        // transport is the relay: a card naming the mesh sent a tester's first message down the one road
+        // that had been unreachable from the sharer's own browser all morning (`peerAddr=d9b44acc…` on
+        // Frits' card, the day NKN's public network would not connect). The mesh address goes on the card
+        // only when it is the only address this device has — and until 2026-09-09 a relay-only device
+        // (every headless one, a browser with the mesh off) put NO address on the card at all, naming a
         // person the scanner had no way to write to. The publication lock below still governs both:
         // "never share my global address" is a decision about the address, not about the transport.
         const myPeerAddr = shareableAddress(
-          sa?.peer?.address ?? sa?.relay?.address ?? null,
+          sa?.relay?.address ?? sa?.peer?.address ?? null,
           // The LIVE register value (device scope) — a flip in my-data binds here immediately.
           // opts stays as a test override; no shell passes it.
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
@@ -4224,6 +4249,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
       // is a contact on the person's other devices too. Best-effort and after success.
       if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
+        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
+      // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
+      // next catch-up. The landing side keeps the newer mark, so a hide and a show that cross resolve the same
+      // way everywhere.
+      if (realOpId === 'setContactHidden' && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
       }
       // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
@@ -5747,6 +5778,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     personAddress,
     /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */
     ownAddressBindings,
+    /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
+    ownAddresses,
 
     /**
      * Presence hook for the delivery guarantee — call when a peer becomes

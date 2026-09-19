@@ -763,6 +763,20 @@ export async function bootAgentBundle(opts = {}) {
   const contactChannel = createContactThreadChannel({
     blobStore: contactAttachmentBlobs,
     pair: pairRoster,
+    // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included (web parity)
+    notePeer: (addr) => peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
+    // a carried turn lands in the thread THIS device keys by identity, whatever address the sibling keyed it by
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    // a hidden contact who writes again comes back (L106, web parity): the book says who is hidden; a landed
+    // turn from one of them — direct, or carried by my own device — unhides the row (through the waist, so the
+    // mark carries to the other devices). The thread's one-line marker rides the TURN (`returned`), painted by
+    // the thread screen. Hiding is Contacten only: their circles, the thread and the pair roster never change.
+    // For the seeded contact this is only ever a REPLY — the box never initiates.
+    isHidden: async (contactId) => {
+      const rows = (await agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? [];
+      return rows.some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true);
+    },
+    onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); },
     // the route (a contact with a pair roster) rides as send options (web parity)
     sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'

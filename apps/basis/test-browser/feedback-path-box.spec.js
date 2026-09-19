@@ -129,7 +129,9 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     const reply = `dank je, ik kijk ernaar ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });
     expect(answered.sent, `the maker could not answer: ${answered.why}`).toBe(true);
-    const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 12, every: 3000 });
+    // The answer may ride the pair route first and reach the visitor by the fallback after that route's greeting
+    // times out (~20 s in CI): the poll allows for it.
+    const back = await waitForContactMessageDetailed(visitor.page, reply, { tries: 20, every: 3000 });
     expect(back.painted, `the maker's answer never reached the visitor's screen (found: ${back.found})`).toBe(true);
     log('STEP5 the answer', 'PASS', 'round trip complete');
   } finally {

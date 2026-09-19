@@ -53,7 +53,7 @@ const NO_RELAY_BASE_URL = `http://localhost:${NO_RELAY_PORT}`;
 /* Which specs boot SEVERAL clients over the relay fixture (`peerHarness.js`, or their own contexts): they
  * run under `relay`. Everything else is a single-context spec through `helpers.js` and runs under
  * `no-relay`. Matched by file so a spec belongs to exactly one project and nothing has to declare it. */
-const RELAY_SPECS = /(journeys|matrix|twopeer|two-relays|walk-[a-z0-9]+)\.spec\.js$/;
+const RELAY_SPECS = /(journeys|matrix|twopeer|two-relays|feedback-path-box|walk-[a-z0-9]+)\.spec\.js$/;
 
 export default defineConfig({
   testDir: './test-browser',

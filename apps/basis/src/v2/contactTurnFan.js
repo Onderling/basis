@@ -144,6 +144,8 @@ export function makeContactTurnPeerHandler({ siblings, selfPubKey, applyTurn, on
     let addrs = [];
     try { addrs = (await siblings()) ?? []; } catch { refuse('siblings-unavailable', fromAddr); return; }
     if (!addrs.includes(fromAddr)) { refuse('not-a-sibling', fromAddr); return; }
-    try { await applyTurn(wire, { fromAddr }); } catch { /* a landed turn never throws into the router */ }
+    // A landed turn never throws into the router — but a shell whose landing failed must hear of it, or the
+    // turn vanishes between "received" and "shown" with no line anywhere (2026-09-19).
+    try { await applyTurn(wire, { fromAddr }); } catch (err) { refuse(`apply-failed: ${err?.message ?? err}`, fromAddr); }
   };
 }

@@ -324,3 +324,21 @@ describe('a turn CARRIED by my own device from someone this device never met', (
     expect(noted).toEqual(['peer-B']);
   });
 });
+
+describe('a carried turn lands in the thread THIS device keys by identity', () => {
+  // Two devices of one person may key the same contact differently: the box keyed the visitor's thread by the
+  // wire address the message came from (the visitor's person-key address), the web app keys threads by
+  // identity (the visitor's profile address) — Frits' rule of 2026-09-03. The carried turn then landed on
+  // the web app under a key its Contacten row never opens (2026-09-19, the browser walk of the feedback
+  // path: "maker was handed contactId 58gT…, the row is 8Zcy…"). On landing, the channel resolves the
+  // sibling's key through the shell's `identityOf`, so every device of the person opens the same thread.
+  it('resolves the sibling\'s contactId through identityOf; notes the resolved person; rehydrates under it', async () => {
+    const noted = [];
+    const identityOf = (a) => (a === 'visitor-person-key-addr' ? 'visitor-profile' : a);
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), notePeer: (a) => { noted.push(a); }, identityOf });
+    const landed = await ch.applyOwnDeviceTurn({ direction: 'in', contactId: 'visitor-person-key-addr', fromAddr: 'visitor-person-key-addr', text: 'hoi Wilfred', messageId: 'k1', ts: 1 });
+    expect(landed.contactId, 'the landed turn names the identity-keyed thread').toBe('visitor-profile');
+    expect((await ch.rehydrate('visitor-profile')).map((t) => t.text)).toEqual(['hoi Wilfred']);
+    expect(noted).toEqual(['visitor-profile']);
+  });
+});

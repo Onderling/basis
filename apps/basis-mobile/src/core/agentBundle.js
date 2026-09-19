@@ -765,6 +765,8 @@ export async function bootAgentBundle(opts = {}) {
     pair: pairRoster,
     // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included (web parity)
     notePeer: (addr) => peerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
+    // a carried turn lands in the thread THIS device keys by identity, whatever address the sibling keyed it by
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     // the route (a contact with a pair roster) rides as send options (web parity)
     sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'

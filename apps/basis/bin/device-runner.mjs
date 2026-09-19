@@ -257,6 +257,7 @@ if (relayUrl) {
   contactChannel = createContactThreadChannel({
     sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     localActor: 'me',
     // Direct messages are sealed to the PERSON's current key; an enrolled box holds it, handed over at enrol.
     sealFor: agent.contactSeal?.sealFor ?? null,
@@ -318,8 +319,13 @@ if (relayUrl) {
     },
   });
 
+  // The thread is keyed by IDENTITY, as on both shells: a turn from a contact's person-key address or their
+  // per-circle address lands in the same thread as one from their profile address — and the key this device
+  // carries to its siblings is one they open too (2026-09-19: keyed by the wire address, the carried turn sat
+  // on the maker's web app under a key its Contacten row never opened).
   const landTurn = ({ fromAddr, text, buttons, messageId, replyTo, ts }) => {
-    contactChannel.persistInbound({ contactId: fromAddr, fromAddr, text, buttons, messageId, replyTo, ts })
+    const contactId = agent.identityOfAddress?.(fromAddr) ?? fromAddr;
+    contactChannel.persistInbound({ contactId, fromAddr, text, buttons, messageId, replyTo, ts })
       ?.then((r) => { if (!r?.deduped) walkLog({ kind: 'contact-turn', from: String(fromAddr).slice(0, 12), text }); })
       ?.catch(() => { /* durability is best-effort, as in the shells */ });
   };

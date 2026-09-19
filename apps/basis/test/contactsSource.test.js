@@ -112,6 +112,22 @@ describe('stoopContactToRow (S1 #2 — member directory)', () => {
   });
 });
 
+describe('mergeContacts — the peer graph wins the row, the book keeps the NAME', () => {
+  it('a peer-graph row that only knows the address does not rename the person to their key', () => {
+    // Frits' phone, 2026-09-19: "Wilfred is gone and now I only have a random-string contact". Sending the
+    // first message put the recipient in the peer graph (address only, no name); the merge let the peer row
+    // win whole, so the book's name — the one thing the card gave — was replaced by the key.
+    const peerRows = [{ contactId: 'LE1n', name: 'LE1n', isBot: false, peerAddr: 'LE1n' }];
+    const stoopRows = [{ contactId: 'LE1n', name: 'Wilfred', isBot: false, source: 'contact', peerAddr: 'LE1n', trustLevel: 'bekend' }];
+    const [row] = mergeContacts(peerRows, stoopRows);
+    expect(row.name, 'the card\'s name stands when the graph has none').toBe('Wilfred');
+    expect(row.trustLevel).toBe('bekend');
+    // A peer row that HAS a name (a bot, a peer that introduced itself) keeps it.
+    const [named] = mergeContacts([{ contactId: 'LE1n', name: 'Wil the bot', isBot: true }], stoopRows);
+    expect(named.name).toBe('Wil the bot');
+  });
+});
+
 describe('mergeContacts (S1 #2)', () => {
   it('merges peer + stoop rows, de-dupes by contactId (peer wins), bots first', () => {
     const peerRows = [

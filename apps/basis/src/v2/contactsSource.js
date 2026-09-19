@@ -94,9 +94,18 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
   for (const r of stoopRows) if (r?.contactId) byId.set(r.contactId, r);
   for (const r of peerRows) {
     if (!r?.contactId) continue;
-    // peer wins — but what only the contact book knows (the trust level, the pair roster) rides along
+    // peer wins — but what only the contact book knows (the trust level, the pair roster) rides along, and so
+    // does the NAME when the graph has none: a peer row that only knows the address names itself by it, and
+    // letting that win renamed the seeded contact to a key the moment a first message put them in the graph
+    // (2026-09-19: "Wilfred is gone, a random-string contact instead").
     const book = byId.get(r.contactId);
-    byId.set(r.contactId, book ? { ...r, ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}), ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}) } : r);
+    const nameless = !r.name || r.name === r.contactId || r.name === r.peerAddr;
+    byId.set(r.contactId, book ? {
+      ...r,
+      ...(nameless && book.name && book.name !== book.contactId ? { name: book.name } : {}),
+      ...(book.trustLevel && !r.trustLevel ? { trustLevel: book.trustLevel } : {}),
+      ...(book.pairCircleId ? { pairCircleId: book.pairCircleId } : {}),
+    } : r);
   }
   return sortContactRows([...byId.values()]);
 }

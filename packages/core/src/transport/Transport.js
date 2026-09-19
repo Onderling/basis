@@ -387,6 +387,17 @@ export class Transport extends Emitter {
    * @param {{warn?: boolean}} [opts]
    * @returns {string} one of our own addresses
    */
+  /**
+   * Does this transport hold `address` as one of its own — the primary, or a bound alias? What a caller
+   * asks before sending AS an address: a send in the name of an address this transport does not hold
+   * leaves from the primary instead (see `#ownAddress`), which is the wrong identity for circle traffic.
+   * @param {string} address
+   * @returns {boolean}
+   */
+  holdsAddress(address) {
+    return typeof address === 'string' && !!address && (address === this.#address || this.#aliases.has(address));
+  }
+
   #ownAddress(claimed, { warn = true } = {}) {
     const asked = typeof claimed === 'string' && claimed ? claimed : null;
     if (!asked) return this.#address;

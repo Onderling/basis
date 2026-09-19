@@ -924,7 +924,13 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
  *   their per-circle address while the relay had never been told it (found on hardware 2026-07-30, mobile
  *   first; web had the same hole).
  */
-function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
+// RETURNS THE WHOLE CHAIN (2026-09-19), as mobile's does: prime, register on every relay, announce. Until now the
+// call fired and forgot, which was fine at boot and wrong for a circle made on the spot — the pair roster founds
+// its circle, "awaits" this, and sends its first turn while the relay has not yet bound the per-circle address;
+// the transport, asked to speak as an alias it does not hold, fell back to the primary, and the contact refused
+// that first HI as "a member's canonical identity where they sign per-circle" (one refusal in every log; the
+// handshake completed on a later retry). A caller that does not care still need not await.
+async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   const circleIds = [...new Set([
     ...circlesCache.map((c) => c?.id).filter(Boolean),
     ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
@@ -933,34 +939,37 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   // for EVERY circle, before (and independently of) the relay scoping below. One shared primer, called
   // identically by mobile (`agentBundle.js`). Note it asks the SUBSTRATE rather than trusting the ids
   // computed above: those come from `circlesCache`, which is a rendering convenience and is empty on a
-  // cold boot — exactly when priming matters most. Fire-and-forget for the same reason the rest is.
-  primeCircleSecurity({ agent, circleIds })
-    .catch((err) => console.warn('[circleApp] circle security priming failed:', err?.message ?? err));
+  // cold boot — exactly when priming matters most.
+  try { await primeCircleSecurity({ agent, circleIds }); }
+  catch (err) { console.warn('[circleApp] circle security priming failed:', err?.message ?? err); }
   if (!CIRCLE_RELAY_URL || !agent?.relay?.supportsAliases) return;
   const points = getConnectionPoints();
   const circlesForPoint = (url) => points.circlesFor(url);
   circlesForPoint.pointsFor = (cid) => points.pointsFor(cid);   // the reverse view the scoper duck-types
   // On EVERY relay this device is on (2026-09-08), each scoped to the circles that ride it — the facade's
   // per-relay port, never the transport itself.
-  registerCircleAddressesOnRelays({
-    relays: agent.relays?.list?.() ?? [],
-    circleIds,
-    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-    // An address IS a key, so registering it means answering the relay's challenge with the key
-    // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
-    // refused here and only here: the invariant-2 half of a change that landed on one shell.
-    circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
-    alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
-    circlesForPoint,
-    // The relay this device connects to IS the deployment default — unmapped circles land here alone.
-    defaultRelayUrl: CIRCLE_RELAY_URL,
-    onError: (err, cid) => console.warn(`[circleApp] circle-address register failed (${cid}):`, err?.message ?? err),
-  })
+  try {
+    await registerCircleAddressesOnRelays({
+      relays: agent.relays?.list?.() ?? [],
+      circleIds,
+      circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+      // An address IS a key, so registering it means answering the relay's challenge with the key
+      // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
+      // refused here and only here: the invariant-2 half of a change that landed on one shell.
+      circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+      circlesForPoint,
+      // The relay this device connects to IS the deployment default — unmapped circles land here alone.
+      defaultRelayUrl: CIRCLE_RELAY_URL,
+      onError: (err, cid) => console.warn(`[circleApp] circle-address register failed (${cid}):`, err?.message ?? err),
+    });
     // ONLY NOW announce. Before the aliases are bound the announcement is signed by the canonical key and
     // every recipient refuses it, while the fan reports success (measured 2026-08-02). Web previously
     // fired the primer and this call unawaited, so it RACED; mobile lost deterministically.
-    .then(() => announceCircleAddresses({ agent, circleIds }))
-    .catch((err) => console.warn('[circleApp] circle-address registration failed:', err?.message ?? err));
+    await announceCircleAddresses({ agent, circleIds });
+  } catch (err) {
+    console.warn('[circleApp] circle-address registration failed:', err?.message ?? err);
+  }
 }
 
 // In-app relay setting (Settings → Mij): persist the URL, update the resolved value, and RECONNECT the
@@ -2233,6 +2242,8 @@ function buildCircleBot(agent) {
     // that decide whether a peer-graph record is a row in Contacten (a walk's red names the filter, not a guess).
     window.onderlingIdentityOf = (addr) => _peerAgent?.identityOfAddress?.(addr) ?? null;
     window.onderlingOwnAddresses = () => _peerAgent?.ownAddresses?.() ?? [];
+    // e2e seam: the secure agent's peer surface, so a walk can record what this device SENDS and as which identity.
+    window.onderlingSecureAgent = agent.sa ?? null;
     window.onderlingAddBot = addBotFromInput;  // manual / programmatic add
     try {
       const params = new URLSearchParams(_bootSearch);

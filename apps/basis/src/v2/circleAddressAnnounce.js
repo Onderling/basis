@@ -350,31 +350,23 @@ export async function propagateCircleAddressesAfterJoin({
     }
   }
 
-  // 2. The newcomer learns the circle — over the SAME direct peer channel the redeem response just
-  //    travelled, not the circle fan.
+  // 2. The newcomer learns the circle — over the circle fan as well, narrowed to them.
   //
-  //    This is a race, not a preference. The newcomer only starts listening on their per-circle
-  //    address once their own device registers it (`makeCircleReachable` → `registerCirclePresence`),
-  //    which happens after the redeem returns — so a fan sent from here, milliseconds earlier, would
-  //    be aimed at an address the relay has not yet heard of. Their global address is provably live
-  //    at this instant: a response reached them on it a moment ago. It reveals nothing new either —
-  //    it is the address they gave the admin to join with.
-  //
-  //    The envelope is the one `broadcastCircleAddresses` produces, so the receiving handler and its
-  //    deny-by-default verification are the same on both routes.
-  if (others.length && typeof agent.sendPeerMessage === 'function') {
-    const ts = Date.now();
+  //    Until 2026-09-19 this went DIRECT to their global address ("the channel that demonstrably works":
+  //    the redeem response had just reached them there), and the fan was avoided because their per-circle
+  //    address might not be registered yet. Two things changed under it. The relay HOLDS a send to an
+  //    address nobody has registered and delivers it when they do (measured in the feedback walk), so the
+  //    fan is not a race. And since 2026-09-16 a circle-scoped envelope must be signed by the sender's
+  //    per-circle identity: the direct send left signed as the person, and every joiner refused it —
+  //    "a member's canonical identity where they sign per-circle" — then learned the circle from the
+  //    admin's own per-circle announce that followed. The fan signs as this circle, hold-forwards to the
+  //    newcomer's per-circle address, and is the one envelope shape the receiver verifies.
+  if (others.length) {
     try {
-      await agent.sendPeerMessage(newMemberWebid, {
-        type:    'p2p-chat',
-        subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND,
-        circleId,
-        msgId:   `ca-${ts.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-        ts,
-        announcements: others,
-        noWake:  true,
-      }, { guarantee: 'hold-forward' });
-      out.toNewMember = others.length;
+      const r = await agent.callSkill('stoop', 'broadcastCircleAddresses', {
+        groupId: circleId, announcements: others, to: [newMemberWebid],
+      });
+      out.toNewMember = Number(r?.sent) || 0;
     } catch (err) {
       logger?.warn?.('[circle-address] telling the newcomer about the circle failed', err?.message ?? err);
     }

@@ -284,14 +284,17 @@ describe('the admin\'s post-join propagation', () => {
     expect(fan.args.to).toEqual([BRAM]);
     expect(out.toCircle).toBe(2);
 
-    // 2. The circle's addresses go to the NEWCOMER over the direct peer channel the redeem response
-    //    just used — their per-circle address is not listening yet, their global one demonstrably is.
-    expect(log.peerSends).toHaveLength(1);
-    expect(log.peerSends[0].to).toBe(CATO);
-    expect(log.peerSends[0].payload.subtype).toBe(CIRCLE_ADDRESS_ANNOUNCE_KIND);
-    expect(log.peerSends[0].payload.announcements.map((a) => a.memberWebid)).toEqual([BRAM]);
-    // Housekeeping must never wake a phone.
-    expect(log.peerSends[0].payload.noWake).toBe(true);
+    // 2. The circle's addresses go to the NEWCOMER over the circle fan too — narrowed to them, signed as this
+    //    circle's identity, hold-forwarded to a per-circle address they may not have registered yet (the relay
+    //    holds; measured 2026-09-19). Until then this went DIRECT to their global address, signed by the admin's
+    //    canonical identity — which the 2026-09-16 sender rule refuses inside a circle once the admin has a
+    //    proven per-circle address: every joiner logged "refused a validly-signed envelope" and learned the
+    //    circle from the per-circle announce that followed anyway.
+    const toNewcomer = log.skills.filter((s) => s.op === 'broadcastCircleAddresses')[1];
+    expect(toNewcomer.args.to).toEqual([CATO]);
+    expect(toNewcomer.args.announcements.map((a) => a.memberWebid)).toEqual([BRAM]);
+    expect(out.toNewMember, 'what the fan reports it sent').toBe(2);
+    expect(log.peerSends, 'nothing circle-scoped leaves signed as the person').toHaveLength(0);
 
     // …and the newcomer's freshly-recorded address was BOUND before any of that was sent, or the
     // fan above would have been aimed at an address this device cannot seal to.

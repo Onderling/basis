@@ -266,6 +266,7 @@ import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
 import CircleProfileScreen from './CircleProfileScreen.js';
+import ShareMyContactScreen from './ShareMyContactScreen.js';
 import CircleBlockedScreen from './CircleBlockedScreen.js';
 import CircleAdvancedScreen from './CircleAdvancedScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
@@ -1496,6 +1497,7 @@ export default function CircleLauncherScreen({
       // Hop screen lives under the Mij tab.
       if (view === 'hop') { setView('availability'); return true; }
       if (view === 'blocked') { setView('profile'); return true; }
+      if (view === 'shareContact') { setView('profile'); return true; }
       // S2/S5 — Mij sub-views.
       if (view === 'mydata') { setView('profile'); return true; }
       if (view === 'advanced') { setView('profile'); return true; }
@@ -1637,7 +1639,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -1651,6 +1653,14 @@ export default function CircleLauncherScreen({
     return (
       <WithTabBar active="mij" onSelect={onTab}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('profile')} />
+      </WithTabBar>
+    );
+  }
+  // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
+  if (view === 'shareContact') {
+    return (
+      <WithTabBar active="mij" onSelect={onTab}>
+        <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
   }

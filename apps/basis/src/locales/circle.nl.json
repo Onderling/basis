@@ -6516,6 +6516,10 @@
     "opened_added": {
       "text": "{{name}} is toegevoegd aan je contacten.",
       "doc": "After opening someone's contact link: the contact was added; name = their display name, handle or key."
+    },
+    "share": {
+      "text": "Delen…",
+      "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
     }
   }
 }

@@ -50,3 +50,18 @@ function bodyOf(payload) {
   const body = s.slice(CONTACT_SCHEME.length);
   return B64URL.test(body) ? body : null;
 }
+
+/**
+ * What the "share my contact" panel shows, resolved once for both shells: the card stoop makes and its link form.
+ * A shell paints; it decides nothing. No card (no identity yet) ⇒ `payload: null`; no http(s) app url (a dev shell,
+ * a native build without `EXPO_PUBLIC_WEB_APP_URL`) ⇒ `link: null` — the QR and the code still stand.
+ * @param {{ callSkill: (app: string, op: string, args: object) => Promise<any>, appUrl?: string|null }} a
+ * @returns {Promise<{ payload: string|null, link: string|null }>}
+ */
+export async function loadShareMyContact({ callSkill, appUrl = null } = {}) {
+  let payload = null;
+  try { payload = (await callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { payload = null; }
+  if (typeof payload !== 'string' || !payload) return { payload: null, link: null };
+  const link = appUrl ? contactCardLink(appUrl, payload) : { ok: false };
+  return { payload, link: link.ok ? link.link : null };
+}

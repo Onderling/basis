@@ -20,6 +20,7 @@
 
 import { parseInviteDeepLink } from '../../../basis/src/v2/inviteDeepLink.js';
 import { enrollOfferFromLink } from '../../../basis/src/v2/enrollOffer.js';
+import { contactCardFromLink } from '../../../basis/src/v2/contactCardLink.js';
 
 const STOOP_CONTACT_SCHEME = 'onderling-contact://';
 const STOOP_INVITE_SCHEME  = 'onderling-invite://';
@@ -57,10 +58,13 @@ function _classifyPair(text) {
   return typeof text === 'string' && text.startsWith(PAIR_SCHEME) ? text : null;
 }
 
+// The raw `onderling-contact://` code (a QR) OR the link form the web app shares (`…#contact=<card>`, Mij →
+// "Mijn contact delen", 2026-09-19) — one shared reader, so a link and a scan of the same card cannot diverge.
 function _classifyContact(text) {
-  return typeof text === 'string' && text.startsWith(STOOP_CONTACT_SCHEME)
-    ? text
-    : null;
+  if (typeof text !== 'string') return null;
+  if (text.startsWith(STOOP_CONTACT_SCHEME)) return text;
+  const fromLink = contactCardFromLink(text);
+  return fromLink.ok ? fromLink.payload : null;
 }
 
 function _classifyInvite(text) {

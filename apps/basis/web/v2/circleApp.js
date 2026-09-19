@@ -192,7 +192,7 @@ import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rul
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
-import { contactCardLink, contactCardFromLink } from '../../src/v2/contactCardLink.js';
+import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
 import { renderShareMyContact } from './shareMyContact.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
@@ -3963,11 +3963,8 @@ async function showMij() {
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
 async function showShareMyContact() {
   hideCircleTabBar(tabBarEl);
-  let payload = null;
-  try { payload = (await rawCallSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { payload = null; }
-  const here = `${window.location.origin}${window.location.pathname}`;
-  const link = payload ? contactCardLink(here, payload) : { ok: false };
-  renderShareMyContact(rootEl, { payload, link: link.ok ? link.link : null, t, onBack: showMij });
+  const { payload, link } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
+  renderShareMyContact(rootEl, { payload, link, t, onBack: showMij });
 }
 
 // SILENT out-of-circle delivery — the "shared with me" inbox (a Mij sub-screen). Reads the

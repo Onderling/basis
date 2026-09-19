@@ -167,6 +167,14 @@ Failures here surface either gradle/Hermes wiring or a real
 substrate bug — both are valuable; capture the redbox + `adb
 logcat` output and file under #249.
 
+### Build-time settings (`.env`, gitignored — `EXPO_PUBLIC_*`)
+
+| key | what it is | unset ⇒ |
+|---|---|---|
+| `EXPO_PUBLIC_CIRCLE_RELAY_URL` | the relay this build dials by default (the in-app setting wins) | NKN only |
+| `EXPO_PUBLIC_WEB_APP_URL` | where the hosted web app lives (e.g. `https://onderling.org/basis/`) — Mij → *Mijn contact delen* puts the contact in a link to it (`…#contact=<card>`), the same link web makes; a tapped link and a scanned QR add the contact through one reader | no link row; the QR and the code still stand |
+| `EXPO_PUBLIC_CIRCLE_LLM_*`, `EXPO_PUBLIC_CIRCLE_EMBED_*`, `EXPO_PUBLIC_CIRCLE_BOT_NAME` | the circle assistant's model, embedder and name | the assistant is off / the defaults |
+
 ## Troubleshooting
 
 ### `Unable to resolve "@onderling/react-native/platform/polyfills"`

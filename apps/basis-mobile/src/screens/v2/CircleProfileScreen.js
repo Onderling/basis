@@ -12,7 +12,7 @@ import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 
-export default function CircleProfileScreen({ callSkill, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked }) {
+export default function CircleProfileScreen({ callSkill, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [profile, setProfile] = useState({});
@@ -131,6 +131,10 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
         )}
       </Section>
 
+      {/* Share my contact (web parity with circleProfile.js, 2026-09-19): the QR, the code, the link. */}
+      {typeof onShareContact === 'function' && (
+        <Pressable style={styles.secondary} onPress={onShareContact} testID="profile-share-contact"><Text style={styles.secondaryText}>{t('circle.profile.share_contact')}</Text></Pressable>
+      )}
       {typeof onAvailability === 'function' && (
         <Pressable style={styles.secondary} onPress={onAvailability} testID="profile-availability"><Text style={styles.secondaryText}>{t('circle.profile.availability')}</Text></Pressable>
       )}

@@ -5,7 +5,7 @@
  * link, a bare hash, the raw `onderling-contact://` code.
  */
 import { describe, it, expect } from 'vitest';
-import { contactCardLink, contactCardFromLink, CONTACT_LINK_PARAM } from '../../src/v2/contactCardLink.js';
+import { contactCardLink, contactCardFromLink, loadShareMyContact, CONTACT_LINK_PARAM } from '../../src/v2/contactCardLink.js';
 
 const CARD = 'onderling-contact://eyJ3ZWJpZCI6Ind4In0';
 
@@ -37,5 +37,15 @@ describe('contactCardFromLink', () => {
     expect(contactCardFromLink('').ok).toBe(false);
     expect(contactCardFromLink(null).ok).toBe(false);
     expect(contactCardFromLink('#contact=not*base64').ok).toBe(false);
+  });
+});
+
+describe('loadShareMyContact — what the panel shows, for both shells', () => {
+  it('the card and its link; the code alone without an app url; nothing without a card', async () => {
+    const callSkill = async (app, op) => (app === 'stoop' && op === 'getContactShareQr' ? { payload: CARD } : {});
+    expect(await loadShareMyContact({ callSkill, appUrl: 'https://onderling.org/basis/' })).toEqual({ payload: CARD, link: `https://onderling.org/basis/#${CONTACT_LINK_PARAM}=eyJ3ZWJpZCI6Ind4In0` });
+    expect(await loadShareMyContact({ callSkill })).toEqual({ payload: CARD, link: null });
+    expect(await loadShareMyContact({ callSkill: async () => ({ error: 'no identity' }) })).toEqual({ payload: null, link: null });
+    expect(await loadShareMyContact({ callSkill: async () => { throw new Error('down'); } })).toEqual({ payload: null, link: null });
   });
 });

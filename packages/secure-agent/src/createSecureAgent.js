@@ -1352,13 +1352,26 @@ export async function createSecureAgent(opts = {}) {
           // the relay, in cleartext, via `_to`) the link between that address and the identity the
           // rest of our circles use — the exact linkage per-circle addressing exists to withhold.
           // Absent ⇒ the canonical key, which is right for contact/pairing traffic.
-          const answerKey = (typeof agent.security?.selfIdentityFor === 'function'
-            ? agent.security.selfIdentityFor(env._to)?.pubKey : null) ?? identity.pubKey;
+          const dialledIdentity = (typeof agent.security?.selfIdentityFor === 'function' && env._to !== identity.pubKey)
+            ? agent.security.selfIdentityFor(env._to) : null;
+          const answerKey = dialledIdentity?.pubKey ?? identity.pubKey;
           // `from` — answer AS the address they dialled (G13), or a handshake to a per-circle address
           // can never complete. `re` — name the envelope we are answering, which is what makes this a
           // REPLY and therefore unanswerable; no new wire field is needed for that.
           const helloArgs = [env._from, { pubKey: answerKey, ack: true }, { from: env._to, re: env._id ?? null }];
+          // THE ANSWER IN AN ALIAS'S NAME NEEDS A TRANSPORT THAT CARRIES ALIASES (2026-09-19). A HI to one of
+          // our per-circle addresses can arrive over an alias-blind transport (NKN routes it to the person
+          // behind the alias); answering there, the transport cannot send as the alias and falls back to
+          // the primary — so the peer's per-circle address receives a HI signed by the person, refuses it
+          // ("a member's canonical identity where they sign per-circle"), and files nothing under the alias
+          // it dialled. The send path already has this rule; the answer follows it: an alias answer is sent
+          // over an alias-capable transport, or not at all — silence is retried on the next envelope, a
+          // canonical answer is refused AND leaks the alias→identity link the address exists to withhold.
+          const aliasAnswer = !!dialledIdentity;
+          const canCarry = (t) => !aliasAnswer
+            || (t?.supportsAliases === true && (typeof t.holdsAddress !== 'function' || t.holdsAddress(env._to)));
           try {
+            if (!canCarry(tx)) throw new Error('this transport cannot answer as a per-circle address');
             await tx.sendHello(...helloArgs);
             // NOT `helloedPeers` — answering someone is not the same as having announced ourselves to them,
             // and conflating the two also let the send path believe it had already introduced itself.
@@ -1390,8 +1403,8 @@ export async function createSecureAgent(opts = {}) {
             try { routing.onTransportFailure?.(env._from, tx?.name ?? null); } catch { /* defensive */ }
             let recovered = false;
             try {
-              const sel = await route(env._from);
-              if (sel?.transport && sel.transport !== tx) {
+              const sel = await route(env._from, aliasAnswer ? { requireAliasCapable: true } : null);
+              if (sel?.transport && sel.transport !== tx && canCarry(sel.transport)) {
                 await sel.transport.sendHello(...helloArgs);
                 reciprocatedPeers.add(env._from);
                 recovered = true;

@@ -91,3 +91,26 @@ describe('renderCircleProfile — availability link', () => {
     expect(onAvailability).toHaveBeenCalled();
   });
 });
+
+describe('renderCircleProfile — the version line (2026-09-19)', () => {
+  it('says which build this tab runs, at the bottom; a build without a tag says so', () => {
+    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, version: 'v0.1.13-alpha' });
+    const line = el.querySelector('.cc-profile__version');
+    expect(line.textContent).toBe('circle.profile.version:{"tag":"v0.1.13-alpha"}');
+    expect(el.lastElementChild).toBe(line);
+    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t, version: '' }).querySelector('.cc-profile__version').textContent).toBe('circle.profile.version:{"tag":"circle.profile.version_dev"}');
+    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__version')).toBeNull();
+  });
+});
+
+describe('renderCircleProfile — share my contact (2026-09-19)', () => {
+  it('offers "share my contact" beside the other Mij links, and omits it without the seam', () => {
+    const onShareContact = vi.fn();
+    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, onShareContact });
+    const link = el.querySelector('.cc-profile__share-contact');
+    expect(link.textContent).toBe('circle.profile.share_contact');
+    link.click();
+    expect(onShareContact).toHaveBeenCalled();
+    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__share-contact')).toBeNull();
+  });
+});

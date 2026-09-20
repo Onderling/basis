@@ -677,6 +677,8 @@ export class SecurityLayer {
       to:          env._to,
       ownAddress:  this.ownAddressFor(env._to),
       pattern:     env._p,
+      // a HI that answers one (`_re`) is the peer's reciprocal; a HI without is their first contact
+      answering:   !!env._re || env?.payload?.ack === true,
     });
     if (!verdict.allow) {
       this.#refusedUnauthorized += 1;

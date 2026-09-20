@@ -190,6 +190,10 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
+import { createVersionWatch } from '../../src/v2/appVersion.js';
+import { renderUpdateBar } from './updateBar.js';
+import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
+import { renderShareMyContact } from './shareMyContact.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
@@ -920,7 +924,13 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
  *   their per-circle address while the relay had never been told it (found on hardware 2026-07-30, mobile
  *   first; web had the same hole).
  */
-function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
+// RETURNS THE WHOLE CHAIN (2026-09-19), as mobile's does: prime, register on every relay, announce. Until now the
+// call fired and forgot, which was fine at boot and wrong for a circle made on the spot — the pair roster founds
+// its circle, "awaits" this, and sends its first turn while the relay has not yet bound the per-circle address;
+// the transport, asked to speak as an alias it does not hold, fell back to the primary, and the contact refused
+// that first HI as "a member's canonical identity where they sign per-circle" (one refusal in every log; the
+// handshake completed on a later retry). A caller that does not care still need not await.
+async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   const circleIds = [...new Set([
     ...circlesCache.map((c) => c?.id).filter(Boolean),
     ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
@@ -929,34 +939,37 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   // for EVERY circle, before (and independently of) the relay scoping below. One shared primer, called
   // identically by mobile (`agentBundle.js`). Note it asks the SUBSTRATE rather than trusting the ids
   // computed above: those come from `circlesCache`, which is a rendering convenience and is empty on a
-  // cold boot — exactly when priming matters most. Fire-and-forget for the same reason the rest is.
-  primeCircleSecurity({ agent, circleIds })
-    .catch((err) => console.warn('[circleApp] circle security priming failed:', err?.message ?? err));
+  // cold boot — exactly when priming matters most.
+  try { await primeCircleSecurity({ agent, circleIds }); }
+  catch (err) { console.warn('[circleApp] circle security priming failed:', err?.message ?? err); }
   if (!CIRCLE_RELAY_URL || !agent?.relay?.supportsAliases) return;
   const points = getConnectionPoints();
   const circlesForPoint = (url) => points.circlesFor(url);
   circlesForPoint.pointsFor = (cid) => points.pointsFor(cid);   // the reverse view the scoper duck-types
   // On EVERY relay this device is on (2026-09-08), each scoped to the circles that ride it — the facade's
   // per-relay port, never the transport itself.
-  registerCircleAddressesOnRelays({
-    relays: agent.relays?.list?.() ?? [],
-    circleIds,
-    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-    // An address IS a key, so registering it means answering the relay's challenge with the key
-    // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
-    // refused here and only here: the invariant-2 half of a change that landed on one shell.
-    circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
-    alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
-    circlesForPoint,
-    // The relay this device connects to IS the deployment default — unmapped circles land here alone.
-    defaultRelayUrl: CIRCLE_RELAY_URL,
-    onError: (err, cid) => console.warn(`[circleApp] circle-address register failed (${cid}):`, err?.message ?? err),
-  })
+  try {
+    await registerCircleAddressesOnRelays({
+      relays: agent.relays?.list?.() ?? [],
+      circleIds,
+      circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+      // An address IS a key, so registering it means answering the relay's challenge with the key
+      // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
+      // refused here and only here: the invariant-2 half of a change that landed on one shell.
+      circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
+      alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+      circlesForPoint,
+      // The relay this device connects to IS the deployment default — unmapped circles land here alone.
+      defaultRelayUrl: CIRCLE_RELAY_URL,
+      onError: (err, cid) => console.warn(`[circleApp] circle-address register failed (${cid}):`, err?.message ?? err),
+    });
     // ONLY NOW announce. Before the aliases are bound the announcement is signed by the canonical key and
     // every recipient refuses it, while the fan reports success (measured 2026-08-02). Web previously
     // fired the primer and this call unawaited, so it RACED; mobile lost deterministically.
-    .then(() => announceCircleAddresses({ agent, circleIds }))
-    .catch((err) => console.warn('[circleApp] circle-address registration failed:', err?.message ?? err));
+    await announceCircleAddresses({ agent, circleIds });
+  } catch (err) {
+    console.warn('[circleApp] circle-address registration failed:', err?.message ?? err);
+  }
 }
 
 // In-app relay setting (Settings → Mij): persist the URL, update the resolved value, and RECONNECT the
@@ -1375,6 +1388,9 @@ const CIRCLE_LLM_MODEL     = import.meta.env?.VITE_CIRCLE_LLM_MODEL ?? undefined
 // but aborts a local model's cold-start (qwen2.5:7b warms up in 30–60s) → the bot silently
 // drops to "basic mode". Default generous (90s) for the local case; override via env.
 const CIRCLE_LLM_TIMEOUT_MS = Number(import.meta.env?.VITE_CIRCLE_LLM_TIMEOUT_MS ?? 90000) || 90000;
+// The build this tab runs — the tag the publish baked in ('' on a dev server). Shown under Mij; compared with the
+// site's version.json at boot and on every return to the tab, so a tab left open does not silently run last week.
+const APP_VERSION = String(import.meta.env?.VITE_APP_VERSION ?? '');
 // F-retrieve tier-2 embeddings — defaults to the LLM base (the enclave serves both
 // /v1/chat/completions + /v1/embeddings), so semantic RAG rides the same trust
 // boundary unless explicitly pointed elsewhere. Model defaults to the provider's
@@ -2222,6 +2238,12 @@ function buildCircleBot(agent) {
   if (typeof window !== 'undefined') {
     window.onderlingContactChannel = circleContactChannel;
     window.onderlingPeers = circlePeerGraph;   // debug / e2e seam (roster + journey-A tests seed/inspect peers)
+    // e2e seam: what this device resolves an address to, and which addresses it counts as its own — the two reads
+    // that decide whether a peer-graph record is a row in Contacten (a walk's red names the filter, not a guess).
+    window.onderlingIdentityOf = (addr) => _peerAgent?.identityOfAddress?.(addr) ?? null;
+    window.onderlingOwnAddresses = () => _peerAgent?.ownAddresses?.() ?? [];
+    // e2e seam: the secure agent's peer surface, so a walk can record what this device SENDS and as which identity.
+    window.onderlingSecureAgent = agent.sa ?? null;
     window.onderlingAddBot = addBotFromInput;  // manual / programmatic add
     try {
       const params = new URLSearchParams(_bootSearch);
@@ -3928,9 +3950,21 @@ async function showMij() {
     onBlocked: showBlocked,
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: showAdvanced,
+    version: APP_VERSION,
+    // This person's contact as a QR, a code and a link — the way to be reached without a circle.
+    onShareContact: showShareMyContact,
   });
   rerender();
   load();
+}
+
+// Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card stoop makes
+// (`getContactShareQr` — webid, key, name, the address I am written to, my relay), painted three ways. The LINK is
+// this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
+async function showShareMyContact() {
+  hideCircleTabBar(tabBarEl);
+  const { payload, link } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
+  renderShareMyContact(rootEl, { payload, link, t, onBack: showMij });
 }
 
 // SILENT out-of-circle delivery — the "shared with me" inbox (a Mij sub-screen). Reads the
@@ -7846,6 +7880,18 @@ async function boot() {
   const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log')));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
+  // IS THIS TAB THE BUILD THE SITE SERVES? A page never updates itself: on 2026-09-19 a laptop ran the build from
+  // before the fix that made the phone's messages visible, while the site served the fix. Checked now and every time
+  // the tab regains focus; when the site is ahead, a bar at the top says so with one action. A dev build never nags.
+  if (APP_VERSION) {
+    const versionUrl = `${window.location.pathname.replace(/[^/]*$/, '')}version.json`;   // beside the app, whatever path it lives under
+    const watch = createVersionWatch({
+      running: APP_VERSION, versionUrl,
+      onUpdate: ({ served }) => renderUpdateBar(document.body, { served, t, onReload: () => window.location.reload() }),
+    });
+    watch.check().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') watch.check().catch(() => {}); });
+  }
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
@@ -8474,6 +8520,28 @@ async function boot() {
         agent.personKeySync?.requestFromSiblings().catch(() => {});
         // …and which of the person's devices is primary for direct messages (sync-policy §12).
         agent.primaryDevice?.requestFromSiblings?.().catch(() => {});
+        // AN ARRIVING CONTACT LINK (`…#contact=<payload>` — the clickable form of someone's contact QR): add the
+        // contact through the one decoder, scrub the card from the address bar, open Contacten so the new row is
+        // the first thing seen. A fragment never reached the server; scrubbing keeps it out of the history too.
+        // At boot, and on `hashchange`: a link pasted into an already-open tab changes only the fragment and
+        // reloads nothing — without the listener, nothing would happen at all.
+        const takeContactFromHash = () => {
+          try {
+            const fromLink = contactCardFromLink(window.location.hash);
+            if (!fromLink.ok) return;
+            try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
+            rawCallSkill('stoop', 'addContactFromQr', { payload: fromLink.payload })
+              .then((r) => {
+                const c = r?.contact;
+                if (!c || r?.error) { globalThis.alert?.(t('circle.contacts.add_failed')); return; }
+                globalThis.alert?.(t('circle.shareContact.opened_added', { name: c.displayName ?? c.handle ?? c.webid ?? '' }));
+                showContacts();
+              })
+              .catch(() => { globalThis.alert?.(t('circle.contacts.add_failed')); });
+          } catch { /* a malformed hash is not an error state */ }
+        };
+        takeContactFromHash();
+        window.addEventListener('hashchange', takeContactFromHash);
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on

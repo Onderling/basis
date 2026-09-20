@@ -920,13 +920,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       `[realAgent] no roster recorded for own circle address ${String(ownAddress).slice(0, 12)}… — `
       + 'traffic to it is ACCEPTED unchecked until this circle\'s membership has been read once.',
     ),
-    onRefused: ({ circleId, senderKey, reason }) => console.warn(
-      reason === SENDER_REASON.CANONICAL_REFUSED
+    // …naming the address it came FROM and the one it was sent TO: a refusal that names only the key sent a
+    // diagnosis the wrong way twice (2026-09-19).
+    onRefused: ({ circleId, senderKey, from, ownAddress, pattern, answering, reason }) => console.warn(
+      (reason === SENDER_REASON.CANONICAL_REFUSED
         ? `[realAgent] refused a validly-signed envelope in ${circleId ?? 'a circle'}: the key `
           + `${String(senderKey).slice(0, 12)}… is a MEMBER's canonical identity, and that member has `
           + 'proved a per-circle address — inside a circle only the per-circle key may speak.'
         : `[realAgent] refused a validly-signed envelope in ${circleId ?? 'a circle'}: the key `
-          + `${String(senderKey).slice(0, 12)}… is not on its roster.`,
+          + `${String(senderKey).slice(0, 12)}… is not on its roster.`)
+      + ` (${pattern ?? 'a message'}${answering ? ' answering ours' : ''} from ${String(from ?? '?').slice(0, 12)}… to ${String(ownAddress ?? '?').slice(0, 12)}…)`,
     ),
     // The transition, said out loud (B6). These members are still accepted on their canonical key
     // because refusing them would make them undeliverable rather than pseudonymous — a shrinking

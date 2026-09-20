@@ -47,6 +47,13 @@ export function renderCircleProfile(container, {
   onBlocked,
   // The advanced surface — surface-less ops + settable params. Absent ⇒ omitted.
   onAdvanced,
+  // The build this tab runs (the tag the publish baked in; '' on a dev server). Absent ⇒ no line; given ⇒ the
+  // last line of Mij, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's
+  // build looked like a laptop that receives nothing).
+  version,
+  // Share my contact (2026-09-19) — the panel with this person's contact as a QR, a code and a link, so
+  // someone can be handed it without a circle. Absent ⇒ omitted, like its peers.
+  onShareContact,
   // D / consumer-switch — the projected PAGE surface for the `me` op
   // (renderWeb(manifest).pages[] entry, selected via pageForOp). When present,
   // the header label is derived from `page.labelKey` via t, making this
@@ -138,6 +145,9 @@ export function renderCircleProfile(container, {
   container.appendChild(locSection);
 
   // ── availability + my-data links ──────────────────────────────────────────
+  if (typeof onShareContact === 'function') {
+    container.appendChild(button(tr('circle.profile.share_contact'), 'cc-profile__share-contact', onShareContact));
+  }
   if (typeof onAvailability === 'function') {
     const avail = button(tr('circle.profile.availability'), 'cc-profile__availability', onAvailability);
     container.appendChild(avail);
@@ -172,6 +182,12 @@ export function renderCircleProfile(container, {
     b.className = 'cc-profile__busy';
     b.textContent = tr('circle.profile.saving');
     container.appendChild(b);
+  }
+  if (typeof version === 'string') {
+    const v = document.createElement('div');
+    v.className = 'cc-profile__version';
+    v.textContent = tr('circle.profile.version', { tag: version || tr('circle.profile.version_dev') });
+    container.appendChild(v);
   }
   return container;
 

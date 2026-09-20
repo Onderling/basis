@@ -12,6 +12,15 @@ describe('basis-mobile QR classifiers', () => {
     expect(r.payload).toMatch(/^onderling-contact:\/\//);
   });
 
+  it('classifies the contact LINK the web app shares (…#contact=<card>) as kind:contact — the card itself (2026-09-19)', () => {
+    // Mij → "Mijn contact delen" hands out a link beside the QR; tapped on a phone it must add the contact
+    // exactly as the scanned code does — one decoder (`contactCardFromLink`), shared with web's boot.
+    const r = classifyQrPayload('https://onderling.org/basis/#contact=eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0', CL);
+    expect(r.kind).toBe('contact');
+    expect(r.payload).toBe('onderling-contact://eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0');
+    expect(classifyQrPayload('https://onderling.org/basis/#enroll=abc', CL).kind).not.toBe('contact');
+  });
+
   it('classifies a onderling-invite:// URL as kind:invite', () => {
     const r = classifyQrPayload('onderling-invite://eyJncm91cElkIjoidGVzdCJ9', CL);
     expect(r.kind).toBe('invite');

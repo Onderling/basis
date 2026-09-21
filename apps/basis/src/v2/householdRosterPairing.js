@@ -189,9 +189,22 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
  *   holds only what was fanned to it AFTER its join — the circle's `create`, earlier joins, roles and
  *   evictions live before that and reach it only by a pull. Runs after the binding, since the pull leaves as
  *   this circle's identity and is answered to the addresses just bound (2026-09-16).
- * @returns {Promise<{registered: boolean, bound: number, skipped: number, pulled: boolean}>}
+ * @param {object|null} [a.invite]   the decoded invite the join redeemed (`relayUrl`, `podBacked`, `podUrl`)
+ * @param {(a: {invite: object, circleId: string}) => {recorded?: string[]}} [a.recordPoints]
+ *   the host's connection-points recorder (`recordJoinedCirclePoints` over its store). Runs FIRST: the
+ *   circle's relay is where presence registers this device's alias and where the pull below is scoped to.
+ *   Recorded by the shells' `onDispatched` until 2026-09-21 — AFTER this step had registered and pulled, so
+ *   the pull left with no points for the circle, over a transport that held no alias of ours, signed as the
+ *   canonical self, and was refused at the admin (the joiner never got the creator's person key on two
+ *   relays). The pair-roster join has no `onDispatched`, so a pair circle never recorded its point at all.
+ * @returns {Promise<{points: string[], registered: boolean, bound: number, skipped: number, pulled: boolean}>}
  */
-export async function makeCircleReachable({ agent, circleId, registerCirclePresence, pullLanes } = {}) {
+export async function makeCircleReachable({ agent, circleId, invite = null, recordPoints = null, registerCirclePresence, pullLanes } = {}) {
+  let points = [];
+  if (invite && typeof recordPoints === 'function') {
+    try { points = (await recordPoints({ invite, circleId }))?.recorded ?? []; }
+    catch (err) { if (typeof console !== 'undefined') console.warn(`[circle] joined ${circleId} but could not record its connection point: ${err?.message ?? err}`); }
+  }
   let registered = false;
   if (typeof registerCirclePresence === 'function') {
     try { await registerCirclePresence(); registered = true; }
@@ -218,5 +231,5 @@ export async function makeCircleReachable({ agent, circleId, registerCirclePrese
       if (typeof console !== 'undefined') console.warn(`[circle] joined ${circleId} but could not pull its lanes — the roster fills in at the next reconnect: ${err?.message ?? err}`);
     }
   }
-  return { registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0, pulled };
+  return { points, registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0, pulled };
 }

@@ -47,7 +47,7 @@ import {
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
   nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS, POINT_STATUS_LABELS, pointStatus,
-  createConnectionPoints, adoptExistingRelay, asyncStorageConnectionPointsIo, recordJoinedCirclePoints,
+  createConnectionPoints, adoptExistingRelay, asyncStorageConnectionPointsIo,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // circle-scoped event stream + per-row action chips.
@@ -2212,19 +2212,8 @@ export default function CircleLauncherScreen({
               setJoinArgs(null);
               const gid = r?.groupId ?? r?.joinedGroupId ?? null;
               if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
-              // Rule 1 (web parity) — record the joined circle's pod/relay connection point(s) from what
-              // the invite carried (the modal passes the decoded invite back). Best-effort by design:
-              // the list is a convenience, a failure never breaks the join.
-              if (gid && r?.invite) {
-                (async () => {
-                  try {
-                    const io = asyncStorageConnectionPointsIo(AsyncStorage);
-                    const store = createConnectionPoints({ initial: await io.load(), save: (v) => { io.save(v); } });
-                    recordJoinedCirclePoints({ store, invite: r.invite, circleId: gid });
-                    bundle?.registerCirclePresence?.();   // G13 — a new relay point changes the scoping
-                  } catch { /* best-effort */ }
-                })();
-              }
+              // (The joined circle's connection point is recorded by the bundle's `onCircleJoined`, before presence
+              // and the pull — web parity by construction.)
               load();
             }}
           />

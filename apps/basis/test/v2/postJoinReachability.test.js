@@ -112,7 +112,7 @@ describe('the seam fires from the WIZARD path, not just the programmatic one', (
     await finalSubmit({
       state, callSkill: joiningCallSkill(), onJoined: (a) => seen.push(a),
     });
-    expect(seen).toEqual([{ circleId: 'rt3' }]);
+    expect(seen).toEqual([{ circleId: 'rt3', invite: expect.objectContaining({ groupId: 'rt3' }) }])   // …with the invite it redeemed (the connection point is recorded from it, 2026-09-21);
   });
 
   it('and from joinCircleFromInvite, which forwards it', async () => {
@@ -122,7 +122,7 @@ describe('the seam fires from the WIZARD path, not just the programmatic one', (
       rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
     });
     expect(r).toMatchObject({ ok: true, circleId: 'rt3' });
-    expect(seen).toEqual([{ circleId: 'rt3' }]);
+    expect(seen).toEqual([{ circleId: 'rt3', invite: expect.objectContaining({ groupId: 'rt3' }) }])   // …with the invite it redeemed (the connection point is recorded from it, 2026-09-21);
   });
 
   it('it fires AFTER the redeem — registering before there is a membership is pointless', async () => {

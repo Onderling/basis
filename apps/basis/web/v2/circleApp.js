@@ -1353,10 +1353,14 @@ let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
  * bind the other members' addresses, and PULL the circle's pull-all lanes — the `create`, earlier joins, roles,
  * evictions and keys all predate the join and are fanned to nobody after the fact.
  */
-function circleOnJoined({ circleId }) {
+function circleOnJoined({ circleId, invite = null }) {
   return makeCircleReachable({
     agent: _peerAgent,
     circleId,
+    invite,
+    // Rule 1 — the joined circle's connection point(s), from what the invite carried (its pod and/or its relay),
+    // recorded FIRST so presence and the pull below aim at the circle's relay. Best-effort: never blocks a join.
+    recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
     // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
     registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
     pullLanes: (cid) => Promise.allSettled(
@@ -4513,11 +4517,9 @@ async function showJoinCircle(inviteArg) {
   // resolves the relay (pubKey) + nkn native address via `addressesOf` on the
   // redeem send, instead of falling back to the un-routable bare pubKey. Best-effort:
   // a bad/relay-only invite just populates nothing and the join proceeds unchanged.
-  let decodedInvite = null;
   try {
     const decoded = {};
     decodeInviteForPopulate(invite, decoded);
-    decodedInvite = decoded.invite ?? null;
     if (decoded.invite) await populateAdminAddressesFromInvite({ peerGraph: circlePeerGraph, invite: decoded.invite });
   } catch { /* population must never block the join */ }
   // The join wizard mounts FROM its declared flow (batch 6): `flows: [{ id: 'joinGroup', … }]` on the
@@ -4563,14 +4565,7 @@ async function showJoinCircle(inviteArg) {
         try { await overrideStore.update(gid, { capabilityOptOuts: reply.capabilityOptOuts }); }
         catch { /* best-effort — a failed prefs write must not break the join */ }
       }
-      // Rule 1 — record the joined circle's connection point(s) from what the invite carried: its POD
-      // (J-NP1) and/or its RELAY (the invite-carries-endpoint decision — a pasted invite has no
-      // deep-link context to learn the relay from). Shared recorder, so mobile records identically.
-      // Best-effort: the list is a convenience — it must never block a join.
-      if (gid && decodedInvite) {
-        try { recordJoinedCirclePoints({ store: getConnectionPoints(), invite: decodedInvite, circleId: gid }); }
-        catch { /* best-effort */ }
-      }
+      // (The joined circle's connection point is recorded in `circleOnJoined`, before presence and the pull.)
       try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* */ }
     },
   });

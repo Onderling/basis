@@ -140,6 +140,25 @@ describe('makeCircleReachable — a fresh joiner PULLS the circle\'s lanes (2026
     expect(order).toEqual(['register', 'pull:k1']);
     expect(r).toMatchObject({ registered: true, pulled: true });
   });
+  it('records the circle\'s CONNECTION POINTS from the invite FIRST — before presence, before the pull (2026-09-21)', async () => {
+    // The point used to be recorded by the shells' `onDispatched`, after `onJoined` had already registered presence
+    // and pulled: the pull left with no points for the circle, over a transport that did not hold this device's alias,
+    // and arrived signed as the canonical self — refused at the admin (two-relays walk STEP3b, the joiner never got the
+    // creator's person key). The pair-roster join had no `onDispatched` at all, so a pair circle never recorded its point.
+    const order = [];
+    const invite = { relayUrl: 'wss://kring.example', podBacked: false };
+    const r = await makeCircleReachable({
+      agent: mk(), circleId: 'k1', invite,
+      recordPoints: ({ invite: inv, circleId }) => { order.push(`points:${circleId}:${inv.relayUrl}`); return { recorded: ['relay'] }; },
+      registerCirclePresence: async () => { order.push('register'); },
+      pullLanes: async (cid) => { order.push(`pull:${cid}`); },
+    });
+    expect(order).toEqual(['points:k1:wss://kring.example', 'register', 'pull:k1']);
+    expect(r).toMatchObject({ points: ['relay'], registered: true, pulled: true });
+    // without an invite (a create, a follow) or without the seam: nothing recorded, nothing broken
+    expect((await makeCircleReachable({ agent: mk(), circleId: 'k1', recordPoints: () => { throw new Error('never'); } })).points).toEqual([]);
+    expect((await makeCircleReachable({ agent: mk(), circleId: 'k1', invite })).points).toEqual([]);
+  });
   it('a pull that fails costs the join nothing — stated, not swallowed', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const r = await makeCircleReachable({ agent: mk(), circleId: 'k1', pullLanes: async () => { throw new Error('no peer'); } });

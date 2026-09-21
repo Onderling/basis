@@ -759,7 +759,8 @@ export async function finalSubmit({
     state.submitStage = 'connecting';
     if (typeof onStage === 'function') { try { onStage(state.submitStage); } catch { /* cosmetic */ } }
     if (result && result.groupId && typeof onJoined === 'function') {
-      try { await onJoined({ circleId: result.groupId }); }
+      // …with the invite it redeemed: the circle's connection point is recorded there, before presence and the pull.
+      try { await onJoined({ circleId: result.groupId, invite: state.invite ?? null }); }
       catch { /* reachability is repaired on the next circles load either way */ }
     }
     // Record this circle membership into the profile registry (restore-data) so a restored device knows its

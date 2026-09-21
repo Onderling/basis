@@ -155,7 +155,7 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     const rostersOf = async (page) => page.evaluate(async () => {
       const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
       const out = {};
-      for (const cid of ids) { try { const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: cid }); out[String(cid).slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}@[${(m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)).join(',')}]${m.circleAddress ? `*${String(m.circleAddress).slice(0, 8)}` : ''}`); } catch (e) { out[String(cid).slice(0, 14)] = String(e); } }
+      for (const cid of ids) { try { const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: cid }); out[String(cid).slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}@[${(m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)).join(',')}]${m.circleAddress ? `*${String(m.circleAddress).slice(0, 8)}` : ''}${m.handle ? ` h=${m.handle}` : ''}${m.said ? ` said=${JSON.stringify(m.said)}` : ''}`); } catch (e) { out[String(cid).slice(0, 14)] = String(e); } }
       return out;
     }).catch((e) => String(e));
     // SIBLINGS FOLLOW A CIRCLE (L109): the box founded the pair circle with the visitor; the maker's tab is the
@@ -178,7 +178,8 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     // of theirs speaks as to its siblings) used to be a second, nameless row here — sorted by key bytes, first in
     // CI — and an answer sent to it went nowhere (the STEP5 red of 2026-09-19). Asserted so it cannot come back.
     const personRows = (makerRows ?? []).filter((r) => !r.includes('(bot)'));
-    expect(personRows, `the maker's Contacten lists exactly the visitor — no row for the maker's own addresses (box: ${JSON.stringify(boxPrimary)})`).toEqual([`${String(visitorWho?.webid)}:${String(visitorWho?.webid)}`]);
+    const makerBook = await maker.page.evaluate(async () => ((await window.onderlingCall('stoop', 'listContacts', {}))?.contacts ?? []).map((c) => `${String(c.webid).slice(0, 8)}:${c.displayName ?? ''}/${c.handle ?? ''}`)).catch((e) => String(e));
+    expect(personRows, `the maker's Contacten lists exactly the visitor, named by their key (no name given, no placeholder) — no row for the maker's own addresses (box: ${JSON.stringify(boxPrimary)}; maker book: ${JSON.stringify(makerBook)}; maker rosters: ${JSON.stringify(makerRosters)})`).toEqual([`${String(visitorWho?.webid)}:${String(visitorWho?.webid)}`]);
     const reply = `dank je, ik kijk ernaar ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });
     expect(answered.sent, `the maker could not answer: ${answered.why}`).toBe(true);

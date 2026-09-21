@@ -4510,7 +4510,10 @@ export function buildSkills({
         for (const m of a.members) {
           if (!m || typeof m.webid !== 'string' || !m.webid || m.webid === from) continue;
           try {
-            const { role: _role, ...displayOnly } = m;
+            // …and the HANDLE is stripped too (2026-09-21): the seeded trail folds it (`peerDisplay`), and the member
+            // map is also the CONTACT BOOK's row — written there, a roster fact became the person's handle in Contacten,
+            // and a pair circle's quiet placeholder handle was painted as a visitor's name on every device the seed reached.
+            const { role: _role, handle: _handle, ...displayOnly } = m;
             await members.addMember(displayOnly);
             membersRecorded += 1;
           } catch { /* per-row best-effort */ }

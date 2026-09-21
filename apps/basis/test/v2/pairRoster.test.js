@@ -99,7 +99,7 @@ describe('the invite lands — the join', () => {
     expect(r1).toEqual({ joined: true, circleId: id });
     expect(r2).toEqual({ joined: true, circleId: id });
     expect(sendPeerRedeem, 'joined twice').toHaveBeenCalledTimes(1);
-    expect(joined).toEqual([{ circleId: id }]);
+    expect(joined.map((j) => [j.circleId, j.invite?.groupId])).toEqual([[id, id]]);   // …with the invite: the point is recorded there
     expect(calls.find((c) => c.op === 'addContact')?.args).toEqual({ webid: ANNA, pairCircleId: id });
     // A person WITHOUT a handle joins under a quiet derived one — on the pair roster's row only. It must never become
     // the person's profile handle: found 2026-09-21 when the book started reading the roster and a visitor's

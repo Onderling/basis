@@ -64,7 +64,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 import { registerCircleAddressesOnRelays } from '../../../basis/src/v2/circleAddressRegistration.js';
 import { makeCircleReachable } from '../../../basis/src/v2/householdRosterPairing.js';
-import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnectionPointsIo, POINT_KIND } from '../../../basis/src/v2/connectionPoints.js';
+import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND } from '../../../basis/src/v2/connectionPoints.js';
 // SILENT out-of-circle delivery — the per-user "shared with me" store (TIERED: AsyncStorage canonical + pod
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
@@ -935,8 +935,20 @@ export async function bootAgentBundle(opts = {}) {
   // connect() resolves a tick later).  Callers should not cache the
   // returned value across renders.
   const laneCatchUpsRef = { current: null };
-  pairSeams.onJoined = ({ circleId } = {}) => makeCircleReachable({
-    agent, circleId, registerCirclePresence,
+  // Rule 1 — the joined circle's connection point(s) from the invite, through a SAVING store (the boot-time
+  // `loadConnectionPoints` is a read-only snapshot), recorded before presence and the pull; the send-time
+  // circle → relays snapshot is refreshed from it at once, so the first send after a join is scoped right.
+  const recordPointsFromInvite = async ({ invite, circleId }) => {
+    const pointsIo = asyncStorageConnectionPointsIo(AsyncStorage);   // the POINTS store's io (not the relay pref's)
+    const store = createConnectionPoints({ initial: await pointsIo.load(), save: pointsIo.save });
+    const r = recordJoinedCirclePoints({ store, invite, circleId });
+    _pointsList = store.list();
+    return r;
+  };
+  pairSeams.onJoined = ({ circleId, invite = null } = {}) => makeCircleReachable({
+    agent, circleId, invite,
+    recordPoints: recordPointsFromInvite,
+    registerCirclePresence,
     pullLanes: (cid) => Promise.allSettled(
       ['membership', 'gov', 'key'].map((k) => laneCatchUpsRef.current?.[k]?.requestCircle?.(cid, { callSkill })),
     ),

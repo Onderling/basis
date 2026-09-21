@@ -24,6 +24,10 @@ describe('share my contact — parity', () => {
     const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     for (const src of [webHost, webPanel, mobileScreen]) expect(code(src)).not.toMatch(/#contact=|getContactShareQr/);
   });
+  it('both shells draw the QR from what the loader says it encodes — neither decides link-or-code itself', () => {
+    expect(webPanel).toMatch(/qr \?\? payload/);
+    expect(mobileScreen).toMatch(/state\.qr \?\? state\.payload/);
+  });
   it('both shells read an arriving link through the one reader', () => {
     expect(webHost).toMatch(/contactCardFromLink\(window\.location\.hash\)/);
     expect(mobileClassifier).toMatch(/contactCardFromLink\(/);

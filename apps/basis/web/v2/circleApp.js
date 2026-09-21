@@ -3963,8 +3963,8 @@ async function showMij() {
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
 async function showShareMyContact() {
   hideCircleTabBar(tabBarEl);
-  const { payload, link } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
-  renderShareMyContact(rootEl, { payload, link, t, onBack: showMij });
+  const { payload, link, qr } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
+  renderShareMyContact(rootEl, { payload, link, qr, t, onBack: showMij });
 }
 
 // SILENT out-of-circle delivery — the "shared with me" inbox (a Mij sub-screen). Reads the

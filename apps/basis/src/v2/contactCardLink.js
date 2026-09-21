@@ -52,16 +52,23 @@ function bodyOf(payload) {
 }
 
 /**
- * What the "share my contact" panel shows, resolved once for both shells: the card stoop makes and its link form.
- * A shell paints; it decides nothing. No card (no identity yet) ⇒ `payload: null`; no http(s) app url (a dev shell,
- * a native build without `EXPO_PUBLIC_WEB_APP_URL`) ⇒ `link: null` — the QR and the code still stand.
+ * What the "share my contact" panel shows, resolved once for both shells: the card stoop makes, its link form, and
+ * what the QR encodes. A shell paints; it decides nothing. No card (no identity yet) ⇒ `payload: null`; no http(s)
+ * app url (a dev shell, a native build without `EXPO_PUBLIC_WEB_APP_URL`) ⇒ `link: null` — the QR and the code
+ * still stand.
+ *
+ * THE QR IS THE LINK when there is one (Frits 2026-09-21): a phone's camera does nothing with `onderling-contact://…`
+ * but opens an https link in the browser, where the app adds the contact — the invite QR has always worked that
+ * way. The in-app scanner reads both forms, so a QR of the link scans in the app too. Without a link the QR is the
+ * raw code, which only the in-app scanner reads.
  * @param {{ callSkill: (app: string, op: string, args: object) => Promise<any>, appUrl?: string|null }} a
- * @returns {Promise<{ payload: string|null, link: string|null }>}
+ * @returns {Promise<{ payload: string|null, link: string|null, qr: string|null, qrEncodes: 'link'|'code'|null }>}
  */
 export async function loadShareMyContact({ callSkill, appUrl = null } = {}) {
   let payload = null;
   try { payload = (await callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { payload = null; }
-  if (typeof payload !== 'string' || !payload) return { payload: null, link: null };
-  const link = appUrl ? contactCardLink(appUrl, payload) : { ok: false };
-  return { payload, link: link.ok ? link.link : null };
+  if (typeof payload !== 'string' || !payload) return { payload: null, link: null, qr: null, qrEncodes: null };
+  const linkR = appUrl ? contactCardLink(appUrl, payload) : { ok: false };
+  const link = linkR.ok ? linkR.link : null;
+  return { payload, link, qr: link ?? payload, qrEncodes: link ? 'link' : 'code' };
 }

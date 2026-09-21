@@ -18,13 +18,15 @@ import { circleTabsMobile } from '../../../../basis/src/v2/tabProjection.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { useTheme } from './themeContext.js';
 
-export default function CircleTabBar({ active, onSelect }) {
+// `badges` — a count per tab id (2026-09-21: Contacten's unread, summed; web parity with circleTabBar.js).
+export default function CircleTabBar({ active, onSelect, badges = {} }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={styles.bar} testID="circle-tabbar">
       {circleTabsMobile(basisManifest).map((tab) => {
         const on = active === tab.id;
+        const n = Number(badges?.[tab.id]) || 0;
         return (
           <Pressable
             key={tab.id}
@@ -32,9 +34,13 @@ export default function CircleTabBar({ active, onSelect }) {
             onPress={() => onSelect?.(tab.id)}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
+            accessibilityLabel={n > 0 && tab.id === 'contacten' ? t('circle.contacts.unread_tab', { count: n }) : undefined}
             testID={`circle-tab-${tab.id}`}
           >
-            <Text style={[styles.label, on && styles.labelActive]}>{t(tab.labelKey)}</Text>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, on && styles.labelActive]}>{t(tab.labelKey)}</Text>
+              {n > 0 ? <Text style={styles.badge} testID={`circle-tab-${tab.id}-badge`}>{String(n)}</Text> : null}
+            </View>
           </Pressable>
         );
       })}
@@ -55,6 +61,8 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1, borderColor: 'transparent',
   },
   tabActive: { backgroundColor: theme.color.accent, borderColor: theme.color.accent },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   label: { fontSize: 14, fontWeight: '600', color: theme.color.inkSoft },
   labelActive: { color: theme.color.white },
+  badge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, textAlign: 'center', fontSize: 11, fontWeight: '700', lineHeight: 18, backgroundColor: theme.color.accent, color: theme.color.white, overflow: 'hidden' },
 });

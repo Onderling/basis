@@ -193,6 +193,7 @@ import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromL
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
+import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
@@ -903,6 +904,8 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
   } catch (err) {
     console.warn('[circleApp] peer connect failed — circle chat is local-only:', err?.message ?? err);
   }
+  // The Contacten badge from what this device already holds — a message that landed while the tab was closed.
+  refreshContactUnread().then(repaintContactBadge).catch(() => {});
 }
 
 // G13 — register this device's per-circle addresses on the connected relay, SCOPED to the relay-diversity
@@ -2726,10 +2729,13 @@ function buildCircleBot(agent) {
 
 // Top-level tab bar (Circles / Stroom / Mij). Shown on the three top-level
 // surfaces; hidden inside a circle + its sub-screens.
+let _activeTab = null;             // which top-level tab is showing — so a landed turn can repaint the bar's badge
+let _contactUnread = {};           // the last computed unread map (contactId → {unread, lastTs}); the bar reads its sum
 function showTabBar(active) {
   // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
   // it must not repaint the thread over whatever is showing.
   _activeContactThread = null;
+  _activeTab = active;
   renderCircleTabBar(tabBarEl, {
     active, t,
     onScreens: showScreens,
@@ -2737,7 +2743,29 @@ function showTabBar(active) {
     onNearby: showNearby,
     onContacts: showContacts,
     onMij: showMij,
+    badges: { contacten: totalUnread(_contactUnread) },
   });
+}
+
+// WHAT IS NEW IN CONTACTEN (2026-09-21): the seen-marks on this device, the unread map from the channel's durable
+// turns, the count on each row and the sum on the tab. Recomputed when the roster paints and when a turn lands.
+const contactSeen = makeContactSeenStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
+async function refreshContactUnread() {
+  try {
+    const turns = await circleContactChannel?.rehydrateAll?.() ?? [];
+    _contactUnread = buildContactUnread({ turns, seenAt: await contactSeen.read() });
+  } catch { _contactUnread = {}; }
+  return _contactUnread;
+}
+function repaintContactBadge() {
+  if (_activeTab && tabBarEl?.childElementCount) showTabBar(_activeTab);
+}
+// A turn from a contact landed and is STORED (the count reads the store): if its thread is not on screen, the row
+// and the tab say something is new. Called after the persist on both paths — the direct one paints first and
+// persists after, so a count taken at the paint would have missed the turn (measured in the share walk).
+function noteNewContactTurn(contactId, origin) {
+  if (origin === 'user' || _activeContactThread?.contactId === contactId) return;
+  refreshContactUnread().then(() => { repaintContactBadge(); if (rootEl?.querySelector?.('.cc-contacts')) showContacts().catch(() => {}); }).catch(() => {});
 }
 
 // Contacten tab: the bot/peer roster. Reads the app PeerGraph via the
@@ -2747,8 +2775,10 @@ async function showContacts() {
   showTabBar('contacten');
   let contacts = [];
   try { contacts = await loadAllContacts(); } catch { contacts = []; }
+  const unread = await refreshContactUnread();
+  showTabBar('contacten');   // the sum may have changed
   renderContactsRoster(rootEl, {
-    contacts, t,
+    contacts, unread, t,
     onOpen: showContactThread,
     onAdd: () => {
       const input = (globalThis.prompt?.(t('circle.contacts.add_prompt')) || '').trim();
@@ -3120,6 +3150,8 @@ async function showContactThread(contactId) {
   });
   _activeContactThread = { contactId, rerender, setHidden: (h) => { if (hidden !== null) { hidden = h; rerender(); } } };
   rerender();
+  // Opening the thread is reading it: the seen-mark moves to now, and the row's count is gone next time.
+  contactSeen.mark(contactId, Date.now()).then(() => { if (_contactUnread[contactId]) _contactUnread[contactId].unread = 0; }).catch(() => {});
   // The seal status is async (it may read shared circles' rosters): mark once it is known, if this thread is still the open one.
   if (typeof _peerAgent?.contactSeal?.statusFor === 'function') {
     _peerAgent.contactSeal.statusFor(peerAddr).then((status) => {
@@ -3164,7 +3196,10 @@ function onContactReply({ contactId: keyedBy, fromAddr, threadId, text, buttons,
   // …and the persist decides whether THIS turn brought a hidden contact back: the bubble then carries the marker.
   try {
     circleContactChannel?.persistInbound?.({ contactId, fromAddr, text, buttons, messageId, replyTo, ts, file })
-      ?.then?.((r) => { if (r?.returned && painted) { painted.returned = true; if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender(); } })
+      ?.then?.((r) => {
+        if (r?.returned && painted) { painted.returned = true; if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender(); }
+        if (!r?.deduped) noteNewContactTurn(contactId, 'bot');
+      })
       ?.catch?.(() => {});
   } catch { /* best-effort — durability never blocks the live render */ }
 }
@@ -3183,6 +3218,7 @@ async function onOwnDeviceContactTurn(wire) {
     text: landed.text, buttons: landed.buttons, messageId: landed.messageId,
     replyTo: landed.replyTo, file: landed.file, returned: landed.returned,
   });
+  noteNewContactTurn(landed.contactId, landed.origin);   // stored already (the channel persisted before answering)
 }
 
 // The render half every arriving turn shares: put the bubble in its thread, paint if that thread is
@@ -3195,7 +3231,10 @@ function paintContactTurn({ contactId, fromAddr, origin, text, buttons, messageI
   // `returned` — this turn brought a hidden contact back; the renderer paints the marker above it.
   const bubble = { origin, text, buttons, messageId, ...(replyTo ? { replyTo } : {}), ...(file ? { file } : {}), ...(returned ? { returned: true } : {}) };
   thread.messages.push(bubble);
-  if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
+  if (_activeContactThread?.contactId === contactId) {
+    _activeContactThread.rerender();
+    contactSeen.mark(contactId, Date.now()).catch(() => {});   // read as it arrives
+  }
   // Resolve a friendlier name for an unsolicited inbound thread (fire-and-forget).
   if (isNew) {
     loadAllContacts()

@@ -11,7 +11,7 @@
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitShownHidden } from '../../src/v2/contactsSource.js';
 
-export function renderContactsRoster(container, { contacts = [], t, onOpen, onAdd } = {}) {
+export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
@@ -76,6 +76,18 @@ export function renderContactsRoster(container, { contacts = [], t, onOpen, onAd
     meta.textContent = bits.join(' · ');
     if (bits.length) body.appendChild(meta);
     li.appendChild(body);
+
+    // What is NEW here (2026-09-21): inbound messages newer than the moment this thread was last opened — the host
+    // computes it (`contactUnread.js`), the row shows the count. Frits: "I have to check each contact all the time".
+    const n = Number(unread?.[c.contactId]?.unread) || 0;
+    if (n > 0) {
+      li.classList.add('is-unread');
+      const badge = document.createElement('span');
+      badge.className = 'cc-contacts__unread';
+      badge.textContent = String(n);
+      badge.setAttribute('aria-label', tr('circle.contacts.unread', { count: n }));
+      li.appendChild(badge);
+    }
 
     const open = document.createElement('button');
     open.type = 'button';

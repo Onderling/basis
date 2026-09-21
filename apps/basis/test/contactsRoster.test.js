@@ -108,3 +108,17 @@ describe('hidden contacts fold away (L106)', () => {
     expect(all.querySelector('.cc-contacts__fold')).toBeTruthy();
   });
 });
+
+describe('unread on Contacten (2026-09-21)', () => {
+  it('a row with unread shows the count with its label; a read row shows nothing', () => {
+    const el = renderContactsRoster(document.createElement('div'), {
+      contacts: [{ contactId: 'bea', name: 'Bea', reachable: true }, { contactId: 'cas', name: 'Cas', reachable: true }],
+      unread: { bea: { unread: 2, lastTs: 200 } }, t: (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k), onOpen: () => {},
+    });
+    const bea = el.querySelector('.cc-contacts__row[data-contact-id="bea"]');
+    expect(bea.classList.contains('is-unread')).toBe(true);
+    expect(bea.querySelector('.cc-contacts__unread').textContent).toBe('2');
+    expect(bea.querySelector('.cc-contacts__unread').getAttribute('aria-label')).toBe('circle.contacts.unread:{"count":2}');
+    expect(el.querySelector('.cc-contacts__row[data-contact-id="cas"] .cc-contacts__unread')).toBeNull();
+  });
+});

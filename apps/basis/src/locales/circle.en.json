@@ -4035,6 +4035,14 @@
     "sealed_device": {
       "text": "Sealed to the device only",
       "doc": "Thread header of a direct message. No person key on record for this contact yet: messages are sealed to the device that holds their address, as before. Their next card, or a circle you share, brings the key."
+    },
+    "unread": {
+      "text": "{{count}} new",
+      "doc": "The unread badge on a Contacten row (and its accessible label): inbound messages newer than the moment this thread was last opened on this device. count = how many."
+    },
+    "unread_tab": {
+      "text": "Contacts: {{count}} new",
+      "doc": "Accessible label of the count on the Contacten tab: every contact's unread, summed."
     }
   },
   "pairedDevices": {

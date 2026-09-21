@@ -90,6 +90,8 @@ import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
+import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
+import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
@@ -1298,6 +1300,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // is scoped) so the restore-and-open boot loop can enumerate this device's circles. Default → none, so a
   // degraded/bare registry simply re-opens nothing rather than throwing at boot.
   let readSelfCircleMemberships = async () => ({});
+  // Siblings follow a circle (composed below, once the sibling set is known): the registry setter — the one seam
+  // every "I am in this circle now" passes (the join wizard, the create hook, the enrol consume) — fans a NEW
+  // membership to the person's other devices through it.
+  let circleFollowSync = null;
   // The registry handle, bridged OUT of the agents block for the host-skill ceremonies
   // (revokeDevice's tombstone write) — same outer-let idiom as its neighbours.
   let agentsRegistryRef = null;
@@ -1523,11 +1529,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       setCircleMembership: async ({ profileId, circleId, handle, address, proof, relays, key }) => {
         const cur = await agentsRegistry.lookup(profileId);
         if (!cur) throw new Error(`setCircleMembership: no such profile ${profileId}`);
+        const wasIn = !!circleMembershipsOf(cur)[circleId];
         const record = { handle, address };
         if (proof != null) record.proof = proof;
         if (Array.isArray(relays)) record.relays = relays;
         if (key != null) record.key = key;
         await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
+        // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
+        // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
+        if (!wasIn && profileId === 'default') circleFollowSync?.fanJoined(circleId).catch(() => { /* the sibling asks on connect */ });
         return { ok: true };
       },
       // Personas — the PERSISTED per-context disclosure policy ("what this persona shares in circle X").
@@ -2126,6 +2136,49 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     onLanded: () => savePeerBindings(),
   });
+  // THE CIRCLES THIS DEVICE IS IN, each as the entry a sibling joins from — the enrol offer's circle shape
+  // (`{id, handle, address, relays}`, the address THIS device's per-circle one). Built once, for the add-a-device
+  // offer and for the follow carry alike: the registry's records first, then whatever the substrate holds
+  // beyond them (a pair circle made a moment ago); the same exclusions the boot's reopen makes.
+  async function myCircleEntries() {
+    const memberships = await readSelfCircleMemberships().catch(() => ({}));
+    const ids = Object.keys(memberships);
+    try {
+      const r = await rawStoop('listMyCircles', {});
+      for (const c of (Array.isArray(r?.circles) ? r.circles : [])) {
+        const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
+        if (typeof id === 'string' && id && !ids.includes(id)) ids.push(id);
+      }
+    } catch { /* the registry set alone still serves */ }
+    const onRelays = (() => { try { return (sa.relays?.list?.() ?? []).map((r) => r?.url).filter((u) => typeof u === 'string' && u); } catch { return []; } })();
+    const out = [];
+    for (const id of ids) {
+      if (!id || id === 'household' || id === tasksPrimaryCircleId) continue;   // same exclusions as reopen
+      const address = circleAddressFor(id);
+      if (!address) continue;
+      const rec = memberships[id] ?? null;
+      out.push({ id, handle: rec?.handle ?? null, address, relays: Array.isArray(rec?.relays) && rec.relays.length ? [...rec.relays] : onRelays });
+    }
+    return out;
+  }
+  // SIBLINGS FOLLOW A CIRCLE (L109 option A): a circle founded or joined on any device of the person reaches the
+  // others as a carry, and each joins itself by the enrol consume's per-circle step — the shells hand that step in
+  // (`setConsume`, composed beside their `bootstrapFromStashedOffer`), the lane table spreads the handlers, the
+  // connect kick asks the siblings what this device lacks. A kring the person switched off here is not joined.
+  let circleFollowConsume = null;
+  const followSelection = makeSyncSelection({ getParamValue: (key) => paramsService.register.valueOf(key) });
+  circleFollowSync = createCircleFollowSync({
+    siblings: ownDeviceSiblings,
+    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+    myEntries: myCircleEntries,
+    isIn: async (circleId) => (await myCircleEntries()).some((e) => e.id === circleId),
+    kringOn: (circleId) => followSelection.kringOn(circleId),
+    consume: (entry) => (typeof circleFollowConsume === 'function'
+      ? circleFollowConsume(entry)
+      : Promise.resolve({ circleId: entry.id, ok: false, steps: [], error: 'no-consume' })),   // a composition without the step joins nothing
+    onLanded: (r) => console.info(`[circle-follow] ${r.ok ? 'joined' : 'could not join'} ${String(r.circleId).slice(0, 12)}… after a sibling (${r.steps.join(' ')})`),
+  });
+  circleFollowSync.setConsume = (fn) => { circleFollowConsume = typeof fn === 'function' ? fn : null; };
   // LIVE, the key half: a greeting that passed the hello gate just bound a key here. The core agent
   // says so (`peer`) for the initial HI and for the ack alike, so both directions of first contact
   // reach the siblings — and the vault.
@@ -2274,22 +2327,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // no phrase ride here; holding the offer lets you ask nothing (enrolling IS the phrase).
     const relayUrl = typeof parts?.[0]?.data?.relayUrl === 'string' && parts[0].data.relayUrl ? parts[0].data.relayUrl : null;
     try {
-      const memberships = await readSelfCircleMemberships().catch(() => ({}));
-      const ids = Object.keys(memberships);
-      try {
-        const r = await callSkill('stoop', 'listMyCircles', {});
-        for (const c of (Array.isArray(r?.circles) ? r.circles : [])) {
-          const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
-          if (typeof id === 'string' && id && !ids.includes(id)) ids.push(id);
-        }
-      } catch { /* the registry set alone still serves */ }
-      const circles = [];
-      for (const id of ids) {
-        if (!id || id === 'household' || id === tasksPrimaryCircleId) continue;   // same exclusions as reopen
-        const address = circleAddressFor(id);
-        if (!address) continue;
-        circles.push({ id, handle: memberships[id]?.handle ?? null, address });
-      }
+      const circles = (await myCircleEntries()).map(({ id, handle, address }) => ({ id, handle, address }));
       if (circles.length === 0) return [DataPart({ ok: false, error: 'no-circles' })];
       const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles });
       return [DataPart({ ok: true, uri, circles: circles.length })];
@@ -5897,6 +5935,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // shells spread `handlers` into the router and kick `requestFromSiblings` on connect; the
     // announce landing calls `pushTo` for a device of mine that just appeared.
     knownPeersSync,
+    // Siblings follow a circle: the lane table spreads `handlers`; the shells `setConsume(entry => consumeCircleEntry(deps, entry))`
+    // beside their enrol consume and kick `requestFromSiblings` on connect; the registry setter fans a new membership.
+    circleFollowSync,
     /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */
     personKey: currentPersonKey,
     // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.

@@ -189,7 +189,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
@@ -8630,7 +8630,7 @@ async function boot() {
         // registry membership record, the announce to the sibling, the catch-up pulls. The SAME
         // consume runs after a recovery-file import: the file's peers are stashed as an offer, and
         // the import door calls this rather than waiting for the next launch.
-        agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+        const enrolDeps = {
           agent,
           callSkill: rawCallSkill,
           sendPeerMessage: (to, payload, opts2) => agent.sendPeerMessage(to, payload, opts2),
@@ -8642,7 +8642,12 @@ async function boot() {
             taskCatchUpShell?.requestFrom(siblingAddress, circleId),
             chatCatchUpShell?.requestFrom(siblingAddress, circleId),
           ]),
-        }).then((r) => {
+        };
+        // A circle another device of the person founded or joined: the same per-circle step, run when the
+        // sibling's carry lands — and asked for on connect, for what happened while this tab was closed.
+        agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+        agent.circleFollowSync?.requestFromSiblings().catch(() => {});
+        agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
           if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });

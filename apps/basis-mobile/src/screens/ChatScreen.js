@@ -67,7 +67,7 @@ import { makeCirclePolicyPeerHandler } from '../../../basis/src/v2/circlePolicyR
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
-import { consumeEnrollOffer } from '../../../basis/src/v2/enrollOffer.js';
+import { consumeEnrollOffer, consumeCircleEntry } from '../../../basis/src/v2/enrollOffer.js';
 import { seedContactCard }    from '../../../basis/src/v2/seededContact.js';
 import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
@@ -824,7 +824,7 @@ export default function ChatScreen({
         // stashed as an offer), so a restored phone hears its circles again on this launch.
         if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {
           globalThis.__onderlingEnrollOfferConsumed = true;
-          bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+          const enrolDeps = {
             agent: bundle.agent,
             callSkill: bundle.callSkill,
             sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
@@ -836,7 +836,12 @@ export default function ChatScreen({
               taskCatchUp?.requestFrom(siblingAddress, circleId),
               chatCatchUp?.requestFrom(siblingAddress, circleId),
             ]),
-          }).then((r) => {
+          };
+          // A circle another device of the person founded or joined: the same per-circle step, run when the
+          // sibling's carry lands — and asked for on connect, for what happened while the app was closed (web parity).
+          bundle.agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+          setTimeout(() => { bundle.agent.circleFollowSync?.requestFromSiblings().catch(() => {}); }, 2700);
+          bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
             if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
             return r;
           }).catch(() => { /* retried next launch — the stash only clears on full success */ });

@@ -253,6 +253,7 @@ export function chatTurnsFromItems(items, { threadKey } = {}) {
     if (threadKey != null && s.threadKey !== threadKey) continue;
     out.push({
       origin:    s.direction === 'out' ? 'user' : 'bot',
+      contactId: s.threadKey ?? null,   // which thread — for a read across ALL threads (an unread count per contact)
       text:      it.text ?? '',
       messageId: s.nonce ?? it.id ?? '',
       ts:        typeof s.sentAt === 'number' ? s.sentAt : (it.addedAt ?? 0),

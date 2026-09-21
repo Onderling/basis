@@ -467,3 +467,16 @@ describe('the first message carries my card, and a card that arrives names the s
     expect(cards).toEqual([beaCard]);
   });
 });
+
+describe('rehydrateAll — every thread\'s turns in one read, each naming its thread (for the unread count, 2026-09-21)', () => {
+  it('returns the turns of all threads with their contactId; rehydrate(one) is unchanged', async () => {
+    const ch = createContactThreadChannel({ sendToPeer: vi.fn(async () => ({})), itemStore: memItemStore(), now: () => 5 });
+    await ch.persistInbound({ contactId: 'bea', fromAddr: 'bea', text: 'hoi', messageId: 'b1', ts: 1 });
+    await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'dag', messageId: 'b2' }).sent;
+    await ch.persistInbound({ contactId: 'cas', fromAddr: 'cas', text: 'yo', messageId: 'c1', ts: 3 });
+    const all = await ch.rehydrateAll();
+    expect(all.map((t) => [t.contactId, t.origin, t.messageId]).sort()).toEqual([['bea', 'bot', 'b1'], ['bea', 'user', 'b2'], ['cas', 'bot', 'c1']]);
+    expect((await ch.rehydrate('bea')).map((t) => t.messageId)).toEqual(['b1', 'b2']);
+    expect(await createContactThreadChannel({ sendToPeer: () => {} }).rehydrateAll(), 'ephemeral: nothing').toEqual([]);
+  });
+});

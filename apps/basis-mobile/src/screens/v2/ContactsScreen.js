@@ -14,7 +14,8 @@ import { useTheme } from './themeContext.js';
 import { listContacts, mergeContacts, stoopContactToRow, splitShownHidden } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 
-export default function ContactsScreen({ bundle, onOpen }) {
+// `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
+export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const peerGraph = bundle?.peerGraph ?? null;
@@ -72,22 +73,26 @@ export default function ContactsScreen({ bundle, onOpen }) {
     }
   }, [addText, peerGraph, bundle, callSkill, reload]);
 
-  const rowFor = (c, isHidden = false) => (
-    <Pressable
-      key={c.contactId}
-      style={[styles.row, !c.reachable && styles.rowOffline, isHidden && styles.rowHidden]}
-      onPress={() => onOpen?.(c)}
-      accessibilityRole="button"
-      testID={`contact-row-${c.contactId}`}
-    >
-      <Text style={styles.icon}>{c.isBot ? '🤖' : '👤'}</Text>
-      <View style={styles.body}>
-        <Text style={styles.name}>{c.name}</Text>
-        <Text style={styles.meta}>{rosterMeta(c)}</Text>
-      </View>
-      <Text style={styles.open}>{t('circle.contacts.open')}</Text>
-    </Pressable>
-  );
+  const rowFor = (c, isHidden = false) => {
+    const n = Number(unread?.[c.contactId]?.unread) || 0;   // what is NEW here (2026-09-21), web parity
+    return (
+      <Pressable
+        key={c.contactId}
+        style={[styles.row, !c.reachable && styles.rowOffline, isHidden && styles.rowHidden]}
+        onPress={() => onOpen?.(c)}
+        accessibilityRole="button"
+        testID={`contact-row-${c.contactId}`}
+      >
+        <Text style={styles.icon}>{c.isBot ? '🤖' : '👤'}</Text>
+        <View style={styles.body}>
+          <Text style={[styles.name, n > 0 && styles.nameUnread]}>{c.name}</Text>
+          <Text style={styles.meta}>{rosterMeta(c)}</Text>
+        </View>
+        {n > 0 ? <Text style={styles.unread} accessibilityLabel={t('circle.contacts.unread', { count: n })} testID={`contact-unread-${c.contactId}`}>{String(n)}</Text> : null}
+        <Text style={styles.open}>{t('circle.contacts.open')}</Text>
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.wrap} testID="contacts-screen">
@@ -162,6 +167,8 @@ const makeStyles = (theme) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md },
   rowOffline: { opacity: 0.6 },
   rowHidden: { opacity: 0.5 },
+  nameUnread: { fontWeight: '800' },
+  unread: { minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, textAlign: 'center', lineHeight: 20, fontSize: 12, fontWeight: '700', backgroundColor: theme.color.accent, color: theme.color.white, overflow: 'hidden', marginRight: 8 },
   fold: { paddingVertical: 10, alignItems: 'center' },
   foldText: { fontSize: 13, color: theme.color.inkSoft, textDecorationLine: 'underline' },
   icon: { fontSize: 22 },

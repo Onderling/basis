@@ -17,7 +17,8 @@ import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio } from '../../core/nearbyAllowsStore.js';
-import { pushContactReply } from '../../core/contactReplyInbox.js';
+import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
+import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState } from 'react-native';
 import { useTheme } from './themeContext.js';
@@ -409,7 +410,7 @@ function PersonaPanel({
   );
 }
 
-function WithTabBar({ active, onSelect, children }) {
+function WithTabBar({ active, onSelect, badges, children }) {
   // The tab frame paints the app's GROUND. It used to be a bare `flex: 1` View, which is transparent,
   // so any screen inside it that themed its text but not its background showed the platform's default
   // white — themed (light) ink on white, unreadable, and glaring beside an otherwise dark app. The
@@ -419,7 +420,7 @@ function WithTabBar({ active, onSelect, children }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.paper }}>
       <View style={{ flex: 1 }}>{children}</View>
-      <CircleTabBar active={active} onSelect={onSelect} />
+      <CircleTabBar active={active} onSelect={onSelect} badges={badges} />
     </View>
   );
 }
@@ -584,6 +585,25 @@ export default function CircleLauncherScreen({
   }, [bundle, loadCircleTransport]);
   // the contact (bot/peer) whose DM thread is open under the Contacten tab.
   const [contactThread, setContactThread] = useState(null);
+  // WHAT IS NEW IN CONTACTEN (2026-09-21, web parity): the seen-marks on this device (AsyncStorage), the unread map
+  // from the channel's durable turns, the count on each row and the sum on the tab. Recomputed when a turn lands
+  // (the reply inbox) and when a thread is opened (its seen-mark moves to now).
+  const contactSeen = useMemo(() => makeContactSeenStore(AsyncStorage), []);
+  const [contactUnread, setContactUnread] = useState({});
+  const refreshContactUnread = useCallback(async () => {
+    try {
+      const turns = (await bundle?.contactChannel?.rehydrateAll?.()) ?? [];
+      setContactUnread(buildContactUnread({ turns, seenAt: await contactSeen.read() }));
+    } catch { setContactUnread({}); }
+  }, [bundle, contactSeen]);
+  useEffect(() => { refreshContactUnread(); }, [refreshContactUnread]);
+  useEffect(() => subscribeContactReplies(() => { refreshContactUnread(); }), [refreshContactUnread]);
+  const openContactThread = useCallback((contact) => {
+    setContactThread(contact);
+    // opening the thread is reading it — the seen-mark moves to now, the badge is gone
+    contactSeen.mark(contact?.contactId, Date.now()).then(refreshContactUnread).catch(() => {});
+  }, [contactSeen, refreshContactUnread]);
+  const tabBadges = useMemo(() => ({ contacten: totalUnread(contactUnread) }), [contactUnread]);
   const [viewAsPolicy, setViewAsPolicy] = useState('pairwise');
   const [viewAsMembers, setViewAsMembers] = useState([]);
   const [folioFiles, setFolioFiles] = useState([]);
@@ -1597,7 +1617,7 @@ export default function CircleLauncherScreen({
     if (screensSubMode === 'view') {
       const screen = screensBook.screens.find((s) => s.id === viewingScreenId);
       return (
-        <WithTabBar active="screens" onSelect={onTab}>
+        <WithTabBar active="screens" onSelect={onTab} badges={tabBadges}>
           <View style={{ flex: 1, padding: 16, backgroundColor: theme.color.paper }}>
             <Pressable
               onPress={() => { setScreensSubMode('picker'); setViewingScreenId(null); }}
@@ -1619,7 +1639,7 @@ export default function CircleLauncherScreen({
       );
     }
     return (
-      <WithTabBar active="screens" onSelect={onTab}>
+      <WithTabBar active="screens" onSelect={onTab} badges={tabBadges}>
         <CircleScreensPickerScreen
           book={screensBook}
           onOpenScreen={(sid) => { setViewingScreenId(sid); setScreensSubMode('view'); }}
@@ -1638,7 +1658,7 @@ export default function CircleLauncherScreen({
   // S2 — Mij = your profile (identity + skills + location); availability is a sub-view.
   if (view === 'profile') {
     return (
-      <WithTabBar active="mij" onSelect={onTab}>
+      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
@@ -1651,7 +1671,7 @@ export default function CircleLauncherScreen({
   // its only undo, in a place a person can find without being any circle's admin.
   if (view === 'blocked') {
     return (
-      <WithTabBar active="mij" onSelect={onTab}>
+      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -1659,7 +1679,7 @@ export default function CircleLauncherScreen({
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
-      <WithTabBar active="mij" onSelect={onTab}>
+      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -1668,7 +1688,7 @@ export default function CircleLauncherScreen({
   // op + the settable params, from the shared projections; back returns to profile.
   if (view === 'advanced') {
     return (
-      <WithTabBar active="mij" onSelect={onTab}>
+      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} />
       </WithTabBar>
     );
@@ -1681,7 +1701,7 @@ export default function CircleLauncherScreen({
   // built from the encapsulated identity secret). A null opener makes a row tap a deny-safe no-op.
   if (view === 'sharedWithMe') {
     return (
-      <WithTabBar active="mij" onSelect={onTab}>
+      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
@@ -1693,14 +1713,14 @@ export default function CircleLauncherScreen({
   // S5 — "My data": data-location + privacy + usage (read-only); sub-view of Mij.
   if (view === 'mydata') {
     return (
-      <WithTabBar active="mij" onSelect={onTab}>
+      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer} onOpenConnectionPoints={() => setView('points')} />
       </WithTabBar>
     );
   }
   if (view === 'availability') {
     return (
-      <WithTabBar active="mij" onSelect={onTab}>
+      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleAvailabilityScreen
           store={availabilityStore}
           onHop={() => setView('hop')}
@@ -1712,18 +1732,19 @@ export default function CircleLauncherScreen({
   if (view === 'contacten') {
     if (contactThread) {
       return (
-        <WithTabBar active="contacten" onSelect={onTab}>
+        <WithTabBar active="contacten" onSelect={onTab} badges={tabBadges}>
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
             onBack={() => setContactThread(null)}
+            onRead={() => contactSeen.mark(contactThread?.contactId, Date.now()).then(refreshContactUnread).catch(() => {})}
           />
         </WithTabBar>
       );
     }
     return (
-      <WithTabBar active="contacten" onSelect={onTab}>
-        <ContactsScreen bundle={bundle} onOpen={(contact) => setContactThread(contact)} />
+      <WithTabBar active="contacten" onSelect={onTab} badges={tabBadges}>
+        <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} />
       </WithTabBar>
     );
   }
@@ -1861,7 +1882,7 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <WithTabBar active="nearby" onSelect={onTab}>
+      <WithTabBar active="nearby" onSelect={onTab} badges={tabBadges}>
         <NearbyScreenHost
           bundle={bundle}
           onBack={() => setView('list')}
@@ -2098,7 +2119,7 @@ export default function CircleLauncherScreen({
   }
 
   return (
-    <WithTabBar active="circles" onSelect={onTab}>
+    <WithTabBar active="circles" onSelect={onTab} badges={tabBadges}>
       <View style={styles.page} testID="circle-launcher">
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>

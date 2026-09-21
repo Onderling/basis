@@ -42,3 +42,15 @@ describe('renderCircleTabBar', () => {
     expect(btns.map((b) => b.textContent)).toEqual(projected.map((tab) => t(tab.labelKey)));
   });
 });
+
+describe('the Contacten tab carries the unread count (2026-09-21)', () => {
+  it('paints the sum on the tab when > 0, nothing otherwise', () => {
+    const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
+    const el = renderCircleTabBar(document.createElement('nav'), { active: 'circles', t, badges: { contacten: 3 } });
+    const tab = el.querySelector('[data-tab="contacten"]');
+    expect(tab.querySelector('.circle-tabbar__badge').textContent).toBe('3');
+    expect(tab.getAttribute('aria-label')).toBe('circle.contacts.unread_tab:{"count":3}');
+    const none = renderCircleTabBar(document.createElement('nav'), { active: 'circles', t, badges: { contacten: 0 } });
+    expect(none.querySelector('.circle-tabbar__badge')).toBeNull();
+  });
+});

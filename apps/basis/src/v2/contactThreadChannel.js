@@ -432,6 +432,21 @@ export function createContactThreadChannel({
   }
 
   /**
+   * Every durable turn of every thread, each with its `contactId` — one read of the store, for what is NEW in
+   * Contacten (`contactUnread.js`): per contact, the inbound turns newer than the person last opened that thread.
+   * Empty in ephemeral mode. Bytes are not re-attached (a count needs none).
+   * @returns {Promise<Array<{contactId: string|null, origin: 'user'|'bot', ts: number, messageId: string}>>}
+   */
+  async function rehydrateAll() {
+    let store = typeof itemStore === 'function' ? itemStore() : itemStore;
+    store = await store;
+    if (!store || typeof store.listOpen !== 'function') return [];
+    let items = [];
+    try { items = await store.listOpen({}); } catch { return []; }
+    return chatTurnsFromItems(items);
+  }
+
+  /**
    * Build a `makePeerRouter`-compatible handler for the inbound reply subtype.
    * Register it under `subtypes.in` in the shell's peer router; it normalises
    * the bot's reply envelope and forwards it to `onReply`.
@@ -513,5 +528,5 @@ export function createContactThreadChannel({
     };
   }
 
-  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, replyHandler, messageHandler, subtypes };
+  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, subtypes };
 }

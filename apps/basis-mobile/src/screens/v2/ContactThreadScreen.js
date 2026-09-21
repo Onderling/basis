@@ -16,7 +16,9 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { subscribeContactReplies } from '../../core/contactReplyInbox.js';
 
-export default function ContactThreadScreen({ bundle, contact, onBack }) {
+// `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
+export default function ContactThreadScreen({ bundle, contact, onBack, onRead }) {
+  const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const channel = bundle?.contactChannel ?? null;
@@ -120,6 +122,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
       // and the marker paints above this bubble. A DIRECT arrival is pushed before its persist decides that, so
       // the decision follows as a marker-only push naming the same turn: mark the bubble already on screen.
       if (reply.returned === true) setHidden((h) => (h === null ? null : false));
+      if (reply.origin !== 'user' && !reply.markerOnly) { try { onReadRef.current?.(); } catch { /* the badge, not the message */ } }   // read as it arrives
       if (reply.markerOnly === true) {
         setMessages((prev) => {
           const i = reply.messageId ? prev.findIndex((m) => m.messageId === reply.messageId) : -1;

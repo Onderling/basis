@@ -72,3 +72,38 @@ export async function loadShareMyContact({ callSkill, appUrl = null } = {}) {
   const link = linkR.ok ? linkR.link : null;
   return { payload, link, qr: link ?? payload, qrEncodes: link ? 'link' : 'code' };
 }
+
+/**
+ * The card's body, decoded — `{ webid, pubKey, handle, displayName, peerAddr, relays, personKey, … }` — or null. The
+ * one decoder outside stoop for the one place that must READ a card before handing it to stoop: a card that arrives
+ * in a message must name the sender (below), or a stranger could put anyone's name on their own address.
+ * @param {string} payload  `onderling-contact://<base64url json>`
+ */
+export function decodeContactCard(payload) {
+  const body = bodyOf(payload);
+  if (!body) return null;
+  try {
+    const std = body.replaceAll('-', '+').replaceAll('_', '/');
+    const pad = std + '='.repeat((4 - (std.length % 4)) % 4);
+    const bin = typeof atob === 'function' ? atob(pad) : Buffer.from(pad, 'base64').toString('binary');
+    const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+    const obj = JSON.parse(new TextDecoder().decode(bytes));
+    return obj && typeof obj === 'object' && typeof obj.webid === 'string' && obj.webid ? obj : null;
+  } catch { return null; }
+}
+
+/**
+ * A CARD THAT RIDES A MESSAGE IS ONLY TAKEN WHEN IT NAMES THE SENDER (2026-09-21). The first message to a contact
+ * carries the sender's card so the receiver knows who wrote (name, handle, where to write back, the person key) —
+ * the exchange Frits expected of a first contact. A card is self-described, so the receiver checks it against what
+ * it can verify: the identity behind the address the message came from (the shell's `identityOf`: the profile
+ * address itself, or the person behind a per-circle address). A card naming anyone else is dropped.
+ * @param {string} payload    the card
+ * @param {string} contactId  the person the message is from, as the receiver resolved it
+ * @returns {object|null}     the decoded card when it names `contactId`, else null
+ */
+export function cardNamesSender(payload, contactId) {
+  const card = decodeContactCard(payload);
+  if (!card || typeof contactId !== 'string' || !contactId) return null;
+  return (card.webid === contactId || card.peerAddr === contactId) ? card : null;
+}

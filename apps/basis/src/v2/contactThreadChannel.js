@@ -26,6 +26,7 @@
  */
 
 import { createAddressedDeliver, chatTurnsFromItems } from '@onderling/item-store';
+import { cardNamesSender } from './contactCardLink.js';
 import { applyPresendFloor } from './presendFloor.js';
 
 /** Generic platform subtypes for a contact-thread turn / reply. */
@@ -110,6 +111,16 @@ export function createContactThreadChannel({
   // outbound turn to someone I hid brings nobody back: that is my act, and Tonen is its word.
   isHidden = null,
   onReturned = null,
+  // MY CARD RIDES A MESSAGE WHENEVER THE CONTACT DOES NOT HAVE THIS ONE (2026-09-21; Frits 09-18: "they exchange
+  // their cards, and then there is a contact"; 09-21: "aren't card updates fanned out anyway?"). `myCard()` → this
+  // person's `onderling-contact://…` card (name, handle, where to write back, the person key), or null. It rides
+  // the first message to a contact, the next message after it changed (a name set under Mij), and once per session
+  // — inside the seal when there is one. `onCard({ contactId, fromAddr, card })`
+  // is called for a card that ARRIVES and names the sender (checked here against the shell's `identityOf`, so a
+  // stranger cannot put a name on someone else's address); the shell adds it to the book, and the book carry names
+  // the person on every device. Both optional: without them a message carries no name, as before.
+  myCard = null,
+  onCard = null,
 } = {}) {
   const hiddenNow = async (contactId) => {
     if (typeof isHidden !== 'function' || !contactId) return false;
@@ -119,6 +130,7 @@ export function createContactThreadChannel({
     if (typeof onReturned !== 'function' || !contactId) return;
     try { await onReturned(contactId); } catch { /* the row is a convenience; the turn is stored regardless */ }
   };
+  const cardSentTo = new Map();   // peerAddr → the card last sent them this session (see `myCard`)
   const resolveId = (id) => { if (typeof identityOf !== 'function' || !id) return id; try { return identityOf(id) || id; } catch { return id; } };
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
@@ -178,6 +190,7 @@ export function createContactThreadChannel({
     // The pair roster's material rides in the clear only when the turn does (else it is inside the box below).
     if (typeof env.extras?.pairInvite === 'string' && !env.extras?.sealed) payload.pairInvite = env.extras.pairInvite;
     if (env.extras?.pairRequest === true && !env.extras?.sealed) payload.pairRequest = true;
+    if (typeof env.extras?.card === 'string' && !env.extras?.sealed) payload.card = env.extras.card;
     // Sealed to the PERSON: the wire carries the box and no text — a device that holds the profile key but not the
     // person key (a revoked one) receives an envelope it cannot read.
     if (env.extras?.sealed) { payload.sealed = env.extras.sealed; payload.text = ''; }
@@ -236,19 +249,26 @@ export function createContactThreadChannel({
           if (p?.pairRequest === true) envelope.extras.pairRequest = true;
         } catch { /* the roster is made on a later turn; the message goes regardless */ }
       }
-      // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
-      // pair roster's material with it: an invite is a join secret).
-      if (typeof sealFor === 'function') {
-        try {
-          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}) };
-          const s = await sealFor(peerAddr, content); if (s) envelope.extras.sealed = s;
-        } catch { /* unsealed, as before */ }
-      }
       // THE ROUTE: a contact with a pair roster is written to at their primary per-circle address there, over the
       // pair circle (as my per-circle address) — never at the profile address once the roster exists.
       let route = null;
       if (pair && typeof pair.routeFor === 'function') { try { route = await pair.routeFor(peerAddr); } catch { route = null; } }
+      // My card rides when this contact has not had THIS one from this session: the first message, the next after a
+      // change, once per session. Inside the seal when there is one (below), in the clear otherwise.
+      let cardOnBoard = null;
+      if (typeof myCard === 'function') {
+        try { const c = await myCard(); if (typeof c === 'string' && c && cardSentTo.get(peerAddr) !== c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
+      }
+      // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
+      // pair roster's material with it: an invite is a join secret).
+      if (typeof sealFor === 'function') {
+        try {
+          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}) };
+          const s = await sealFor(peerAddr, content); if (s) envelope.extras.sealed = s;
+        } catch { /* unsealed, as before */ }
+      }
       const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
+      if (cardOnBoard) cardSentTo.set(peerAddr, cardOnBoard);   // it left (delivered or held): they have this one
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       if (!res?.deduped) {
@@ -416,6 +436,21 @@ export function createContactThreadChannel({
   }
 
   /**
+   * Every durable turn of every thread, each with its `contactId` — one read of the store, for what is NEW in
+   * Contacten (`contactUnread.js`): per contact, the inbound turns newer than the person last opened that thread.
+   * Empty in ephemeral mode. Bytes are not re-attached (a count needs none).
+   * @returns {Promise<Array<{contactId: string|null, origin: 'user'|'bot', ts: number, messageId: string}>>}
+   */
+  async function rehydrateAll() {
+    let store = typeof itemStore === 'function' ? itemStore() : itemStore;
+    store = await store;
+    if (!store || typeof store.listOpen !== 'function') return [];
+    let items = [];
+    try { items = await store.listOpen({}); } catch { return []; }
+    return chatTurnsFromItems(items);
+  }
+
+  /**
    * Build a `makePeerRouter`-compatible handler for the inbound reply subtype.
    * Register it under `subtypes.in` in the shell's peer router; it normalises
    * the bot's reply envelope and forwards it to `onReply`.
@@ -459,6 +494,7 @@ export function createContactThreadChannel({
       let text = payload.text ?? '';
       let pairInvite = typeof payload.pairInvite === 'string' ? payload.pairInvite : null;
       let pairRequest = payload.pairRequest === true;
+      let card = typeof payload.card === 'string' ? payload.card : null;
       if (payload.sealed && typeof payload.sealed === 'object') {
         // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
         const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
@@ -466,6 +502,13 @@ export function createContactThreadChannel({
         text = content.text;
         if (typeof content.pairInvite === 'string') pairInvite = content.pairInvite;
         if (content.pairRequest === true) pairRequest = true;
+        if (typeof content.card === 'string') card = content.card;
+      }
+      // The sender's card — taken only when it names the person this message is from (the shell's read of the
+      // address); the shell adds it to the book. Never on the thread; the words go on regardless.
+      if (card && typeof onCard === 'function') {
+        const contactId = resolveId(fromAddr);
+        if (cardNamesSender(card, contactId)) { Promise.resolve(onCard({ contactId, fromAddr, card })).catch(() => {}); }
       }
       // The pair roster's material lands on its seam (never on the thread); the turn's words go on as always.
       if (pair) {
@@ -489,5 +532,5 @@ export function createContactThreadChannel({
     };
   }
 
-  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, replyHandler, messageHandler, subtypes };
+  return { sendTurn, persistInbound, persistOutbound, applyOwnDeviceTurn, rehydrate, rehydrateAll, replyHandler, messageHandler, subtypes };
 }

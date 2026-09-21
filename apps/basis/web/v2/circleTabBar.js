@@ -16,7 +16,7 @@ import { circleTabs } from '../../src/v2/tabProjection.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onNearby, onContacts, onMij } = {}) {
+export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onNearby, onContacts, onMij, badges = {} } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleTabBar.js');
   // id → the host-wired handler.  Keyed by the projected tab id, so the
@@ -34,6 +34,15 @@ export function renderCircleTabBar(container, { active, t, onScreens, onCircles,
       btn.setAttribute('aria-current', 'page');
     }
     btn.textContent = tr(tab.labelKey);
+    // A count on a tab (2026-09-21: Contacten's unread, summed) — the host passes `badges: { <tab id>: n }`.
+    const n = Number(badges?.[tab.id]) || 0;
+    if (n > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'circle-tabbar__badge';
+      badge.textContent = String(n);
+      btn.appendChild(badge);
+      if (tab.id === 'contacten') btn.setAttribute('aria-label', tr('circle.contacts.unread_tab', { count: n }));
+    }
     const on = handlers[tab.id];
     btn.addEventListener('click', () => { if (typeof on === 'function') on(); });
     container.appendChild(btn);

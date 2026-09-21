@@ -777,6 +777,10 @@ export async function bootAgentBundle(opts = {}) {
       return rows.some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true);
     },
     onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); },
+    // the first message to a contact carries MY card; a card that arrives (naming its sender) goes into the book, so
+    // whoever writes to me is a named row on every device (web parity, 2026-09-21)
+    myCard: async () => { try { return (await agent.callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card }); },
     // the route (a contact with a pair roster) rides as send options (web parity)
     sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'

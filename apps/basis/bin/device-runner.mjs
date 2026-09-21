@@ -294,6 +294,13 @@ if (relayUrl) {
       await callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false });
       walkLog({ kind: 'contact-returned', contactId: String(contactId).slice(0, 12) });
     },
+    // The first message to a contact carries the person's card; one that arrives (naming its sender) goes into the
+    // book here — and the book carry names that person on the phone and the laptop (2026-09-21).
+    myCard: async () => { try { return (await callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    onCard: async ({ contactId, card }) => {
+      const r = await callSkill('stoop', 'addContactFromQr', { payload: card });
+      walkLog({ kind: 'contact-card', contactId: String(contactId).slice(0, 12), name: r?.contact?.displayName ?? r?.contact?.handle ?? null });
+    },
     localActor: 'me',
     // Direct messages are sealed to the PERSON's current key; an enrolled box holds it, handed over at enrol.
     sealFor: agent.contactSeal?.sealFor ?? null,

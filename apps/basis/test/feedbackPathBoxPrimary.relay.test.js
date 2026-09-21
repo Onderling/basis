@@ -80,6 +80,8 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     await connectNodesOverRelay([visitor], { relayUrl: relay.url });
     const seeded = await seedContactCard({ payload: card, callSkill: (a, o, x) => visitor.agent.callSkill(a, o, x) });
     expect(seeded.seeded).toBe(true);
+    // the visitor names itself, as a tester does under Mij, so the card its first message carries has a name
+    await visitor.agent.callSkill('stoop', 'setMyDisplayName', { displayName: 'Vera' });
   }, 240_000);
 
   afterAll(async () => {
@@ -108,6 +110,13 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     // …and can SEE it: the sender is a row in the web device's Contacten. A carried turn from a stranger used to be
     // stored under a sender the roster had no row for — the maker's laptop, 2026-09-18: "delivered", nothing on screen.
     expect([...web.notedPeers], 'the visitor is a row on the web device — the carried turn noted its sender').toContain(visitor.pubKey);
+    // …and NAMED (2026-09-21): the first message carried the visitor's card; the box took it into its book; the book
+    // carry brought the row to the web device. Frits' laptop, 09-21: "most contacts have these codes as names".
+    const onBoxCard = await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-card') ?? null, { timeout: 15_000, step: 500 });
+    expect(onBoxCard, `the box never took the visitor's card:\n${box.out.slice(-800)}`).toBeTruthy();
+    expect(onBoxCard.name, 'the card named the visitor').toBe('Vera');
+    const named = await until(async () => (((await web.agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === visitor.pubKey && c.displayName === 'Vera') ? true : null), { timeout: 20_000, step: 500 });
+    expect(named, 'the web device\'s book names the visitor "Vera" — carried from the box').toBe(true);
   }, 90_000);
 
   it('a second message, after the pair roster had every chance to form, lands too — and rides the pair roster the BOX speaks', async () => {

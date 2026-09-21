@@ -51,8 +51,9 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     const dest = `${new URL(B.page.url()).pathname}${new URL(B.page.url()).search}${link.slice(link.indexOf('#'))}`;
     await B.page.goto('about:blank');
     await B.page.goto(dest);
-    await B.page.waitForTimeout(6000);
-    expect(new URL(B.page.url()).hash, 'the card is scrubbed from B\'s address bar').toBe('');
+    // the boot takes the card once the agent is up — poll for the scrub rather than guess the boot's length
+    await expect.poll(() => new URL(B.page.url()).hash, { timeout: 30_000, message: 'the card is scrubbed from B\'s address bar once the boot took it' }).toBe('');
+    await B.page.waitForTimeout(2000);
     await gotoCircles(B.page);
     await B.page.locator('[data-tab="contacten"]').first().click();
     await B.page.waitForTimeout(1500);
@@ -62,6 +63,10 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     log('STEP2 B opens the link', 'PASS', 'Anna is a contact on B');
 
     // ── B writes to Anna; A's screen shows it ─────────────────────────────────────────────────────
+    // B names itself first, as a tester does under Mij: the first message carries B's card, so A's row for B reads "Bea".
+    await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
+    await B.page.locator('.cc-profile__display').fill('Bea'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500);
+    await gotoCircles(B.page);
     const marker = `hoi Anna, via je link ${Date.now().toString(36)}`;
     // What B's send returned (route, verdict), kept for a red.
     await B.page.evaluate(() => {
@@ -72,6 +77,25 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     });
     const sent = await sendDirectMessage(B.page, marker, { to: aId });
     expect(sent.sent, `B could not write: ${sent.why}`).toBe(true);
+    // ── Before A opens anything: the Contacten tab says something is new, and B's row carries the count (2026-09-21,
+    // Frits: "add some 'new message' visual to the contacts frame — I have to check each contact all the time").
+    await gotoCircles(A.page);
+    const badgeState = async () => A.page.evaluate(async () => ({
+      badge: document.querySelector('[data-tab="contacten"] .circle-tabbar__badge')?.textContent ?? null,
+      tabs: [...document.querySelectorAll('[data-tab]')].map((b) => b.dataset.tab),
+      turns: ((await window.onderlingContactChannel?.rehydrateAll?.()) ?? []).map((t) => `${String(t.contactId).slice(0, 8)}:${t.origin}:${t.ts}`),
+      seen: (() => { try { return localStorage.getItem('cc.contactSeenAt'); } catch { return 'n/a'; } })(),
+    })).catch((e) => String(e));
+    try {
+      await expect.poll(async () => (await badgeState())?.badge, { timeout: 30_000 }).toBe('1');
+    } catch (e) {
+      throw new Error(`the Contacten tab shows the unread count — state: ${JSON.stringify(await badgeState())}`);
+    }
+    await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(1500);
+    const unreadRows = await A.page.evaluate(() => [...document.querySelectorAll('.cc-contacts__row.is-unread')].map((r) => `${r.dataset.contactId?.slice(0, 12)}:${r.querySelector('.cc-contacts__unread')?.textContent}`));
+    expect(unreadRows.length, `exactly B's row is unread: ${JSON.stringify(unreadRows)}`).toBe(1);
+    expect(unreadRows[0].endsWith(':1')).toBe(true);
+    log('STEP3a new on A', 'PASS', `tab badge 1, row ${unreadRows[0]}`);
     const seen = await waitForContactMessageDetailed(A.page, marker, { tries: 12, every: 3000 });
     if (!seen.found) {
       const bWho = await B.page.evaluate(async () => { const w = await window.onderlingCall('stoop', 'whoAmI', {}); return { webid: String(w?.webid).slice(0, 12), pubKey: String(w?.pubKey).slice(0, 12), person: String(w?.personAddress ?? '').slice(0, 12) }; }).catch((e) => String(e));
@@ -95,7 +119,16 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     }
     expect(seen.found, 'B\'s message never reached A — see "STEP3 diagnostics"').toBe(true);
     expect(seen.painted, 'reached A but not painted').toBe(true);
-    log('STEP3 B writes, A sees it', 'PASS', `row ${String(seen.contactId).slice(0, 12)}…`);
+    // …and A's row for B is NAMED (2026-09-21): the first message carried B's card. Frits' laptop, 09-21: "most
+    // contacts have these codes as names still".
+    await gotoCircles(A.page);
+    await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(1500);
+    const bRowName = await A.page.locator(`.cc-contacts__row[data-contact-id="${seen.contactId}"] .cc-contacts__name`).first().textContent().catch(() => null);
+    expect(bRowName, 'A\'s Contacten names B by the name B gave itself — the card rode the first message').toBe('Bea');
+    // …and having opened the thread, the badge is gone: read is read.
+    expect(await A.page.locator('.cc-contacts__row.is-unread').count(), 'opening the thread cleared the row').toBe(0);
+    expect(await A.page.locator('[data-tab="contacten"] .circle-tabbar__badge').count(), '…and the tab').toBe(0);
+    log('STEP3 B writes, A sees it', 'PASS', `row ${String(seen.contactId).slice(0, 12)}… named "${bRowName}", read`);
 
     // ── B writes AGAIN, once the pair roster has formed: this one rides the pair route, from B's per-circle
     // address. It must land in the SAME thread — the one keyed by B — not in one keyed by an address no row opens.

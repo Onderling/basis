@@ -378,6 +378,25 @@ describe('deriveRoster', () => {
       });
       expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee-renamed');
     });
+
+    it('a member\'s OWN later statement (`member-props`) is the authority for handle · displayName · avatarRef — it beats the cached rename (2026-09-21)', async () => {
+      // The one road for a name change: the member's self-signed `member-props` on the membership lane (the note
+      // `NOTE-member-props-on-the-membership-lane.md`). The MemberMap "cache" is where the retired side wire wrote;
+      // a value the fold holds from the member's own statement wins over it, and over the join-time handle.
+      const joiner = await AgentIdentity.generate(new VaultMemory());
+      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      // the statement is self-subject: subject === the member's own ref (`authorRef`) — the fold's rule
+      const props = signSpine(joiner, { kind: 'member-props', circleId: 'g1', subject: 'NEW-MEMBER', parent: join.hash,
+        payload: { authorRef: 'NEW-MEMBER', handle: 'cee-now', displayName: 'Cee Now', avatarRef: 'media:av1' } }).body;
+      const roster = deriveRoster({
+        redemptions: [], spineStatements: [join, props], foldAuthoritative: true,
+        memberMapForDisplay: [{ webid: 'NEW-MEMBER', handle: 'cee-cached', displayName: 'Cached Cee' }],
+      });
+      const row = roster.find((m) => m.webid === 'NEW-MEMBER');
+      expect(row?.handle).toBe('cee-now');
+      expect(row?.displayName).toBe('Cee Now');
+      expect(row?.avatarRef).toBe('media:av1');
+    });
   });
 
   // ── HOW an admin came to be one, carried onto the row (`adminVia`) ────────────────────────────────

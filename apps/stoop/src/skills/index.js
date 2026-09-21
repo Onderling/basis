@@ -2113,6 +2113,21 @@ export function buildSkills({
       // renaming to the same handle at once would both read a free handle and both write it (story 2.1).
       return withHandleClaim(store, groupId, v.handle, async () => {
         const taken = await collectCircleHandles({ store, members, groupId });
+        // …and every FOLDED roster's handles (2026-09-21): a member's later `member-props` rename lives on the lane, not
+        // in this device's cache, so the trail + cache alone would let two members claim one handle. The handle is the
+        // person's, one across their circles (`member-props` goes to every circle they are in), so every circle counts.
+        // The fold is the rule that binds (it refuses the statement on every device); this read says so up front.
+        try {
+          const mine = new Set();
+          for (const it of (await store.listOpen({ type: 'membership-redemption' })) ?? []) { if (it?.source?.redeemedBy === from && typeof it?.source?.groupId === 'string') mine.add(it.source.groupId); }
+          if (groupId) mine.add(groupId);
+          for (const gid of mine) {
+            try {
+              const r = await listGroupMembersCore(scope, { groupId: gid }, { from });
+              for (const m of r?.members ?? []) if (m?.webid && m.handle) taken.push({ webid: m.webid, handle: m.handle });
+            } catch { /* this circle's fold still refuses a collision */ }
+          }
+        } catch { /* the fold still refuses a collision */ }
         if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
           return { error: 'invalid-handle', reason: 'handle-taken' };
         }

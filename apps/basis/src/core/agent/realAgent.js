@@ -90,7 +90,7 @@ import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
-import { isRosterTrailItem } from '@onderling/circles';
+import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
@@ -2096,6 +2096,18 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (typeof b?.address === 'string' && typeof b?.pubKey === 'string') sa.agent.security?.learnPeerKey?.(b.address, b.pubKey);
     }
   } catch { /* nothing kept, or unreadable — greetings establish afresh */ }
+  // `member-props` to every circle I am in (see the after-write hook): my current handle/displayName from the
+  // profile, the circles from the substrate (pair circles included), the per-circle diff read from the roster.
+  async function tellMyRostersWhatISay() {
+    if (typeof membershipEmit !== 'function') return { error: 'no-membership-rail' };
+    const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
+    const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
+      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+    return emitMemberProps(
+      { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
+      { from: chatId.pubKey, circleIds: circles, props: { handle: me.handle, displayName: me.displayName } },
+    );
+  }
   const knownPeersSync = createKnownPeersSync({
     siblings: ownDeviceSiblings,
     selfPubKey: chatId.pubKey,
@@ -4259,6 +4271,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       // way everywhere.
       if (realOpId === 'setContactHidden' && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
+      // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
+      // is a `member-props` statement on the membership lane of every circle — pair circles included, which is how
+      // a contact learns it — one per circle, only where the row differs (the diff gate), a failing circle retried
+      // on the next save. The one road; the admin-mediated persona-props wire and the card-on-a-message update
+      // road are retired by it. Best-effort and after success; the local row is already written.
+      if ((realOpId === 'setMyHandle' || realOpId === 'setMyDisplayName') && !rawReply?.error) {
+        tellMyRostersWhatISay()
+          .then((r) => console.info(`[member-props] ${r?.error ? r.error : `told ${r.emitted.length} circle(s)${r.unchanged.length ? `, ${r.unchanged.length} unchanged` : ''}${r.failed.length ? `, FAILED in ${r.failed.map((c) => String(c).slice(0, 12)).join(' ')}` : ''}`}`))
+          .catch((err) => console.warn(`[member-props] not every roster was told: ${err?.message ?? err}`));
       }
       // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
       //

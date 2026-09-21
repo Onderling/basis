@@ -102,6 +102,8 @@ export function deriveRoster({
    * the set beyond itself.
    */
   const provenAddresses = new Map();
+  // webid → { handle?, displayName?, avatarRef? } — what a member SAID about themselves on the lane (`member-props`)
+  let saidByWebid = Object.create(null);
   const addProvenAddress = (webid, groupId, address, proof) => {
     if (typeof webid !== 'string' || !webid) return;
     if (typeof address !== 'string' || !address) return;
@@ -245,6 +247,7 @@ export function deriveRoster({
       seed: { members: seedMembers, admins: seedAdmins },
       ...(rulesGate ? { rulesGate } : {}),
     });
+    saidByWebid = folded.props ?? Object.create(null);
     const inMembers = new Set(folded.members);
     const inAdmins  = new Set(folded.admins);
     if (authoritative) {
@@ -362,10 +365,20 @@ export function deriveRoster({
     // carries the handle a person chose AT JOIN (`peerDisplay`); the MemberMap carries the handle they
     // have NOW (renames land there). A person who renamed must not be shown their join-time name, so
     // for `handle` / `displayName` a present cache value wins and the trail is the fallback.
+    // …and what the member SAID about themselves on the lane (`member-props`, 2026-09-21) wins over both: the one
+    // road for a name change is the member's own signed statement, folded on every device; the cache is where the
+    // retired side wire used to write, and the join-time handle is the fallback of fallbacks.
+    const said = saidByWebid[rec.webid] ?? {};
     const merged = {
       ...disp, ...rec,
       ...(typeof disp.handle === 'string' && disp.handle ? { handle: disp.handle } : {}),
       ...(typeof disp.displayName === 'string' && disp.displayName ? { displayName: disp.displayName } : {}),
+      ...(typeof said.handle === 'string' && said.handle ? { handle: said.handle } : {}),
+      ...(typeof said.displayName === 'string' && said.displayName ? { displayName: said.displayName } : {}),
+      ...(typeof said.avatarRef === 'string' && said.avatarRef ? { avatarRef: said.avatarRef } : {}),
+      // …and WHICH of them the lane holds, verbatim: the emitter's diff gate compares against this, never against
+      // the merged row (the local cache has the new name before any statement exists — measured 2026-09-21).
+      ...(Object.keys(said).length ? { said: { ...said } } : {}),
     };
     // `circleAddresses` — the member's full proven address SET, primary first. `circleAddress`
     // stays the primary slot (every existing consumer keeps working); the set is what sender

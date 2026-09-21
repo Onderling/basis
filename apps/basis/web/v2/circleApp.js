@@ -141,7 +141,7 @@ import { createPairRoster } from '../../src/v2/pairRoster.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
-import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
+import { loadBookRows, loadContactRoster } from '../../src/v2/contactsSource.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -189,7 +189,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
@@ -1353,10 +1353,14 @@ let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
  * bind the other members' addresses, and PULL the circle's pull-all lanes — the `create`, earlier joins, roles,
  * evictions and keys all predate the join and are fanned to nobody after the fact.
  */
-function circleOnJoined({ circleId }) {
+function circleOnJoined({ circleId, invite = null }) {
   return makeCircleReachable({
     agent: _peerAgent,
     circleId,
+    invite,
+    // Rule 1 — the joined circle's connection point(s), from what the invite carried (its pod and/or its relay),
+    // recorded FIRST so presence and the pull below aim at the circle's relay. Best-effort: never blocks a join.
+    recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
     // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
     registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
     pullLanes: (cid) => Promise.allSettled(
@@ -2789,12 +2793,7 @@ async function showContacts() {
 
 // S1 #2 — the unified Contacten roster: PeerGraph bots/peers MERGED with the
 // stoop ContactBook (people the user added, with trust/tags). One directory.
-async function loadStoopContacts() {
-  try {
-    const res = await rawCallSkill('stoop', 'listContacts', {});
-    return (Array.isArray(res?.contacts) ? res.contacts : []).map(stoopContactToRow).filter(Boolean);
-  } catch { return []; }
-}
+const loadStoopContacts = () => loadBookRows(rawCallSkill);
 // Hiding a contact (L106): a mark on the BOOK row, never on the graph — so only the book can answer "is this
 // one hidden", and only the book's op changes it. Hiding is Contacten only: the thread, the pair roster, their
 // circles, roster rows and member cards are untouched. The mark rides the own-devices carry, so the act on any
@@ -2829,15 +2828,9 @@ async function contactCardArrived({ contactId, card }) {
   }
   if (rootEl?.querySelector?.('.cc-contacts')) showContacts().catch(() => {});
 }
-async function loadAllContacts() {
-  const [peerRows, stoopRows] = await Promise.all([
-    // A member's per-circle address is where they are reached in one circle, never a second contact.
-    // …and never me: my person address, my profile key, my devices' per-circle addresses are not contacts.
-    listContacts(circlePeerGraph, { identityOf: (a) => _peerAgent?.identityOfAddress?.(a) ?? null, ownAddresses: () => _peerAgent?.ownAddresses?.() ?? [] }).catch(() => []),
-    loadStoopContacts(),
-  ]);
-  return mergeContacts(peerRows, stoopRows);
-}
+// The one Contacten read (shared with mobile): the graph less aliases and my own addresses, the book, merged, and
+// every contact with a pair roster here named by what they said on it.
+const loadAllContacts = () => loadContactRoster({ peerGraph: circlePeerGraph, agent: _peerAgent, callSkill: rawCallSkill });
 
 /**
  * objective L · Phase 2 — open the OUT-OF-CIRCLE recipient picker overlay. Lists the Contacten roster's
@@ -4524,11 +4517,9 @@ async function showJoinCircle(inviteArg) {
   // resolves the relay (pubKey) + nkn native address via `addressesOf` on the
   // redeem send, instead of falling back to the un-routable bare pubKey. Best-effort:
   // a bad/relay-only invite just populates nothing and the join proceeds unchanged.
-  let decodedInvite = null;
   try {
     const decoded = {};
     decodeInviteForPopulate(invite, decoded);
-    decodedInvite = decoded.invite ?? null;
     if (decoded.invite) await populateAdminAddressesFromInvite({ peerGraph: circlePeerGraph, invite: decoded.invite });
   } catch { /* population must never block the join */ }
   // The join wizard mounts FROM its declared flow (batch 6): `flows: [{ id: 'joinGroup', … }]` on the
@@ -4574,14 +4565,7 @@ async function showJoinCircle(inviteArg) {
         try { await overrideStore.update(gid, { capabilityOptOuts: reply.capabilityOptOuts }); }
         catch { /* best-effort — a failed prefs write must not break the join */ }
       }
-      // Rule 1 — record the joined circle's connection point(s) from what the invite carried: its POD
-      // (J-NP1) and/or its RELAY (the invite-carries-endpoint decision — a pasted invite has no
-      // deep-link context to learn the relay from). Shared recorder, so mobile records identically.
-      // Best-effort: the list is a convenience — it must never block a join.
-      if (gid && decodedInvite) {
-        try { recordJoinedCirclePoints({ store: getConnectionPoints(), invite: decodedInvite, circleId: gid }); }
-        catch { /* best-effort */ }
-      }
+      // (The joined circle's connection point is recorded in `circleOnJoined`, before presence and the pull.)
       try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* */ }
     },
   });
@@ -8630,7 +8614,7 @@ async function boot() {
         // registry membership record, the announce to the sibling, the catch-up pulls. The SAME
         // consume runs after a recovery-file import: the file's peers are stashed as an offer, and
         // the import door calls this rather than waiting for the next launch.
-        agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+        const enrolDeps = {
           agent,
           callSkill: rawCallSkill,
           sendPeerMessage: (to, payload, opts2) => agent.sendPeerMessage(to, payload, opts2),
@@ -8642,7 +8626,12 @@ async function boot() {
             taskCatchUpShell?.requestFrom(siblingAddress, circleId),
             chatCatchUpShell?.requestFrom(siblingAddress, circleId),
           ]),
-        }).then((r) => {
+        };
+        // A circle another device of the person founded or joined: the same per-circle step, run when the
+        // sibling's carry lands — and asked for on connect, for what happened while this tab was closed.
+        agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+        agent.circleFollowSync?.requestFromSiblings().catch(() => {});
+        agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
           if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });

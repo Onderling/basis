@@ -102,7 +102,7 @@ describe('the receiver enforces it — the lane table', () => {
     agent.membershipRail = railStub(); agent.keyRail = railStub();
     const { catchUps } = buildCircleLanes({ agent });
     const callSkill = async (_o, op, a) => (op === 'listMyCircles' ? { circles: ['k1', 'k2'] }
-      : op === 'listGroupRoster' ? { members: [{ webid: 'w', addr: `addr:${a.groupId}` }] } : {});
+      : op === 'listGroupMembers' ? { members: [{ webid: 'w', circleAddress: `addr:${a.groupId}` }] } : {});   // the derived roster (2026-09-21)
     for (const cu of [catchUps.membership, catchUps.key, catchUps.task, catchUps.chat]) await cu.requestAll({ callSkill });
     expect(sent.every((s) => s.circleId === 'k2'), JSON.stringify(sent)).toBe(true);
     expect(sent.length).toBeGreaterThan(0);

@@ -759,7 +759,8 @@ export async function finalSubmit({
     state.submitStage = 'connecting';
     if (typeof onStage === 'function') { try { onStage(state.submitStage); } catch { /* cosmetic */ } }
     if (result && result.groupId && typeof onJoined === 'function') {
-      try { await onJoined({ circleId: result.groupId }); }
+      // …with the invite it redeemed: the circle's connection point is recorded there, before presence and the pull.
+      try { await onJoined({ circleId: result.groupId, invite: state.invite ?? null }); }
       catch { /* reachability is repaired on the next circles load either way */ }
     }
     // Record this circle membership into the profile registry (restore-data) so a restored device knows its
@@ -902,11 +903,14 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     : {};
 
   if (inv?.kind === 'membershipCode' && inv.code && inv.groupId) {
-    // Path A — membershipCode.
-    const handle = await callSkill('stoop', 'setMyHandle', { handle: state.handle });
-    if (handle?.reason === 'handle-taken') throw handleTakenError();
-    if (handle?.ok === false || handle?.error) {
-      throw new Error(handle.error ?? "Couldn't set handle.");
+    // Path A — membershipCode. The join handle becomes the person's handle — unless the caller said it is for this
+    // circle's row only (`profileHandle: false`: the pair roster's derived placeholder for a person without one).
+    if (state.profileHandle !== false) {
+      const handle = await callSkill('stoop', 'setMyHandle', { handle: state.handle });
+      if (handle?.reason === 'handle-taken') throw handleTakenError();
+      if (handle?.ok === false || handle?.error) {
+        throw new Error(handle.error ?? "Couldn't set handle.");
+      }
     }
     // Fold-in phase C — enact the ACCEPTED charter-driven skill-sharing default BEFORE the
     // release is computed, so the coarse (category-rung) skill keys ride the same join release.

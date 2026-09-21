@@ -99,8 +99,26 @@ describe('the invite lands — the join', () => {
     expect(r1).toEqual({ joined: true, circleId: id });
     expect(r2).toEqual({ joined: true, circleId: id });
     expect(sendPeerRedeem, 'joined twice').toHaveBeenCalledTimes(1);
-    expect(joined).toEqual([{ circleId: id }]);
+    expect(joined.map((j) => [j.circleId, j.invite?.groupId])).toEqual([[id, id]]);   // …with the invite: the point is recorded there
     expect(calls.find((c) => c.op === 'addContact')?.args).toEqual({ webid: ANNA, pairCircleId: id });
+    // A person WITHOUT a handle joins under a quiet derived one — on the pair roster's row only. It must never become
+    // the person's profile handle: found 2026-09-21 when the book started reading the roster and a visitor's
+    // Contacten row read "pjy8n7fq" — the placeholder had been set as their handle at the join and stated on every
+    // roster as what they say about themselves.
+    expect(calls.filter((c) => c.op === 'setMyHandle'), 'the placeholder is not the person\'s handle').toEqual([]);
+    expect(calls.find((c) => c.op === 'recordRemoteRedemption')?.args?.peerDisplay).toMatch(/^p[a-z0-9]{4,7}$/);
+  });
+  it('a person WITH a handle joins the pair roster under it, and the profile keeps it (the ordinary join path)', async () => {
+    const { callSkill, calls } = fakeSkills({ self: BEA });
+    let resolveJoin;
+    const sendPeerRedeem = vi.fn(() => new Promise((r) => { resolveJoin = r; }));
+    const pr = createPairRoster({ selfWebid: BEA, callSkill, sendPeerRedeem, myHandle: async () => 'beatrix' });
+    const id = pairCircleIdFor(ANNA, BEA);
+    const p = pr.onInvite(ANNA, inviteFor(id));
+    await vi.waitFor(() => expect(typeof resolveJoin).toBe('function'));
+    resolveJoin({ ok: true, groupId: id });
+    expect(await p).toEqual({ joined: true, circleId: id });
+    expect(calls.filter((c) => c.op === 'setMyHandle').map((c) => c.args.handle)).toEqual(['beatrix']);
   });
   it('an invite whose id is not THE pair id for these two is refused — a stranger cannot put you in a roster of theirs', async () => {
     const { callSkill } = fakeSkills({ self: BEA });

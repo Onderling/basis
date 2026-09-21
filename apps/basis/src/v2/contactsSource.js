@@ -174,3 +174,71 @@ export async function listContacts(peerGraph, { identityOf = null, ownAddresses 
   const rows = peers.filter((p) => !isMe(p) && !isAlias(p)).map(peerToContactRow).filter(Boolean);
   return sortContactRows(rows);
 }
+
+/**
+ * THE BOOK READS THE ROSTER (2026-09-21). A contact with a pair roster on this device is named by what THEY SAID on
+ * it — their `member-props` on the pair circle's membership lane (displayName, then handle), folded on every device
+ * like the rest of the roster — and by the card only where the roster says nothing yet (the first exchange, or a
+ * contact from before the lane). The card was a name's only road before, so a rename never reached a contact who
+ * already had one; the lane is the road now, and this is where the book reads it. Every device of the person is in
+ * every pair circle since the siblings follow a circle, so the laptop reads the same roster the box does.
+ *
+ * A bot is never renamed (its name is the registry's); a roster that cannot be read leaves the row as it was.
+ *
+ * @param {Array<object>} rows  merged Contacten rows (`pairCircleId` from the book)
+ * @param {object} [opts]
+ * @param {(circleId: string, webid: string) => Promise<object|null>} [opts.rosterRow]  the folded member row on that circle
+ * @returns {Promise<Array<object>>}  the rows, re-sorted on what is painted
+ */
+export async function nameContactsFromRosters(rows = [], { rosterRow = null } = {}) {
+  if (typeof rosterRow !== 'function') return rows;
+  const named = await Promise.all(rows.map(async (r) => {
+    if (!r || r.isBot || typeof r.pairCircleId !== 'string' || !r.pairCircleId) return r;
+    let m = null;
+    try { m = await rosterRow(r.pairCircleId, r.contactId); } catch { m = null; }
+    const said = m?.said && typeof m.said === 'object' ? m.said : null;
+    const name = (typeof said?.displayName === 'string' && said.displayName) ? said.displayName
+      : (typeof said?.handle === 'string' && said.handle) ? said.handle : null;
+    return name ? { ...r, name, namedBy: 'roster' } : r;
+  }));
+  return sortContactRows(named);
+}
+
+/** The book's rows, through the one row mapper. */
+export async function loadBookRows(callSkill) {
+  if (typeof callSkill !== 'function') return [];
+  try {
+    const res = await callSkill('stoop', 'listContacts', {});
+    return (Array.isArray(res?.contacts) ? res.contacts : []).map(stoopContactToRow).filter(Boolean);
+  } catch { return []; }
+}
+
+/**
+ * THE CONTACTEN READ, composed once for every shell (web's roster, mobile's Contacten and its share picker): the
+ * graph's rows with aliases and my own addresses skipped, the book's rows, merged (the graph wins the row, the book
+ * the name and the marks), then named from the pair rosters. A shell hands in its agent and `callSkill` and paints.
+ * Each pair roster is read once per call, whatever the number of rows.
+ *
+ * @param {object} a
+ * @param {{ all: () => Promise<object[]> } | null} a.peerGraph
+ * @param {object|null} a.agent  `identityOfAddress(addr)` and `ownAddresses()` are read off it when present
+ * @param {(app: string, op: string, args?: object) => Promise<any>} a.callSkill
+ */
+export async function loadContactRoster({ peerGraph = null, agent = null, callSkill = null } = {}) {
+  const [peerRows, bookRows] = await Promise.all([
+    listContacts(peerGraph, {
+      identityOf: (a) => agent?.identityOfAddress?.(a) ?? null,
+      ownAddresses: () => agent?.ownAddresses?.() ?? [],
+    }).catch(() => []),
+    loadBookRows(callSkill),
+  ]);
+  const merged = mergeContacts(peerRows, bookRows);
+  if (typeof callSkill !== 'function') return merged;
+  const rosters = new Map();   // circleId → the members read (one read per roster per call)
+  const rosterRow = async (circleId, webid) => {
+    if (!rosters.has(circleId)) rosters.set(circleId, callSkill('stoop', 'listGroupMembers', { groupId: circleId }).then((r) => (Array.isArray(r?.members) ? r.members : [])).catch(() => []));
+    return (await rosters.get(circleId)).find((m) => m?.webid === webid) ?? null;
+  };
+  return nameContactsFromRosters(merged, { rosterRow });
+}
+

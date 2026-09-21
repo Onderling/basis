@@ -31,6 +31,7 @@
 import { frontier } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { chunkItems, DEFAULT_CHUNK_SIZE } from './chunking.js';
+import { catchUpTargets } from './catchUpTargets.js';
 
 /** The most statements one replay round serves. The window a long-offline device converges through —
  *  several rounds page through a bigger backlog. `param()` returns the default (200). */
@@ -65,7 +66,7 @@ export function makeFrontierReplay({
   rail, sendToPeer, subtypes, statementsFor = null, onChange = null, mayServe = null,
   limit = REPLAY_WINDOW_LIMIT, chunkSize = DEFAULT_CHUNK_SIZE,
   offerThreshold = REPLAY_OFFER_THRESHOLD, autoAllow = REPLAY_AUTO_ALLOW, onOffer: offerSeam = null,
-  onRefused = null,
+  onRefused = null, selfWebid = null, allowGlobal = null,
 } = {}) {
   if (!rail || typeof rail.storedStatements !== 'function' || typeof rail.ingest !== 'function') {
     throw new Error('frontierReplay: a rail (storedStatements + ingest) is required');
@@ -237,18 +238,22 @@ export function makeFrontierReplay({
       // `listMyCircles` answers with plain string ids — see the same branch in `governanceCatchUp`.
       const circleId = typeof b === 'string' ? b : (b?.groupId ?? b?.id);
       if (typeof circleId !== 'string' || !circleId) continue;
-      let members = [];
-      try { members = (await callSkill('stoop', 'listGroupRoster', { groupId: circleId }))?.members ?? []; } catch { continue; }
-      for (const m of members) {
-        const addr = m?.addr ?? m?.circleAddress ?? null;
-        if (typeof addr !== 'string' || !addr) continue;
-        try { await requestFrom(addr, circleId); requested += 1; } catch { /* next peer */ }
-      }
+      requested += (await requestCircle(circleId, { callSkill })).requested;
     }
     return { requested };
   }
 
-  return { onRequest, onBatch, onOffer, requestFrom, requestAll, localFrontier, subtypes: { request: REQ, batch: BATCH, offer: OFFER } };
+  /** ONE circle's replay request, at each other member's PER-CIRCLE address (2026-09-21, see `catchUpTargets`). */
+  async function requestCircle(circleId, { callSkill }) {
+    const targets = await catchUpTargets({ callSkill, circleId, selfWebid, allowGlobal });
+    let requested = 0;
+    for (const t of targets) {
+      try { await requestFrom(t.addr, circleId); requested += 1; } catch { /* next peer */ }
+    }
+    return { requested };
+  }
+
+  return { onRequest, onBatch, onOffer, requestFrom, requestAll, requestCircle, localFrontier, subtypes: { request: REQ, batch: BATCH, offer: OFFER } };
 }
 
 export default makeFrontierReplay;

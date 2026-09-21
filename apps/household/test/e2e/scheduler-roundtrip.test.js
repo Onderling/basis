@@ -163,6 +163,10 @@ describe('Phase 4 e2e — Scheduler suppression hook (5.7c)', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    // Pinned to a MORNING, as the suite above is: the fake clock starts from the real time of day, and a run after
+    // 18:00 UTC advanced two hours across the 20:00 digest, which posted beside the nudge — "expected 2 to be 1",
+    // three times in CI (2026-09-04, -20, -21). Pinning to 18:29Z reproduces it every run; a morning never does.
+    vi.setSystemTime(new Date('2026-01-05T09:00:00Z'));
     store  = new InMemoryStore();
     bridge = new MockBridge();
   });

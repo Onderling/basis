@@ -57,5 +57,6 @@ export { createGroupWithRules, createGroupV2, redeemInviteWithGate } from './cir
 // `grant/revokePodAccess`.
 export {
   redeemMembershipCode, verifyMembershipCodeForPeer, leaveGroup, removeMember, acceptGroupRules,
+  emitMemberProps, MEMBER_PROPS_FIELDS,
 } from './circleMembershipWriters.js';
 export { hasHumanRules } from './circleRulesDoc.js';

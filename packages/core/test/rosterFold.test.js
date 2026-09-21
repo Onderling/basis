@@ -463,3 +463,65 @@ describe('foldRoster — the handle a member chose rides the join', () => {
     expect(gone.handles?.[bob.pubKey]).toBeUndefined();
   });
 });
+
+// ── `member-props` — what a member says about themselves, on their own row (2026-09-21) ───────────────────────────
+// One generalized self-subject kind on the membership lane (the note `NOTE-member-props-on-the-membership-lane.md`,
+// Fable's review): handle · displayName · avatarRef — fields, never new kinds. Self-only, members-only, an allowlist
+// (admin-owned facts are refused), newest wins per field, and the HANDLE is unique in the circle: a handle another
+// current member holds is refused, deny-wins, on every device independently — the one check the admin did at the
+// join that moves to the fold.
+describe('member-props — a member\'s own display fields, folded onto their row', () => {
+  it('a self-signed member-props sets displayName / avatarRef / handle on the member\'s row; newest wins per field', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', avatarRef: 'blob:1' }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bobby' }, parent: p1.hash });
+    const r = foldRoster([join, p1, p2], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey]).toEqual({ displayName: 'Bobby', avatarRef: 'blob:1' });   // p2 changed one field; the other stands
+    expect(r.handles[bob.pubKey]).toBe('bob');
+    const p3 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'bobby' }, parent: p2.hash });
+    const r3 = foldRoster([join, p1, p2, p3], { founders: [founder.pubKey] });
+    expect(r3.handles[bob.pubKey]).toBe('bobby');
+    expect(r3.props[bob.pubKey].handle, 'a handle from the member\'s own statement is in props too (a projection tells it from the join\'s)').toBe('bobby');
+    expect(r.props[bob.pubKey].handle, 'the join\'s handle is not').toBeUndefined();
+  });
+
+  it('self-only and members-only: nobody sets another\'s fields; an outsider\'s statement records nothing', async () => {
+    const { founder, bob, mallory } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const impersonated = body(founder, 'member-props', bob, { payload: { authorRef: founder.pubKey, displayName: 'Not Bob' } });
+    const outsider = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, displayName: 'Mallory' } });
+    const r = foldRoster([join, impersonated, outsider], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey]).toBeUndefined();
+    expect(r.props[mallory.pubKey]).toBeUndefined();
+    expect(r.members).not.toContain(mallory.pubKey);
+  });
+
+  it('the allowlist: a statement naming an admin-owned fact (role, addresses, keys) is refused whole', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const sneaky = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', role: 'admin' }, parent: join.hash });
+    const r = foldRoster([join, sneaky], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey], 'refused whole — not even the harmless field').toBeUndefined();
+    expect(r.admins).toEqual([founder.pubKey]);
+  });
+
+  it('HANDLE UNIQUENESS at the fold: a handle another current member holds is refused, deny-wins; a freed handle may be taken', async () => {
+    const { founder, bob, mallory } = await ids();
+    const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const jm = body(mallory, 'join', mallory, { payload: { peerDisplay: 'mal' } });
+    const grab = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob', displayName: 'M' }, parent: jm.hash });
+    let r = foldRoster([jb, jm, grab], { founders: [founder.pubKey] });
+    expect(r.handles[mallory.pubKey], 'the old handle stays').toBe('mal');
+    expect(r.props[mallory.pubKey], 'the whole statement is refused — a collision is not a partial success').toBeUndefined();
+    // bob leaves; the handle is free; mallory may take it now
+    const leave = body(bob, 'leave', bob, { parent: jb.hash });
+    const grab2 = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob' }, parent: grab.hash, deps: [leave.hash] });
+    r = foldRoster([jb, jm, grab, leave, grab2], { founders: [founder.pubKey] });
+    expect(r.handles[mallory.pubKey]).toBe('bob');
+    // …and a member keeping their OWN handle is not a collision with themselves
+    const same = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob', displayName: 'Mal' }, parent: grab2.hash });
+    r = foldRoster([jb, jm, grab, leave, grab2, same], { founders: [founder.pubKey] });
+    expect(r.props[mallory.pubKey]).toEqual({ handle: 'bob', displayName: 'Mal' });
+  });
+});

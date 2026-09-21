@@ -417,20 +417,21 @@ describe('the first message carries my card, and a card that arrives names the s
   // sender's card inside the seal; the receiver hands it to `onCard` only when it names the sender.
   const encode = (obj) => 'onderling-contact://' + Buffer.from(JSON.stringify(obj)).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
   const MY_CARD = encode({ webid: 'me', displayName: 'Anna', peerAddr: 'me' });
-  it('rides the turn whenever it differs from the last one sent to that contact: the first message, a changed name, a new session', async () => {
-    // Frits 2026-09-21: "aren't card updates fanned out anyway?" — they are now, with the next message: a name changed
-    // under Mij reaches a contact on the next turn to them. A new session sends it once more (650 bytes), which is
-    // also how a contact who met you before this change gets your name.
+  it('rides the FIRST message to a contact each session — the introduction; a changed name does not re-send it (the roster carries that)', async () => {
+    // Frits 2026-09-21: "aren't card updates fanned out anyway?" — a name changed under Mij is a `member-props`
+    // statement on every pair roster's membership lane now, folded on every device of the contact; the book reads the
+    // roster. The card is the introduction only. A new session sends it once more (650 bytes) — how a contact who met
+    // you before the lane carried names still gets one.
     const sent = [];
     let card = MY_CARD;
     const ch = createContactThreadChannel({ sendToPeer: async (a, p) => { sent.push(p); }, myCard: async () => card });
     await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'hoi', messageId: 'm1' }).sent;
     expect(sent[0].card, 'the first message carries the card').toBe(MY_CARD);
     await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'nog', messageId: 'm2' }).sent;
-    expect(sent[1].card, 'the same card does not ride twice').toBeUndefined();
+    expect(sent[1].card, 'the card does not ride twice').toBeUndefined();
     card = encode({ webid: 'me', displayName: 'Anna B.', peerAddr: 'me' });
     await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'nieuw', messageId: 'm3' }).sent;
-    expect(sent[2].card, 'a changed card rides again').toBe(card);
+    expect(sent[2].card, 'a changed name is the roster\'s to carry, not the card\'s').toBeUndefined();
     await ch.sendTurn({ peerAddr: 'cas', threadId: 'cas', text: 'hoi', messageId: 'm4' }).sent;
     expect(sent[3].card, 'per contact: Cas has never had it').toBe(card);
     const fresh = createContactThreadChannel({ sendToPeer: async (a, p) => { sent.push(p); }, myCard: async () => card });

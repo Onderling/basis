@@ -36,6 +36,10 @@ export const membershipManifest = Object.freeze({
     // Self-subject at the fold: the highest version is current (core personKeyFold.js).
     { id: 'membership.personKey', description: "A member announces their CURRENT person key (version n+1) — a ceremony statement: binds by root reveal covering the key; self-subject; the highest version is current.", appends: [{ lane: MEMBERSHIP_LANE, kind: 'person-key' }] },
     { id: 'membership.rulesAccept', description: "A member re-accepts the circle's current rules version (self-subject; supersedes the version on their signed join).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'rules-accept' }] },
+    // What a member says about THEMSELVES (2026-09-21): handle · displayName · avatarRef (by reference) — one generalized
+    // self-subject kind, fields never new kinds; the handle unique in the circle at the fold; one statement per circle,
+    // pair circles included, which is how a contact learns a name. Retires the persona-props side wire.
+    { id: 'membership.props', description: "A member changes the self-described fields of their own row — handle, display name, avatar (by reference). Self-subject; the fold refuses a handle another current member holds (deny-wins) and any admin-owned field.", appends: [{ lane: MEMBERSHIP_LANE, kind: 'member-props' }] },
   ],
 });
 

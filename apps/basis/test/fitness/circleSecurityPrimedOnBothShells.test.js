@@ -72,3 +72,25 @@ describe('the primer stands on its own', () => {
     expect(bare).toMatch(/new Set\(\[[\s\S]{0,120}fromSubstrate/);
   });
 });
+
+/**
+ * PRESENCE covers every circle the SUBSTRATE holds — the pair circles included (2026-09-21).
+ *
+ * Measured on Frits' phone: after a reload, its message to Wilfred over the pair route left signed as the
+ * phone's canonical identity and the box refused it at the door ("a member's canonical identity … only the
+ * per-circle key may speak") — three times, nothing fanned, nothing on the laptop. Web's `registerCirclePresence`
+ * took its circle ids from `circlesCache`, the LAUNCHER's list, which `loadCircles` filters pair circles OUT of
+ * (they are hidden tiles by design). So a pair circle's per-circle address was registered on the relay only at
+ * the join, never again: the transport did not hold it after a reload, the send fell back to the primary
+ * address, and every contact's door refuses that. Mobile and the box asked the substrate all along.
+ */
+describe('presence covers what the substrate holds, not what the launcher shows', () => {
+  it('web takes the circle ids for relay registration from listMyCircles, never from the render cache alone', () => {
+    const bare = code(SHELLS.web);
+    const fn = bare.slice(bare.indexOf('function registerCirclePresence('), bare.indexOf('\n}', bare.indexOf('function registerCirclePresence(')));
+    expect(fn, 'registerCirclePresence must read the substrate').toMatch(/listMyCircles/);
+  });
+  it('the launcher list is a VIEW: it hides pair circles, and that is fine — presence must not read it', () => {
+    expect(code('apps/basis/src/v2/circleModel.js')).toMatch(/isPairCircleId/);
+  });
+});

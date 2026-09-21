@@ -32,6 +32,10 @@ export const SEAMS = Object.freeze([
   // back as shown) and must unhide when they write, or the laptop and the phone would disagree with it.
   { id: 'contact-channel-hidden',   pattern: /isHidden:/,                        why: 'a hidden contact who writes again comes back — the shell tells the channel who is hidden…' },
   { id: 'contact-channel-returned', pattern: /onReturned:/,                      why: '…and what to do when one of them lands a turn: unhide the row (and, where there is a screen, mark the thread)' },
+  // The first message carries the sender's card (2026-09-21): a device that does not hand its card in leaves the
+  // other side a nameless row; one that does not take a card in never names the people who write to it.
+  { id: 'contact-channel-my-card',   pattern: /myCard:/,                          why: 'the first message to a contact carries my card — name, handle, where to write back, the person key' },
+  { id: 'contact-channel-on-card',   pattern: /onCard:/,                          why: 'a card that arrives with a message (naming its sender) goes into the book; the book carry names them on every device' },
   { id: 'pair-roster',           pattern: /createPairRoster\(/,                 why: 'the hidden two-member circle every written-to contact gets; DMs ride it (L105)' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
   { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },

@@ -124,7 +124,7 @@ function wireLanes(node) {
   const govHandler = makeCircleGovernancePeerHandler({ eventLog: laneLog(node), rail: govRail, onChange: govChanged });
   const govCatchUp = makeGovernanceCatchUp({
     rail: govRail,
-    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the OPTIONS too (`circleId`: sign as this circle) — as the shells' lane table forwards them
     onChange: govChanged,
   });
   node._govRail = govRail;
@@ -134,7 +134,7 @@ function wireLanes(node) {
   const memCatchUp = node.agent.membershipRail
     ? makeGovernanceCatchUp({
       rail: node.agent.membershipRail,
-      sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+      sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the OPTIONS too (`circleId`: sign as this circle) — as the shells' lane table forwards them
       subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
     })
     : null;
@@ -143,7 +143,7 @@ function wireLanes(node) {
   const chatReplay = (node.chatRail ?? node.agent.chatRail)
     ? makeFrontierReplay({
       rail: node.chatRail ?? node.agent.chatRail,
-      sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+      sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the OPTIONS too (`circleId`: sign as this circle) — as the shells' lane table forwards them
       subtypes: CHAT_CATCHUP_SUBTYPES,
       // Auto-allow anything at journey scale — the consent rung has its own coverage; what is under
       // test here is whether the backlog arrives at all.
@@ -154,7 +154,7 @@ function wireLanes(node) {
   const taskReplay = node.agent.taskRail
     ? makeFrontierReplay({
       rail: node.agent.taskRail,
-      sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+      sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the OPTIONS too (`circleId`: sign as this circle) — as the shells' lane table forwards them
       subtypes: TASK_CATCHUP_SUBTYPES,
       statementsFor: (cid) => node.agent.taskRail.catchUpStatements(cid),
     })

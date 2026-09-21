@@ -106,7 +106,7 @@ describe('join wizard — consent-at-join', () => {
     handle.value = 'anne'; handle.dispatchEvent(new Event('input'));
     clickByLabel(el, 'circle.join.wizard.join');
     await vi.waitFor(() => expect(onDispatched).toHaveBeenCalled());
-    expect(onJoined).toHaveBeenCalledWith({ circleId: 'b1' });
+    expect(onJoined).toHaveBeenCalledWith(expect.objectContaining({ circleId: 'b1' }))   // …and the invite it redeemed (2026-09-21);
     expect(order).toEqual(['joined:b1', 'dispatched']);
   });
 });

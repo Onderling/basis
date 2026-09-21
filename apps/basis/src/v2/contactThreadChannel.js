@@ -111,10 +111,11 @@ export function createContactThreadChannel({
   // outbound turn to someone I hid brings nobody back: that is my act, and Tonen is its word.
   isHidden = null,
   onReturned = null,
-  // THE FIRST MESSAGE CARRIES MY CARD (2026-09-21; Frits 09-18: "they exchange their cards, and then there is a
-  // contact"). `myCard()` → this person's `onderling-contact://…` card (name, handle, where to write back, the
-  // person key), or null. While no pair roster exists with the peer — the first exchange — every turn carries it,
-  // inside the seal when there is one; once the roster exists they have it. `onCard({ contactId, fromAddr, card })`
+  // MY CARD RIDES A MESSAGE WHENEVER THE CONTACT DOES NOT HAVE THIS ONE (2026-09-21; Frits 09-18: "they exchange
+  // their cards, and then there is a contact"; 09-21: "aren't card updates fanned out anyway?"). `myCard()` → this
+  // person's `onderling-contact://…` card (name, handle, where to write back, the person key), or null. It rides
+  // the first message to a contact, the next message after it changed (a name set under Mij), and once per session
+  // — inside the seal when there is one. `onCard({ contactId, fromAddr, card })`
   // is called for a card that ARRIVES and names the sender (checked here against the shell's `identityOf`, so a
   // stranger cannot put a name on someone else's address); the shell adds it to the book, and the book carry names
   // the person on every device. Both optional: without them a message carries no name, as before.
@@ -129,6 +130,7 @@ export function createContactThreadChannel({
     if (typeof onReturned !== 'function' || !contactId) return;
     try { await onReturned(contactId); } catch { /* the row is a convenience; the turn is stored regardless */ }
   };
+  const cardSentTo = new Map();   // peerAddr → the card last sent them this session (see `myCard`)
   const resolveId = (id) => { if (typeof identityOf !== 'function' || !id) return id; try { return identityOf(id) || id; } catch { return id; } };
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
@@ -251,10 +253,11 @@ export function createContactThreadChannel({
       // pair circle (as my per-circle address) — never at the profile address once the roster exists.
       let route = null;
       if (pair && typeof pair.routeFor === 'function') { try { route = await pair.routeFor(peerAddr); } catch { route = null; } }
-      // My card rides the first exchange — every turn until the pair roster exists, so a lost first message does not
-      // lose the name. Inside the seal when there is one (below), in the clear otherwise, like the roster material.
-      if (!route && typeof myCard === 'function') {
-        try { const c = await myCard(); if (typeof c === 'string' && c) envelope.extras.card = c; } catch { /* no card, no name — the message goes regardless */ }
+      // My card rides when this contact has not had THIS one from this session: the first message, the next after a
+      // change, once per session. Inside the seal when there is one (below), in the clear otherwise.
+      let cardOnBoard = null;
+      if (typeof myCard === 'function') {
+        try { const c = await myCard(); if (typeof c === 'string' && c && cardSentTo.get(peerAddr) !== c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
       }
       // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
       // pair roster's material with it: an invite is a join secret).
@@ -265,6 +268,7 @@ export function createContactThreadChannel({
         } catch { /* unsealed, as before */ }
       }
       const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
+      if (cardOnBoard) cardSentTo.set(peerAddr, cardOnBoard);   // it left (delivered or held): they have this one
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       if (!res?.deduped) {

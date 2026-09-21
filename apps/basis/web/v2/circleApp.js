@@ -2228,6 +2228,10 @@ function buildCircleBot(agent) {
     // from one of them — direct, or carried by my own device — unhides the row and marks the thread
     isHidden: contactIsHidden,
     onReturned: contactReturned,
+    // the first message to a contact carries MY card, and a card that arrives (naming its sender) goes into the book —
+    // so whoever writes to me is a NAMED row, on every device (the book carry), not a key (2026-09-21)
+    myCard: async () => { try { return (await rawCallSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    onCard: contactCardArrived,
     // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
     // this device's per-circle address there, which is the only key the pair roster admits
     sendToPeer: (addr, payload, opts) =>
@@ -2783,6 +2787,17 @@ async function contactReturned(contactId) {
   await setContactHidden(contactId, false);
   if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
   else if (rootEl?.querySelector?.('.cc-contacts')) showContacts().catch(() => {});   // Contacten is showing: the row moves out of the fold
+}
+// A card that arrived with a message, already checked to name its sender: into the book through the one decoder
+// (a re-add merges over an existing row and leaves a hidden mark alone), then the row on screen gets its name.
+async function contactCardArrived({ contactId, card }) {
+  try { await rawCallSkill('stoop', 'addContactFromQr', { payload: card }); } catch { return; }
+  const thread = contactThreads.get(contactId);
+  if (thread) {
+    try { const row = (await loadAllContacts()).find((c) => c.contactId === contactId); if (row?.name && row.name !== contactId) thread.name = row.name; } catch { /* the next open names it */ }
+    if (_activeContactThread?.contactId === contactId) _activeContactThread.rerender();
+  }
+  if (rootEl?.querySelector?.('.cc-contacts')) showContacts().catch(() => {});
 }
 async function loadAllContacts() {
   const [peerRows, stoopRows] = await Promise.all([

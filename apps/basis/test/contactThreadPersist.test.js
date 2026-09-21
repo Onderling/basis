@@ -409,3 +409,61 @@ describe('a hidden contact who writes again comes back (L106) — one seam, both
     expect((await sib.rehydrate('bob')).find((t) => t.messageId === 'r1')?.returned, 'the sibling stores the mark too').toBe(true);
   });
 });
+
+describe('the first message carries my card, and a card that arrives names the sender (2026-09-21)', () => {
+  // Frits, 09-18: "the device should send a Hi, then they exchange their cards, and then there is a contact". Until now
+  // a message carried no name: whoever wrote to you was a row named by its key on every device but the one that
+  // scanned their card. Now: while no pair roster exists with the peer (the first exchange), the turn carries the
+  // sender's card inside the seal; the receiver hands it to `onCard` only when it names the sender.
+  const encode = (obj) => 'onderling-contact://' + Buffer.from(JSON.stringify(obj)).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  const MY_CARD = encode({ webid: 'me', displayName: 'Anna', peerAddr: 'me' });
+  it('rides the turn while there is no pair route to the peer; not once there is one', async () => {
+    const sent = [];
+    let route = null;
+    const pair = { prepare: vi.fn(async () => null), routeFor: vi.fn(async () => route) };
+    const ch = createContactThreadChannel({ sendToPeer: async (a, p) => { sent.push(p); }, pair, myCard: async () => MY_CARD });
+    await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'hoi', messageId: 'm1' }).sent;
+    expect(sent[0].card, 'the first exchange carries the card').toBe(MY_CARD);
+    route = { to: 'bea@pair', circleId: 'pair-x', personKey: null };
+    await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'nog', messageId: 'm2' }).sent;
+    expect(sent[1].card, 'once the roster exists the card no longer rides — they have it').toBeUndefined();
+  });
+  it('rides INSIDE the seal when there is one, and without a `myCard` seam nothing changes', async () => {
+    const sent = [];
+    const sealFor = vi.fn(async (to, content) => ({ box: JSON.stringify(content) }));
+    const ch = createContactThreadChannel({ sendToPeer: async (a, p) => { sent.push(p); }, sealFor, myCard: async () => MY_CARD });
+    await ch.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'hoi', messageId: 'm1' }).sent;
+    expect(sent[0].card, 'not in the clear beside the box').toBeUndefined();
+    expect(JSON.parse(sent[0].sealed.box).card).toBe(MY_CARD);
+    const plain = []; const ch2 = createContactThreadChannel({ sendToPeer: async (a, p) => { plain.push(p); } });
+    await ch2.sendTurn({ peerAddr: 'bea', threadId: 'bea', text: 'hoi', messageId: 'm1' }).sent;
+    expect(plain[0].card).toBeUndefined();
+  });
+  it('a card that arrives is handed to `onCard` only when it names the sender; the words land either way', async () => {
+    const cards = []; const msgs = [];
+    const identityOf = (a) => (a === 'bea-in-pair' ? 'bea' : a);
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, identityOf, onCard: (info) => { cards.push(info); } });
+    const router = makePeerRouter({ handlers: { [ch.subtypes.out]: ch.messageHandler((m) => msgs.push(m)) } });
+    const beaCard = encode({ webid: 'bea', displayName: 'Bea', peerAddr: 'bea' });
+    await router({ from: 'bea', payload: { subtype: ch.subtypes.out, text: 'hoi', messageId: 'x1', card: beaCard } });
+    expect(cards).toEqual([{ contactId: 'bea', fromAddr: 'bea', card: beaCard }]);
+    // over the pair route: the sender is a per-circle address that resolves to the person the card names
+    await router({ from: 'bea-in-pair', payload: { subtype: ch.subtypes.out, text: 'nog', messageId: 'x2', card: beaCard } });
+    expect(cards.length).toBe(2);
+    // a card naming someone else is dropped; the message still lands
+    const forged = encode({ webid: 'carl', displayName: 'Carl', peerAddr: 'carl' });
+    await router({ from: 'bea', payload: { subtype: ch.subtypes.out, text: 'psst', messageId: 'x3', card: forged } });
+    expect(cards.length).toBe(2);
+    expect(msgs.map((m) => m.text)).toEqual(['hoi', 'nog', 'psst']);
+  });
+  it('…and out of the seal too', async () => {
+    const cards = [];
+    const beaCard = encode({ webid: 'bea', displayName: 'Bea', peerAddr: 'bea' });
+    const openFor = vi.fn(async (sealed) => JSON.parse(sealed.box));
+    const ch = createContactThreadChannel({ sendToPeer: () => {}, openFor, onCard: (info) => { cards.push(info.card); } });
+    const router = makePeerRouter({ handlers: { [ch.subtypes.out]: ch.messageHandler(() => {}) } });
+    await router({ from: 'bea', payload: { subtype: ch.subtypes.out, messageId: 'x1', sealed: { box: JSON.stringify({ text: 'hoi', card: beaCard }) } } });
+    await new Promise((r) => { setTimeout(r, 0); });   // the seam is fire-and-forget beside the turn
+    expect(cards).toEqual([beaCard]);
+  });
+});

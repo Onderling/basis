@@ -300,6 +300,9 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         // hidden; the landing unhides the row. Recorded too, so a walk can assert the marker's moment.
         isHidden: async (contactId) => ((await agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true),
         onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); returned.push(contactId); },
+        // the first message carries my card; an arriving card goes into the book — as the shells compose it
+        myCard: async () => { try { return (await agent.callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+        onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card }); },
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,
         localActor: pubKey,

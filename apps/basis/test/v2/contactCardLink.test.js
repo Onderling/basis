@@ -5,7 +5,7 @@
  * link, a bare hash, the raw `onderling-contact://` code.
  */
 import { describe, it, expect } from 'vitest';
-import { contactCardLink, contactCardFromLink, loadShareMyContact, CONTACT_LINK_PARAM } from '../../src/v2/contactCardLink.js';
+import { contactCardLink, contactCardFromLink, loadShareMyContact, decodeContactCard, cardNamesSender, CONTACT_LINK_PARAM } from '../../src/v2/contactCardLink.js';
 
 const CARD = 'onderling-contact://eyJ3ZWJpZCI6Ind4In0';
 
@@ -50,5 +50,26 @@ describe('loadShareMyContact — what the panel shows, for both shells', () => {
     expect(await loadShareMyContact({ callSkill })).toEqual({ payload: CARD, link: null, qr: CARD, qrEncodes: 'code' });
     expect(await loadShareMyContact({ callSkill: async () => ({ error: 'no identity' }) })).toEqual({ payload: null, link: null, qr: null, qrEncodes: null });
     expect(await loadShareMyContact({ callSkill: async () => { throw new Error('down'); } })).toEqual({ payload: null, link: null, qr: null, qrEncodes: null });
+  });
+});
+
+describe('a card that rides a message is taken only when it names the sender (2026-09-21)', () => {
+  const encode = (obj) => 'onderling-contact://' + Buffer.from(JSON.stringify(obj)).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  const bea = encode({ webid: 'bea-webid', pubKey: 'bea-device-key', displayName: 'Bea', peerAddr: 'bea-webid', relays: ['wss://r'] });
+  it('decodes the card, and refuses junk', () => {
+    expect(decodeContactCard(bea)).toMatchObject({ webid: 'bea-webid', displayName: 'Bea' });
+    expect(decodeContactCard('onderling-contact://not*base64')).toBeNull();
+    expect(decodeContactCard('onderling-invite://abc')).toBeNull();
+    expect(decodeContactCard(encode({ displayName: 'no webid' }))).toBeNull();
+  });
+  it('the card is taken when it names the person the message came from — by webid or by the address it says to write to', () => {
+    expect(cardNamesSender(bea, 'bea-webid')?.displayName).toBe('Bea');
+    const viaAddr = encode({ webid: 'bea-webid', displayName: 'Bea', peerAddr: 'bea-profile-addr' });
+    expect(cardNamesSender(viaAddr, 'bea-profile-addr')?.displayName).toBe('Bea');
+  });
+  it('…and dropped when it names anyone else — a stranger cannot put a name on someone else\'s address', () => {
+    expect(cardNamesSender(bea, 'carl-webid')).toBeNull();
+    expect(cardNamesSender(bea, '')).toBeNull();
+    expect(cardNamesSender('', 'bea-webid')).toBeNull();
   });
 });

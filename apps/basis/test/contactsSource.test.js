@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { PeerGraph } from '@onderling/core';
 import {
   listContacts, peerToContactRow, stoopContactToRow, mergeContacts, splitShownHidden,
+  nameContactsFromRosters, loadContactRoster,
 } from '../src/v2/contactsSource.js';
 
 describe('peerToContactRow', () => {
@@ -182,5 +183,50 @@ describe('mergeContacts (S1 #2)', () => {
   it('handles empty inputs', () => {
     expect(mergeContacts()).toEqual([]);
     expect(mergeContacts([{ contactId: 'a', name: 'A', isBot: false }], [])).toHaveLength(1);
+  });
+});
+
+describe('THE BOOK READS THE ROSTER (2026-09-21) — a contact with a pair roster here is named by what they SAID on it', () => {
+  // Fable's answer 4 on member-props: the one road for a name is the member's own signed statement on the membership
+  // lane, folded on every device; the card names a contact only until their roster says something. Every device of
+  // the person is in every pair circle since the siblings follow a circle, so this holds on the laptop as on the box.
+  const book = (over) => stoopContactToRow({ webid: 'bea', pubKey: 'bea', displayName: 'Bea (card)', pairCircleId: 'pair-ab', ...over });
+  it('the roster\'s `said` displayName wins, then its handle; the card stays where the roster says nothing; a bot is untouched', async () => {
+    const rosters = { 'pair-ab': [{ webid: 'bea', said: { displayName: 'Beatrix', handle: 'bea' } }] };
+    const rosterRow = async (cid, webid) => (rosters[cid] ?? []).find((m) => m.webid === webid) ?? null;
+    const [named] = await nameContactsFromRosters([book()], { rosterRow });
+    expect(named.name).toBe('Beatrix');
+    expect(named.namedBy).toBe('roster');
+    rosters['pair-ab'][0].said = { handle: 'bea-h' };
+    expect((await nameContactsFromRosters([book()], { rosterRow }))[0].name).toBe('bea-h');
+    rosters['pair-ab'][0].said = undefined;                       // the roster row exists, the lane holds nothing yet
+    expect((await nameContactsFromRosters([book()], { rosterRow }))[0].name, 'the card is the fallback').toBe('Bea (card)');
+    expect((await nameContactsFromRosters([book({ pairCircleId: undefined })], { rosterRow }))[0].name, 'no pair roster: the card').toBe('Bea (card)');
+    const bot = peerToContactRow({ pubKey: 'bot', name: 'Wilfred', type: 'a2a', skills: [{ id: 's' }] });
+    expect((await nameContactsFromRosters([{ ...bot, pairCircleId: 'pair-ab' }], { rosterRow }))[0].name).toBe('Wilfred');
+  });
+  it('a roster that cannot be read leaves the row as it was; without the seam the rows pass through', async () => {
+    const [r] = await nameContactsFromRosters([book()], { rosterRow: async () => { throw new Error('no roster'); } });
+    expect(r.name).toBe('Bea (card)');
+    expect(await nameContactsFromRosters([book()], {})).toEqual([book()]);
+  });
+  it('re-sorts by the roster name (Contacten is alphabetical on what is painted)', async () => {
+    const rows = [stoopContactToRow({ webid: 'a', displayName: 'Zed', pairCircleId: 'p-a' }), stoopContactToRow({ webid: 'b', displayName: 'Mia' })];
+    const named = await nameContactsFromRosters(rows, { rosterRow: async (cid) => (cid === 'p-a' ? { webid: 'a', said: { displayName: 'Aaf' } } : null) });
+    expect(named.map((r) => r.name)).toEqual(['Aaf', 'Mia']);
+  });
+  it('loadContactRoster composes the whole Contacten read for every shell: graph + book, merged, named from the rosters', async () => {
+    const g = new PeerGraph();
+    await g.upsert({ id: 'bea', pubKey: 'bea', type: 'native', name: 'bea' });
+    const calls = [];
+    const callSkill = async (app, op, args) => {
+      calls.push(op);
+      if (op === 'listContacts') return { contacts: [{ webid: 'bea', pubKey: 'bea', displayName: 'Bea (card)', pairCircleId: 'pair-ab' }] };
+      if (op === 'listGroupMembers') return { members: args.groupId === 'pair-ab' ? [{ webid: 'bea', said: { displayName: 'Beatrix' } }] : [] };
+      return null;
+    };
+    const rows = await loadContactRoster({ peerGraph: g, agent: { identityOfAddress: () => null, ownAddresses: () => [] }, callSkill });
+    expect(rows.map((r) => [r.contactId, r.name, r.source])).toEqual([['bea', 'Beatrix', 'contact']]);
+    expect(calls).toEqual(['listContacts', 'listGroupMembers']);
   });
 });

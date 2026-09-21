@@ -141,7 +141,7 @@ import { createPairRoster } from '../../src/v2/pairRoster.js';
 import { contactSealMark } from '../../src/v2/contactSealMark.js';
 import { makeSyncSelection, SYNC_SILOS, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, parseKringenOff, serializeKringenOff } from '../../src/v2/syncSelection.js';
 import { presendFloorFor } from '../../src/v2/presendFloor.js';
-import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
+import { loadBookRows, loadContactRoster } from '../../src/v2/contactsSource.js';
 import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
@@ -2789,12 +2789,7 @@ async function showContacts() {
 
 // S1 #2 — the unified Contacten roster: PeerGraph bots/peers MERGED with the
 // stoop ContactBook (people the user added, with trust/tags). One directory.
-async function loadStoopContacts() {
-  try {
-    const res = await rawCallSkill('stoop', 'listContacts', {});
-    return (Array.isArray(res?.contacts) ? res.contacts : []).map(stoopContactToRow).filter(Boolean);
-  } catch { return []; }
-}
+const loadStoopContacts = () => loadBookRows(rawCallSkill);
 // Hiding a contact (L106): a mark on the BOOK row, never on the graph — so only the book can answer "is this
 // one hidden", and only the book's op changes it. Hiding is Contacten only: the thread, the pair roster, their
 // circles, roster rows and member cards are untouched. The mark rides the own-devices carry, so the act on any
@@ -2829,15 +2824,9 @@ async function contactCardArrived({ contactId, card }) {
   }
   if (rootEl?.querySelector?.('.cc-contacts')) showContacts().catch(() => {});
 }
-async function loadAllContacts() {
-  const [peerRows, stoopRows] = await Promise.all([
-    // A member's per-circle address is where they are reached in one circle, never a second contact.
-    // …and never me: my person address, my profile key, my devices' per-circle addresses are not contacts.
-    listContacts(circlePeerGraph, { identityOf: (a) => _peerAgent?.identityOfAddress?.(a) ?? null, ownAddresses: () => _peerAgent?.ownAddresses?.() ?? [] }).catch(() => []),
-    loadStoopContacts(),
-  ]);
-  return mergeContacts(peerRows, stoopRows);
-}
+// The one Contacten read (shared with mobile): the graph less aliases and my own addresses, the book, merged, and
+// every contact with a pair roster here named by what they said on it.
+const loadAllContacts = () => loadContactRoster({ peerGraph: circlePeerGraph, agent: _peerAgent, callSkill: rawCallSkill });
 
 /**
  * objective L · Phase 2 — open the OUT-OF-CIRCLE recipient picker overlay. Lists the Contacten roster's

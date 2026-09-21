@@ -177,6 +177,34 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(bRoster.pair, 'B is in the pair circle with A').toBeTruthy();
     expect(bRoster.founderAddress, 'B holds A\'s proven per-circle address there').toBeTruthy();
     log('STEP5 the circle was learned', 'PASS', `pair ${String(bRoster.pair).slice(0, 14)}…, founder at ${String(bRoster.founderAddress).slice(0, 12)}…`);
+
+    // ── B renames under Mij; A's Contacten row for B renames — THE BOOK READS THE ROSTER (2026-09-21). ────
+    // The name travels as B's `member-props` statement on the pair circle's membership lane, folded on A; the row's
+    // name is what the roster says, the card (which named the row "Bea" at STEP3) the fallback. No message is sent.
+    const bId = (await B.page.evaluate(async () => window.onderlingCall('stoop', 'whoAmI', {})))?.webid;
+    await gotoCircles(B.page);   // B sits in the thread after STEP4: back to the launcher, where Mij is
+    await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
+    await B.page.locator('.cc-profile__display').fill('Beatrix'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500);
+    await gotoCircles(A.page);
+    await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(1000);
+    const aRowName = async () => {
+      // the roster folds on arrival; the painted row is re-read on each poll (Contacten re-opened)
+      await A.page.locator('[data-tab="mij"]').first().click(); await A.page.waitForTimeout(300);
+      await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(700);
+      return A.page.locator(`.cc-contacts__row[data-contact-id="${bId}"] .cc-contacts__name`).first().textContent().catch(() => null);
+    };
+    try {
+      await expect.poll(aRowName, { timeout: 45_000 }).toBe('Beatrix');
+    } catch {
+      const aRoster = await A.page.evaluate(async (b) => {
+        const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-'));
+        const out = {};
+        for (const id of ids) { const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: id }); out[id.slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}:${m.displayName ?? ''}:${JSON.stringify(m.said ?? null)}`); }
+        return out;
+      }, bId).catch((e) => String(e));
+      throw new Error(`A's row for B did not take the roster's name — painted "${await aRowName()}"; A's pair rosters: ${JSON.stringify(aRoster)}`);
+    }
+    log('STEP6 the book reads the roster', 'PASS', 'B renamed under Mij; A\'s row reads "Beatrix" without a message');
   } finally {
     await teardown([A, B].filter(Boolean));
   }

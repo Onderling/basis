@@ -931,7 +931,20 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
 // that first HI as "a member's canonical identity where they sign per-circle" (one refusal in every log; the
 // handshake completed on a later retry). A caller that does not care still need not await.
 async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
+  // EVERY CIRCLE THE SUBSTRATE HOLDS — the pair circles included (2026-09-21). `circlesCache` is the LAUNCHER's list,
+  // and `loadCircles` filters pair circles out of it (hidden tiles, by design). Reading presence from it meant a pair
+  // circle's per-circle address was registered on the relay at the join and never again: after a reload the
+  // transport did not hold it, a send over the pair route fell back to the primary address, and the contact's
+  // door refused that as "a member's canonical identity" — Frits' phone → Wilfred, 2026-09-21, three times, nothing
+  // fanned. Mobile (`liveCircleIds`) and the box asked the substrate all along; the union keeps a circle the
+  // substrate has not caught up on yet (a just-joined one arrives as `extraCircleIds`).
+  let held = [];
+  try {
+    held = ((await agent?.callSkill?.('stoop', 'listMyCircles', {}))?.circles ?? [])
+      .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+  } catch { held = []; }
   const circleIds = [...new Set([
+    ...held,
     ...circlesCache.map((c) => c?.id).filter(Boolean),
     ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
   ])];
@@ -3963,8 +3976,8 @@ async function showMij() {
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
 async function showShareMyContact() {
   hideCircleTabBar(tabBarEl);
-  const { payload, link } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
-  renderShareMyContact(rootEl, { payload, link, t, onBack: showMij });
+  const { payload, link, qr } = await loadShareMyContact({ callSkill: rawCallSkill, appUrl: `${window.location.origin}${window.location.pathname}` });
+  renderShareMyContact(rootEl, { payload, link, qr, t, onBack: showMij });
 }
 
 // SILENT out-of-circle delivery — the "shared with me" inbox (a Mij sub-screen). Reads the

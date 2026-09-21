@@ -12,12 +12,13 @@
  * @param {object} a
  * @param {string|null} a.payload   the `onderling-contact://…` card, or null when none could be made
  * @param {string|null} a.link      the clickable form, or null when the app has no http(s) url (a file:// dev shell)
+ * @param {string|null} [a.qr]      what the QR encodes — the link when there is one, else the code (the loader decides)
  * @param {Function} a.t
  * @param {() => void} a.onBack
  */
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderShareMyContact(container, { payload = null, link = null, t, onBack } = {}) {
+export function renderShareMyContact(container, { payload = null, link = null, qr = null, t, onBack } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'shareMyContact.js');
   container.innerHTML = '';
@@ -48,15 +49,19 @@ export function renderShareMyContact(container, { payload = null, link = null, t
   hint.textContent = tr('circle.shareContact.hint');
   container.appendChild(hint);
 
-  // The QR: the raw code (a camera app hands it to the paste box; the in-app scanner decodes it). Drawn lazily
-  // by the qrcode lib — the copyable code below is the fallback when it cannot load.
+  // The QR: the LINK when there is one — a phone's camera opens it in the browser, where the app adds the contact;
+  // the in-app scanner reads it too. Else the raw code (only the in-app scanner reads that). Drawn lazily by the
+  // qrcode lib — the copyable rows below are the fallback when it cannot load. A card-length link is ~650 bytes:
+  // 260px at level L keeps the modules ~3px on a laptop screen, which a phone camera reads; 220px/M was ~2px.
+  const qrValue = qr ?? payload;
   const canvas = document.createElement('canvas');
   canvas.className = 'cc-share__qr';
-  canvas.width = 220; canvas.height = 220;
-  canvas.style.cssText = 'display:block;max-width:220px;margin:8px 0;background:#fff'; // hex-ok: QR scanner contrast
+  canvas.dataset.encodes = qrValue === link ? 'link' : 'code';
+  canvas.width = 260; canvas.height = 260;
+  canvas.style.cssText = 'display:block;max-width:260px;margin:8px 0;background:#fff'; // hex-ok: QR scanner contrast
   container.appendChild(canvas);
   import('qrcode').then((mod) => {
-    (mod.default ?? mod).toCanvas(canvas, payload, { width: 220, margin: 1, errorCorrectionLevel: 'M' }, () => {});
+    (mod.default ?? mod).toCanvas(canvas, qrValue, { width: 260, margin: 1, errorCorrectionLevel: 'L' }, () => {});
   }).catch(() => { canvas.remove(); });
 
   const copyRow = (cls, value, label) => {

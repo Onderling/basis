@@ -22,12 +22,12 @@ export const WEB_APP_URL = process.env.EXPO_PUBLIC_WEB_APP_URL || null;
 export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_APP_URL }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const [state, setState] = useState({ loading: true, payload: null, link: null });
+  const [state, setState] = useState({ loading: true, payload: null, link: null, qr: null });
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const r = typeof callSkill === 'function' ? await loadShareMyContact({ callSkill, appUrl }) : { payload: null, link: null };
+      const r = typeof callSkill === 'function' ? await loadShareMyContact({ callSkill, appUrl }) : { payload: null, link: null, qr: null };
       if (alive) setState({ loading: false, ...r });
     })();
     return () => { alive = false; };
@@ -51,8 +51,9 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
       ) : (
         <View>
           <Text style={styles.note}>{t('circle.shareContact.hint')}</Text>
+          {/* the QR is the LINK when there is one (a camera opens it), else the code — the shared loader decides */}
           <View style={styles.qrBox} testID="share-contact-qr">
-            <QrCodeView value={state.payload} size={220} />
+            <QrCodeView value={state.qr ?? state.payload} size={240} />
           </View>
           <Text style={styles.label}>{t('circle.shareContact.code_label')}</Text>
           <Text style={styles.value} selectable numberOfLines={3} testID="share-contact-code">{state.payload}</Text>

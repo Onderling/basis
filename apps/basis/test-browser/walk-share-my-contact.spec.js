@@ -29,6 +29,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     await A.page.locator('.cc-profile__share-contact').click();
     await expect(A.page.locator('.cc-share__title')).toBeVisible();
     expect(await A.page.locator('canvas.cc-share__qr').count(), 'the QR is painted').toBe(1);
+    expect(await A.page.locator('canvas.cc-share__qr').getAttribute('data-encodes'), 'the QR is the LINK — a phone camera opens it').toBe('link');
     const code = await A.page.locator('.cc-share__code input').inputValue();
     expect(code.startsWith('onderling-contact://'), `the code is the card: ${code.slice(0, 30)}`).toBe(true);
     const link = await A.page.locator('.cc-share__link input').inputValue();
@@ -98,7 +99,13 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
 
     // ── B writes AGAIN, once the pair roster has formed: this one rides the pair route, from B's per-circle
     // address. It must land in the SAME thread — the one keyed by B — not in one keyed by an address no row opens.
+    // …and B RELOADS first, the way a phone does between two visits (2026-09-21, Frits' phone → Wilfred): after a
+    // reload the per-circle addresses must be registered on the relay again, pair circles included, or the send
+    // over the pair route leaves as B's canonical identity and A's door refuses it — "sent" on B, nothing on A.
     await B.page.waitForTimeout(6000);
+    await B.page.reload({ waitUntil: 'load' });
+    await B.page.waitForTimeout(8000);
+    await gotoCircles(B.page);
     const second = `en nog een, over de pair-route ${Date.now().toString(36)}`;
     const sent2 = await sendDirectMessage(B.page, second, { to: aId });
     expect(sent2.sent, `B could not write again: ${sent2.why}`).toBe(true);

@@ -12,6 +12,7 @@
  * chat protocol's offer/mode machinery exists because chat is big and windowed; governance is neither).
  */
 import { GOV_EVENT } from './governanceLog.js';
+import { catchUpTargets } from './catchUpTargets.js';
 
 export const GOV_CATCHUP_REQUEST = 'circle-governance-catchup-request';
 export const GOV_CATCHUP_BATCH   = 'circle-governance-catchup-batch';
@@ -32,7 +33,7 @@ const RETRY_REFUSED_MS = 2000;
  *   known peer, and every statement is a SIGNED fact the receiver re-verifies; the residual exposure is the
  *   proposal/vote metadata itself, the same the live fan already carries). Wire a roster check to narrow.
  */
-export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null, extraStatementsFor = null } = {}) {
+export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null, extraStatementsFor = null, selfWebid = null, allowGlobal = null } = {}) {
   // Lane-parametrized: the governance pair by default; a second lane (membership) passes its own pair —
   // one mechanism, per-lane wire names. (Content lanes don't use this — they ride the windowed
   // `frontierReplay`; pull-all is for the small deny-wins lanes where completeness is the point.)
@@ -118,7 +119,7 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
 
   /**
    * The reconnect kick: request every circle's governance statements from that circle's reachable members
-   * (same member source the chat catch-up uses — `listMyCircles` + `listGroupRoster` addrs). Best-effort,
+   * (same member source the chat catch-up uses — `listMyCircles` + the derived roster's per-circle addresses). Best-effort,
    * deduped per (peer, circle); a failed peer costs nothing — any ONE complete peer suffices (pull-all +
    * idempotent ingest converge regardless of who answers).
    */
@@ -144,14 +145,14 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
    * own join: earlier joins, roles, evictions) never reached it, and the creator's row on the joiner had no
    * person key. Best-effort per peer; any one complete peer suffices (idempotent ingest).
    */
+  // AT THE MEMBER'S PER-CIRCLE ADDRESS (2026-09-21): the same ladder the fan climbs, from the derived roster — never
+  // the global webid `listGroupRoster` names, which met the member at its canonical door and drew a canonical
+  // greeting the requester's gate refused (`catchUpTargets`).
   async function requestCircle(circleId, { callSkill }) {
-    let members = [];
-    try { members = (await callSkill('stoop', 'listGroupRoster', { groupId: circleId }))?.members ?? []; } catch { return { requested: 0 }; }
+    const targets = await catchUpTargets({ callSkill, circleId, selfWebid, allowGlobal });
     let requested = 0;
-    for (const m of members) {
-      const addr = m?.addr ?? m?.circleAddress ?? null;
-      if (typeof addr !== 'string' || !addr) continue;
-      try { await requestFrom(addr, circleId); requested += 1; } catch { /* next peer */ }
+    for (const t of targets) {
+      try { await requestFrom(t.addr, circleId); requested += 1; } catch { /* next peer */ }
     }
     return { requested };
   }

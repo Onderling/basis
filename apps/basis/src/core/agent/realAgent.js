@@ -5938,6 +5938,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Siblings follow a circle: the lane table spreads `handlers`; the shells `setConsume(entry => consumeCircleEntry(deps, entry))`
     // beside their enrol consume and kick `requestFromSiblings` on connect; the registry setter fans a new membership.
     circleFollowSync,
+    /** The person's address-fallback setting, read live — the lanes' catch-ups aim at the global key only when it is on. */
+    addressFallbackOn,
     /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */
     personKey: currentPersonKey,
     // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.

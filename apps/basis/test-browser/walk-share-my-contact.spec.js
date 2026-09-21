@@ -158,14 +158,13 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(seen2.painted, 'B\'s second message is on A\'s device but NOT on the screen — stored under an address no row opens (the direct path keyed by the sender address, not the person)').toBe(true);
     expect(seen2.contactId, 'the same thread as the first message').toBe(seen.contactId);
     log('STEP4 the second message', 'PASS', 'same thread, painted');
-    // What the join refused, if anything — LOGGED, not asserted (2026-09-19). One refusal per join remains in
-    // ~half the runs: the joiner's lane catch-up requests speak as its pair-circle address TO THE ADMIN'S GLOBAL
-    // address (its roster row has no per-circle address at that instant), so the admin — dialled at its canonical
-    // address — answers the HI canonically, to the joiner's per-circle address, which the joiner's gate rightly
-    // refuses. Nothing is lost (the handshake completes on the next envelope); the fix is the catch-up aiming
-    // circle traffic at the member's per-circle address, never the global one — its own item (ledger L110).
+    // NOTHING REFUSED inside the pair circle during the join. Until 2026-09-21 two envelopes were, every run: the
+    // joiner's lane catch-up requests left as its pair-circle address FOR THE ADMIN'S GLOBAL address (`listGroupRoster`
+    // names webids), so the admin — met at its canonical door — answered the greeting canonically, to a per-circle
+    // address, which the joiner's gate rightly refused. The catch-ups aim at the member's per-circle address now
+    // (`catchUpTargets`); a refusal here again means a lane found its way back to a global key.
     const pairRefusals = [...refusedOnB.map((t) => `B: ${t}`), ...refusedOnA.map((t) => `A: ${t}`)].filter((t) => /pair-/.test(t));
-    if (pairRefusals.length) console.log(`### NOTE: ${pairRefusals.length} envelope(s) refused in the pair circle during the join (L110):\n${pairRefusals.join('\n')}`);
+    expect(pairRefusals, 'no envelope is refused inside the pair circle during the join').toEqual([]);
     // B holds the founder's per-circle address on the pair roster — the circle was learned, on the channel that works.
     const bRoster = await B.page.evaluate(async (a) => {
       const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-'));

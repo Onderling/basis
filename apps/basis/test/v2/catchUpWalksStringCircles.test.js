@@ -19,8 +19,8 @@ const CIRCLE = 'circle:absent';
 /** The two ops a `requestAll` walk makes, answering in the shapes the real skills answer in. */
 const callSkill = (app, op) => {
   if (op === 'listMyCircles') return Promise.resolve({ circles: [CIRCLE] });   // STRINGS, not objects
-  if (op === 'listGroupRoster') {
-    return Promise.resolve({ members: [{ addr: 'peer:ada', role: 'admin' }, { addr: 'peer:bo', role: 'member' }] });
+  if (op === 'listGroupMembers') {   // the derived roster: per-circle addresses (2026-09-21 — never `listGroupRoster`'s global webids)
+    return Promise.resolve({ members: [{ webid: 'ada', circleAddress: 'peer:ada', role: 'admin' }, { webid: 'bo', circleAddress: 'peer:bo', role: 'member' }] });
   }
   return Promise.resolve({});
 };

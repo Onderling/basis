@@ -101,9 +101,13 @@ export function buildCircleLanes({
   };
 
   // ── the catch-ups ────────────────────────────────────────────────────────────────────────────
+  // Where a request goes: each other member's PER-CIRCLE address from the derived roster; the global key only when
+  // the person allows the address fallback (the same gate the fan's resolver reads). Never this device's own row.
+  const aim = { selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? null, allowGlobal: () => agent.addressFallbackOn?.() === true };
   const gov = govRail ? makeGovernanceCatchUp({
     rail: govRail,
     sendToPeer: send,
+    ...aim,
     onChange: govChange,
     // The durable-head serve: a member offline past the lane's audit window still receives the
     // preserved, originally-signed rules-update statement — the final setting never deletes.
@@ -113,6 +117,7 @@ export function buildCircleLanes({
   const membership = agent.membershipRail ? makeGovernanceCatchUp({
     rail: agent.membershipRail,
     sendToPeer: send,
+    ...aim,
     subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
     onChange: onMembership,
   }) : null;
@@ -122,6 +127,7 @@ export function buildCircleLanes({
   const key = agent.keyRail ? makeGovernanceCatchUp({
     rail: agent.keyRail,
     sendToPeer: send,
+    ...aim,
     subtypes: KEY_CATCHUP_SUBTYPES,
     onChange: keyChange,
   }) : null;
@@ -131,6 +137,7 @@ export function buildCircleLanes({
   const task = agent.taskRail ? makeFrontierReplay({
     rail: agent.taskRail,
     sendToPeer: send,
+    ...aim,
     subtypes: TASK_CATCHUP_SUBTYPES,
     statementsFor: (circleId) => agent.taskRail.catchUpStatements(circleId),
   }) : null;
@@ -140,6 +147,7 @@ export function buildCircleLanes({
   const chat = agent.chatRail ? makeFrontierReplay({
     rail: agent.chatRail,
     sendToPeer: send,
+    ...aim,
     subtypes: CHAT_CATCHUP_SUBTYPES,
     onChange: chatChange,
     ...(typeof chatRefused === 'function' ? { onRefused: chatRefused } : {}),

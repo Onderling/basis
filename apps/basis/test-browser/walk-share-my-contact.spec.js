@@ -29,6 +29,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     await A.page.locator('.cc-profile__share-contact').click();
     await expect(A.page.locator('.cc-share__title')).toBeVisible();
     expect(await A.page.locator('canvas.cc-share__qr').count(), 'the QR is painted').toBe(1);
+    expect(await A.page.locator('canvas.cc-share__qr').getAttribute('data-encodes'), 'the QR is the LINK — a phone camera opens it').toBe('link');
     const code = await A.page.locator('.cc-share__code input').inputValue();
     expect(code.startsWith('onderling-contact://'), `the code is the card: ${code.slice(0, 30)}`).toBe(true);
     const link = await A.page.locator('.cc-share__link input').inputValue();

@@ -41,6 +41,12 @@ describe('renderShareMyContact', () => {
     el.querySelector('.cc-share__back').click();
     expect(onBack).toHaveBeenCalled();
   });
+  it('the QR encodes the LINK when there is one, else the code (2026-09-21: a camera opens a link, not a scheme)', () => {
+    const withLink = renderShareMyContact(document.createElement('div'), { payload: CARD, link: LINK, qr: LINK, t, onBack: () => {} });
+    expect(withLink.querySelector('canvas.cc-share__qr').dataset.encodes).toBe('link');
+    const codeOnly = renderShareMyContact(document.createElement('div'), { payload: CARD, link: null, qr: CARD, t, onBack: () => {} });
+    expect(codeOnly.querySelector('canvas.cc-share__qr').dataset.encodes).toBe('code');
+  });
   it('a card without a link form (no app url) still shows the code and the QR', () => {
     const el = renderShareMyContact(document.createElement('div'), { payload: CARD, link: null, t, onBack: () => {} });
     expect(el.querySelector('.cc-share__code input').value).toBe(CARD);

@@ -57,7 +57,7 @@ import { listsManifest } from '../../lists/manifest.js';
 
 import { EventLog } from '../src/eventLog.js';
 import { wireEventLogPersistence, fileSnapshotIo, fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
-import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
@@ -471,7 +471,7 @@ if (relayUrl) {
   // The stashed offer (from `--enrol`, or a re-try from an earlier start): consumed exactly as both
   // shells consume a scanned one — registry record, presence, the roster seed from the sibling, the
   // announce, every lane's catch-up. No-op when nothing is stashed.
-  agent.bootstrapFromStashedOffer = () => consumeEnrollOffer({
+  const enrolDeps = {
     agent, callSkill,
     sendPeerMessage: (to, payload, o) => agent.sendPeerMessage(to, payload, o),
     storage: offerStash,
@@ -480,7 +480,12 @@ if (relayUrl) {
       lanes.catchUps.task?.requestFrom(siblingAddress, circleId),
       lanes.catchUps.chat?.requestFrom(siblingAddress, circleId),
     ]),
-  }).then((r) => {
+  };
+  // A circle another device of the person founded or joined (a kring joined on the phone): the same per-circle
+  // step, run when the sibling's carry lands; the log says so. Asked for on connect with the other kicks below.
+  agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+  agent.circleFollowSync?.onLanded?.((r) => walkLog({ kind: 'circle-follow', from: String(r.from).slice(0, 12), circleId: r.circleId, ok: r.ok, steps: r.steps }));
+  agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
     if (r?.consumed) {
       walkLog({ kind: 'enroll-offer', cleared: r.cleared, circles: r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps })) });
       console.log(`device-runner: joined ${r.circles?.filter((c) => c.ok).length ?? 0} circle(s) from the offer${r.cleared ? '' : ' — some did not complete; retried on the next start'}.`);
@@ -534,6 +539,11 @@ if (relayUrl) {
     agent.primaryDevice?.requestFromSiblings?.().catch(() => { /* the carry brings a later claim either way */ });
     walkLog({ kind: 'catch-up-kick', lane: 'primary-device' });
   }, 2600);
+  // The circles the person's other devices are in that this box is not (founded or joined while it was down).
+  setTimeout(() => {
+    agent.circleFollowSync?.requestFromSiblings?.().catch(() => { /* the carry brings a later one either way */ });
+    walkLog({ kind: 'catch-up-kick', lane: 'circle-follow' });
+  }, 2700);
   kick(lanes.catchUps.task, 'tasks', 3000);
   kick(lanes.catchUps.chat, 'chat', 3500);
   kick(lanes.catchUps.key, 'keys', 3500);

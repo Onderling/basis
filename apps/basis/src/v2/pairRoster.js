@@ -71,11 +71,15 @@ export function createPairRoster({
   };
 
   // The handle this person joins the pair circle under: theirs when they have one, else a quiet derived one that
-  // passes the handle rule (letters and digits, a few characters) — nobody reads it; the circle is hidden.
+  // passes the handle rule (letters and digits, a few characters). The derived one lives on the pair roster's row
+  // ONLY — never on the profile: the join path sets the person's handle from the join handle, and a placeholder that
+  // became the handle was then stated on every roster as what the person says about themselves, and painted as their
+  // name on every contact's Contacten (2026-09-21, "pjy8n7fq"). `own` says which it is; the join keeps the profile
+  // handle alone when it is not the person's.
   const derivedHandle = () => `p${selfWebid.replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 7) || 'erson'}`;
   const handleFor = async () => {
-    try { const h = typeof myHandle === 'function' ? await myHandle() : myHandle; if (typeof h === 'string' && h.trim().length >= 3) return h.trim(); } catch { /* fall through */ }
-    return derivedHandle();
+    try { const h = typeof myHandle === 'function' ? await myHandle() : myHandle; if (typeof h === 'string' && h.trim().length >= 3) return { handle: h.trim(), own: true }; } catch { /* fall through */ }
+    return { handle: derivedHandle(), own: false };
   };
   const myCircles = async () => {
     try { return new Set(((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).filter((c) => typeof c === 'string')); } catch { return new Set(); }
@@ -160,8 +164,9 @@ export function createPairRoster({
       if ((await myCircles()).has(expected)) { await recordOnContact(webid, expected); return { joined: false, reason: 'already-in', circleId: expected }; }
       if (inFlight.has(expected)) return inFlight.get(expected);
       const run = (async () => {
+        const { handle, own } = await handleFor();
         const r = await joinCircleFromInvite({
-          inviteUri, callSkill, sendPeerRedeem, handle: await handleFor(),
+          inviteUri, callSkill, sendPeerRedeem, handle, profileHandle: own,
           ...(typeof circleAddressFor === 'function' ? { circleAddressFor } : {}),
           ...(typeof signCircleLink === 'function' ? { signCircleLink } : {}),
           ...(typeof dialEndpoint === 'function' ? { dialEndpoint } : {}),

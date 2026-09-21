@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
-import { listContacts, mergeContacts, stoopContactToRow, splitShownHidden } from '../../../../basis/src/v2/contactsSource.js';
+import { splitShownHidden, loadContactRoster } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
@@ -32,16 +32,10 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
   // S1 #2 — the unified directory: PeerGraph bots/peers merged with the stoop
   // ContactBook (people the user added, with trust/tags). Same shared helpers as web.
   const reload = useCallback(async () => {
-    try {
-      const [peerRows, stoopRes] = await Promise.all([
-        // A member's per-circle address is where they are reached in one circle, never a second contact.
-        // …and never me (web parity): my person address, my profile key, my devices' per-circle addresses are not contacts.
-        listContacts(peerGraph, { identityOf: (a) => bundle?.agent?.identityOfAddress?.(a) ?? null, ownAddresses: () => bundle?.agent?.ownAddresses?.() ?? [] }).catch(() => []),
-        (typeof callSkill === 'function' ? callSkill('stoop', 'listContacts', {}) : Promise.resolve(null)).catch(() => null),
-      ]);
-      const stoopRows = (Array.isArray(stoopRes?.contacts) ? stoopRes.contacts : []).map(stoopContactToRow).filter(Boolean);
-      setContacts(mergeContacts(peerRows, stoopRows));
-    } catch { setContacts([]); }
+    // The one Contacten read (web parity): the graph less aliases and my own addresses, the book, merged, and every
+    // contact with a pair roster here named by what they said on it.
+    try { setContacts(await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill })); }
+    catch { setContacts([]); }
   }, [peerGraph, callSkill]);
 
   // Load on mount + whenever the graph changes (a bot added/discovered/removed).

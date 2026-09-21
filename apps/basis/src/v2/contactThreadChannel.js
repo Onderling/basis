@@ -130,7 +130,7 @@ export function createContactThreadChannel({
     if (typeof onReturned !== 'function' || !contactId) return;
     try { await onReturned(contactId); } catch { /* the row is a convenience; the turn is stored regardless */ }
   };
-  const cardSentTo = new Map();   // peerAddr → the card last sent them this session (see `myCard`)
+  const cardSentTo = new Set();   // the contacts that had my card this session (see `myCard`)
   const resolveId = (id) => { if (typeof identityOf !== 'function' || !id) return id; try { return identityOf(id) || id; } catch { return id; } };
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
@@ -253,11 +253,13 @@ export function createContactThreadChannel({
       // pair circle (as my per-circle address) — never at the profile address once the roster exists.
       let route = null;
       if (pair && typeof pair.routeFor === 'function') { try { route = await pair.routeFor(peerAddr); } catch { route = null; } }
-      // My card rides when this contact has not had THIS one from this session: the first message, the next after a
-      // change, once per session. Inside the seal when there is one (below), in the clear otherwise.
+      // My card rides on the FIRST message to this contact each session — the introduction: name, handle, where to
+      // write back, the person key — inside the seal when there is one (below), in the clear otherwise. A name
+      // changed later travels as my `member-props` on the pair roster's lane, which every device of theirs folds; the
+      // card is not re-sent for it (it was, 2026-09-21, for one release, before the lane carried names).
       let cardOnBoard = null;
-      if (typeof myCard === 'function') {
-        try { const c = await myCard(); if (typeof c === 'string' && c && cardSentTo.get(peerAddr) !== c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
+      if (typeof myCard === 'function' && !cardSentTo.has(peerAddr)) {
+        try { const c = await myCard(); if (typeof c === 'string' && c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
       }
       // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
       // pair roster's material with it: an invite is a join secret).
@@ -268,7 +270,7 @@ export function createContactThreadChannel({
         } catch { /* unsealed, as before */ }
       }
       const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
-      if (cardOnBoard) cardSentTo.set(peerAddr, cardOnBoard);   // it left (delivered or held): they have this one
+      if (cardOnBoard) cardSentTo.add(peerAddr);   // it left (delivered or held): they have it
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
       if (!res?.deduped) {

@@ -43,6 +43,10 @@ export const SEAMS = Object.freeze([
   { id: 'person-key-catchup',    pattern: /personKeySync/,                       why: 'the person key and its chain, on every device' },
   { id: 'grants-catchup',        pattern: /grantsCatchUp/,                       why: 'the grants lane: what my devices may do' },
   { id: 'circle-presence',       pattern: /registerCirclePresence/,              why: 'per-circle addresses on the relay and the announce — the three acts every device performs on connect' },
+  // Siblings follow a circle (L109, 2026-09-21): a circle founded or joined on one device reaches the others. A shell
+  // that hands no consume in hears the carry and joins nothing; one that never asks misses what happened while it was off.
+  { id: 'circle-follow-consume', pattern: /circleFollowSync\??\.setConsume\(/,   why: 'a circle a sibling founded or joined: this device joins it by the enrol consume\'s per-circle step, composed with the shell\'s seams' },
+  { id: 'circle-follow-request', pattern: /circleFollowSync\??\.requestFromSiblings/, why: 'the circles the siblings are in that this device is not — asked at connect' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */

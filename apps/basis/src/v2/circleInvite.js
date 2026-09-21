@@ -155,6 +155,7 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
  * additive: default args ⇒ exactly the previous fresh-only behaviour.
  *
  * @param {{ inviteUri:(string|object), callSkill:Function, sendPeerRedeem?:Function, handle:string,
+ *           profileHandle?:boolean,
  *           shareAddress?:boolean, linkChoice?:string, circles?:Array<{id:string,name?:string}>,
  *           circleAddressFor?:(circleId:string)=>(string|null),
  *           signCircleLink?:(sourceCircleId:string, groupId:string, address:string)=>(any),
@@ -170,6 +171,10 @@ export async function joinCircleFromInvite({
   // current version; the default (false) sends nothing, and a rules-gated fold refuses the join on
   // every member's device. There is deliberately no way to join a rules-gated circle without saying so.
   rulesAccepted = false,
+  // `false`: the handle is for this circle's roster row only and the person's PROFILE handle is left alone — the
+  // pair roster joins a person who has no handle under a derived placeholder (2026-09-21). Default: the join
+  // handle IS the person's handle, as the wizard has always had it.
+  profileHandle = true,
 } = {}) {
   const h = String(handle ?? '').trim();
   if (!h) return { error: 'handle-required' };
@@ -178,6 +183,7 @@ export async function joinCircleFromInvite({
   if (state.inviteParseError) return { error: state.inviteParseError };
   if (!state.invite || !state.invite.groupId) return { error: 'bad-invite' };
   state.handle = h;
+  state.profileHandle = profileHandle !== false;
   state.shareAddress = shareAddress !== false;
   state.rulesAccepted = rulesAccepted === true;   // task #80 — explicit, never inferred
   // Wave B — the "continue as an existing self" choice (default fresh/unlinkable). Populate the

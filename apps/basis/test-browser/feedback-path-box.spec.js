@@ -158,7 +158,19 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
       for (const cid of ids) { try { const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: cid }); out[String(cid).slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}@[${(m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)).join(',')}]${m.circleAddress ? `*${String(m.circleAddress).slice(0, 8)}` : ''}`); } catch (e) { out[String(cid).slice(0, 14)] = String(e); } }
       return out;
     }).catch((e) => String(e));
-    const makerRosters = await rostersOf(maker.page);
+    // SIBLINGS FOLLOW A CIRCLE (L109): the box founded the pair circle with the visitor; the maker's tab is the
+    // box's sibling and must be IN it now — the carry landed, the seed came from the box, the roster derived.
+    // Before 2026-09-21 the tab held one circle and the box two, and the maker's answer could not ride the pair route.
+    let makerRosters = await rostersOf(maker.page);
+    for (let i = 0; i < 40 && !Object.keys(makerRosters ?? {}).some((k) => k.startsWith('pair-')); i += 1) {
+      await maker.page.waitForTimeout(1500);
+      makerRosters = await rostersOf(maker.page);
+    }
+    const boxFollow = walkLog(dataDir).filter((e) => e.kind === 'circle-follow');
+    const makerFollowed = Object.entries(makerRosters ?? {}).filter(([k]) => k.startsWith('pair-'));
+    expect(makerFollowed.length, `the maker's tab did not follow the box into the pair circle — maker rosters: ${JSON.stringify(makerRosters)}; box circle-follow log: ${JSON.stringify(boxFollow)}; maker console:\n${makerConsole.slice(-20).join('\n')}`).toBe(1);
+    expect(makerFollowed[0][1].length, `the followed pair roster names both persons on the maker's tab: ${JSON.stringify(makerFollowed)}`).toBeGreaterThanOrEqual(2);
+    log('STEP4b the tab follows the box', 'PASS', `into ${makerFollowed[0][0]}…: ${JSON.stringify(makerFollowed[0][1])}`);
     const visitorRosters = await rostersOf(visitor.page);
     const boxPresence = walkLog(dataDir).filter((e) => e.kind === 'presence').slice(-1)[0] ?? null;
     const boxPrimary = walkLog(dataDir).filter((e) => e.kind === 'primary-device').slice(-1)[0] ?? null;

@@ -131,28 +131,35 @@ describe('governance catch-up — the offline third device converges (pull-all, 
     expect(cFold.proposals[0].votes).toEqual([expect.objectContaining({ voter: 'webid:alice', choice: 'yes' })]);
   });
 
-  it('requestAll asks every reachable member of every circle (the reconnect kick)', async () => {
+  it('requestAll asks every reachable member of every circle (the reconnect kick) — at their PER-CIRCLE address, never mine', async () => {
     const sent = [];
     const rail = { storedStatements: () => [], ingest: async () => ({ ok: false }) };
-    const cu = makeGovernanceCatchUp({ rail, sendToPeer: (addr, payload) => sent.push({ addr, subtype: payload.subtype }) });
+    const cu = makeGovernanceCatchUp({ rail, selfWebid: 'me', sendToPeer: (addr, payload) => sent.push({ addr, subtype: payload.subtype }) });
     const callSkill = async (o, op) => {
       if (op === 'listMyCircles') return { circles: [{ groupId: 'c1' }, { groupId: 'c2' }] };
-      if (op === 'listGroupRoster') return { members: [{ webid: 'w1', addr: 'addr:1' }, { webid: 'w2' /* unreachable */ }] };
+      if (op === 'listGroupMembers') return { members: [{ webid: 'me', circleAddress: 'me@c' }, { webid: 'w1', circleAddress: 'w1@c' }, { webid: 'w2' /* never announced */ }] };
       return {};
     };
     const { requested } = await cu.requestAll({ callSkill });
     expect(requested).toBe(2);                                       // one reachable member × two circles
+    expect(sent.map((s) => s.addr)).toEqual(['w1@c', 'w1@c']);
     expect(sent.every((s) => s.subtype === GOV_CATCHUP_REQUEST)).toBe(true);
   });
 
   it('requestCircle asks every reachable member of ONE circle — what a fresh joiner runs for the circle it just joined', async () => {
+    // 2026-09-21: the derived roster's per-circle address (primary, else the first proven one); a member with none is
+    // reached at their global key ONLY when the person allows the address fallback (the fan's rung, the same gate).
     const sent = [];
     const rail = { storedStatements: () => [], ingest: async () => ({ ok: false }) };
-    const cu = makeGovernanceCatchUp({ rail, sendToPeer: (addr, payload) => sent.push({ addr, circleId: payload.circleId }) });
-    const callSkill = async (o, op, a) => (op === 'listGroupRoster' && a.groupId === 'c1'
-      ? { members: [{ webid: 'w1', addr: 'addr:1' }, { webid: 'w2', circleAddress: 'addr:2' }, { webid: 'w3' }] } : {});
+    let fallback = false;
+    const cu = makeGovernanceCatchUp({ rail, selfWebid: 'me', allowGlobal: () => fallback, sendToPeer: (addr, payload) => sent.push({ addr, circleId: payload.circleId }) });
+    const callSkill = async (o, op, a) => (op === 'listGroupMembers' && a.groupId === 'c1'
+      ? { members: [{ webid: 'w1', circleAddress: 'addr:1' }, { webid: 'w2', circleAddresses: ['addr:2'] }, { webid: 'w3' }, { webid: 'me', circleAddress: 'addr:me' }] } : {});
     expect((await cu.requestCircle('c1', { callSkill })).requested).toBe(2);
     expect(sent).toEqual([{ addr: 'addr:1', circleId: 'c1' }, { addr: 'addr:2', circleId: 'c1' }]);
+    fallback = true; sent.length = 0;
+    expect((await cu.requestCircle('c1', { callSkill })).requested, 'with the fallback on, w3 is asked at its global key').toBe(3);
+    expect(sent[2]).toEqual({ addr: 'w3', circleId: 'c1' });
     expect((await cu.requestCircle('c9', { callSkill })).requested, 'a circle with no roster here asks nobody').toBe(0);
   });
 });

@@ -262,7 +262,7 @@ import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
-import { listContacts, mergeContacts, stoopContactToRow } from '../../../../basis/src/v2/contactsSource.js';
+import { loadContactRoster } from '../../../../basis/src/v2/contactsSource.js';
 import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
@@ -1218,12 +1218,7 @@ export default function CircleLauncherScreen({
   const [shareContacts, setShareContacts] = useState([]);
   const loadShareContacts = useCallback(async () => {
     try {
-      const [peerRows, stoopRes] = await Promise.all([
-        listContacts(bundle?.peerGraph ?? null, { identityOf: (a) => bundle?.agent?.identityOfAddress?.(a) ?? null, ownAddresses: () => bundle?.agent?.ownAddresses?.() ?? [] }).catch(() => []),
-        (typeof bundle?.callSkill === 'function' ? bundle.callSkill('stoop', 'listContacts', {}) : Promise.resolve(null)).catch(() => null),
-      ]);
-      const stoopRows = (Array.isArray(stoopRes?.contacts) ? stoopRes.contacts : []).map(stoopContactToRow).filter(Boolean);
-      const merged = mergeContacts(peerRows, stoopRows);
+      const merged = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null });
       setShareContacts(merged);
       // Story 1.2 — hand the roster to the pod layer so a canonical REVOKE can re-derive an out-of-circle
       // grantee's sealing key and evict exactly that grantee (instead of rotating away from all of them).

@@ -605,3 +605,51 @@ export async function acceptGroupRules({ store, emitSpine }, { a, from } = {}) {
   if (!stmt) return { error: 'no-membership-rail' };
   return { ok: true, rulesAccepted: version };
 }
+
+/** The fields a member may say about themselves on the lane — one place, shared with the fold's allowlist. */
+export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef']);
+
+/**
+ * `member-props` — what a member says about THEMSELVES, on every roster they are on (2026-09-21; the note
+ * `NOTE-member-props-on-the-membership-lane.md`, Fable's review). Replaces the admin-mediated persona-props side
+ * wire and the card-on-a-message update road with the one road every roster fact takes: a self-subject statement
+ * on the membership lane, signed with that circle's key, folded on every device (self-only, members-only, the
+ * handle unique in the circle — `rosterFold.js`).
+ *
+ * ONE STATEMENT PER CIRCLE, carrying only the fields that differ from that circle's roster row as this device
+ * holds it — the diff gate: an unchanged save appends nothing, and a circle joined later gets what it lacks. A
+ * circle whose append fails is named and the loop goes on; the next save retries it. The avatar rides BY
+ * REFERENCE (`avatarRef`: a hash/path into the item store), never inline — the lane is exempt from compaction.
+ *
+ * @param {object} deps
+ * @param {Function|undefined} deps.emitSpine  the membership rail's appender (`{kind, circleId, subject, actor, payload}`)
+ * @param {(circleId: string) => Promise<Array<object>>} deps.myRowIn  the circle's roster rows as this device holds them
+ * @param {object} args
+ * @param {string} args.from        the member (their webid — subject and actor)
+ * @param {string[]} args.circleIds every circle to tell — pair circles included
+ * @param {object} args.props       `{ handle?, displayName?, avatarRef? }` — the values now
+ * @returns {Promise<{ok: true, emitted: string[], unchanged: string[], failed: string[]}|{error: string}>}
+ */
+export async function emitMemberProps({ emitSpine, myRowIn }, { from, circleIds = [], props = {} } = {}) {
+  if (typeof emitSpine !== 'function') return { error: 'no-membership-rail' };
+  if (typeof from !== 'string' || !from) return { error: 'not-authenticated' };
+  const wanted = {};
+  for (const k of MEMBER_PROPS_FIELDS) if (typeof props?.[k] === 'string' && props[k]) wanted[k] = props[k];
+  const emitted = []; const unchanged = []; const failed = [];
+  for (const circleId of Array.isArray(circleIds) ? circleIds : []) {
+    if (typeof circleId !== 'string' || !circleId) continue;
+    let row = null;
+    try { row = ((await myRowIn?.(circleId)) ?? []).find((m) => m && (m.webid ?? m.ref) === from) ?? null; } catch { row = null; }
+    // The diff is against what the LANE holds for me in this circle (`row.said`, the fold's props) — never against the
+    // merged row, whose display fields the local cache fills before any statement exists.
+    const laneHas = row?.said && typeof row.said === 'object' ? row.said : {};
+    const payload = {};
+    for (const [k, v] of Object.entries(wanted)) if (laneHas[k] !== v) payload[k] = v;
+    if (Object.keys(payload).length === 0) { unchanged.push(circleId); continue; }
+    try {
+      const stmt = await emitSpine({ kind: 'member-props', circleId, subject: from, actor: from, payload });
+      if (stmt) emitted.push(circleId); else failed.push(circleId);
+    } catch { failed.push(circleId); }
+  }
+  return { ok: true, emitted, unchanged, failed };
+}

@@ -54,7 +54,11 @@ export function caretakerOrder(candidates, seed) {
     .map(({ ref }) => ref);
 }
 
-const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accept']);
+const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accept', 'member-props']);
+/** `member-props` — the fields a member may say about THEMSELVES (2026-09-21). Anything else on the statement — a role,
+ *  an address, a key — is an admin-owned or ceremony-owned fact, and a statement naming one is refused WHOLE: a
+ *  partial acceptance would let a stray field ride a harmless one. `authorRef` is the self-only proof, not a field. */
+const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef']);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
 function equivocators(stmts) {
@@ -152,6 +156,9 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   // reaches only the device that admitted them; the join reaches every device, so this is where the others
   // learn what to call a member (walked 2026-09-14: everyone but the admin saw `peer-…`).
   const handles = Object.create(null);
+  // subject → { displayName?, avatarRef? } — what a member has said about themselves (`member-props`, 2026-09-21).
+  // The handle lives in `handles` (one map for the join's and the later change); these are the rest.
+  const props = Object.create(null);
 
   // ── HOW EACH ADMIN CAME TO BE ONE ──────────────────────────────────────────────────────────────
   // Three ways in, and until now all three rendered as the same word. `role: 'admin'` on a roster row
@@ -275,7 +282,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     }
 
     // Apply: removals win over same-depth joins/promotes (deny-wins).
-    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; }
+    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; delete props[x]; }
     for (const x of joined)   if (!removed.has(x)) members.add(x);
     for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); adminVia.set(x, 'role'); }
     for (const x of demoted)  { admins.delete(x); adminVia.delete(x); }
@@ -293,6 +300,30 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (p.authorRef !== s.subject) continue;             // self-only
       if (!members.has(s.subject)) continue;               // members only
       rulesAccepted[s.subject] = v;
+    }
+
+    // `member-props` — what a member says about themselves: handle · displayName · avatarRef (2026-09-21, the note
+    // `NOTE-member-props-on-the-membership-lane.md`, Fable's review). Self-only (subject == authorRef), members only
+    // (after this depth's joins and removals), the allowlist (a statement naming an admin-owned fact is refused
+    // whole), newest wins per field (fold order; an absent field leaves the old value). THE HANDLE IS UNIQUE in the
+    // circle: a handle another CURRENT member holds refuses the whole statement, deny-wins, on every device
+    // independently — the one check the admin did at the join that moves here now the member writes their own row.
+    // Ordered by hash within the depth, so two devices fold the same collision the same way.
+    for (const s of [...batch].filter((x) => x.kind === 'member-props').sort((a, b) => (a.hash < b.hash ? -1 : 1))) {
+      const p = s.payload && typeof s.payload === 'object' ? s.payload : null;
+      if (!p || p.authorRef !== s.subject) continue;                       // self-only
+      if (!members.has(s.subject)) continue;                                // members only
+      const keys = Object.keys(p).filter((k) => k !== 'authorRef');
+      if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELDS.has(k))) continue;   // the allowlist: refused whole
+      if (typeof p.handle === 'string' && p.handle) {
+        const taken = [...members].some((m) => m !== s.subject && handles[m] === p.handle);
+        if (taken) continue;                                                // uniqueness: deny-wins, the old handle stays
+      }
+      const mine = props[s.subject] ?? (props[s.subject] = {});
+      // the handle goes to `handles` (one map with the join's) AND to `props` — a projection needs to know a handle
+      // came from the member's own later statement, which beats a cached rename, not from the join, which does not
+      if (typeof p.handle === 'string' && p.handle) { handles[s.subject] = p.handle; mine.handle = p.handle; }
+      for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
     }
 
     // ── THE LAST-ADMIN CARETAKER ────────────────────────────────────────────────────────────────
@@ -358,7 +389,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
 
   const adminProvenance = Object.create(null);
   for (const a of [...admins].sort()) adminProvenance[a] = adminVia.get(a) ?? 'role';
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles };
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props };
 }
 
 export default foldRoster;

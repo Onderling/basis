@@ -48,7 +48,7 @@ import { withCalendarOutbound } from '../../../basis/src/core/handlers/calendarO
 // OBJ-2 membership — shared joiner-side peer-redeem sender (correlated by the bundle's pending-map).
 import { makeSendGroupRedeemRequest } from '../../../basis/src/core/handlers/groupRedeem.js';
 // personas#2 — post-join "share to this circle" sender (member → admin roster-property push).
-import { makeSendPersonaPropsUpdate, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
+import { createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 import { sendA2ATask } from '@onderling/core';
 // The Nearby SURFACE — one control over every discovering transport, and one merged peer list. App code
 // must go through these rather than reaching into `bundle.mdns` (`CLAUDE.md`): reaching for a transport is
@@ -879,16 +879,9 @@ export async function bootAgentBundle(opts = {}) {
   });
   pairSeams.sendPeerRedeem = sendPeerRedeem;
 
-  // personas#2 — post-join persona-property push: ONE shared pending-map + sender (parity with the
-  // redeem pair). ChatScreen wires the update+ack handlers against this map; the About-me screen uses
-  // this sender via shareDisclosureToCircle.
-  const pendingPersonaProps = new Map();
-  const sendPersonaUpdate = makeSendPersonaPropsUpdate({
-    sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
-    isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
-    pendingMap:      pendingPersonaProps,
-    circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
-  });
+  // "Share to this circle" says the persona's release on the circle's membership lane (`member-props`, step two
+  // 2026-09-22) — the agent's writer, no admin in the loop; the About-me/Mij screens call it via shareDisclosureToCircle.
+  const emitMemberProps = (a) => agent.emitMemberProps?.(a);
   // Diff-gate memo (profile-update propagation): what this device last shared with each
   // (persona, circle). In-memory for the session (parity with web's localStorage-backed memo);
   // the share screens pass it so an open-and-save-unchanged is a true no-op.
@@ -992,8 +985,7 @@ export async function bootAgentBundle(opts = {}) {
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,
-    pendingPersonaProps,
-    sendPersonaUpdate,
+    emitMemberProps,
     disclosureShareMemo,
     contactSkills,
     peerGraph,

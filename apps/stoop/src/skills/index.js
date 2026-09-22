@@ -1215,15 +1215,6 @@ async function addContactCore(scope, a, ctx) {
   }
 }
 
-async function removeContactCore(scope, a, ctx) {
-  const { bundle, metrics } = scope;
-  if (!bundle?.contacts) return { error: 'no-contacts' };
-  if (typeof a.webid !== 'string' || !a.webid) return { error: 'webid required' };
-  await bundle.contacts.removeContact(a.webid);
-  metrics?.record?.('contact-removed');
-  return { ok: true };
-}
-
 /**
  * B★ B3 (Workstream B) — the single source of truth for the wireable stoop
  * ops: opId → pure `(scope, args, ctx) → result` core.  BOTH projections read
@@ -1245,7 +1236,6 @@ export const STOOP_CORES = Object.freeze({
   respondToItem:    respondToItemCore,
   signOutOfPod:     signOutOfPodCore,
   addContact:       addContactCore,
-  removeContact:    removeContactCore,
 });
 
 /**
@@ -3163,14 +3153,18 @@ export function buildSkills({
       for (const type of CIRCLE_EXIT_TYPES) {
         try { exitItems.push(...(await store.listOpen({ type })) ?? []); } catch { /* absent ⇒ none */ }
       }
+      const left = [];
       for (const gid of [...ids]) {
         const exits = collectCircleExits({ items: exitItems, groupId: gid });
-        if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) ids.delete(gid);
+        if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) { ids.delete(gid); left.push(gid); }
       }
       return {
         circles: [...ids],
         // Names alongside the ids, so a shell never has to show an identifier where a name belongs.
         names: Object.fromEntries([...ids].filter((g) => names.has(g)).map((g) => [g, names.get(g)])),
+        // …and the circles this device has LEFT (or been removed from) — what a sibling that slept through the leave
+        // is told on connect, so it leaves too (2026-09-22).
+        left,
         _sync: simulateSync(),
       };
     }, {
@@ -5162,12 +5156,6 @@ export function buildSkills({
      */
     wire('addContact', {
       description: 'Add or update a 1:1 contact.',
-      visibility:  'authenticated',
-    }),
-
-    /** removeContact({webid}) — drop a contact (and remove from any lists). */
-    wire('removeContact', {
-      description: 'Remove a 1:1 contact (drops MemberMap entry; removes from lists).',
       visibility:  'authenticated',
     }),
 

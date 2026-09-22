@@ -152,7 +152,7 @@ export async function removeCircleMember({
  * @param {() => any} [a.unregister]   shell-supplied transport de-registration (best-effort)
  * @returns {Promise<{ok: boolean, error?: string, unbound: number, snapshotDropped: boolean}>}
  */
-export async function leaveCircleLocally({ agent = null, callSkill = null, circleId, unregister = null } = {}) {
+export async function leaveCircleLocally({ agent = null, callSkill = null, circleId, unregister = null, followed = false } = {}) {
   const out = { ok: false, unbound: 0, snapshotDropped: false };
   const skill = skillSeam(agent, callSkill);
   if (!skill || !circleId) { out.error = 'missing-args'; return out; }
@@ -161,8 +161,10 @@ export async function leaveCircleLocally({ agent = null, callSkill = null, circl
   // to enumerate, and the addresses we need to unbind would be gone with them.
   const members = await rawRoster({ callSkill: skill, circleId });
 
+  // `followed`: this leave follows a sibling's (2026-09-22) — the marker only; the statement, the key rotation and
+  // any deleting were the leaving device's. Everything below (unbind, snapshot, presence) is this device's own.
   let res;
-  try { res = await skill('stoop', 'leaveGroup', { groupId: circleId, confirm: true }); }
+  try { res = await skill('stoop', 'leaveGroup', { groupId: circleId, confirm: true, ...(followed ? { followed: true } : {}) }); }
   catch (err) { res = { error: err?.message ?? 'leave-failed' }; }
   if (res?.error) { out.error = res.error; return out; }
   out.ok = true;

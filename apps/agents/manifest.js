@@ -239,6 +239,21 @@ export const agentsManifest = {
       ],
       surfaces: { chat: { reply: 'record', hint: 'Record a per-circle membership on a profile (restore-data).' } },
     },
+    /* …and its removal: a circle the person LEFT comes off the restore-data (2026-09-22), or a restored device
+     * re-opens it. The agent's leave writes through this; a leave that follows a sibling's does too. */
+    {
+      id:        'removeProfileCircleMembership', group: 'compose',
+      verb:      'update',
+      appliesTo: { type: 'agent' },
+      // The record is a device's own restore-data (never merged with anyone's): the last write to the profile wins,
+      // and a leave is a write like the join that made the record.
+      resolves:  [{ field: 'circleMemberships', policy: 'content' }],
+      params: [
+        { name: 'id',       kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'circleId', kind: 'string', required: true, schema: { minLength: 1 } },
+      ],
+      surfaces: { chat: { reply: 'record', hint: 'Take a per-circle membership off a profile (the person left that circle).' } },
+    },
 
     /* Personas — persist what a persona SHARES per context (circle/project). The general per-persona version
      * of the feedback charter consent; the "About me" surface + join wizard write through these. */

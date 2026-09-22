@@ -92,6 +92,8 @@ import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
+import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
+import { unregisterCircleAddressesOnRelays } from '../../v2/circleAddressRegistration.js';
 import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
@@ -146,6 +148,7 @@ import {
   createDriver,
   driversFromProperties,
   setCircleMembership as registrySetCircleMembership,
+  removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
   deviceDelegationOf, deviceDelegationsOf, setDeviceDelegation as registrySetDeviceDelegation,
   isRequestable,
@@ -1540,6 +1543,15 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (!wasIn && profileId === 'default') circleFollowSync?.fanJoined(circleId).catch(() => { /* the sibling asks on connect */ });
         return { ok: true };
       },
+      // A circle LEFT comes off the profile (2026-09-22): with the record still there a restored device re-opened a
+      // circle the person had left, and the boot's reopen re-opened its store on every device.
+      removeCircleMembership: async ({ profileId, circleId }) => {
+        const cur = await agentsRegistry.lookup(profileId);
+        if (!cur) return { ok: true, removed: false };
+        if (!circleMembershipsOf(cur)[circleId]) return { ok: true, removed: false };
+        await agentsRegistry.register({ ...cur, properties: registryRemoveCircleMembership(cur.properties ?? {}, circleId) });
+        return { ok: true, removed: true };
+      },
       // Personas — the PERSISTED per-context disclosure policy ("what this persona shares in circle X").
       // Merge via the pure disclosure setter, then re-register the FULL entry (preserves properties/key/grants).
       setDisclosure: async ({ profileId, contextId, key, enabled, rung, matchable, requestable }) => {
@@ -2106,17 +2118,24 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (typeof b?.address === 'string' && typeof b?.pubKey === 'string') sa.agent.security?.learnPeerKey?.(b.address, b.pubKey);
     }
   } catch { /* nothing kept, or unreadable — greetings establish afresh */ }
-  // `member-props` to every circle I am in (see the after-write hook): my current handle/displayName from the
-  // profile, the circles from the substrate (pair circles included), the per-circle diff read from the roster.
+  // WHAT I SAY ABOUT MYSELF — the one `member-props` writer (the note `NOTE-member-props-on-the-membership-lane.md`):
+  // one statement per circle named, only what differs from what the fold already holds for me there (`row.said`),
+  // a failing circle named and retried on the next save. `sayOnRosters` is the shells' seam too (About me's "share
+  // to this circle" says the persona release through it, step two 2026-09-22); `tellMyRostersWhatISay` is the
+  // after-write hook's call for the name fields, over every circle I am in (pair circles included).
+  const sayOnRosters = ({ circleIds = [], props = {} } = {}) => {
+    if (typeof membershipEmit !== 'function') return Promise.resolve({ error: 'no-membership-rail', emitted: [], unchanged: [], failed: [] });
+    return emitMemberProps(
+      { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
+      { from: chatId.pubKey, circleIds, props },
+    );
+  };
   async function tellMyRostersWhatISay() {
     if (typeof membershipEmit !== 'function') return { error: 'no-membership-rail' };
     const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
     const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-    return emitMemberProps(
-      { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
-      { from: chatId.pubKey, circleIds: circles, props: { handle: me.handle, displayName: me.displayName } },
-    );
+    return sayOnRosters({ circleIds: circles, props: { handle: me.handle, displayName: me.displayName } });
   }
   const knownPeersSync = createKnownPeersSync({
     siblings: ownDeviceSiblings,
@@ -2167,16 +2186,33 @@ export async function createRealHouseholdAgent(opts = {}) {
   // connect kick asks the siblings what this device lacks. A kring the person switched off here is not joined.
   let circleFollowConsume = null;
   const followSelection = makeSyncSelection({ getParamValue: (key) => paramsService.register.valueOf(key) });
+  // THE LEAVE FOLLOWS (2026-09-22): a sibling's `device-circle-left` lands → this device's own local leave — the exit
+  // marker (no statement: the sibling's already folded the person out), the members' keys unbound, the authorize
+  // snapshot dropped, the per-circle address off every relay, the registry record off. Composed here, not in the
+  // shells: every part of it is the agent's (the relays included), so web ≡ mobile ≡ box by construction.
+  const leaveFollowed = async (circleId) => {
+    const r = await leaveCircleLocally({
+      // the two hooks the hygiene needs, from the closure (the handle below exposes the same two)
+      agent: { forgetPeerAddress: (address) => sa.forgetPeerAddress?.(address) ?? false, forgetCircleSenders: (cid) => circleSenders.forgetCircleSenders(cid) },
+      callSkill: (app, op, args) => callSkill(app, op, args), circleId, followed: true,
+      unregister: () => unregisterCircleAddressesOnRelays({
+        relays: sa.relays?.list?.() ?? [], circleIds: [circleId], circleAddressFor: (cid) => circleAddressFor(cid),
+      }),
+    });
+    return { ok: r?.ok === true, ...r };
+  };
   circleFollowSync = createCircleFollowSync({
     siblings: ownDeviceSiblings,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     myEntries: myCircleEntries,
+    myLeft: async () => { try { return (await rawStoop('listMyCircles', {}))?.left ?? []; } catch { return []; } },
     isIn: async (circleId) => (await myCircleEntries()).some((e) => e.id === circleId),
     kringOn: (circleId) => followSelection.kringOn(circleId),
     consume: (entry) => (typeof circleFollowConsume === 'function'
       ? circleFollowConsume(entry)
       : Promise.resolve({ circleId: entry.id, ok: false, steps: [], error: 'no-consume' })),   // a composition without the step joins nothing
-    onLanded: (r) => console.info(`[circle-follow] ${r.ok ? 'joined' : 'could not join'} ${String(r.circleId).slice(0, 12)}… after a sibling (${r.steps.join(' ')})`),
+    leave: leaveFollowed,
+    onLanded: (r) => console.info(`[circle-follow] ${r.steps.includes('left') ? (r.ok ? 'left' : 'could not leave') : (r.ok ? 'joined' : 'could not join')} ${String(r.circleId).slice(0, 12)}… after a sibling (${r.steps.join(' ')})`),
   });
   circleFollowSync.setConsume = (fn) => { circleFollowConsume = typeof fn === 'function' ? fn : null; };
   // LIVE, the key half: a greeting that passed the hello gate just bound a key here. The core agent
@@ -4320,6 +4356,14 @@ export async function createRealHouseholdAgent(opts = {}) {
           .then((r) => console.info(`[member-props] ${r?.error ? r.error : `told ${r.emitted.length} circle(s)${r.unchanged.length ? `, ${r.unchanged.length} unchanged` : ''}${r.failed.length ? `, FAILED in ${r.failed.map((c) => String(c).slice(0, 12)).join(' ')}` : ''}`}`))
           .catch((err) => console.warn(`[member-props] not every roster was told: ${err?.message ?? err}`));
       }
+      // LEAVING a circle takes it off the profile (a restore must not re-open it) and tells the person's other devices
+      // (2026-09-22): each still in it leaves too. A leave that FOLLOWS a sibling's tells nobody — the sibling did.
+      if (realOpId === 'leaveGroup' && !out?.error && typeof realArgs.groupId === 'string' && realArgs.groupId) {
+        const circleId = realArgs.groupId;
+        try { await callSkill('agents', 'removeProfileCircleMembership', { id: 'default', circleId }); }
+        catch (err) { if (typeof console !== 'undefined') console.warn(`[restore-data] the left circle ${String(circleId).slice(0, 12)}… is still on the restore list: ${err?.message ?? err}`); }
+        if (realArgs.followed !== true) circleFollowSync?.fanLeft(circleId).catch(() => { /* the sibling asks on connect */ });
+      }
       // MAKING a circle puts you in it, so it belongs in the list a restore reads back.
       //
       // Joining wrote this record (the join wizard, after the redeem) and creating never did, so the
@@ -5152,15 +5196,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         ok: true, message: msg, contact: { ...c, trustLevel: trustEn }, _sync: simulateSync(),
       };
     }
-    // removeContact: real returns {ok: true} → friendly text.
-    if (opId === 'removeContact' && data.ok === true) {
-      const who = args?.webid ?? '(contact)';
-      return {
-        ok: true,
-        message: `✓ Removed contact: ${who}`,
-        _sync: simulateSync(),
-      };
-    }
     // getContactShareQr: real returns {payload: 'onderling-contact://...'}
     // → record reply with the URL spelt out (user can paste into any
     // QR generator).  Canvas-rendered QR image is a follow-up.
@@ -5938,6 +5973,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Siblings follow a circle: the lane table spreads `handlers`; the shells `setConsume(entry => consumeCircleEntry(deps, entry))`
     // beside their enrol consume and kick `requestFromSiblings` on connect; the registry setter fans a new membership.
     circleFollowSync,
+    /** Say something about myself on the rosters named: `{ circleIds, props }` → `{ emitted, unchanged, failed }` (the `member-props` writer). */
+    emitMemberProps: sayOnRosters,
     /** The person's address-fallback setting, read live — the lanes' catch-ups aim at the global key only when it is on. */
     addressFallbackOn,
     /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */

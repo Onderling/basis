@@ -58,7 +58,11 @@ const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accep
 /** `member-props` — the fields a member may say about THEMSELVES (2026-09-21). Anything else on the statement — a role,
  *  an address, a key — is an admin-owned or ceremony-owned fact, and a statement naming one is refused WHOLE: a
  *  partial acceptance would let a stray field ride a harmless one. `authorRef` is the self-only proof, not a field. */
-const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef']);
+// `personaProperties` (2026-09-22, step two): the persona's RELEASE for this circle — coarse, reveal-gated, media by sealed
+// reference — as one map that wins whole (a key that leaves the release leaves the row; `{}` clears). It rides the same
+// self-subject statement, so the admin-mediated side wire for it could be retired.
+const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
 function equivocators(stmts) {
@@ -315,6 +319,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (!members.has(s.subject)) continue;                                // members only
       const keys = Object.keys(p).filter((k) => k !== 'authorRef');
       if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELDS.has(k))) continue;   // the allowlist: refused whole
+      if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
       if (typeof p.handle === 'string' && p.handle) {
         const taken = [...members].some((m) => m !== s.subject && handles[m] === p.handle);
         if (taken) continue;                                                // uniqueness: deny-wins, the old handle stays
@@ -324,6 +329,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // came from the member's own later statement, which beats a cached rename, not from the join, which does not
       if (typeof p.handle === 'string' && p.handle) { handles[s.subject] = p.handle; mine.handle = p.handle; }
       for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
+      if (isPlainMap(p.personaProperties)) mine.personaProperties = { ...p.personaProperties };   // whole map, newest wins
     }
 
     // ── THE LAST-ADMIN CARETAKER ────────────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ import { DRIVER_KINDS } from '@onderling/agent-registry';
 const keyLabel = (key) => t(`circle.aboutme.key.${key}`, { defaultValue: key });
 const kindLabel = (k) => t(`circle.aboutme.driverkind.${k}`, { defaultValue: k });
 
-export default function CircleAboutMeScreen({ callSkill, sendPersonaUpdate, lastShared = null, personaId, circles = [], onBack }) {
+export default function CircleAboutMeScreen({ callSkill, emitMemberProps, lastShared = null, personaId, circles = [], onBack }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState(null);
@@ -63,10 +63,10 @@ export default function CircleAboutMeScreen({ callSkill, sendPersonaUpdate, last
   const shareToCircle = useCallback(async (circleId) => {
     setShareState((s) => ({ ...s, [circleId]: 'sharing' }));
     let res;
-    try { res = await shareDisclosureToCircle({ callSkill, sendPersonaUpdate, lastShared, circleId, personaId }); }
+    try { res = await shareDisclosureToCircle({ callSkill, emitMemberProps, lastShared, circleId, personaId }); }
     catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
     setShareState((s) => ({ ...s, [circleId]: res?.ok ? 'ok' : (res?.reason ?? 'failed') }));
-  }, [callSkill, sendPersonaUpdate, lastShared, personaId]);
+  }, [callSkill, emitMemberProps, lastShared, personaId]);
 
   return (
     <View style={styles.root}>

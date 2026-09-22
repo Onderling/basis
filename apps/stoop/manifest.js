@@ -90,7 +90,7 @@ const ITEM_TYPES = [
   //    adaptStoopReply), and respondToItem/markReturned/dispute gate
   //    on `type:'post'`; the `feed` view renders it.
   //  - 'contact' — the ContactBook graph (listContacts / addContact /
-  //    removeContact / setContactTrust / startDm appliesTo + the
+  //    setContactTrust / startDm appliesTo + the
   //    `contacts` view).
   //  - 'member'  — circle roster rows (listGroupMembers appliesTo + the
   //    [DM] row button via startDm's `['contact','member']` gate).
@@ -127,7 +127,11 @@ export const stoopManifest = {
     lend:          { atoms: ['complete', 'reassign', 'remove'] },
     request:       { atoms: ['remove'] },
     'group-leave': { atoms: ['remove'] },
-    contact:       { atoms: ['add', 'list', 'remove', 'submit'] },
+    // No `remove` (retired 2026-09-22): dropping the book row is not deleting a contact — the row is the MemberMap
+    // entry every kring roster reads for that person, and the pair roster and its keys stay. Hiding is the act on
+    // the alpha surface (`setContactHidden`); the relationship act (leave the pair circle, then drop the row) is a
+    // sitting of its own.
+    contact:       { atoms: ['add', 'list', 'submit'] },
     member:        { atoms: ['add', 'list'] },
   },
 
@@ -678,18 +682,6 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'removeContact', verb: 'remove',
-      appliesTo: { type: 'contact' },
-      params: [
-        { name: 'webid', kind: 'webid', required: true },
-      ],
-      surfaces: {
-        slash: { command: '/remove-contact' },
-        chat:  { reply: 'text', hint: 'remove a contact' },
-        ui:    { control: 'button', labelKey: 'circle.button.stoop.removeContact' },
-      },
-    },
-    {
       id:   'setContactTrust', group: 'admin', verb: 'submit',
       appliesTo: { type: 'contact' },
       params: [
@@ -711,7 +703,12 @@ export const stoopManifest = {
       params: [
         { name: 'webid',    kind: 'webid',   required: true },
         { name: 'hidden',   kind: 'boolean', required: true },
-        { name: 'hiddenAt', kind: 'number',  required: false },   // a landing's time (a sibling's newer change); a tap has none
+        // A landing's time (a sibling's newer change); a tap has none. A PREFERENCE, ordered by device clocks: each
+        // device stamps its own `Date.now()`, so newest-wins across a person's devices is a wall-clock race (a laptop
+        // ten minutes behind can lose its newer unhide). Not enforced, by design — it gets the log's order the day the
+        // book becomes an item type (L97's merge); until then the enforceability rule applies: this is a filter on what
+        // you see, and the string says so.
+        { name: 'hiddenAt', kind: 'number',  required: false },
       ],
       surfaces: {
         slash: { command: '/hide-contact', body: 'flags' },

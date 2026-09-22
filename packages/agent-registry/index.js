@@ -37,7 +37,7 @@ export { loadProfile } from './src/loadProfile.js';
 export {
   CIRCLE_MEMBERSHIPS_KEY, isKeyRef, isCircleMembershipRecord, normaliseCircleMembership,
   circleMembershipsOf, circleMembershipOf, circleKeyRefOf, circleMembershipsFromProperties,
-  setCircleMembership,
+  setCircleMembership, removeCircleMembership,
 } from './src/circleMembership.js';
 // The enrolled-devices map (add-a-device): root-signed delegation records per deviceId — the
 // auditable device list + the revocation tombstone's home. Same construction as circleMembership.

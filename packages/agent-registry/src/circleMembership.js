@@ -127,6 +127,22 @@ export function circleMembershipsFromProperties(getProfile, profileId, opts = {}
  * @param {string} circleId
  * @param {object} patch       any subset of { handle, address, proof, relays, key } to merge in
  */
+/**
+ * A circle the person LEFT (or was removed from) comes off the profile — with the record still there a restored
+ * device re-opened a circle the person had left (found 2026-09-22 while making a leave follow the siblings).
+ * A circle not on the record is a no-op; the other records stay.
+ */
+export function removeCircleMembership(properties, circleId) {
+  if (typeof circleId !== 'string' || !circleId) throw new TypeError('removeCircleMembership: circleId required');
+  const cur = properties?.[CIRCLE_MEMBERSHIPS_KEY];
+  const curMap = (cur?.mode === 'own' && cur.value && typeof cur.value === 'object' && !Array.isArray(cur.value))
+    ? cur.value
+    : {};
+  if (!(circleId in curMap)) return properties;
+  const { [circleId]: _gone, ...rest } = curMap;
+  return setOwn(properties, CIRCLE_MEMBERSHIPS_KEY, rest);
+}
+
 export function setCircleMembership(properties, circleId, patch) {
   if (typeof circleId !== 'string' || !circleId) throw new TypeError('setCircleMembership: circleId required');
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new TypeError('setCircleMembership: record required');

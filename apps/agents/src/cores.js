@@ -612,6 +612,26 @@ export async function setProfileCircleMembership(store, args = {}) {
   }
 }
 
+/**
+ * removeProfileCircleMembership — a circle LEFT (or removed from) comes off the profile's restore-data (2026-09-22):
+ * with the record still there a restored device re-opened a circle the person had left. A circle not on the record
+ * answers `{ok:true, removed:false}`. Degrades (ok:false) if unwired / missing id or circleId.
+ */
+export async function removeProfileCircleMembership(store, args = {}) {
+  const s = asStore(store);
+  const id = typeof args?.id === 'string' ? args.id.trim() : '';
+  const circleId = typeof args?.circleId === 'string' ? args.circleId.trim() : '';
+  if (typeof s.profiles?.removeCircleMembership !== 'function' || !id || !circleId) {
+    return { ok: false, reason: !id ? 'id-required' : (!circleId ? 'circleId-required' : 'profiles-unavailable') };
+  }
+  try {
+    const r = await s.profiles.removeCircleMembership({ profileId: id, circleId });
+    return { ok: true, id, circleId, removed: r?.removed === true };
+  } catch (err) {
+    return { ok: false, reason: 'remove-failed', detail: err?.message ?? String(err) };
+  }
+}
+
 /** getProfileDrivers — just the DRIVER-typed properties of a profile (for the About-me editor + the matcher). */
 export async function getProfileDrivers(store, args = {}) {
   const s = asStore(store);
@@ -709,6 +729,7 @@ export const AGENT_CORES = Object.freeze({
   setProfileDriver,
   getProfileDrivers,
   setProfileCircleMembership,
+  removeProfileCircleMembership,
   setProfileDisclosure,
   getProfileDisclosure,
   getPersonaView,

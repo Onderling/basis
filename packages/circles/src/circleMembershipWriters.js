@@ -427,15 +427,21 @@ export async function leaveGroup({
 }, { a, from } = {}) {
   if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
 
+  // `followed`: this leave FOLLOWS a sibling's (2026-09-22) — the person already left on another device, whose
+  // self-signed `leave` folded them out of the circle everywhere and whose custodian rotated the key. This device
+  // writes its own exit marker (what `listMyCircles` reads) and nothing else: no second statement (it would be
+  // refused — the row is gone), no second rotation, no deleting.
+  const followed = a.followed === true;
   const [marker] = await store.addItems(
     [{
       type:       'group-leave',
-      text:       `${from} left ${a.groupId}`,
-      source:     { groupId: a.groupId, leftBy: from, leftAt: Date.now() },
+      text:       `${from} left ${a.groupId}${followed ? ' (followed from another device)' : ''}`,
+      source:     { groupId: a.groupId, leftBy: from, leftAt: Date.now(), ...(followed ? { followed: true } : {}) },
       visibility: 'household',
     }],
     { actor: from },
   );
+  if (followed) return { leaveMarkerId: marker.id, deletedItems: 0, followed: true, _sync: simulateSync() };
 
   // Sealed household pod: revoke the leaver's ACL + rotate the group key (forward secrecy) + drop
   // them from the MemberMap so fan-out stops. A self-leave is 'graceful' — the leaver keeps access

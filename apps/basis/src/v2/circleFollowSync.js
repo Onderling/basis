@@ -16,11 +16,19 @@
  * a landing in flight is not run twice.
  *
  * Nothing here decides membership: the sibling's roster seed and the lanes' catch-ups do, exactly as at enrol.
+ *
+ * THE LEAVE FOLLOWS TOO (2026-09-22). A circle left on one device is left on the person's others: the leaving
+ * device carries `device-circle-left`, and a sibling still in that circle runs its LOCAL leave — the exit marker,
+ * the unbinding, the presence gone, the registry record off — WITHOUT a statement of its own: the sibling's
+ * self-signed `leave` on the circle's lane already folded the person out everywhere, and a second one would only
+ * be refused. The offline half: the answer to "which circles are you in" names what the answerer LEFT as well, so a
+ * device that slept through the leave leaves on connect; a carry never re-joins a circle a sibling has left.
  */
 
 export const CIRCLE_FOLLOW_SUBTYPES = Object.freeze({
   carry:   'device-circle-joined',    // "I am in this circle now" — the entry a sibling can join from
-  request: 'device-circles-request',  // "which circles are you in?" — answered with one carry per circle
+  left:    'device-circle-left',      // "I left this circle" — a sibling still in it leaves too (2026-09-22)
+  request: 'device-circles-request',  // "which circles are you in?" — answered with one carry per circle, then one left per circle left
 });
 
 const validEntry = (c) => c && typeof c === 'object' && typeof c.id === 'string' && c.id && typeof c.address === 'string' && c.address;
@@ -35,9 +43,11 @@ const validEntry = (c) => c && typeof c === 'object' && typeof c.id === 'string'
  * @param {(circleId: string) => boolean} [a.kringOn]        the device's kring opt-out (`syncSelection.kringOn`)
  * @param {(entry: object) => Promise<{circleId: string, ok: boolean, steps: string[]}>} a.consume
  *   the per-circle enrol step, composed by the shell with its seams (presence, the content pulls)
+ * @param {() => Promise<string[]>} [a.myLeft]   the circles THIS device has left (its exit markers) — the answer's second half
+ * @param {(circleId: string) => Promise<{ok: boolean}>} [a.leave]   the local leave, without a statement (the agent's)
  * @param {(r: {from: string, circleId: string, ok: boolean, steps: string[]}) => void} [a.onLanded]
  */
-export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, kringOn = () => true, consume, onLanded = null } = {}) {
+export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, kringOn = () => true, consume, myLeft = null, leave = null, onLanded = null } = {}) {
   if (typeof siblings !== 'function') throw new Error('circleFollowSync: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('circleFollowSync: `sendToPeer` is required');
   if (typeof myEntries !== 'function' || typeof isIn !== 'function' || typeof consume !== 'function') throw new Error('circleFollowSync: `myEntries`, `isIn` and `consume` are required');
@@ -48,10 +58,27 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
     return addrs.includes(fromAddr);
   };
   const wire = (circle) => ({ subtype: CIRCLE_FOLLOW_SUBTYPES.carry, circle });
+  // NESTED, like the carry's `circle`: a top-level `circleId` is what the sibling send reads as the circle to SPEAK IN,
+  // and the circle just left is the one circle it must not speak in (the sibling table names the ones still shared).
+  const leftWire = (circleId) => ({ subtype: CIRCLE_FOLLOW_SUBTYPES.left, circle: { id: circleId } });
+  const leftHere = new Set();   // circles a sibling told us it left this session — a later carry for one is not a re-join
   const landedListeners = new Set();   // the shells' observability (a box's walk log) beside the composer's `onLanded`
   const inFlight = new Map();   // circleId → the landing's promise: a re-sent carry joins it, never runs the step twice
 
+  async function landLeft(fromAddr, circleId) {
+    leftHere.add(circleId);
+    if (!(await isIn(circleId))) return null;
+    if (typeof leave !== 'function') return null;                  // a composition without the step leaves nothing
+    let ok = false;
+    try { ok = (await leave(circleId))?.ok === true; } catch { ok = false; }
+    const summary = { from: fromAddr, circleId, ok, steps: ['left'] };
+    try { onLanded?.(summary); } catch { /* observability never throws */ }
+    for (const fn of landedListeners) { try { fn(summary); } catch { /* observability never throws */ } }
+    return summary;
+  }
+
   async function land(fromAddr, circle) {
+    if (leftHere.has(circle.id)) return null;                        // a sibling left it: a carry is not a re-join
     if (inFlight.has(circle.id)) return inFlight.get(circle.id);
     const p = (async () => {
       try {
@@ -87,7 +114,17 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
       return { attempted };
     },
 
-    /** CATCH-UP: ask every sibling which circles it is in; each answers with one carry per circle. */
+    /** LIVE: this device just left `circleId` — tell every sibling. */
+    async fanLeft(circleId) {
+      if (typeof circleId !== 'string' || !circleId) return { attempted: 0 };
+      let addrs = [];
+      try { addrs = (await siblings()) ?? []; } catch { return { attempted: 0 }; }
+      let attempted = 0;
+      await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, leftWire(circleId), { guarantee: 'hold-forward' }); } catch { /* the sibling asks on connect */ } }));
+      return { attempted };
+    },
+
+    /** CATCH-UP: ask every sibling which circles it is in; each answers with one carry per circle, then one left per circle left. */
     async requestFromSiblings() {
       let addrs = [];
       try { addrs = (await siblings()) ?? []; } catch { return { requested: 0 }; }
@@ -113,6 +150,19 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
         for (const circle of entries.filter(validEntry)) {
           try { await sendToPeer(fromAddr, wire(circle), { guarantee: 'hold-forward' }); } catch { /* the sibling asks again */ }
         }
+        // …then what this device LEFT, so a sibling that slept through a leave leaves on connect
+        let left = [];
+        try { left = typeof myLeft === 'function' ? ((await myLeft()) ?? []) : []; } catch { left = []; }
+        for (const circleId of left.filter((id) => typeof id === 'string' && id)) {
+          try { await sendToPeer(fromAddr, leftWire(circleId), { guarantee: 'hold-forward' }); } catch { /* the sibling asks again */ }
+        }
+      },
+      [CIRCLE_FOLLOW_SUBTYPES.left]: async (fromAddr, payload) => {
+        if (payload?.subtype !== CIRCLE_FOLLOW_SUBTYPES.left) return;
+        const circleId = payload.circle?.id;
+        if (typeof circleId !== 'string' || !circleId) return;
+        if (!(await isSibling(fromAddr))) return;                      // only a device of mine may take me out of a circle
+        await landLeft(fromAddr, circleId);
       },
     },
   };

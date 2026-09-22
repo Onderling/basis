@@ -190,7 +190,14 @@ export function makeMembershipEmitter({ rail, myRef, fan = null }) {
       // So an evict WAITS for its fan. It costs one send on the one path where a person is being told
       // something they cannot be told later, and the caller still completes if it fails: the await is
       // wrapped, and `removeMember` reports `told` either way.
-      if (kind === 'evict') {
+      //
+      // A LEAVE waits too (2026-09-22): it is the last thing this device ever says in the circle, and the shells'
+      // `leaveCircleLocally` forgets the members' keys and drops the circle's authorize snapshot the moment
+      // `leaveGroup` returns — so a fire-and-forget fan resolved its addresses against a device that had just
+      // forgotten how to reach anyone, greeted, could not accept the answer, and held the statement for ever. The
+      // members learned of the leave only by luck (the journeys leave without the hygiene, so they never saw it);
+      // on web and mobile a leave did not travel. Found by the leave-follows relay walk.
+      if (kind === 'evict' || kind === 'leave') {
         try { await fan(circleId, res.statement); } catch { /* reported by the caller as told:false */ }
       } else {
         try { fan(circleId, res.statement); } catch { /* fan is best-effort — never block the writer */ }

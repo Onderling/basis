@@ -239,6 +239,21 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     expect(await shownRows.count(), 'Wilfred is a row in the list again').toBe(1);
     expect(await visitor.page.locator('.cc-contacts__fold').count(), 'nothing hidden any more — no fold').toBe(0);
     log('STEP6 hidden, then back', 'PASS', 'the marker is painted above the returning turn');
+
+    // ── THE LEAVE FOLLOWS (2026-09-22): the maker's tab leaves "Thuis"; the box — its sibling — leaves it too. ─────
+    // Through the real tile menu (right-click → Verlaten → the confirm), the shells' shared `leaveCircleLocally`; the
+    // box hears `device-circle-left` on the own-devices carry and runs its own local leave; its log says so.
+    await gotoCircles(maker.page);
+    const boxCirclesBefore = (await new Promise((r) => { setTimeout(r, 500); }), walkLog(dataDir).filter((e) => e.kind === 'presence').slice(-1)[0]?.circles ?? null);
+    const thuis = maker.page.locator('.circle-tile', { hasText: /Thuis/ }).first();
+    expect(await thuis.count(), 'the maker still has the Thuis tile').toBe(1);
+    maker.page.once('dialog', (d) => d.accept());
+    await thuis.click({ button: 'right' });
+    await maker.page.locator('.circle-launcher__tile-menu-item[data-action="leave"]').click();
+    await expect.poll(() => maker.page.locator('.circle-tile', { hasText: /Thuis/ }).count(), { timeout: 20_000, message: 'the tile is gone on the maker' }).toBe(0);
+    const boxLeft = await untilLog(dataDir, (e) => e.kind === 'circle-follow' && e.steps?.includes('left') && e.ok === true, 30_000);
+    expect(boxLeft, `the box never followed the leave — circle-follow log: ${JSON.stringify(walkLog(dataDir).filter((e) => e.kind === 'circle-follow'))}`).toBeTruthy();
+    log('STEP7 the leave follows', 'PASS', `box left ${String(boxLeft.circleId).slice(0, 12)}… after its sibling (presence had ${boxCirclesBefore} circles)`);
   } finally {
     try { box?.child?.kill('SIGTERM'); } catch { /* */ }
     await teardown([maker, visitor].filter(Boolean));

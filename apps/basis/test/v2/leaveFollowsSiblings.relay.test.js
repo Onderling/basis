@@ -51,7 +51,7 @@ describe('a circle left on one device is left on the person\'s others', () => {
       await Promise.all([B, A].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: cid })));
       for (const stmt of B.agent.membershipRail.storedStatements(cid)) await A.agent.membershipRail.ingest(cid, stmt);
     }
-    // A2: enrolled from A's offer, in both circles (the enrol corridor, as the shells run it)
+    // the second device — enrolled from A's offer, in all three circles (the enrol corridor, as the shells run it)
     const built = await A.agent.callSkill('household', 'buildEnrollOffer', { relayUrl: 'ws://relay.example' });
     expect(built.ok, JSON.stringify(built)).toBe(true);
     const storage = memStorage();

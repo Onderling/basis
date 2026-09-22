@@ -307,7 +307,6 @@ import { householdManifest } from '../../../household/manifest.js';
 import { deviceDelegationsOf } from '@onderling/agent-registry';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
-import { makeRosterUpdatedPeerHandler } from '../../src/v2/rosterUpdated.js';
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, announceOwnCircleAddress,
@@ -1251,9 +1250,9 @@ function publishEventToLog(e) {
   });
 }
 // Profile-update propagation: the memo — what this device last SAID to each (persona, circle); the diff-gate's
-// left-hand side, so open-and-save-unchanged says nothing at all. (The `roster-updated` pull-me ANNOUNCER that stood
-// here is gone with the persona side wire, 2026-09-22 — the release is a `member-props` statement now and lands by
-// the membership lane; the receive half below stays until the kind is retired with it.)
+// left-hand side, so open-and-save-unchanged says nothing at all. (The `roster-updated` pull-me — announcer, receive
+// half and entry kind — is gone with the persona side wire, 2026-09-22: the release is a `member-props` statement
+// now and lands by the membership lane, whose `membershipChange` re-reads the roster.)
 const disclosureShareMemo = createDisclosureShareMemo(localStorageDisclosureShareIo());
 // The member-side PULL: a pull-me for the open circle re-reads its roster rows. Silent — the
 // MEMBERS rows / member cards just refresh; no bubble, no toast.
@@ -1724,6 +1723,13 @@ if (typeof window !== 'undefined') {
       ? Promise.resolve(rawCallSkill(appOrigin, opId, args)).catch((e) => ({ error: String(e?.message ?? e) }))
       : Promise.resolve({ error: 'callSkill-not-ready' })
   );
+  // What the "share to this circle" button does, as a seam a walk can drive (the button lives inside a panel).
+  window.onderlingShareToCircle = (circleId, personaId = 'default') => shareDisclosureToCircle({
+    callSkill: rawCallSkill,
+    emitMemberProps: (a) => _peerAgent?.emitMemberProps?.(a),
+    circleId, personaId, lastShared: disclosureShareMemo,
+    resealMediaForCircle: resealPersonaMediaForCircle,
+  });
   /** Invoke one of the ops the surface offers — the same `{opId, args}` a tap compiles to. */
   window.onderlingDispatch = (opId, args = {}) => (
     typeof circleDispatchReady === 'function'
@@ -6459,7 +6465,7 @@ function showCircle(id, circle, policy) {
 
   const rerender = () => {
     // the per-circle surface is a CHAT projection: it excludes the log's silent system lane
-    // (the `roster-updated` pull-me and friends). The cross-circle Stream tab is the firehose.
+    // (the silent system lane). The cross-circle Stream tab is the firehose.
     // The conversation shows what this circle chose — its admin setting, else its template's, else the
     // permissive default (`conversationKinds.js`). A filter, never a data change.
     // Decision 3 (2026-07-29) — from the POLICY, which is where a create writes them (web ≡ mobile).
@@ -6935,8 +6941,8 @@ function showCircle(id, circle, policy) {
         broadcastFanOut({ msgId: retryId, text, ts: evt?.ts ?? Date.now(), card: evt?.payload?.card });
       },
     }),
-    // Profile-update propagation — the PULL half: re-read this circle's roster rows (the same op
-    // + normaliser the MEMBERS tab uses) after a silent `roster-updated` entry says a row moved.
+    // Re-read this circle's roster rows (the same op + normaliser the MEMBERS tab uses) when the
+    // membership lane says a row moved — `membershipChange` on the lane table, below.
     refreshRoster: () => loadRoster(),
   };
   rerender();
@@ -8495,7 +8501,6 @@ async function boot() {
           // profile-update propagation — the roster owner says "row X changed, keys [a,b]"; we
           // record it as a SILENT stream entry (never a chat bubble, never a wake) and re-read
           // those rows from the roster. The values are never on this wire.
-          'roster-updated':          makeRosterUpdatedPeerHandler({ eventLog, onPull: pullRosterForCircle }),
           // The Nearby room's inbound side — asks, answers, cards, room chat, broadcast invites (nearbyRoomBinding.js).
           ...(ensureNearbyRoom(agent)?.handlers ?? {}),
           // a contact-bot's reply in its 1:1 DM thread (guarded: the channel

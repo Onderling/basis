@@ -148,7 +148,7 @@ describe('the router', () => {
   it('claims exactly the room\'s subtypes and leaves the rest to other handlers', () => {
     const { b } = pair();
     expect(Object.keys(b.handlers).sort()).toEqual([...NEARBY_ROOM_SUBTYPES].sort());
-    expect(b.onPeerMessage('a', { subtype: 'roster-updated' })).toBe(false);
+    expect(b.onPeerMessage('a', { subtype: 'not-a-subtype-this-router-knows' })).toBe(false);
     expect(b.onPeerMessage('a', null)).toBe(false);
   });
 

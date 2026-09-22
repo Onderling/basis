@@ -97,7 +97,6 @@ import {
 } from '../../../basis/src/core/handlers/groupRedeem.js';
 // profile-update propagation — the roster "pull-me" signal (announce on a real roster write;
 // receive → record the silent stream entry + re-read). Web parity (circleApp.js).
-import { makeRosterUpdatedPeerHandler } from '../../../basis/src/v2/rosterUpdated.js';
 import { makeHandleHelpWithAccepted, makeHandleHelpWithResponse }
                                from '../../../basis/src/core/handlers/helpWith.js';
 import { makeHandleCalendarInvite }
@@ -591,7 +590,6 @@ export default function ChatScreen({
       }),
       // profile-update propagation — record the roster owner's silent "pull-me" onto the shared
       // eventLog (never a bubble, never a wake); the launcher's roster view re-reads on it.
-      'roster-updated':        makeRosterUpdatedPeerHandler({ eventLog: eventLogRef.current }),
       'help-with-accepted':    makeHandleHelpWithAccepted({
         ensureDmThread:    handleDmThreadOpen,
         appendBubble,

@@ -142,10 +142,12 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // and the shell owns the one set, so this app reads it and no longer offers a door to it → 96,
   // then +1 for `setContactPersonKey` (a contact's current person key: from their card, or a chain
   // verified from the version on record — what a direct message to them is sealed to) → 97.
+  // 2026-09-22: -1, `recordMemberPersonaProperties` retired with the persona side wire — what a member discloses to
+  // a circle is their own `member-props` statement on its membership lane now, folded by every device → 96.
   // This number is a snapshot on purpose: adding an op to the waist should be a deliberate act
   // that someone updates a count for, not something that slips in unremarked.
-  it('ships the full chat+slash surface (one stoop manifest, 97 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(97);
+  it('ships the full chat+slash surface (one stoop manifest, 96 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(96);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

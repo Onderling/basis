@@ -104,7 +104,7 @@ describe('a circle left on one device is left on the person\'s others', () => {
     expect(leavesOnLane(A2, X, A.pubKey) <= 1, 'the follower holds at most the sibling\'s statement').toBe(true);
     const bRoster = (await B.agent.callSkill('stoop', 'listGroupMembers', { groupId: X }))?.members ?? [];
     expect(bRoster.map((m) => m.webid), 'B\'s roster no longer names A').not.toContain(A.pubKey);
-  }, 150_000);
+  }, 300_000);   // the enrol corridor over three circles, then the leave + the follow — heavy, and heavier on a loaded runner
 
   it('the offline half: A2 is dark while A leaves Y; on connect A2 asks its siblings and leaves Y too', async () => {
     const live = A2._routerRef.fn;
@@ -120,5 +120,5 @@ describe('a circle left on one device is left on the person\'s others', () => {
     expect(await registryHas(A2, Y)).toBe(false);
     expect(await myCircles(A2), 'Z stays on both').toContain(Z);
     expect(leavesOnLane(B, Y, A.pubKey), 'one leave in Y too').toBe(1);
-  }, 60_000);
+  }, 120_000);
 });

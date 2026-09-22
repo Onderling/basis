@@ -20,7 +20,7 @@
  *   • REVEAL-GATING — everything downstream only ever sees the release; the persona's private values never leave.
  */
 
-import { releaseUnchanged, changedReleaseKeys } from '../../v2/rosterUpdated.js';
+import { releaseUnchanged, changedReleaseKeys } from '@onderling/agent-registry';
 
 /**
  * The member-side "what did I last share with this circle?" memo — the diff-gate's left-hand side.

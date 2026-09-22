@@ -5,7 +5,7 @@
  * the system's privacy here rests on THREE facts worth pinning, because each could silently flip:
  *
  *   1. A member's display name NEVER propagates to other devices. `setMyDisplayName` writes only
- *      the local MemberMap row; the roster-updated fan carries refs, not values; the pull re-reads
+ *      the local MemberMap row; the release travels as the member's own statement on the lane; the fold re-reads
  *      the receiving device's own roster. So another device's roster row for you simply has no
  *      name on it — the strongest privacy there is, and worth an alarm if it ever changes
  *      silently (a future sync that starts carrying names would flip this whole model).

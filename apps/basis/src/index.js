@@ -137,11 +137,9 @@ export { advancedOpRows, advancedParamRows } from './v2/advancedSurface.js';
 export { paramsManifest } from './v2/paramsManifest.js';
 // profile-update propagation (Phase-4 Wave B) — the roster "pull-me" signal substrate:
 // the diff comparator, the silent-entry kind, the announce (admin) + receive (member) factories.
-export {
-  ROSTER_UPDATED_KIND, changedReleaseKeys, releaseUnchanged,
-  rosterUpdatedPayload, appendRosterUpdatedEntry, isValidRosterUpdatedEnvelope,
-  makeRosterUpdateAnnouncer, makeRosterUpdatedPeerHandler,
-} from './v2/rosterUpdated.js';
+// The disclosure diff-gate's comparers, from the registry that owns the release vocabulary. (They used to be
+// re-exported through `v2/rosterUpdated.js` — retired with the pull-me, 2026-09-22.)
+export { changedReleaseKeys, releaseUnchanged } from '@onderling/agent-registry';
 // B2 — per-circle ADDRESS announcing: the proven "here is where I answer in this circle" record,
 // the admin's post-join propagation (the only party that can reach both a newcomer and the circle),
 // and the receive half that records it AND refreshes who may speak, from one roster read.
@@ -326,6 +324,9 @@ export {
   // whether an inbound entry should refresh its conversation) cannot hardcode a second copy of the string.
   CHAT_KIND,
 } from './v2/conversationKinds.js';
+// The MEMBERSHIP lane's entry kind — what a statement about who is in a circle lands as on the device log. Named
+// once, so a shell that refreshes its members view on one cannot hardcode a second copy of the string.
+export { MEMBERSHIP_LANE } from './v2/membershipManifest.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

@@ -3153,14 +3153,18 @@ export function buildSkills({
       for (const type of CIRCLE_EXIT_TYPES) {
         try { exitItems.push(...(await store.listOpen({ type })) ?? []); } catch { /* absent ⇒ none */ }
       }
+      const left = [];
       for (const gid of [...ids]) {
         const exits = collectCircleExits({ items: exitItems, groupId: gid });
-        if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) ids.delete(gid);
+        if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) { ids.delete(gid); left.push(gid); }
       }
       return {
         circles: [...ids],
         // Names alongside the ids, so a shell never has to show an identifier where a name belongs.
         names: Object.fromEntries([...ids].filter((g) => names.has(g)).map((g) => [g, names.get(g)])),
+        // …and the circles this device has LEFT (or been removed from) — what a sibling that slept through the leave
+        // is told on connect, so it leaves too (2026-09-22).
+        left,
         _sync: simulateSync(),
       };
     }, {

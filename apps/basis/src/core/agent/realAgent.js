@@ -5152,15 +5152,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         ok: true, message: msg, contact: { ...c, trustLevel: trustEn }, _sync: simulateSync(),
       };
     }
-    // removeContact: real returns {ok: true} → friendly text.
-    if (opId === 'removeContact' && data.ok === true) {
-      const who = args?.webid ?? '(contact)';
-      return {
-        ok: true,
-        message: `✓ Removed contact: ${who}`,
-        _sync: simulateSync(),
-      };
-    }
     // getContactShareQr: real returns {payload: 'onderling-contact://...'}
     // → record reply with the URL spelt out (user can paste into any
     // QR generator).  Canvas-rendered QR image is a follow-up.

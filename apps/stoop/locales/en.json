@@ -318,10 +318,7 @@
     "confirm_block_body":   { "text": "Blocked contacts can no longer message you.", "doc": "ConfirmModal body before blocking." },
     "no_active_group":      { "text": "Join a group first.", "doc": "Empty state when no active bundle." },
     "trust_label":          { "text": "Trust level", "doc": "Section label above the trust-level chip pair." },
-    "flags_label":          { "text": "Per-contact options", "doc": "Section label above the flag-toggle rows." },
-    "remove":               { "text": "Remove", "doc": "Destructive: drop this contact from the list (calls removeContact)." },
-    "confirm_remove_title": { "text": "Remove contact?", "doc": "ConfirmModal title before removing." },
-    "confirm_remove_body":  { "text": "This contact will be removed from your list.", "doc": "ConfirmModal body before removing." }
+    "flags_label":          { "text": "Per-contact options", "doc": "Section label above the flag-toggle rows." }
   },
   "chat_threads": {
     "empty":              { "text": "No conversations yet.", "doc": "Empty state on ChatThreadsScreen." },
@@ -531,8 +528,6 @@
     "flag_on":                 { "text": "on", "doc": "Lower-case 'on' suffix for per-contact flag buttons." },
     "flag_off":                { "text": "off", "doc": "Lower-case 'off' suffix for per-contact flag buttons." },
     "tags_placeholder":        { "text": "tags (comma-separated)", "doc": "Placeholder for the per-contact tags input." },
-    "remove":                  { "text": "Remove", "doc": "Per-contact remove button." },
-    "remove_confirm":          { "text": "Remove {webid}?", "doc": "JS confirm() dialog before removing a contact." },
 
     "add_heading":             { "text": "Add a new contact", "doc": "H2 above the add-contact section." },
     "qr_heading":              { "text": "Via QR / link", "doc": "H3 for the QR / paste-link sub-flow." },

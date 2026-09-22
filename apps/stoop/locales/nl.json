@@ -318,10 +318,7 @@
     "confirm_block_body":   { "text": "Geblokkeerde contacten kunnen je geen berichten meer sturen.", "doc": "ConfirmModal body before blocking." },
     "no_active_group":      { "text": "Sluit eerst aan bij een groep.", "doc": "Empty state when no active bundle." },
     "trust_label":          { "text": "Vertrouwen", "doc": "Section label above the trust-level chip pair." },
-    "flags_label":          { "text": "Per-contact opties", "doc": "Section label above the flag-toggle rows." },
-    "remove":               { "text": "Verwijder", "doc": "Destructive: drop this contact from the list." },
-    "confirm_remove_title": { "text": "Contact verwijderen?", "doc": "ConfirmModal title before removing." },
-    "confirm_remove_body":  { "text": "Dit contact wordt uit je lijst verwijderd.", "doc": "ConfirmModal body before removing." }
+    "flags_label":          { "text": "Per-contact opties", "doc": "Section label above the flag-toggle rows." }
   },
   "chat_threads": {
     "empty":              { "text": "Nog geen gesprekken.", "doc": "Empty state on ChatThreadsScreen." },
@@ -531,8 +528,6 @@
     "flag_on":                 { "text": "aan", "doc": "Lower-case 'on' suffix for per-contact flag buttons." },
     "flag_off":                { "text": "uit", "doc": "Lower-case 'off' suffix for per-contact flag buttons." },
     "tags_placeholder":        { "text": "tags (komma-gescheiden)", "doc": "Placeholder for the per-contact tags input." },
-    "remove":                  { "text": "Verwijderen", "doc": "Per-contact remove button." },
-    "remove_confirm":          { "text": "{webid} verwijderen?", "doc": "JS confirm() dialog before removing a contact. {webid} is the contact's WebID URL." },
 
     "add_heading":             { "text": "Nieuw contact toevoegen", "doc": "H2 above the add-contact section." },
     "qr_heading":              { "text": "Via QR / link", "doc": "H3 for the QR / paste-link sub-flow." },

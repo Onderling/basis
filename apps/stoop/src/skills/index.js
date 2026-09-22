@@ -1215,15 +1215,6 @@ async function addContactCore(scope, a, ctx) {
   }
 }
 
-async function removeContactCore(scope, a, ctx) {
-  const { bundle, metrics } = scope;
-  if (!bundle?.contacts) return { error: 'no-contacts' };
-  if (typeof a.webid !== 'string' || !a.webid) return { error: 'webid required' };
-  await bundle.contacts.removeContact(a.webid);
-  metrics?.record?.('contact-removed');
-  return { ok: true };
-}
-
 /**
  * B★ B3 (Workstream B) — the single source of truth for the wireable stoop
  * ops: opId → pure `(scope, args, ctx) → result` core.  BOTH projections read
@@ -1245,7 +1236,6 @@ export const STOOP_CORES = Object.freeze({
   respondToItem:    respondToItemCore,
   signOutOfPod:     signOutOfPodCore,
   addContact:       addContactCore,
-  removeContact:    removeContactCore,
 });
 
 /**
@@ -5162,12 +5152,6 @@ export function buildSkills({
      */
     wire('addContact', {
       description: 'Add or update a 1:1 contact.',
-      visibility:  'authenticated',
-    }),
-
-    /** removeContact({webid}) — drop a contact (and remove from any lists). */
-    wire('removeContact', {
-      description: 'Remove a 1:1 contact (drops MemberMap entry; removes from lists).',
       visibility:  'authenticated',
     }),
 

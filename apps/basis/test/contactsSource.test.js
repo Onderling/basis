@@ -230,3 +230,39 @@ describe('THE BOOK READS THE ROSTER (2026-09-21) — a contact with a pair roste
     expect(calls).toEqual(['listContacts', 'listGroupMembers']);
   });
 });
+
+describe('THE NAMELESS ROW COMES BACK (2026-09-22, the delete/hide note §6a-3) — shown, named by the ladder, never folded for a message that arrived', () => {
+  // Hiding a sender the book never held upserts `{ webid, pubKey: webid, hidden: true }` (ContactBook.setHidden). When
+  // they write again the shell unhides the row (`onReturned` → setContactHidden false — the channel's seam, tested in
+  // contactThreadPersist). What is painted then is decided HERE: the row is SHOWN and named by the ladder — what they
+  // said on the pair roster → the card's name → their key. Frits 2026-09-19: "their next message brings them back";
+  // a person who never gave a name is still a person who just wrote, so the row is never left in the fold for want
+  // of a name (L108's "random string" was my OWN addresses painted as people — fixed at the source, a different thing).
+  const returned = (over = {}) => ({ webid: 'x9k', pubKey: 'x9k', hidden: false, hiddenAt: 5, ...over });   // the book row after the return
+  const g = async () => { const pg = new PeerGraph(); await pg.upsert({ id: 'x9k', pubKey: 'x9k', type: 'native', name: 'x9k' }); return pg; };
+  const skills = (book, roster = []) => async (app, op, args) => (op === 'listContacts' ? { contacts: [book] } : op === 'listGroupMembers' ? { members: roster } : null);
+  it('named by what they SAID on the pair roster', async () => {
+    const rows = await loadContactRoster({ peerGraph: await g(), agent: null, callSkill: skills(returned({ pairCircleId: 'pair-x' }), [{ webid: 'x9k', said: { displayName: 'Xander' } }]) });
+    const { shown, hidden } = splitShownHidden(rows);
+    expect(shown.map((r) => [r.contactId, r.name])).toEqual([['x9k', 'Xander']]);
+    expect(hidden).toEqual([]);
+  });
+  it('else by the CARD\'s name (the book row the card wrote)', async () => {
+    const rows = await loadContactRoster({ peerGraph: await g(), agent: null, callSkill: skills(returned({ displayName: 'Xander (card)', pairCircleId: 'pair-x' }), [{ webid: 'x9k' }]) });
+    const { shown, hidden } = splitShownHidden(rows);
+    expect(shown.map((r) => r.name)).toEqual(['Xander (card)']);
+    expect(hidden).toEqual([]);
+  });
+  it('else by their KEY — shown all the same; a message that arrived is never behind the fold', async () => {
+    const rows = await loadContactRoster({ peerGraph: await g(), agent: null, callSkill: skills(returned()) });
+    const { shown, hidden } = splitShownHidden(rows);
+    expect(shown.map((r) => [r.contactId, r.name, r.hidden])).toEqual([['x9k', 'x9k', false]]);
+    expect(hidden).toEqual([]);
+  });
+  it('and while still hidden (no message yet), the same nameless row sits in the fold — the mark, not the name, decides', async () => {
+    const rows = await loadContactRoster({ peerGraph: await g(), agent: null, callSkill: skills(returned({ hidden: true })) });
+    const { shown, hidden } = splitShownHidden(rows);
+    expect(shown).toEqual([]);
+    expect(hidden.map((r) => r.contactId)).toEqual(['x9k']);
+  });
+});

@@ -86,17 +86,11 @@ describe('Stoop V2 Phase 24 — ContactBook', () => {
     expect(r2.contact.displayName).toBe('Cas');
   });
 
-  it('removeContact drops the entry + cleans lists', async () => {
+  it('there is no removeContact (retired 2026-09-22): the row is the MemberMap entry every kring roster reads — hiding is the act', async () => {
     const { bundle } = await buildBundle();
-    await callSkill(bundle.agent, 'addContact', { webid: BOB, trustLevel: 'bekend' });
-    const list = (await callSkill(bundle.agent, 'createContactList', { name: 'Vrienden' })).list;
-    await callSkill(bundle.agent, 'addToContactList', { listId: list.listId, webid: BOB });
-
-    await callSkill(bundle.agent, 'removeContact', { webid: BOB });
-    const contacts = (await callSkill(bundle.agent, 'listContacts', {})).contacts;
-    expect(contacts).toEqual([]);
-    const reloaded = (await callSkill(bundle.agent, 'getContactList', { listId: list.listId })).list;
-    expect(reloaded.contactWebids).toEqual([]);
+    expect(bundle.agent.skills.get('removeContact') ?? null).toBeNull();
+    expect(typeof bundle.contacts.removeContact).toBe('undefined');
+    expect(typeof bundle.contacts.setHidden).toBe('function');
   });
 
   it('setContactTrust + setContactTags persist on MemberMap', async () => {

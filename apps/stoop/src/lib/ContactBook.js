@@ -24,7 +24,8 @@
  *   the resulting `webid` into ContactBook methods.
  * - `addContact` is upsert-shaped — calling it twice with the same
  *   webid updates fields (trust level promotion, tag changes).
- *   Removal is explicit via `removeContact`.
+ *   There is no removal (retired 2026-09-22): the row is also the MemberMap entry every kring roster reads for
+ *   the person, so dropping it degrades their row in every shared circle; hiding (`setHidden`) is the act.
  * - **Asymmetric.**  `addContact(bob, vertrouwd)` only changes
  *   *my* MemberMap entry for Bob.  Notifying Bob's agent so HE can
  *   choose to reciprocate is Phase 24.6's
@@ -98,22 +99,6 @@ export function createContactBook({ members, dataSource }) {
     return members.addMember(merged);
   }
 
-  /** Remove a contact entirely (drops the MemberMap entry).  Idempotent. */
-  async function removeContact(webid) {
-    if (!webid) throw new TypeError('removeContact: webid required');
-    await members.removeMember(webid);
-    // Also drop the contact from any lists referencing them.
-    const lists = await listLists();
-    for (const list of lists) {
-      if (list.contactWebids.includes(webid)) {
-        await saveList({
-          ...list,
-          contactWebids: list.contactWebids.filter(w => w !== webid),
-        });
-      }
-    }
-  }
-
   async function setTrustLevel(webid, level) {
     if (!VALID_TRUST.has(level) && level !== null) {
       throw new TypeError(`setTrustLevel: invalid level '${level}'`);
@@ -135,6 +120,15 @@ export function createContactBook({ members, dataSource }) {
    *
    * @param {string} webid
    * @param {boolean} hidden
+   */
+  /**
+   * Hide or show a contact in Contacten — a mark on the book row, never on the roster or the thread. A webid the book
+   * does not hold yet (someone who wrote to me and was never added) gets a placeholder row `{ webid, pubKey: webid }`
+   * (in this binding a sender's webid IS its chat key), so the mark has a row to sit on; when they write again the
+   * shell shows the row, named by the ladder (what they said on the pair roster → the card → the key).
+   *
+   * `hiddenAt` orders the marks between a person's devices (newest wins on landing) and is each device's own clock —
+   * a wall-clock race, stated in the manifest row and accepted until the book is an item type on the log (L97).
    */
   async function setHidden(webid, hidden, hiddenAt = Date.now()) {
     if (!webid) throw new TypeError('setHidden: webid required');
@@ -277,7 +271,6 @@ export function createContactBook({ members, dataSource }) {
   return {
     // contact CRUD
     addContact,
-    removeContact,
     setTrustLevel,
     setHidden,
     setTags,

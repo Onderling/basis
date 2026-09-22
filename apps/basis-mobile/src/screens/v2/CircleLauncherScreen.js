@@ -385,7 +385,7 @@ const DEFAULT_SCREEN_RECIPE = Object.freeze({
  */
 function PersonaPanel({
   personaId, onClose, styles, callSkill, circles = [],
-  sendPersonaUpdate = null, lastShared = null, resealMediaForCircle = null, profilePicture = null,
+  emitMemberProps = null, lastShared = null, resealMediaForCircle = null, profilePicture = null,
 }) {
   return (
     <Modal visible={!!personaId} animationType="slide" transparent onRequestClose={onClose}>
@@ -399,7 +399,7 @@ function PersonaPanel({
           </View>
           {personaId ? (
             <CircleMijScreen
-              callSkill={callSkill} sendPersonaUpdate={sendPersonaUpdate} lastShared={lastShared}
+              callSkill={callSkill} emitMemberProps={emitMemberProps} lastShared={lastShared}
               resealMediaForCircle={resealMediaForCircle} profilePicture={profilePicture}
               personaId={personaId} circles={circles}
             />
@@ -2029,7 +2029,7 @@ export default function CircleLauncherScreen({
         circles={circles}
         recipeStore={recipeStore}
         onStoopEvent={bundle?.onStoopEvent}
-        sendPersonaUpdate={bundle?.sendPersonaUpdate}
+        emitMemberProps={bundle?.emitMemberProps}
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}
         profilePicture={profilePicture}
@@ -2510,7 +2510,7 @@ function CircleDetail({
   readMembershipStatements = null,
   eventLog,
   circles = [],
-  recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, onStoopEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -4251,7 +4251,7 @@ function CircleDetail({
       {/* The "Mij → persona's" surface, opened from a profile row on the agents surface. */}
       <PersonaPanel
         personaId={aboutMePersona} onClose={() => setAboutMePersona(null)} styles={styles}
-        callSkill={rawCallSkill} circles={circles} sendPersonaUpdate={sendPersonaUpdate}
+        callSkill={rawCallSkill} circles={circles} emitMemberProps={emitMemberProps}
         lastShared={disclosureShareMemo} resealMediaForCircle={resealMediaForCircle}
         profilePicture={profilePicture}
       />

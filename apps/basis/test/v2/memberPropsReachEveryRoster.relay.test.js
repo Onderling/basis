@@ -88,4 +88,35 @@ describe('a member\'s own name reaches every roster they are on — member-props
     const after = await bram.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE_A });
     expect(JSON.stringify(rowOf(after?.members ?? [], bram.pubKey))).toBe(rowsBefore);
   }, 30_000);
+
+  // STEP TWO (2026-09-22): the persona's RELEASE for a circle rides the same statement. No admin in the loop: bram's
+  // own device says it on A's lane, the admin's and cato's rows fold it; B never hears what bram told A alone.
+  it('bram shares his persona release to A → the admin\'s and cato\'s rows for bram carry it; B\'s roster does not; a withdrawn key is gone; an unchanged share says nothing', async () => {
+    const { shareDisclosureToCircle, createDisclosureShareMemo } = await import('../../src/core/handlers/personaPropsUpdate.js');
+    const call = (app, op, args) => bram.agent.callSkill(app, op, args);
+    await call('agents', 'setProfileProperty', { id: 'default', key: 'place', value: 'Groningen' });
+    await call('agents', 'setProfileProperty', { id: 'default', key: 'realName', value: 'Bram Bakker' });
+    await call('agents', 'setProfileDisclosure', { id: 'default', contextId: CIRCLE_A, key: 'place', enabled: true });
+    // realName stays undisclosed to A: reveal-gating — it must never travel
+    const memo = createDisclosureShareMemo();
+    const share = () => shareDisclosureToCircle({ callSkill: call, emitMemberProps: (a) => bram.agent.emitMemberProps(a), circleId: CIRCLE_A, personaId: 'default', lastShared: memo });
+    const r1 = await share();
+    expect(r1).toMatchObject({ ok: true, via: 'lane' });
+    for (const who of [admin, cato]) {
+      const ok = await until(async () => (rowOf(await readRoster(who, CIRCLE_A), bram.pubKey)?.personaProperties?.place === 'Groningen' ? true : null), { timeout: 20_000, step: 400 });
+      expect(ok, `${who.label}'s row for bram in A carries the release`).toBe(true);
+      const row = rowOf(await readRoster(who, CIRCLE_A), bram.pubKey);
+      expect(row.personaProperties.realName, 'the undisclosed property never travels').toBeUndefined();
+      expect(row.said?.personaProperties, 'the row says the lane holds it').toEqual({ place: 'Groningen' });
+    }
+    expect(rowOf(await readRoster(admin, CIRCLE_B), bram.pubKey)?.personaProperties?.place, 'B was not told').toBeUndefined();
+    // unchanged share: nothing said
+    expect(await share()).toEqual({ ok: true, via: 'none', unchanged: true, changedKeys: [] });
+    // withdraw: the key leaves the release → the rows lose it (the map is replaced whole)
+    await call('agents', 'setProfileDisclosure', { id: 'default', contextId: CIRCLE_A, key: 'place', enabled: false });
+    const r3 = await share();
+    expect(r3).toMatchObject({ ok: true, via: 'lane' });
+    const gone = await until(async () => { const pp = rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey)?.personaProperties; return pp && pp.place === undefined ? true : null; }, { timeout: 20_000, step: 400 });
+    expect(gone, 'the admin\'s row no longer carries the withdrawn property').toBe(true);
+  }, 90_000);
 });

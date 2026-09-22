@@ -1,5 +1,6 @@
 import { hasHumanRules } from './circleRulesDoc.js';
 import { personKeyAnnouncement } from '@onderling/core';
+import { releaseUnchanged } from '@onderling/agent-registry';
 /**
  * Key-coupled membership WRITERS — pure-body lift out of stoop's `buildSkills` (the §8c migration, slice-b).
  * These persist a circle's membership STATE transitions as typed `store.addItems([{type}])` items
@@ -607,7 +608,13 @@ export async function acceptGroupRules({ store, emitSpine }, { a, from } = {}) {
 }
 
 /** The fields a member may say about themselves on the lane — one place, shared with the fold's allowlist. */
-export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef']);
+export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+// The persona properties are a MAP (the persona's release for one circle — computed whole, media by sealed reference),
+// compared whole against what the lane holds: the same `releaseUnchanged` the diff-gate memo has always used.
+const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const sameSaid = (k, laneValue, v) => (k === 'personaProperties'
+  ? isPlainMap(laneValue) && releaseUnchanged(laneValue, v)
+  : laneValue === v);
 
 /**
  * `member-props` — what a member says about THEMSELVES, on every roster they are on (2026-09-21; the note
@@ -634,7 +641,10 @@ export async function emitMemberProps({ emitSpine, myRowIn }, { from, circleIds 
   if (typeof emitSpine !== 'function') return { error: 'no-membership-rail' };
   if (typeof from !== 'string' || !from) return { error: 'not-authenticated' };
   const wanted = {};
-  for (const k of MEMBER_PROPS_FIELDS) if (typeof props?.[k] === 'string' && props[k]) wanted[k] = props[k];
+  for (const k of MEMBER_PROPS_FIELDS) {
+    if (k === 'personaProperties') { if (isPlainMap(props?.[k])) wanted[k] = { ...props[k] }; }
+    else if (typeof props?.[k] === 'string' && props[k]) wanted[k] = props[k];
+  }
   const emitted = []; const unchanged = []; const failed = [];
   for (const circleId of Array.isArray(circleIds) ? circleIds : []) {
     if (typeof circleId !== 'string' || !circleId) continue;
@@ -644,7 +654,11 @@ export async function emitMemberProps({ emitSpine, myRowIn }, { from, circleIds 
     // merged row, whose display fields the local cache fills before any statement exists.
     const laneHas = row?.said && typeof row.said === 'object' ? row.said : {};
     const payload = {};
-    for (const [k, v] of Object.entries(wanted)) if (laneHas[k] !== v) payload[k] = v;
+    for (const [k, v] of Object.entries(wanted)) {
+      // an empty release where the lane never said anything is not a change; where it said something, it is a clear
+      if (k === 'personaProperties' && !isPlainMap(laneHas[k]) && Object.keys(v).length === 0) continue;
+      if (!sameSaid(k, laneHas[k], v)) payload[k] = v;
+    }
     if (Object.keys(payload).length === 0) { unchanged.push(circleId); continue; }
     try {
       const stmt = await emitSpine({ kind: 'member-props', circleId, subject: from, actor: from, payload });

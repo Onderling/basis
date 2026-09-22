@@ -397,6 +397,24 @@ describe('deriveRoster', () => {
       expect(row?.displayName).toBe('Cee Now');
       expect(row?.avatarRef).toBe('media:av1');
     });
+
+    it('…and for the PERSONA PROPERTIES (step two, 2026-09-22): the map the member said on the lane beats the cached and the join-time one, whole', async () => {
+      const joiner = await AgentIdentity.generate(new VaultMemory());
+      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const props = signSpine(joiner, { kind: 'member-props', circleId: 'g1', subject: 'NEW-MEMBER', parent: join.hash,
+        payload: { authorRef: 'NEW-MEMBER', personaProperties: { region: 'zuid' } } }).body;
+      const roster = deriveRoster({
+        redemptions: [], spineStatements: [join, props], foldAuthoritative: true,
+        memberMapForDisplay: [{ webid: 'NEW-MEMBER', personaProperties: { region: 'noord', profilePicture: { ref: 'media:old' } } }],
+      });
+      const row = roster.find((m) => m.webid === 'NEW-MEMBER');
+      expect(row?.personaProperties, 'the withdrawn picture is gone — the map is replaced, not merged').toEqual({ region: 'zuid' });
+      expect(row?.said?.personaProperties).toEqual({ region: 'zuid' });
+      // without a statement, the cache still shows (a contact from before the lane)
+      const before = deriveRoster({ redemptions: [], spineStatements: [join], foldAuthoritative: true,
+        memberMapForDisplay: [{ webid: 'NEW-MEMBER', personaProperties: { region: 'noord' } }] });
+      expect(before.find((m) => m.webid === 'NEW-MEMBER')?.personaProperties).toEqual({ region: 'noord' });
+    });
   });
 
   // ── HOW an admin came to be one, carried onto the row (`adminVia`) ────────────────────────────────

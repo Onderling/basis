@@ -486,6 +486,27 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r.props[bob.pubKey].handle, 'the join\'s handle is not').toBeUndefined();
   });
 
+  it('the PERSONA PROPERTIES ride as one field group (step two, 2026-09-22): the released map, per circle, newest map wins whole; by reference only', async () => {
+    // What a persona discloses to THIS circle (`getPersonaRelease` — coarse, reveal-gated, media by sealed reference) travels
+    // as `personaProperties` on the same statement, so the admin-mediated `persona-props-update` wire can go. A map, not
+    // fields: the release is computed whole per circle, and a key that leaves the release must leave the row.
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: { region: 'noord', profilePicture: { ref: 'media:abc', sealedTo: 'circle' } } }, parent: join.hash });
+    const r1 = foldRoster([join, p1], { founders: [founder.pubKey] });
+    expect(r1.props[bob.pubKey].personaProperties).toEqual({ region: 'noord', profilePicture: { ref: 'media:abc', sealedTo: 'circle' } });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: { region: 'zuid' } }, parent: p1.hash });
+    const r2 = foldRoster([join, p1, p2], { founders: [founder.pubKey] });
+    expect(r2.props[bob.pubKey].personaProperties, 'the newer map replaces the older whole — a withdrawn picture is gone').toEqual({ region: 'zuid' });
+    const cleared = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: {} }, parent: p2.hash });
+    expect(foldRoster([join, p1, p2, cleared], { founders: [founder.pubKey] }).props[bob.pubKey].personaProperties, 'an empty map is a clear').toEqual({});
+    const notAMap = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: 'noord' }, parent: p2.hash });
+    expect(foldRoster([join, p1, p2, notAMap], { founders: [founder.pubKey] }).props[bob.pubKey].personaProperties, 'a non-map is refused; the last map stands').toEqual({ region: 'zuid' });
+    const beside = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', personaProperties: { region: 'oost' } }, parent: p2.hash });
+    const rb = foldRoster([join, p1, p2, beside], { founders: [founder.pubKey] });
+    expect(rb.props[bob.pubKey]).toEqual({ displayName: 'Bob', personaProperties: { region: 'oost' } });
+  });
+
   it('self-only and members-only: nobody sets another\'s fields; an outsider\'s statement records nothing', async () => {
     const { founder, bob, mallory } = await ids();
     const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });

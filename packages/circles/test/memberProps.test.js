@@ -41,3 +41,25 @@ describe('emitMemberProps', () => {
     expect(await emitMemberProps({ emitSpine: null }, { from: ME, circleIds: ['c1'], props: { displayName: 'A' } })).toEqual({ error: 'no-membership-rail' });
   });
 });
+
+describe('emitMemberProps — the persona properties (step two, 2026-09-22)', () => {
+  it('the release rides as ONE map for the circle named; the gate compares the whole map against what the lane holds; `{}` is a clear', async () => {
+    const emitted = [];
+    const emitSpine = vi.fn(async (stmt) => { emitted.push(stmt); return { hash: 'h' }; });
+    const rows = {
+      'c1':     [{ webid: ME, said: { personaProperties: { region: 'noord' } } }],
+      'c2':     [{ webid: ME, said: { personaProperties: { region: 'zuid', profilePicture: { ref: 'media:1' } } } }],
+      'pair-x': [{ webid: ME, said: {} }],
+    };
+    const props = { personaProperties: { region: 'zuid', profilePicture: { ref: 'media:1' } } };
+    const r = await emitMemberProps({ emitSpine, myRowIn: rosterOf(rows) }, { from: ME, circleIds: ['c1', 'c2'], props });
+    expect(emitted.map((s) => [s.circleId, s.payload])).toEqual([['c1', props]]);   // c2 already says exactly this
+    expect(r).toEqual({ ok: true, emitted: ['c1'], unchanged: ['c2'], failed: [] });
+    emitted.length = 0;
+    const cleared = await emitMemberProps({ emitSpine, myRowIn: rosterOf(rows) }, { from: ME, circleIds: ['c1', 'pair-x'], props: { personaProperties: {} } });
+    expect(emitted.map((s) => [s.circleId, s.payload])).toEqual([['c1', { personaProperties: {} }]]);   // a clear is a change where something was said
+    expect(cleared.unchanged, 'the lane never said anything here: an empty release changes nothing').toEqual(['pair-x']);
+    expect((await emitMemberProps({ emitSpine, myRowIn: rosterOf(rows) }, { from: ME, circleIds: ['c1'], props: { personaProperties: 'noord' } })).emitted)
+      .toEqual([]);   // not a map: nothing to say (the circle counts as unchanged, as for an empty set)
+  });
+});

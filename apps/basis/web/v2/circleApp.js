@@ -307,7 +307,7 @@ import { householdManifest } from '../../../household/manifest.js';
 import { deviceDelegationsOf } from '@onderling/agent-registry';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
-import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
+import { makeRosterUpdatedPeerHandler } from '../../src/v2/rosterUpdated.js';
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin, makeThisDevicePrimary, announceOwnCircleAddress,
@@ -327,7 +327,7 @@ import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../src/v2
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../../src/core/handlers/groupRedeem.js';
 // personas#2 — post-join "share to this circle": the same request/ack + orchestrator trio, wired
 // into the peer router alongside group-redeem (member ⇄ admin roster-property push).
-import { makeHandlePersonaPropsUpdate, makeHandlePersonaPropsAck, makeSendPersonaPropsUpdate, shareDisclosureToCircle, createDisclosureShareMemo, localStorageDisclosureShareIo } from '../../src/core/handlers/personaPropsUpdate.js';
+import { shareDisclosureToCircle, createDisclosureShareMemo, localStorageDisclosureShareIo } from '../../src/core/handlers/personaPropsUpdate.js';
 // drivers #5 (b) — flag noticeboard posts that resonate with my private drivers (on-device match).
 import { annotateResonantPosts } from '../../src/core/handlers/driverMatchNotify.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
@@ -1250,17 +1250,11 @@ function publishEventToLog(e) {
     ts: e.ts ?? Date.now(),
   });
 }
-// Profile-update propagation (roster-as-truth, diff-gated, silent pull-me).
-//   • the memo — what this device last shared with each (persona, circle); the diff-gate's
-//     left-hand side, so open-and-save-unchanged sends nothing at all.
-//   • the announcer — after a REAL roster write, drop the SILENT `roster-updated` entry on the
-//     circle stream + fan the same refs (member + changed key NAMES, never values) to members.
+// Profile-update propagation: the memo — what this device last SAID to each (persona, circle); the diff-gate's
+// left-hand side, so open-and-save-unchanged says nothing at all. (The `roster-updated` pull-me ANNOUNCER that stood
+// here is gone with the persona side wire, 2026-09-22 — the release is a `member-props` statement now and lands by
+// the membership lane; the receive half below stays until the kind is retired with it.)
 const disclosureShareMemo = createDisclosureShareMemo(localStorageDisclosureShareIo());
-const announceRosterUpdate = makeRosterUpdateAnnouncer({
-  rawCallSkill: (app, op, args) => (typeof rawCallSkill === 'function' ? rawCallSkill(app, op, args) : null),
-  eventLog,
-  onChange: () => { try { _circleRender?.rerender?.(); } catch { /* no open circle */ } },
-});
 // The member-side PULL: a pull-me for the open circle re-reads its roster rows. Silent — the
 // MEMBERS rows / member cards just refresh; no bubble, no toast.
 const pullRosterForCircle = async ({ circleId }) => {
@@ -1764,9 +1758,6 @@ let circleContactChannel = null; // contact-thread peer channel (conversational 
 // OBJ-2 membership — peer-redeem correlation (joiner side) + the sender, set when the agent boots.
 const circlePendingRedeems = new Map();  // requestId → {resolve,reject,timer}
 let circleSendPeerRedeem = null;         // makeSendGroupRedeemRequest(...) bound to this agent
-// personas#2 — post-join persona-property push correlation (member side) + its sender.
-const circlePendingPersonaProps = new Map();  // requestId → {resolve,reject,timer}
-let circleSendPersonaUpdate = null;           // makeSendPersonaPropsUpdate(...) bound to this agent
 // OBJ-2 S1c-shell — feed the household no-pod sync roster with a circle's MEMBERS
 // (people, from the stoop group roster — never bots). Assigned in the boot fn
 // (which owns `agent`); module-level so `showDetail` (open-circle) can call it.
@@ -5589,15 +5580,12 @@ async function openAboutMePanel(personaId) {
       // personas#2 — push a persona's current disclosure for `contextId` up to the circle roster.
       onShareToCircle: (contextId, forPersonaId) => shareDisclosureToCircle({
         callSkill:         rawCallSkill,
-        sendPersonaUpdate: circleSendPersonaUpdate,
+        // The release is SAID on the circle's membership lane (`member-props`, step two 2026-09-22) — no admin in the loop.
+        emitMemberProps:   (a) => _peerAgent?.emitMemberProps?.(a),
         circleId:          contextId,
         personaId:         forPersonaId,
-        // Diff-gate: an unchanged save is a true no-op (nothing sent, written or announced).
+        // Diff-gate: an unchanged save is a true no-op (nothing said, nothing re-sealed).
         lastShared:        disclosureShareMemo,
-        // Only used when I AM this circle's admin — then this device owns the roster and
-        // announces its own row's pull-me; otherwise the remote admin announces.
-        // (the member ref comes back from the roster write itself — `result.memberWebid`).
-        announceRosterUpdate,
         // Media props (profilePicture) leave RE-SEALED to this circle (option (a)):
         // the self-sealed source copy → a copy sealed with the circle's own key.
         resealMediaForCircle: resealPersonaMediaForCircle,
@@ -8176,13 +8164,6 @@ async function boot() {
       // circle being joined), so the admin records it instead of dropping it as unproven.
       signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     });
-    // personas#2 — the post-join "share to this circle" sender (same shape as the redeem sender).
-    circleSendPersonaUpdate = makeSendPersonaPropsUpdate({
-      sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
-      isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
-      pendingMap:      circlePendingPersonaProps,
-      circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
-    });
     // when signed in, route stoop's items to the user's REAL pod (parity with
     // folio/calendar; reuses stoop's already-built pod-routing write-through). Best-effort.
     if (podSession?.isLoggedIn && circleRealPodRouting?.podRoot && typeof agent.attachStoopPod === 'function') {
@@ -8511,8 +8492,6 @@ async function boot() {
           }),
           // personas#2 — post-join persona-property push: admin records the member's disclosure onto
           // the roster + acks; the member resolves the pending push on the ack.
-          'persona-props-update':    makeHandlePersonaPropsUpdate({ callSkill: rawCallSkill, sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts), announceRosterUpdate }),
-          'persona-props-ack':       makeHandlePersonaPropsAck({ pendingMap: circlePendingPersonaProps }),
           // profile-update propagation — the roster owner says "row X changed, keys [a,b]"; we
           // record it as a SILENT stream entry (never a chat bubble, never a wake) and re-read
           // those rows from the roster. The values are never on this wire.

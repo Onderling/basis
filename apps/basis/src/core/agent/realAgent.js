@@ -2106,17 +2106,24 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (typeof b?.address === 'string' && typeof b?.pubKey === 'string') sa.agent.security?.learnPeerKey?.(b.address, b.pubKey);
     }
   } catch { /* nothing kept, or unreadable — greetings establish afresh */ }
-  // `member-props` to every circle I am in (see the after-write hook): my current handle/displayName from the
-  // profile, the circles from the substrate (pair circles included), the per-circle diff read from the roster.
+  // WHAT I SAY ABOUT MYSELF — the one `member-props` writer (the note `NOTE-member-props-on-the-membership-lane.md`):
+  // one statement per circle named, only what differs from what the fold already holds for me there (`row.said`),
+  // a failing circle named and retried on the next save. `sayOnRosters` is the shells' seam too (About me's "share
+  // to this circle" says the persona release through it, step two 2026-09-22); `tellMyRostersWhatISay` is the
+  // after-write hook's call for the name fields, over every circle I am in (pair circles included).
+  const sayOnRosters = ({ circleIds = [], props = {} } = {}) => {
+    if (typeof membershipEmit !== 'function') return Promise.resolve({ error: 'no-membership-rail', emitted: [], unchanged: [], failed: [] });
+    return emitMemberProps(
+      { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
+      { from: chatId.pubKey, circleIds, props },
+    );
+  };
   async function tellMyRostersWhatISay() {
     if (typeof membershipEmit !== 'function') return { error: 'no-membership-rail' };
     const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
     const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-    return emitMemberProps(
-      { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
-      { from: chatId.pubKey, circleIds: circles, props: { handle: me.handle, displayName: me.displayName } },
-    );
+    return sayOnRosters({ circleIds: circles, props: { handle: me.handle, displayName: me.displayName } });
   }
   const knownPeersSync = createKnownPeersSync({
     siblings: ownDeviceSiblings,
@@ -5929,6 +5936,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Siblings follow a circle: the lane table spreads `handlers`; the shells `setConsume(entry => consumeCircleEntry(deps, entry))`
     // beside their enrol consume and kick `requestFromSiblings` on connect; the registry setter fans a new membership.
     circleFollowSync,
+    /** Say something about myself on the rosters named: `{ circleIds, props }` → `{ emitted, unchanged, failed }` (the `member-props` writer). */
+    emitMemberProps: sayOnRosters,
     /** The person's address-fallback setting, read live — the lanes' catch-ups aim at the global key only when it is on. */
     addressFallbackOn,
     /** The current person key `{ version, pubKey }` (rotating, per profile), or null on an enrolled device from before person keys. */

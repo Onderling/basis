@@ -981,24 +981,6 @@ export const stoopManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'recordMemberPersonaProperties',
-      circleScoped: false, verb: 'set',
-      // ADMIN side: the circle admin owns the roster, so a member sends their released properties and the
-      // admin records them. `memberWebid` comes from the AUTHENTICATED peer address at the call site,
-      // never from the payload — a member speaks only for their own row.
-      params: [
-        { name: 'groupId',           kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'memberWebid',       kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'personaProperties', kind: 'object', required: true },
-        { name: 'circleAddress',     kind: 'string' },
-      ],
-      resolves: [{ field: 'personaProperties', policy: 'content' }],
-      surfaces: {
-        chat: { hint: "Record a member's released persona properties on the circle roster (admin side)." },
-        ui:   { control: 'page' },
-      },
-    },
 
     // ── Waking a device ─────────────────────────────────────────────
     // Registration only. WHETHER something may wake you is the recipient's own attention setting,

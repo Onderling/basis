@@ -70,7 +70,6 @@ import { makeCircleAddressAnnouncePeerHandler, announceOwnCircleAddress, propaga
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../src/core/handlers/groupRedeem.js';
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
-import { makeRosterUpdatedPeerHandler } from '../src/v2/rosterUpdated.js';
 import { applyRulesUpdates } from '../src/v2/rulesUpdateLane.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 
@@ -415,7 +414,6 @@ if (relayUrl) {
       // has nowhere to go: the one message this device exists to pass on would stop here.
       'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent, logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} } }),
       // A roster owner says a row changed; the values are re-read, never carried on this wire.
-      'roster-updated': makeRosterUpdatedPeerHandler({ eventLog: deviceLog, onPull: async () => {} }),
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>

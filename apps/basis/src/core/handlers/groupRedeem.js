@@ -103,8 +103,7 @@ export function makeHandleGroupRedeemRequest({
         // same `verifyCircleLink` check the admin runs on the way in, so a co-member who has merely SEEN
         // the admin's address in another circle cannot inject it here.
         //
-        // (The general refresh path — addresses on the roster-updated broadcast — is deliberately NOT
-        // built here: it is the same mechanism as "re-announce", and the two belong together.)
+        // (The general refresh path is the per-circle address announce — "re-announce" — not this reply.)
         const own = ownProvenCircleAddress(groupId, { circleAddressFor, signCircleAddress });
         if (own) Object.assign(reply, own);
         // …and the admin's display rides back beside their address (W10): the joiner's roster then

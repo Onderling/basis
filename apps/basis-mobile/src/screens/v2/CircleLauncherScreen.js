@@ -55,6 +55,9 @@ import {
   // recognising an inbound CHAT entry for THIS circle — the same kind + the same circle-id read the
   // conversation projection itself uses, so the refresh cannot key off something the filter ignores.
   CHAT_KIND, eventCircleId,
+  // the membership lane's entry kind — a statement about who is in this circle (join · leave · role · what a
+  // member says about themselves) is what makes the members tab re-read
+  MEMBERSHIP_LANE,
   // P1.7 — the viewer's conversation filter (kinds × people/agents), shared model, device-local store.
   applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
   // "Never share my global address" — the publication lock (web parity).
@@ -90,7 +93,6 @@ import {
   // B (circle bot) — dispatch primitives to run an interpreted command in the circle.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, executeBulkDispatch,
   // profile-update propagation — the silent "pull-me" entry kind (the roster PULL trigger).
-  ROSTER_UPDATED_KIND,
 } from '@onderling-app/basis';
 // B (circle bot) — v2 free-text→LLM→command surface (shared with web). Deep-imported like the other
 // v2 modules (circleChatReceiver etc.) since they're not on the basis barrel.
@@ -2747,13 +2749,15 @@ function CircleDetail({
   useEffect(() => { setActiveTab(DEFAULT_CIRCLE_TAB); }, [circle?.id]);
 
   // (roster state `tabMembers` is declared above the rows memo — it feeds the sender labels.)
-  // Profile-update propagation — the PULL: a silent `roster-updated` entry for THIS circle means a
-  // member's row moved; bump this tick to re-read the roster (no bubble, no toast — just a refresh).
+  // A member's row moved — a statement on this circle's MEMBERSHIP lane (a join, a leave, a role, what a member
+  // says about themselves): bump this tick to re-read the roster (no bubble, no toast — just a refresh). Until
+  // 2026-09-22 this read the `roster-updated` pull-me, which the admin fanned after writing someone's disclosure;
+  // the disclosure is the member's own statement on that same lane now, so one subscription covers both.
   const [membersReloadTick, setMembersReloadTick] = useState(0);
   useEffect(() => {
     if (!eventLog?.subscribe || !circle?.id) return undefined;
     return eventLog.subscribe((e) => {
-      if (e?.type === ROSTER_UPDATED_KIND && e?.circleId === circle.id) {
+      if (e?.type === MEMBERSHIP_LANE && eventCircleId(e) === circle.id) {
         setMembersReloadTick((n) => n + 1);
       }
       // …and the conversation itself. `rows` is a memo re-pulled off a hand-bumped `streamTick`, and the

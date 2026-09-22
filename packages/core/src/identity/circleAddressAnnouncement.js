@@ -54,7 +54,7 @@ import { deriveCircleAddress } from './circleAddress.js';
 export const CIRCLE_ADDRESS_ANNOUNCE_KIND = 'circle-address-announce';
 
 /**
- * Shape one announcement — a WHITELIST, like `rosterUpdatedPayload`: anything a caller passes that
+ * Shape one announcement — a WHITELIST: anything a caller passes that
  * is not one of these fields is dropped here, at the boundary, rather than travelling.
  *
  * `personaProperties` (optional) is the member's per-circle RELEASE — what they chose to disclose to

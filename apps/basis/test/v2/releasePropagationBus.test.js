@@ -5,9 +5,10 @@
  * hermetic `connectNodesOverBus` harness, driven through the REAL `getPersonaRelease` path (not a hardcoded
  * `personaProperties`), with a CROSS-CIRCLE NEGATIVE — the one-persona-two-circles bleed check (story 9.1).
  *
- * The crossing is the `circle-address-announce` fan (NOT item-sync): `recordMemberPersonaProperties` on the
- * admin patches the admin's roster, and `broadcastCircleAddresses` carries the release to each member's
- * per-circle address; the receiver patches its OWN membership trail, so its `listGroupMembers` sees it.
+ * The crossing is the MEMBERSHIP LANE (2026-09-22, step two of the member-props note): the discloser says their
+ * release for the circle as their own signed `member-props` statement, every member's device folds it onto that
+ * member's roster row, and no admin is in the loop. (It was the admin-mediated `recordMemberPersonaProperties` +
+ * the address-announce fan until then; both retired.)
  *
  * Boots with `allowAddressFallback: false` so delivery PROVES per-circle addressing (a missing address-bind
  * would throw / go undeliverable, naming the seam) rather than silently falling back to the global key.
@@ -26,11 +27,13 @@ import {
   bindCircleAddresses, readRoster, until, teardown,
 } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
-import { announcementsFromRoster } from '../../src/v2/circleAddressAnnounce.js';
+import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../src/core/handlers/personaPropsUpdate.js';
 
 const X = 'circle-x-release-bus';
 const Y = 'circle-y-release-bus';
-const NO_FALLBACK = { agentOpts: { allowAddressFallback: false } };
+// `taskLane: true` gives each node its DEVICE LOG — without one the factory builds no membership rail, so
+// nothing can be said on the lane at all (the release included). The shells always have one.
+const NO_FALLBACK = { taskLane: true, agentOpts: { allowAddressFallback: false } };
 const rowFor = (roster, webid) => roster.find((m) => m?.webid === webid) ?? null;
 
 async function settle(node, group) {
@@ -38,15 +41,14 @@ async function settle(node, group) {
   await bindCircleAddressKeysFor({ agent: node.agent, circleId: group });
 }
 
-/** Admin records a member's release, then re-fans the roster (the crossing). Returns the fanned announcements. */
-async function recordAndFan(admin, group, memberWebid, released) {
-  const rec = await admin.agent.callSkill('stoop', 'recordMemberPersonaProperties', {
-    groupId: group, memberWebid, personaProperties: released ?? {},
+/** The MEMBER says their own release for this circle on its membership lane (what "share to this circle" runs). */
+async function sayRelease(node, group) {
+  const memo = createDisclosureShareMemo();
+  return shareDisclosureToCircle({
+    callSkill: (app, op, args) => node.agent.callSkill(app, op, args),
+    emitMemberProps: (a) => node.agent.emitMemberProps(a),
+    circleId: group, personaId: 'default', lastShared: memo,
   });
-  expect(rec?.ok, `record on ${group}`).toBe(true);
-  const announcements = announcementsFromRoster({ members: await readRoster(admin, group), circleId: group });
-  await admin.agent.callSkill('stoop', 'broadcastCircleAddresses', { groupId: group, announcements });
-  return announcements;
 }
 
 describe('release propagation over the BUS — per-circle gated delivery to a third device (5.1 / 9.1)', () => {
@@ -90,9 +92,9 @@ describe('release propagation over the BUS — per-circle gated delivery to a th
     const relX = await cato.agent.callSkill('agents', 'getPersonaRelease', { id: 'default', contextId: X });
     expect(relX?.released?.realName, 'the source release carries the disclosed name').toBe('Catharina');
 
-    await recordAndFan(admin, X, cato.pubKey, relX.released);
+    expect((await sayRelease(cato, X)).ok, 'cato said it on X\'s lane').toBe(true);
 
-    // Anne's OWN roster (device-local trail, patched by the fan) holds Cato's released name.
+    // Anne's OWN roster (folded from cato's statement) holds Cato's released name.
     const anneRow = await until(async () => {
       const row = rowFor(await readRoster(anne, X), cato.pubKey);
       return row?.personaProperties?.realName ? row : null;
@@ -108,7 +110,7 @@ describe('release propagation over the BUS — per-circle gated delivery to a th
     const relX = await cato.agent.callSkill('agents', 'getPersonaRelease', { id: 'default', contextId: X });
     expect(relX?.released?.realName).toBe('Catharina Bakker');
 
-    await recordAndFan(admin, X, cato.pubKey, relX.released);
+    expect((await sayRelease(cato, X)).ok).toBe(true);
 
     const updated = await until(async () => {
       const row = rowFor(await readRoster(anne, X), cato.pubKey);
@@ -123,11 +125,10 @@ describe('release propagation over the BUS — per-circle gated delivery to a th
     const relY = await cato.agent.callSkill('agents', 'getPersonaRelease', { id: 'default', contextId: Y });
     expect(relY?.released?.realName, 'nothing disclosed in Y ⇒ empty release').toBeUndefined();
 
-    const anns = await recordAndFan(admin, Y, cato.pubKey, relY.released);
-    expect(anns.find((x) => x.memberWebid === cato.pubKey)?.personaProperties,
-      'Cato\'s Y announcement carries NO release').toBeUndefined();
+    const saidInY = await sayRelease(cato, Y);
+    expect(saidInY, 'nothing disclosed in Y ⇒ nothing said there').toMatchObject({ ok: true });
 
-    // Give the fan time; Yuri's OWN Y roster must hold no name for Cato — X's disclosure did not bleed into Y.
+    // Give the lane time; Yuri's OWN Y roster must hold no name for Cato — X's disclosure did not bleed into Y.
     await new Promise((r) => setTimeout(r, 800));
     const yuriRow = rowFor(await readRoster(yuri, Y), cato.pubKey);
     expect(yuriRow?.personaProperties?.realName ?? null,

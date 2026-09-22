@@ -104,7 +104,6 @@ export const ENTRY_KINDS = Object.freeze({
   // conversation line would be derived from; the statement itself must never paint. Same retention as the
   // human task kind: the store row is the durable head, the statements age out and catch-up re-serves heads.
   'task-statement':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING()),
-  'roster-updated':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
   'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true, CIRCLE_BINDING({ accepts: ACCEPTS.KEY })),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening
   membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.CIRCLE, SIGNS.ROOT], subject: [SUBJECT.PERSON, SUBJECT.DEVICE], accepts: ACCEPTS.MEMBERSHIP, syncPolicy: SYNC.CIRCLE }),   // the roster refolds from these — never drops

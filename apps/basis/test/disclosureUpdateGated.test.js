@@ -16,9 +16,8 @@
  *
  * Discloser-side, like story 5.1 (`revealPerCircleDisclosure.test.js`) — never the viewer-side
  * `Reveals`/`viewerNameOptIn`. Scope: this is the READ-path half (the release the sender computes). The
- * three-device DELIVERY half (`fanRosterUpdated` → a third device re-reads) is the roster-fan seam still owed
- * (`plans/NOTE-multi-device-user-stories.md` §5.1/§5.3) — no existing test drives roster-persona sync over the
- * bus.
+ * three-device DELIVERY half — the release said on the circle's membership lane, folded by every member —
+ * is proven over the bus and over a real relay (`v2/releasePropagationBus.test.js`, `v2/releasePropagation.relay.test.js`).
  */
 import { describe, it, expect, afterAll } from 'vitest';
 

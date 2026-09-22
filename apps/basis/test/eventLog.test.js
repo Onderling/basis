@@ -303,7 +303,7 @@ describe('EventLog — per-kind retention', () => {
     const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 5000 } });
     log.append(mk({ id: 'chat-old', ts: 0 }));
     log.append(ev({ id: 'gov-old', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'propose' } }));
-    log.append(ev({ id: 'ping-old', ts: 0, app: 'system', type: 'roster-updated', circleId: 'c1' }));
+    log.append(ev({ id: 'ping-old', ts: 0, app: 'system', type: 'delivery-state', circleId: 'c1' }));
     clock = 2000;   // past chat(1000) + short(500), inside audit(5000)
     log.prune();
     const ids = log.query().map((e) => e.id);

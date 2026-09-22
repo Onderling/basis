@@ -20,7 +20,7 @@ import {
   bindCircleAddresses, readRoster, until, teardown,
 } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
-import { announcementsFromRoster } from '../../src/v2/circleAddressAnnounce.js';
+import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../src/core/handlers/personaPropsUpdate.js';
 
 const GROUP = 'circle-release-prop';
 async function settle(node) {
@@ -37,7 +37,7 @@ describe('a released name reaches co-members (real relay, three devices)', () =>
     relay = await startJourneyRelay();
     relayUrl = relay.url;
     [admin, bram, cato] = await Promise.all([
-      bootRealAgentNode('admin'), bootRealAgentNode('bram'), bootRealAgentNode('cato'),
+      bootRealAgentNode('admin', { taskLane: true }), bootRealAgentNode('bram', { taskLane: true }), bootRealAgentNode('cato', { taskLane: true }),
     ]);
     await connectNodesOverRelay([admin, bram, cato], { relayUrl });
 
@@ -59,19 +59,16 @@ describe('a released name reaches co-members (real relay, three devices)', () =>
   });
 
   it("Bram releases his name to the circle → Cato's device HOLDS 'Bram de Wit'", async () => {
-    // Bram discloses his name to THIS circle (the admin is the roster authority that records it —
-    // exactly what a `full` join or a post-join "share to this circle" lands on the admin).
-    const rec = await admin.agent.callSkill('stoop', 'recordMemberPersonaProperties', {
-      groupId: GROUP, memberWebid: bram.pubKey, personaProperties: { realName: 'Bram de Wit' },
+    // Bram discloses his name to THIS circle and says so himself: one `member-props` statement on the circle's
+    // membership lane (what "share to this circle" runs since 2026-09-22 — no admin in the loop).
+    await bram.agent.callSkill('agents', 'setProfileProperty', { id: 'default', key: 'realName', value: 'Bram de Wit' });
+    await bram.agent.callSkill('agents', 'setProfileDisclosure', { id: 'default', contextId: GROUP, key: 'realName', enabled: true });
+    const said = await shareDisclosureToCircle({
+      callSkill: (app, op, args) => bram.agent.callSkill(app, op, args),
+      emitMemberProps: (a) => bram.agent.emitMemberProps(a),
+      circleId: GROUP, personaId: 'default', lastShared: createDisclosureShareMemo(),
     });
-    expect(rec?.ok).toBe(true);
-
-    // The admin re-fans the roster; the announcement now carries Bram's release alongside his address.
-    const roster = await readRoster(admin, GROUP);
-    const announcements = announcementsFromRoster({ members: roster, circleId: GROUP });
-    expect(announcements.find((x) => x.memberWebid === bram.pubKey)?.personaProperties?.realName,
-      'the admin fan carries the release').toBe('Bram de Wit');
-    await admin.agent.callSkill('stoop', 'broadcastCircleAddresses', { groupId: GROUP, announcements });
+    expect(said, JSON.stringify(said)).toMatchObject({ ok: true, via: 'lane' });
 
     // …and it lands on Cato's device, on Bram's row — the released name crossed the wire.
     const catoBram = await until(async () => {
@@ -84,17 +81,14 @@ describe('a released name reaches co-members (real relay, three devices)', () =>
   }, 60000);
 
   it('Cato, who released NOTHING, stays a handle to everyone — no name is conjured', async () => {
-    // Cato never disclosed a name. The admin's fan of Cato's row carries no release, so no co-member
-    // ever holds a name for Cato — the source gate is structural (an empty release travels as nothing).
-    const roster = await readRoster(admin, GROUP);
-    const catoAnn = announcementsFromRoster({ members: roster, circleId: GROUP })
-      .find((x) => x.memberWebid === cato.pubKey);
-    expect(catoAnn, 'Cato is announced (address)').toBeTruthy();
-    expect(catoAnn.personaProperties, 'but with NO release — nothing to fan').toBeUndefined();
-
-    await admin.agent.callSkill('stoop', 'broadcastCircleAddresses',
-      { groupId: GROUP, announcements: announcementsFromRoster({ members: roster, circleId: GROUP }) });
-    // Give the fan time, then confirm Bram's device holds no name for Cato.
+    // Cato never disclosed a name, so his release is empty and there is nothing to say: the source gate is
+    // structural, and no co-member ever holds a name for him.
+    const said = await shareDisclosureToCircle({
+      callSkill: (app, op, args) => cato.agent.callSkill(app, op, args),
+      emitMemberProps: (a) => cato.agent.emitMemberProps(a),
+      circleId: GROUP, personaId: 'default', lastShared: createDisclosureShareMemo(),
+    });
+    expect(said, 'an empty release says nothing at all').toMatchObject({ ok: true });
     await new Promise((r) => setTimeout(r, 800));
     const bramCato = rowFor(await readRoster(bram, GROUP), cato.pubKey);
     expect(bramCato?.personaProperties ?? null, 'Cato disclosed nothing, so nobody holds a name').toBeNull();

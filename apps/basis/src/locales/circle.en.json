@@ -6326,10 +6326,6 @@
         "text": "Hide",
         "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
       },
-      "removeContact": {
-        "text": "Remove contact",
-        "doc": "Row-action button for stoop:removeContact, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
-      },
       "conflictDisputeWizard": {
         "text": "Dispute",
         "doc": "Row-action button for stoop:conflictDisputeWizard, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."

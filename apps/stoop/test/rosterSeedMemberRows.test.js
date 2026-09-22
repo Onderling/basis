@@ -41,3 +41,20 @@ describe('recordRosterSeed — the member rows', () => {
     expect(row.handle ?? null, 'the join-time handle stays a roster fact').toBeNull();
   });
 });
+
+describe('setContactHidden on a sender the book never held (the delete/hide note §6a-3)', () => {
+  it('hides on a placeholder row `{ webid, pubKey: webid }`; showing again keeps the row, unnamed until the ladder names it', async () => {
+    const id = await AgentIdentity.generate(new VaultMemory());
+    const bundle = await createNeighbourhoodAgent({
+      identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
+      offeringMatch: { group: CIRCLE, localActor: ME, peers: [] }, members: [],
+    });
+    await bundle.offeringMatch.start();
+    const hid = await callSkill(bundle.agent, 'setContactHidden', { webid: 'stranger', hidden: true });
+    expect(hid.contact).toMatchObject({ webid: 'stranger', pubKey: 'stranger', hidden: true });
+    const back = await callSkill(bundle.agent, 'setContactHidden', { webid: 'stranger', hidden: false });
+    expect(back.contact).toMatchObject({ webid: 'stranger', hidden: false });
+    const rows = (await callSkill(bundle.agent, 'listContacts', {})).contacts;
+    expect(rows.map((c) => [c.webid, c.hidden, c.displayName ?? null, c.handle ?? null])).toEqual([['stranger', false, null, null]]);
+  });
+});

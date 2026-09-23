@@ -173,8 +173,16 @@ for (const rel of scanned) {
   if (!existsSync(abs)) continue;
   const isLedgerFile = rel === 'REMAINING-WORK.md';
   const lines = readFileSync(abs, 'utf8').split('\n');
+  // A GENERATED block is a view of the markers, not a place one can hide: counting it would flag a
+  // projection of the very thing this guard protects, and no hand could annotate it — the next regeneration
+  // would take the annotation straight back out. Marked by begin/end comments, so any future derived block
+  // gets the same treatment without naming a private file here.
+  let derived = false;
   lines.forEach((line, i) => {
     const lineNo = i + 1;
+    if (/<!--\s*[a-z-]+:begin\s*-->/.test(line)) { derived = true; return; }
+    if (/<!--\s*[a-z-]+:end\s*-->/.test(line)) { derived = false; return; }
+    if (derived) return;
     if (isLedgerFile && lineNo >= ledgerFirstLine && lineNo <= ledgerLastLine) return;
     if (!MARKER.test(line)) return;
     if (ANNOTATED.test(line)) return;

@@ -45,6 +45,7 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
 import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
+import { forgetThrowawaySelf } from '../../src/v2/enrolForgets.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -1891,6 +1892,28 @@ async function resolveCircleMediaComposition(circleId, policy) {
   return createCircleMediaComposition({
     circleId, getSealStrategy, localActor: LOCAL_ACTOR, bucket: devMediaBucket,
   });
+}
+
+/**
+ * How THIS shell reaches its own storage, for the enrol clear. The list of what to forget is
+ * `enrolForgets.js`; nothing here decides anything — a shell does composition and paint.
+ *
+ * The circle ids come from the registry rather than `indexedDB.databases()`, which Firefox does not implement:
+ * that route would silently clear nothing on one browser and pass everywhere it is tested.
+ */
+function webForgetAdapter() {
+  return {
+    listCircleIds: async () => ((await rawCallSkill?.('stoop', 'listMyCircles', {}))?.circles ?? [])
+      .map((c) => c?.id).filter(Boolean),
+    listKeys: async () => { try { return Object.keys(window.localStorage); } catch { return []; } },
+    dropStore: (name) => new Promise((resolve) => {
+      try {
+        const req = indexedDB.deleteDatabase(name);
+        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+      } catch { resolve(); }
+    }),
+    dropKey: (key) => { try { window.localStorage.removeItem(key); } catch { /* quota / disabled */ } },
+  };
 }
 
 /** a pseudo-pod client for one circle (real per-circle sealed storage, no OIDC/CSS). Objective L:
@@ -5038,7 +5061,17 @@ function showEnrollDeviceFlow() {
       go.type = 'button';
       go.className = 'cc-btn cc-btn--primary';
       go.textContent = t('circle.enroll.reload');
-      go.addEventListener('click', () => { try { window.location.reload(); } catch { /* */ } });
+      go.addEventListener('click', async () => {
+        // Forget the throwaway self BEFORE the reload — the ceremony has replaced the content key those bytes
+        // were sealed under, so the next boot would greet a former self in every circle and warn about rows it
+        // cannot open. WHAT is forgotten is decided once in `enrolForgets.js`; this shell supplies only how its
+        // own storage is reached. A clear that fails never blocks the reload: the warnings are noise, a device
+        // that cannot restart is not.
+        if (inst?.produces?.clearContent) {
+          try { await forgetThrowawaySelf(webForgetAdapter()); } catch { /* best-effort, by design */ }
+        }
+        try { window.location.reload(); } catch { /* */ }
+      });
       card.appendChild(go);
     } else {
       msg.textContent = outcome === 'invalid-phrase'

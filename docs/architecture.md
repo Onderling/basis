@@ -937,7 +937,7 @@ the **chat identity is derived from the profile on every device**, so it is the 
 single fact is what makes every other device operation possible: a member's roster row is keyed by that
 stable identity, so a second device — or a replacement one — is recognised as *the same member* and its
 new address joins that member's set, rather than arriving as a stranger who must be admitted again.
-Someone who wants to be two people is two profiles with two identities, deliberately; a person does not
+Someone who wants to be two people is two profiles with two identities, deliberately (a profile presented to others is what the UI calls a **persona**; see the glossary); a person does not
 get to look like several by owning several devices, and the app will not manufacture that appearance.
 
 **Adding, replacing and revoking a device — one family of operations.** They share a shape: the recovery

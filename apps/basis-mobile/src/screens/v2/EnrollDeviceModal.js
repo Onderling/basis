@@ -13,6 +13,7 @@ import { QrCodeView } from '@onderling/react-native/qr/view';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
 import { stashEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
+import { forgetThrowawaySelf } from '../../../../basis/src/v2/enrolForgets.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 
@@ -31,6 +32,34 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
   const [offerInvalid, setOfferInvalid] = useState(false);
   const [offerView, setOfferView] = useState(null);   // null | {uri} | {error}
   const runnerRef = useRef(null);
+  const forgotten = useRef(false);
+
+  // Forget the throwaway self, once, as soon as the ceremony has succeeded (web parity: the same call sits
+  // before circleApp's reload button). This install was nobody's until now — it booted unenrolled, with an
+  // identity and content of its own — and the ceremony has just replaced the content key those bytes were
+  // sealed under. WHAT is forgotten is decided once in `enrolForgets.js`; this shell supplies only how its own
+  // storage is reached. Never on the failure path, and a clear that fails never blocks the restart.
+  useEffect(() => {
+    const ok = inst?.steps?.ceremony?.outcome === 'ok' && inst?.produces?.clearContent;
+    if (!ok || forgotten.current) return;
+    forgotten.current = true;
+    (async () => {
+      try {
+        await forgetThrowawaySelf({
+          listCircleIds: async () => ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])
+            .map((c) => c?.id).filter(Boolean),
+          listKeys: async () => { try { return await AsyncStorage.getAllKeys(); } catch { return []; } },
+          // An AsyncStorage "store" is a key SCOPE, so dropping one is dropping every key under it.
+          dropStore: async (name) => {
+            const all = await AsyncStorage.getAllKeys().catch(() => []);
+            const mine = all.filter((k) => k === name || k.startsWith(`${name}:`) || k.startsWith(`${name}/`));
+            if (mine.length) await AsyncStorage.multiRemove(mine).catch(() => {});
+          },
+          dropKey: async (key) => { await AsyncStorage.removeItem(key).catch(() => {}); },
+        });
+      } catch { /* best-effort, by design */ }
+    })();
+  }, [inst, callSkill]);
 
   useEffect(() => {
     if (!visible || typeof callSkill !== 'function') return;

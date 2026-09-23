@@ -2408,7 +2408,12 @@ export async function createRealHouseholdAgent(opts = {}) {
         return [DataPart({ ok: false, outcome, error: r.detail ?? r.code })];
       }
       await retireCurrentSelfRow();
-      return [DataPart({ ok: true, reloadRequired: true, deviceId: r.deviceId })];
+      // …and the shell clears what the THROWAWAY self wrote before it reloads. This install was nobody's until
+      // now — it booted unenrolled, with an identity and content of its own — and the ceremony has just replaced
+      // the content key those bytes were sealed under. The box has swept them since 2026-09-14; `clearContent`
+      // is how web and mobile are told to do the same, on the success path only. The list is
+      // `src/v2/enrolForgets.js`; each shell hands only its own storage adapter.
+      return [DataPart({ ok: true, reloadRequired: true, clearContent: true, deviceId: r.deviceId })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'enroll-failed' })]; }
   }, { visibility: 'trusted' });   // overwrites the owner root + enrolls: owner-only
 

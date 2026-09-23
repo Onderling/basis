@@ -940,6 +940,32 @@ new address joins that member's set, rather than arriving as a stranger who must
 Someone who wants to be two people is two profiles with two identities, deliberately (a profile presented to others is what the UI calls a **persona**; see the glossary); a person does not
 get to look like several by owning several devices, and the app will not manufacture that appearance.
 
+**One person, many personas — a persona is a profile with its own key.** The registry holds one or more
+**profiles** per person; the default profile is the one every device starts as. Keys derive
+`root → profile → per-circle address` (decisions 2026-07-14), so two profiles are **two people on the wire**:
+different chat identities, different per-circle addresses, nothing a co-member can join up — unlinkable by
+default, linkable only by the person's choice. "Persona" is the user-facing word for a profile you present.
+Four properties follow from that, and all four are in the code:
+
+- **Own or inherit.** A profile is an open property graph; every property is `own` or `inherit` from the
+  default profile (`profileProperties.resolveProperty`). A persona overrides its label, its key and its
+  disclosure and inherits the rest — settings, relay, storage — so making one is cheap and nothing migrates.
+- **A circle is joined AS one profile.** The join records the persona (`joinGroupState.setPersona`; `null`
+  is the protective default, "join minimally"), the circle's address for you derives from that profile's
+  seed, and the roster row's `said` group — handle, displayName, the face — is that profile's name *in that
+  circle*, carried by `member-props` on the membership lane. Handle uniqueness is per circle, at the fold;
+  there is no global handle, on purpose. (The picker's logic is shared; painting it is on the persona brief.)
+- **Disclosure is a setting on the profile, per context.** What a circle sees of your background
+  (`personaProperties`, the reveal ladder) is the profile's disclosure policy for that context, pushed from
+  Mij; the name-class fields are not part of it. Mij paints the persona: its card, its contexts, its releases.
+- **Devices carry profiles, not the other way round.** Every device of the person derives every profile's
+  identity, so a persona is the same on all your devices; a device is never a persona (see the paragraph
+  above). Infrastructure attaches to a profile-in-the-registry, never to a loaded instance.
+
+Stated gap, on purpose: **contacts do not hang off a persona yet** — the contact book is one list for the
+whole agent and a contact is handed the default profile's address (`plans/NOTE-persona-scoping.md`: the rule
+"everything you own hangs off exactly one persona" is designed, the contact half is not built).
+
 **Adding, replacing and revoking a device — one family of operations.** They share a shape: the recovery
 phrase is the authority, it is typed on the device that is *gaining* it, and it never travels.
 

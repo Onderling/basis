@@ -100,3 +100,41 @@ describe('forgetThrowawaySelf — the order is the safety', () => {
     expect(s.dropped.keys).toEqual([]);
   });
 });
+
+describe('§8c — the device comes back WHOLE after the clear', () => {
+  /**
+   * Fable's warning was that clearing the registry could leave a device enrolled in the vault and in no circle:
+   * the ceremony writes its delegation record, `clearContent` drops the registry, and the consume step on the
+   * next boot might assume the record is still there.
+   *
+   * It does not, and not by luck. Boot reads `enrolledDevice` from the CUSTODY MARKER and the delegation blob
+   * in the VAULT (`realAgent.js` ~605–625), then self-heals the registry record from it — with the reason
+   * written out where it is done: "the ceremony itself never had to write a registry it could not yet see
+   * (pre-reload it was still the old install's)". That old install's registry is exactly what this clears. And
+   * `consumeEnrollOffer` reads the OFFER STASH for which circles to join, never the registry; circles never
+   * depend on the record either ("every address still proves itself at the roster").
+   *
+   * So the behaviour is safe because three inputs survive. This pins that they do — a later hand adding any of
+   * them to the content list turns a passing enrol into a device that is nobody, and nothing else would fail.
+   */
+  const KEPT = (name) => THROWAWAY_CONTENT.keep.some((k) => k === name || k.endsWith(`:${name}`) || k.includes(name));
+
+  it('keeps every input the boot self-heal and the consume step read', () => {
+    // 1 · the custody marker and 2 · the delegation blob — where `enrolledDevice` comes from
+    expect(KEPT('custody-mode'), 'the custody marker says this install is a delegation').toBe(true);
+    expect(KEPT('device-delegation-seed'), 'the delegation blob carries the deviceId and the PRE-SIGNED record').toBe(true);
+    // 3 · the offer stash — which circles to re-join
+    expect(THROWAWAY_CONTENT.keep).toContain('onderling.enrollOffer');
+  });
+
+  it('and none of the three is also on the content side', () => {
+    const content = [...THROWAWAY_CONTENT.stores, ...THROWAWAY_CONTENT.keys];
+    for (const n of ['custody-mode', 'device-delegation-seed', 'onderling.enrollOffer', 'content-at-rest-key']) {
+      expect(content.some((c) => c.includes(n)), `${n} is not cleared`).toBe(false);
+    }
+    // the prefixes are the other way a key can be swept up without ever being named
+    for (const n of ['onderling.enrollOffer', 'custody-mode']) {
+      expect(THROWAWAY_CONTENT.keyPrefixes.some((p) => n.startsWith(p)), `${n} is not caught by a prefix`).toBe(false);
+    }
+  });
+});

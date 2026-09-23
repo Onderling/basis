@@ -12,6 +12,7 @@
 
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { paintFace } from './faceView.js';
 
 // Privacy-badge palette (§10c) — the discrete states map to Onderling status tokens (mirrors
 // apps/basis/src/v2/theme.js). Colour AMPLIFIES the shape; quiet is a NEUTRAL slate outline (never green).
@@ -33,6 +34,7 @@ function _ensurePrivacyPulseKeyframes() {
 
 export function renderContactThread(container, {
   name = '',
+  face = null,       // the contact's own face as the lane carries it (a `data:image/` thumb) — null = the initial
   messages = [],
   skills = [],
   busy = false,
@@ -69,6 +71,12 @@ export function renderContactThread(container, {
   back.textContent = tr('circle.contacts.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   header.appendChild(back);
+  // The contact's face beside their name — the same slot Contacten and a roster row use, so the person you
+  // opened is visibly the person you were looking at.
+  const avatar = document.createElement('span');
+  avatar.className = 'cc-cthread__face cc-contacts__icon';
+  paintFace(avatar, { face, name });
+  header.appendChild(avatar);
   const title = document.createElement('h2');
   title.className = 'cc-cthread__title';
   title.textContent = tr('circle.contacts.thread_title', { name });

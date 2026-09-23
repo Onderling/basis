@@ -3040,6 +3040,9 @@ async function showContactThread(contactId) {
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
   catch { /* fall back to any cached thread below */ }
   const name = row?.name ?? contactThreads.get(contactId)?.name ?? contactId;
+  // …and their face, from the same row Contacten painted — one source, so the thread you opened shows the
+  // person you tapped rather than a second guess at who they are.
+  const face = row?.face ?? null;
   const peerAddr = row?.peerAddr ?? contactThreads.get(contactId)?.peerAddr ?? contactId;
   if (!contactThreads.has(contactId)) contactThreads.set(contactId, { name, peerAddr, messages: [] });
   const thread = contactThreads.get(contactId);
@@ -3113,6 +3116,7 @@ async function showContactThread(contactId) {
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
+    face,
     messages: (() => {
       const room = ensureNearbyRoom();
       const pending = room?.pendingReachFrom?.(thread.peerAddr);

@@ -12,6 +12,7 @@ import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import FaceView from './FaceView.js';
 import { splitShownHidden, loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 
@@ -81,7 +82,9 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
         accessibilityRole="button"
         testID={`contact-row-${c.contactId}`}
       >
-        <Text style={styles.icon}>{c.isBot ? '🤖' : '👤'}</Text>
+        {/* THE FACE, or this person's own first letter (web parity: contactsRoster's icon slot). A bot keeps
+            its glyph — it is not a person and has no face. */}
+        <FaceView row={c} size={32} fallbackGlyph={c.isBot ? '🤖' : null} />
         <View style={styles.body}>
           <Text style={[styles.name, n > 0 && styles.nameUnread]}>
             {c.name}

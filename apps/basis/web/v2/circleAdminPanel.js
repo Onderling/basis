@@ -20,6 +20,7 @@ import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // decision (web ≡ mobile); the panel paints it and works nothing out for itself.
 import { roleControlFor } from '../../src/v2/circleRoleControl.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { paintFace } from './faceView.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
@@ -85,6 +86,12 @@ export function renderCircleAdminPanel(container, {
       const li = document.createElement('li');
       li.className = 'cc-admin__member';
       li.dataset.webid = m.webid ?? '';
+      // The member's face, from what they said on this circle's lane — the same slot Contacten and the thread
+      // header use. These are RAW `listGroupMembers` rows, which is exactly where `said.avatarThumb` lives.
+      const avatar = document.createElement('span');
+      avatar.className = 'cc-contacts__icon cc-admin__member-face';
+      paintFace(avatar, m);
+      li.appendChild(avatar);
       const name = document.createElement('span');
       name.className = 'cc-admin__member-name';
       name.textContent = m.displayName || m.handle || m.webid || '';

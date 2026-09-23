@@ -199,7 +199,11 @@ export async function nameContactsFromRosters(rows = [], { rosterRow = null } = 
     const said = m?.said && typeof m.said === 'object' ? m.said : null;
     const name = (typeof said?.displayName === 'string' && said.displayName) ? said.displayName
       : (typeof said?.handle === 'string' && said.handle) ? said.handle : null;
-    return name ? { ...r, name, namedBy: 'roster' } : r;
+    // …and their FACE, from the same statement. A contact's picture reaches this device exactly the way their
+    // name does — on the pair circle's membership lane — so it is taken here and not fetched from anywhere.
+    const face = (typeof said?.avatarThumb === 'string' && said.avatarThumb) ? said.avatarThumb : null;
+    if (!name && !face) return r;
+    return { ...r, ...(name ? { name, namedBy: 'roster' } : {}), ...(face ? { face } : {}) };
   }));
   return sortContactRows(named);
 }

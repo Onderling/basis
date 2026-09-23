@@ -10,6 +10,7 @@
 
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitShownHidden } from '../../src/v2/contactsSource.js';
+import { paintFace } from './faceView.js';
 
 export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd } = {}) {
   if (!container) return container;
@@ -51,9 +52,10 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     if (!c.reachable) li.classList.add('is-offline');
     if (c.hidden) li.classList.add('is-hidden');
 
+    // THE FACE, or this person's own first letter. A bot keeps its glyph: it is not a person and has no face.
     const icon = document.createElement('span');
     icon.className = 'cc-contacts__icon';
-    icon.textContent = c.isBot ? '🤖' : '👤';
+    paintFace(icon, c, { fallbackGlyph: c.isBot ? '🤖' : null });
     li.appendChild(icon);
 
     const body = document.createElement('div');

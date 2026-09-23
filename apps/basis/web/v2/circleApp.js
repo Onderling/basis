@@ -45,7 +45,7 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
 import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
-import { runPendingForget, markerVaultOver } from '../../src/v2/enrolForgets.js';
+import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -1903,8 +1903,7 @@ async function resolveCircleMediaComposition(circleId, policy) {
  */
 function webForgetAdapter() {
   return {
-    listCircleIds: async () => ((await rawCallSkill?.('stoop', 'listMyCircles', {}))?.circles ?? [])
-      .map((c) => c?.id).filter(Boolean),
+    listCircleIds: async () => circleIdsFrom(await rawCallSkill?.('stoop', 'listMyCircles', {})),
     listKeys: async () => { try { return Object.keys(window.localStorage); } catch { return []; } },
     // A BLOCKED delete is a FAILURE, not a success. `deleteDatabase` fires `onblocked` when another tab still
     // holds a connection, and then simply waits — so resolving there would report the bytes as gone while they

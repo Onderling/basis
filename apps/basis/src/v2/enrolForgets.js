@@ -282,3 +282,15 @@ export function markerVaultOver(storage, prefix = 'cc-owner-root:') {
     delete: async (k) => { try { await storage?.removeItem?.(at(k)); } catch { /* same */ } },
   };
 }
+
+/**
+ * `listMyCircles` answers with ids as STRINGS in practice, and object rows in some paths — every consumer in
+ * this repo normalises both (`realAgent.js` ~2136, ~2167). Said once here because getting it wrong is silent:
+ * a `.map((c) => c.id)` over the string shape yields nothing, and a clear with no ids skips every per-circle
+ * store while reporting success. That is exactly the half-cleared state this file exists to prevent, and it is
+ * how the enrol walk caught this on its first run.
+ */
+export function circleIdsFrom(listMyCirclesResult) {
+  const rows = Array.isArray(listMyCirclesResult?.circles) ? listMyCirclesResult.circles : [];
+  return rows.map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => typeof id === 'string' && id);
+}

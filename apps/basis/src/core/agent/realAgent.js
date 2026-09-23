@@ -199,6 +199,7 @@ async function restoreOrGenerate(vault) {
 }
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
 import { stashEnrollOffer } from '../../v2/enrollOffer.js';
@@ -2402,7 +2403,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // The THROWAWAY self's circle ids, read while its registry is still this device's. The clear that
       // follows on the next boot is named after them, and by then there is no agent to ask.
       let throwawayCircleIds = [];
-      try { throwawayCircleIds = ((await rawStoop('listMyCircles', {}))?.circles ?? []).map((c) => c?.id).filter(Boolean); }
+      try { throwawayCircleIds = circleIdsFrom(await rawStoop('listMyCircles', {})); }
       catch { /* a registry that cannot be read leaves the named stores to the list's own constants */ }
       const r = await restoreOwnerRoot({
         mnemonic, rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault,

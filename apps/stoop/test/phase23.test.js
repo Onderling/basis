@@ -42,51 +42,6 @@ async function buildBundle() {
   return bundle;
 }
 
-/* ── The FACE — a member's own small picture, bounded ────────────── */
-
-describe('setMyFace — the picture a member shows on their own rows', () => {
-  it('persists to MemberMap as avatarThumb; getMyProfile reads it back', async () => {
-    const bundle = await buildBundle();
-    const thumb = 'data:image/jpeg;base64,/9j/4AAQ';   // truncated stub
-    const r = await callSkill(bundle.agent, 'setMyFace', { thumb });
-    expect(r.avatarThumb).toBe(thumb);
-
-    const me = await callSkill(bundle.agent, 'getMyProfile', {});
-    expect(me.entry.avatarThumb).toBe(thumb);
-  });
-
-  it('clearMyFace resets it to null', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'setMyFace', { thumb: 'data:image/jpeg;base64,xxx' });
-    const r = await callSkill(bundle.agent, 'clearMyFace', {});
-    expect(r.cleared).toBe(true);
-    const me = await callSkill(bundle.agent, 'getMyProfile', {});
-    expect(me.entry.avatarThumb).toBeNull();
-  });
-
-  it('refuses a missing, oversize, or non-image face — so a person gets a reason, not a picture that never appears', async () => {
-    // The real gate is the FOLD, on every receiver, whatever app version wrote the statement. This check is
-    // only so the person who pressed the button learns why nothing happened.
-    const bundle = await buildBundle();
-    expect(await callSkill(bundle.agent, 'setMyFace', {})).toEqual({ error: 'thumb required' });
-    expect(await callSkill(bundle.agent, 'setMyFace', { thumb: 'https://example.org/me.png' }))
-      .toEqual({ error: 'face-must-be-an-image-data-url' });
-    const huge = `data:image/jpeg;base64,${'A'.repeat(5000)}`;
-    expect(await callSkill(bundle.agent, 'setMyFace', { thumb: huge }))
-      .toMatchObject({ error: 'face-too-large', max: 4096 });
-  });
-
-  it('leaves avatarUrl alone — the local display cache is a different thing and must not travel', async () => {
-    // `rosterAccessGate` marks `avatarUrl` PRIVATE: it is an arbitrary URL, possibly a cached note about
-    // somebody else, and it never leaves the device. The face is mine, bounded, and rides the lane. Two
-    // fields on purpose; merging them would put the private one on the wire.
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'setMyFace', { thumb: 'data:image/png;base64,iVBORw0' });
-    const me = await callSkill(bundle.agent, 'getMyProfile', {});
-    expect(me.entry.avatarUrl ?? null, 'the cache field is untouched by setting a face').toBeNull();
-  });
-});
-
 /* ── 23.4 Holiday mode ─────────────────────────────────────────── */
 
 describe('Stoop V2 Phase 23.4 — holidayMode', () => {

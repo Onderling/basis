@@ -121,8 +121,8 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       <Section title={t('circle.admin.members')}>
         {members.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_members')}</Text> : members.map((m) => (
           <View key={m.webid || m.handle} style={styles.row} testID={`admin-member-${m.webid}`}>
-            {/* The member's face, from what they said on this circle's lane — these are raw listGroupMembers
-                rows, which is where `said.avatarThumb` lives. web parity: circleAdminPanel.js. */}
+            {/* The member's face — the persona picture they DISCLOSED to this circle, so its presence on the
+                row is already the permission. web parity: circleAdminPanel.js. */}
             <FaceView row={m} size={28} />
             <Text style={styles.name}>{m.displayName || m.handle || m.webid}</Text>
             {m.role && m.role !== 'member' && <Text style={styles.role}>{t(`circle.admin.role.${m.role}`)}</Text>}

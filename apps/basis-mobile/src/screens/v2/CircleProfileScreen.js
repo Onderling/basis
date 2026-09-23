@@ -11,8 +11,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
-import FaceView from './FaceView.js';
-import { pickFace } from '../../v2/attachmentPicker.js';
 
 export default function CircleProfileScreen({ callSkill, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
   const theme = useTheme();
@@ -49,25 +47,6 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
     setBusy(false); load();
   }, [handle, display, profile, callSkill, load]);
 
-  // MY FACE — web parity: circleProfile's face row, the same 96 px and the same 4 KB cap, and the refusal is
-  // said HERE because the fold refuses it in silence on every other device.
-  const [faceStatus, setFaceStatus] = useState('');
-  const pickMyFace = useCallback(async () => {
-    setFaceStatus(t('circle.profile.face_working'));
-    try {
-      const r = await pickFace();
-      if (!r) { setFaceStatus(''); return; }                       // cancelled, or permission refused
-      if (r.error) { setFaceStatus(t('circle.profile.face_refused', { reason: r.error })); return; }
-      const said = await callSkill('stoop', 'setMyFace', { thumb: r.thumb });
-      setFaceStatus(said?.error ? t('circle.profile.face_refused', { reason: said.error }) : '');
-    } catch (err) { setFaceStatus(t('circle.profile.face_refused', { reason: err?.message ?? String(err) })); }
-    load();
-  }, [callSkill, load]);
-  const clearMyFace = useCallback(async () => {
-    try { await callSkill('stoop', 'clearMyFace', {}); } catch { /* surfaced on reload */ }
-    setFaceStatus(''); load();
-  }, [callSkill, load]);
-
   const addOffering = useCallback(async (categoryId) => { try { await callSkill('stoop', 'addMyOffering', { categoryId }); } catch { /* */ } load(); }, [callSkill, load]);
   const removeOffering = useCallback(async (categoryId) => { try { await callSkill('stoop', 'removeMyOffering', { categoryId }); } catch { /* */ } load(); }, [callSkill, load]);
   const geocode = useCallback(async () => {
@@ -92,22 +71,6 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
       <Text style={styles.title}>{t('circle.profile.title')}</Text>
 
       <Section title={t('circle.profile.identity')}>
-        {/* The face, above the name, because it is the same thing: what a member says about themselves. Shown
-            as OTHERS will see it — the same slot and fallback a roster row paints. */}
-        <View style={styles.faceRow}>
-          <FaceView row={profile} size={48} />
-          <Pressable onPress={pickMyFace} accessibilityRole="button" testID="profile-face-pick">
-            <Text style={styles.facePick}>
-              {t(profile.avatarThumb ? 'circle.profile.face_change' : 'circle.profile.face_choose')}
-            </Text>
-          </Pressable>
-          {profile.avatarThumb ? (
-            <Pressable onPress={clearMyFace} accessibilityRole="button" testID="profile-face-remove">
-              <Text style={styles.faceRemove}>{t('circle.profile.face_remove')}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        {faceStatus ? <Text style={styles.faceStatus} testID="profile-face-status">{faceStatus}</Text> : null}
         <Field label={t('circle.profile.handle')} value={handle} onChangeText={setHandle} testID="profile-handle" />
         <Field label={t('circle.profile.displayName')} value={display} onChangeText={setDisplay} testID="profile-display" />
         <Pressable style={styles.primary} onPress={saveIdentity} testID="profile-save"><Text style={styles.primaryText}>{t('circle.profile.save')}</Text></Pressable>
@@ -214,12 +177,6 @@ function Field({ label, value, onChangeText, testID }) {
 }
 
 const makeStyles = (theme) => StyleSheet.create({
-  // The face row: the slot, then the two words that act on it. Aligned to the picture rather than the text,
-  // so the row reads as "this is you" and not as another field.
-  faceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  facePick: { color: theme.color.accent ?? theme.color.ink, fontSize: 14, fontWeight: '600' },
-  faceRemove: { color: theme.color.inkSoft, fontSize: 14 },
-  faceStatus: { color: theme.color.inkSoft, fontSize: 12, marginBottom: 8 },
   wrap: { flex: 1, backgroundColor: theme.color.paper },
   content: { padding: 16, gap: 16, paddingBottom: 80 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },

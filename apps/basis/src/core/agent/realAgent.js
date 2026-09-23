@@ -2136,14 +2136,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
     const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-    // The face travels on the SAME loop the names do, to every circle including the pair circles — so a
-    // contact sees it through their pair roster row without a message, exactly as a rename reaches them.
-    // `avatarThumb` only: `avatarUrl` beside it on the same entry is the local display cache the roster gate
-    // keeps private, and must never be put on the wire by being mistaken for this.
-    return sayOnRosters({
-      circleIds: circles,
-      props: { handle: me.handle, displayName: me.displayName, ...(me.avatarThumb ? { avatarThumb: me.avatarThumb } : {}) },
-    });
+    // Names only. The PICTURE does not ride here: it is the persona's `profilePicture` attribute and travels
+    // in the per-circle RELEASE (`shareDisclosureToCircle` → `personaProperties`), re-sealed for each circle.
+    // Putting it here too would be a second road for one thing — which is what happened on 2026-09-23 and was
+    // taken out again.
+    return sayOnRosters({ circleIds: circles, props: { handle: me.handle, displayName: me.displayName } });
   }
   const knownPeersSync = createKnownPeersSync({
     siblings: ownDeviceSiblings,
@@ -4372,10 +4369,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // a contact learns it — one per circle, only where the row differs (the diff gate), a failing circle retried
       // on the next save. The one road; the admin-mediated persona-props wire and the card-on-a-message update
       // road are retired by it. Best-effort and after success; the local row is already written.
-      // …and the FACE goes the same way (2026-09-23): `setMyFace` / `clearMyFace` are a member saying something
-      // about themselves, exactly like a name, so they ride the same loop to the same rosters. Without this
-      // hook the op would write a picture nobody but this device ever sees.
-      if (['setMyHandle', 'setMyDisplayName', 'setMyFace', 'clearMyFace'].includes(realOpId) && !rawReply?.error) {
+      if ((realOpId === 'setMyHandle' || realOpId === 'setMyDisplayName') && !rawReply?.error) {
         tellMyRostersWhatISay()
           .then((r) => console.info(`[member-props] ${r?.error ? r.error : `told ${r.emitted.length} circle(s)${r.unchanged.length ? `, ${r.unchanged.length} unchanged` : ''}${r.failed.length ? `, FAILED in ${r.failed.map((c) => String(c).slice(0, 12)).join(' ')}` : ''}`}`))
           .catch((err) => console.warn(`[member-props] not every roster was told: ${err?.message ?? err}`));

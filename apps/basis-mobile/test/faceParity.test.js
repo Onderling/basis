@@ -12,6 +12,12 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(path.join(HERE, '..', '..', '..', p), 'utf8');
+/**
+ * Comments come out before anything is matched. `lint-content-classification` learned this the hard way on
+ * 2026-09-23 (prose apostrophes opening fake string literals); here the risk is the opposite — a comment that
+ * NAMES the retired road, explaining why it is gone, reading as the road itself.
+ */
+const code = (p) => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
 const WEB = {
   painter: 'apps/basis/web/v2/faceView.js',
@@ -41,10 +47,21 @@ describe('the face is painted the same way on both shells', () => {
     for (const site of MOBILE.sites) expect(read(site), `${site} paints a face`).toMatch(/<FaceView\b/);
   });
 
-  it('neither painter can be handed a fetchable URL — the refusal lives in the shared decision', () => {
-    // A `src` pointing at somebody else's server would turn painting a row into a request that says who is
-    // reading it and when. Both shells rely on `faceOf` for that, so the check belongs there and nowhere else.
+  it('neither painter can be handed anything but a SEALED ref — the refusal lives in the shared decision', () => {
+    // A bare URL would turn painting a row into a request to somebody else's server that says who is reading
+    // it and when; an unsealed ref would be plaintext where a sealed pointer belongs. Both shells rely on
+    // `faceOf` for that, so the check belongs there and nowhere else.
     const shared = read('apps/basis/src/v2/memberFace.js');
-    expect(shared).toMatch(/startsWith\('data:image\/'\)/);
+    expect(shared).toMatch(/isSealedMediaRef\(/);
+  });
+
+  it('and there is only ONE picture road — the persona attribute, never a second inline field', () => {
+    // A second road existed for part of 2026-09-23 (`said.avatarThumb`, its own op and its own picker) and was
+    // removed. This is the check that it does not come back: the decision reads `profilePicture`, and nothing
+    // in either shell's paint path knows another name for a face.
+    expect(code('apps/basis/src/v2/memberFace.js')).toMatch(/profilePicture/);
+    for (const p of ['apps/basis/src/v2/memberFace.js', WEB.painter, MOBILE.painter, ...WEB.sites, ...MOBILE.sites]) {
+      expect(code(p), `${p} must not name a second face field`).not.toMatch(/avatarThumb/);
+    }
   });
 });

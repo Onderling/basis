@@ -20,7 +20,6 @@
  */
 import { pageLabel } from '../../src/v2/pageProjection.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
-import { paintFace } from './faceView.js';
 
 export function renderCircleProfile(container, {
   profile = {},
@@ -28,8 +27,6 @@ export function renderCircleProfile(container, {
   busy = false,
   t,
   onSaveProfile,
-  onPickFace = null,    // (File) => Promise<{ok}|{error}> — resize + setMyFace; absent ⇒ no picker rendered
-  onClearFace = null,   // () => Promise<*> — take the face off my rows
   // Fold-in phase C — open the "Mij → persona's" surface (where offerings live now).
   // Absent ⇒ the pointer renders as plain text (older callers / tests).
   onOpenMij,
@@ -80,48 +77,6 @@ export function renderCircleProfile(container, {
 
   // ── identity (handle + display name) ────────────────────────────────────
   const idSection = section(tr('circle.profile.identity'));
-
-  // ── MY FACE ───────────────────────────────────────────────────────────
-  // Above the name, because it is the same thing: what a member says about themselves. It shows the face as
-  // OTHERS will see it — the same slot and the same fallback a roster row paints — so there is no separate
-  // idea of "how my picture looks here" to get out of step with how it looks to anyone else.
-  if (typeof onPickFace === 'function') {
-    const faceRow = document.createElement('div');
-    faceRow.className = 'cc-profile__face-row';
-    const slot = document.createElement('span');
-    slot.className = 'cc-contacts__icon cc-profile__face';
-    paintFace(slot, profile);
-    faceRow.appendChild(slot);
-
-    const pick = document.createElement('input');
-    pick.type = 'file';
-    pick.accept = 'image/jpeg,image/png,image/webp';   // what the encoder can read; the fold takes the result
-    pick.className = 'cc-profile__face-input';
-    pick.id = 'cc-profile-face-input';
-    const label = document.createElement('label');
-    label.className = 'cc-btn cc-btn--quiet cc-profile__face-pick';
-    label.htmlFor = pick.id;
-    label.textContent = tr(profile.avatarThumb ? 'circle.profile.face_change' : 'circle.profile.face_choose');
-
-    const status = document.createElement('span');
-    status.className = 'cc-profile__face-status';
-    pick.addEventListener('change', async () => {
-      const file = pick.files?.[0];
-      if (!file) return;
-      status.textContent = tr('circle.profile.face_working');
-      const r = await onPickFace(file);
-      // A refusal must say WHY here: the fold would refuse it silently on every other device, and the person
-      // pressing this button is the only one who can do anything about it.
-      status.textContent = r?.error ? tr('circle.profile.face_refused', { reason: r.error }) : '';
-      pick.value = '';
-    });
-    faceRow.append(label, pick, status);
-
-    if (profile.avatarThumb && typeof onClearFace === 'function') {
-      faceRow.appendChild(button(tr('circle.profile.face_remove'), 'cc-profile__face-remove', () => onClearFace()));
-    }
-    idSection.appendChild(faceRow);
-  }
 
   const handle = labelledInput(tr('circle.profile.handle'), profile.handle ?? '', 'cc-profile__handle');
   const display = labelledInput(tr('circle.profile.displayName'), profile.displayName ?? '', 'cc-profile__display');

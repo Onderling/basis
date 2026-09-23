@@ -2318,45 +2318,6 @@ export function buildSkills({
     }),
 
     /**
-     * setMyFace({thumb})
-     *   The small picture a member shows on their own row, as a bounded inline data-URL.
-     *
-     *   NOT `avatarUrl`, which sits beside it and stays. The two look alike and are not: `avatarUrl` is a
-     *   LOCAL DISPLAY CACHE — an arbitrary URL, possibly someone else's, which `rosterAccessGate` marks
-     *   PRIVATE precisely so it never leaves this device. The FACE is the opposite: it is mine, it is bounded,
-     *   and it is meant to travel — it rides `member-props` to every circle I am in and the fold refuses it
-     *   above 4 KB. Merging the two fields would put a private cache on the wire, which is why they are two.
-     *
-     *   The cap is checked here too, but this is not where it binds: any app version could skip this op. The
-     *   gate is the fold, on every receiver (`rosterFold.js`). This one is only so a person gets a refusal
-     *   they can act on instead of a picture that silently never appears.
-     */
-    defineSkill('setMyFace', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const thumb = typeof a.thumb === 'string' ? a.thumb.trim() : '';
-      if (!thumb) return { error: 'thumb required' };
-      if (!thumb.startsWith('data:image/')) return { error: 'face-must-be-an-image-data-url' };
-      if (thumb.length > 4096) return { error: 'face-too-large', max: 4096, was: thumb.length };
-      if (!members) return { error: 'no-member-map' };
-      const updated = await members.addMember({ webid: from, avatarThumb: thumb });
-      return { avatarThumb: thumb, member: updated, _sync: simulateSync() };
-    }, {
-      description: 'Set the calling actor\'s face: a small inline picture (data:image/ URL, at most 4 KB) shown on their roster rows.',
-      visibility:  'authenticated',
-    }),
-
-    /** clearMyFace() — take the face off my rows. An empty face travels like any other change. */
-    defineSkill('clearMyFace', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, avatarThumb: null });
-      return { cleared: true, member: updated, _sync: simulateSync() };
-    }, {
-      description: 'Clear the calling actor\'s face.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * setPeerReveal({peerWebid, showDisplayName?: bool=true})
      *   — local-only viewer choice; flips Reveals so this viewer
      *   sees `displayName` for the named peer.

@@ -39,6 +39,18 @@ Tests use [Vitest](https://vitest.dev). Unit tests live under
 `packages/*/test/`; cross-component scenarios under
 `packages/integration-tests/`.
 
+## Branches
+
+- Three long-lived branches: `development` (default; every PR lands here), `live` (the release gate; only
+  `development` merges into it), `master` (legacy, frozen). Everything else is a short-lived feature branch.
+- **A feature branch is deleted when its PR merges** — on origin by the repository setting, locally by the author.
+  A branch that outlives its merge is a mistake, not an archive: the commits are on `development`.
+- History that must survive without a branch is a **tag** (`archive/pre-purge-app-trunk`) and a ref bundle outside
+  the repo — see `docs/repository-layout.md` §"History that is not on a branch". Never a `master-backup-*` branch.
+- Sweep: `git branch --merged development` lists what is safe to delete locally; a branch that is unmerged by
+  ancestry but whose patches are on `development` (a rebase) is found with `git cherry development <branch>`
+  (every line `-` = safe). Ancestry alone lies here since the 2026-04-09 history rewrite.
+
 ## Other expectations
 
 - Read `CLAUDE.md` for the project's working agreements before touching the kernel

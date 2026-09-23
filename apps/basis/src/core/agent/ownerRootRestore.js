@@ -33,6 +33,7 @@ import { Bootstrap, deriveDeviceSeed, deriveVaultAtRestKeyFrom, signDeviceDelega
 import { VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
+import { markForgetPending } from '../../v2/enrolForgets.js';
 
 /** The profile the chat identity is derived from. */
 export const DEFAULT_PROFILE = 'default';
@@ -95,7 +96,7 @@ const _newDeviceId = () => {
  *                                    (root in the key door) so legacy callers keep working.
  * @returns {Promise<{ok: true, pubKey: string, deviceId?: string, custody?: string} | {ok: false, code: string, detail?: string}>}
  */
-export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault } = {}) {
+export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault, throwawayCircleIds = [] } = {}) {
   if (typeof mnemonic !== 'string' || !mnemonic.trim()) return { ok: false, code: 'empty' };
   if (!rootKeyStore || !chatVault) return { ok: false, code: 'no-vault' };
 
@@ -150,6 +151,11 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     // The note the NEXT boot reads: a restore happened here, finish it (the restore-finish flow asks what
     // came back and what the person wants). Plain, device-local, cleared by that flow's first step.
     if (markerVault) { try { await markerVault.set(RESTORE_PENDING_KEY, JSON.stringify({ at: new Date().toISOString() })); } catch { /* the flow can be started by hand */ } }
+    // …and the other note the next boot reads: forget what the THROWAWAY self wrote here. Every device boots
+    // unenrolled first — a wiped one restoring from its phrase just as much as a second device being enrolled —
+    // and the content key those bytes were sealed under has just been replaced. Same vault, same lifecycle as
+    // the marker above; the clear itself is `enrolForgets.js`, read by each shell at boot.
+    await markForgetPending(markerVault, enrollDevice ? 'enrol' : 'restore', throwawayCircleIds);
 
     // 4. THE CUTOVER (delegation custody only): the door's seed becomes the delegation; the
     //    marker names it + carries the root fingerprint the sealed vaults' sentinel was bound to.

@@ -61,7 +61,25 @@ const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accep
 // `personaProperties` (2026-09-22, step two): the persona's RELEASE for this circle — coarse, reveal-gated, media by sealed
 // reference — as one map that wins whole (a key that leaves the release leaves the row; `{}` clears). It rides the same
 // self-subject statement, so the admin-mediated side wire for it could be retired.
-const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef', 'avatarThumb', 'personaProperties']);
+
+/**
+ * THE FACE, and why it is the one field of this kind that may carry bytes.
+ *
+ * `avatarThumb` is a small picture INLINE on the statement. Everything else here is a name or a reference,
+ * and the reason is this lane: membership statements are EXEMPT FROM COMPACTION, because the roster must stay
+ * rebuildable from the log — so every statement ever made on it is kept by every device for ever. An unbounded
+ * picture per change would therefore grow without limit on the one lane that never sheds anything.
+ *
+ * So the picture is bounded, and bounded HERE. A writer's own limit is a convention: the writer is whatever app
+ * version the sender happens to run, and a sender who wants to put a megabyte on everyone's disk simply would.
+ * The fold is where it binds, because every receiver folds independently and refuses identically.
+ *
+ * `data:image/` only: any other URL would turn painting a roster row into a request to somebody else's server,
+ * which leaks who is reading whose row and when.
+ */
+const AVATAR_THUMB_MAX_CHARS = 4096;
+const AVATAR_THUMB_PREFIX = 'data:image/';
 const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
@@ -320,6 +338,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       const keys = Object.keys(p).filter((k) => k !== 'authorRef');
       if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELDS.has(k))) continue;   // the allowlist: refused whole
       if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
+      if ('avatarThumb' in p) {                                                            // the face: bounded, or refused whole
+        const th = p.avatarThumb;
+        if (typeof th !== 'string' || !th.startsWith(AVATAR_THUMB_PREFIX) || th.length > AVATAR_THUMB_MAX_CHARS) continue;
+      }
       if (typeof p.handle === 'string' && p.handle) {
         const taken = [...members].some((m) => m !== s.subject && handles[m] === p.handle);
         if (taken) continue;                                                // uniqueness: deny-wins, the old handle stays
@@ -328,7 +350,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // the handle goes to `handles` (one map with the join's) AND to `props` — a projection needs to know a handle
       // came from the member's own later statement, which beats a cached rename, not from the join, which does not
       if (typeof p.handle === 'string' && p.handle) { handles[s.subject] = p.handle; mine.handle = p.handle; }
-      for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
+      for (const k of ['displayName', 'avatarRef', 'avatarThumb']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
       if (isPlainMap(p.personaProperties)) mine.personaProperties = { ...p.personaProperties };   // whole map, newest wins
     }
 

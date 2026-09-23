@@ -486,6 +486,58 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r.props[bob.pubKey].handle, 'the join\'s handle is not').toBeUndefined();
   });
 
+  // ── THE FACE (2026-09-23) ────────────────────────────────────────────────────────────────────────────
+  // A small thumbnail rides INLINE on member-props — the one field of this kind that carries bytes. That is
+  // only safe because it is BOUNDED: this lane is exempt from compaction, so every statement on it is kept by
+  // every device for ever, and an unbounded picture per change would grow without limit on the one lane that
+  // never sheds anything. The cap is enforced at the FOLD, not at the writer, because the writer is whatever
+  // app version the sender happens to run — the enforceability test. Deny-wins and whole-statement, like the
+  // handle collision beside it: a refused face does not quietly land a display name with it.
+  it('a face within the cap lands on the row', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const thumb = `data:image/webp;base64,${'A'.repeat(200)}`;
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, avatarThumb: thumb, displayName: 'Bob' }, parent: join.hash });
+    const r = foldRoster([join, p1], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey].avatarThumb).toBe(thumb);
+    expect(r.props[bob.pubKey].displayName).toBe('Bob');
+  });
+
+  it('a face OVER the cap refuses the whole statement — the display name beside it does not sneak in', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const tooBig = `data:image/webp;base64,${'A'.repeat(8000)}`;   // > 4 KB
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, avatarThumb: tooBig, displayName: 'Bob' }, parent: join.hash });
+    const r = foldRoster([join, p1], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey]?.avatarThumb, 'the oversize face is refused').toBeUndefined();
+    expect(r.props[bob.pubKey]?.displayName, 'and so is everything it travelled with').toBeUndefined();
+  });
+
+  it('a face that is not an image data-URL is refused too — a link is not a face', async () => {
+    // `data:image/` only: anything else is a pointer at somebody else's server, which would turn painting a
+    // roster row into a request that leaks who is reading it and when.
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    for (const bad of ['https://example.org/me.png', 'data:text/html;base64,AAAA', 'blob:whatever']) {
+      const p = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, avatarThumb: bad }, parent: join.hash });
+      const r = foldRoster([join, p], { founders: [founder.pubKey] });
+      expect(r.props[bob.pubKey]?.avatarThumb, `${bad} is not a face`).toBeUndefined();
+    }
+  });
+
+  it('a newer face replaces an older one, and every device agrees which is newer', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const one = `data:image/webp;base64,${'A'.repeat(100)}`;
+    const two = `data:image/webp;base64,${'B'.repeat(100)}`;
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, avatarThumb: one }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, avatarThumb: two }, parent: p1.hash });
+    const inOrder = foldRoster([join, p1, p2], { founders: [founder.pubKey] });
+    const shuffled = foldRoster([p2, join, p1], { founders: [founder.pubKey] });
+    expect(inOrder.props[bob.pubKey].avatarThumb).toBe(two);
+    expect(shuffled.props[bob.pubKey].avatarThumb, 'read order does not decide whose face you see').toBe(two);
+  });
+
   it('the PERSONA PROPERTIES ride as one field group (step two, 2026-09-22): the released map, per circle, newest map wins whole; by reference only', async () => {
     // What a persona discloses to THIS circle (`getPersonaRelease` — coarse, reveal-gated, media by sealed reference) travels
     // as `personaProperties` on the same statement, so the admin-mediated `persona-props-update` wire can go. A map, not

@@ -631,8 +631,14 @@ const sameSaid = (k, laneValue, v) => (k === 'personaProperties'
  *
  * ONE STATEMENT PER CIRCLE, carrying only the fields that differ from that circle's roster row as this device
  * holds it — the diff gate: an unchanged save appends nothing, and a circle joined later gets what it lacks. A
- * circle whose append fails is named and the loop goes on; the next save retries it. The avatar rides BY
- * REFERENCE (`avatarRef`: a hash/path into the item store), never inline — the lane is exempt from compaction.
+ * circle whose append fails is named and the loop goes on; the next save retries it.
+ *
+ * THE PICTURE, in two halves (narrowed 2026-09-23 from "never inline"). The lane is exempt from compaction —
+ * `entryKinds.js` declares the membership kind `RETAIN.RECORD`, "the roster refolds from these — never drops" —
+ * so anything said here is kept by every device for ever. That forbids an UNBOUNDED picture, not a bounded one.
+ * A face (`avatarThumb`) rides inline, hard-capped at 4 KB and `data:image/` only, refused at the fold by every
+ * receiver independently. The FULL-SIZE picture still rides by REFERENCE (`avatarRef`: a hash/path into the
+ * item store) and waits on the media carrier.
  *
  * @param {object} deps
  * @param {Function|undefined} deps.emitSpine  the membership rail's appender (`{kind, circleId, subject, actor, payload}`)

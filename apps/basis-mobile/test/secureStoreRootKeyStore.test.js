@@ -73,10 +73,15 @@ describe('the restore door and the boot door are the SAME keystore', () => {
       // restore ceremony enrolled this install; the root is never persisted anywhere).
       expect(keystore.store.size).toBe(1);
       // The owner-root vault carries only NON-SECRET notes: the custody marker (mode + deviceId +
-      // fingerprint tag) and the restore-pending note the next boot's restore-finish flow reads —
-      // never a seed or a phrase.
+      // fingerprint tag), the restore-pending note the next boot's restore-finish flow reads, and the
+      // forget-pending note that tells the next boot to clear what the THROWAWAY self wrote here (a wiped
+      // device restoring from its phrase booted unenrolled first, like every device) — never a seed or a
+      // phrase. This list is pinned deliberately: a secret arriving in this vault must fail a test, and
+      // adding a note must be a decision someone took on purpose rather than a diff nobody read.
       const rootKeys = [...newPhone.store.keys()].filter((k) => k.startsWith('cc-owner-root:')).sort();
-      expect(rootKeys).toEqual(['cc-owner-root:custody-mode', 'cc-owner-root:restore-pending']);
+      expect(rootKeys).toEqual([
+        'cc-owner-root:custody-mode', 'cc-owner-root:forget-pending', 'cc-owner-root:restore-pending',
+      ]);
 
       const b2 = await bootAgentBundle({ asyncStorage: newPhone, secureStore: keystore });
       expect(b2.agent.sa.agent.identity.pubKey).toBe(before);                // …and the boot found it there

@@ -103,3 +103,13 @@ A file's *function* is encoded in its name/location, and that decides whether gi
 **The guard:** `npm run lint:docs` (`scripts/lint-doc-refs.mjs`, wired into CI) fails if a public file links
 into a private path or outside the repo, and if anything private is tracked. That keeps references valid on a
 fresh clone and stops the public/private split from drifting.
+
+## History that is not on a branch
+
+- **`archive/pre-purge-app-trunk`** — a TAG (annotated, on origin since 2026-09-23), not a branch: the app trunk
+  as it stood on 2026-06-14 before the plan-docs history purge. The only archive ref; every other pre-July
+  branch was deleted on 2026-09-23 after a subject/patch-id check showed their code is on `development`.
+- **The ref bundle** `~/expotest/canopy-mono-refs-2026-09-23.bundle` (34 MB, 312 refs, every branch and tag as of
+  that day, outside the repo) — `git bundle verify` it; `git fetch <bundle> <ref>` brings any deleted branch back.
+- The `outreach/` folder was removed from the tree on 2026-09-07 (#58); its material lives in the private site
+  repo. It remains in history; a history rewrite, if ever, is one job for everything, before going public.

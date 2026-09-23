@@ -31,7 +31,6 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
   const [offerInvalid, setOfferInvalid] = useState(false);
   const [offerView, setOfferView] = useState(null);   // null | {uri} | {error}
   const runnerRef = useRef(null);
-
   useEffect(() => {
     if (!visible || typeof callSkill !== 'function') return;
     const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => callSkill('household', opId, args) });

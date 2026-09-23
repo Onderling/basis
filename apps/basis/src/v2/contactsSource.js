@@ -224,7 +224,7 @@ export async function loadBookRows(callSkill) {
  * @param {object|null} a.agent  `identityOfAddress(addr)` and `ownAddresses()` are read off it when present
  * @param {(app: string, op: string, args?: object) => Promise<any>} a.callSkill
  */
-export async function loadContactRoster({ peerGraph = null, agent = null, callSkill = null } = {}) {
+export async function loadContactRoster({ peerGraph = null, agent = null, callSkill = null, names = null } = {}) {
   const [peerRows, bookRows] = await Promise.all([
     listContacts(peerGraph, {
       identityOf: (a) => agent?.identityOfAddress?.(a) ?? null,
@@ -233,12 +233,122 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
     loadBookRows(callSkill),
   ]);
   const merged = mergeContacts(peerRows, bookRows);
-  if (typeof callSkill !== 'function') return merged;
+  if (typeof callSkill !== 'function') return withNameMarkers(merged, names);
   const rosters = new Map();   // circleId → the members read (one read per roster per call)
   const rosterRow = async (circleId, webid) => {
     if (!rosters.has(circleId)) rosters.set(circleId, callSkill('stoop', 'listGroupMembers', { groupId: circleId }).then((r) => (Array.isArray(r?.members) ? r.members : [])).catch(() => []));
     return (await rosters.get(circleId)).find((m) => m?.webid === webid) ?? null;
   };
-  return nameContactsFromRosters(merged, { rosterRow });
+  return withNameMarkers(await nameContactsFromRosters(merged, { rosterRow }), names);
+}
+
+/**
+ * The two name markers, applied where every shell reads (L116): who cannot be told apart by name, and who has
+ * renamed themselves since this device last looked. Both are projections over the rows — nothing on the lane,
+ * nothing stored but what this device painted.
+ */
+async function withNameMarkers(rows, names) {
+  if (!names || typeof names.read !== 'function') return markLookalikes(rows);
+  let lastSeenNames = {};
+  try { lastSeenNames = await names.read(); } catch { lastSeenNames = {}; }
+  const marked = markLookalikes(markRenames(rows, { lastSeenNames }));
+  try { await names.remember?.(marked); } catch { /* the marker is a courtesy; a failed write costs nothing else */ }
+  return marked;
+}
+
+/** The key a name collides on: what a person READS, so case and stray space do not make two names different. */
+const nameKey = (name) => String(name ?? '').trim().toLowerCase();
+
+/**
+ * TELLING TWO CONTACTS APART (L116, 2026-09-23). Since the book reads the roster a contact is named by
+ * what THEY said on the pair roster — so a contact can take the name of another of your contacts, and Contacten
+ * would show two identical rows with the thread opening under the name.
+ *
+ * When two or more SHOWN rows read the same, each of them carries `lookalike`: their handle, or the last four of
+ * their key when they have none. EVERY row of the set is marked, never just the newcomer — a person cannot guess
+ * which one moved, and marking one implies the other is "the real one", which this device cannot know. A bot is
+ * left alone: its name is the registry's, not a claim someone made about themselves.
+ *
+ * @param {Array<object>} rows  merged Contacten rows
+ * @returns {Array<object>}     the same rows; colliding ones carry `lookalike`
+ */
+export function markLookalikes(rows = []) {
+  const counts = new Map();
+  for (const r of rows) {
+    if (!r || r.isBot || r.hidden === true) continue;          // hidden rows are not on screen: they collide with nobody
+    const k = nameKey(r.name);
+    if (!k) continue;
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return rows.map((r) => {
+    if (!r || r.isBot || r.hidden === true) return r;
+    const k = nameKey(r.name);
+    if (!k || (counts.get(k) ?? 0) < 2) return r;
+    const tell = (typeof r.handle === 'string' && r.handle) ? r.handle : String(r.contactId ?? '').slice(-4);
+    return tell ? { ...r, lookalike: tell } : r;
+  });
+}
+
+/**
+ * A CONTACT WHO RENAMED THEMSELVES. A rename arrives from the roster with no announcement: a row simply
+ * reads differently the next time you look. So a row whose lane-borne name differs from the one this device last
+ * PAINTED carries `wasName` — the old one — until the thread is opened (the same per-device mark the unread count
+ * keeps). A first sighting is not a rename.
+ *
+ * @param {Array<object>} rows
+ * @param {{lastSeenNames?: Object<string, {name: string}>}} [opts]
+ */
+export function markRenames(rows = [], { lastSeenNames = {} } = {}) {
+  return rows.map((r) => {
+    if (!r || r.isBot) return r;
+    const was = lastSeenNames?.[r.contactId]?.name;
+    if (typeof was !== 'string' || !was) return r;              // never seen here: nothing to have changed
+    if (nameKey(was) === nameKey(r.name)) return r;
+    return { ...r, wasName: was };
+  });
+}
+
+/** Where the last-painted names live (device-local, like the seen-marks: `cc.contactNames`). */
+export const CONTACT_NAMES_KEY = 'cc.contactNames';
+
+/**
+ * The per-device memory of what each contact's row LAST READ — the left-hand side of `markRenames`. Duck-typed
+ * io (`localStorage` on web, AsyncStorage on mobile), exactly like `makeContactSeenStore`.
+ */
+export function makeContactNameStore(io) {
+  async function read() {
+    try {
+      const raw = await io.getItem(CONTACT_NAMES_KEY);
+      const v = raw ? JSON.parse(raw) : {};
+      return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+    } catch { return {}; }
+  }
+  async function write(map) {
+    try { await io.setItem(CONTACT_NAMES_KEY, JSON.stringify(map)); } catch { /* quota / disabled: the marker simply does not show */ }
+  }
+  return {
+    read,
+    /** Remember the names as painted — for rows that carry NO rename marker (a marked row is not "seen" yet). */
+    async remember(rows = []) {
+      const map = await read();
+      let changed = false;
+      for (const r of rows) {
+        if (!r || r.isBot || typeof r.contactId !== 'string' || !r.contactId) continue;
+        if (r.wasName) continue;                                 // still to be acknowledged — keep the old name
+        const name = typeof r.name === 'string' ? r.name : '';
+        if (!name || map[r.contactId]?.name === name) continue;
+        map[r.contactId] = { name, at: Date.now() };
+        changed = true;
+      }
+      if (changed) await write(map);
+    },
+    /** The thread was opened: this name is now the one this device knows. */
+    async seen(contactId, name) {
+      if (typeof contactId !== 'string' || !contactId || typeof name !== 'string' || !name) return;
+      const map = await read();
+      map[contactId] = { name, at: Date.now() };
+      await write(map);
+    },
+  };
 }
 

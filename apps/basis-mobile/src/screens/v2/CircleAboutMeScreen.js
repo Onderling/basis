@@ -214,12 +214,15 @@ export default function CircleAboutMeScreen({ callSkill, emitMemberProps, lastSh
                       disabled={shareState[c.circleId] === 'sharing'}
                       onPress={() => shareToCircle(c.circleId)}
                     >
-                      <Text style={styles.shareBtnText}>{t('circle.aboutme.share_to_circle')}</Text>
+                      <Text style={styles.shareBtnText}>
+                        {/* with every toggle off, pressing this STOPS sharing — the word follows the act (L115) */}
+                        {c.rows.some((r) => r.enabled) ? t('circle.aboutme.share_to_circle') : t('circle.mij.stop_sharing')}
+                      </Text>
                     </Pressable>
                     {shareState[c.circleId] ? (
                       <Text style={styles.shareStatus}>
                         {shareState[c.circleId] === 'sharing' ? t('circle.aboutme.sharing_now')
-                          : shareState[c.circleId] === 'ok' ? t('circle.aboutme.shared_ok')
+                          : shareState[c.circleId] === 'ok' ? (c.rows.some((r) => r.enabled) ? t('circle.aboutme.shared_ok') : t('circle.mij.stopped_sharing'))
                           : t('circle.aboutme.share_failed', { reason: shareState[c.circleId] })}
                       </Text>
                     ) : null}

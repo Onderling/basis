@@ -264,7 +264,7 @@ import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
-import { loadContactRoster } from '../../../../basis/src/v2/contactsSource.js';
+import { loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
@@ -591,6 +591,8 @@ export default function CircleLauncherScreen({
   // from the channel's durable turns, the count on each row and the sum on the tab. Recomputed when a turn lands
   // (the reply inbox) and when a thread is opened (its seen-mark moves to now).
   const contactSeen = useMemo(() => makeContactSeenStore(AsyncStorage), []);
+  // …and what each row LAST READ here — the rename marker's left-hand side (L116, web parity).
+  const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
   const [contactUnread, setContactUnread] = useState({});
   const refreshContactUnread = useCallback(async () => {
     try {
@@ -604,7 +606,9 @@ export default function CircleLauncherScreen({
     setContactThread(contact);
     // opening the thread is reading it — the seen-mark moves to now, the badge is gone
     contactSeen.mark(contact?.contactId, Date.now()).then(refreshContactUnread).catch(() => {});
-  }, [contactSeen, refreshContactUnread]);
+    // …and it acknowledges a rename: the "was: …" line under the row clears (L116, web parity)
+    contactNames.seen(contact?.contactId, contact?.name).catch(() => {});
+  }, [contactSeen, contactNames, refreshContactUnread]);
   const tabBadges = useMemo(() => ({ contacten: totalUnread(contactUnread) }), [contactUnread]);
   const [viewAsPolicy, setViewAsPolicy] = useState('pairwise');
   const [viewAsMembers, setViewAsMembers] = useState([]);
@@ -1220,7 +1224,7 @@ export default function CircleLauncherScreen({
   const [shareContacts, setShareContacts] = useState([]);
   const loadShareContacts = useCallback(async () => {
     try {
-      const merged = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null });
+      const merged = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames });
       setShareContacts(merged);
       // Story 1.2 — hand the roster to the pod layer so a canonical REVOKE can re-derive an out-of-circle
       // grantee's sealing key and evict exactly that grantee (instead of rotating away from all of them).

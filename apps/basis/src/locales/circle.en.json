@@ -4036,6 +4036,14 @@
       "text": "Sealed to the device only",
       "doc": "Thread header of a direct message. No person key on record for this contact yet: messages are sealed to the device that holds their address, as before. Their next card, or a circle you share, brings the key."
     },
+    "lookalike_hint": {
+      "text": "Two contacts use this name — this is the handle (or key) of this one.",
+      "doc": "contacten — tooltip on the handle/key painted beside a display name two or more contacts share (L116)."
+    },
+    "was_named": {
+      "text": "was: {name}",
+      "doc": "contacten — one line under a row whose contact renamed themselves on the pair roster; clears when the thread is opened (L116)."
+    },
     "unread": {
       "text": "{{count}} new",
       "doc": "The unread badge on a Contacten row (and its accessible label): inbound messages newer than the moment this thread was last opened on this device. count = how many."
@@ -5461,6 +5469,14 @@
     "level_all": {
       "text": "everything",
       "doc": "mij#personas — level cell when no rung was chosen (the full value)."
+    },
+    "stop_sharing": {
+      "text": "Stop sharing here",
+      "doc": "mij#personas — the action on a circle where nothing is disclosed any more but the circle still holds what was shared before: pushes the empty release, which the lane carries as a clear (L115, 2026-09-23)."
+    },
+    "stopped_sharing": {
+      "text": "Stopped ✓",
+      "doc": "mij#personas — status after the withdrawal landed."
     },
     "nothing_shared": {
       "text": "shares nothing here",

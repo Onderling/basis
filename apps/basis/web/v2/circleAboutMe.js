@@ -265,11 +265,16 @@ export function renderAboutMe(container, {
 
     // "Share to this circle" — push the current disclosure to the circle's roster (post-join). The
     // toggles above only change LOCAL intent; this is what makes the circle actually see the change.
+    // The button is offered whenever there is a property to talk about — the rows here are the TOGGLES, not what
+    // is disclosed, so unticking the last one never takes it away (that was Mij's table, L115, fixed there).
+    // What did mislead: with every toggle off, pressing it STOPS sharing, and it still said "share". The word
+    // follows the act now — an empty release is a real statement, the lane carries `{}` as a clear.
     if (c.rows.length && typeof onShareToCircle === 'function') {
+      const sharingNothing = !c.rows.some((r) => r.enabled);
       const shareBtn = document.createElement('button');
       shareBtn.type = 'button';
       shareBtn.className = 'cc-aboutme__share-btn';
-      shareBtn.textContent = tr('circle.aboutme.share_to_circle');
+      shareBtn.textContent = sharingNothing ? tr('circle.mij.stop_sharing') : tr('circle.aboutme.share_to_circle');
       const status = document.createElement('span');
       status.className = 'cc-aboutme__share-status';
       shareBtn.addEventListener('click', async () => {
@@ -279,7 +284,7 @@ export function renderAboutMe(container, {
         try { res = await onShareToCircle(c.circleId); }
         catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
         status.textContent = res?.ok
-          ? tr('circle.aboutme.shared_ok')
+          ? (sharingNothing ? tr('circle.mij.stopped_sharing') : tr('circle.aboutme.shared_ok'))
           : tr('circle.aboutme.share_failed', { reason: res?.reason ?? '' });
         shareBtn.disabled = false;
       });

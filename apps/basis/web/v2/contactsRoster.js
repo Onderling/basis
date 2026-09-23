@@ -61,7 +61,23 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     const name = document.createElement('div');
     name.className = 'cc-contacts__name';
     name.textContent = c.name;
+    // TWO PEOPLE, ONE NAME (L116): a contact is named by what THEY say on the pair roster, so one can take
+    // another's name. Every row of a colliding set says which one it is — the handle, else the key's tail.
+    if (c.lookalike) {
+      const tell = document.createElement('span');
+      tell.className = 'cc-contacts__lookalike';
+      tell.textContent = c.lookalike;
+      tell.title = tr('circle.contacts.lookalike_hint');
+      name.appendChild(tell);
+    }
     body.appendChild(name);
+    // …and a contact who RENAMED themselves says what they were, until you open the thread.
+    if (c.wasName) {
+      const was = document.createElement('div');
+      was.className = 'cc-contacts__was';
+      was.textContent = tr('circle.contacts.was_named', { name: c.wasName });
+      body.appendChild(was);
+    }
 
     const meta = document.createElement('div');
     meta.className = 'cc-contacts__meta';

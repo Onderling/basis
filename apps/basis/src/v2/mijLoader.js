@@ -79,5 +79,20 @@ export async function loadMijModel({ callSkill, personaId, circles = [], activeC
     }
   }));
 
-  return buildMijViewModel({ personas, circles, releases });
+  // WHAT THE LANE HOLDS FOR ME in each circle — my own roster row's `said.personaProperties` (`member-props`).
+  // The model needs it to offer "stop sharing" for a circle where nothing is disclosed any more but the
+  // co-members still hold something. Read per circle, best-effort: a circle that cannot be read simply
+  // offers nothing, which is the safe direction.
+  const withLane = await Promise.all((Array.isArray(circles) ? circles : []).map(async (c) => {
+    const id = typeof c === 'string' ? c : (c?.id ?? c?.groupId);
+    if (!id) return c;
+    try {
+      const me = (await callSkill('stoop', 'whoAmI', {}))?.webid ?? null;
+      const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: id }))?.members ?? [];
+      const mine = me ? rows.find((m) => (m.webid ?? m.addr ?? m.ref) === me) : null;
+      const said = mine?.said?.personaProperties;
+      return { ...c, ...(said && typeof said === 'object' ? { sharedOnLane: said } : {}) };
+    } catch { return c; }
+  }));
+  return buildMijViewModel({ personas, circles: withLane, releases });
 }

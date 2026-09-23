@@ -9,9 +9,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
-import { splitShownHidden, loadContactRoster } from '../../../../basis/src/v2/contactsSource.js';
+import { splitShownHidden, loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
@@ -28,15 +29,18 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
   // sight, until they write again or the person shows them. A list of only hidden contacts is not empty.
   const [foldOpen, setFoldOpen] = useState(false);
   const { shown, hidden } = useMemo(() => splitShownHidden(contacts), [contacts]);
+  // What each row last read HERE — the rename marker's left-hand side. The launcher owns the same store;
+  // this screen is the other door onto the same list, so it reads through the same one.
+  const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
 
   // S1 #2 — the unified directory: PeerGraph bots/peers merged with the stoop
   // ContactBook (people the user added, with trust/tags). Same shared helpers as web.
   const reload = useCallback(async () => {
     // The one Contacten read (web parity): the graph less aliases and my own addresses, the book, merged, and every
     // contact with a pair roster here named by what they said on it.
-    try { setContacts(await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill })); }
+    try { setContacts(await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill, names: contactNames })); }
     catch { setContacts([]); }
-  }, [peerGraph, callSkill]);
+  }, [peerGraph, callSkill, contactNames]);
 
   // Load on mount + whenever the graph changes (a bot added/discovered/removed).
   useEffect(() => {
@@ -79,7 +83,13 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
       >
         <Text style={styles.icon}>{c.isBot ? '🤖' : '👤'}</Text>
         <View style={styles.body}>
-          <Text style={[styles.name, n > 0 && styles.nameUnread]}>{c.name}</Text>
+          <Text style={[styles.name, n > 0 && styles.nameUnread]}>
+            {c.name}
+            {/* two contacts, one name (web parity): every row of the set says which one it is */}
+            {c.lookalike ? <Text style={styles.lookalike} accessibilityLabel={t('circle.contacts.lookalike_hint')}>{`  ${c.lookalike}`}</Text> : null}
+          </Text>
+          {/* …and one who renamed themselves says what they were, until the thread is opened */}
+          {c.wasName ? <Text style={styles.wasName}>{t('circle.contacts.was_named', { name: c.wasName })}</Text> : null}
           <Text style={styles.meta}>{rosterMeta(c)}</Text>
         </View>
         {n > 0 ? <Text style={styles.unread} accessibilityLabel={t('circle.contacts.unread', { count: n })} testID={`contact-unread-${c.contactId}`}>{String(n)}</Text> : null}
@@ -168,6 +178,8 @@ const makeStyles = (theme) => StyleSheet.create({
   icon: { fontSize: 22 },
   body: { flex: 1 },
   name: { fontSize: 15, fontWeight: '600', color: theme.color.ink },
+  lookalike: { fontSize: 12, fontWeight: '400', color: theme.color.inkSoft },
+  wasName: { fontSize: 12, fontStyle: 'italic', color: theme.color.inkSoft },
   meta: { fontSize: 12, color: theme.color.inkSoft, marginTop: 2 },
   open: { fontSize: 13, fontWeight: '600', color: theme.color.accent },
 });

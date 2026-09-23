@@ -132,8 +132,8 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
   }, [callSkill, model?.defaultId, load]);
 
   // personas#2 — push a persona's current disclosure for the circle up to its roster.
-  const onShareToCircle = useCallback(async (circleId, forPersonaId) => {
-    const k = `${circleId}:${forPersonaId}`;
+  const onShareToCircle = useCallback(async (circleId, forPersonaId, { stop = false } = {}) => {
+    const k = stop ? `${circleId}:stop` : `${circleId}:${forPersonaId}`;
     setShareState((s) => ({ ...s, [k]: 'sharing' }));
     let res;
     try { res = await shareDisclosureToCircle({ callSkill, emitMemberProps, lastShared, resealMediaForCircle, circleId, personaId: forPersonaId }); }
@@ -381,6 +381,29 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
               <Text style={styles.cardName}>{circle.name}</Text>
               {!circle.rows.length ? (
                 <Text style={styles.empty}>{t('circle.mij.nothing_shared')}</Text>
+              ) : null}
+              {/* …and TAKING IT BACK (web parity): nothing is disclosed here any more, but the circle still
+                  holds what was said last time, so this is the one place the withdrawal can be pushed. Same op as
+                  sharing — an empty release is a real statement the lane carries as a clear — with its own word. */}
+              {circle.canWithdraw ? (
+                <View style={styles.sharePersonaLine}>
+                  <Pressable
+                    style={styles.btnQuiet}
+                    accessibilityRole="button"
+                    testID={`mij-stop-sharing-${circle.circleId}`}
+                    disabled={shareState[`${circle.circleId}:stop`] === 'sharing'}
+                    onPress={() => onShareToCircle(circle.circleId, model.defaultId, { stop: true })}
+                  >
+                    <Text style={styles.btnQuietText}>{t('circle.mij.stop_sharing')}</Text>
+                  </Pressable>
+                  {shareState[`${circle.circleId}:stop`] ? (
+                    <Text style={styles.shareStatus}>
+                      {shareState[`${circle.circleId}:stop`] === 'sharing' ? t('circle.aboutme.sharing_now')
+                        : shareState[`${circle.circleId}:stop`] === 'ok' ? t('circle.mij.stopped_sharing')
+                        : t('circle.aboutme.share_failed', { reason: shareState[`${circle.circleId}:stop`] })}
+                    </Text>
+                  ) : null}
+                </View>
               ) : null}
               {circle.rows.map((r, i) => {
                 const firstOfGroup = r.personaId !== prevPersona;

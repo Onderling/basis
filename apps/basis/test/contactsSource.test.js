@@ -7,8 +7,7 @@ import { describe, it, expect } from 'vitest';
 
 import { PeerGraph } from '@onderling/core';
 import {
-  listContacts, peerToContactRow, stoopContactToRow, mergeContacts, splitShownHidden,
-  nameContactsFromRosters, loadContactRoster,
+  listContacts, peerToContactRow, stoopContactToRow, mergeContacts, splitShownHidden, nameContactsFromRosters, loadContactRoster, markLookalikes, markRenames, makeContactNameStore,
 } from '../src/v2/contactsSource.js';
 
 describe('peerToContactRow', () => {
@@ -264,5 +263,80 @@ describe('THE NAMELESS ROW COMES BACK (2026-09-22, the delete/hide note §6a-3) 
     const { shown, hidden } = splitShownHidden(rows);
     expect(shown).toEqual([]);
     expect(hidden.map((r) => r.contactId)).toEqual(['x9k']);
+  });
+});
+
+describe('TELLING TWO CONTACTS APART (2026-09-23) — the lookalike name', () => {
+  // Since the book reads the roster, a contact is named by what THEY said on their pair roster — so a
+  // contact can rename themselves to the name of another of your contacts. Two rows "Frits", one an impostor,
+  // and the thread opens under the name. The gate is cheap and belongs to the projection, not to a shell: when
+  // two or more SHOWN rows share a display name, every one of them carries the handle (or the key's last four)
+  // beside it — all of them, not only the newcomer, because a person cannot guess which one moved.
+  const row = (contactId, name, over = {}) => ({ contactId, name, isBot: false, source: 'contact', hidden: false, ...over });
+  it('marks every row of a colliding set, never a unique one; a bot is left alone', () => {
+    const rows = markLookalikes([
+      row('aaaa1111', 'Frits', { handle: 'frits' }),
+      row('bbbb2222', 'Frits'),
+      row('cccc3333', 'Bea', { handle: 'bea' }),
+      row('dddd4444', 'Frits', { isBot: true }),
+    ]);
+    const by = Object.fromEntries(rows.map((r) => [r.contactId, r]));
+    expect(by.aaaa1111.lookalike, 'the handle tells them apart where there is one').toBe('frits');
+    expect(by.bbbb2222.lookalike, 'else the key says which one this is').toBe('2222');
+    expect(by.cccc3333.lookalike, 'a name nobody else uses needs nothing').toBeUndefined();
+    expect(by.dddd4444.lookalike, 'a bot is not a person and is named by its registry').toBeUndefined();
+  });
+  it('compares the name as it is PAINTED — case and surrounding space do not make two names different', () => {
+    const rows = markLookalikes([row('aaaa1111', 'Frits'), row('bbbb2222', ' frits ')]);
+    expect(rows.every((r) => r.lookalike)).toBe(true);
+  });
+  it('a hidden row is not on screen, so it collides with nobody', () => {
+    const rows = markLookalikes([row('aaaa1111', 'Frits'), row('bbbb2222', 'Frits', { hidden: true })]);
+    expect(rows.find((r) => r.contactId === 'aaaa1111').lookalike).toBeUndefined();
+  });
+});
+
+describe('A CONTACT WHO RENAMED THEMSELVES — "was: …" until you have seen it', () => {
+  // The rename lands from the roster with no announcement of any kind; a row simply reads differently the next
+  // time you look. So the row says what it was, until the thread is opened — the same seen-mark the unread
+  // count already keeps per device.
+  const row = (contactId, name) => ({ contactId, name, isBot: false, source: 'contact', hidden: false });
+  it('carries the previous name once the lane-borne name differs from what this device last saw', () => {
+    const seen = { aaaa1111: { name: 'Frits', at: 1 } };
+    const [r] = markRenames([row('aaaa1111', 'Frits de Boer')], { lastSeenNames: seen });
+    expect(r.wasName).toBe('Frits');
+  });
+  it('says nothing when the name is unchanged, when this device never saw one, or once it is seen again', () => {
+    expect(markRenames([row('a', 'Frits')], { lastSeenNames: { a: { name: 'Frits', at: 1 } } })[0].wasName).toBeUndefined();
+    expect(markRenames([row('a', 'Frits')], { lastSeenNames: {} })[0].wasName, 'a first sighting is not a rename').toBeUndefined();
+    expect(markRenames([row('a', 'Frits de Boer')], { lastSeenNames: { a: { name: 'Frits de Boer', at: 2 } } })[0].wasName).toBeUndefined();
+  });
+  it('a store remembers what was painted, and clears the marker when the thread is opened', async () => {
+    const mem = new Map();
+    const store = makeContactNameStore({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => { mem.set(k, v); } });
+    await store.remember([row('a', 'Frits'), row('b', 'Bea')]);
+    expect((await store.read()).a.name).toBe('Frits');
+    const [r] = markRenames([row('a', 'Frits de Boer')], { lastSeenNames: await store.read() });
+    expect(r.wasName).toBe('Frits');
+    await store.seen('a', 'Frits de Boer');                       // the thread was opened
+    expect(markRenames([row('a', 'Frits de Boer')], { lastSeenNames: await store.read() })[0].wasName).toBeUndefined();
+  });
+});
+
+describe('loadContactRoster — the name markers ride the one read', () => {
+  it('marks lookalikes and renames, and remembers what it painted', async () => {
+    const g = new PeerGraph();
+    const mem = new Map();
+    const names = makeContactNameStore({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => { mem.set(k, v); } });
+    await names.seen('aa11', 'Frits');
+    const callSkill = async (app, op) => (op === 'listContacts'
+      ? { contacts: [{ webid: 'aa11', displayName: 'Frits de Boer' }, { webid: 'bb22', displayName: 'Bea' }, { webid: 'cc33', displayName: 'Bea' }] }
+      : null);
+    const rows = await loadContactRoster({ peerGraph: g, agent: null, callSkill, names });
+    const by = Object.fromEntries(rows.map((r) => [r.contactId, r]));
+    expect(by.aa11.wasName, 'the row says what it was').toBe('Frits');
+    expect(by.bb22.lookalike && by.cc33.lookalike, 'both Beas are told apart').toBeTruthy();
+    expect((await names.read()).bb22.name, 'a row with no marker is remembered as painted').toBe('Bea');
+    expect((await names.read()).aa11.name, 'a row still to be acknowledged keeps the OLD name').toBe('Frits');
   });
 });

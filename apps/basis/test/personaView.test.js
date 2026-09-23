@@ -465,3 +465,36 @@ describe('renderMij', () => {
     expect(noCircles.querySelector('.cc-mij__empty-note').textContent).toBe('circle.mij.no_circles');
   });
 });
+
+describe('buildMijViewModel — taking a disclosure back (2026-09-23)', () => {
+  // Found on the live walk: untick the last disclosed property and the circle's row collapsed to "nothing
+  // shared" with no button, so the withdrawal could never be pushed and every co-member kept the old value.
+  // The rule is the model's, not the shell's: a circle offers "stop sharing" when the release is EMPTY and the
+  // LANE still holds something for me there (`said.personaProperties` on my own roster row — the truth, not a
+  // device-local memo: a second device that never shared must still be able to stop it).
+  const persona = (enabled) => ({
+    id: 'default', name: 'me',
+    properties: { place: { mode: 'own', value: 'Groningen' } },
+    disclosure: { perContext: { k1: { place: { enabled } } } },
+  });
+  const model = ({ released, onLane }) => buildMijViewModel({
+    personas: [persona(Object.keys(released ?? {}).length > 0)], defaultId: 'default',
+    circles: [{ id: 'k1', name: 'Kring', ...(onLane !== undefined ? { sharedOnLane: onLane } : {}) }],
+    releases: released === undefined ? {} : { default: { k1: released } },
+  }).circles.find((c) => c.circleId === 'k1');
+
+  it('offers it when nothing is released here but the lane still holds something', () => {
+    const c = model({ released: {}, onLane: { place: 'Groningen' } });
+    expect(c.rows).toEqual([]);                       // nothing disclosed — the row is empty, as before
+    expect(c.canWithdraw, 'the circle offers "stop sharing"').toBe(true);
+  });
+  it('does not offer it when the lane holds nothing either — there is nothing to take back', () => {
+    expect(model({ released: {}, onLane: {} }).canWithdraw).toBe(false);
+    expect(model({ released: {}, onLane: undefined }).canWithdraw, 'a composition that does not read the lane offers nothing').toBe(false);
+  });
+  it('does not offer it while something IS still disclosed — that row has its own share action', () => {
+    const c = model({ released: { place: 'Groningen' }, onLane: { place: 'Groningen' } });
+    expect(c.rows.length).toBeGreaterThan(0);
+    expect(c.canWithdraw).toBe(false);
+  });
+});

@@ -389,11 +389,21 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
       // GENERAL persona doesn't share here yet (opt-UP, default withhold).
       const defaultEnabled = new Set(rows.filter((r) => r.personaId === defaultId).map((r) => r.key));
       const addable = generalShareable.filter((k) => !defaultEnabled.has(k));
+      // TAKING IT BACK (2026-09-23). A circle with nothing disclosed shows "nothing shared" — and until
+      // today that row had no action at all, so a person who unticked their last property could not push the
+      // withdrawal: every co-member kept the old value for ever. The mechanism was already right (the writer
+      // emits `personaProperties: {}` and the fold treats an empty release as a clear); only the affordance was
+      // missing. It is offered when the release is empty AND the LANE still holds something for me here
+      // (`sharedOnLane` = my own roster row's `said.personaProperties`) — the truth rather than a device-local
+      // memo, so a second device that never shared can still stop it.
+      const onLane = (c.sharedOnLane && typeof c.sharedOnLane === 'object' && !Array.isArray(c.sharedOnLane))
+        ? Object.keys(c.sharedOnLane).length > 0 : false;
       return {
         circleId: c.id,
         name: (typeof c.name === 'string' && c.name) ? c.name : c.id,
         rows,
         addable,
+        canWithdraw: rows.length === 0 && onLane,
         charter: normaliseCharter(c.charter),
       };
     });

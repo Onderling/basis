@@ -9,7 +9,10 @@
  *   (3) SHARE TO A CIRCLE — a disclosed property said on the lane lands on a co-member's roster row, and withdrawing it takes it away.
  *
  * Nothing here touches Frits' account: the identities are fresh per run and the circle is created here.
- * Run: LIVE_WALK=1 npx playwright test --project=chromium test-browser/walk-live-v0118.spec.js
+ * Run: LIVE_WALK=1 npx playwright test --project=relay test-browser/walk-live-v0118.spec.js
+ *
+ * STEP4b (taking a disclosure back) is RED until v0.1.19 is published: the fix is on `development` and the live
+ * site is what it is. That is the point of a live walk — it says what is out there, not what is in the branch.
  */
 import { test, expect } from '@playwright/test';
 import { gotoCircles, createCircle, getInvite, joinFromInvite, openCircleMatching, toChat } from './peerHarness.js';
@@ -110,7 +113,7 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
       await A.page.locator('.cc-profile__offerings-moved-link').first().click();
       await A.page.waitForTimeout(2500);
       const btn = A.page.locator('.cc-mij__cell-action button').first();
-      if (!(await btn.count())) { await closePanel(A.page); return null; }   // no disclosed row ⇒ no button (see STEP4b)
+      if (!(await btn.count())) { await closePanel(A.page); return null; }   // nothing offered at all (see STEP4b)
       await btn.click();
       await expect.poll(() => A.page.locator('.cc-mij__share-status').first().textContent(), { timeout: 30_000 }).toMatch(/gedeeld|shared|fout|failed/i);
       const status = (await A.page.locator('.cc-mij__share-status').first().textContent())?.trim();
@@ -125,18 +128,18 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
     }, { timeout: 60_000 });
     expect(bHasIt, "B's roster row for A carries the disclosed property").toBeTruthy();
     log('STEP4 share to this circle', 'PASS', "landed on the co-member's roster row");
-    // …and taking it back. Unticking the last disclosed property collapses the circle's row to "nothing shared"
-    // — WITH NO SHARE BUTTON (`circleMij.js` ~326, `circleAboutMe.js` ~268 gate it on `rows.length`). So the
-    // withdrawal cannot be pushed from the UI at all: a person can stop disclosing, and the co-member's row
-    // keeps the old value until something else says otherwise. Recorded as a FINDING, not asserted.
+    // …and TAKING IT BACK. Until 2026-09-23 unticking the last disclosed property collapsed the circle's
+    // row to "nothing shared" with no button, so the withdrawal could never be pushed and the co-member kept the
+    // old value. The row carries the action now — an empty release is a real statement the lane carries as a clear.
     await call(A.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: gid, key: 'place', enabled: false });
     const pressed = await pressShare();
-    const withdrawn = pressed === null ? null : await until(async () => {
+    expect(pressed, 'a circle that still holds something offers "stop sharing"').toBeTruthy();
+    const withdrawn = await until(async () => {
       const row = (await rosterOf(B.page, gid)).find((m) => m.webid === aWho.webid);
       return row && !row.personaProperties?.place ? true : null;
-    }, { timeout: 45_000 });
-    log('STEP4b taking a disclosure back', pressed === null ? 'FINDING' : (withdrawn ? 'PASS' : 'FINDING'),
-      pressed === null ? 'the share button is gone once nothing is disclosed — no way to push the withdrawal' : `status: ${pressed}`);
+    }, { timeout: 60_000 });
+    expect(withdrawn, "the withdrawal landed on the co-member's row").toBe(true);
+    log('STEP4b taking a disclosure back', 'PASS', `status: ${pressed}`);
 
     // ── (1) + (2) THE LEAVE: A leaves; B is told; A's second device leaves too ─────────────────────
     await closePanel(A.page);

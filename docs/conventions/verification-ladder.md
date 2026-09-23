@@ -19,10 +19,26 @@ before the next is started.
 | 3 | **The gate** (CI) | the guards, every package suite, the live-pod tier, the e2e journeys — on the PR's merge result | GitHub, on every PR and every push to `development`/`live` | ~8 min |
 | 4 | **The tail** (CI) | the browser suite, eight shards — the only thing that tests a **shell composition** | GitHub, after a merge to `development` or `live`, or by hand (`workflow_dispatch`) — never on a PR | 10–20 min |
 | 5 | **The release check** | that `development`'s head has a completed post-merge run with every job green, the tail included | `npm run release:check`, before the release PR | seconds |
-| 6 | **The release** | `development → live` (a PR, merged on rung 5's verdict), a tag, the box's own health gate (the wire smoke) and rollback, `publish:web`'s verify of `version.json` | the person releasing | minutes; the box follows within five |
+| 6 | **The release** | `development → live` (a PR, merged on rung 5's verdict), a tag, **the merge back into `development` — also a PR** (see below), the box's own health gate (the wire smoke) and rollback, `publish:web`'s verify of `version.json` | the person releasing | minutes; the box follows within five |
 
 **The rule in one line:** rungs 0–2 before the PR, rung 3 gates the merge, rung 4 gates the *release*,
 rung 5 says whether rung 4 passed on the bytes about to ship.
+
+### The merge back, since branch protection (2026-09-23)
+
+`development` and `live` both carry branch protection: eighteen required checks, and **no direct pushes**. The
+release chain used to end with a `git push origin development` to bring the merge commit back; that push is now
+refused, and the failure lands *after* `live` has moved and the web is published — the worst moment to discover
+a step no longer works. So the last step is a PR like every other:
+
+```
+release:check → PR development→live → merge → tag → PR live→development → publish:web → probe
+```
+
+The merge-back PR carries no changes of its own (it is the release merge commit travelling home), so its gate is
+a formality — but it is the gate, and skipping it leaves `live` ahead of `development`, which makes the next
+release's diff a lie. Protection does not enforce admins, so a person can override in a genuine emergency;
+an agent session cannot and should not.
 
 ## When to take the quick route and when the full one
 

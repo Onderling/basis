@@ -331,7 +331,13 @@ export function setConsentDecline(state, key, declined) {
 export async function loadPersonas({ callSkill } = {}) {
   try {
     const reply = await callSkill('agents', 'listAgents', {});
-    const rows = Array.isArray(reply?.agents) ? reply.agents : [];
+    // BOTH shapes. The registry core answers `{agents:[…]}`, but the one route the shells reach `agents` ops
+    // through adapts it to the chat renderer's `{items:[{id,label}]}` — a presentation adapter in the routing
+    // path, so a programmatic caller gets the presentation shape too. Reading only `agents` meant this list
+    // was ALWAYS empty on web and mobile, and a picker that renders only when it is non-empty was invisible
+    // from the day it was written. Its own tests never caught it: they hand it personas directly.
+    const rows = Array.isArray(reply?.agents) ? reply.agents
+      : (Array.isArray(reply?.items) ? reply.items : []);
     return rows
       .filter((a) => a && a.role === 'profile')
       .map((a) => ({ id: a.agentId, name: a.name || a.agentId }));

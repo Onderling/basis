@@ -2558,6 +2558,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           const fold = foldKeyEvents(events, { groupId: circleId });
           if (!fold?.recipients?.length) continue;
           const gone = retiredSealingFor(circleId);
+          // ALREADY DONE? Another admin may have rotated this circle between our read and now. If the current
+          // fold no longer names any retired address, the work exists and minting a second version off the same
+          // parent would only create the honest concurrency the fold has to resolve afterwards. This decides
+          // nothing — two admins who genuinely race still both land, and `collapseKeyEvents` keeps both keys —
+          // it just makes the race rare instead of routine.
+          if (!fold.recipients.some((r) => gone.has(r))) continue;
           const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
           const recipients = fold.recipients.filter((r) => !gone.has(r));
           if (!recipients.includes(mine)) recipients.push(mine);

@@ -10,6 +10,7 @@ import {
   generateKeypair, makeOpener, sealForAudience,
   establishKeyEvent, rotateKeyEvent, foldKeyEvents,
   readKeyChain, currentGroupKey, openAcrossKeyChain, KEY_EVENT_KIND,
+  collapseKeyEvents, MAX_KEYS_PER_VERSION,
 } from '../src/index.js';
 
 const GID = 'circle-x';
@@ -146,5 +147,33 @@ describe('two admins rotate to the same version at once', () => {
       const chain = readKeyChain(log, { groupId: GID, opener: opener(c) });
       expect(chain.length, 'the newcomer can open v1 whichever order the device read the two wraps').toBe(1);
     }
+  });
+
+  it('a fourth key at one version is REFUSED — that is the only adversary in this item', () => {
+    // Two honest admins colliding is two keys; three is a partition healing; more is a client minting keys to
+    // grow every member's chain, which is a cost it imposes on everyone else. Every device drops the same
+    // extras, by keyId, so a refusal does not become a new way for devices to disagree.
+    const a = generateKeypair();
+    const { event: e1 } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey] });
+    const many = [e1];
+    for (let i = 0; i < 6; i += 1) {
+      const { event } = rotateKeyEvent({ groupId: GID, priorEvents: [e1], recipients: [a.publicKey] });
+      many.push(event);
+    }
+    const kept = collapseKeyEvents(many).filter((e) => e.version === 2);
+    expect(kept.length, 'capped').toBe(MAX_KEYS_PER_VERSION);
+    // …and the same ones, whatever order they arrived in.
+    const shuffled = collapseKeyEvents([...many].reverse()).filter((e) => e.version === 2);
+    expect(shuffled.map((e) => e.keyId)).toEqual(kept.map((e) => e.keyId));
+  });
+
+  it('keyId names the KEY, not the wrap — the same key wrapped twice has one id, two keys have two', () => {
+    const a = generateKeypair(); const b = generateKeypair();
+    const { event: e1, groupKey } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey] });
+    const { event: rewrapped } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey, b.publicKey], groupKey });
+    const { event: different } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey] });
+    expect(rewrapped.keyId, 'a re-wrap of one key keeps its name').toBe(e1.keyId);
+    expect(rewrapped.sealed, '…even though the envelope differs').not.toBe(e1.sealed);
+    expect(different.keyId, 'a different key gets a different name').not.toBe(e1.keyId);
   });
 });

@@ -78,10 +78,10 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
 // The circle fan-out CORE lives in the circles substrate now; stoop injects its deps + helpers.
 // The per-circle ADDRESS announce/record logic lives there too (same DI lift), as does the
-// roster read / persona-property write / roster-updated fan.
+// roster read (the persona-property write + the roster-updated fan retired 2026-09-22: the release is the member's own statement on the membership lane).
 import {
   createCircleFanOut, recordCircleAddress, fanCircleAddresses,
-  listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated, listCircleMembers,
+  listCircleRoster, listCircleMembers,
   createGroupWithRules, createGroupV2, redeemInviteWithGate,
   redeemMembershipCode as redeemMembershipCodeCore,
   verifyMembershipCodeForPeer as verifyMembershipCodeForPeerCore,
@@ -2995,7 +2995,7 @@ export function buildSkills({
      *   forged address writes NOTHING and answers `{ok:false, reason:'unproven-address'}` — an
      *   honest refusal, never a silent no-op.
      *
-     *   WHOSE row may this write? Same rule as `recordMemberPersonaProperties`: a REMOTE caller may
+     *   WHOSE row may this write? A REMOTE caller may
      *   only ever write their OWN row (`memberWebid` ignored, `from` wins) and may only UPDATE a row
      *   that already exists — a stranger cannot announce themselves into a circle. The LOCAL path
      *   (the peer bridge, which substitutes the authenticated envelope sender, and the admin
@@ -3245,42 +3245,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * recordMemberPersonaProperties({ groupId, memberWebid?, personaProperties, circleAddress? })
-     *   — property layer, "share to this circle" (POST-join disclosure push). The admin-side
-     *   write that lands an already-joined member's freshly-disclosed persona properties onto the
-     *   roster. The general/post-join counterpart of the join-time `verifyMembershipCodeForPeer`
-     *   roster-write (index.js ~2162): same `members.addMember` merge + the SAME durable backing
-     *   (patch the member's `membership-redemption` item source) so the update survives a roster
-     *   rebuild, exactly like `personaProperties` recovered in `listGroupMembers`.
-     *
-     *   `memberWebid` defaults to the caller (`from`) for a LOCAL self-update (the admin adjusting
-     *   their own row); the peer handler passes `memberWebid: fromAddr` — the authenticated peer
-     *   address (webid == the mesh signing address here, so a member can only speak for their own
-     *   row, never overwrite another's). Only updates an EXISTING member (never mints a phantom).
-     *   An empty `personaProperties` ({}) is a valid "I now share nothing here" and clears the slot.
-     *
-     *   DIFF-GATED (profile-update propagation): the roster is the source of truth, so it is also
-     *   the diff authority. When the row already says exactly this, NOTHING is written and the
-     *   answer is `{ok:true, unchanged:true, changedKeys:[]}` — the caller then announces no
-     *   "pull-me" and the circle stays quiet. A real change answers with `changedKeys` (key NAMES
-     *   only), which is what the silent pull-me entry carries.
-     *
-     *   Returns: { ok:true, groupId, memberWebid, keys, changedKeys, unchanged? } | { ok:false, reason }.
-     */
-    defineSkill('recordMemberPersonaProperties', async ({ parts, from }) => {
-      // Thin wrapper: the persona-property write logic (whose-row gate + diff-gate +
-      // durable patch) lives in `@onderling/circles` (`recordMemberPersonaProperties`).
-      // Stoop injects the store, the MemberMap, the release-key diff, and its `_sync`
-      // producer, and passes the parsed args + carrier context.
-      return recordMemberPersonaProperties(
-        { store, members, changedReleaseKeys, simulateSync },
-        { a: dataArgs(parts), from, localActor },
-      );
-    }, {
-      description: 'Record an already-joined member\'s disclosed persona properties onto the roster (post-join "share to this circle").',
-      visibility:  'authenticated',
-    }),
 
     /**
      * ingestRemotePost({payload, fromPubKey})
@@ -4121,41 +4085,11 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * broadcastRosterUpdated({groupId, memberRef, keys?, msgId, ts?})
-     *   — the roster "pull-me" signal. Sibling of the `broadcastCircle*`
-     *   family (same fan-out plumbing, subtype `roster-updated`), with one
-     *   defining difference: it carries NO CONTENT. Only a member REF and the
-     *   NAMES of the properties that changed ride the wire; every receiver
-     *   re-reads the changed rows from the roster itself.
-     *
-     *   Fired by the roster owner right after a REAL
-     *   `recordMemberPersonaProperties` write (an unchanged save announces
-     *   nothing). Receivers route it to basis's `makeRosterUpdatedPeerHandler`,
-     *   which records a SILENT stream entry — no chat bubble, and it never
-     *   wakes an offline member — and refreshes the members view.
-     *
-     *   Best-effort + fire-and-forget: per-peer failures land in the returned
-     *   `errors[]` array but never throw.
-     */
-    defineSkill('broadcastRosterUpdated', async ({ parts, from }) => {
-      // Thin wrapper: the roster-updated fan logic lives in `@onderling/circles`
-      // (`fanRosterUpdated`). Stoop injects the fan-out core and passes the parsed
-      // args + active-circle default.
-      return fanRosterUpdated(
-        { broadcastToCircle },
-        { a: dataArgs(parts), groupId, from },
-      );
-    }, {
-      description: 'Fan a roster "pull-me" signal (member ref + changed property NAMES, never values) out to every other member via chat.send subtype:roster-updated; receivers re-read the changed roster rows.',
-      visibility:  'authenticated',
-    }),
 
     /**
      * broadcastCircleAddresses({groupId, announcements, to?, msgId?, ts?})
-     *   — the SEND half of per-circle address announcing (B2, 2026-08-02). Sibling of
-     *   `broadcastRosterUpdated`: same circle-scoped fan-out plumbing, subtype
-     *   `circle-address-announce`.
+     *   — the SEND half of per-circle address announcing (B2, 2026-08-02): circle-scoped fan-out
+     *   plumbing, subtype `circle-address-announce`.
      *
      *   It carries a LIST because one mechanism serves all three moments:
      *     • a member RE-ANNOUNCING their own address  → one announcement, unnarrowed fan;

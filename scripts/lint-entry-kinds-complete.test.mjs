@@ -17,7 +17,7 @@ const VOCAB = { SIGNS: parseVocab(SRC, 'SIGNS'), SUBJECT: parseVocab(SRC, 'SUBJE
 describe('lint-entry-kinds-complete', () => {
   it('parses the REAL table: every row has a binding, the unknown kind is local, the manifests append to declared lanes', () => {
     const rows = parseRows(SRC);
-    expect(Object.keys(rows).length).toBeGreaterThanOrEqual(16);
+    expect(Object.keys(rows).length).toBeGreaterThanOrEqual(15);   // 16 until `roster-updated` was retired (2026-09-22)
     expect(Object.values(rows).every((b) => typeof b === 'string' && b.length)).toBe(true);
     expect(rows.membership).toMatch(/accepts: ACCEPTS\.MEMBERSHIP/);
     expect(parseUnknown(SRC)).toMatch(/LOCAL_BINDING/);

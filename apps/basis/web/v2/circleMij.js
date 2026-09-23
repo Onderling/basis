@@ -331,6 +331,28 @@ function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }) {
       const empty = el('td', 'cc-mij__empty', tr('circle.mij.nothing_shared'));
       empty.colSpan = 6;
       trEl.appendChild(empty);
+      // …and TAKING IT BACK: nothing is disclosed here any more, but the circle still holds what I said
+      // last time — so this is the one place the withdrawal can be pushed. Same op as sharing (an empty release
+      // is a real statement: the lane carries `{}` as a clear), different word.
+      const action = el('td', 'cc-mij__cell-action');
+      if (c.canWithdraw && typeof onShareToCircle === 'function') {
+        const stop = el('button', 'cc-btn cc-btn--quiet cc-mij__stop-sharing', tr('circle.mij.stop_sharing'));
+        stop.type = 'button';
+        const status = el('span', 'cc-mij__share-status');
+        stop.addEventListener('click', async () => {
+          stop.disabled = true;
+          status.textContent = tr('circle.aboutme.sharing_now');
+          let res;
+          try { res = await onShareToCircle(c.circleId, model.defaultId); }
+          catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
+          status.textContent = res?.ok
+            ? tr('circle.mij.stopped_sharing')
+            : tr('circle.aboutme.share_failed', { reason: res?.reason ?? '' });
+          stop.disabled = false;
+        });
+        action.append(stop, status);
+      }
+      trEl.appendChild(action);
       tbody.appendChild(trEl);
     }
     let prevPersona = null;

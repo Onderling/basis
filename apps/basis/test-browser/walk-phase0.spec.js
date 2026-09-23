@@ -59,12 +59,12 @@ test('I5 — drivers and persona properties: one store or two, and keyed how?', 
       await openCircleMatching(A.page, /persona.?kring/i);
       return (await surface(A.page))?.where?.circleId ?? null;
     })();
-    const recorded = await call(A.page, 'stoop', 'recordMemberPersonaProperties', {
-      groupId: gid, memberWebid: webid, personaProperties: { mobility: 'walks' },
-    });
-    log('I5 · recordMemberPersonaProperties', recorded?.error ? 'FINDING' : 'OBSERVED', JSON.stringify(recorded)?.slice(0, 140));
-    // Two different facts, two different reads — settled 2026-08-29. `recordMemberPersonaProperties` records what
-    // a MEMBER disclosed to THIS circle, onto the circle's roster; the read for that is the roster row.
+    await call(A.page, 'agents', 'setProfileProperty', { id: 'default', key: 'mobility', value: 'walks' });
+    await call(A.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: gid, key: 'mobility', enabled: true });
+    const recorded = await A.page.evaluate(async (cid) => window.onderlingShareToCircle?.(cid, 'default') ?? { error: 'no-seam' }, gid);
+    log('I5 · the release said on the circle\'s lane', recorded?.error ? 'FINDING' : 'OBSERVED', JSON.stringify(recorded)?.slice(0, 140));
+    // Two different facts, two different reads — settled 2026-08-29. What a MEMBER disclosed to THIS circle lands
+    // on the circle's roster (their own `member-props` statement since 2026-09-22); the read for that is the roster row.
     // `getPersonaView` is the person's own profile (properties + per-context disclosure policy) in the agents
     // registry — it never held the roster record and is not supposed to.
     const roster = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });

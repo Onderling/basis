@@ -55,6 +55,9 @@ import {
   // recognising an inbound CHAT entry for THIS circle — the same kind + the same circle-id read the
   // conversation projection itself uses, so the refresh cannot key off something the filter ignores.
   CHAT_KIND, eventCircleId,
+  // the membership lane's entry kind — a statement about who is in this circle (join · leave · role · what a
+  // member says about themselves) is what makes the members tab re-read
+  MEMBERSHIP_LANE,
   // P1.7 — the viewer's conversation filter (kinds × people/agents), shared model, device-local store.
   applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
   // "Never share my global address" — the publication lock (web parity).
@@ -90,7 +93,6 @@ import {
   // B (circle bot) — dispatch primitives to run an interpreted command in the circle.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, executeBulkDispatch,
   // profile-update propagation — the silent "pull-me" entry kind (the roster PULL trigger).
-  ROSTER_UPDATED_KIND,
 } from '@onderling-app/basis';
 // B (circle bot) — v2 free-text→LLM→command surface (shared with web). Deep-imported like the other
 // v2 modules (circleChatReceiver etc.) since they're not on the basis barrel.
@@ -262,7 +264,7 @@ import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
-import { loadContactRoster } from '../../../../basis/src/v2/contactsSource.js';
+import { loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
@@ -589,6 +591,8 @@ export default function CircleLauncherScreen({
   // from the channel's durable turns, the count on each row and the sum on the tab. Recomputed when a turn lands
   // (the reply inbox) and when a thread is opened (its seen-mark moves to now).
   const contactSeen = useMemo(() => makeContactSeenStore(AsyncStorage), []);
+  // …and what each row LAST READ here — the rename marker's left-hand side (web parity).
+  const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
   const [contactUnread, setContactUnread] = useState({});
   const refreshContactUnread = useCallback(async () => {
     try {
@@ -602,7 +606,9 @@ export default function CircleLauncherScreen({
     setContactThread(contact);
     // opening the thread is reading it — the seen-mark moves to now, the badge is gone
     contactSeen.mark(contact?.contactId, Date.now()).then(refreshContactUnread).catch(() => {});
-  }, [contactSeen, refreshContactUnread]);
+    // …and it acknowledges a rename: the "was: …" line under the row clears (web parity)
+    contactNames.seen(contact?.contactId, contact?.name).catch(() => {});
+  }, [contactSeen, contactNames, refreshContactUnread]);
   const tabBadges = useMemo(() => ({ contacten: totalUnread(contactUnread) }), [contactUnread]);
   const [viewAsPolicy, setViewAsPolicy] = useState('pairwise');
   const [viewAsMembers, setViewAsMembers] = useState([]);
@@ -1218,7 +1224,7 @@ export default function CircleLauncherScreen({
   const [shareContacts, setShareContacts] = useState([]);
   const loadShareContacts = useCallback(async () => {
     try {
-      const merged = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null });
+      const merged = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames });
       setShareContacts(merged);
       // Story 1.2 — hand the roster to the pod layer so a canonical REVOKE can re-derive an out-of-circle
       // grantee's sealing key and evict exactly that grantee (instead of rotating away from all of them).
@@ -2747,13 +2753,15 @@ function CircleDetail({
   useEffect(() => { setActiveTab(DEFAULT_CIRCLE_TAB); }, [circle?.id]);
 
   // (roster state `tabMembers` is declared above the rows memo — it feeds the sender labels.)
-  // Profile-update propagation — the PULL: a silent `roster-updated` entry for THIS circle means a
-  // member's row moved; bump this tick to re-read the roster (no bubble, no toast — just a refresh).
+  // A member's row moved — a statement on this circle's MEMBERSHIP lane (a join, a leave, a role, what a member
+  // says about themselves): bump this tick to re-read the roster (no bubble, no toast — just a refresh). Until
+  // 2026-09-22 this read the `roster-updated` pull-me, which the admin fanned after writing someone's disclosure;
+  // the disclosure is the member's own statement on that same lane now, so one subscription covers both.
   const [membersReloadTick, setMembersReloadTick] = useState(0);
   useEffect(() => {
     if (!eventLog?.subscribe || !circle?.id) return undefined;
     return eventLog.subscribe((e) => {
-      if (e?.type === ROSTER_UPDATED_KIND && e?.circleId === circle.id) {
+      if (e?.type === MEMBERSHIP_LANE && eventCircleId(e) === circle.id) {
         setMembersReloadTick((n) => n + 1);
       }
       // …and the conversation itself. `rows` is a memo re-pulled off a hand-bumped `streamTick`, and the

@@ -25,7 +25,6 @@ describe('the defaults are derived, not copied', () => {
   it('technical kinds are off by default, and offerings are on', () => {
     const def = defaultConversationKinds();
     expect(def).toContain('offer');            // Frits said "maybe"; the per-circle setting resolves it
-    expect(def).not.toContain('roster-updated');
     expect(def).not.toContain('agent-action');
   });
 

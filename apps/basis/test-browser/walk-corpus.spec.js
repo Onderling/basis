@@ -107,8 +107,12 @@ test('corpus 8.x / 9.x / 10.x — the property, persona and driver layers: is th
     const release = await call(A.page, 'agents', 'getPersonaRelease', { id: me, contextId: gid });
     log('corpus 9.x · persona surface', ok(view) || ok(release) ? 'OBSERVED' : 'BLOCKED',
       `view: ${JSON.stringify(view)?.slice(0, 90)} · release: ${JSON.stringify(release)?.slice(0, 90)}`);
-    const rec = await call(A.page, 'stoop', 'recordMemberPersonaProperties', { groupId: gid, properties: { woont: 'hier' } });
-    log('corpus 9.2 · can a property be recorded and read back?', ok(rec) ? 'OBSERVED' : 'BLOCKED',
+    // 9.2 — a property DISCLOSED to this circle and said on its lane (the member's own `member-props`, 2026-09-22),
+    // then read back off the roster row. The admin-mediated record is retired.
+    await call(A.page, 'agents', 'setProfileProperty', { id: 'default', key: 'woont', value: 'hier' });
+    await call(A.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: gid, key: 'woont', enabled: true });
+    const rec = await A.page.evaluate(async (cid) => window.onderlingShareToCircle?.(cid, 'default') ?? { error: 'no-seam' }, gid);
+    log('corpus 9.2 · can a property be disclosed and read back?', ok(rec) ? 'OBSERVED' : 'BLOCKED',
       JSON.stringify(rec)?.slice(0, 140));
 
     // 10.x — drivers
@@ -186,10 +190,12 @@ test('corpus 9.1 / 9.2 / 10.x — personas across two circles, and drivers', asy
     const cato = (await call(Cato.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
 
     // 9.2 — record a property in ONE circle, then look at both.
-    const rec = await call(Cato.page, 'stoop', 'recordMemberPersonaProperties', {
-      groupId: gx, personaProperties: { woont: 'in de straat', kanHelpenMet: 'tuin' },
-    });
-    log('corpus 9.2 · can a member record persona properties?', rec?.error || rec?.ok === false ? 'FINDING' : 'PASS',
+    for (const [key, value] of [['woont', 'in de straat'], ['kanHelpenMet', 'tuin']]) {
+      await call(Cato.page, 'agents', 'setProfileProperty', { id: 'default', key, value });
+      await call(Cato.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: gx, key, enabled: true });
+    }
+    const rec = await Cato.page.evaluate(async (cid) => window.onderlingShareToCircle?.(cid, 'default') ?? { error: 'no-seam' }, gx);
+    log('corpus 9.2 · can a member say their release on the circle\'s lane?', rec?.error || rec?.ok === false ? 'FINDING' : 'PASS',
       JSON.stringify(rec)?.slice(0, 160));
     await Cato.page.waitForTimeout(4000);
 

@@ -14,7 +14,7 @@
  * `displayName` (a local cache that never crosses the peer allowlist).
  *
  * Scope note: this asserts the enforcement PRIMITIVE (the per-circle release gate). The full roster-fan
- * delivery to a third device (`recordMemberPersonaProperties` → `fanRosterUpdated` → re-read) is a separate
+ * delivery to a third device (the member's own `member-props` statement on the circle's lane → the fold) is a separate
  * seam; and story 5.1 as literally worded (a JOIN-TIME reveal picker) is not reachable through the programmatic
  * `joinCircleFromInvite` today (the picker lives in the shell wizard state; and `getPersonaRelease` needs
  * explicit `keys`) — two adoption gaps this story legitimately points at, tracked in

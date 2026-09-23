@@ -29,7 +29,7 @@
  * An unproven or forged address writes NOTHING and answers
  * `{ok:false, reason:'unproven-address'}` — an honest refusal, never a silent no-op.
  *
- * WHOSE row may this write? Same rule as `recordMemberPersonaProperties`: a
+ * WHOSE row may this write? A
  * REMOTE caller may only ever write their OWN row (`memberWebid` ignored, `from`
  * wins) and may only UPDATE a row that already exists — a stranger cannot
  * announce themselves into a circle. The LOCAL path (the peer bridge, which
@@ -213,7 +213,7 @@ export async function recordCircleAddress(
 
 /**
  * Fan proven per-circle ADDRESS announcements to a circle (the send half).
- * Sibling of `broadcastRosterUpdated`: same circle-scoped fan-out plumbing,
+ * Circle-scoped fan-out plumbing,
  * subtype `circle-address-announce`.
  *
  * It carries a LIST because one mechanism serves all three moments:

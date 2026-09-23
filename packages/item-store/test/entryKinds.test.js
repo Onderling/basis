@@ -24,7 +24,6 @@ describe('the table answers all four questions per kind', () => {
 
   it('a conversation kind is human-facing and may wake; a system kind is neither', () => {
     expect(entryKind('chat-message')).toMatchObject({ lane: LANE.HUMAN, wakes: true });
-    expect(entryKind('roster-updated')).toMatchObject({ lane: LANE.SYSTEM, wakes: false });
   });
 
   it('conversationKinds is DERIVED, so adding a human kind cannot forget the chat surface', () => {
@@ -144,7 +143,7 @@ describe('auditability and retention', () => {
   });
 
   it('pure plumbing is short-lived and not auditable', () => {
-    for (const k of ['roster-updated', 'delivery-state']) {
+    for (const k of ['delivery-state']) {
       expect(retentionOf(k), k).toBe(RETAIN.SHORT);
       expect(isAuditKind(k), k).toBe(false);
     }

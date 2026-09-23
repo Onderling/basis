@@ -65,6 +65,26 @@ describe('a member\'s own name reaches every roster they are on — member-props
     // cato is in A only — B's roster never heard of cato and cato never heard of B: nothing to assert, nothing leaked
   }, 60_000);
 
+  it('a FACE reaches the same rows, and an oversize one reaches none of them', async () => {
+    // The face rides the loop the names ride — the point of putting it on `member-props` rather than
+    // inventing a wire for it. And the cap is the fold's, on every receiver: the op refuses locally so the
+    // person gets a reason, but the assertion that matters is that an oversize face does not land anywhere.
+    const face = `data:image/png;base64,${'iVBORw0KGgo'.repeat(12)}`;
+    // Through the op a person presses — the after-write hook fans it, the same hook a rename uses. Calling a
+    // fan helper directly would prove the mechanism and not the path.
+    expect((await bram.agent.callSkill('stoop', 'setMyFace', { thumb: face }))?.error).toBeUndefined();
+    for (const [who, circleId] of [[admin, CIRCLE_A], [cato, CIRCLE_A], [admin, CIRCLE_B]]) {
+      const ok = await until(async () => (rowOf(await readRoster(who, circleId), bram.pubKey)?.avatarThumb === face ? true : null), { timeout: 20_000, step: 400 });
+      expect(ok, `${who.label}'s row for bram in ${circleId} shows the face`).toBe(true);
+    }
+    // …and what the LANE holds is the face and not the cache. `said` is the statement verbatim, so this is
+    // the precise claim: `avatarUrl` — an arbitrary URL the roster gate marks PRIVATE — is not in it, which
+    // is the whole reason the face is a second field rather than a rename of that one.
+    const said = rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey)?.said ?? {};
+    expect(said.avatarThumb, 'the lane holds the face').toBe(face);
+    expect('avatarUrl' in said, 'and never the private cache beside it').toBe(false);
+  }, 60_000);
+
   it('a handle change reaches the rows too; a handle ANOTHER member holds is refused — by the op here (it reads the folded rosters), by the fold everywhere (kernel-tested)', async () => {
     const r = await bram.agent.callSkill('stoop', 'setMyHandle', { handle: 'bramdv' });
     expect(r?.error).toBeUndefined();

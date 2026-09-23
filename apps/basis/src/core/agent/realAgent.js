@@ -2136,7 +2136,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
     const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-    return sayOnRosters({ circleIds: circles, props: { handle: me.handle, displayName: me.displayName } });
+    // The face travels on the SAME loop the names do, to every circle including the pair circles — so a
+    // contact sees it through their pair roster row without a message, exactly as a rename reaches them.
+    // `avatarThumb` only: `avatarUrl` beside it on the same entry is the local display cache the roster gate
+    // keeps private, and must never be put on the wire by being mistaken for this.
+    return sayOnRosters({
+      circleIds: circles,
+      props: { handle: me.handle, displayName: me.displayName, ...(me.avatarThumb ? { avatarThumb: me.avatarThumb } : {}) },
+    });
   }
   const knownPeersSync = createKnownPeersSync({
     siblings: ownDeviceSiblings,
@@ -4365,7 +4372,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // a contact learns it — one per circle, only where the row differs (the diff gate), a failing circle retried
       // on the next save. The one road; the admin-mediated persona-props wire and the card-on-a-message update
       // road are retired by it. Best-effort and after success; the local row is already written.
-      if ((realOpId === 'setMyHandle' || realOpId === 'setMyDisplayName') && !rawReply?.error) {
+      // …and the FACE goes the same way (2026-09-23): `setMyFace` / `clearMyFace` are a member saying something
+      // about themselves, exactly like a name, so they ride the same loop to the same rosters. Without this
+      // hook the op would write a picture nobody but this device ever sees.
+      if (['setMyHandle', 'setMyDisplayName', 'setMyFace', 'clearMyFace'].includes(realOpId) && !rawReply?.error) {
         tellMyRostersWhatISay()
           .then((r) => console.info(`[member-props] ${r?.error ? r.error : `told ${r.emitted.length} circle(s)${r.unchanged.length ? `, ${r.unchanged.length} unchanged` : ''}${r.failed.length ? `, FAILED in ${r.failed.map((c) => String(c).slice(0, 12)).join(' ')}` : ''}`}`))
           .catch((err) => console.warn(`[member-props] not every roster was told: ${err?.message ?? err}`));

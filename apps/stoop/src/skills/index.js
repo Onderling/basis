@@ -2318,41 +2318,41 @@ export function buildSkills({
     }),
 
     /**
-     * setMyAvatarUrl({url})  — Phase 23.1.
-     *   Wire the calling actor's `avatarUrl` field on MemberMap. URL
-     *   convention is `mem://stoop/avatars/<webid>.<ext>` for content
-     *   stored in the local cache; once a pod is attached, the cache
-     *   write-through stages the same path under
-     *   `<pod>/stoop/avatars/...`.  Apps that don't follow the
-     *   `mem://stoop/avatars/` convention can pass any URI — Stoop
-     *   doesn't fetch or validate the content here, only stores the
-     *   reference.
+     * setMyFace({thumb})
+     *   The small picture a member shows on their own row, as a bounded inline data-URL.
+     *
+     *   NOT `avatarUrl`, which sits beside it and stays. The two look alike and are not: `avatarUrl` is a
+     *   LOCAL DISPLAY CACHE — an arbitrary URL, possibly someone else's, which `rosterAccessGate` marks
+     *   PRIVATE precisely so it never leaves this device. The FACE is the opposite: it is mine, it is bounded,
+     *   and it is meant to travel — it rides `member-props` to every circle I am in and the fold refuses it
+     *   above 4 KB. Merging the two fields would put a private cache on the wire, which is why they are two.
+     *
+     *   The cap is checked here too, but this is not where it binds: any app version could skip this op. The
+     *   gate is the fold, on every receiver (`rosterFold.js`). This one is only so a person gets a refusal
+     *   they can act on instead of a picture that silently never appears.
      */
-    defineSkill('setMyAvatarUrl', async ({ parts, from }) => {
+    defineSkill('setMyFace', async ({ parts, from }) => {
       const a = dataArgs(parts);
-      const url = typeof a.url === 'string' ? a.url.trim() : '';
-      if (!url) return { error: 'url required' };
+      const thumb = typeof a.thumb === 'string' ? a.thumb.trim() : '';
+      if (!thumb) return { error: 'thumb required' };
+      if (!thumb.startsWith('data:image/')) return { error: 'face-must-be-an-image-data-url' };
+      if (thumb.length > 4096) return { error: 'face-too-large', max: 4096, was: thumb.length };
       if (!members) return { error: 'no-member-map' };
-      const updated = await members.addMember({ webid: from, avatarUrl: url });
-      return { avatarUrl: url, member: updated, _sync: simulateSync() };
+      const updated = await members.addMember({ webid: from, avatarThumb: thumb });
+      return { avatarThumb: thumb, member: updated, _sync: simulateSync() };
     }, {
-      description: 'Set the calling actor\'s avatar URL (mem://stoop/avatars/<webid>.<ext> by convention).',
+      description: 'Set the calling actor\'s face: a small inline picture (data:image/ URL, at most 4 KB) shown on their roster rows.',
       visibility:  'authenticated',
     }),
 
-    /**
-     * clearMyAvatar()  — Phase 23.1.  Reset the calling actor's
-     * `avatarUrl` to null on MemberMap.  No content delete here —
-     * leave the bytes in the cache; a future "compactor" can sweep
-     * orphaned avatars.
-     */
-    defineSkill('clearMyAvatar', async ({ from }) => {
+    /** clearMyFace() — take the face off my rows. An empty face travels like any other change. */
+    defineSkill('clearMyFace', async ({ from }) => {
       if (!members) return { error: 'no-member-map' };
       const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, avatarUrl: null });
+      const updated = await members.addMember({ ...me, avatarThumb: null });
       return { cleared: true, member: updated, _sync: simulateSync() };
     }, {
-      description: 'Clear the calling actor\'s avatar URL (does not delete cached bytes).',
+      description: 'Clear the calling actor\'s face.',
       visibility:  'authenticated',
     }),
 

@@ -112,7 +112,8 @@ export class MemberMap extends Emitter {
    * @param {string} [m.displayName]
    *   Real / chosen display name.  Treated as opt-in-to-show when paired
    *   with a Reveals store (see ./Reveals.js).
-   * @param {string} [m.avatarUrl]
+   * @param {string} [m.avatarUrl]    the LOCAL display cache (private, never travels)
+   * @param {string} [m.avatarThumb]  the member's own face: inline `data:image/`, ≤ 4 KB, rides the lane
    *   Optional avatar image URL.
    * @param {string} [m.stableId]
    *   Stoop V1 Phase 11 (2026-05-06): the SDK-level stable user
@@ -226,8 +227,15 @@ export class MemberMap extends Emitter {
       // legacy consumers (H2/H4) leave it absent.
       handle:      m.handle ?? null,
       displayName: m.displayName ?? null,
-      // avatarUrl: optional avatar image URL (any URI).
+      // avatarUrl: optional avatar image URL (any URI). A LOCAL DISPLAY CACHE — it may point anywhere,
+      // including at a note this device keeps about somebody else, and `rosterAccessGate` marks it PRIVATE
+      // so it never leaves. Do not confuse it with the face below; they are two fields on purpose.
       avatarUrl:   m.avatarUrl ?? null,
+      // avatarThumb: the member's own FACE — a small inline `data:image/` picture, at most 4 KB, which they
+      // publish. It rides `member-props` to every circle they are in and the roster fold refuses it above the
+      // cap, on every receiver. Mine, bounded, and meant to travel: the exact opposite of `avatarUrl`, which
+      // is why merging the two would put a private cache on the wire.
+      avatarThumb: m.avatarThumb ?? null,
       // stableId: SDK-level "this person" key (Stoop V1 Phase 11).
       // Survives handle changes + network-pubkey rotations.  Apps
       // key mute / ban / report on this.  Optional.

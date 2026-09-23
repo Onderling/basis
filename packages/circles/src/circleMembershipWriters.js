@@ -1,5 +1,5 @@
 import { hasHumanRules } from './circleRulesDoc.js';
-import { personKeyAnnouncement } from '@onderling/core';
+import { personKeyAnnouncement, MEMBER_PROPS_FIELDS } from '@onderling/core';
 import { releaseUnchanged } from '@onderling/agent-registry';
 /**
  * Key-coupled membership WRITERS — pure-body lift out of stoop's `buildSkills` (the §8c migration, slice-b).
@@ -613,8 +613,13 @@ export async function acceptGroupRules({ store, emitSpine }, { a, from } = {}) {
   return { ok: true, rulesAccepted: version };
 }
 
-/** The fields a member may say about themselves on the lane — one place, shared with the fold's allowlist. */
-export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+/**
+ * The fields a member may say about themselves on the lane. RE-EXPORTED from the kernel, not restated: this
+ * was a second frozen copy that called itself "one place, shared with the fold's allowlist", and it proved the
+ * point by going stale the moment `avatarThumb` landed in the fold and not here. The fold is where the list
+ * binds, so the fold owns it.
+ */
+export { MEMBER_PROPS_FIELDS };
 // The persona properties are a MAP (the persona's release for one circle — computed whole, media by sealed reference),
 // compared whole against what the lane holds: the same `releaseUnchanged` the diff-gate memo has always used.
 const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);

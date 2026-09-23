@@ -61,7 +61,14 @@ const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accep
 // `personaProperties` (2026-09-22, step two): the persona's RELEASE for this circle — coarse, reveal-gated, media by sealed
 // reference — as one map that wins whole (a key that leaves the release leaves the row; `{}` clears). It rides the same
 // self-subject statement, so the admin-mediated side wire for it could be retired.
-const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef', 'avatarThumb', 'personaProperties']);
+/**
+ * What a member may say about THEMSELVES. The kernel owns this list because the kernel is where it BINDS —
+ * a statement naming anything else is refused whole, on every receiver, whatever app version wrote it. The
+ * writer in `@onderling/circles` imports it rather than keeping its own: it had a second frozen copy that
+ * called itself "one place, shared with the fold's allowlist", and it went stale the moment a field landed.
+ */
+export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'avatarThumb', 'personaProperties']);
+const MEMBER_PROPS_FIELD_SET = new Set(MEMBER_PROPS_FIELDS);
 
 /**
  * THE FACE, and why it is the one field of this kind that may carry bytes.
@@ -336,7 +343,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (!p || p.authorRef !== s.subject) continue;                       // self-only
       if (!members.has(s.subject)) continue;                                // members only
       const keys = Object.keys(p).filter((k) => k !== 'authorRef');
-      if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELDS.has(k))) continue;   // the allowlist: refused whole
+      if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELD_SET.has(k))) continue;   // the allowlist: refused whole
       if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
       if ('avatarThumb' in p) {                                                            // the face: bounded, or refused whole
         const th = p.avatarThumb;

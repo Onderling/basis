@@ -81,7 +81,7 @@ export async function loadMijModel({ callSkill, personaId, circles = [], activeC
 
   // WHAT THE LANE HOLDS FOR ME in each circle — my own roster row's `said.personaProperties` (`member-props`).
   // The model needs it to offer "stop sharing" for a circle where nothing is disclosed any more but the
-  // co-members still hold something (L115). Read per circle, best-effort: a circle that cannot be read simply
+  // co-members still hold something. Read per circle, best-effort: a circle that cannot be read simply
   // offers nothing, which is the safe direction.
   const withLane = await Promise.all((Array.isArray(circles) ? circles : []).map(async (c) => {
     const id = typeof c === 'string' ? c : (c?.id ?? c?.groupId);

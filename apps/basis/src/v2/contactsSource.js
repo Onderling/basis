@@ -243,7 +243,7 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
 }
 
 /**
- * The two name markers, applied where every shell reads (L116): who cannot be told apart by name, and who has
+ * The two name markers, applied where every shell reads: who cannot be told apart by name, and who has
  * renamed themselves since this device last looked. Both are projections over the rows — nothing on the lane,
  * nothing stored but what this device painted.
  */
@@ -260,7 +260,7 @@ async function withNameMarkers(rows, names) {
 const nameKey = (name) => String(name ?? '').trim().toLowerCase();
 
 /**
- * TELLING TWO CONTACTS APART (L116, 2026-09-23). Since the book reads the roster a contact is named by
+ * TELLING TWO CONTACTS APART (2026-09-23). Since the book reads the roster a contact is named by
  * what THEY said on the pair roster — so a contact can take the name of another of your contacts, and Contacten
  * would show two identical rows with the thread opening under the name.
  *

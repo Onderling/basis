@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * TAKING A DISCLOSURE BACK (L115) — the affordance on Mij's per-circle table.
+ * TAKING A DISCLOSURE BACK — the affordance on Mij's per-circle table.
  *
  * Found on the live walk of v0.1.18: untick the last disclosed property and the circle's row collapsed to
  * "nothing shared" with NO action, so the withdrawal could never be pushed and every co-member kept the old

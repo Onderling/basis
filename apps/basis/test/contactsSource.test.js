@@ -266,7 +266,7 @@ describe('THE NAMELESS ROW COMES BACK (2026-09-22, the delete/hide note §6a-3) 
   });
 });
 
-describe('TELLING TWO CONTACTS APART (L116, 2026-09-23) — the lookalike name', () => {
+describe('TELLING TWO CONTACTS APART (2026-09-23) — the lookalike name', () => {
   // Since the book reads the roster, a contact is named by what THEY said on their pair roster — so a
   // contact can rename themselves to the name of another of your contacts. Two rows "Frits", one an impostor,
   // and the thread opens under the name. The gate is cheap and belongs to the projection, not to a shell: when
@@ -296,7 +296,7 @@ describe('TELLING TWO CONTACTS APART (L116, 2026-09-23) — the lookalike name',
   });
 });
 
-describe('A CONTACT WHO RENAMED THEMSELVES (L116) — "was: …" until you have seen it', () => {
+describe('A CONTACT WHO RENAMED THEMSELVES — "was: …" until you have seen it', () => {
   // The rename lands from the roster with no announcement of any kind; a row simply reads differently the next
   // time you look. So the row says what it was, until the thread is opened — the same seen-mark the unread
   // count already keeps per device.
@@ -323,7 +323,7 @@ describe('A CONTACT WHO RENAMED THEMSELVES (L116) — "was: …" until you have 
   });
 });
 
-describe('loadContactRoster — the name markers ride the one read (L116)', () => {
+describe('loadContactRoster — the name markers ride the one read', () => {
   it('marks lookalikes and renames, and remembers what it painted', async () => {
     const g = new PeerGraph();
     const mem = new Map();

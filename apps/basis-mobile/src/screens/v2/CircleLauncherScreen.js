@@ -591,7 +591,7 @@ export default function CircleLauncherScreen({
   // from the channel's durable turns, the count on each row and the sum on the tab. Recomputed when a turn lands
   // (the reply inbox) and when a thread is opened (its seen-mark moves to now).
   const contactSeen = useMemo(() => makeContactSeenStore(AsyncStorage), []);
-  // …and what each row LAST READ here — the rename marker's left-hand side (L116, web parity).
+  // …and what each row LAST READ here — the rename marker's left-hand side (web parity).
   const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
   const [contactUnread, setContactUnread] = useState({});
   const refreshContactUnread = useCallback(async () => {
@@ -606,7 +606,7 @@ export default function CircleLauncherScreen({
     setContactThread(contact);
     // opening the thread is reading it — the seen-mark moves to now, the badge is gone
     contactSeen.mark(contact?.contactId, Date.now()).then(refreshContactUnread).catch(() => {});
-    // …and it acknowledges a rename: the "was: …" line under the row clears (L116, web parity)
+    // …and it acknowledges a rename: the "was: …" line under the row clears (web parity)
     contactNames.seen(contact?.contactId, contact?.name).catch(() => {});
   }, [contactSeen, contactNames, refreshContactUnread]);
   const tabBadges = useMemo(() => ({ contacten: totalUnread(contactUnread) }), [contactUnread]);

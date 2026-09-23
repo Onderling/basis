@@ -389,7 +389,7 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
       // GENERAL persona doesn't share here yet (opt-UP, default withhold).
       const defaultEnabled = new Set(rows.filter((r) => r.personaId === defaultId).map((r) => r.key));
       const addable = generalShareable.filter((k) => !defaultEnabled.has(k));
-      // TAKING IT BACK (L115, 2026-09-23). A circle with nothing disclosed shows "nothing shared" — and until
+      // TAKING IT BACK (2026-09-23). A circle with nothing disclosed shows "nothing shared" — and until
       // today that row had no action at all, so a person who unticked their last property could not push the
       // withdrawal: every co-member kept the old value for ever. The mechanism was already right (the writer
       // emits `personaProperties: {}` and the fold treats an empty release as a clear); only the affordance was

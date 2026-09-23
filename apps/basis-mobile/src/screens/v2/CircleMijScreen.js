@@ -382,7 +382,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
               {!circle.rows.length ? (
                 <Text style={styles.empty}>{t('circle.mij.nothing_shared')}</Text>
               ) : null}
-              {/* …and TAKING IT BACK (L115, web parity): nothing is disclosed here any more, but the circle still
+              {/* …and TAKING IT BACK (web parity): nothing is disclosed here any more, but the circle still
                   holds what was said last time, so this is the one place the withdrawal can be pushed. Same op as
                   sharing — an empty release is a real statement the lane carries as a clear — with its own word. */}
               {circle.canWithdraw ? (

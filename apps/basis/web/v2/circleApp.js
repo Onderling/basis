@@ -2751,7 +2751,7 @@ function showTabBar(active) {
 // WHAT IS NEW IN CONTACTEN (2026-09-21): the seen-marks on this device, the unread map from the channel's durable
 // turns, the count on each row and the sum on the tab. Recomputed when the roster paints and when a turn lands.
 const contactSeen = makeContactSeenStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
-// …and what each contact's row LAST READ on this device — the left-hand side of the rename marker (L116): a
+// …and what each contact's row LAST READ on this device — the left-hand side of the rename marker: a
 // contact who renames themselves on the pair roster announces nothing, so the row says what they were until
 // the thread is opened.
 const contactNames = makeContactNameStore({ getItem: (k) => window.localStorage.getItem(k), setItem: (k, v) => window.localStorage.setItem(k, v) });
@@ -3146,7 +3146,7 @@ async function showContactThread(contactId) {
   rerender();
   // Opening the thread is reading it: the seen-mark moves to now, and the row's count is gone next time.
   contactSeen.mark(contactId, Date.now()).then(() => { if (_contactUnread[contactId]) _contactUnread[contactId].unread = 0; }).catch(() => {});
-  // …and it acknowledges a rename: the "was: …" line under the row clears once you have been in the thread (L116).
+  // …and it acknowledges a rename: the "was: …" line under the row clears once you have been in the thread.
   contactNames.seen(contactId, name).catch(() => { /* the marker is a courtesy */ });
   // The seal status is async (it may read shared circles' rosters): mark once it is known, if this thread is still the open one.
   if (typeof _peerAgent?.contactSeal?.statusFor === 'function') {

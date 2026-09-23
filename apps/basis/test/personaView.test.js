@@ -466,7 +466,7 @@ describe('renderMij', () => {
   });
 });
 
-describe('buildMijViewModel — taking a disclosure back (L115, 2026-09-23)', () => {
+describe('buildMijViewModel — taking a disclosure back (2026-09-23)', () => {
   // Found on the live walk: untick the last disclosed property and the circle's row collapsed to "nothing
   // shared" with no button, so the withdrawal could never be pushed and every co-member kept the old value.
   // The rule is the model's, not the shell's: a circle offers "stop sharing" when the release is EMPTY and the

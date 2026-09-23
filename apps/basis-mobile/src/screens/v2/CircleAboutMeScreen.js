@@ -215,7 +215,7 @@ export default function CircleAboutMeScreen({ callSkill, emitMemberProps, lastSh
                       onPress={() => shareToCircle(c.circleId)}
                     >
                       <Text style={styles.shareBtnText}>
-                        {/* with every toggle off, pressing this STOPS sharing — the word follows the act (L115) */}
+                        {/* with every toggle off, pressing this STOPS sharing — the word follows the act */}
                         {c.rows.some((r) => r.enabled) ? t('circle.aboutme.share_to_circle') : t('circle.mij.stop_sharing')}
                       </Text>
                     </Pressable>

@@ -61,7 +61,7 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     const name = document.createElement('div');
     name.className = 'cc-contacts__name';
     name.textContent = c.name;
-    // TWO PEOPLE, ONE NAME (L116): a contact is named by what THEY say on the pair roster, so one can take
+    // TWO PEOPLE, ONE NAME: a contact is named by what THEY say on the pair roster, so one can take
     // another's name. Every row of a colliding set says which one it is — the handle, else the key's tail.
     if (c.lookalike) {
       const tell = document.createElement('span');

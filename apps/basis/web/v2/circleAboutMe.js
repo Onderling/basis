@@ -266,7 +266,7 @@ export function renderAboutMe(container, {
     // "Share to this circle" — push the current disclosure to the circle's roster (post-join). The
     // toggles above only change LOCAL intent; this is what makes the circle actually see the change.
     // The button is offered whenever there is a property to talk about — the rows here are the TOGGLES, not what
-    // is disclosed, so unticking the last one never takes it away (that was Mij's table, L115, fixed there).
+    // is disclosed, so unticking the last one never takes it away (that was Mij's table, fixed there).
     // What did mislead: with every toggle off, pressing it STOPS sharing, and it still said "share". The word
     // follows the act now — an empty release is a real statement, the lane carries `{}` as a clear.
     if (c.rows.length && typeof onShareToCircle === 'function') {

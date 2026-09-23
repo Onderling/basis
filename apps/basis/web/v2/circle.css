@@ -837,14 +837,14 @@
 /* Unread on a row (2026-09-21): the count, and the name in bold. */
 .cc-contacts__row.is-unread .cc-contacts__name { font-weight: 800; }
 .cc-contacts__lookalike {
-  /* who this one is, when two rows read the same (L116) — quiet, beside the name, never instead of it */
+  /* who this one is, when two rows read the same — quiet, beside the name, never instead of it */
   margin-left: .4em;
   font-size: .82em;
   font-weight: 400;
   opacity: .65;
 }
 .cc-contacts__was {
-  /* what this contact was called before they renamed themselves, until the thread is opened (L116) */
+  /* what this contact was called before they renamed themselves, until the thread is opened */
   font-size: .82em;
   opacity: .6;
   font-style: italic;

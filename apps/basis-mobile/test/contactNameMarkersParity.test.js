@@ -1,11 +1,11 @@
 /**
- * TELLING CONTACTS APART (L116, 2026-09-23) — web ≡ mobile, from ONE source. Since the book reads the roster a
+ * TELLING CONTACTS APART (2026-09-23) — web ≡ mobile, from ONE source. Since the book reads the roster a
  * contact is named by what THEY said, so one can take another's name and a rename arrives unannounced. Both
  * markers are projection rules in `contactsSource.js` (`markLookalikes` / `markRenames` + the per-device name
  * store), applied inside the ONE shared Contacten read — so a shell that marks rows for itself, or keeps its own
  * memory of what it painted, is the drift this pins.
  *
- * …and TAKING A DISCLOSURE BACK (L115): the action on a circle that discloses nothing but still holds something
+ * …and TAKING A DISCLOSURE BACK: the action on a circle that discloses nothing but still holds something
  * on the lane, and the word that follows the act when every toggle is off.
  */
 import { describe, it, expect } from 'vitest';
@@ -44,7 +44,7 @@ describe('the name markers on Contacten — parity', () => {
   });
 });
 
-describe('taking a disclosure back (L115) — parity', () => {
+describe('taking a disclosure back — parity', () => {
   const model   = read('../../basis/src/v2/personaView.js');
   const loader  = read('../../basis/src/v2/mijLoader.js');
   const webMij  = read('../../basis/web/v2/circleMij.js');

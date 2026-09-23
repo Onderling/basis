@@ -29,7 +29,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
   // sight, until they write again or the person shows them. A list of only hidden contacts is not empty.
   const [foldOpen, setFoldOpen] = useState(false);
   const { shown, hidden } = useMemo(() => splitShownHidden(contacts), [contacts]);
-  // What each row last read HERE — the rename marker's left-hand side (L116). The launcher owns the same store;
+  // What each row last read HERE — the rename marker's left-hand side. The launcher owns the same store;
   // this screen is the other door onto the same list, so it reads through the same one.
   const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
 
@@ -85,8 +85,8 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
         <View style={styles.body}>
           <Text style={[styles.name, n > 0 && styles.nameUnread]}>
             {c.name}
-            {/* two contacts, one name (L116, web parity): every row of the set says which one it is */}
-            {c.lookalike ? <Text style={styles.lookalike}>{`  ${c.lookalike}`}</Text> : null}
+            {/* two contacts, one name (web parity): every row of the set says which one it is */}
+            {c.lookalike ? <Text style={styles.lookalike} accessibilityLabel={t('circle.contacts.lookalike_hint')}>{`  ${c.lookalike}`}</Text> : null}
           </Text>
           {/* …and one who renamed themselves says what they were, until the thread is opened */}
           {c.wasName ? <Text style={styles.wasName}>{t('circle.contacts.was_named', { name: c.wasName })}</Text> : null}

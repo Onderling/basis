@@ -331,7 +331,7 @@ function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }) {
       const empty = el('td', 'cc-mij__empty', tr('circle.mij.nothing_shared'));
       empty.colSpan = 6;
       trEl.appendChild(empty);
-      // …and TAKING IT BACK (L115): nothing is disclosed here any more, but the circle still holds what I said
+      // …and TAKING IT BACK: nothing is disclosed here any more, but the circle still holds what I said
       // last time — so this is the one place the withdrawal can be pushed. Same op as sharing (an empty release
       // is a real statement: the lane carries `{}` as a clear), different word.
       const action = el('td', 'cc-mij__cell-action');

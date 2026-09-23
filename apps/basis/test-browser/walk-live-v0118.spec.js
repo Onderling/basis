@@ -128,7 +128,7 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
     }, { timeout: 60_000 });
     expect(bHasIt, "B's roster row for A carries the disclosed property").toBeTruthy();
     log('STEP4 share to this circle', 'PASS', "landed on the co-member's roster row");
-    // …and TAKING IT BACK (L115). Until 2026-09-23 unticking the last disclosed property collapsed the circle's
+    // …and TAKING IT BACK. Until 2026-09-23 unticking the last disclosed property collapsed the circle's
     // row to "nothing shared" with no button, so the withdrawal could never be pushed and the co-member kept the
     // old value. The row carries the action now — an empty release is a real statement the lane carries as a clear.
     await call(A.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: gid, key: 'place', enabled: false });

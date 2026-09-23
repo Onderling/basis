@@ -956,6 +956,22 @@ export const stoopManifest = {
       },
     },
     {
+      id:   'setMyFace', verb: 'set',
+      params: [{ name: 'thumb', kind: 'string', required: true, ...STR_NONEMPTY }],
+      surfaces: {
+        chat: { hint: "Set this person's face: a small inline picture (a data:image/ URL, at most 4 KB) shown beside their name on every roster they are on." },
+        ui:   { control: 'button' },
+      },
+    },
+    {
+      id:   'clearMyFace', verb: 'set',
+      params: [],
+      surfaces: {
+        chat: { hint: "Take this person's face off their rows. The empty statement travels like any other change." },
+        ui:   { control: 'button' },
+      },
+    },
+    {
       id:   'listMyHandles', verb: 'list',
       params: [],
       surfaces: {
@@ -1916,11 +1932,11 @@ export const stoopManifest = {
     //      record-level read.  Adapter has to either trust the record
     //      envelope or know to re-read per-field.  Out of scope here;
     //      page already reads holiday-mode separately.
-    //   8. `avatarUrl` is bytes (data-URL after resize), not a primitive
+    //   8. the FACE is bytes (a data-URL after resize), not a primitive
     //      that fits 's `type: 'boolean' | 'enum' | string`. The
     //      avatar input is a file-picker with client-side resize
-    //      (`fileToResizedDataUrl`) + dispatch to `setMyAvatarUrl({url})`
-    //      and clear via `clearMyAvatar({})`. has no `'file'` or
+    //      (the shared `encodeImageFile`) + dispatch to `setMyFace({thumb})`
+    //      and clear via `clearMyFace({})`. has no `'file'` or
     //      `'image'` field type + no notion of "client-side transform
     //      before dispatch".  Stays hand-coded.
     //   9. `skills` section is a list-shape WITHIN a record-shape view

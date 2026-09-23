@@ -79,3 +79,49 @@ export async function pickAndEncodeImage({
 
   return toInboundAttachment({ full, thumbBase64: thumb.base64, mime: 'image/jpeg' });
 }
+
+/** The face's size and cap — the fold's, so a picture that gets past here gets past every receiver. */
+export const FACE_DIM = 96;
+export const FACE_MAX_CHARS = 4096;
+
+/**
+ * Pick a picture and encode it as a FACE: a `data:image/jpeg` URL at most 4096 characters.
+ *
+ * Web parity: `attachmentEncoder.encodeImageFile(file, { maxDim: 96, maxBytes: 2900 })`. Same two facts on
+ * both shells — 96 px, and a quality ladder rather than one shot, because the cap is on the data-URL STRING
+ * and base64 is a third larger than the bytes it carries. Always JPEG: a face needs no transparency, and PNG
+ * has no quality to trade away, so it is the one format that can come out over the cap with nothing to do
+ * about it.
+ *
+ * @returns {Promise<{thumb: string}|{error: string}|null>} null = the person cancelled or refused permission
+ */
+export async function pickFace({ picker, manipulator } = {}) {
+  /* eslint-disable global-require */
+  const ImagePicker = picker || require('expo-image-picker');
+  const ImageManipulator = manipulator || require('expo-image-manipulator');
+  /* eslint-enable global-require */
+
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync?.();
+  if (perm && perm.granted === false) return null;
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions?.Images ?? 'Images',
+    quality: 1,
+  });
+  if (res?.canceled) return null;
+  const asset = res?.assets?.[0];
+  if (!asset?.uri) return null;
+
+  const format = ImageManipulator.SaveFormat?.JPEG ?? 'jpeg';
+  const resize = [{ resize: (asset.width || 0) >= (asset.height || 0) ? { width: FACE_DIM } : { height: FACE_DIM } }];
+  let last = 0;
+  for (const compress of [0.85, 0.7, 0.55, 0.4]) {
+    const out = await ImageManipulator.manipulateAsync(asset.uri, resize, { compress, format, base64: true });
+    if (typeof out?.base64 !== 'string' || !out.base64) continue;
+    const thumb = `data:image/jpeg;base64,${out.base64}`;
+    if (thumb.length <= FACE_MAX_CHARS) return { thumb };
+    last = thumb.length;
+  }
+  // Every quality tried and still too big — a refusal the person can act on (a different picture), rather
+  // than a statement every other device would refuse in silence.
+  return { error: `${last} > ${FACE_MAX_CHARS}` };
+}

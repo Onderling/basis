@@ -4023,6 +4023,32 @@ async function showMij() {
       } catch { /* surfaced on reload */ }
       busy = false; await load();
     },
+    // MY FACE — resize here, say it on the lane there. 96 px and 4 KB are the fold's cap, so a picture that
+    // gets past this point gets past every receiver; the encoder is the one already used for attachments,
+    // which is why the shell holds no image code of its own.
+    onPickFace: async (file) => {
+      try {
+        // 96 px is the face's size. The BYTE cap here is not the fold's 4096: the fold counts the data-URL
+        // STRING, and base64 is a third larger than the bytes it carries (plus the `data:image/…;base64,`
+        // prefix). ~2900 bytes is what reliably fits 4096 characters, and the encoder drops JPEG quality
+        // until it does.
+        const encoded = await encodeImageFile(file, { maxDim: 96, maxBytes: 2900 });
+        if (!encoded?.dataB64) return { error: 'encode' };
+        const thumb = `data:${encoded.mime};base64,${encoded.dataB64}`;
+        // A PNG or WebP keeps its format (`outputMimeFor`) and so has no quality ladder to fall down — one
+        // can come out over the cap. Say so rather than letting the op refuse with a number nobody can act
+        // on: a different picture, or a JPEG, is the thing to try.
+        if (thumb.length > 4096) return { error: `${thumb.length} > 4096` };
+        const r = await rawCallSkill('stoop', 'setMyFace', { thumb });
+        if (r?.error) return { error: r.error };
+        await load();
+        return { ok: true };
+      } catch (err) { return { error: err?.message ?? String(err) }; }
+    },
+    onClearFace: async () => {
+      try { await rawCallSkill('stoop', 'clearMyFace', {}); } catch { /* surfaced on reload */ }
+      await load();
+    },
     // Fold-in phase C — the quiet skills pointer opens the persona surface.
     onOpenMij: () => openAboutMePanel('default'),
     onGeocode: async (query) => {

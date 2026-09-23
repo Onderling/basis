@@ -144,10 +144,14 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // verified from the version on record — what a direct message to them is sealed to) → 97.
   // 2026-09-22: -1, `recordMemberPersonaProperties` retired with the persona side wire — what a member discloses to
   // a circle is their own `member-props` statement on its membership lane now, folded by every device → 96.
+  // 2026-09-23: +2, `setMyFace` / `clearMyFace` — a member's own small picture, said on the membership lane
+  // beside their name. They are NOT the retired `setMyAvatarUrl` / `clearMyAvatar` renamed: those wrote
+  // `avatarUrl`, the private local display cache, had no surface on either shell, and nothing ever painted
+  // what they wrote. The face is a different field with a different life — bounded, published, folded → 98.
   // This number is a snapshot on purpose: adding an op to the waist should be a deliberate act
   // that someone updates a count for, not something that slips in unremarked.
-  it('ships the full chat+slash surface (one stoop manifest, 96 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(96);
+  it('ships the full chat+slash surface (one stoop manifest, 98 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(98);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

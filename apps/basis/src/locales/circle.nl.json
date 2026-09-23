@@ -4331,6 +4331,26 @@
     "share_contact": {
       "text": "Mijn contact delen →",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
+    },
+    "face_choose": {
+      "text": "Kies een foto",
+      "doc": "mij — the button that opens the file picker for the member’s own face, when they have none yet."
+    },
+    "face_change": {
+      "text": "Andere foto",
+      "doc": "mij — the same button once a face is set."
+    },
+    "face_remove": {
+      "text": "Weghalen",
+      "doc": "mij — takes the face off the member’s rows everywhere; the empty statement travels like any other change."
+    },
+    "face_working": {
+      "text": "Bezig…",
+      "doc": "mij — while the picture is being resized and said on the lane."
+    },
+    "face_refused": {
+      "text": "Foto niet gelukt: {{reason}}",
+      "doc": "mij — the picture was refused (too large after resizing, or not an image). reason = the op’s word for what was wrong. Said HERE because the fold refuses it silently on every other device, and this person is the only one who can act on it."
     }
   },
   "blocked": {

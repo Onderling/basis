@@ -11,7 +11,7 @@
  * that is what these tests pin: the classification is total, the order is safe, and a failure keeps everything.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { THROWAWAY_CONTENT, forgetThrowawaySelf } from '../../src/v2/enrolForgets.js';
+import { THROWAWAY_CONTENT, forgetThrowawaySelf, markForgetPending, runPendingForget, FORGET_PENDING_KEY } from '../../src/v2/enrolForgets.js';
 
 /** a shell's storage, faked: named stores (an IndexedDB database / an AsyncStorage scope / a directory) + flat keys */
 function fakeShell({ stores = [], keys = [], circleIds = [], failListing = false } = {}) {
@@ -136,5 +136,81 @@ describe('§8c — the device comes back WHOLE after the clear', () => {
     for (const n of ['onderling.enrollOffer', 'custody-mode']) {
       expect(THROWAWAY_CONTENT.keyPrefixes.some((p) => n.startsWith(p)), `${n} is not caught by a prefix`).toBe(false);
     }
+  });
+});
+
+describe('the NOTE, not a button — every path that enrols gets the clear', () => {
+  /** a vault, faked: the plain device-local kind the marker lives in, beside `restore-pending` */
+  const fakeVault = (initial = {}) => {
+    const m = new Map(Object.entries(initial));
+    return {
+      m,
+      get: async (k) => m.get(k) ?? null,
+      set: async (k, v) => { m.set(k, v); },
+      delete: async (k) => { m.delete(k); },
+    };
+  };
+
+  it('a DIRECT op enrol clears on the next boot — no UI driven, which is how the walk enrols', async () => {
+    // This is the whole reason for the note. The clear used to hang off the web flow's reload button and the
+    // mobile modal's effect, and the live walk enrols with `window.onderlingCall('household','enrollDevice')`.
+    // Both shapes would have passed their own tests while the one path people and walks take went past.
+    const v = fakeVault();
+    await markForgetPending(v, 'enrol', ['abc']);
+    const s = shellOf({ stores: ['cc-agent-registry', 'cc-circle-abc'], keys: ['cc.contactNames'] });
+    const r = await runPendingForget({ markerVault: v, shell: s });
+    expect(r.ran).toBe(true);
+    expect(s.dropped.stores, 'the noted circle went too').toEqual(expect.arrayContaining(['cc-circle-abc', 'cc-agent-registry']));
+    expect(await v.get(FORGET_PENDING_KEY), 'the note is gone once the work is done').toBeNull();
+  });
+
+  it('carries the circle ids ON the note — at boot there is no agent to ask', async () => {
+    // The per-circle stores are named after the THROWAWAY self's circles, which only its registry knows, and
+    // boot has no agent. A shell's own `listCircleIds` would answer "none" and every per-circle store would be
+    // skipped in silence — the half-cleared state the whole file exists to avoid.
+    const v = fakeVault();
+    await markForgetPending(v, 'enrol', ['zzz']);
+    const s = shellOf({ stores: ['cc-circle-zzz'], circleIds: [] });   // the shell knows nothing
+    await runPendingForget({ markerVault: v, shell: s });
+    expect(s.dropped.stores).toContain('cc-circle-zzz');
+  });
+
+  it('a boot with no note does nothing at all', async () => {
+    const s = shellOf({ stores: ['cc-agent-registry'] });
+    const r = await runPendingForget({ markerVault: fakeVault(), shell: s });
+    expect(r).toMatchObject({ ran: false, reason: 'nothing-pending' });
+    expect(s.dropped.stores, 'an ordinary boot never clears anything').toEqual([]);
+  });
+
+  it('a REFUSED drop keeps the note, so the next boot tries again', async () => {
+    // A blocked IndexedDB delete — another tab holding the database — is the real case. Counting it as success
+    // would leave the bytes for ever with nothing left to say so.
+    const v = fakeVault();
+    await markForgetPending(v, 'enrol', []);
+    const r = await runPendingForget({
+      markerVault: v,
+      shell: { dropStore: () => { throw new Error('blocked by another connection'); }, dropKey: () => {} },
+    });
+    expect(r.ran).toBe(true);
+    expect(r.failed, 'the refusals are counted, not swallowed').toBeGreaterThan(0);
+    expect(await v.get(FORGET_PENDING_KEY), 'the note STAYS').not.toBeNull();
+  });
+
+  it('a registry that cannot be read keeps the note too', async () => {
+    const v = fakeVault();
+    // no ids on the note, and the shell's fallback throws — nothing is dropped, so nothing is forgotten
+    await markForgetPending(v, 'enrol', []);
+    const s = shellOf({ stores: ['cc-agent-registry'], failListing: true });
+    const r = await runPendingForget({ markerVault: v, shell: s });
+    expect(r.ok).toBe(false);
+    expect(s.dropped.stores).toEqual([]);
+    expect(await v.get(FORGET_PENDING_KEY), 'still owed').not.toBeNull();
+  });
+
+  it('the restore door leaves the note too — a wiped device also booted unenrolled first', async () => {
+    const v = fakeVault();
+    await markForgetPending(v, 'restore', []);
+    const note = JSON.parse(await v.get(FORGET_PENDING_KEY));
+    expect(note.why).toBe('restore');
   });
 });

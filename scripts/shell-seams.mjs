@@ -26,7 +26,7 @@ export const SEAMS = Object.freeze([
   // box swept its own named paths from 2026-09-14; web and mobile did not, and nothing failed — which is exactly
   // why this is a seam and not a convention. All three read ONE list now (`src/v2/enrolForgets.js`); a shell
   // supplies only how its storage is reached.
-  { id: 'enrol-forgets-the-throwaway-self', pattern: /forgetThrowawaySelf\(/, why: 'a device that keeps a former self\'s content greets it in every circle and warns about rows it cannot open, for ever' },
+  { id: 'enrol-forgets-the-throwaway-self', pattern: /runPendingForget\(/, why: 'a device that keeps a former self\'s content greets it in every circle and warns about rows it cannot open, for ever — read the ceremony\'s note as the FIRST awaited act of boot, before any store is touched' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   { id: 'contact-channel',       pattern: /createContactThreadChannel\(/,        why: 'direct messages: durable threads, the person seal, the own-devices carry' },
   // A ROW is a view: only the shells that paint Contacten compose it. The box stores the thread and carries it; the
@@ -58,7 +58,7 @@ export const SEAMS = Object.freeze([
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs'] },
 ]);
 

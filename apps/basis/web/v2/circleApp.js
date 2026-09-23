@@ -45,7 +45,7 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
 import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
-import { forgetThrowawaySelf } from '../../src/v2/enrolForgets.js';
+import { runPendingForget, markerVaultOver } from '../../src/v2/enrolForgets.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -1906,11 +1906,22 @@ function webForgetAdapter() {
     listCircleIds: async () => ((await rawCallSkill?.('stoop', 'listMyCircles', {}))?.circles ?? [])
       .map((c) => c?.id).filter(Boolean),
     listKeys: async () => { try { return Object.keys(window.localStorage); } catch { return []; } },
-    dropStore: (name) => new Promise((resolve) => {
+    // A BLOCKED delete is a FAILURE, not a success. `deleteDatabase` fires `onblocked` when another tab still
+    // holds a connection, and then simply waits — so resolving there would report the bytes as gone while they
+    // sit on disk with nothing left to say so. It rejects instead: `runPendingForget` counts the refusal and
+    // leaves the ceremony's note in place, and the next boot (or the next tab-close) finishes the job.
+    dropStore: (name) => new Promise((resolve, reject) => {
+      let settled = false;
+      const done = (fn) => (...a) => { if (!settled) { settled = true; fn(...a); } };
+      const ok = done(resolve);
+      const no = done(reject);
       try {
         const req = indexedDB.deleteDatabase(name);
-        req.onsuccess = req.onerror = req.onblocked = () => resolve();
-      } catch { resolve(); }
+        req.onsuccess = () => ok();
+        req.onerror = () => no(new Error(`delete refused: ${name}`));
+        req.onblocked = () => { /* another connection — give it the bounded wait below, then give up */ };
+        setTimeout(() => no(new Error(`delete blocked: ${name}`)), 3000);
+      } catch (err) { no(err); }
     }),
     dropKey: (key) => { try { window.localStorage.removeItem(key); } catch { /* quota / disabled */ } },
   };
@@ -5061,17 +5072,10 @@ function showEnrollDeviceFlow() {
       go.type = 'button';
       go.className = 'cc-btn cc-btn--primary';
       go.textContent = t('circle.enroll.reload');
-      go.addEventListener('click', async () => {
-        // Forget the throwaway self BEFORE the reload — the ceremony has replaced the content key those bytes
-        // were sealed under, so the next boot would greet a former self in every circle and warn about rows it
-        // cannot open. WHAT is forgotten is decided once in `enrolForgets.js`; this shell supplies only how its
-        // own storage is reached. A clear that fails never blocks the reload: the warnings are noise, a device
-        // that cannot restart is not.
-        if (inst?.produces?.clearContent) {
-          try { await forgetThrowawaySelf(webForgetAdapter()); } catch { /* best-effort, by design */ }
-        }
-        try { window.location.reload(); } catch { /* */ }
-      });
+      // The clear does NOT hang off this button: the ceremony leaves a `forget-pending` marker in the vault and
+      // boot reads it (see the first awaited act of the boot below). A button-shaped clear was reachable only
+      // from the UI, and the walk — like any direct caller of the op — went straight past it.
+      go.addEventListener('click', () => { try { window.location.reload(); } catch { /* */ } });
       card.appendChild(go);
     } else {
       msg.textContent = outcome === 'invalid-phrase'
@@ -7954,6 +7958,23 @@ function broadcastPolicy({ circleId, policy }) {
 }
 
 async function boot() {
+  // ── THE FIRST AWAITED ACT: finish a ceremony's clear, if one is owed ──────────────────────────────────
+  // The add-a-device ceremony (and the owner-root restore) leaves a `forget-pending` note in the vault, and
+  // this is where it is read. It must come before ANY store is touched: the IndexedDB backend opens lazily,
+  // so a constructed store is not yet a connection — but a store that has been READ is, and a database with
+  // an open connection refuses to be deleted. The marker is removed only when every drop succeeded, so a
+  // blocked delete (another tab) simply tries again on the next boot rather than losing the fact silently.
+  try {
+    const forgot = await runPendingForget({
+      markerVault: markerVaultOver(window.localStorage),
+      shell: webForgetAdapter(),
+    });
+    if (forgot.ran) {
+      console.info(`[enrol] forgot the throwaway self: ${forgot.stores} store(s), ${forgot.keys} key(s)`
+        + `${forgot.failed ? `, ${forgot.failed} refused — the note stays, the next start tries again` : ''}`);
+    }
+  } catch { /* a clear that cannot run never blocks a boot */ }
+
   // THE DEVICE LOG IS DURABLE (the content re-root's first slice): hydrate the persisted snapshot before
   // anything appends, then late-bind the debounced save. Without this every reload wiped the log and the
   // legacy chat store quietly stayed the real record — the inverse of the decided hierarchy. Best-effort:

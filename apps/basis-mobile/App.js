@@ -87,6 +87,7 @@ import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStor
 import { makeCirclePolicyPendingStoreRN } from './src/core/circlePolicyPendingStorageRN.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
+import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);
@@ -457,6 +458,27 @@ export default function App() {
         // Now it is a sealed StorageBackend like web's, and the AGENT hydrates it — at the first moment
         // the content key exists, which is why this no longer happens before the bundle boots. Reading
         // it here would hand back an envelope nobody can open yet.
+        // ── FINISH A CEREMONY'S CLEAR, if one is owed (web parity: circleApp's boot does this first) ────
+        // The add-a-device ceremony and the owner-root restore leave a `forget-pending` note in the vault;
+        // this is where it is read, before any store is touched. The note carries the throwaway self's circle
+        // ids, captured while its registry was still readable. Removed only when every drop succeeded, so a
+        // storage that refuses simply tries again on the next launch.
+        try {
+          const forgot = await runPendingForget({
+            markerVault: markerVaultOver(AsyncStorage),
+            shell: {
+              listKeys: async () => { try { return await AsyncStorage.getAllKeys(); } catch { return []; } },
+              dropStore: async (name) => {
+                const all = await AsyncStorage.getAllKeys().catch(() => []);
+                const mine = all.filter((k) => k === name || k.startsWith(`${name}:`) || k.startsWith(`${name}/`));
+                if (mine.length) await AsyncStorage.multiRemove(mine);
+              },
+              dropKey: async (key) => { await AsyncStorage.removeItem(key); },
+            },
+          });
+          if (forgot.ran) console.info(`[enrol] forgot the throwaway self: ${forgot.stores} store(s), ${forgot.keys} key(s)`);
+        } catch { /* a clear that cannot run never blocks a launch */ }
+
         const deviceLogIo = backendSnapshotIo(
           sealedLocalBackend(createAsBackend({ AsyncStorage, scope: 'cc-device-log' })),
         );

@@ -183,13 +183,102 @@ export async function forgetThrowawaySelf({ listCircleIds, listKeys, dropStore, 
 
   let droppedStores = 0;
   let droppedKeys = 0;
+  let failed = 0;
+  // A refusal is COUNTED, not swallowed. The boot marker is removed only when this comes back with none:
+  // a blocked IndexedDB delete (another tab holding the database) would otherwise read as success and the
+  // bytes would stay for ever with nothing left to say so.
   for (const name of stores) {
     if (keep.has(name)) continue;
-    try { await dropStore(name); droppedStores += 1; } catch { /* absent, or a storage that refuses: not fatal */ }
+    try { await dropStore(name); droppedStores += 1; } catch { failed += 1; }
   }
   for (const key of keys) {
     if (keep.has(key)) continue;
-    try { await dropKey(key); droppedKeys += 1; } catch { /* same */ }
+    try { await dropKey(key); droppedKeys += 1; } catch { failed += 1; }
   }
-  return { ok: true, stores: droppedStores, keys: droppedKeys };
+  return { ok: true, stores: droppedStores, keys: droppedKeys, failed };
+}
+
+/**
+ * The note the ceremony leaves and the NEXT BOOT reads. Same shape, same vault and same lifecycle as
+ * `restore-pending` (`ownerRootRestore.js`): written on the ceremony's success path, read as the first awaited
+ * act of a shell's boot, deleted only once the work it names is done.
+ *
+ * Why a marker rather than a call at the end of the ceremony: the clear was wired to the web flow's terminal
+ * button and the mobile modal's effect, and the live walk enrols by calling the op DIRECTLY — so the one path
+ * that is actually walked went straight past it. A marker is reached by every path that enrols or restores,
+ * survives a crash mid-clear (the next boot finishes it), and needs no UI driven to be tested.
+ */
+export const FORGET_PENDING_KEY = 'forget-pending';
+
+/**
+ * Leave the note. Called on the success path of the add-a-device ceremony and of the owner-root restore — a
+ * wiped device restoring from its phrase also booted unenrolled first, and its throwaway content is just as
+ * unopenable as an enrolled device's.
+ */
+export async function markForgetPending(markerVault, why = 'enrol', circleIds = []) {
+  if (!markerVault || typeof markerVault.set !== 'function') return false;
+  // The ids ride the NOTE, captured here rather than read at boot. The per-circle stores are named after the
+  // THROWAWAY self's circles, which only its registry knows — and by the time boot reads this note the agent
+  // does not exist yet, so there is nothing to ask. Written at the one moment both facts are true: the
+  // ceremony has succeeded and the old registry is still readable.
+  const ids = Array.isArray(circleIds) ? circleIds.filter((c) => typeof c === 'string' && c) : [];
+  try { await markerVault.set(FORGET_PENDING_KEY, JSON.stringify({ at: new Date().toISOString(), why, circleIds: ids })); return true; }
+  catch { return false; }   // the clear is best-effort; a ceremony never fails because of it
+}
+
+/**
+ * Read the note at boot and, if it is there, forget the throwaway self — then remove the note, and ONLY then.
+ *
+ * Ordering: this must be the first awaited act of a shell's boot, before any store is read or written. The
+ * IndexedDB backend opens lazily (`IndexedDbBackend.js`: `dbPromise` is null until the first operation), so a
+ * constructed-but-untouched store is not yet a connection — but a store that has been READ is, and deleting a
+ * database with an open connection blocks.
+ *
+ * Crash-safety: the marker is deleted only when every drop succeeded. A blocked delete (another tab holding the
+ * database), a storage that refuses, a registry that cannot be read — all leave the marker set, and the next
+ * boot tries again. Clearing twice is a no-op; clearing never is the bug.
+ *
+ * @returns {Promise<{ran: boolean, ok?: boolean, reason?: string, stores?: number, keys?: number, failed?: number}>}
+ */
+export async function runPendingForget({ markerVault, shell } = {}) {
+  if (!markerVault || typeof markerVault.get !== 'function') return { ran: false, reason: 'no-marker-vault' };
+  let pending = null;
+  try { pending = await markerVault.get(FORGET_PENDING_KEY); } catch { return { ran: false, reason: 'marker-unreadable' }; }
+  if (!pending) return { ran: false, reason: 'nothing-pending' };
+
+  let noted = [];
+  try { noted = JSON.parse(typeof pending === 'string' ? pending : JSON.stringify(pending))?.circleIds ?? []; }
+  catch { noted = []; }   // an unreadable note still clears everything it can name without one
+
+  // The ids come from the note, not from a registry read: there is no agent at this point in a boot, and the
+  // shell's own `listCircleIds` would answer "none" — silently skipping every per-circle store, which is the
+  // half-cleared state this whole file exists to avoid. A shell may still supply one as a fallback.
+  const shellArg = { ...(shell ?? {}) };
+  if (noted.length) shellArg.listCircleIds = async () => noted;
+  const r = await forgetThrowawaySelf(shellArg);
+  if (r.ok && !r.failed) {
+    try { await markerVault.delete?.(FORGET_PENDING_KEY); } catch { /* the next boot clears again; harmless */ }
+    return { ran: true, ...r };
+  }
+  // Left set ON PURPOSE: whatever refused is still there, and a device half-forgotten is the state this
+  // whole file exists to avoid.
+  return { ran: true, ...r };
+}
+
+/**
+ * A marker vault over a plain key-value storage, so every shell reads the ceremony's note the same way and
+ * none of them has to reach into the agent to get one.
+ *
+ * The note is PLAIN and device-local, exactly like `restore-pending` beside it — it says only "a ceremony
+ * happened here, finish it", which is worth nothing to anyone who can already read this device's storage.
+ * The prefix is the owner-root vault's, so the marker lives with the ceremony that wrote it and survives the
+ * clear for the same reason the delegation blob does.
+ */
+export function markerVaultOver(storage, prefix = 'cc-owner-root:') {
+  const at = (k) => `${prefix}${k}`;
+  return {
+    get: async (k) => { try { return (await storage?.getItem?.(at(k))) ?? null; } catch { return null; } },
+    set: async (k, v) => { try { await storage?.setItem?.(at(k), v); } catch { /* full or disabled */ } },
+    delete: async (k) => { try { await storage?.removeItem?.(at(k)); } catch { /* same */ } },
+  };
 }

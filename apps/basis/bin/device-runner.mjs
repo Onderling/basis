@@ -72,7 +72,7 @@ import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { applyRulesUpdates } from '../src/v2/rulesUpdateLane.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
-import { forgetThrowawaySelf } from '../src/v2/enrolForgets.js';
+import { runPendingForget } from '../src/v2/enrolForgets.js';
 
 const { values } = parseArgs({ options: {
   'data-dir':   { type: 'string',  default: path.join(homedir(), '.basis-device') },
@@ -132,6 +132,44 @@ const { hydrated } = await wireEventLogPersistence({
 // Where an add-a-device offer waits between the enrol ceremony and the next start — the node shape of
 // what the shells keep in plain storage. Public data (the offer grants nothing without the phrase).
 const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
+
+// ── FINISH A CEREMONY'S CLEAR, if one is owed (web ≡ mobile ≡ box: the same note, read at each boot) ──────
+// `--enrol` leaves a `forget-pending` note in the vault rather than sweeping inline, so every shell clears by
+// one path and the one a person walks is the one a walk can prove. Before the agent, so nothing has opened a
+// store yet. This shell supplies only the translation: a shared store name → one of THIS disk's paths. A name
+// it does not know is a no-op, so the blast radius is exactly `contentPaths` — the vault and the offer stash
+// are not in that object and cannot be reached from here even by mistake.
+{
+  const boxPathFor = {
+    'cc-agent-registry': contentPaths.registry,
+    'cc-device-log': contentPaths.deviceLog,
+    'cc-contact-dm-state': contentPaths.contactDm,
+    'cc-outbox-state': contentPaths.outbox,
+    'cc-outbox-cache': contentPaths.outbox,
+    'cc-settings-state': contentPaths.settings,
+    'cc-settings-cache': contentPaths.settings,
+    'cc-stoop-state': contentPaths.stoop,
+    'cc-stoop-cache': contentPaths.stoop,
+    'cc-household-state': contentPaths.household,
+    'cc-household-cache': contentPaths.household,
+    'cc-tasks-cache': contentPaths.tasks,
+  };
+  try {
+    const forgot = await runPendingForget({
+      markerVault: vault,
+      shell: {
+        dropStore: (name) => {
+          const p = boxPathFor[name];
+          if (!p) return;                                  // a store only the painting shells have
+          rmSync(p, { recursive: true, force: true });      // a throw here counts as a refusal: the note stays
+        },
+        dropKey: () => {},                                  // no flat key-value store: settings are a file
+      },
+    });
+    if (forgot.ran) console.log(`device-runner: forgot the throwaway self — ${forgot.stores} store(s)`
+      + `${forgot.failed ? `, ${forgot.failed} refused (the note stays; the next start retries)` : ''}`);
+  } catch { /* a clear that cannot run never blocks a start */ }
+}
 
 // EVERYTHING A SHELL KEEPS, this device keeps — on disk, under the data dir, sealed like the shells seal
 // it. Until 2026-09-14 only the household items and the log were kept; the registry (which circles this
@@ -244,35 +282,11 @@ async function enrolOnce() {
     // under — left in place, the next boot would greet a former self in every circle and warn about rows it
     // cannot open. So the content starts empty; the vaults the ceremony wrote and the offer stash stay.
     //
-    // The LIST is shared with web and mobile now (`src/v2/enrolForgets.js`) — the box swept this from
-    // 2026-09-14 and the two painting shells did not, which is the kind of drift nothing fails on. This shell
-    // supplies only the translation: a shared store name → one of THIS disk's paths. A name it does not know
-    // is a no-op, so the blast radius is exactly `contentPaths` and never a byte outside it — the offer stash
-    // and the vaults are not in that object, so they cannot be reached from here even by mistake.
-    const boxPathFor = {
-      'cc-agent-registry': contentPaths.registry,
-      'cc-device-log': contentPaths.deviceLog,
-      'cc-contact-dm-state': contentPaths.contactDm,
-      'cc-outbox-state': contentPaths.outbox,
-      'cc-outbox-cache': contentPaths.outbox,
-      'cc-settings-cache': contentPaths.settings,
-      'cc-stoop-cache': contentPaths.stoop,
-      'cc-household-cache': contentPaths.household,
-      'cc-tasks-cache': contentPaths.tasks,
-    };
-    await forgetThrowawaySelf({
-      // The registry is a directory on this disk and the ceremony has just replaced the content key, so there
-      // is nothing readable to enumerate; the box's per-circle items live inside the three `*-items.json`
-      // above rather than in a store per circle, so it needs no ids. Returning none is the honest answer,
-      // not a failure — and `forgetThrowawaySelf` only refuses when the read THROWS.
-      listCircleIds: async () => [],
-      dropStore: (name) => {
-        const p = boxPathFor[name];
-        if (!p) return;                                   // web/mobile-only store: nothing of it on this disk
-        try { rmSync(p, { recursive: true, force: true }); } catch { /* nothing there */ }
-      },
-      dropKey: () => {},                                  // no flat key-value store here: settings are a file
-    });
+    // The clear itself no longer happens HERE. The ceremony leaves a `forget-pending` note in the vault and
+    // the runner's own start reads it — one path for all three shells, and the one a person actually walks. A
+    // clear at the end of `--enrol` was fine for this shell (it is a separate CLI run) but not for the others,
+    // where it hung off a button the walk never pressed; two shapes is how a walk proves one thing and a person
+    // gets another. `restoreOwnerRoot` writes the note, with the throwaway self's circle ids on it.
     console.log(`device-runner: enrolled as device ${String(r.deviceId ?? '').slice(0, 12)}… for ${stashed.circles.length} circle(s).`);
     console.log('  Now start the runner as usual; on that start it joins the circles the offer names.');
     return 0;

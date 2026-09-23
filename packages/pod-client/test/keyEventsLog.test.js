@@ -92,3 +92,59 @@ describe('no-pod rotation on removal — backward secrecy', () => {
     expect(openAcrossKeyChain(v2env, readKeyChain([e1, e2], { groupId: GID, opener: opener(bob) }))).toBe('new era');
   });
 });
+
+// ── TWO ADMINS ROTATE AT ONCE (2026-09-23) ───────────────────────────────────────────────────────────────
+// Not an adversary: two people with the authority to rotate, doing it at the same moment. Until today the
+// collapse was `byVersion.set(e.version, e)` — last in READ ORDER wins — in two places, the local store and
+// this fold. Each device kept whichever arrived last, so members held different keys for the same version and
+// could not open each other's content. Electing one deterministically would stop the split but lose whatever
+// was sealed under the loser; keeping both loses nothing, because the reader already trials the whole chain.
+describe('two admins rotate to the same version at once', () => {
+  const twoRotations = () => {
+    const a = generateKeypair(); const b = generateKeypair(); const c = generateKeypair();
+    const { event: e1 } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey, b.publicKey, c.publicKey] });
+    // Both admins see v1 and rotate. Neither has seen the other's rotation — that is what "at once" means.
+    const { event: fromA } = rotateKeyEvent({ groupId: GID, priorEvents: [e1], recipients: [a.publicKey, b.publicKey, c.publicKey] });
+    const { event: fromB } = rotateKeyEvent({ groupId: GID, priorEvents: [e1], recipients: [a.publicKey, b.publicKey, c.publicKey] });
+    return { a, b, c, e1, fromA, fromB };
+  };
+
+  it('content sealed under EITHER key opens, on a device that saw them in either order', () => {
+    const { a, c, e1, fromA, fromB } = twoRotations();
+    // Each admin sealed something under its own new key before hearing about the other.
+    const underA = seal(currentGroupKey(readKeyChain([e1, fromA], { groupId: GID, opener: opener(a) })), 'from A');
+    const underB = seal(currentGroupKey(readKeyChain([e1, fromB], { groupId: GID, opener: opener(a) })), 'from B');
+    // A third member receives both, in whichever order the relay hands them over.
+    for (const log of [[e1, fromA, fromB], [e1, fromB, fromA]]) {
+      const chain = readKeyChain(log, { groupId: GID, opener: opener(c) });
+      expect(openAcrossKeyChain(underA, chain), 'A\'s content opens').toBe('from A');
+      expect(openAcrossKeyChain(underB, chain), 'B\'s content opens too — neither is discarded').toBe('from B');
+    }
+  });
+
+  it('every device agrees which key is CURRENT, whatever order it read them in', () => {
+    // The chain keeps both, but the next write must not fork again: `current` is one event, chosen the same
+    // way everywhere, so the race heals on the next rotation instead of persisting.
+    const { e1, fromA, fromB } = twoRotations();
+    const one = foldKeyEvents([e1, fromA, fromB], { groupId: GID });
+    const other = foldKeyEvents([fromB, e1, fromA], { groupId: GID });
+    expect(one.sealed, 'the same current envelope on both devices').toBe(other.sealed);
+    expect(one.version).toBe(2);
+  });
+
+  it('a RE-WRAP of one key still collapses — and keeps the wrap that reaches MORE people', () => {
+    // The benign case the de-dupe was built for: the same key re-sealed as the roster grows. Keeping both
+    // would grow the log for nothing; keeping the LAST READ can drop the wrap that added the new member on a
+    // device that read them the other way round. The superset always serves.
+    const a = generateKeypair(); const b = generateKeypair(); const c = generateKeypair();
+    const { event: e1, groupKey } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey, b.publicKey] });
+    const { event: wider } = rotateKeyEvent({ groupId: GID, priorEvents: [], recipients: [a.publicKey, b.publicKey, c.publicKey], groupKey });
+    const widerAtV1 = { ...wider, version: 1 };   // the same KEY, re-wrapped to one more recipient, at v1
+    for (const log of [[e1, widerAtV1], [widerAtV1, e1]]) {
+      const r = foldKeyEvents(log, { groupId: GID });
+      expect(r.version, 'still one version').toBe(1);
+      const chain = readKeyChain(log, { groupId: GID, opener: opener(c) });
+      expect(chain.length, 'the newcomer can open v1 whichever order the device read the two wraps').toBe(1);
+    }
+  });
+});

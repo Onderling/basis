@@ -26,6 +26,7 @@
 // rotation DURING a member's tenure was wrapped to THEIR sealing key, so they decrypt the chain they lived
 // through; eras before they joined / after they left are simply absent from their fold.
 
+import { sha256 } from '@noble/hashes/sha2.js';
 import { generateGroupKey, openWithGroupKey, isSealed } from './envelope.js';
 import { buildGroupKeyResource } from './groupKeyResource.js';
 
@@ -43,12 +44,80 @@ export const KEY_EVENT_KIND = 'group-key-event';
  * @param {string[]} o.recipients     the then-current members' sealing PUBLIC keys.
  * @returns {{kind:string, groupId:string|null, version:number, members:number, recipients:string[], sealed:string}}
  */
+/**
+ * WHICH KEY this event distributes, as a name anyone holding it computes the same way.
+ *
+ * A version number says WHEN, not WHICH — and two admins who rotate at the same moment both mint version n+1,
+ * with different keys. Without a name for the key, "the same version" and "the same key" are indistinguishable,
+ * and the only available de-dupe is "whichever I read last", which is how the two of them used to give every
+ * device a different answer.
+ *
+ * A hash of the key, domain-separated so it can never collide with a hash computed for another purpose.
+ * It reveals nothing: a holder already has the key, and a non-holder gains only the ability to recognise two
+ * wraps as being of the same thing — which is exactly what it is for.
+ */
+const KEY_ID_DOMAIN = new TextEncoder().encode('onderling/group-key-id/v1');
+export function keyIdOf(groupKey) {
+  if (typeof groupKey !== 'string' || !groupKey) return null;
+  const body = new TextEncoder().encode(groupKey);
+  const buf = new Uint8Array(KEY_ID_DOMAIN.length + body.length);
+  buf.set(KEY_ID_DOMAIN, 0); buf.set(body, KEY_ID_DOMAIN.length);
+  return [...sha256(buf).subarray(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * The most a version may carry. Two honest admins colliding is TWO keys; three is a partition healing; more is
+ * a client minting keys to grow every member's chain, which is the one place this whole concern meets an
+ * adversary. Over the cap the extra events are refused — deny-wins, the same shape as a handle collision.
+ */
+export const MAX_KEYS_PER_VERSION = 3;
+
+/**
+ * Collapse a list of key-events for one circle into the events that must be kept.
+ *
+ * TWO rules, not one, because "same version" covers two different situations:
+ *
+ *   · **the same key, wrapped again** — a v1 re-sealed to one more recipient as the roster grows. One must
+ *     win, and it must be the wrap that reaches MORE people: a superset always serves everyone the subset
+ *     served, while "last read" can drop the wrap that added the newcomer on a device that read the two in the
+ *     other order. Ties break on the lower `sealed`, so every device picks the same one.
+ *   · **two different keys** — two admins rotating at once. Both are kept. The reader trials the whole chain
+ *     (`openAcrossKeyChain`), so content sealed under either opens; discarding one would lose it silently.
+ *
+ * Beyond `MAX_KEYS_PER_VERSION` distinct keys at one version, the extra ones are dropped in a stable order so
+ * every device drops the same ones.
+ */
+export function collapseKeyEvents(events) {
+  const byKey = new Map();                       // `${version}:${keyId}` → the winning wrap
+  for (const e of events) {
+    const id = `${e.version}:${e.keyId ?? e.sealed}`;   // an event without a keyId is its own key, by its wrap
+    const held = byKey.get(id);
+    if (!held) { byKey.set(id, e); continue; }
+    const mine = Array.isArray(e.recipients) ? e.recipients.length : (e.members ?? 0);
+    const theirs = Array.isArray(held.recipients) ? held.recipients.length : (held.members ?? 0);
+    if (mine > theirs || (mine === theirs && String(e.sealed) < String(held.sealed))) byKey.set(id, e);
+  }
+  const perVersion = new Map();
+  for (const e of byKey.values()) {
+    const list = perVersion.get(e.version) ?? [];
+    list.push(e); perVersion.set(e.version, list);
+  }
+  const out = [];
+  for (const [, list] of perVersion) {
+    // Stable everywhere: by keyId, so the cap drops the same events on every device.
+    list.sort((x, y) => (String(x.keyId ?? x.sealed) < String(y.keyId ?? y.sealed) ? -1 : 1));
+    out.push(...list.slice(0, MAX_KEYS_PER_VERSION));
+  }
+  return out.sort((a, b) => a.version - b.version);
+}
+
 export function buildKeyEvent({ groupId, version = 1, groupKey, recipients } = {}) {
   const res = buildGroupKeyResource({ version, groupKey, recipients });
   return {
     kind: KEY_EVENT_KIND,
     groupId: groupId ?? null,
     version: res.version,
+    keyId: keyIdOf(groupKey),
     members: res.members,
     recipients: res.recipients,
     sealed: res.sealed,
@@ -109,17 +178,24 @@ export function foldKeyEvents(events, { groupId } = {}) {
     && Number.isInteger(e.version) && (groupId == null || e.groupId === groupId));
   if (forGroup.length === 0) return null;
 
-  const byVersion = new Map();          // collapse same-version re-issues (last wins), then order ascending.
-  for (const e of forGroup) byVersion.set(e.version, e);
-  const ordered = [...byVersion.values()].sort((a, b) => a.version - b.version);
+  // Collapse by (version, KEY) rather than by version — see `collapseKeyEvents`. A version may now hold more
+  // than one event, which is what two admins rotating at once looks like.
+  const ordered = collapseKeyEvents(forGroup);
+  const newest = ordered[ordered.length - 1].version;
+  const atNewest = ordered.filter((e) => e.version === newest);
 
-  const current = ordered[ordered.length - 1];
+  // CURRENT is still exactly one event, and every device picks the same one: the lowest `keyId` at the newest
+  // version. That is not an election over what is TRUE — both keys are true and both are kept below — it is an
+  // agreement about what to SEAL WITH next, so the race heals on the following write instead of forking again.
+  const current = [...atNewest].sort((a, b) => (String(a.keyId ?? a.sealed) < String(b.keyId ?? b.sealed) ? -1 : 1))[0];
   const resource = {
     v: 1, version: current.version, members: current.members,
     recipients: current.recipients ?? null, sealed: current.sealed,
   };
-  const history = ordered.slice(0, -1).map((e) => ({
-    version: e.version, members: e.members, recipients: e.recipients ?? null, sealed: e.sealed,
+  // Everything else is history — including the OTHER key(s) at the current version. `history` is a plain list
+  // and every reader trials it, so a second row at one version needs nothing new from the shape.
+  const history = ordered.filter((e) => e !== current).map((e) => ({
+    version: e.version, keyId: e.keyId ?? null, members: e.members, recipients: e.recipients ?? null, sealed: e.sealed,
   }));
   if (history.length) resource.history = history;
   return resource;

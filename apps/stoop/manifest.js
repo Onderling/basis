@@ -717,6 +717,28 @@ export const stoopManifest = {
       },
     },
     {
+      // WHAT A CONTACT SEES OF YOU (L125, Frits 2026-09-24): the persona whose release their pair roster carries, and
+      // the level it discloses to them. The lens, not a second you — one identity runs (L123). Changed on the thread
+      // header; the row travels to the person's other devices and the newer `personaAt` wins, like `hiddenAt`. The
+      // release itself is said on the pair circle by the device where the change was made (`contactLens.js`).
+      id:   'setContactPersona', group: 'admin', verb: 'submit',
+      appliesTo: { type: 'contact' },
+      resolves: [{ field: 'persona', policy: 'content' }],
+      params: [
+        { name: 'webid',        kind: 'webid',  required: true },
+        { name: 'persona',      kind: 'string', required: true },
+        { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
+        // A landing's time (a sibling's newer change); a tap has none. The same device-clock preference `hiddenAt` states.
+        { name: 'personaAt',    kind: 'number', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/contact-persona', body: 'flags' },
+        chat:  { reply: 'text', hint: 'change which persona a contact sees you as, and how much it discloses to them' },
+        // the thread header paints the everyday control (both shells); the page is the generic door every op has
+        ui:    { control: 'page', labelKey: 'circle.button.stoop.setContactPersona' },
+      },
+    },
+    {
       // A contact's CURRENT person key: taken on first sight (the card), else verified as a chain of links from the
       // version already on record. Reached by the card scan and by the person-key chain lane — no surface of its own.
       id:   'setContactPersonKey', group: 'data', verb: 'submit',
@@ -1448,6 +1470,8 @@ export const stoopManifest = {
         // Which of your personas this contact is added through — what they see of you. Optional: absent
         // means "not recorded", which is a different thing from "the default", and nothing may read it as one.
         { name: 'persona', kind: 'string', required: false },
+        // …and the level that persona discloses to them (`handle` · `profile` · `full`), chosen in the add sheet.
+        { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
       ],
       resolves: [{ field: 'contact', policy: 'content' }],
       surfaces: {

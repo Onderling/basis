@@ -47,3 +47,24 @@ describe('the persona a contact was added through', () => {
     expect(again.persona, 'the earlier choice stands').toBe('buurt');
   });
 });
+
+describe('changing what a contact sees, later (L125)', () => {
+  it('records the persona, the level and WHEN — and all three survive the member map', async () => {
+    await book.addContact({ webid: 'w5', persona: 'default' });
+    const row = await book.setPersona('w5', 'buurt', { revealPreset: 'handle', personaAt: 1000 });
+    expect(row).toMatchObject({ persona: 'buurt', revealPreset: 'handle', personaAt: 1000 });
+    expect(await members.resolveByWebid('w5')).toMatchObject({ persona: 'buurt', revealPreset: 'handle', personaAt: 1000 });
+  });
+
+  it('keeps the level already recorded when the change names none', async () => {
+    await book.addContact({ webid: 'w6', persona: 'default', revealPreset: 'full' });
+    const row = await book.setPersona('w6', 'buurt', { personaAt: 5 });
+    expect(row.revealPreset).toBe('full');
+  });
+
+  it('refuses a level that is not one, and a contact the book does not hold', async () => {
+    await book.addContact({ webid: 'w7' });
+    await expect(book.setPersona('w7', 'buurt', { revealPreset: 'everything' })).rejects.toThrow();
+    await expect(book.setPersona('nobody', 'buurt')).rejects.toThrow();
+  });
+});

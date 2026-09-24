@@ -238,6 +238,11 @@ export class MemberMap extends Emitter {
       // Nothing may read a missing value AS the default: that fallback is how the persona picker stayed
       // broken for weeks.
       persona:     m.persona ?? null,
+      // …and the LEVEL that persona discloses to them (a reveal preset — `handle` · `profile` · `full`), recorded
+      // because `full` adds no persona keys of its own and so cannot be read back off the disclosure. `personaAt`
+      // is when either was last changed: a person's devices take the newer one (the own-devices carry, L125).
+      revealPreset: typeof m.revealPreset === 'string' ? m.revealPreset : null,
+      personaAt:   Number.isFinite(m.personaAt) ? m.personaAt : null,
       // stableId: SDK-level "this person" key (Stoop V1 Phase 11).
       // Survives handle changes + network-pubkey rotations.  Apps
       // key mute / ban / report on this.  Optional.

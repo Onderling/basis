@@ -35,6 +35,8 @@
  *   visible to Bob.  Stored on Bob's MemberMap entry in MY map.
  */
 
+import { REVEAL_PRESETS } from '@onderling/agent-registry';
+
 const LISTS_PREFIX = 'mem://stoop/lists/';
 
 const VALID_TRUST = new Set(['bekend', 'vertrouwd']);
@@ -136,6 +138,28 @@ export function createContactBook({ members, dataSource }) {
     if (!Number.isFinite(hiddenAt)) throw new TypeError('setHidden: hiddenAt must be a time');
     const existing = (await members.resolveByWebid(webid)) ?? { webid, pubKey: webid };
     return members.addMember({ ...existing, relation: 'contact', hidden, hiddenAt });
+  }
+
+  /**
+   * Change what a contact sees of you (L125): the persona their pair roster carries a release of, and the level
+   * that persona discloses to them. `personaAt` orders the change between a person's devices, the newer one wins
+   * — the same device-clock preference as `hiddenAt`, stated there. The level is kept when the change names none.
+   * Only a contact the book holds: the lens has nothing to sit on for a stranger.
+   * @param {string} webid
+   * @param {string} persona
+   * @param {{revealPreset?: 'handle'|'profile'|'full', personaAt?: number}} [opts]
+   */
+  async function setPersona(webid, persona, { revealPreset = null, personaAt = Date.now() } = {}) {
+    if (!webid) throw new TypeError('setPersona: webid required');
+    if (typeof persona !== 'string' || !persona.trim()) throw new TypeError('setPersona: persona required');
+    if (revealPreset !== null && !REVEAL_PRESETS.includes(revealPreset)) throw new TypeError(`setPersona: invalid level '${revealPreset}'`);
+    if (!Number.isFinite(personaAt)) throw new TypeError('setPersona: personaAt must be a time');
+    const existing = await members.resolveByWebid(webid);
+    if (!existing) throw new Error('setPersona: contact not found');
+    return members.addMember({
+      ...existing, relation: 'contact', persona: persona.trim(),
+      ...(revealPreset ? { revealPreset } : {}), personaAt,
+    });
   }
 
   async function setTags(webid, tags) {
@@ -273,6 +297,7 @@ export function createContactBook({ members, dataSource }) {
     addContact,
     setTrustLevel,
     setHidden,
+    setPersona,
     setTags,
     setFlag,
     listContacts,

@@ -55,6 +55,7 @@ export function renderContactThread(container, {
   hidden = null,           // L106: is this contact hidden from Contacten? true/false paints Verbergen/Tonen; null = not a person (a bot) → no control
   onToggleHidden = null,   // (hidden: boolean) => void — the person's own act; a message from the contact does the same as `false`
   contactId = null,        // the thread's key, on the root as data-contact-id — what a probe reads to name the open thread
+  onOpenLens = null,       // L125: () => void — "what does this contact see of you?"; a person's thread only (with `hidden`)
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactThread.js');
@@ -145,6 +146,16 @@ export function renderContactThread(container, {
     hide.textContent = tr(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide');
     hide.addEventListener('click', () => onToggleHidden(!hidden));
     header.appendChild(hide);
+  }
+  // WHAT THEY SEE (L125, Frits 2026-09-24): which persona this contact sees you as, and how much — changed here,
+  // beside the other per-contact control. A person's thread only: a bot has no pair roster to say a release on.
+  if (typeof hidden === 'boolean' && typeof onOpenLens === 'function') {
+    const lens = document.createElement('button');
+    lens.type = 'button';
+    lens.className = 'cc-cthread__lens';
+    lens.textContent = tr('circle.contacts.lens.open');
+    lens.addEventListener('click', () => onOpenLens());
+    header.appendChild(lens);
   }
   container.appendChild(header);
   if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {

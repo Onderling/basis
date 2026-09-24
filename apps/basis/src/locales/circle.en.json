@@ -4051,6 +4051,58 @@
     "unread_tab": {
       "text": "Contacts: {{count}} new",
       "doc": "Accessible label of the count on the Contacten tab: every contact's unread, summed."
+    },
+    "lens": {
+      "title": {
+        "text": "What does {{name}} see of you?",
+        "doc": "Thread header — the lens control's heading (L125). Says 'see', never 'know a different you': one identity runs (L123)."
+      },
+      "persona": {
+        "text": "They see you as",
+        "doc": "Lens control — the persona a contact sees you as."
+      },
+      "level": {
+        "text": "How much",
+        "doc": "Lens control — the reveal level that persona discloses to this contact."
+      },
+      "hint": {
+        "text": "Same you, a different view: this chooses whose details they receive. They still talk to you.",
+        "doc": "Lens control — the honest sentence: a different VIEW of the same person, not a second identity (L123)."
+      },
+      "save": {
+        "text": "Save",
+        "doc": "Lens control — save."
+      },
+      "cancel": {
+        "text": "Cancel",
+        "doc": "Lens control / add sheet — cancel."
+      },
+      "saved": {
+        "text": "Saved — {{name}} now sees you as {{persona}}.",
+        "doc": "Lens control — confirmation after a change."
+      },
+      "failed": {
+        "text": "That did not save. Nothing changed.",
+        "doc": "Lens control — a change that did not save."
+      },
+      "open": {
+        "text": "What they see",
+        "doc": "Thread header — the button that opens the lens control."
+      }
+    },
+    "add_sheet": {
+      "title": {
+        "text": "Add {{name}}",
+        "doc": "Add sheet (L125) — heading when a scanned card or a link is about to be added."
+      },
+      "intro": {
+        "text": "You are adding {{name}} as a contact. Choose what they see of you — you can change it later on their thread.",
+        "doc": "Add sheet — asks what the new contact sees of you, prefilled with the default persona and your usual level."
+      },
+      "add": {
+        "text": "Add",
+        "doc": "Add sheet — confirm the add."
+      }
     }
   },
   "pairedDevices": {
@@ -6363,6 +6415,10 @@
       "setContactHidden": {
         "text": "Hide",
         "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
+      },
+      "setContactPersona": {
+        "text": "What they see",
+        "doc": "Row-action / page button for stoop:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
       },
       "conflictDisputeWizard": {
         "text": "Dispute",

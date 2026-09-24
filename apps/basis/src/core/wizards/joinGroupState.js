@@ -817,6 +817,14 @@ export async function finalSubmit({
       try {
         const address = circleAddressFor(result.groupId);
         if (address) {
+          // `'default'` is CORRECT here, not an oversight — and it looks like one, so: today exactly one
+          // identity runs. Every `deriveAgentSeed(` in the agent says `'default'`, and `circleAddressFor`
+          // derives from that seed, so the address just computed IS the default profile's however
+          // `state.persona` was set. The persona chose which RELEASE rides (`getPersonaRelease` above); it
+          // did not choose whose key joined. Recording the membership under the persona would file this
+          // circle under a profile that owns no address in it — a record contradicting the wire.
+          // When a persona becomes its own person on the wire (ledger L123) this line becomes
+          // `id: state.persona ?? 'default'`, and not before.
           await callSkill('agents', 'setProfileCircleMembership', {
             id: 'default', circleId: result.groupId, handle: state.handle, address,
           });

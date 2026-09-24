@@ -38,6 +38,19 @@ export function peerToContactRow(peer) {
 }
 
 /**
+ * The book's rows out of a `listContacts` reply, WHOLE. The waist answers with both `contacts` (the book's rows as
+ * stored) and `items` (the chat projection — id, label, handle, trust, peerAddr, personKey, pairCircleId, and not
+ * `persona`, `revealPreset`, `hidden` or `deletedAt`). A programmatic reader wants the rows: reading `items` first
+ * made every row look persona-less, and the pair roster founded every pair circle with no release (2026-09-24).
+ * `items` is read only when a reply has nothing else.
+ */
+export function bookRowsOf(reply) {
+  if (Array.isArray(reply?.contacts)) return reply.contacts;
+  if (Array.isArray(reply?.items)) return reply.items;
+  return [];
+}
+
+/**
  * One roster row from a stoop ContactBook entry (S1 #2 — member directory).
  * Stoop's `listContacts` returns MemberMap entries (`relation:'contact'`) with a
  * webid + pubKey + displayName/handle + trustLevel + tags. These are PEOPLE the

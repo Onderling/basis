@@ -709,6 +709,10 @@ export const stoopManifest = {
         // book becomes an item type (L97's merge); until then the enforceability rule applies: this is a filter on what
         // you see, and the string says so.
         { name: 'hiddenAt', kind: 'number',  required: false },
+        // L114: this hide is a DELETE (the caller also leaves the pair circle) — recorded as `deletedAt`, which a
+        // return keeps so the thread can say "you had deleted this contact". A landing carries the sibling's time.
+        { name: 'deleted',   kind: 'boolean', required: false },
+        { name: 'deletedAt', kind: 'number',  required: false },
       ],
       surfaces: {
         slash: { command: '/hide-contact', body: 'flags' },

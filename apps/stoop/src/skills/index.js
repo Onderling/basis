@@ -5091,7 +5091,10 @@ export function buildSkills({
       if (!bundle?.contacts) return { error: 'no-contacts' };
       try {
         // `hiddenAt` is a landing's (a sibling's newer change carried here); a person's own tap has none and gets now.
-        const m = await bundle.contacts.setHidden(a.webid, a.hidden === true, Number.isFinite(a.hiddenAt) ? a.hiddenAt : Date.now());
+        const m = await bundle.contacts.setHidden(a.webid, a.hidden === true, Number.isFinite(a.hiddenAt) ? a.hiddenAt : Date.now(), {
+          // L114: a delete is a hide that also left the pair circle — recorded so a return can say so
+          deleted: a.deleted === true, deletedAt: Number.isFinite(a.deletedAt) ? a.deletedAt : null,
+        });
         return { contact: m };
       } catch (err) {
         return { error: err?.message ?? String(err) };

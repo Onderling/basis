@@ -14,6 +14,7 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { splitShownHidden, loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
+import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
@@ -61,7 +62,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
         input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
         // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one
         // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
-        addContact: callSkill ? (payload) => callSkill('stoop', 'addContactFromQr', { payload }) : undefined,
+        addContact: callSkill ? (payload) => callSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA }) : undefined,
       });
       setAddText(''); setAddOpen(false);
       reload();

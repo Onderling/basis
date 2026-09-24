@@ -1443,10 +1443,15 @@ export const stoopManifest = {
     },
     {
       id:   'addContactFromQr', verb: 'add',
-      params: [{ name: 'payload', kind: 'object', required: true }],
+      params: [
+        { name: 'payload', kind: 'object', required: true },
+        // Which of your personas this contact is added through — what they see of you. Optional: absent
+        // means "not recorded", which is a different thing from "the default", and nothing may read it as one.
+        { name: 'persona', kind: 'string', required: false },
+      ],
       resolves: [{ field: 'contact', policy: 'content' }],
       surfaces: {
-        chat: { hint: 'Add a contact from a scanned QR payload.' },
+        chat: { hint: 'Add a contact from a scanned QR payload. `persona` records which of your personas they were added through.' },
         ui:   { control: 'button' },
       },
     },

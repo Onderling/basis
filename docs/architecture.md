@@ -968,9 +968,12 @@ first, third and fourth are in the code; the second's identity half is not:
   identity, so a persona is the same on all your devices; a device is never a persona (see the paragraph
   above). Infrastructure attaches to a profile-in-the-registry, never to a loaded instance.
 
-Stated gap, on purpose: **contacts do not hang off a persona yet** — the contact book is one list for the
-whole agent and a contact is handed the default profile's address (`plans/NOTE-persona-scoping.md`: the rule
-"everything you own hangs off exactly one persona" is designed, the contact half is not built).
+**Contacts carry a persona as a lens, not as an identity** (2026-09-24). Every contact row records which
+persona that contact sees you as (`contactPersona.js`), and that persona's release founds and joins the pair
+circle with them. Every add path records the default today — there is no flow yet in which to choose another.
+What it does not change is who they talk to: the contact book is still one list for the whole agent and every
+contact holds the default profile's address and pair id. So the honest sentence is "this contact sees you
+as …", never "this contact knows a different you"; the second waits on a persona running as its own person.
 
 **Adding, replacing and revoking a device — one family of operations.** They share a shape: the recovery
 phrase is the authority, it is typed on the device that is *gaining* it, and it never travels.
@@ -1005,13 +1008,12 @@ phrase is the authority, it is typed on the device that is *gaining* it, and it 
   share keys, so any one of them can be retired without touching the others.
 
 **What a phrase alone cannot bring back.** It rebuilds every key, and therefore every identity — but not
-the *list* of circles those keys belong to. That list lives in the owner's registry, which is a
-device-local store unless it is mirrored to a pod, so a person whose only device is gone comes back as
-provably themselves with nothing to re-open. The honest paths out are a registry that survives the device
-(mirrored to the owner's pod — sealed to the owner, which is the part that has to be built, since this
-resource carries no sealing of its own), the **recovery file** (the registry sealed to the phrase, exported
-by the person), or an offer from another device they still hold; a recovery screen that promises more
-than that is promising the wrong thing.
+the *list* of circles those keys belong to. That list lives in the owner's registry, so a person whose only
+device is gone and who kept no copy of it comes back as provably themselves with nothing to re-open. The
+honest paths out are a registry that survives the device (mirrored to the owner's pod, sealed to the owner —
+see the Pod home), the **recovery file** (the registry sealed to the phrase, exported by the person from My
+data), or an offer from another device they still hold; a recovery screen that promises more than that is
+promising the wrong thing.
 
 **The recovery file also carries each circle's member list** (2026-09-13). The list of circles alone
 gave a restored device a circle's name and nobody to reach: restore enrols the new device, so its
@@ -1128,17 +1130,15 @@ are addressed through `pod-routing` where the app has adopted it; a few producer
 **What actually rides the pod today, and what does not.** The parameter register and the personal history
 mirror are pod-backed when you are signed in, sealed to you, and local-only when you are not. The **owner's
 registry** — the single write-truth for your profiles, your enrolled devices' delegation records, and, per
-circle, the handle and address you use there plus a reference to your wrapped circle key — is **not**: it
-is device-local, and mirroring it is written on both sides but not composed — and it carries no sealing
-of its own, so composing the carrier without adding one would put every circle, handle and address on the
-pod in clear. The pattern to copy is the settings mirror's seal-to-self, keyed from the owner root so it
-opens on every one of that person's devices — together with its restore gate, which probes the pod copy
-before the first flush so a fresh install without the phrase never overwrites the owner's sealed record
-with its own empty one. That is why a person whose
-only device is gone comes back as provably themselves with nothing to re-open, and why the recovery
-artifact matters: the same registry can be sealed into a passphrase-protected file (owner root plus a
-registry snapshot), which is the pod-less carrier of the same fact. Both are built; neither is reached from
-a surface yet, which is exactly the kind of gap this section exists to state rather than imply.
+circle, the handle and address you use there plus a reference to your wrapped circle key — rides the same
+way (`registryCarrier.js`, composed by the agent on every shell): sealed at rest locally, and when you are
+signed in, mirrored to the pod in cache mode, sealed to self with the settings mirror's strategy and stored
+under an **opaque name** only a holder of the owner's key can compute, so the host learns that a resource
+exists and not what it is. It carries the settings mirror's restore gate too: before the first write-through
+it probes the pod copy, and a copy sealed under another key (a fresh install without the phrase) holds rather
+than being overwritten by a one-device list. Without a pod, the pod-less carrier of the same fact is the
+**recovery file** — the registry and the owner root sealed into a passphrase-protected file, exported and
+imported from My data on both shells. A person with neither loses the list, not the identity.
 
 **Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding
 structure.** Apps address a **storage function** ("this circle's items", "my notes"), and a routing layer
@@ -1207,7 +1207,7 @@ menu, the ops another agent may invoke, and the web/mobile screens. Neither AI n
 both are compilers to the waist, and so is a peer. Screens, list→detail drill-downs, and record views
 render generically from the declaration; a capability matrix (circle policy × app) decides what shows.
 The coverage snapshot records which op has which surface, and its guard fails when it drifts from the
-manifests (the guard is in the `npm run guards` aggregate; wiring that aggregate into CI is open work).
+manifests (the guard is in the `npm run guards` aggregate, which CI runs as the first job of the merge gate).
 
 **Every op has a default place, by construction.** An op with no bespoke screen is still visible and
 reachable: the **advanced surface** (Mij → Geavanceerd, both platforms) lists exactly the

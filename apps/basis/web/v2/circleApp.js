@@ -47,6 +47,8 @@ import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
+import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens } from '../../src/v2/contactLens.js';
+import { renderContactLensPanel } from './contactLensPanel.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -3024,6 +3026,37 @@ async function loadTaskGrants({ taskId, circleId } = {}) {
   } catch { return []; }
 }
 
+// WHAT A CONTACT SEES OF YOU (L125, Frits 2026-09-24: "both"). Before a scanned card or a link is added, the sheet
+// asks — persona and level, prefilled with the default and your usual level; later, the thread header changes it.
+// The logic is `src/v2/contactLens.js`; the pair roster's own id function names the pair circle for both.
+function openLensForm(extra) { mountMyDataWizard(renderContactLensPanel, { t, ...extra }); }
+/** Add a card AFTER the sheet: the chosen lens, or `null` when the person closed it (nothing added). */
+async function addContactWithSheet(payload) {
+  const model = await contactAddSheetModel({ payload, callSkill: rawCallSkill });
+  // not a card this decoder reads: hand it to stoop as before, which refuses it with its own reason
+  if (!model) return rawCallSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
+  const choice = await new Promise((resolve) => openLensForm({
+    mode: 'add', model, onSubmit: (c) => resolve(c), onCancel: () => resolve(null),
+  }));
+  if (!choice) return null;
+  return addContactAs({ callSkill: rawCallSkill, payload, ...choice, pairCircleIdOf: circlePairRoster?.pairCircleIdFor });
+}
+/** The thread header's "what they see": the row's lens, changed in place, the release said on the pair circle. */
+async function openContactLens(contactId, name) {
+  let row = null;
+  try { row = ((await rawCallSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c?.webid === contactId) ?? null; } catch { row = null; }
+  const pairCircleIdOf = circlePairRoster?.pairCircleIdFor;
+  const model = await contactLensModel({ callSkill: rawCallSkill, row: row ?? { webid: contactId }, pairCircleIdOf });
+  openLensForm({
+    mode: 'change', model: { ...model, name: name || row?.displayName || row?.handle || contactId },
+    onSubmit: async (choice) => {
+      const r = await changeContactLens({ callSkill: rawCallSkill, contactId, ...choice, shareRelease: shareCircleRelease, pairCircleIdOf });
+      const personaName = model.personas.find((p) => p.id === choice.persona)?.name ?? choice.persona;
+      globalThis.alert?.(r?.error ? t('circle.contacts.lens.failed') : t('circle.contacts.lens.saved', { name: name || contactId, persona: personaName }));
+    },
+  });
+}
+
 // add a bot to the app PeerGraph (an https agent-card URL → discoverA2A;
 // else a raw peer address → manual upsert), then re-render the roster.  Reuses
 // the shared `addBotToGraph` (web≡mobile).  Best-effort: a bad URL/address shows
@@ -3035,10 +3068,16 @@ async function addBotFromInput(input) {
       input, peerGraph: circlePeerGraph, coreAgent: circleCoreAgent, discover: discoverA2A,
       // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one decoder);
       // the unified roster merges the ContactBook, so the person appears DM-ready right away.
-      addContact: (payload) => rawCallSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA }),
+      // …asking first what they will see of you (L125): the sheet, prefilled; a cancel adds nothing
+      addContact: async (payload) => {
+        const r = await addContactWithSheet(payload);
+        if (r === null) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+        return r;
+      },
     });
     globalThis.alert?.(t('circle.contacts.added', { name: rec?.name ?? rec?.displayName ?? rec?.handle ?? rec?.url ?? rec?.pubKey ?? '' }));
   } catch (err) {
+    if (err?.code === 'cancelled') return;   // the person closed the sheet — nothing was added, nothing to say
     console.warn('[circleApp] add bot failed:', err?.message ?? err);
     // A circle invite pasted in the contact box is the VERIFIED rung — point at the join flow.
     globalThis.alert?.(t(err?.code === 'circle-invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed'));
@@ -3153,6 +3192,7 @@ async function showContactThread(contactId) {
     onToggleHidden: async (next) => {
       try { await setContactHidden(contactId, next); } catch { error = true; rerender(); }
     },
+    onOpenLens: () => { openContactLens(contactId, thread.name).catch(() => {}); },
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
     onButtonTap: async (b) => {
@@ -8634,8 +8674,9 @@ async function boot() {
             const fromLink = contactCardFromLink(window.location.hash);
             if (!fromLink.ok) return;
             try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
-            rawCallSkill('stoop', 'addContactFromQr', { payload: fromLink.payload, persona: DEFAULT_PERSONA })
+            addContactWithSheet(fromLink.payload)
               .then((r) => {
+                if (r === null) return;   // closed the sheet: nothing added
                 const c = r?.contact;
                 if (!c || r?.error) { globalThis.alert?.(t('circle.contacts.add_failed')); return; }
                 globalThis.alert?.(t('circle.shareContact.opened_added', { name: c.displayName ?? c.handle ?? c.webid ?? '' }));

@@ -53,6 +53,10 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     await B.page.goto(dest);
     // the boot takes the card once the agent is up — poll for the scrub rather than guess the boot's length
     await expect.poll(() => new URL(B.page.url()).hash, { timeout: 30_000, message: 'the card is scrubbed from B\'s address bar once the boot took it' }).toBe('');
+    // …and B is ASKED first what A will see of them (L125, 2026-09-24): the sheet, prefilled — a tap on Add adds.
+    await expect(B.page.locator('[data-testid="contact-add-sheet"]'), 'the add sheet asks before the card is added').toBeVisible({ timeout: 30_000 });
+    expect(await B.page.locator('.cc-lens__persona').inputValue(), 'the default persona is prefilled').toBe('default');
+    await B.page.locator('.cc-lens__ok').click();
     await B.page.waitForTimeout(2000);
     await gotoCircles(B.page);
     await B.page.locator('[data-tab="contacten"]').first().click();

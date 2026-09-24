@@ -4658,6 +4658,8 @@ export function buildSkills({
         // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable
         // from one that was. Only the explicit backfill may write `default`, and only where it can prove it.
         ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
+        // the level chosen in the add sheet; absent when nobody was asked (a card arriving with a message)
+        ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
         trustLevel,
       });
       metrics?.record?.('contact-added-from-qr');
@@ -5096,6 +5098,25 @@ export function buildSkills({
       }
     }, {
       description: 'Hide a contact from Contacten (the row stays; their next message brings them back), or show them again.',
+      visibility:  'authenticated',
+    }),
+
+    /** setContactPersona({webid, persona, revealPreset?, personaAt?}) — what a contact sees of you (L125). */
+    defineSkill('setContactPersona', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.contacts) return { error: 'no-contacts' };
+      try {
+        const m = await bundle.contacts.setPersona(a.webid, a.persona, {
+          revealPreset: a.revealPreset ?? null,
+          // a landing carries the sibling's time; a person's own tap gets now
+          personaAt: Number.isFinite(a.personaAt) ? a.personaAt : Date.now(),
+        });
+        return { contact: m };
+      } catch (err) {
+        return { error: err?.message ?? String(err) };
+      }
+    }, {
+      description: 'Change which persona a contact sees you as, and the level it discloses to them. The lens: the contact talks to the same you.',
       visibility:  'authenticated',
     }),
 

@@ -90,6 +90,7 @@ import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
+import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -2157,6 +2158,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
       // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
       setHidden: (webid, hidden, hiddenAt) => rawStoop('setContactHidden', { webid, hidden, hiddenAt }),
+      // …and a newer change of what the contact sees of the person (L125), by the same rule
+      setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawStoop('setContactPersona', {
+        webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
+      }),
     },
     onLanded: () => savePeerBindings(),
   });
@@ -3546,6 +3551,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   catch (err) { if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan not installed:', err?.message ?? err); }
   await chatAgent.hello(stoopAgent.address);
 
+  // Contacts made before the persona field existed record NONE. Write `default` onto them once — only where the
+  // pair circle id PROVES it (`backfillContactPersonas`): a row whose pair circle is not the default identity's is
+  // reported and left alone. `personaAt: 0`, so any real choice made on any device outranks it; RAW, so a
+  // backfilled row does not fan (every device backfills its own, from the same proof). Best-effort, after boot.
+  backfillContactPersonas({
+    rows: await rawContacts().catch(() => []),
+    selfWebid: chatId.pubKey,
+    setPersona: (webid, persona) => rawStoop('setContactPersona', { webid, persona, personaAt: 0 }),
+  }).then((r) => { if (r.mismatched && typeof console !== 'undefined') console.warn(`[contact-persona] ${r.mismatched} contact row(s) not provably the default persona's — left unrecorded`); })
+    .catch(() => {});
+
   // Pre-seed the local actor's stoop handle + displayName so
   // /stoop-profile has something to show (real getMyProfile returns
   // {entry: null} until the user first sets these).  Opts out with
@@ -4371,7 +4387,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
       // next catch-up. The landing side keeps the newer mark, so a hide and a show that cross resolve the same
       // way everywhere.
-      if (realOpId === 'setContactHidden' && rawReply?.contact) {
+      // …and what a contact sees of the person (L125), by the same carry: changed here, changed on every device.
+      if ((realOpId === 'setContactHidden' || realOpId === 'setContactPersona') && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
       }
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij

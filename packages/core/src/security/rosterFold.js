@@ -187,6 +187,16 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   // subject → { displayName?, avatarRef? } — what a member has said about themselves (`member-props`, 2026-09-21).
   // The handle lives in `handles` (one map for the join's and the later change); these are the rest.
   const props = Object.create(null);
+  // SUPERSESSION (L121, 2026-09-24). This lane keeps every statement for ever (`RETAIN.RECORD`), so a member who
+  // changes their face weekly grows every device's log by a thumb a week, for the life of the circle. The fold
+  // itself decides which `member-props` statements are DEAD: accepted, setting NO handle, and every field they
+  // set overwritten by a LATER accepted statement of the same subject. Dropping those changes no fold on any
+  // device — the newest setter of each field survives, `handles` is untouched at every depth (a handle-bearing
+  // statement is never dead: uniqueness is evaluated against history and the history must stay), and a refused
+  // statement is never named here (its acceptance depends on the very history compaction would remove).
+  // Computed identically everywhere, so every device drops the same statements — or none.
+  const propSetters = new Map();   // subject → Map<field, hash of the latest ACCEPTED setter>
+  const propStatements = [];       // every ACCEPTED member-props: { hash, subject, fields, setsHandle }
 
   // ── HOW EACH ADMIN CAME TO BE ONE ──────────────────────────────────────────────────────────────
   // Three ways in, and until now all three rendered as the same word. `role: 'admin'` on a roster row
@@ -346,7 +356,8 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
       // THE FACE'S CAP. A released `profilePicture` carries an inline thumbnail in its sealing line, and this
       // lane is EXEMPT FROM COMPACTION (`entryKinds.js`: "the roster refolds from these — never drops"), so
-      // anything said here is kept by every device for ever. A photo-sized thumb would therefore grow the one
+      // anything said here is kept by every device for ever — except what THIS fold names in `superseded`, which the
+      // rail tombstones (chain kept, bytes gone; L121). A rejected statement is never named, so the cap still binds. A photo-sized thumb would therefore grow the one
       // lane that never sheds anything. Two numbers, on purpose: `MAX_SEALED_THUMB_CHARS` (48 KB, a device
       // param) is the ceiling for a PHOTO's inline preview anywhere; 4 KB is the ceiling for a FACE, because a
       // face is 96 px and a photo is not. Refused whole and deny-wins, like the handle collision above: a
@@ -358,6 +369,16 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
         if (taken) continue;                                                // uniqueness: deny-wins, the old handle stays
       }
       const mine = props[s.subject] ?? (props[s.subject] = {});
+      {   // record what this ACCEPTED statement set, for supersession (see `propSetters` above)
+        const setFields = [];
+        if (typeof p.handle === 'string' && p.handle) setFields.push('handle');
+        for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) setFields.push(k);
+        if (isPlainMap(p.personaProperties)) setFields.push('personaProperties');
+        const mineSetters = propSetters.get(s.subject) ?? new Map();
+        for (const f of setFields) mineSetters.set(f, s.hash);
+        propSetters.set(s.subject, mineSetters);
+        propStatements.push({ hash: s.hash, subject: s.subject, fields: setFields, setsHandle: setFields.includes('handle') });
+      }
       // the handle goes to `handles` (one map with the join's) AND to `props` — a projection needs to know a handle
       // came from the member's own later statement, which beats a cached rename, not from the join, which does not
       if (typeof p.handle === 'string' && p.handle) { handles[s.subject] = p.handle; mine.handle = p.handle; }
@@ -428,7 +449,11 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
 
   const adminProvenance = Object.create(null);
   for (const a of [...admins].sort()) adminProvenance[a] = adminVia.get(a) ?? 'role';
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props };
+  // The dead statements: see `propSetters`. Sorted so the list itself is identical on every device.
+  const superseded = propStatements
+    .filter((st) => !st.setsHandle && st.fields.length > 0 && st.fields.every((f) => propSetters.get(st.subject)?.get(f) !== st.hash))
+    .map((st) => st.hash).sort();
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded };
 }
 
 export default foldRoster;

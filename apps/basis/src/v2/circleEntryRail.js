@@ -190,6 +190,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const seenByAuthorParent = new Map();   // `${author}|${parent}` → Set(hash) — fork detection
     const disputedRefs = new Set();
     for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+      if (stmt?.tombstone === true) continue;   // a compacted statement has no event to project (L121)
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
       const b = v.body;
@@ -223,6 +224,18 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const seenByAuthorParent = new Map();
     const disputed = new Set();
     for (const { statement: stmt, atSeq } of storedEntries(circleId)) {
+      if (stmt?.tombstone === true) {
+        // A TOMBSTONE (L121): verified and bound when it landed; compacted to its chain fields on the fold's own
+        // word. It carries no content the fold could act on (payload = the authorRef alone, which every consumer
+        // reads as "nothing said") — only the edge that keeps later statements' causal depth where it was. Not
+        // re-verified: there is no signature left to check, and the only thing a forged one could do is add a
+        // depth edge, which a writer of this device's own log could do in a hundred other ways.
+        const b = stmt.body ?? {};
+        const ref = b.payload?.authorRef;
+        if (typeof ref !== 'string' || !ref || typeof b.hash !== 'string' || !declaredKinds.includes(b.kind)) continue;
+        bodies.push({ ...b, author: ref, authorKey: b.author, atSeq, tombstone: true });
+        continue;
+      }
       const v = safeVerify(stmt, circleId);
       if (!v.ok) continue;
       const b = v.body;
@@ -248,7 +261,34 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     return { bodies, disputed };
   }
 
-  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements };
+  /**
+   * TOMBSTONE the statements the FOLD has called dead (L121 — `rosterFold.superseded`, statement hashes the roster
+   * fold computes identically on every device). The entry stays; its payload becomes a skeleton that keeps every
+   * CHAIN field (hash · author · parentHash · deps · kind · subject · the authorRef) and sheds the content — so the
+   * author's chain and every later statement's causal depth are exactly what they were, and only the bytes go.
+   * The rail translates hashes to entry ids and decides nothing. Returns how many entries were tombstoned.
+   */
+  const tombstoneOf = (stmt) => {
+    const b = stmt?.body ?? {};
+    return {
+      tombstone: true,
+      body: {
+        v: b.v, kind: b.kind, circleId: b.circleId, subject: b.subject, author: b.author,
+        parentHash: b.parentHash ?? null, deps: Array.isArray(b.deps) ? b.deps : [], hash: b.hash,
+        payload: { authorRef: b.payload?.authorRef },
+      },
+      by: stmt?.by,
+    };
+  };
+  function compact(circleId, hashes) {
+    if (typeof eventLog.compactEntries !== 'function') return 0;
+    const ids = [...(hashes ?? [])].filter((h) => typeof h === 'string' && h).map((h) => `${entryKind}:${h}`);
+    if (ids.length === 0) return 0;
+    const live = new Set(eventLog.query({}).filter((e) => e && e.type === entryKind && e.circleId === circleId && e.payload?.body && e.payload.tombstone !== true).map((e) => e.id));
+    return eventLog.compactEntries(ids.filter((id) => live.has(id)), (e) => ({ ...e, payload: tombstoneOf(e.payload) }));
+  }
+
+  return { append, ingest, verify, readVerified, readVerifiedBodies, storedStatements, compact };
 }
 
 export default makeCircleEntryRail;

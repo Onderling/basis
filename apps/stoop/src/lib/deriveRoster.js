@@ -62,6 +62,8 @@ export function deriveRoster({
   memberMapForDisplay = [],
   exits = null,
   spineStatements = [],
+  // After the fold, its full result — the host uses `folded.superseded` to compact the lane (L121). Optional.
+  onFolded = null,
   // The membership-rider cutover switch: TRUE when the statements come from the RAIL's verified read
   // (bindings resolved against real per-circle keys) — the fold is then AUTHORITATIVE and the wall-clock
   // exit rule retires. FALSE (legacy store path / compositions where author==ref is the global-identity
@@ -248,6 +250,7 @@ export function deriveRoster({
       ...(rulesGate ? { rulesGate } : {}),
     });
     saidByWebid = folded.props ?? Object.create(null);
+    if (typeof onFolded === 'function') { try { onFolded(folded); } catch { /* the host's reaction never breaks a read */ } }
     const inMembers = new Set(folded.members);
     const inAdmins  = new Set(folded.admins);
     if (authoritative) {

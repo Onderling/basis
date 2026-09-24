@@ -3297,6 +3297,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     });
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
+    // The fold's compaction verdict comes back the same road the statements went out on (L121): stoop hands
+    // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
+    // between here and the fold has to learn a new name.
+    membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
     // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
     // full-item snapshot, fanned via broadcastCircleTask; receivers verify at their rail and causally merge
     // the head. The store's publish hook routes task types here instead of the legacy mirror (the per-type

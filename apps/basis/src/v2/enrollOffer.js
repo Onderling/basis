@@ -169,6 +169,17 @@ export async function stashEnrollOffer(storage, uriOrLink) {
   return parsed;
 }
 
+/**
+ * Does the restore-finish flow apply to this boot? Only after a RESTORE. Every phrase ceremony leaves the
+ * `restore-pending` note — the add-a-device enrol too — but an offer waiting at boot means the ceremony was an ADD:
+ * the offer brings the circles, and "your circles are not here / can anyone still use the old phone?" is wrong for a
+ * person adding a device next to one they still hold (found 2026-09-24 by the own-devices browser walk).
+ * @param {{restorePending: boolean, offerPending: boolean}} a
+ */
+export function restoreFinishApplies({ restorePending = false, offerPending = false } = {}) {
+  return restorePending === true && offerPending !== true;
+}
+
 export async function pendingEnrollOffer(storage) {
   let raw = null;
   try { raw = await storage.getItem(ENROLL_OFFER_STORAGE_KEY); } catch { raw = null; }

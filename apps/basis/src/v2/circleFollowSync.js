@@ -86,7 +86,10 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
     let mine = null;
     try { mine = typeof sightOf === 'function' ? await sightOf(circleId) : null; } catch { mine = null; }
     if (Number.isFinite(mine?.at) && mine.at >= sight.at) return;   // older (or the same) news
-    try { await setSight(circleId, { putAway: sight.putAway, at: sight.at }); } catch { /* the next carry retries */ }
+    try { await setSight(circleId, { putAway: sight.putAway, at: sight.at }); } catch { return; /* the next carry retries */ }
+    // the mark changed what this device shows: the shells' listeners repaint (no `onLanded` log line — nothing joined)
+    const summary = { from: null, circleId, ok: true, steps: ['sight'] };
+    for (const fn of landedListeners) { try { fn(summary); } catch { /* observability never throws */ } }
   }
 
   async function land(fromAddr, circle) {

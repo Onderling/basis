@@ -194,7 +194,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
@@ -3457,6 +3457,16 @@ function launcherPinMuteSignature() {
 // showLauncher (which would re-schedule that refresh and loop forever; that infinite re-render
 // starved the main thread and hung the headless e2e, 2026-06-11).
 let _bootFailure = null;   // the agent boot's error, if it died — painted on the launcher
+
+/**
+ * The circles this device is in CHANGED underneath the launcher — an enrol offer consumed, a sibling's circle carried
+ * in: re-read the list and, when the launcher is what the person is looking at, repaint it. Without this a freshly
+ * enrolled device showed none of its circles until a reload (found 2026-09-24 by the own-devices browser walk).
+ */
+async function circlesChangedUnderneath() {
+  try { circlesCache = await loadCircles(sources); } catch { return; }
+  if (getActiveCircle() == null) { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
+}
 
 function paintLauncher() {
   // project the EventLog into per-circle previews; tiles show a
@@ -8050,7 +8060,12 @@ function broadcastPolicy({ circleId, policy }) {
   });
 }
 
+// Was an enrol offer waiting when this boot started? Read before anything can consume it: a ceremony with an offer
+// waiting was an ADD, and the restore-finish flow ("your circles are not here") is not for it.
+let offerPendingAtBoot = false;
+
 async function boot() {
+  try { offerPendingAtBoot = !!(await pendingEnrollOffer(window.localStorage)); } catch { offerPendingAtBoot = false; }
   // ── THE FIRST AWAITED ACT: finish a ceremony's clear, if one is owed ──────────────────────────────────
   // The add-a-device ceremony (and the owner-root restore) leaves a `forget-pending` note in the vault, and
   // this is where it is read. It must come before ANY store is touched: the IndexedDB backend opens lazily,
@@ -8341,7 +8356,9 @@ async function boot() {
       // transport being connected; a no-op otherwise.
       if (pendingRestoreFlow) { pendingRestoreFlow = false; setTimeout(() => showRestoreSettingsFlow(), 0); }
       // A phrase ceremony ran on this device and the restore-finish flow has not asked yet: ask once.
-      if (agent.restorePending?.()) setTimeout(() => showRestoreFinishFlow(), 0);
+      if (restoreFinishApplies({ restorePending: agent.restorePending?.() === true, offerPending: offerPendingAtBoot })) setTimeout(() => showRestoreFinishFlow(), 0);
+      // …an add-a-device from an offer is not a restore: drop the note without the flow (the offer brings the circles)
+      else if (agent.restorePending?.()) agent.dismissRestorePending?.().catch?.(() => {});
       // basis's ops reach the waist from here on: the drawer's rows, and anything else that dispatches
       // `callSkill('basis', …)`, now land in the table below instead of the agent's bare default.
       rawCallSkill = withCalendarOutbound(agent.callSkill, {
@@ -8768,9 +8785,12 @@ async function boot() {
         // A circle another device of the person founded or joined: the same per-circle step, run when the
         // sibling's carry lands — and asked for on connect, for what happened while this tab was closed.
         agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+        // a circle carried in from a sibling (joined, left, or its put-away mark): the launcher follows, live
+        agent.circleFollowSync?.onLanded?.(() => { circlesChangedUnderneath().catch(() => {}); });
         agent.circleFollowSync?.requestFromSiblings().catch(() => {});
         agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
           if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+          if (r?.consumed) circlesChangedUnderneath().catch(() => {});   // the offer's circles, on screen now
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         agent.bootstrapFromStashedOffer();

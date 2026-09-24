@@ -6007,6 +6007,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)
     historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
     restorePending: () => restorePendingAtBoot,   // a phrase ceremony ran here and the restore-finish flow has not asked yet
+    /** The ceremony was an ADD (an offer is being consumed), not a restore: drop the note without the flow. */
+    dismissRestorePending: async () => {
+      try { await ownerRootVault.delete?.(RESTORE_PENDING_KEY); } catch { /* best-effort — the next boot asks again */ }
+      restorePendingAtBoot = false;
+    },
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.
     circleAddressFor,

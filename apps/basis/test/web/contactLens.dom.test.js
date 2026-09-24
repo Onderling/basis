@@ -73,3 +73,19 @@ describe('closing by clicking outside', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('delete, on the thread header (L114)', () => {
+  it('offers Verwijderen on a person\'s thread and hands the act to the shell', () => {
+    const container = document.createElement('div');
+    const onDelete = vi.fn();
+    renderContactThread(container, { name: 'Anne', messages: [], t: (k) => k, hidden: false, onToggleHidden: vi.fn(), onDelete });
+    container.querySelector('.cc-cthread__delete').click();
+    expect(onDelete).toHaveBeenCalled();
+  });
+  it('a return after a deletion says "verwijderd"', () => {
+    const container = document.createElement('div');
+    renderContactThread(container, { name: 'Anne', t: (k) => k, hidden: false, deletedAt: 5,
+      messages: [{ origin: 'bot', text: 'hoi', returned: true, ts: 10 }] });
+    expect(container.querySelector('.cc-cthread__system').textContent).toBe('circle.contacts.returned_deleted_marker');
+  });
+});

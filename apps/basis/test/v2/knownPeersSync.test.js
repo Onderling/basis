@@ -31,7 +31,7 @@ function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book =
       has: async (webid) => book.has(webid),
       add: async (c) => { book.set(c.webid, c); },
       get: async (webid) => book.get(webid) ?? null,
-      setHidden: async (webid, hidden, hiddenAt) => { book.set(webid, { ...book.get(webid), hidden, hiddenAt }); },
+      setHidden: async (webid, hidden, hiddenAt, { deletedAt } = {}) => { book.set(webid, { ...book.get(webid), hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }); },
       setPersona: async (webid, persona, { revealPreset = null, personaAt } = {}) => {
         book.set(webid, { ...book.get(webid), persona, ...(revealPreset ? { revealPreset } : {}), personaAt });
       },
@@ -212,5 +212,17 @@ describe('what a contact sees of you follows the person (L125)', () => {
       contacts: [{ webid: 'w', persona: 'default', personaAt: 1500 }],
     });
     expect(r.book.get('w').persona, 'older news never undoes a later choice').toBe('buurt');
+  });
+});
+
+describe('a deletion follows the person too (L114)', () => {
+  it('the deletion\'s time rides with the newer hidden mark, so every device can say "verwijderd"', async () => {
+    const r = rig();
+    r.book.set('w', { webid: 'w', hidden: false, hiddenAt: 1000 });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w', hidden: true, hiddenAt: 2000, deletedAt: 2000 }],
+    });
+    expect(r.book.get('w')).toMatchObject({ hidden: true, hiddenAt: 2000, deletedAt: 2000 });
   });
 });

@@ -50,7 +50,10 @@ const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'ava
   'hidden', 'hiddenAt',
   // what this contact sees of you — the persona, its level, and WHEN they last changed (L125): the second field-set a
   // sibling may change on a row this device holds, by the same newer-wins rule
-  'persona', 'revealPreset', 'personaAt'];
+  'persona', 'revealPreset', 'personaAt',
+  // …and WHEN the contact was deleted (L114): a delete is a hide that also left the pair circle, and its time rides
+  // with the hidden mark so every device's marker can say "verwijderd"
+  'deletedAt'];
 
 function bindingToWire(b) {
   if (!b || typeof b !== 'object') return null;
@@ -133,7 +136,7 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
           if (typeof c.hidden === 'boolean' && Number.isFinite(c.hiddenAt) && typeof contacts.get === 'function' && typeof contacts.setHidden === 'function') {
             const myAt = Number.isFinite(mine?.hiddenAt) ? mine.hiddenAt : -Infinity;
             if (c.hiddenAt > myAt) {
-              await contacts.setHidden(c.webid, c.hidden, c.hiddenAt);   // the newer change, with its time
+              await contacts.setHidden(c.webid, c.hidden, c.hiddenAt, Number.isFinite(c.deletedAt) ? { deletedAt: c.deletedAt } : undefined);   // the newer change, with its time
               if (mine?.hidden !== c.hidden) hiddenChanged.push({ webid: c.webid, hidden: c.hidden });
             }
           }

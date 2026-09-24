@@ -44,6 +44,39 @@ describe('foldRoster — the deterministic membership head', () => {
     expect(afterRejoin.members).toEqual([founder.pubKey, mallory.pubKey].sort());   // re-admitted
   });
 
+  // ── WHO MAY ADMIT SOMEONE ELSE (Frits 2026-09-24, ledger L127: "any admin should be able to readmit someone who
+  // left"). A join signed by the joiner stands on its redemption row (checked where the rows are, in the roster
+  // read). A join signed by SOMEONE ELSE — an admin confirming a remote joiner — stands only when that author is an
+  // admin AT THAT CAUSAL POINT: the same `canAct` the role and evict statements already answer to. Before this the
+  // fold admitted every join and the read allowed only founders, so an organiser's promoted admin could never
+  // re-admit someone who had left (the pair roster's returning contact, when the one who deleted them had founded it).
+  it('a promoted admin re-admits someone who LEFT — the join it signs folds after its own promotion', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinBob  = body(bob, 'join', bob);
+    const joinMal  = body(mallory, 'join', mallory);
+    const promote  = body(founder, 'role', bob, { payload: { role: 'admin' } });
+    const malLeaves = body(mallory, 'leave', mallory, { parent: joinMal.hash });
+    // bob, having seen his promotion and mallory's leave, confirms mallory's return
+    const bobAdmits = body(bob, 'join', mallory, { parent: joinBob.hash, deps: [promote.hash, malLeaves.hash] });
+    const r = foldRoster([joinBob, joinMal, promote, malLeaves, bobAdmits], { founders: [founder.pubKey] });
+    expect(r.members).toContain(mallory.pubKey);
+  });
+
+  it('a join of SOMEONE ELSE signed by a non-admin admits nobody', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinBob  = body(bob, 'join', bob);
+    // bob is a plain member: his statement that mallory joined carries no authority
+    const bobAdmits = body(bob, 'join', mallory, { parent: joinBob.hash });
+    const r = foldRoster([joinBob, bobAdmits], { founders: [founder.pubKey] });
+    expect(r.members).not.toContain(mallory.pubKey);
+  });
+
+  it('the founder confirming a remote joiner still admits them (unchanged)', async () => {
+    const { founder, mallory } = await ids();
+    const r = foldRoster([body(founder, 'join', mallory)], { founders: [founder.pubKey] });
+    expect(r.members).toContain(mallory.pubKey);
+  });
+
   // ── DYNAMIC ROLE AUTHORITY — closed by the deps-DAG (DESIGN-log-ordering-unification §2–4). A cross-author
   // causal edge (`deps`: the frontier the author had SEEN) raises the causal depth, so "bob's evict is causally
   // AFTER founder's promote-of-bob" IS representable: bob's evict carries the promote in its deps, folds at a
@@ -611,8 +644,11 @@ describe('member-props supersession — the fold computes the dead set, and drop
     const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
     const jc = body(cato, 'join', cato, { payload: { peerDisplay: 'cato' } });
     const takeX = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: jb.hash });
-    const catoX = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash });   // refused: taken
-    const bobY = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'y' }, parent: takeX.hash });
+    // The ORDER is the premise, so it is written as causal edges (2026-09-24 — this test was red one run in two): cato
+    // claims x HAVING SEEN bob's claim, and bob moves on to y HAVING SEEN cato's refused claim. Without the edges the
+    // statements are concurrent and the fold's deterministic tiebreak over the random test keys decided who held x.
+    const catoX = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash, deps: [takeX.hash] });
+    const bobY = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'y' }, parent: takeX.hash, deps: [catoX.hash] });
     const r = foldRoster([jb, jc, takeX, catoX, bobY], { founders: [founder.pubKey] });
     expect(r.handles[cato.pubKey]).toBe('cato');
     expect(r.superseded).toEqual([]);   // handle-bearing statements are never dead, refused ones never named

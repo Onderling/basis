@@ -91,6 +91,7 @@ import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
+import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -1989,7 +1990,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
   const personSeedFor = (version) => (personKey?.version === version ? personKey.seed : (personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
   const contactRecords = async () => {
-    try { const r = await callSkill('stoop', 'listContacts', {}); return r?.items ?? r?.contacts ?? []; } catch { return []; }
+    try { return bookRowsOf(await callSkill('stoop', 'listContacts', {})); } catch { return []; }
   };
   /**
    * The PERSON an address names: an address this device has bound to an identity (a per-circle or mesh alias) resolves
@@ -2157,7 +2158,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       add: (contact) => rawStoop('addContact', contact),
       get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
       // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
-      setHidden: (webid, hidden, hiddenAt) => rawStoop('setContactHidden', { webid, hidden, hiddenAt }),
+      setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawStoop('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
       // …and a newer change of what the contact sees of the person (L125), by the same rule
       setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawStoop('setContactPersona', {
         webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,

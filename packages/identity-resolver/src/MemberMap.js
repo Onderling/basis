@@ -243,6 +243,9 @@ export class MemberMap extends Emitter {
       // is when either was last changed: a person's devices take the newer one (the own-devices carry, L125).
       revealPreset: typeof m.revealPreset === 'string' ? m.revealPreset : null,
       personaAt:   Number.isFinite(m.personaAt) ? m.personaAt : null,
+      // L114: when this contact was DELETED (hidden + the pair circle left) — kept after a return, so the thread
+      // can say "you had deleted this contact". Null for a contact never deleted.
+      deletedAt:   Number.isFinite(m.deletedAt) ? m.deletedAt : null,
       // stableId: SDK-level "this person" key (Stoop V1 Phase 11).
       // Survives handle changes + network-pubkey rotations.  Apps
       // key mute / ban / report on this.  Optional.

@@ -354,7 +354,8 @@ describe('deriveRoster', () => {
       const joiner = await AgentIdentity.generate(new VaultMemory());
       const roster = deriveRoster({
         redemptions: [redemption({ redeemedBy: 'B' })],
-        spineStatements: [stmt(joiner, 'join', 'NEW-MEMBER')],
+        // resolved as the read resolves it (author key → the member's webid): a SELF-signed join
+        spineStatements: [{ ...stmt(joiner, 'join', 'NEW-MEMBER'), author: 'NEW-MEMBER' }],
         foldAuthoritative: true,
       });
       expect(roster.map((m) => m.webid).sort()).toEqual(['B', 'NEW-MEMBER']);   // admitted, B kept
@@ -364,14 +365,14 @@ describe('deriveRoster', () => {
       // B's device folds C's join from the spine; C's redemption row lives in the admin's store and never
       // arrives here. Before this, C rendered as `peer-…` on every device but the admin's (walked 2026-09-14).
       const joiner = await AgentIdentity.generate(new VaultMemory());
-      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const join = { ...signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body, author: 'NEW-MEMBER' };   // resolved: a self-signed join
       const roster = deriveRoster({ redemptions: [], spineStatements: [join], foldAuthoritative: true });
       expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee');
     });
 
     it('a handle the MemberMap holds NOW (a rename) still wins over the join-time one', async () => {
       const joiner = await AgentIdentity.generate(new VaultMemory());
-      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const join = { ...signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body, author: 'NEW-MEMBER' };   // resolved: a self-signed join
       const roster = deriveRoster({
         redemptions: [], spineStatements: [join], foldAuthoritative: true,
         memberMapForDisplay: [{ webid: 'NEW-MEMBER', handle: 'cee-renamed' }],
@@ -384,7 +385,7 @@ describe('deriveRoster', () => {
       // `NOTE-member-props-on-the-membership-lane.md`). The MemberMap "cache" is where the retired side wire wrote;
       // a value the fold holds from the member's own statement wins over it, and over the join-time handle.
       const joiner = await AgentIdentity.generate(new VaultMemory());
-      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const join = { ...signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body, author: 'NEW-MEMBER' };   // resolved: a self-signed join
       // the statement is self-subject: subject === the member's own ref (`authorRef`) — the fold's rule
       const props = signSpine(joiner, { kind: 'member-props', circleId: 'g1', subject: 'NEW-MEMBER', parent: join.hash,
         payload: { authorRef: 'NEW-MEMBER', handle: 'cee-now', displayName: 'Cee Now', avatarRef: 'media:av1' } }).body;
@@ -400,7 +401,7 @@ describe('deriveRoster', () => {
 
     it('…and for the PERSONA PROPERTIES (step two, 2026-09-22): the map the member said on the lane beats the cached and the join-time one, whole', async () => {
       const joiner = await AgentIdentity.generate(new VaultMemory());
-      const join = signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body;
+      const join = { ...signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body, author: 'NEW-MEMBER' };   // resolved: a self-signed join
       const props = signSpine(joiner, { kind: 'member-props', circleId: 'g1', subject: 'NEW-MEMBER', parent: join.hash,
         payload: { authorRef: 'NEW-MEMBER', personaProperties: { region: 'zuid' } } }).body;
       const roster = deriveRoster({

@@ -12,6 +12,7 @@
 
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
 import { paintFace } from './faceView.js';
 
 // Privacy-badge palette (§10c) — the discrete states map to Onderling status tokens (mirrors
@@ -56,6 +57,8 @@ export function renderContactThread(container, {
   onToggleHidden = null,   // (hidden: boolean) => void — the person's own act; a message from the contact does the same as `false`
   contactId = null,        // the thread's key, on the root as data-contact-id — what a probe reads to name the open thread
   onOpenLens = null,       // L125: () => void — "what does this contact see of you?"; a person's thread only (with `hidden`)
+  onDelete = null,         // L114: () => void — delete this contact (the shell confirms first); a person's thread only
+  deletedAt = null,        // L114: when this contact was deleted — a return after it says "verwijderd", not "verborgen"
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactThread.js');
@@ -157,6 +160,15 @@ export function renderContactThread(container, {
     lens.addEventListener('click', () => onOpenLens());
     header.appendChild(lens);
   }
+  // DELETE (L114): hide + leave the pair circle — a relationship act. The shell asks first (the confirm is the undo).
+  if (typeof hidden === 'boolean' && typeof onDelete === 'function') {
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'cc-cthread__delete';
+    del.textContent = tr('circle.contacts.delete');
+    del.addEventListener('click', () => onDelete());
+    header.appendChild(del);
+  }
   container.appendChild(header);
   if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
     const note = document.createElement('div');
@@ -180,10 +192,11 @@ export function renderContactThread(container, {
     // The turn that brought a hidden contact back carries the mark (`returned`, decided where it first landed
     // and stored with the turn): a SYSTEM line above its bubble — "Je had dit contact verborgen." — so the person
     // understands why someone they removed is back in their list. Neither side's bubble.
-    if (m.returned === true) {
+    const markerKey = returnedMarkerKey(m, deletedAt);
+    if (markerKey) {
       const sys = document.createElement('div');
       sys.className = 'cc-cthread__system';
-      sys.textContent = tr('circle.contacts.returned_marker');
+      sys.textContent = tr(markerKey);
       log.appendChild(sys);
     }
     const row = document.createElement('div');

@@ -25,6 +25,7 @@ import { quickCreateCircle } from './circleCreate.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from './circleInvite.js';
 import { decodeInvite } from '../core/wizards/joinGroupState.js';
 import { personaOfContact } from './contactPersona.js';
+import { bookRowsOf } from './contactsSource.js';
 
 export { PAIR_CIRCLE_PREFIX, pairCircleIdFor, isPairCircleId, pairFounderOf } from './pairCircleId.js';
 
@@ -62,7 +63,7 @@ export function createPairRoster({
   const personaOf = async (webid) => {
     if (typeof personaFor === 'function') { try { return (await personaFor(webid)) ?? null; } catch { return null; } }
     try {
-      const rows = ((r) => r?.items ?? r?.contacts ?? [])(await callSkill('stoop', 'listContacts', {}));
+      const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
       return personaOfContact(rows.find((c) => c?.webid === webid));
     } catch { return null; }
   };
@@ -76,8 +77,7 @@ export function createPairRoster({
     if (typeof fromAddr !== 'string' || !fromAddr) return fromAddr;
     try { const r = typeof identityOf === 'function' ? identityOf(fromAddr) : null; if (typeof r === 'string' && r && r !== fromAddr) return r; } catch { /* next */ }
     try {
-      const res = await callSkill('stoop', 'listContacts', {});
-      const rows = res?.items ?? res?.contacts ?? [];
+      const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
       const hit = rows.find((c) => c?.webid === fromAddr || c?.personKey?.pubKey === fromAddr || c?.peerAddr === fromAddr);
       if (hit?.webid) return hit.webid;
     } catch { /* the address stands */ }
@@ -133,6 +133,15 @@ export function createPairRoster({
     return { circleId, created: true };
   }
 
+  /** An invite into a pair circle this side holds — naming ME as the admin to redeem with. `null` when none can be made. */
+  async function inviteInto(circleId) {
+    try {
+      const inv = await buildCircleInviteUri({ callSkill, circleId, adminPeerAddr: selfWebid, ...(typeof relayUrl === 'function' && relayUrl() ? { relayUrl: relayUrl() } : {}) });
+      if (!inv?.uri) { logger?.warn?.(`[pair-roster] no invite for ${circleId.slice(0, 12)}: ${inv?.error ?? 'no-code'}`); return null; }
+      return { pairInvite: inv.uri };
+    } catch (err) { logger?.warn?.(`[pair-roster] could not invite into the pair roster: ${err?.message ?? err}`); return null; }
+  }
+
   return {
     pairCircleIdFor: (contactWebid) => pairCircleIdFor(selfWebid, contactWebid),
     /** Where a message to this contact goes once the pair roster exists (see `pairRouteFor`). */
@@ -147,15 +156,18 @@ export function createPairRoster({
       const circleId = pairCircleIdFor(selfWebid, contactWebid);
       const mine = await myCircles();
       if (mine.has(circleId) && await memberOf(circleId, contactWebid)) return null;
-      if (pairFounderOf(selfWebid, contactWebid) !== selfWebid) return mine.has(circleId) ? null : { pairRequest: true };
+      // WHO CREATES and WHO INVITES are two questions (2026-09-24, L114). The founder rule decides who MAKES the pair
+      // circle, so the two sides never make two. Once it exists, whoever holds it invites the one who is missing — the
+      // contact who deleted you (left) and is written to again, even when they were the founder: without this, a
+      // founder who left could never be brought back, because the side still in the circle waited for a founder.
+      if (mine.has(circleId)) return inviteInto(circleId);
+      if (pairFounderOf(selfWebid, contactWebid) !== selfWebid) return { pairRequest: true };
       try {
         await ensureCircle(contactWebid, { name });
-        // the invite names ME as the admin to redeem with (the joiner's redeem is a round-trip to the founder), at
-        // the profile address the Hi established — the last thing the pair roster ever uses that address for
-        const inv = await buildCircleInviteUri({ callSkill, circleId, adminPeerAddr: selfWebid, ...(typeof relayUrl === 'function' && relayUrl() ? { relayUrl: relayUrl() } : {}) });
-        if (!inv?.uri) { logger?.warn?.(`[pair-roster] no invite for ${circleId.slice(0, 12)}: ${inv?.error ?? 'no-code'}`); return null; }
-        return { pairInvite: inv.uri };
       } catch (err) { logger?.warn?.(`[pair-roster] could not prepare the pair roster: ${err?.message ?? err}`); return null; }
+      // the invite names ME as the admin to redeem with (the joiner's redeem is a round-trip to me), at the profile
+      // address the Hi established — the last thing the pair roster ever uses that address for
+      return inviteInto(circleId);
     },
     /** The other side asked (their first turn, they do not found): make the roster, answer with the invite. */
     async onRequest(fromAddr, { name = null } = {}) {
@@ -174,7 +186,7 @@ export function createPairRoster({
       // code, so a forged claim admits nobody anywhere.
       if (webid === fromAddr && typeof invite?.adminPeerAddr === 'string' && invite.adminPeerAddr && invite.adminPeerAddr !== selfWebid) {
         try {
-          const rows = ((r) => r?.items ?? r?.contacts ?? [])(await callSkill('stoop', 'listContacts', {}));
+          const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
           if (rows.some((c) => c?.webid === invite.adminPeerAddr)) webid = invite.adminPeerAddr;
         } catch { /* the address stands */ }
       }

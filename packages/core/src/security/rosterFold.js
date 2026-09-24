@@ -311,6 +311,11 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     const joined = new Set();
     for (const s of batch) {
       if (s.kind !== 'join' || !joinPassesGate(s)) continue;
+      // A join signed by SOMEONE ELSE — an admin confirming a remote joiner — stands on that author's authority AT
+      // THIS DEPTH, the same `canAct` a role or an evict answers to (Frits 2026-09-24: "any admin should be able to
+      // readmit someone who left"). A self-signed join needs no authority here: it stands on its redemption row,
+      // which the roster read checks where the rows are.
+      if (s.author !== s.subject && !canAct(s.author)) continue;
       joined.add(s.subject);
       // The acceptance rides the join's signed payload — record it with the membership it establishes.
       const v = s.payload && typeof s.payload === 'object' ? s.payload.rulesAccepted : undefined;

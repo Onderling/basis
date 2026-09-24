@@ -132,12 +132,15 @@ export function createContactBook({ members, dataSource }) {
    * `hiddenAt` orders the marks between a person's devices (newest wins on landing) and is each device's own clock —
    * a wall-clock race, stated in the manifest row and accepted until the book is an item type on the log (L97).
    */
-  async function setHidden(webid, hidden, hiddenAt = Date.now()) {
+  async function setHidden(webid, hidden, hiddenAt = Date.now(), { deleted = false, deletedAt = null } = {}) {
     if (!webid) throw new TypeError('setHidden: webid required');
     if (typeof hidden !== 'boolean') throw new TypeError('setHidden: hidden must be boolean');
     if (!Number.isFinite(hiddenAt)) throw new TypeError('setHidden: hiddenAt must be a time');
     const existing = (await members.resolveByWebid(webid)) ?? { webid, pubKey: webid };
-    return members.addMember({ ...existing, relation: 'contact', hidden, hiddenAt });
+    // A DELETE is a hide that also left the pair circle (L114): `deletedAt` stays on the row after a return, so the
+    // returning turn can say "you had deleted this contact". A landing carries the sibling's time.
+    const del = Number.isFinite(deletedAt) ? { deletedAt } : (deleted === true && hidden ? { deletedAt: hiddenAt } : {});
+    return members.addMember({ ...existing, relation: 'contact', hidden, hiddenAt, ...del });
   }
 
   /**

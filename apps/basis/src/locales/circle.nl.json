@@ -3974,6 +3974,30 @@
       "text": "Je had dit contact verborgen.",
       "doc": "The one-line marker painted in the thread when a hidden contact writes again and comes back — so the person understands why someone they removed is in their list. Wilfred (the seeded contact) never initiates, so for him it is only ever a reply."
     },
+    "returned_deleted_marker": {
+      "text": "Je had dit contact verwijderd. Ze schreven opnieuw, dus ze zijn terug.",
+      "doc": "The one-line marker above the turn that brought a DELETED contact back (L114) — the pair circle is re-joined, the row shown again."
+    },
+    "delete": {
+      "text": "Verwijderen",
+      "doc": "Thread header — delete this contact (L114): hide + leave the pair circle. Opens a confirm sheet first."
+    },
+    "delete_title": {
+      "text": "{{name}} verwijderen?",
+      "doc": "Confirm sheet heading for deleting a contact (L114)."
+    },
+    "delete_body": {
+      "text": "{{name}} verdwijnt uit je contacten op al je apparaten en jullie gedeelde verbinding stopt. Jullie gesprek blijft op dit apparaat. Als {{name}} je opnieuw schrijft, komt die terug.",
+      "doc": "Confirm sheet body (L114) — the three facts: gone from sight everywhere, the connection closes, a message brings them back. Never promises they cannot reach you: that would be blocking."
+    },
+    "delete_confirm": {
+      "text": "Verwijderen",
+      "doc": "Confirm sheet — the destructive button."
+    },
+    "deleted": {
+      "text": "{{name}} is verwijderd.",
+      "doc": "After a delete (L114)."
+    },
     "trust": {
       "bekend": {
         "text": "bekend",

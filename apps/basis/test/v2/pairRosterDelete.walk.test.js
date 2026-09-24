@@ -10,10 +10,10 @@
  * once for each ROLE: which side founded the pair circle is fixed by the two keys, so a contact deletes as the
  * founder in about half of all pairs.
  *
- * THE FOUNDER CASE IS KNOWN RED (found 2026-09-24, instrumented): the return is admitted by the one admin left —
- * the promoted co-admin — and the roster read admits a join authored by someone else only on a FOUNDER's authority
- * ("dynamic non-founder-admin authority is the deferred causal-authority slice", stoop `index.js`). That is a
- * membership-authority rule for every circle, so it is not changed here; `it.fails` turns red the day it lands.
+ * THE FOUNDER CASE (found 2026-09-24, instrumented): the return is admitted by the one admin left — the promoted
+ * co-admin. The roster read used to admit a join signed by someone else only on a FOUNDER's authority; the fold now
+ * admits it on the author's admin authority at that causal point (Frits: "any admin should be able to readmit
+ * someone who left", ledger L127).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { bootRealAgentNode, connectNodesOverBus, until, teardown, readRoster } from '../support/pairRealAgents.js';
@@ -84,6 +84,6 @@ describe('delete a contact — the deleter FOUNDED the pair circle', () => {
   beforeAll(async () => { p = await pairWith(true); }, 60_000);
   afterAll(async () => { await teardown(...p.nodes); });
   it('deleting hides the row, marks it deleted, and takes the deleter off the pair roster on both sides', async () => { await deletes(p); }, 30_000);
-  // KNOWN RED — the co-admin's admission of a returning founder is refused (see the header). Turns red when fixed.
-  it.fails('their next message re-forms the pair circle — needs non-founder-admin authority for joins', async () => { await returns(p); }, 60_000);
+  // The promoted co-admin re-admits the returning founder (Frits 2026-09-24, L127: any admin may re-admit).
+  it('their next message: the co-admin invites the founder back, the pair circle re-forms, the row returns marked', async () => { await returns(p); }, 60_000);
 });

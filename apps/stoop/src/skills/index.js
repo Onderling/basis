@@ -1078,8 +1078,9 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // HERE (where the trail rows are at hand), per the join-proof decision:
     //   • a SELF-authored join must carry `payload.redemptionRef` naming an existing redemption row for the
     //     same subject — deny-favouring: a row that hasn't arrived yet defers the join to the next read;
-    //   • a join authored by SOMEONE ELSE stands only on a FOUNDER's authority (dynamic non-founder-admin
-    //     authority is the deferred causal-authority slice).
+    //   • a join authored by SOMEONE ELSE is passed on to the fold, which admits it only when its author is an
+    //     admin AT THAT CAUSAL POINT (`canAct`, as for role and evict — Frits 2026-09-24, L127: any admin may
+    //     re-admit someone who left). This was founders-only, so a promoted admin could never re-admit anyone.
     try {
       const { bodies } = await membershipRead(groupId);
       addGenesisFounders(bodies);          // creation first: the join filter below reads the result
@@ -1090,7 +1091,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
           return typeof ref === 'string' && !!ref
             && forGroup.some((it) => it.id === ref && it?.source?.redeemedBy === b.subject);
         }
-        return founderWebids.has(b.author);
+        return true;   // the fold decides, by the author's authority at that depth
       });
     } catch { spineStatements = []; }
   } else {

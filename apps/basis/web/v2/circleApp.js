@@ -1256,6 +1256,20 @@ function publishEventToLog(e) {
 // half and entry kind — is gone with the persona side wire, 2026-09-22: the release is a `member-props` statement
 // now and lands by the membership lane, whose `membershipChange` re-reads the roster.)
 const disclosureShareMemo = createDisclosureShareMemo(localStorageDisclosureShareIo());
+/** A persona's release said on one circle — ONE composition for every door that says it: Mij's share button, the
+ *  pair roster founding a contact's circle, the create wizard founding yours, and the walk's seam. */
+function shareCircleRelease(circleId, personaId) {
+  return shareDisclosureToCircle({
+    callSkill: rawCallSkill,
+    // The release is SAID on the circle's membership lane (`member-props`) — no admin in the loop.
+    emitMemberProps: (a) => _peerAgent?.emitMemberProps?.(a),
+    circleId, personaId,
+    // Diff-gate: an unchanged save is a true no-op (nothing said, nothing re-sealed).
+    lastShared: disclosureShareMemo,
+    // Media props (profilePicture) leave RE-SEALED to this circle: the self-sealed source → a circle-sealed copy.
+    resealMediaForCircle: resealPersonaMediaForCircle,
+  });
+}
 // The member-side PULL: a pull-me for the open circle re-reads its roster rows. Silent — the
 // MEMBERS rows / member cards just refresh; no bubble, no toast.
 const pullRosterForCircle = async ({ circleId }) => {
@@ -1726,12 +1740,7 @@ if (typeof window !== 'undefined') {
       : Promise.resolve({ error: 'callSkill-not-ready' })
   );
   // What the "share to this circle" button does, as a seam a walk can drive (the button lives inside a panel).
-  window.onderlingShareToCircle = (circleId, personaId = 'default') => shareDisclosureToCircle({
-    callSkill: rawCallSkill,
-    emitMemberProps: (a) => _peerAgent?.emitMemberProps?.(a),
-    circleId, personaId, lastShared: disclosureShareMemo,
-    resealMediaForCircle: resealPersonaMediaForCircle,
-  });
+  window.onderlingShareToCircle = (circleId, personaId = 'default') => shareCircleRelease(circleId, personaId);
   /** Invoke one of the ops the surface offers — the same `{opId, args}` a tap compiles to. */
   window.onderlingDispatch = (opId, args = {}) => (
     typeof circleDispatchReady === 'function'
@@ -2255,10 +2264,7 @@ function buildCircleBot(agent) {
     relayUrl: () => connectedRelayUrls()?.[0] ?? null,
     activeEndpointUrl: () => connectedRelayUrls(),
     // the lens: the founder says on the new pair circle what this contact's persona discloses (same road as Mij's share)
-    shareRelease: (cid, personaId) => shareDisclosureToCircle({
-      callSkill: rawCallSkill, emitMemberProps: (a) => _peerAgent?.emitMemberProps?.(a),
-      circleId: cid, personaId, lastShared: disclosureShareMemo, resealMediaForCircle: resealPersonaMediaForCircle,
-    }),
+    shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,
@@ -5639,18 +5645,7 @@ async function openAboutMePanel(personaId) {
         await draw();
       },
       // personas#2 — push a persona's current disclosure for `contextId` up to the circle roster.
-      onShareToCircle: (contextId, forPersonaId) => shareDisclosureToCircle({
-        callSkill:         rawCallSkill,
-        // The release is SAID on the circle's membership lane (`member-props`, step two 2026-09-22) — no admin in the loop.
-        emitMemberProps:   (a) => _peerAgent?.emitMemberProps?.(a),
-        circleId:          contextId,
-        personaId:         forPersonaId,
-        // Diff-gate: an unchanged save is a true no-op (nothing said, nothing re-sealed).
-        lastShared:        disclosureShareMemo,
-        // Media props (profilePicture) leave RE-SEALED to this circle (option (a)):
-        // the self-sealed source copy → a copy sealed with the circle's own key.
-        resealMediaForCircle: resealPersonaMediaForCircle,
-      }),
+      onShareToCircle: (contextId, forPersonaId) => shareCircleRelease(contextId, forPersonaId),
     });
   };
   await draw();
@@ -5834,6 +5829,8 @@ function openCreateCircleWizard() {
   if (typeof rawCallSkill !== 'function') { globalThis.alert?.(t('circle.create_unavailable')); return; }
   mountMyDataWizard(renderCreateGroupWizard, {
     getMyPeerAddr: () => circleHouseholdAgent?.householdSelfAddr ?? null,
+    // the persona the founder picked says what it discloses in the new circle
+    shareFounderRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }

@@ -28,6 +28,10 @@ import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat
 import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
+// The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
+import { loadPersonas } from './joinGroupState.js';
+import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
+export { loadPersonas };
 
 /* ─── Policy catalogues ───────────────────────────────────────── */
 
@@ -292,11 +296,39 @@ export function initialState() {
     inviteMaxRedemptions:  INVITE_CEILING_FALLBACK,
     storagePolicy:         DEFAULT_CIRCLE_STORAGE_POSTURE,
     groupPodUri:           '',
+    // Which persona founds the circle (Frits 2026-09-24: the create wizard asks, the default preselected).
+    // It decides which RELEASE rides onto the new circle — the lens — not whose key founds it: one identity
+    // runs today, so the founding address is the default profile's whatever is picked. `null` = start
+    // minimally (nothing released), the join wizard's same protective choice.
+    persona:               DEFAULT_PERSONA,
+    personas:              [],
     // Submission
     submitting:            false,
     submitError:           null,
     successResult:         null,
   };
+}
+
+/* ─── The founding persona ─────────────────────────────────── */
+
+/**
+ * Hand the picker its list, and keep the choice honest against it: a persona that is on the list stays chosen,
+ * `null` ("start minimally") stays a choice, and a choice naming a persona that no longer exists falls back to
+ * the default — never to a silent "nothing", which would release less than the person saw selected.
+ * @param {object} state
+ * @param {Array<{id: string, name: string}>} personas   `loadPersonas`' output
+ */
+export function withPersonas(state, personas) {
+  const list = Array.isArray(personas) ? personas : [];
+  const chosen = state.persona;
+  const keep = chosen === null || list.some((p) => p.id === chosen);
+  return { ...state, personas: list, persona: keep ? chosen : DEFAULT_PERSONA };
+}
+
+/** The founding persona's name as the review shows it; `null` when the founder starts minimally. */
+export function founderPersonaName(state) {
+  if (!state?.persona) return null;
+  return (state.personas ?? []).find((p) => p.id === state.persona)?.name ?? state.persona;
 }
 
 /* ─── Rules object + submit ────────────────────────────────── */
@@ -420,7 +452,7 @@ export function encodeInviteUri(payload) {
  * wizard adds adminPeerAddr + rules into the result before stashing as
  * successResult; mobile may do the same in its own wrapper).
  */
-export async function finalSubmit({ state, callSkill }) {
+export async function finalSubmit({ state, callSkill, shareRelease = null }) {
   state.submitting  = true;
   state.submitError = null;
   try {
@@ -437,6 +469,15 @@ export async function finalSubmit({ state, callSkill }) {
       ...(state.groupPodUri ? { groupPodUri: state.groupPodUri } : {}),
     });
     if (result?.error) throw new Error(result.error);
+    // The founder's persona says what it discloses here — through the same seam the pair roster founds with.
+    // AFTER the create, and never able to undo it: a release that does not land is reported on the result and
+    // the next Mij share carries it. No seam (the programmatic creates: the help circle, the pair circles) or
+    // "start minimally" means nothing is released, exactly as before this step existed.
+    result.releaseShared = false;
+    if (typeof shareRelease === 'function' && typeof state.persona === 'string' && state.persona) {
+      try { await shareRelease(result.groupId, state.persona); result.releaseShared = true; }
+      catch { result.releaseShared = false; }
+    }
     return { result, state };
   } catch (err) {
     state.submitError = err?.message ?? String(err);

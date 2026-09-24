@@ -33,6 +33,8 @@ import {
   setStoragePolicy,
   // The persona the circle is founded as — the list, and the choice kept honest against it.
   loadPersonas, withPersonas, founderPersonaName,
+  // The circle's id comes from its founder — one helper, both wizards and the quick create.
+  resolveFounderKey, newFounderCircleId,
 } from '../../core/wizards/createGroupState.js';
 import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 // B5 — the ceiling field. `markAxisTouched` so an explicit choice survives a kind switch (the same
@@ -44,7 +46,6 @@ import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../../v2/circlePolicyStore.js';
 import { consequenceKeyFor } from '../../v2/optionConsequences.js';
 import { t } from '../../localisation.js';
-import { deriveCircleId } from '@onderling/core';
 
 /**
  * N1+E8 — persist the wizard's chosen policy axes (features incl. the
@@ -74,12 +75,6 @@ async function persistCreatedCirclePolicy(groupId, state) {
  * @param {Function}    opts.onClose
  * @param {Function}    [opts.onDispatched]
  */
-/** 16 random bytes, so one founder's two circles differ even when named the same thing. */
-function freshNonce() {
-  const b = new Uint8Array(16);
-  (globalThis.crypto ?? {}).getRandomValues?.(b);
-  return b;
-}
 
 export function renderCreateGroupWizard(opts) {
   const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr, shareFounderRelease } = opts;
@@ -95,13 +90,9 @@ export function renderCreateGroupWizard(opts) {
   // late — which is honest: a circle with no derivable founder should not be created at all.
   (async () => {
     if (state.groupId) return;
-    let key = null;
-    try { key = getMyPeerAddr?.() ?? null; } catch { key = null; }
-    if (!key && typeof callSkill === 'function') {
-      try { key = (await callSkill('stoop', 'whoAmI', {}))?.webid ?? null; } catch { key = null; }
-    }
-    if (!key) return;                       // no founder → no id → the wizard cannot advance
-    state.groupId = deriveCircleId(key, freshNonce());
+    const key = await resolveFounderKey({ getMyPeerAddr, callSkill });
+    if (!key || state.groupId) return;      // no founder → no id → the wizard cannot advance
+    state.groupId = newFounderCircleId(key);
     rerender();
   })();
 
@@ -218,7 +209,8 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   appendField(wrap, doc, t('circle.wizard.create.name'), 'name',
     state.name, (v) => {
       state.name = v;
-      if (!state.groupId) state.groupId = deriveCircleId(founderKey(), freshNonce());
+      // The id is derived once, at mount, from the founder (above); typing never makes one. Until the founder
+      // is known the Next button stays off — this used to call a `founderKey()` that was never defined.
       refreshNextBtn();
     },
     { placeholder: 'e.g. Circle Westend' });

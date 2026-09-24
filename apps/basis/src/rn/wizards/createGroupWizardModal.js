@@ -18,7 +18,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
   KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
-  initialState, slugify, isValidSlug, labelOf,
+  initialState, isValidSlug, labelOf,
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
@@ -27,6 +27,8 @@ import {
   ROLE_TEMPLATE_IDS, toggleRole,
   // The persona the circle is founded as (web parity).
   loadPersonas, withPersonas, founderPersonaName,
+  // The circle's id comes from its founder (web parity, L126).
+  resolveFounderKey, newFounderCircleId,
 } from '../../core/wizards/createGroupState.js';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { attachConsequences } from '../../v2/optionConsequences.js';
@@ -64,15 +66,20 @@ export default function CreateGroupWizardModal({
     loadPersonas({ callSkill }).then((personas) => { if (active) setState((s) => withPersonas(s, personas)); }).catch(() => {});
     return () => { active = false; };
   }, [callSkill]);
+  // THE ID COMES FROM THE FOUNDER, derived once at mount — never from the name, and never typed (L126). It was
+  // `slugify(name)` here, with an editable id field: two people who both called their circle "Proeftuin" held one
+  // id, and a device that learned of both merged them. Web closed that on 2026-08-28; this wizard never followed.
+  // Until the founder is known the Next button stays off — a circle with no founder is not created at all.
+  useEffect(() => {
+    let active = true;
+    resolveFounderKey({ getMyPeerAddr, callSkill }).then((key) => {
+      if (!active || !key) return;
+      setState((s) => (s.groupId ? s : { ...s, groupId: newFounderCircleId(key) }));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [callSkill]);   // not `getMyPeerAddr`: the shells pass an inline arrow, new on every render — read once is the point
   const setStep = useCallback((n) => setState((s) => ({ ...s, step: n })), []);
-  const updateName = useCallback((name) => {
-    setState((s) => ({
-      ...s,
-      name,
-      // auto-slugify if the user hasn't manually edited groupId yet
-      groupId: s.groupId === '' || s.groupId === slugify(s.name) ? slugify(name) : s.groupId,
-    }));
-  }, []);
+  const updateName = useCallback((name) => setState((s) => ({ ...s, name })), []);
 
   const onCreate = useCallback(async () => {
     let next = { ...state, submitting: true, submitError: null };
@@ -181,13 +188,6 @@ export default function CreateGroupWizardModal({
                   value={state.name}
                   onChangeText={updateName}
                   placeholder="e.g. Onze Circle"
-                />
-                <Field
-                  label="Circle id (lowercase, digits, _ or -; 3-30 chars)"
-                  value={state.groupId}
-                  onChangeText={(v) => setState((s) => ({ ...s, groupId: v }))}
-                  placeholder="auto-derived from name"
-                  monospace
                 />
                 {state.personas.length > 0 && (
                   <>

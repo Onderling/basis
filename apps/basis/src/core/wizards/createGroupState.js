@@ -8,6 +8,7 @@
  * basis-mobile's RN wizard imports these helpers verbatim.
  */
 import { CIRCLE_STORAGE_POSTURE_NAMES, DEFAULT_CIRCLE_STORAGE_POSTURE } from '@onderling/pod-routing';
+import { deriveCircleId } from '@onderling/core';
 
 
 // 5.5a — Step 3 captures the structured v2 rules doc instead of a
@@ -28,6 +29,10 @@ import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat
 import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
+// The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
+import { loadPersonas } from './joinGroupState.js';
+import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
+export { loadPersonas };
 
 /* ─── Policy catalogues ───────────────────────────────────────── */
 
@@ -292,11 +297,70 @@ export function initialState() {
     inviteMaxRedemptions:  INVITE_CEILING_FALLBACK,
     storagePolicy:         DEFAULT_CIRCLE_STORAGE_POSTURE,
     groupPodUri:           '',
+    // Which persona founds the circle (Frits 2026-09-24: the create wizard asks, the default preselected).
+    // It decides which RELEASE rides onto the new circle — the lens — not whose key founds it: one identity
+    // runs today, so the founding address is the default profile's whatever is picked. `null` = start
+    // minimally (nothing released), the join wizard's same protective choice.
+    persona:               DEFAULT_PERSONA,
+    personas:              [],
     // Submission
     submitting:            false,
     submitError:           null,
     successResult:         null,
   };
+}
+
+/* ─── The circle's id comes from its founder ───────────────── */
+
+/**
+ * A circle's id is derived from its FOUNDER, never from its name (2026-08-28, and on mobile 2026-09-24, L126).
+ * A name-derived id let two people who both called their circle "Proeftuin" hold one id, and a device that
+ * learned of both merged them — a second door into a circle, since names are public and often obvious.
+ * Deriving from the founder's key makes the collision unrepresentable. 16 random bytes beside the key, so one
+ * founder's two circles differ even when named the same thing. Refuses without a founder — never falls back to
+ * anything a stranger could also produce.
+ * @param {string} founderKey  the creating device's identity key
+ */
+export function newFounderCircleId(founderKey) {
+  if (typeof founderKey !== 'string' || !founderKey) throw new Error('circle create: no founder identity — a circle id must come from its founder');
+  const nonce = new Uint8Array(16);
+  (globalThis.crypto ?? {}).getRandomValues?.(nonce);
+  return deriveCircleId(founderKey, nonce);
+}
+
+/**
+ * Who is founding: a key the caller pins, else the shell's peer address, else the app's `whoAmI`. `null` when
+ * none answers — and then no id, so the wizard waits rather than inventing one.
+ */
+export async function resolveFounderKey({ founderPubKey = null, getMyPeerAddr = null, callSkill = null } = {}) {
+  if (typeof founderPubKey === 'string' && founderPubKey) return founderPubKey;
+  try { const k = typeof getMyPeerAddr === 'function' ? getMyPeerAddr() : null; if (typeof k === 'string' && k) return k; } catch { /* next rung */ }
+  if (typeof callSkill === 'function') {
+    try { const w = (await callSkill('stoop', 'whoAmI', {}))?.webid; if (typeof w === 'string' && w) return w; } catch { /* none */ }
+  }
+  return null;
+}
+
+/* ─── The founding persona ─────────────────────────────────── */
+
+/**
+ * Hand the picker its list, and keep the choice honest against it: a persona that is on the list stays chosen,
+ * `null` ("start minimally") stays a choice, and a choice naming a persona that no longer exists falls back to
+ * the default — never to a silent "nothing", which would release less than the person saw selected.
+ * @param {object} state
+ * @param {Array<{id: string, name: string}>} personas   `loadPersonas`' output
+ */
+export function withPersonas(state, personas) {
+  const list = Array.isArray(personas) ? personas : [];
+  const chosen = state.persona;
+  const keep = chosen === null || list.some((p) => p.id === chosen);
+  return { ...state, personas: list, persona: keep ? chosen : DEFAULT_PERSONA };
+}
+
+/** The founding persona's name as the review shows it; `null` when the founder starts minimally. */
+export function founderPersonaName(state) {
+  if (!state?.persona) return null;
+  return (state.personas ?? []).find((p) => p.id === state.persona)?.name ?? state.persona;
 }
 
 /* ─── Rules object + submit ────────────────────────────────── */
@@ -420,7 +484,7 @@ export function encodeInviteUri(payload) {
  * wizard adds adminPeerAddr + rules into the result before stashing as
  * successResult; mobile may do the same in its own wrapper).
  */
-export async function finalSubmit({ state, callSkill }) {
+export async function finalSubmit({ state, callSkill, shareRelease = null }) {
   state.submitting  = true;
   state.submitError = null;
   try {
@@ -437,6 +501,15 @@ export async function finalSubmit({ state, callSkill }) {
       ...(state.groupPodUri ? { groupPodUri: state.groupPodUri } : {}),
     });
     if (result?.error) throw new Error(result.error);
+    // The founder's persona says what it discloses here — through the same seam the pair roster founds with.
+    // AFTER the create, and never able to undo it: a release that does not land is reported on the result and
+    // the next Mij share carries it. No seam (the programmatic creates: the help circle, the pair circles) or
+    // "start minimally" means nothing is released, exactly as before this step existed.
+    result.releaseShared = false;
+    if (typeof shareRelease === 'function' && typeof state.persona === 'string' && state.persona) {
+      try { await shareRelease(result.groupId, state.persona); result.releaseShared = true; }
+      catch { result.releaseShared = false; }
+    }
     return { result, state };
   } catch (err) {
     state.submitError = err?.message ?? String(err);

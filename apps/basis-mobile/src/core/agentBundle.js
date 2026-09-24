@@ -749,6 +749,13 @@ export async function bootAgentBundle(opts = {}) {
   // THE PAIR ROSTER (L105, web parity): the roster a contact lacks, made automatically on the first exchange from
   // the circle mechanics. The redeem sender and the post-join step are composed further down — late-bound here.
   const pairSeams = { sendPeerRedeem: null, onJoined: null };
+  /** A persona's release said on one circle — ONE composition for every door on this device: the pair roster founding
+   *  a contact's circle, and the create wizard founding yours (web's `shareCircleRelease`). The memo is declared
+   *  below and read at call time, long after boot. The picture reseal is the launcher's to compose and passes in. */
+  const shareCircleRelease = (circleId, personaId, { resealMediaForCircle = null } = {}) => shareDisclosureToCircle({
+    callSkill: (app, op, args) => agent.callSkill(app, op, args), emitMemberProps: (a) => agent.emitMemberProps?.(a),
+    circleId, personaId, lastShared: disclosureShareMemo, resealMediaForCircle,
+  });
   const pairRoster = createPairRoster({
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill: (app, op, args) => agent.callSkill(app, op, args),
@@ -760,13 +767,10 @@ export async function bootAgentBundle(opts = {}) {
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => { try { return agent?.relays?.list?.()?.[0]?.url ?? _activeRelayUrl ?? null; } catch { return _activeRelayUrl ?? null; } },
-    // the lens (web parity): the founder says on the new pair circle what this contact's persona discloses. The
-    // memo is declared below; it is read at call time, long after this bundle has booted. No picture reseal here —
-    // the picture reaches the pair circle by the next Mij share, where the launcher composes the reseal.
-    shareRelease: (cid, personaId) => shareDisclosureToCircle({
-      callSkill: (app, op, args) => agent.callSkill(app, op, args), emitMemberProps: (a) => agent.emitMemberProps?.(a),
-      circleId: cid, personaId, lastShared: disclosureShareMemo, resealMediaForCircle: null,
-    }),
+    // the lens (web parity): the founder says on the new pair circle what this contact's persona discloses. No
+    // picture reseal here — the picture reaches the pair circle by the next Mij share, where the launcher composes
+    // the reseal.
+    shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   const contactChannel = createContactThreadChannel({
     blobStore: contactAttachmentBlobs,
@@ -997,6 +1001,8 @@ export async function bootAgentBundle(opts = {}) {
     sendPeerRedeem,
     emitMemberProps,
     disclosureShareMemo,
+    /** Say a persona's release on one circle (the create wizard's founding persona; web parity). */
+    shareCircleRelease,
     contactSkills,
     peerGraph,
     contactChannel,

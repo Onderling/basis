@@ -5882,6 +5882,28 @@
         "text": "Verversen na (dagen)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
+      "persona": {
+        "label": {
+          "text": "Je start deze kring als",
+          "doc": "Create wizard, identity step — which persona founds the circle (Frits 2026-09-24: the create wizard asks, the default preselected). It chooses the RELEASE that rides, not a second identity."
+        },
+        "minimal": {
+          "text": "Start minimaal (deel geen achtergrond)",
+          "doc": "Create wizard — the start-minimally option: no release rides onto the new circle. The join wizard's same protective choice."
+        },
+        "hint": {
+          "text": "Alleen wat deze persona in deze kring deelt, zien de mensen die meedoen — niets wat je niet zelf hebt ingesteld. Later aanpassen kan bij Mij → persona's.",
+          "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
+        }
+      },
+      "review_persona": {
+        "text": "Gestart als",
+        "doc": "Create wizard, review — the founding persona's row."
+      },
+      "review_persona_minimal": {
+        "text": "Minimaal gestart",
+        "doc": "Create wizard, review — the founding row when the founder starts minimally."
+      },
       "step_identity": {
         "text": "Een kring maken",
         "doc": "Mobile create-wizard, step 1 heading."

@@ -5882,6 +5882,28 @@
         "text": "Rotate after (days)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
+      "persona": {
+        "label": {
+          "text": "Start this circle as",
+          "doc": "Create wizard, identity step — which persona founds the circle (Frits 2026-09-24: the create wizard asks, the default preselected). It chooses the RELEASE that rides, not a second identity."
+        },
+        "minimal": {
+          "text": "Start minimally (share no background)",
+          "doc": "Create wizard — the start-minimally option: no release rides onto the new circle. The join wizard's same protective choice."
+        },
+        "hint": {
+          "text": "Only what this persona discloses in this circle is shared with the people who join — nothing you have not set. Adjust later under Me → personas.",
+          "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
+        }
+      },
+      "review_persona": {
+        "text": "Started as",
+        "doc": "Create wizard, review — the founding persona's row."
+      },
+      "review_persona_minimal": {
+        "text": "Started minimally",
+        "doc": "Create wizard, review — the founding row when the founder starts minimally."
+      },
       "step_identity": {
         "text": "Create a circle",
         "doc": "Mobile create-wizard, step 1 heading."

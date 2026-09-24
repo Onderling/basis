@@ -1861,6 +1861,10 @@ export default function ChatScreen({
             // AsyncStorage policy store the launcher reads.  Only consumed
             // by CreateGroupWizardModal; other wizards ignore it.
             persistPolicy={(groupId, patch) => policyStoreRef.current?.update(groupId, patch)}
+            // …and says the founding persona's release on the new circle. Only CreateGroupWizardModal reads it.
+            shareFounderRelease={bootState.kind === 'ready'
+              ? (cid, personaId) => bootState.bundle.shareCircleRelease?.(cid, personaId)
+              : undefined}
             // Bundle I (2026-05-27) — settings modal pod + relay
             // sections.  Only consumed by SettingsWizardModal; other
             // wizards ignore the unknown props.

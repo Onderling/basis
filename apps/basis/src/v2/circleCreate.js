@@ -23,15 +23,7 @@
  * The name is not lost — it stays what people read, and the id becomes what machines match. The UI
  * already prefers the name and treats the id as a fallback, which is why this is cheap.
  */
-import { initialState, finalSubmit } from '../core/wizards/createGroupState.js';
-import { deriveCircleId } from '@onderling/core';
-
-/** 16 random bytes, so one founder's two circles differ even when made in the same second. */
-function freshNonce() {
-  const b = new Uint8Array(16);
-  (globalThis.crypto ?? {}).getRandomValues?.(b);
-  return b;
-}
+import { initialState, finalSubmit, resolveFounderKey, newFounderCircleId } from '../core/wizards/createGroupState.js';
 
 /**
  * @param {object} a
@@ -54,15 +46,10 @@ export async function quickCreateCircle({ callSkill, name, id, founderPubKey, ru
   if (typeof id === 'string' && id.trim()) {
     state.groupId = id.trim();                      // a system circle, pinned on purpose
   } else {
-    // The founder's key is what makes this id theirs. Without it we would be back to deriving an id
-    // from something a stranger can also produce, so ask the app rather than guessing — and if even
-    // that cannot answer, refuse instead of silently falling back to the name.
-    let key = typeof founderPubKey === 'string' && founderPubKey ? founderPubKey : null;
-    if (!key && typeof callSkill === 'function') {
-      try { key = (await callSkill('stoop', 'whoAmI', {}))?.webid ?? null; } catch { key = null; }
-    }
-    if (!key) throw new Error('circle create: no founder identity — a circle id must come from its founder');
-    state.groupId = deriveCircleId(key, freshNonce());
+    // The founder's key is what makes this id theirs (the same helper both wizards use). Without it we would be
+    // back to deriving an id from something a stranger can also produce — so refuse instead of guessing.
+    const key = await resolveFounderKey({ founderPubKey, callSkill });
+    state.groupId = newFounderCircleId(key);
   }
 
   const { result, state: after } = await finalSubmit({ state, callSkill });

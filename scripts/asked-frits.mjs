@@ -41,10 +41,73 @@ const DATE = /\b(20\d\d-\d\d-\d\d)\b/;
  * THE BLOCK IS NOT SCANNED. A generated table that reads itself is not a projection, it is a feedback loop —
  * the first run rendered its own rows as new markers and the second run disagreed with the first.
  */
+/** A line that starts a new unit: a list item, a heading, a table row, a quote bullet. */
+const ITEM_START = /^\s*(?:>\s*)?(?:\d+\.\s|[-*]\s|#|\|)/;
+// Underscores stay: they are half of every identifier the ledger names (`DEFAULT_CIRCLE_ORIGINS`).
+const clean = (s) => s.replace(/[*`>|]/g, '').replace(/\s+/g, ' ').trim();
+
+/**
+ * The marker's whole ITEM, wrapped lines joined: up to the line that starts it, down to the blank line or the
+ * next item. A table row is its own item. The ledger is hard-wrapped at ~120 columns, so reading only the
+ * marker's line cut most questions in half.
+ */
+function itemAround(all, i) {
+  if (/^\s*\|/.test(all[i])) return all[i];
+  // A blockquote is read as its content: its `> ` prefixes would otherwise hide every sentence break.
+  const lines = all.map((l) => l.replace(/^\s*>\s?/, ''));
+  let a = i;
+  while (a > 0 && !ITEM_START.test(lines[a]) && lines[a - 1].trim() !== '') a -= 1;
+  let b = i;
+  while (b + 1 < lines.length && lines[b + 1].trim() !== '' && !ITEM_START.test(lines[b + 1])) b += 1;
+  return lines.slice(a, b + 1).join(' ');
+}
+
+/**
+ * The question, in order of preference:
+ *   1. the sentence that carries the marker — the question is written before it as often as after it;
+ *   2. when that sentence is only the marker (it sits in the closing `[ledger Lnn — ? Needs Frits: when]`),
+ *      the item's bold title, which is how a ledger row names its question;
+ * plus the ASK — the short "(rank it)" / ": when" right after the marker — which says what kind of answer
+ * is wanted.
+ */
+function questionOf(raw) {
+  // The marker opens with a "?", which the sentence split below would take for the end of a sentence.
+  const item = raw.replace(MARKER, '\u0000NF');
+  const at = item.indexOf('\u0000NF');
+  const after = item.slice(at + 3);
+  const ask = (after.match(/^\s*(?:\(([^)]{1,60})\)|:\s*([^.\]\n*]{1,40}?)\s*(?:\]|\.|\*\*|$))/) || [])
+    .slice(1).find(Boolean)?.trim();
+  // Sentences end at . ? ! followed by a capital, a bracket or markdown — not at a file name's dot.
+  const parts = item.split(/(?<=[.!?]\**)\s+(?=\**[A-Z(\["“'*])/);
+  let pos = 0;
+  let k = 0;
+  for (; k < parts.length; k += 1) {
+    const end = item.indexOf(parts[k], pos) + parts[k].length;
+    if (end > at) break;
+    pos = end;
+  }
+  const tidy = (s) => clean((s || '').replace(TAG, '').replace(/\[[^\]]*\u0000NF[^\]]*\]/, '')
+    .replace(/\[ledger[^\]]*\]/i, '').replace('\u0000NF', '').replace(/^\s*\d+\.\s*/, '').replace(/\[L\d+\]/, ''))
+    .replace(/\s+\./g, '.').replace(/\.{2,}/g, '.').replace(/([?!])\.+/g, '$1')
+    .replace(/^[—–\-:,.\s]+/, '').replace(/[—–\-:,\s]+$/, '');
+  let q = tidy(parts[k]);
+  if (q.length < 25) {
+    // The marker stands alone at the end of the item: the item's title names the question, or, with no
+    // title, the sentence just before the marker does.
+    const title = item.match(/\*\*\s*\[L\d+\]\s*([\s\S]*?)\*\*/)?.[1];
+    const before = k > 0 ? tidy(parts[k - 1]) : '';
+    if (title) q = tidy(title);
+    else if (before) q = `${before}${q ? ` ${q}` : ''}`;
+  }
+  if (ask && !q.toLowerCase().includes(ask.toLowerCase())) q = `${q} — *${ask}*`;
+  return q;
+}
+
 function rows(text) {
   const out = [];
   let inBlock = false;
-  text.split('\n').forEach((line, i) => {
+  const lines = text.split('\n');
+  lines.forEach((line, i) => {
     if (line.includes(BEGIN)) { inBlock = true; return; }
     if (line.includes(END)) { inBlock = false; return; }
     if (inBlock) return;
@@ -59,13 +122,11 @@ function rows(text) {
     if (line.includes('asked-frits') || line.includes('`? Needs Frits`') || line.includes('"? Needs Frits')) return;
     const was = line.search(/\bWas:/);
     if (was >= 0 && line.search(MARKER) > was) return;
-    const tag = (line.match(TAG)?.[1] ?? 'n/a').replace(/^l/, 'L');
+    const tag = ((line.match(TAG) ?? line.match(/ledger\s+(L\d+)/i))?.[1] ?? 'n/a').replace(/^l/, 'L');
     const date = line.match(DATE)?.[1] ?? '—';
-    // The question itself: from the marker onward, stripped of the tag and markdown noise, one line.
-    const from = line.slice(line.search(MARKER));
-    const text1 = from.replace(MARKER, '').replace(TAG, '').replace(/[*_`>|]/g, '').replace(/\s+/g, ' ').trim()
-      .replace(/^[—–\-:,.\s]+/, '');
-    out.push({ n: i + 1, tag, date, q: text1.length > 110 ? `${text1.slice(0, 110)}…` : (text1 || '(see the row)') });
+    const q = questionOf(itemAround(lines, i));
+    const cut = q.length > 160 ? `${q.slice(0, q.lastIndexOf(' ', 160))}…` : q;
+    out.push({ n: i + 1, tag, date, q: cut || '(see the row)' });
   });
   return out.reverse();   // newest first — the ledger grows downward, so the last marker is the newest
 }

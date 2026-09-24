@@ -13,7 +13,7 @@
  * in-memory here (session-scoped, like the per-circle pseudo-pod); durability across reloads is a later step that
  * swaps this Map for a vault-/log-backed implementation behind the same interface.
  */
-import { KEY_EVENT_KIND, readKeyChain, openAcrossKeyChain, makeOpener } from '@onderling/pod-client';
+import { KEY_EVENT_KIND, readKeyChain, openAcrossKeyChain, makeOpener, collapseKeyEvents } from '@onderling/pod-client';
 
 /** Group a key-event with no explicit groupId under one bucket, so a store used for a single unnamed circle still works. */
 const NO_GROUP = '\u0000nogroup';
@@ -40,26 +40,28 @@ export function createKeyEventStore() {
       return false;   // not a well-formed key-event — ignore (the handler treats false as "not recorded")
     }
     const key = keyFor(groupId ?? event.groupId ?? null);
-    let versions = byGroup.get(key);
-    if (!versions) { versions = new Map(); byGroup.set(key, versions); }
-    versions.set(event.version, event);   // de-dup by version — last wins
+    let held = byGroup.get(key);
+    if (!held) { held = []; byGroup.set(key, held); }
+    // De-duped by (version, KEY), not by version — `collapseKeyEvents` owns both rules, so the store and the
+    // fold cannot drift apart. They used to do the same "last read wins" collapse independently, which meant
+    // fixing one would have left the other doing it again on the next read.
+    held.push(event);
+    byGroup.set(key, collapseKeyEvents(held));
     return true;
   }
 
   function list(groupId) {
-    const versions = byGroup.get(keyFor(groupId));
-    return versions ? [...versions.values()] : [];
+    return [...(byGroup.get(keyFor(groupId)) ?? [])];
   }
 
   function all() {
     const out = [];
-    for (const versions of byGroup.values()) out.push(...versions.values());
+    for (const held of byGroup.values()) out.push(...held);
     return out;
   }
 
   function has(groupId, version) {
-    const versions = byGroup.get(keyFor(groupId));
-    return !!versions && versions.has(version);
+    return (byGroup.get(keyFor(groupId)) ?? []).some((e) => e.version === version);
   }
 
   /**

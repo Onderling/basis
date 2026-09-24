@@ -77,16 +77,25 @@ function versionEnvelopes(resource) {
 export function unwrapGroupKeyVersion(resource, privateKey, version) {
   if (!resource || typeof resource.sealed !== 'string') throw new Error('unwrapGroupKeyVersion: invalid key resource');
   if (version == null || version === resource.version) return open(resource.sealed, privateKey);
-  const entry = (Array.isArray(resource.history) ? resource.history : []).find((h) => h && h.version === version);
-  if (!entry || typeof entry.sealed !== 'string') throw new Error(`unwrapGroupKeyVersion: version ${version} is not retained`);
-  // The primary envelope first, then any `extra` supplementary envelope (a post-hoc historic grant).
-  try { return open(entry.sealed, privateKey); }
-  catch (e) {
-    for (const ex of (Array.isArray(entry.extra) ? entry.extra : [])) {
-      try { return open(ex, privateKey); } catch { /* not this extra either */ }
+  // EVERY row at that version, not the first. Since two admins can rotate to the same version at once
+  // (`keyEventsLog.js`), a version may be retained more than once — with different keys. `.find` took whichever
+  // row happened to be first and never tried the second, so content sealed under the other key read as "not a
+  // recipient". Same trial-before-throw shape as the `extra` envelopes below, one level out.
+  const entries = (Array.isArray(resource.history) ? resource.history : [])
+    .filter((h) => h && h.version === version && typeof h.sealed === 'string');
+  if (entries.length === 0) throw new Error(`unwrapGroupKeyVersion: version ${version} is not retained`);
+  let last = null;
+  for (const entry of entries) {
+    // The primary envelope first, then any `extra` supplementary envelope (a post-hoc historic grant).
+    try { return open(entry.sealed, privateKey); }
+    catch (e) {
+      last = e;
+      for (const ex of (Array.isArray(entry.extra) ? entry.extra : [])) {
+        try { return open(ex, privateKey); } catch { /* not this extra either */ }
+      }
     }
-    throw e;   // not a recipient of the primary OR any extra envelope of this version
   }
+  throw last;   // not a recipient of the primary OR any extra envelope of any row at this version
 }
 
 /** Every group-key version the caller CAN unwrap (current + retained history), as `{version, groupKey}`,

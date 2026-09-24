@@ -9,6 +9,7 @@
 
 import { circleTint } from '../../src/v2/theme.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { splitBySight, SIGHT } from '../../src/v2/circleSight.js';
 
 // β.3 — fixed display order for circle-kind section headers; anything not in
 // this list is bucketed under 'other' (last).  Mirrors the values produced by
@@ -44,6 +45,11 @@ export function renderCircleLauncher(container, {
   // toggle the label between Mute / Unmute.  Host derives this from the
   // memberOverride store (chatOff flag); absent = treat as unmuted.
   mutedMap = {},
+  // OPBERGEN (Frits 2026-09-24): the person's put-away marks ({circleId: {putAway, at}}) and this device's kring
+  // opt-out; both fold a circle out of the list (`circleSight.js`). `onPutAway(circleId, putAway)` toggles the mark.
+  sights = {},
+  kringOn = null,
+  onPutAway,
   loading = false,
   // A failed agent boot, said HERE — the surface a person is looking at. Without it a dead boot and an
   // empty account paint the same "No circles yet.", and people conclude their data is gone.
@@ -83,8 +89,11 @@ export function renderCircleLauncher(container, {
     container.appendChild(empty);
   }
 
+  // OPBERGEN — what is out of sight folds away below the list (shown · put away · not on this device, one fact).
+  const { shown: inSight, folded } = splitBySight(circles, { sights, kringOn: typeof kringOn === 'function' ? kringOn : () => true });
+
   // β.2 — sort by recent activity (preview.ts desc); stable name tiebreak.
-  const sorted = [...circles].sort((a, b) => {
+  const sorted = [...inSight].sort((a, b) => {
     const ta = previews?.[a.id]?.ts ?? 0;
     const tb = previews?.[b.id]?.ts ?? 0;
     if (tb !== ta) return tb - ta;
@@ -111,7 +120,7 @@ export function renderCircleLauncher(container, {
   const orderedKinds = [...KIND_ORDER, 'other'].filter((k) => groups.has(k));
   const showHeaders = orderedKinds.length > 1;
 
-  const tileHandlers = { onOpenCircle, onPin, onMute, onSettings, onLeave };
+  const tileHandlers = { onOpenCircle, onPin, onMute, onSettings, onLeave, onPutAway };
 
   if (showHeaders) {
     for (const kind of orderedKinds) {
@@ -126,7 +135,7 @@ export function renderCircleLauncher(container, {
       list.className = 'circle-launcher__list';
       for (const c of groups.get(kind)) {
         list.appendChild(renderTile(c, {
-          previews, proposals, pinnedMap, mutedMap, tr, handlers: tileHandlers,
+          previews, proposals, pinnedMap, mutedMap, sights, tr, handlers: tileHandlers,
         }));
       }
       section.appendChild(list);
@@ -137,10 +146,33 @@ export function renderCircleLauncher(container, {
     list.className = 'circle-launcher__list';
     for (const c of ordered) {
       list.appendChild(renderTile(c, {
-        previews, proposals, pinnedMap, mutedMap, tr, handlers: tileHandlers,
+        previews, proposals, pinnedMap, mutedMap, sights, tr, handlers: tileHandlers,
       }));
     }
     container.appendChild(list);
+  }
+
+  // The fold: put away (the person's mark) and not on this device (the kring opt-out), each tile saying which.
+  if (folded.length > 0) {
+    const fold = document.createElement('details');
+    fold.className = 'circle-launcher__fold';
+    const sum = document.createElement('summary');
+    sum.className = 'circle-launcher__fold-title';
+    sum.textContent = tr('circle.launcher.fold', { count: folded.length });
+    fold.appendChild(sum);
+    const list = document.createElement('div');
+    list.className = 'circle-launcher__list circle-launcher__list--folded';
+    for (const c of folded) {
+      const tile = renderTile(c, { previews, proposals, pinnedMap, mutedMap, sights, tr, handlers: tileHandlers });
+      tile.dataset.sight = c.sight;
+      const note = document.createElement('span');
+      note.className = 'circle-tile__sight';
+      note.textContent = tr(c.sight === SIGHT.notHere ? 'circle.launcher.not_here' : 'circle.launcher.put_away');
+      tile.appendChild(note);
+      list.appendChild(tile);
+    }
+    fold.appendChild(list);
+    container.appendChild(fold);
   }
 
   const newBtn = document.createElement('button');
@@ -166,7 +198,7 @@ export function renderCircleLauncher(container, {
 }
 
 /** Render one circle tile.  Extracted in β.3 so grouped + flat paths share it. */
-function renderTile(c, { previews, proposals, pinnedMap, mutedMap, tr, handlers }) {
+function renderTile(c, { previews, proposals, pinnedMap, mutedMap, sights = {}, tr, handlers }) {
   const tile = document.createElement('button');
   tile.type = 'button';
   tile.className = 'circle-tile';
@@ -244,12 +276,12 @@ function renderTile(c, { previews, proposals, pinnedMap, mutedMap, tr, handlers 
   // settings / leave).  Suppressed when no menu handlers are wired so
   // legacy callers (and tests not exercising this path) keep the
   // native browser menu.
-  const hasMenuHandlers = ['onPin', 'onMute', 'onSettings', 'onLeave']
+  const hasMenuHandlers = ['onPin', 'onMute', 'onSettings', 'onLeave', 'onPutAway']
     .some((k) => typeof handlers?.[k] === 'function');
   if (hasMenuHandlers) {
     tile.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openTileMenu(tile, c, { pinnedMap, mutedMap, tr, handlers });
+      openTileMenu(tile, c, { pinnedMap, mutedMap, sights, tr, handlers });
     });
   }
 
@@ -261,7 +293,7 @@ function renderTile(c, { previews, proposals, pinnedMap, mutedMap, tr, handlers 
  * previously-open menu first (only one menu open at a time, anywhere in
  * the launcher).  Outside-click and Escape close the menu.
  */
-function openTileMenu(tile, circle, { pinnedMap, mutedMap, tr, handlers }) {
+function openTileMenu(tile, circle, { pinnedMap, mutedMap, sights = {}, tr, handlers }) {
   // Remove any existing menu first (single-instance).
   for (const old of document.querySelectorAll('.circle-launcher__tile-menu')) {
     old.remove();
@@ -311,6 +343,13 @@ function openTileMenu(tile, circle, { pinnedMap, mutedMap, tr, handlers }) {
       label: tr('circle.tile.menu.settings'),
       handler: handlers.onSettings,
     },
+    // OPBERGEN: out of sight on every device (and it wakes nobody) — or back into the list. Not for a circle this
+    // device does not hold (that one is the kring opt-out, on My data).
+    ...((circle.sight === SIGHT.notHere || typeof handlers.onPutAway !== 'function') ? [] : [{
+      action: 'put-away',
+      label: tr(sights?.[circle.id]?.putAway === true ? 'circle.tile.menu.take_out' : 'circle.tile.menu.put_away'),
+      handler: (id) => handlers.onPutAway(id, sights?.[id]?.putAway !== true),
+    }]),
     {
       action: 'leave',
       label: tr('circle.tile.menu.leave'),

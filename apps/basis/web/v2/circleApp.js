@@ -3412,6 +3412,17 @@ function writeViewMode(id, mode) {
 // and `refreshLauncherMutes` (both fire-and-forget on launcher entry).
 let launcherPinnedMap = {};
 let launcherMutedMap  = {};
+// OPBERGEN (Frits 2026-09-24): the person's put-away marks, off the registry records (carried between devices)
+let launcherSights    = {};
+async function refreshLauncherSights() {
+  try { launcherSights = (await _peerAgent?.circleSights?.()) ?? {}; } catch { launcherSights = {}; }
+}
+/** Put a circle away, or take it out — the agent's one act (registry mark + the carry), then repaint. */
+async function onPutAwayCircle(circleId, putAway) {
+  try { await _peerAgent?.setCircleSight?.(circleId, putAway); } catch { /* the launcher keeps what it had */ }
+  await refreshLauncherSights();
+  paintLauncher();
+}
 
 async function refreshLauncherPins() {
   try { launcherPinnedMap = await pinStore.get(); }
@@ -3437,7 +3448,8 @@ async function refreshLauncherMutes() {
  */
 function launcherPinMuteSignature() {
   const keys = (m) => Object.keys(m ?? {}).filter((k) => m[k]).sort().join(',');
-  return `${keys(launcherPinnedMap)}|${keys(launcherMutedMap)}`;
+  const away = Object.keys(launcherSights ?? {}).filter((k) => launcherSights[k]?.putAway === true).sort().join(',');
+  return `${keys(launcherPinnedMap)}|${keys(launcherMutedMap)}|${away}`;
 }
 
 // β.5 — paint the launcher tiles (previews + pin/mute/proposal state). PURE render, no async
@@ -3470,6 +3482,10 @@ function paintLauncher() {
     onMute:       onMuteCircle,
     onSettings:   (id) => showSettings(id),
     onLeave:      onLeaveCircle,
+    // OPBERGEN — what is out of sight folds away; the kring opt-out is this device's value of the same fact
+    sights:       launcherSights,
+    kringOn:      (id) => makeSyncSelection({ getParamValue: (k) => _peerAgent?.getParamValue?.(k) }).kringOn(id),
+    onPutAway:    onPutAwayCircle,
   });
 }
 
@@ -3492,7 +3508,7 @@ function showLauncher() {
   // (mobile's is the reload blanking the list; same shape, different mechanism). Nothing is lost by
   // skipping: the state we just read is the state the first paint already drew.
   const before = launcherPinMuteSignature();
-  Promise.all([refreshLauncherPins(), refreshLauncherMutes()])
+  Promise.all([refreshLauncherPins(), refreshLauncherMutes(), refreshLauncherSights()])
     .then(() => {
       if (getActiveCircle() != null) return;
       if (launcherPinMuteSignature() === before) return;   // nothing changed → do not rebuild under a press

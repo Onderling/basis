@@ -604,7 +604,7 @@ export async function setProfileCircleMembership(store, args = {}) {
   try {
     await s.profiles.setCircleMembership({
       profileId: id, circleId,
-      handle: args?.handle, address: args?.address, proof: args?.proof, relays: args?.relays, key: args?.key,
+      handle: args?.handle, address: args?.address, proof: args?.proof, relays: args?.relays, key: args?.key, sight: args?.sight,
     });
     return { ok: true, id, circleId };
   } catch (err) {

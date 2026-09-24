@@ -1532,7 +1532,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Circle membership (registry restore-data) — carry a per-circle { handle, address, … } record on the
       // profile so a restored device knows its circles + the handle it used. Merge via the pure setter (keeps
       // the other circles' records), then re-register the FULL entry (preserves key/role/grants/disclosure).
-      setCircleMembership: async ({ profileId, circleId, handle, address, proof, relays, key }) => {
+      setCircleMembership: async ({ profileId, circleId, handle, address, proof, relays, key, sight }) => {
         const cur = await agentsRegistry.lookup(profileId);
         if (!cur) throw new Error(`setCircleMembership: no such profile ${profileId}`);
         const wasIn = !!circleMembershipsOf(cur)[circleId];
@@ -1540,6 +1540,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (proof != null) record.proof = proof;
         if (Array.isArray(relays)) record.relays = relays;
         if (key != null) record.key = key;
+        if (sight != null) record.sight = sight;   // the circle PUT AWAY (opbergen) — a field picked here, or it is dropped
         await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
         // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
         // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
@@ -2187,7 +2188,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       const address = circleAddressFor(id);
       if (!address) continue;
       const rec = memberships[id] ?? null;
-      out.push({ id, handle: rec?.handle ?? null, address, relays: Array.isArray(rec?.relays) && rec.relays.length ? [...rec.relays] : onRelays });
+      out.push({
+        id, handle: rec?.handle ?? null, address, relays: Array.isArray(rec?.relays) && rec.relays.length ? [...rec.relays] : onRelays,
+        // the circle PUT AWAY (opbergen): the person's mark rides the entry, so a sibling takes the newer one
+        ...(rec?.sight ? { sight: { putAway: rec.sight.putAway, at: rec.sight.at } } : {}),
+      });
     }
     return out;
   }
@@ -2223,6 +2228,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       ? circleFollowConsume(entry)
       : Promise.resolve({ circleId: entry.id, ok: false, steps: [], error: 'no-consume' })),   // a composition without the step joins nothing
     leave: leaveFollowed,
+    // PUT AWAY (opbergen): the mark lives on the circle's registry record (restore carries it); a sibling's newer lands
+    sightOf: async (circleId) => (await readSelfCircleMemberships().catch(() => ({})))?.[circleId]?.sight ?? null,
+    setSight: (circleId, sight) => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, sight }),
     onLanded: (r) => console.info(`[circle-follow] ${r.steps.includes('left') ? (r.ok ? 'left' : 'could not leave') : (r.ok ? 'joined' : 'could not join')} ${String(r.circleId).slice(0, 12)}… after a sibling (${r.steps.join(' ')})`),
   });
   circleFollowSync.setConsume = (fn) => { circleFollowConsume = typeof fn === 'function' ? fn : null; };
@@ -5768,7 +5776,23 @@ export async function createRealHouseholdAgent(opts = {}) {
     // shell can re-run it after a late registry import/restore without a full reload. Returns
     // `{ reopened: [circleId] }`. Idempotent + best-effort per circle.
     reopenMemberCircles,
-    registryCarrierStatus: () => registryCarrierStatus(),   // where the registry rides: local / cache, and the probe outcome
+    registryCarrierStatus: () => registryCarrierStatus(),
+    /**
+     * PUT A CIRCLE AWAY, or take it out (opbergen, Frits 2026-09-24): the person's mark on the circle's registry
+     * record, carried to their other devices. Out of sight on every device; wakes nobody (the rule the notification
+     * gate reads when there is one). A person-level fact — never a circle statement.
+     */
+    setCircleSight: async (circleId, putAway) => {
+      const sight = { putAway: putAway === true, at: Date.now() };
+      const r = await callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, sight });
+      if (r?.ok) circleFollowSync?.fanSight?.(circleId).catch?.(() => {});
+      return r?.ok ? { ok: true, sight } : { ok: false, reason: r?.reason ?? 'not-recorded' };
+    },
+    /** `{ [circleId]: { putAway, at } }` — the marks this device holds. */
+    circleSights: async () => {
+      const m = await readSelfCircleMemberships().catch(() => ({}));
+      return Object.fromEntries(Object.entries(m ?? {}).filter(([, r]) => r?.sight).map(([id, r]) => [id, { ...r.sight }]));
+    },   // where the registry rides: local / cache, and the probe outcome
 
     // Transport-NEUTRAL reachability — true when ANY peer transport can carry a
     // message (NKN `.peer` OR the WebSocket `.relay`; sendPeerMessage already

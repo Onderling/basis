@@ -47,7 +47,7 @@ const validEntry = (c) => c && typeof c === 'object' && typeof c.id === 'string'
  * @param {(circleId: string) => Promise<{ok: boolean}>} [a.leave]   the local leave, without a statement (the agent's)
  * @param {(r: {from: string, circleId: string, ok: boolean, steps: string[]}) => void} [a.onLanded]
  */
-export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, kringOn = () => true, consume, myLeft = null, leave = null, onLanded = null } = {}) {
+export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, kringOn = () => true, consume, myLeft = null, leave = null, onLanded = null, sightOf = null, setSight = null } = {}) {
   if (typeof siblings !== 'function') throw new Error('circleFollowSync: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('circleFollowSync: `sendToPeer` is required');
   if (typeof myEntries !== 'function' || typeof isIn !== 'function' || typeof consume !== 'function') throw new Error('circleFollowSync: `myEntries`, `isIn` and `consume` are required');
@@ -77,15 +77,28 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
     return summary;
   }
 
+  /**
+   * PUT AWAY (opbergen, Frits 2026-09-24): the entry carries the circle's SIGHT mark `{ putAway, at }` — a person-level
+   * fact, the newer change wins on every device. Only the mark moves; nothing about the circle's membership does.
+   */
+  async function landSight(circleId, sight) {
+    if (typeof setSight !== 'function' || !sight || typeof sight.putAway !== 'boolean' || !Number.isFinite(sight.at)) return;
+    let mine = null;
+    try { mine = typeof sightOf === 'function' ? await sightOf(circleId) : null; } catch { mine = null; }
+    if (Number.isFinite(mine?.at) && mine.at >= sight.at) return;   // older (or the same) news
+    try { await setSight(circleId, { putAway: sight.putAway, at: sight.at }); } catch { /* the next carry retries */ }
+  }
+
   async function land(fromAddr, circle) {
     if (leftHere.has(circle.id)) return null;                        // a sibling left it: a carry is not a re-join
     if (inFlight.has(circle.id)) return inFlight.get(circle.id);
     const p = (async () => {
       try {
-        if (await isIn(circle.id)) return null;
+        if (await isIn(circle.id)) { await landSight(circle.id, circle.sight); return null; }
         let on = true; try { on = kringOn(circle.id) !== false; } catch { on = true; }
         if (!on) return null;                                       // the person switched this kring off here
         const r = await consume(circle);
+        if (r?.ok === true) await landSight(circle.id, circle.sight);   // joined with the mark it arrived with
         const summary = { from: fromAddr, circleId: circle.id, ok: r?.ok === true, steps: Array.isArray(r?.steps) ? r.steps : [] };
         try { onLanded?.(summary); } catch { /* observability never throws */ }
         for (const fn of landedListeners) { try { fn(summary); } catch { /* observability never throws */ } }
@@ -113,6 +126,9 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
       await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, wire(circle), { guarantee: 'hold-forward' }); } catch { /* the sibling asks on connect */ } }));
       return { attempted };
     },
+
+    /** LIVE: the person put `circleId` away here, or took it out — the entry carries the new mark to every sibling. */
+    async fanSight(circleId) { return this.fanJoined(circleId); },
 
     /** LIVE: this device just left `circleId` — tell every sibling. */
     async fanLeft(circleId) {

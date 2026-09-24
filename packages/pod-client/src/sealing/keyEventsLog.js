@@ -89,8 +89,13 @@ export const MAX_KEYS_PER_VERSION = 3;
  */
 export function collapseKeyEvents(events) {
   const byKey = new Map();                       // `${version}:${keyId}` → the winning wrap
+  // An event minted BEFORE keyIds existed carries none. All such events at one version are treated as ONE key
+  // (`legacy`), collapsed by the re-wrap rule — because on every circle that exists today they ARE one key
+  // (v1, re-wrapped as the roster grew). Treating each old wrap as its own key would count them toward the cap
+  // and drop a legitimate new wrap on exactly the circles people already have.
+  const LEGACY = 'legacy';
   for (const e of events) {
-    const id = `${e.version}:${e.keyId ?? e.sealed}`;   // an event without a keyId is its own key, by its wrap
+    const id = `${e.version}:${e.keyId ?? LEGACY}`;
     const held = byKey.get(id);
     if (!held) { byKey.set(id, e); continue; }
     const mine = Array.isArray(e.recipients) ? e.recipients.length : (e.members ?? 0);
@@ -104,9 +109,11 @@ export function collapseKeyEvents(events) {
   }
   const out = [];
   for (const [, list] of perVersion) {
-    // Stable everywhere: by keyId, so the cap drops the same events on every device.
-    list.sort((x, y) => (String(x.keyId ?? x.sealed) < String(y.keyId ?? y.sealed) ? -1 : 1));
-    out.push(...list.slice(0, MAX_KEYS_PER_VERSION));
+    // Stable everywhere: by keyId, so the cap drops the same events on every device. The legacy row (no keyId)
+    // never counts toward the cap: it is the key every existing circle already holds, not a minted one.
+    const legacy = list.filter((e) => e.keyId == null);
+    const named = list.filter((e) => e.keyId != null).sort((x, y) => (String(x.keyId) < String(y.keyId) ? -1 : 1));
+    out.push(...legacy, ...named.slice(0, MAX_KEYS_PER_VERSION));
   }
   return out.sort((a, b) => a.version - b.version);
 }

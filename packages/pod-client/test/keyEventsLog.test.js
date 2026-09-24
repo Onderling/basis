@@ -167,6 +167,19 @@ describe('two admins rotate to the same version at once', () => {
     expect(shuffled.map((e) => e.keyId)).toEqual(kept.map((e) => e.keyId));
   });
 
+  it('events minted BEFORE keyIds existed are ONE legacy key per version — collapsed by the re-wrap rule, never counted toward the cap', () => {
+    // three old v1 wraps (the roster grew twice), then a v1 re-wrap minted with a keyId, then a v2 rotation
+    const old = (n) => ({ kind: 'group-key-event', groupId: 'g', version: 1, members: n, recipients: Array.from({ length: n }, (_, i) => `r${i}`), sealed: `old-${n}` });
+    const named = { kind: 'group-key-event', groupId: 'g', version: 1, keyId: 'aaaa', members: 4, recipients: ['r0', 'r1', 'r2', 'r3'], sealed: 'new-4' };
+    const v2 = { kind: 'group-key-event', groupId: 'g', version: 2, keyId: 'bbbb', members: 4, recipients: ['r0', 'r1', 'r2', 'r3'], sealed: 'v2' };
+    const kept = collapseKeyEvents([old(1), old(2), old(3), named, v2]);
+    const v1 = kept.filter((e) => e.version === 1);
+    expect(v1).toHaveLength(2);                                   // one legacy row + one named row, not four
+    expect(v1.find((e) => e.keyId == null).sealed).toBe('old-3'); // the legacy wrap that reaches MOST people
+    expect(v1.find((e) => e.keyId === 'aaaa')).toBeTruthy();      // the named wrap survives — nothing dropped by the cap
+    expect(kept.find((e) => e.version === 2)).toBeTruthy();
+  });
+
   it('keyId names the KEY, not the wrap — the same key wrapped twice has one id, two keys have two', () => {
     const a = generateKeypair(); const b = generateKeypair();
     const { event: e1, groupKey } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey] });

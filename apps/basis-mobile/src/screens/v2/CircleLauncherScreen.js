@@ -2236,6 +2236,8 @@ export default function CircleLauncherScreen({
             theme={theme}
             getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
             persistPolicy={(groupId, patch) => policyStore.update?.(groupId, patch)}
+            // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
+            shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
             onClose={() => setCreating(false)}
             onDispatched={(r) => {
               setCreating(false);

@@ -12,7 +12,7 @@
  *
  * Shares src/core/wizards/createGroupState.js with web.
  */
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 
 import {
@@ -25,6 +25,8 @@ import {
   CIRCLE_KINDS, setKind, setSize, setStoragePolicy, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
+  // The persona the circle is founded as (web parity).
+  loadPersonas, withPersonas, founderPersonaName,
 } from '../../core/wizards/createGroupState.js';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { attachConsequences } from '../../v2/optionConsequences.js';
@@ -50,9 +52,18 @@ export default function CreateGroupWizardModal({
   persistPolicy,
   // The host's theme (optional) — the sheet and its kit follow it; absent ⇒ the previous light values.
   theme,
+  // Optional: (circleId, personaId) => Promise — says the founding persona's release on the new circle (the
+  // shell's seam; web's `shareFounderRelease`). Absent ⇒ nothing is released, as before.
+  shareFounderRelease,
 }) {
   const styles = useMemo(() => sheetStyles(theme), [theme]);
   const [state, setState] = useState(() => initialState());
+  // Which persona founds the circle: the join wizard's list, read once. The default stays chosen meanwhile.
+  useEffect(() => {
+    let active = true;
+    loadPersonas({ callSkill }).then((personas) => { if (active) setState((s) => withPersonas(s, personas)); }).catch(() => {});
+    return () => { active = false; };
+  }, [callSkill]);
   const setStep = useCallback((n) => setState((s) => ({ ...s, step: n })), []);
   const updateName = useCallback((name) => {
     setState((s) => ({
@@ -66,7 +77,7 @@ export default function CreateGroupWizardModal({
   const onCreate = useCallback(async () => {
     let next = { ...state, submitting: true, submitError: null };
     setState(next);
-    const { result, state: after } = await finalSubmit({ state: next, callSkill });
+    const { result, state: after } = await finalSubmit({ state: next, callSkill, shareRelease: shareFounderRelease });
     setState({ ...after, successResult: result ?? null });
     // N1+E8 — persist the chosen policy (features incl. neighbourhood chat-off,
     // reveal/pod/llm/agents/consensus) so the new circle opens with the
@@ -115,7 +126,7 @@ export default function CreateGroupWizardModal({
       } catch {}
     }
     if (result) onClose?.();
-  }, [state, callSkill, onDispatched, onClose, persistPolicy]);
+  }, [state, callSkill, onDispatched, onClose, persistPolicy, shareFounderRelease]);
 
   const canAdvance1 = state.name.trim().length > 0 && isValidSlug(state.groupId);
 
@@ -178,6 +189,25 @@ export default function CreateGroupWizardModal({
                   placeholder="auto-derived from name"
                   monospace
                 />
+                {state.personas.length > 0 && (
+                  <>
+                    <RadioGroup
+                      label={t('circle.wizard.create.persona.label')}
+                      value={state.persona ?? ''}
+                      onChange={(id) => setState((s) => ({ ...s, persona: id || null }))}
+                      options={[
+                        { id: '', label: t('circle.wizard.create.persona.minimal') },
+                        ...state.personas.map((p) => ({
+                          id: p.id,
+                          label: p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name,
+                        })),
+                      ]}
+                    />
+                    <Text style={styles.podDisclosure} testID="create-founder-persona-hint">
+                      {t('circle.wizard.create.persona.hint')}
+                    </Text>
+                  </>
+                )}
                 <Field
                   label="Purpose (optional)"
                   value={state.purpose}
@@ -374,6 +404,8 @@ export default function CreateGroupWizardModal({
                   <ReviewList items={[
                     { label: 'Name',        value: state.name },
                     { label: 'Circle id',    value: state.groupId, monospace: true },
+                    { label: t('circle.wizard.create.review_persona'),
+                      value: founderPersonaName(state) ?? t('circle.wizard.create.review_persona_minimal') },
                     ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
                     ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
                     ...(rules.additionalAdmins ? [{ label: 'Extra admins', value: rules.additionalAdmins.join(', ') }] : []),

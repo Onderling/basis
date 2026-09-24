@@ -48,7 +48,7 @@ import { withCalendarOutbound } from '../../../basis/src/core/handlers/calendarO
 // OBJ-2 membership — shared joiner-side peer-redeem sender (correlated by the bundle's pending-map).
 import { makeSendGroupRedeemRequest } from '../../../basis/src/core/handlers/groupRedeem.js';
 // personas#2 — post-join "share to this circle" sender (member → admin roster-property push).
-import { createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
+import { createDisclosureShareMemo, shareDisclosureToCircle } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 import { sendA2ATask } from '@onderling/core';
 // The Nearby SURFACE — one control over every discovering transport, and one merged peer list. App code
 // must go through these rather than reaching into `bundle.mdns` (`CLAUDE.md`): reaching for a transport is
@@ -760,6 +760,13 @@ export async function bootAgentBundle(opts = {}) {
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => { try { return agent?.relays?.list?.()?.[0]?.url ?? _activeRelayUrl ?? null; } catch { return _activeRelayUrl ?? null; } },
+    // the lens (web parity): the founder says on the new pair circle what this contact's persona discloses. The
+    // memo is declared below; it is read at call time, long after this bundle has booted. No picture reseal here —
+    // the picture reaches the pair circle by the next Mij share, where the launcher composes the reseal.
+    shareRelease: (cid, personaId) => shareDisclosureToCircle({
+      callSkill: (app, op, args) => agent.callSkill(app, op, args), emitMemberProps: (a) => agent.emitMemberProps?.(a),
+      circleId: cid, personaId, lastShared: disclosureShareMemo, resealMediaForCircle: null,
+    }),
   });
   const contactChannel = createContactThreadChannel({
     blobStore: contactAttachmentBlobs,

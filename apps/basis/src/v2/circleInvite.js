@@ -18,7 +18,7 @@
 
 import { encodeMembershipCodeUrl } from '../core/wizards/createGroupState.js';
 import { isPodUrl } from './connectionPoints.js';
-import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkChoice } from '../core/wizards/joinGroupState.js';
+import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkChoice, setPersona } from '../core/wizards/joinGroupState.js';
 
 /**
  * Build a `onderling-invite://` URI for an EXISTING circle so the admin can show it as a QR.
@@ -166,6 +166,9 @@ export async function joinCircleFromInvite({
   inviteUri, callSkill, sendPeerRedeem, handle, shareAddress = true,
   linkChoice = 'fresh', circles = null, circleAddressFor = null, signCircleLink = null,
   dialEndpoint = null, activeEndpointUrl = null, onJoined = null,
+  // Join AS this persona: the release that lands on the roster is this persona's for this circle (the lens —
+  // `contactPersona.js`). `null` = join minimally, as the wizard's protective default.
+  persona = null,
   // task #80 (sitting-A decision): the PROGRAMMATIC path passes acceptance EXPLICITLY — no exemption.
   // `true` means the caller has shown/accepted the circle's rules and the join statement will carry the
   // current version; the default (false) sends nothing, and a rules-gated fold refuses the join on
@@ -186,6 +189,7 @@ export async function joinCircleFromInvite({
   state.profileHandle = profileHandle !== false;
   state.shareAddress = shareAddress !== false;
   state.rulesAccepted = rulesAccepted === true;   // task #80 — explicit, never inferred
+  setPersona(state, persona);
   // Wave B — the "continue as an existing self" choice (default fresh/unlinkable). Populate the
   // existing-selves list so setLinkChoice VALIDATES the chosen source circle before honouring it
   // (an unknown/absent choice ⇒ fresh). The signing proof is generated inside finalSubmit from the

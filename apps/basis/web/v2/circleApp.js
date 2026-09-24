@@ -2254,6 +2254,11 @@ function buildCircleBot(agent) {
     myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => connectedRelayUrls()?.[0] ?? null,
     activeEndpointUrl: () => connectedRelayUrls(),
+    // the lens: the founder says on the new pair circle what this contact's persona discloses (same road as Mij's share)
+    shareRelease: (cid, personaId) => shareDisclosureToCircle({
+      callSkill: rawCallSkill, emitMemberProps: (a) => _peerAgent?.emitMemberProps?.(a),
+      circleId: cid, personaId, lastShared: disclosureShareMemo, resealMediaForCircle: resealPersonaMediaForCircle,
+    }),
   });
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,

@@ -43,6 +43,7 @@ export const SEAMS = Object.freeze([
   { id: 'contact-channel-my-card',   pattern: /myCard:/,                          why: 'the first message to a contact carries my card — name, handle, where to write back, the person key' },
   { id: 'contact-channel-on-card',   pattern: /onCard:/,                          why: 'a card that arrives with a message (naming its sender) goes into the book; the book carry names them on every device' },
   { id: 'pair-roster',           pattern: /createPairRoster\(/,                 why: 'the hidden two-member circle every written-to contact gets; DMs ride it (L105)' },
+  { id: 'pair-roster-lens',      pattern: /shareRelease:/,                      why: 'the founder says on a new pair circle what THIS contact\'s persona discloses — which persona a contact sees you as (the lens, persona step 3)' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
   { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
   { id: 'known-peers-catchup',   pattern: /knownPeersSync/,                      why: 'who the person knows, on every device: bindings and the contact book' },

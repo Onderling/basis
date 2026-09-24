@@ -8,7 +8,7 @@
  * platform glue (React state); the channel contract is shared web≡mobile.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
@@ -18,6 +18,9 @@ import { subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import FaceView from './FaceView.js';
 // L125 — "what does this contact see of you?", beside Verbergen (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
+// L114 — delete as a relationship act (hide + leave the pair circle), and the words above a returning turn (web parity)
+import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/contactDelete.js';
+import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
 export default function ContactThreadScreen({ bundle, contact, onBack, onRead }) {
@@ -119,6 +122,25 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead })
     const r = await lens.openLens(contactId, contact?.name).catch(() => ({ saved: false }));
     if (r && !r.saved) setError(true);
   }, [lens, contactId, contact]);
+  // DELETE (L114): asked first — the confirm is the undo — then hide + leave the pair circle.
+  const confirmDelete = useCallback(() => {
+    const who = contact?.name ?? contactId;
+    Alert.alert(t('circle.contacts.delete_title', { name: who }), t('circle.contacts.delete_body', { name: who }), [
+      { text: t('circle.contacts.lens.cancel'), style: 'cancel' },
+      { text: t('circle.contacts.delete_confirm'), style: 'destructive', onPress: async () => {
+        const agent = bundle?.agent;
+        const pairCircleId = bundle?.pairRoster?.pairCircleIdFor?.(contactId) ?? null;
+        const r = await deleteContact({
+          agent, callSkill: bundle?.callSkill, contactWebid: contactId, pairCircleId,
+          unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({
+            relays: agent?.relays?.list?.() ?? [], circleIds: [pairCircleId],
+            circleAddressFor: (cid) => agent?.circleAddressFor?.(cid) ?? null,
+          }) : null,
+        }).catch(() => ({ ok: false }));
+        if (r.ok) onBack?.(); else setError(true);
+      } },
+    ]);
+  }, [bundle, contact, contactId, onBack]);
   const scrollRef = useRef(null);
 
   // Route inbound replies for THIS thread (by threadId echo, else sender addr).
@@ -216,6 +238,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead })
             <Text style={styles.hideText}>{t('circle.contacts.lens.open')}</Text>
           </Pressable>
         ) : null}
+        {hidden !== null ? (
+          <Pressable onPress={confirmDelete} accessibilityRole="button" testID="contact-thread-delete" style={styles.hide}>
+            <Text style={styles.hideText}>{t('circle.contacts.delete')}</Text>
+          </Pressable>
+        ) : null}
       </View>
       {lens.sheet}
       {hidden !== null ? (
@@ -235,8 +262,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead })
           <React.Fragment key={m.id}>
           {/* The turn that brought a hidden contact back carries the mark: a SYSTEM line above its bubble —
               "Je had dit contact verborgen." — neither side's bubble. web≡mobile with contactThread.js. */}
-          {m.returned === true ? (
-            <Text style={styles.system} testID={`contact-returned-${m.id}`}>{t('circle.contacts.returned_marker')}</Text>
+          {returnedMarkerKey(m, contact?.deletedAt ?? null) ? (
+            <Text style={styles.system} testID={`contact-returned-${m.id}`}>{t(returnedMarkerKey(m, contact?.deletedAt ?? null))}</Text>
           ) : null}
           <View style={[styles.msg, m.origin === 'user' ? styles.msgUser : styles.msgBot]}>
             <View style={[styles.bubble, m.origin === 'user' ? styles.bubbleUser : styles.bubbleBot]}>

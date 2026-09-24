@@ -49,6 +49,7 @@ import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/e
 import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
+import { deleteContact } from '../../src/v2/contactDelete.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -3057,6 +3058,30 @@ async function openContactLens(contactId, name) {
   });
 }
 
+/** Delete a contact (L114, Frits 2026-09-24): the confirm sheet, then hide + leave the pair circle (`contactDelete.js`). */
+async function deleteContactWithConfirm(contactId, name) {
+  const who = name || contactId;
+  const ok = await openCircleConfirmDialog({
+    severity: 'danger',
+    title: t('circle.contacts.delete_title', { name: who }),
+    message: t('circle.contacts.delete_body', { name: who }),
+    acceptLabel: t('circle.contacts.delete_confirm'),
+    cancelLabel: t('circle.contacts.lens.cancel'),
+    opId: 'deleteContact',
+  });
+  if (!ok) return;
+  const pairCircleId = circlePairRoster?.pairCircleIdFor?.(contactId) ?? null;
+  const r = await deleteContact({
+    agent: _peerAgent, callSkill: rawCallSkill, contactWebid: contactId, pairCircleId,
+    unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({
+      relays: _peerAgent?.relays?.list?.() ?? [], circleIds: [pairCircleId],
+      circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
+    }) : null,
+  });
+  globalThis.alert?.(r.ok ? t('circle.contacts.deleted', { name: who }) : t('circle.contacts.lens.failed'));
+  if (r.ok) showContacts();
+}
+
 // add a bot to the app PeerGraph (an https agent-card URL → discoverA2A;
 // else a raw peer address → manual upsert), then re-render the roster.  Reuses
 // the shared `addBotToGraph` (web≡mobile).  Best-effort: a bad URL/address shows
@@ -3193,6 +3218,9 @@ async function showContactThread(contactId) {
       try { await setContactHidden(contactId, next); } catch { error = true; rerender(); }
     },
     onOpenLens: () => { openContactLens(contactId, thread.name).catch(() => {}); },
+    deletedAt: row?.deletedAt ?? null,
+    // DELETE (L114): hide + leave the pair circle, asked first — the confirm is the undo
+    onDelete: hidden === null ? null : () => { deleteContactWithConfirm(contactId, thread.name).catch(() => {}); },
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
     onButtonTap: async (b) => {

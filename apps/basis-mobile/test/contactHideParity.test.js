@@ -40,8 +40,9 @@ describe('hide a contact — parity', () => {
     for (const src of [webThread, mobileThread]) {
       expect(src).toMatch(/circle\.contacts\.hide/);
       expect(src).toMatch(/circle\.contacts\.unhide/);
-      expect(src).toMatch(/m\.returned === true/);
-      expect(src).toMatch(/circle\.contacts\.returned_marker/);
+      // the words come from ONE shared choice (2026-09-24, L114): "verborgen", or "verwijderd" after a deletion —
+      // decided from the turn's own mark and the row's deletion time, never by a shell of its own
+      expect(src).toMatch(/returnedMarkerKey\(/);
     }
     // …and no shell composes marker text of its own: the mark rides the turn, the renderer names the key.
     for (const src of [webHost, mobileBundle, box]) expect(src).not.toMatch(/circle\.contacts\.returned_marker/);

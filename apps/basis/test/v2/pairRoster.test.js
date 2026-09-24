@@ -261,7 +261,7 @@ describe('the lens — the pair circle carries the persona the contact row names
   it('…read from the reply the WAIST really gives: full `contacts` beside the trimmed chat `items` (2026-09-24)', async () => {
     // `adaptStoopReply` answers `listContacts` with BOTH: `contacts` (the book's rows, whole) and `items` (the chat
     // projection — id, label, handle, trust, peerAddr, personKey, pairCircleId, and NOT `persona`). Reading `items`
-    // first found no persona on any row, so every pair circle founded with no release: the lens from #188 never took
+    // first found no persona on any row, so every pair circle founded with no release: the contact lens never took
     // effect in a running app. The test above faked a reply the waist never gives.
     const { callSkill } = fakeSkills({ self: ANNA });
     const base = callSkill.getMockImplementation();

@@ -2158,7 +2158,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       add: (contact) => rawStoop('addContact', contact),
       get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
       // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
-      setHidden: (webid, hidden, hiddenAt) => rawStoop('setContactHidden', { webid, hidden, hiddenAt }),
+      setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawStoop('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
       // …and a newer change of what the contact sees of the person (L125), by the same rule
       setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawStoop('setContactPersona', {
         webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,

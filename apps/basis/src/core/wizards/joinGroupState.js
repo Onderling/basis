@@ -331,7 +331,13 @@ export function setConsentDecline(state, key, declined) {
 export async function loadPersonas({ callSkill } = {}) {
   try {
     const reply = await callSkill('agents', 'listAgents', {});
-    const rows = Array.isArray(reply?.agents) ? reply.agents : [];
+    // BOTH shapes. The registry core answers `{agents:[…]}`, but the one route the shells reach `agents` ops
+    // through adapts it to the chat renderer's `{items:[{id,label}]}` — a presentation adapter in the routing
+    // path, so a programmatic caller gets the presentation shape too. Reading only `agents` meant this list
+    // was ALWAYS empty on web and mobile, and a picker that renders only when it is non-empty was invisible
+    // from the day it was written. Its own tests never caught it: they hand it personas directly.
+    const rows = Array.isArray(reply?.agents) ? reply.agents
+      : (Array.isArray(reply?.items) ? reply.items : []);
     return rows
       .filter((a) => a && a.role === 'profile')
       .map((a) => ({ id: a.agentId, name: a.name || a.agentId }));
@@ -349,6 +355,41 @@ export async function loadPersonas({ callSkill } = {}) {
 export function setPersona(state, personaId) {
   state.persona = (typeof personaId === 'string' && personaId.length) ? personaId : null;
   return state;
+}
+
+/**
+ * Bring the chosen persona's own handle into the join field.
+ *
+ * A persona is a profile and a profile has properties, so `handle` is one of them (`setProfileProperty` takes
+ * any key; `getPersonaView` reads it back with the own-or-inherit graph). The persona you join AS then brings
+ * the name you use when you are that persona, instead of you typing it again in every circle.
+ *
+ * PREFILL, NEVER OVERRIDE — the whole contract, and what makes this safe to run on every change of the
+ * picker: it fills an EMPTY field and never touches one a person has put their hands on. Going back to the
+ * picker must not undo their own words.
+ *
+ * Uniqueness is untouched. It stays per circle, at the fold, and a prefilled handle that collides gets the
+ * same `handle-taken` prompt a typed one would — so this changes what the field STARTS as, and nothing about
+ * what the circle will accept.
+ *
+ * A stored value that is not a valid handle is ignored rather than prefilled: a property can hold anything,
+ * and putting something the field will refuse into the field hands the person an error they did not cause.
+ *
+ * @returns {Promise<{applied: boolean, handle?: string}>}
+ */
+export async function applyPersonaHandle({ state, callSkill } = {}) {
+  if (!state || typeof callSkill !== 'function') return { applied: false };
+  const personaId = state.persona;
+  if (typeof personaId !== 'string' || !personaId) return { applied: false };   // joining minimally
+  if (typeof state.handle === 'string' && state.handle.trim() !== '') return { applied: false };   // theirs
+  let view = null;
+  try { view = await callSkill('agents', 'getPersonaView', { id: personaId }); }
+  catch { return { applied: false }; }                                          // offline — the field stands
+  const stored = view?.properties?.handle;
+  const handle = typeof stored === 'string' ? stored.trim().toLowerCase() : '';
+  if (!isValidHandle(handle)) return { applied: false };
+  state.handle = handle;
+  return { applied: true, handle };
 }
 
 /* ─── Reveal-state default at join (C7 · NOTE-reveal-state-and-profile-updates §1.6) ─ */
@@ -776,6 +817,14 @@ export async function finalSubmit({
       try {
         const address = circleAddressFor(result.groupId);
         if (address) {
+          // `'default'` is CORRECT here, not an oversight — and it looks like one, so: today exactly one
+          // identity runs. Every `deriveAgentSeed(` in the agent says `'default'`, and `circleAddressFor`
+          // derives from that seed, so the address just computed IS the default profile's however
+          // `state.persona` was set. The persona chose which RELEASE rides (`getPersonaRelease` above); it
+          // did not choose whose key joined. Recording the membership under the persona would file this
+          // circle under a profile that owns no address in it — a record contradicting the wire.
+          // When a persona becomes its own person on the wire (ledger L123) this line becomes
+          // `id: state.persona ?? 'default'`, and not before.
           await callSkill('agents', 'setProfileCircleMembership', {
             id: 'default', circleId: result.groupId, handle: state.handle, address,
           });

@@ -49,7 +49,10 @@ export async function loadMijModel({ callSkill, personaId, circles = [], activeC
   let rows = [];
   try {
     const listed = await callSkill('agents', 'listAgents', {});
-    rows = (listed?.agents ?? []).filter((a) => a?.role === 'profile');
+    // Both shapes — see `loadPersonas`. This reader was broken the same way and it did not SHOW, because the
+    // fallback below synthesises a `default` row when the list comes back empty: Mij looked right while the
+    // join step silently offered nothing. A fallback that hides a broken read is worse than no fallback.
+    rows = (listed?.agents ?? listed?.items ?? []).filter((a) => a?.role === 'profile');
   } catch { rows = []; }
   if (!rows.some((r) => r.agentId === 'default')) rows.unshift({ agentId: 'default', name: 'default' });
   if (personaId && !rows.some((r) => r.agentId === personaId)) rows.push({ agentId: personaId, name: personaId });

@@ -4687,6 +4687,11 @@ export function buildSkills({
         ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
         // The card's relays become the contact's POINTS — where a message to them goes first.
         ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
+        // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
+        // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
+        // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable
+        // from one that was. Only the explicit backfill may write `default`, and only where it can prove it.
+        ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
         trustLevel,
       });
       metrics?.record?.('contact-added-from-qr');
@@ -4695,7 +4700,7 @@ export function buildSkills({
       const pk = card.personKey ? await adoptContactPersonKey(card.webid, card.personKey, card.personKeyLinks) : null;
       return { contact: m, ...(pk ? { personKey: pk } : {}) };
     }, {
-      description: 'Add a contact from a onderling-contact:// QR/URL payload.',
+      description: 'Add a contact from a onderling-contact:// QR/URL payload. `persona` records which of your personas they were added through — what they see of you.',
       visibility:  'authenticated',
     }),
 

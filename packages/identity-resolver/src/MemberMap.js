@@ -228,6 +228,13 @@ export class MemberMap extends Emitter {
       displayName: m.displayName ?? null,
       // avatarUrl: optional avatar image URL (any URI).
       avatarUrl:   m.avatarUrl ?? null,
+      // persona: WHICH OF YOUR PERSONAS this contact was made through — the profile whose release their pair
+      // roster carries, i.e. what they see of you. NOT a second identity: one key, one address, one pair
+      // circle (ledger L123 is the other thing, and it is not built). `null` means "not recorded" — a row
+      // that predates the field — and only the explicit, checkable backfill may turn that into `default`.
+      // Nothing may read a missing value AS the default: that fallback is how the persona picker stayed
+      // broken for weeks.
+      persona:     m.persona ?? null,
       // stableId: SDK-level "this person" key (Stoop V1 Phase 11).
       // Survives handle changes + network-pubkey rotations.  Apps
       // key mute / ban / report on this.  Optional.

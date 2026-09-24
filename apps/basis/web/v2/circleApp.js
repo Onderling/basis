@@ -46,6 +46,7 @@ import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
+import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -2854,7 +2855,10 @@ async function contactReturned(contactId) {
 // A card that arrived with a message, already checked to name its sender: into the book through the one decoder
 // (a re-add merges over an existing row and leaves a hidden mark alone), then the row on screen gets its name.
 async function contactCardArrived({ contactId, card }) {
-  try { await rawCallSkill('stoop', 'addContactFromQr', { payload: card }); } catch { return; }
+  // The persona is recorded EXPLICITLY even here, where nobody was asked: a card arriving with a message has
+  // no moment to choose in. Writing `default` says "they see your default self", which is true and checkable;
+  // leaving it absent would mean "not recorded" and push the question onto every later reader.
+  try { await rawCallSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); } catch { return; }
   const thread = contactThreads.get(contactId);
   if (thread) {
     try { const row = (await loadAllContacts()).find((c) => c.contactId === contactId); if (row?.name && row.name !== contactId) thread.name = row.name; } catch { /* the next open names it */ }
@@ -3020,7 +3024,7 @@ async function addBotFromInput(input) {
       input, peerGraph: circlePeerGraph, coreAgent: circleCoreAgent, discover: discoverA2A,
       // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one decoder);
       // the unified roster merges the ContactBook, so the person appears DM-ready right away.
-      addContact: (payload) => rawCallSkill('stoop', 'addContactFromQr', { payload }),
+      addContact: (payload) => rawCallSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA }),
     });
     globalThis.alert?.(t('circle.contacts.added', { name: rec?.name ?? rec?.displayName ?? rec?.handle ?? rec?.url ?? rec?.pubKey ?? '' }));
   } catch (err) {
@@ -8624,7 +8628,7 @@ async function boot() {
             const fromLink = contactCardFromLink(window.location.hash);
             if (!fromLink.ok) return;
             try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
-            rawCallSkill('stoop', 'addContactFromQr', { payload: fromLink.payload })
+            rawCallSkill('stoop', 'addContactFromQr', { payload: fromLink.payload, persona: DEFAULT_PERSONA })
               .then((r) => {
                 const c = r?.contact;
                 if (!c || r?.error) { globalThis.alert?.(t('circle.contacts.add_failed')); return; }

@@ -143,6 +143,7 @@ async function loadCreateRealHouseholdAgent() {
 // to false when MdnsModule isn't compiled in (e.g. iOS, Expo Go) — so
 // failure is silent and the "Nearby" UI row simply doesn't render.
 import { DISCOVERABILITY } from '@onderling/core';
+import { DEFAULT_PERSONA } from '../../../basis/src/v2/contactPersona.js';
 
 async function loadMdnsTransport() {   // (batch 7) unused — kept one release for the stoop-mobile mirror; builder owns construction now
   try {
@@ -780,7 +781,9 @@ export async function bootAgentBundle(opts = {}) {
     // the first message to a contact carries MY card; a card that arrives (naming its sender) goes into the book, so
     // whoever writes to me is a named row on every device (web parity, 2026-09-21)
     myCard: async () => { try { return (await agent.callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
-    onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card }); },
+    // web parity (circleApp's contactCardArrived): a card riding a message has no moment to choose in, so
+    // the default is recorded EXPLICITLY rather than left absent — "not recorded" is a different fact.
+    onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); },
     // the route (a contact with a pair roster) rides as send options (web parity)
     sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'

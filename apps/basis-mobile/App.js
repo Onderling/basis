@@ -27,6 +27,7 @@ import { ThemeProvider } from './src/screens/v2/themeContext.js';
 import ChatScreen from './src/screens/ChatScreen.js';
 import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
 import RestoreFlowModal from './src/screens/v2/RestoreFlowModal.js';
+import { pendingEnrollOffer, restoreFinishApplies } from '../basis/src/v2/enrollOffer.js';
 import RestoreFinishModal from './src/screens/v2/RestoreFinishModal.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
@@ -632,7 +633,15 @@ export default function App() {
         // web ≡ mobile: same attach as circleApp.js — the roster feed fills the membrane's index.
         if (b?.agent) b.agent._circleGroupsIndex = circleGroupsIndexRef.current;
         setBundle(b);
-        if (b?.agent?.restorePending?.()) setRestoreFinishPending(true);   // ask once, after the reload the ceremony asked for
+        // Ask once, after the reload the ceremony asked for — but only after a RESTORE (web parity): an add-a-device
+        // from an offer is not one (the offer brings the circles; "your circles are not here" would be wrong). The
+        // stash is read here, before ChatScreen consumes it; the note is dropped without the flow for an add.
+        if (b?.agent?.restorePending?.()) {
+          pendingEnrollOffer(AsyncStorage).catch(() => null).then((offer) => {
+            if (restoreFinishApplies({ restorePending: true, offerPending: !!offer })) setRestoreFinishPending(true);
+            else b.agent.dismissRestorePending?.().catch?.(() => {});
+          });
+        }
         maybeAttachStoopPod();   // S4 — bundle up → attach stoop's item store if already signed in
         // Mark the first-boot seed as done so the next launch skips it.
         // Fire-and-forget; failures are non-fatal (next launch re-seeds,

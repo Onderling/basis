@@ -56,6 +56,9 @@ export const SEAMS = Object.freeze([
   // Opbergen (Frits 2026-09-24): a circle out of sight is one fact on every painting shell — the launcher folds it and its
   // menu sets it through the agent's one act. The box paints no launcher; the carry itself is in the shared agent.
   { id: 'circle-sight', pattern: /setCircleSight/, shells: ['web', 'mobile'], why: 'a circle put away on one device is out of sight on every device — a shell without the fold would show it anyway' },
+  // The restore-finish flow opens after a RESTORE, never after an add-a-device from an offer (2026-09-24): both
+  // painting shells ask the one rule, and paint the one outcome. The box has no screen to paint it on.
+  { id: 'restore-finish-applies', pattern: /restoreFinishApplies\(/, shells: ['web', 'mobile'], why: 'an enrol from an offer is not a restore — "your circles are not here" would tell a person adding a device that their circles are gone' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
   { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
   { id: 'known-peers-catchup',   pattern: /knownPeersSync/,                      why: 'who the person knows, on every device: bindings and the contact book' },

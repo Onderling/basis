@@ -15,6 +15,7 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { restoreFinishOutcome } from '../../../../basis/src/v2/restoreFinishView.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'restore-finish');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
@@ -57,9 +58,6 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
     } catch { setFileText(null); setFileName(null); }
   };
   const status = inst?.steps?.status?.out ?? {};
-  const produces = inst?.produces ?? {};
-  const retireOutcome = inst?.steps?.retire?.outcome;
-  const sourceOutcome = inst?.steps?.source?.outcome;
   const Btn = ({ label, onPress, primary, testID }) => (
     <Pressable style={[styles.button, primary && styles.primary]} onPress={onPress} testID={testID}>
       <Text style={styles.buttonText}>{label}</Text>
@@ -108,21 +106,12 @@ export default function RestoreFinishModal({ visible, callSkill, onClose }) {
       </View>
     );
   } else if (view) {
-    let msg;
-    if (sourceOutcome === 'later') msg = t('circle.restore_finish.later_title');
-    else if (sourceOutcome === 'not-your-file') msg = t('circle.restore_finish.err_not_yours');
-    else if (sourceOutcome === 'unreadable-file') msg = t('circle.restore_finish.err_unreadable');
-    else if (produces.intent === 'adding') msg = t('circle.restore_finish.done_adding');
-    else if (retireOutcome === 'ok') msg = produces.intent === 'lost' ? t('circle.restore_finish.done_loud') : t('circle.restore_finish.done_quiet');
-    else if (retireOutcome === 'wrong-phrase' || retireOutcome === 'invalid-phrase') msg = t('circle.enroll.invalid_phrase');
-    else msg = t('circle.restore_finish.err_failed');
-    const retired = inst?.steps?.retire?.out?.retiredDevices;
-    const retry = retireOutcome && retireOutcome !== 'ok';
+    // the one shared decision of which sentence ends which branch (web parity by construction)
+    const { messageKey, retry, retiredCount } = restoreFinishOutcome(inst);
     body = (
       <View>
-        <Text style={styles.body}>{msg}</Text>
-        {retireOutcome === 'ok' && produces.intent === 'lost' && Array.isArray(retired) && retired.length
-          ? <Text style={styles.muted}>{t('circle.restore_finish.done_devices')} {retired.length}</Text> : null}
+        <Text style={styles.body}>{t(messageKey)}</Text>
+        {retiredCount > 0 ? <Text style={styles.muted}>{t('circle.restore_finish.done_devices')} {retiredCount}</Text> : null}
         <View style={styles.row}>
           <Btn label={retry ? t('circle.enroll.retry') : t('common.close', { defaultValue: 'Sluiten' })} primary testID="restore-finish-close"
             onPress={() => {

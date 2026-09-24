@@ -54,8 +54,16 @@ export async function run({ relayUrl }) {
     check('THE ADMIN LEARNS THE PERSON LEFT — the half the mirror harness cannot show',
       await untilTrue(async () => !hasMember(await rosterOf(anne, CIRCLE), bram.pubKey)));
 
-    check('and so does the bystander — one circle, one roster',
-      await untilTrue(async () => !hasMember(await rosterOf(cato, CIRCLE), bram.pubKey)));
+    // A PROBE THAT NAMES ITS BRANCH (L128): red on CI about one run in five since 2026-09-24, never locally (15/15,
+    // 60–85 ms) — when it fails it never converges, so it is not slowness. On a red, say what each side's roster
+    // holds, so the next failure points at delivery (the leave never reached the bystander) or the fold (it did,
+    // and something re-admitted the leaver) instead of being re-run.
+    const bystanderDropped = await untilTrue(async () => !hasMember(await rosterOf(cato, CIRCLE), bram.pubKey));
+    if (!bystanderDropped) {
+      const rows = async (who) => (await rosterOf(who, CIRCLE)).map((m) => `${m.webid === anne.pubKey ? 'anne' : m.webid === bram.pubKey ? 'bram' : m.webid === cato.pubKey ? 'cato' : String(m.webid).slice(0, 6)}:${m.role ?? '?'}`).join(',');
+      console.log(`[L128] bystander still holds the leaver — cato's roster: ${await rows(cato)} | anne's: ${await rows(anne)} | bram's own: ${await rows(bram)}`);
+    }
+    check('and so does the bystander — one circle, one roster', bystanderDropped);
 
     check('the bystander is untouched by someone else\'s departure',
       hasMember(await rosterOf(anne, CIRCLE), cato.pubKey));

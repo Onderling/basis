@@ -50,6 +50,7 @@ import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
 import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens } from '../../src/v2/contactLens.js';
 import { renderContactLensPanel } from './contactLensPanel.js';
 import { deleteContact } from '../../src/v2/contactDelete.js';
+import { restoreFinishOutcome } from '../../src/v2/restoreFinishView.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -5366,23 +5367,10 @@ function showRestoreFinishFlow() {
       }
     }
 
-    // terminal: say what happened, by the branch that was walked
-    const produces = inst?.produces ?? {};
-    const retireOutcome = inst?.steps?.retire?.outcome;
-    const sourceOutcome = inst?.steps?.source?.outcome;
-    let msg;
-    if (sourceOutcome === 'later') msg = t('circle.restore_finish.later_title');
-    else if (sourceOutcome === 'not-your-file') msg = t('circle.restore_finish.err_not_yours');
-    else if (sourceOutcome === 'unreadable-file') msg = t('circle.restore_finish.err_unreadable');
-    else if (produces.intent === 'adding') msg = t('circle.restore_finish.done_adding');
-    else if (retireOutcome === 'ok') msg = produces.intent === 'lost' ? t('circle.restore_finish.done_loud') : t('circle.restore_finish.done_quiet');
-    else if (retireOutcome === 'wrong-phrase' || retireOutcome === 'invalid-phrase') msg = t('circle.enroll.invalid_phrase');
-    else msg = t('circle.restore_finish.err_failed');
-    card.appendChild(para(msg));
-    if (retireOutcome === 'ok' && produces.intent === 'lost' && Array.isArray(inst?.steps?.retire?.out?.retiredDevices) && inst.steps.retire.out.retiredDevices.length) {
-      card.appendChild(para(`${t('circle.restore_finish.done_devices')} ${inst.steps.retire.out.retiredDevices.length}`, 'muted'));
-    }
-    const retry = retireOutcome && retireOutcome !== 'ok';
+    // terminal: say what happened, by the branch that was walked (the one shared decision — `restoreFinishView.js`)
+    const { messageKey, retry, retiredCount } = restoreFinishOutcome(inst);
+    card.appendChild(para(t(messageKey)));
+    if (retiredCount > 0) card.appendChild(para(`${t('circle.restore_finish.done_devices')} ${retiredCount}`, 'muted'));
     card.appendChild(button(retry ? t('circle.enroll.retry') : t('common.close', { defaultValue: 'Sluiten' }), () => {
       if (!retry) return finish();
       close(); showRestoreFinishFlow();

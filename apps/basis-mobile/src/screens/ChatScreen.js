@@ -824,9 +824,12 @@ export default function ChatScreen({
           // A circle another device of the person founded or joined: the same per-circle step, run when the
           // sibling's carry lands — and asked for on connect, for what happened while the app was closed (web parity).
           bundle.agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+          // a circle carried in from a sibling (joined, left, or its put-away mark): the launcher's list is stale (web parity)
+          bundle.agent.circleFollowSync?.onLanded?.(() => { onCirclesChanged?.(); });
           setTimeout(() => { bundle.agent.circleFollowSync?.requestFromSiblings().catch(() => {}); }, 2700);
           bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
             if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+            if (r?.consumed) onCirclesChanged?.();   // the offer's circles belong on the launcher now (web parity)
             return r;
           }).catch(() => { /* retried next launch — the stash only clears on full success */ });
           setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);

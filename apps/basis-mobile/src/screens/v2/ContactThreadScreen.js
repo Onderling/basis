@@ -16,6 +16,8 @@ import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import FaceView from './FaceView.js';
+// L125 — "what does this contact see of you?", beside Verbergen (web parity)
+import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
 export default function ContactThreadScreen({ bundle, contact, onBack, onRead }) {
@@ -110,6 +112,13 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead })
       setHidden(next);
     } catch { setError(true); }
   }, [hidden, bundle, contactId]);
+  const lens = useContactLensSheet({
+    callSkill: bundle?.callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, t, theme,
+  });
+  const openLens = useCallback(async () => {
+    const r = await lens.openLens(contactId, contact?.name).catch(() => ({ saved: false }));
+    if (r && !r.saved) setError(true);
+  }, [lens, contactId, contact]);
   const scrollRef = useRef(null);
 
   // Route inbound replies for THIS thread (by threadId echo, else sender addr).
@@ -202,7 +211,13 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead })
             <Text style={styles.hideText}>{t(hidden ? 'circle.contacts.unhide' : 'circle.contacts.hide')}</Text>
           </Pressable>
         ) : null}
+        {hidden !== null ? (
+          <Pressable onPress={openLens} accessibilityRole="button" testID="contact-thread-lens" style={styles.hide}>
+            <Text style={styles.hideText}>{t('circle.contacts.lens.open')}</Text>
+          </Pressable>
+        ) : null}
       </View>
+      {lens.sheet}
       {hidden !== null ? (
         <Text style={styles.hideNote} testID="contact-thread-hide-note">{t('circle.contacts.hide_note')}</Text>
       ) : null}

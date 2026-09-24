@@ -16,6 +16,8 @@ import FaceView from './FaceView.js';
 import { splitShownHidden, loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
+// L125 — the add sheet: what the new contact sees of you, asked before the card is added (web parity)
+import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
@@ -27,6 +29,9 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState('');
   const [error, setError] = useState(false);
+  const lens = useContactLensSheet({
+    callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, t, theme,
+  });
   // Hidden contacts (L106, web parity with contactsRoster.js) fold away at the bottom: the row stays, out of
   // sight, until they write again or the person shows them. A list of only hidden contacts is not empty.
   const [foldOpen, setFoldOpen] = useState(false);
@@ -63,15 +68,21 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
         input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
         // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one
         // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
-        addContact: callSkill ? (payload) => callSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA }) : undefined,
+        // …asking first what they will see of you (L125); closing the sheet adds nothing
+        addContact: callSkill ? async (payload) => {
+          const r = await lens.addWithSheet(payload);
+          if (r === null) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+          return r;
+        } : undefined,
       });
       setAddText(''); setAddOpen(false);
       reload();
     } catch (err) {
+      if (err?.code === 'cancelled') return;   // the person closed the sheet: nothing added, the text stays
       // A circle invite pasted here is the VERIFIED rung — point at the join flow instead of failing mutely.
       setError(err?.code === 'circle-invite' ? 'invite' : true);
     }
-  }, [addText, peerGraph, bundle, callSkill, reload]);
+  }, [addText, peerGraph, bundle, callSkill, reload, lens]);
 
   const rowFor = (c, isHidden = false) => {
     const n = Number(unread?.[c.contactId]?.unread) || 0;   // what is NEW here (2026-09-21), web parity
@@ -104,6 +115,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
 
   return (
     <View style={styles.wrap} testID="contacts-screen">
+      {lens.sheet}
       <View style={styles.head}>
         <Text style={styles.title}>{t('circle.contacts.title')}</Text>
         <Pressable style={styles.add} onPress={() => setAddOpen((v) => !v)} accessibilityRole="button" testID="contacts-add">

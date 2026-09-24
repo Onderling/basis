@@ -48,6 +48,9 @@ export const SEAMS = Object.freeze([
   // says a release. A shell that forgets it creates circles where the picker is shown and nothing rides. The box
   // has no create wizard — it joins and holds circles, it does not found them from a form.
   { id: 'create-founds-as-persona', pattern: /shareFounderRelease[:=]/,         shells: ['web', 'mobile'], why: 'the persona picked in the create wizard says what it discloses in the new circle' },
+  // What a contact sees of you (L125): the add sheet before a scanned card or link is added, the control on the
+  // thread header after. A person picks both; the box has nobody to ask.
+  { id: 'contact-lens-asks', pattern: /ContactLens|contactLens\./, shells: ['web', 'mobile'], why: 'a contact added by a person is asked first what they see of you, and it can be changed on their thread' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
   { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
   { id: 'known-peers-catchup',   pattern: /knownPeersSync/,                      why: 'who the person knows, on every device: bindings and the contact book' },

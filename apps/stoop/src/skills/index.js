@@ -2318,45 +2318,6 @@ export function buildSkills({
     }),
 
     /**
-     * setMyAvatarUrl({url})  — Phase 23.1.
-     *   Wire the calling actor's `avatarUrl` field on MemberMap. URL
-     *   convention is `mem://stoop/avatars/<webid>.<ext>` for content
-     *   stored in the local cache; once a pod is attached, the cache
-     *   write-through stages the same path under
-     *   `<pod>/stoop/avatars/...`.  Apps that don't follow the
-     *   `mem://stoop/avatars/` convention can pass any URI — Stoop
-     *   doesn't fetch or validate the content here, only stores the
-     *   reference.
-     */
-    defineSkill('setMyAvatarUrl', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const url = typeof a.url === 'string' ? a.url.trim() : '';
-      if (!url) return { error: 'url required' };
-      if (!members) return { error: 'no-member-map' };
-      const updated = await members.addMember({ webid: from, avatarUrl: url });
-      return { avatarUrl: url, member: updated, _sync: simulateSync() };
-    }, {
-      description: 'Set the calling actor\'s avatar URL (mem://stoop/avatars/<webid>.<ext> by convention).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * clearMyAvatar()  — Phase 23.1.  Reset the calling actor's
-     * `avatarUrl` to null on MemberMap.  No content delete here —
-     * leave the bytes in the cache; a future "compactor" can sweep
-     * orphaned avatars.
-     */
-    defineSkill('clearMyAvatar', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, avatarUrl: null });
-      return { cleared: true, member: updated, _sync: simulateSync() };
-    }, {
-      description: 'Clear the calling actor\'s avatar URL (does not delete cached bytes).',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * setPeerReveal({peerWebid, showDisplayName?: bool=true})
      *   — local-only viewer choice; flips Reveals so this viewer
      *   sees `displayName` for the named peer.

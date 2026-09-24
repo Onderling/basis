@@ -79,3 +79,4 @@ export async function pickAndEncodeImage({
 
   return toInboundAttachment({ full, thumbBase64: thumb.base64, mime: 'image/jpeg' });
 }
+

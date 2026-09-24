@@ -65,6 +65,20 @@ describe('a member\'s own name reaches every roster they are on — member-props
     // cato is in A only — B's roster never heard of cato and cato never heard of B: nothing to assert, nothing leaked
   }, 60_000);
 
+  it('an oversize FACE reaches no roster at all — the cap binds on every receiver', async () => {
+    // The picture itself is the persona's `profilePicture`, disclosed per circle through the release (the
+    // "shares his persona release" case below covers the happy path, and the two-device walk covers it on
+    // real bytes). What is asserted HERE is the refusal, because it is the part no shell can be trusted with:
+    // an app version that skipped its own check would still be refused by every fold that receives it.
+    const huge = { type: 'blob', ref: 'blob://big', enc: { sealed: true, keyRef: 'k', format: 'b', bytes: 99, thumb: 'A'.repeat(9000) } };
+    const before = rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey)?.said?.displayName ?? null;
+    await bram.agent.emitMemberProps({ circleIds: [CIRCLE_A], props: { displayName: 'Bram Oversize', personaProperties: { profilePicture: huge } } });
+    await new Promise((r) => { setTimeout(r, 3000); });
+    const row = rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey);
+    expect(row?.personaProperties?.profilePicture, 'the oversize picture never lands').toBeUndefined();
+    expect(row?.said?.displayName, 'and nothing it travelled with lands either').toBe(before);
+  }, 60_000);
+
   it('a handle change reaches the rows too; a handle ANOTHER member holds is refused — by the op here (it reads the folded rosters), by the fold everywhere (kernel-tested)', async () => {
     const r = await bram.agent.callSkill('stoop', 'setMyHandle', { handle: 'bramdv' });
     expect(r?.error).toBeUndefined();

@@ -77,6 +77,7 @@ export function renderCircleProfile(container, {
 
   // ── identity (handle + display name) ────────────────────────────────────
   const idSection = section(tr('circle.profile.identity'));
+
   const handle = labelledInput(tr('circle.profile.handle'), profile.handle ?? '', 'cc-profile__handle');
   const display = labelledInput(tr('circle.profile.displayName'), profile.displayName ?? '', 'cc-profile__display');
   idSection.appendChild(handle.wrap);

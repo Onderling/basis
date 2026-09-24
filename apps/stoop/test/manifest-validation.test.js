@@ -144,6 +144,11 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // verified from the version on record — what a direct message to them is sealed to) → 97.
   // 2026-09-22: -1, `recordMemberPersonaProperties` retired with the persona side wire — what a member discloses to
   // a circle is their own `member-props` statement on its membership lane now, folded by every device → 96.
+  // 2026-09-23: unchanged at 96. `setMyFace`/`clearMyFace` were added and REMOVED the same day: a member's
+  // picture is the persona's `profilePicture` attribute, disclosed per circle in the release — a road that
+  // already existed, with its own picker on both shells. The legacy `setMyAvatarUrl`/`clearMyAvatar` (which
+  // wrote the private `avatarUrl` display cache, had no surface, and painted nothing) are gone with them:
+  // three picture roads became one.
   // This number is a snapshot on purpose: adding an op to the waist should be a deliberate act
   // that someone updates a count for, not something that slips in unremarked.
   it('ships the full chat+slash surface (one stoop manifest, 96 ops)', () => {

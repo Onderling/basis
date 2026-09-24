@@ -25,14 +25,17 @@ describe('renderContactsRoster', () => {
     expect(onOpen).toHaveBeenCalledWith('https://bot.example');
   });
 
-  it('a person row uses 👤 and clicking the row opens the thread', () => {
+  // Was 👤 for everyone until 2026-09-23. A generic glyph tells you nothing about WHICH person the row is;
+  // the initial is theirs, stable across devices, and becomes their picture the moment they disclose one to
+  // this pair circle. A bot keeps its glyph: it is not a person and has no face.
+  it('a person row shows their FACE — their own initial until a picture is disclosed — and opens the thread', () => {
     const onOpen = vi.fn();
     const el = renderContactsRoster(document.createElement('div'), {
       contacts: [{ contactId: 'PK', name: 'Alice', isBot: false, skillCount: 0, reachable: true }],
       ...ctx(), onOpen,
     });
     const row = el.querySelector('.cc-contacts__row');
-    expect(row.querySelector('.cc-contacts__icon').textContent).toBe('👤');
+    expect(row.querySelector('.cc-contacts__icon').textContent, "Alice's own letter, not a generic person glyph").toBe('A');
     expect(row.className).not.toContain('--bot');
     row.click();
     expect(onOpen).toHaveBeenCalledWith('PK');

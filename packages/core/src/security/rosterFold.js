@@ -61,7 +61,31 @@ const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accep
 // `personaProperties` (2026-09-22, step two): the persona's RELEASE for this circle — coarse, reveal-gated, media by sealed
 // reference — as one map that wins whole (a key that leaves the release leaves the row; `{}` clears). It rides the same
 // self-subject statement, so the admin-mediated side wire for it could be retired.
-const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+/**
+ * What a member may say about THEMSELVES. The kernel owns this list because the kernel is where it BINDS —
+ * a statement naming anything else is refused whole, on every receiver, whatever app version wrote it. The
+ * writer in `@onderling/circles` imports it rather than keeping its own: it had a second frozen copy that
+ * called itself "one place, shared with the fold's allowlist", and it went stale the moment a field landed.
+ */
+export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+
+/**
+ * The most an inline face thumbnail may be. See the note at its use: the picture itself lives behind the blob
+ * gateway, but the SEALING LINE carries a small preview inline, and this lane keeps every statement for ever.
+ */
+export const FACE_THUMB_MAX_CHARS = 4096;
+
+/** A released picture is within the cap, or there is no picture to check. Anything malformed is not a face. */
+function faceThumbWithinCap(pic) {
+  if (pic == null) return true;                                   // no picture disclosed — nothing to cap
+  if (!pic || typeof pic !== 'object' || Array.isArray(pic)) return false;
+  const src = (pic.type === 'media' && pic.source && typeof pic.source === 'object') ? pic.source : pic;
+  const thumb = src?.enc?.thumb;
+  if (thumb == null) return true;                                 // a ref with no inline preview is fine
+  return typeof thumb === 'string' && thumb.length <= FACE_THUMB_MAX_CHARS;
+}
+const MEMBER_PROPS_FIELD_SET = new Set(MEMBER_PROPS_FIELDS);
+
 const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
@@ -318,8 +342,17 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (!p || p.authorRef !== s.subject) continue;                       // self-only
       if (!members.has(s.subject)) continue;                                // members only
       const keys = Object.keys(p).filter((k) => k !== 'authorRef');
-      if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELDS.has(k))) continue;   // the allowlist: refused whole
+      if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELD_SET.has(k))) continue;   // the allowlist: refused whole
       if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
+      // THE FACE'S CAP. A released `profilePicture` carries an inline thumbnail in its sealing line, and this
+      // lane is EXEMPT FROM COMPACTION (`entryKinds.js`: "the roster refolds from these — never drops"), so
+      // anything said here is kept by every device for ever. A photo-sized thumb would therefore grow the one
+      // lane that never sheds anything. Two numbers, on purpose: `MAX_SEALED_THUMB_CHARS` (48 KB, a device
+      // param) is the ceiling for a PHOTO's inline preview anywhere; 4 KB is the ceiling for a FACE, because a
+      // face is 96 px and a photo is not. Refused whole and deny-wins, like the handle collision above: a
+      // refused picture must not quietly land a display name with it. It binds HERE because every receiver
+      // folds independently — a writer's own limit is whatever app version the sender happens to run.
+      if (p.personaProperties && !faceThumbWithinCap(p.personaProperties.profilePicture)) continue;
       if (typeof p.handle === 'string' && p.handle) {
         const taken = [...members].some((m) => m !== s.subject && handles[m] === p.handle);
         if (taken) continue;                                                // uniqueness: deny-wins, the old handle stays

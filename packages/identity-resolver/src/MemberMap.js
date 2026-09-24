@@ -112,7 +112,7 @@ export class MemberMap extends Emitter {
    * @param {string} [m.displayName]
    *   Real / chosen display name.  Treated as opt-in-to-show when paired
    *   with a Reveals store (see ./Reveals.js).
-   * @param {string} [m.avatarUrl]
+   * @param {string} [m.avatarUrl]    the LOCAL display cache (private, never travels)
    *   Optional avatar image URL.
    * @param {string} [m.stableId]
    *   Stoop V1 Phase 11 (2026-05-06): the SDK-level stable user
@@ -226,7 +226,10 @@ export class MemberMap extends Emitter {
       // legacy consumers (H2/H4) leave it absent.
       handle:      m.handle ?? null,
       displayName: m.displayName ?? null,
-      // avatarUrl: optional avatar image URL (any URI).
+      // avatarUrl: optional avatar image URL (any URI). A LOCAL DISPLAY CACHE — it may point anywhere,
+      // including at a note this device keeps about somebody else, and `rosterAccessGate` marks it PRIVATE so
+      // it never leaves. It is NOT the person's face: that is the persona's `profilePicture` attribute, a
+      // sealed media ref disclosed per circle. Nothing paints this one; do not make it travel.
       avatarUrl:   m.avatarUrl ?? null,
       // persona: WHICH OF YOUR PERSONAS this contact was made through — the profile whose release their pair
       // roster carries, i.e. what they see of you. NOT a second identity: one key, one address, one pair

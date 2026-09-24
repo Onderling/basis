@@ -15,6 +15,7 @@ import { createComposerCommands } from '../../../../basis/src/v2/composerCommand
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { subscribeContactReplies } from '../../core/contactReplyInbox.js';
+import FaceView from './FaceView.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
 export default function ContactThreadScreen({ bundle, contact, onBack, onRead }) {
@@ -187,6 +188,9 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead })
         <Pressable onPress={onBack} accessibilityRole="button" testID="contact-thread-back">
           <Text style={styles.back}>{t('circle.contacts.back')}</Text>
         </Pressable>
+        {/* The contact's face beside their name (web parity: contactThread's header slot) — so the person you
+            opened is visibly the person you tapped in Contacten. */}
+        <FaceView row={contact ?? { name }} size={26} />
         <Text style={styles.title}>{t('circle.contacts.thread_title', { name })}</Text>
         {sealedMark ? (
           <Text style={[styles.sealed, sealedMark.level === 'person' ? styles.sealedPerson : null]} testID="contact-thread-sealed" accessibilityLabel={t(sealedMark.key)}>

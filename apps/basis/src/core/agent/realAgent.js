@@ -2136,6 +2136,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
     const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+    // Names only. The PICTURE does not ride here: it is the persona's `profilePicture` attribute and travels
+    // in the per-circle RELEASE (`shareDisclosureToCircle` → `personaProperties`), re-sealed for each circle.
+    // Putting it here too would be a second road for one thing — which is what happened on 2026-09-23 and was
+    // taken out again.
     return sayOnRosters({ circleIds: circles, props: { handle: me.handle, displayName: me.displayName } });
   }
   const knownPeersSync = createKnownPeersSync({

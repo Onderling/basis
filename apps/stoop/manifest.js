@@ -1921,11 +1921,11 @@ export const stoopManifest = {
     //      record-level read.  Adapter has to either trust the record
     //      envelope or know to re-read per-field.  Out of scope here;
     //      page already reads holiday-mode separately.
-    //   8. `avatarUrl` is bytes (data-URL after resize), not a primitive
+    //   8. the profile PICTURE is a sealed media ref, not a primitive
     //      that fits 's `type: 'boolean' | 'enum' | string`. The
     //      avatar input is a file-picker with client-side resize
-    //      (`fileToResizedDataUrl`) + dispatch to `setMyAvatarUrl({url})`
-    //      and clear via `clearMyAvatar({})`. has no `'file'` or
+    //      (the shared `encodeImageFile`) + `onSetPicture` on the Mij persona
+    //      surface, which seals it. has no `'file'` or
     //      `'image'` field type + no notion of "client-side transform
     //      before dispatch".  Stays hand-coded.
     //   9. `skills` section is a list-shape WITHIN a record-shape view

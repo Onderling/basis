@@ -486,6 +486,36 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r.props[bob.pubKey].handle, 'the join\'s handle is not').toBeUndefined();
   });
 
+  // ── THE FACE'S CAP (2026-09-23) ─────────────────────────────────────────────────────────────────────
+  // The picture is the persona's `profilePicture`, disclosed per circle and carried in the release. Its
+  // sealing line holds a small inline thumbnail — and this lane never drops a statement, so that thumbnail is
+  // kept by every device for ever. Capped here, where it binds on every receiver, whatever wrote it.
+  it('a released picture within the cap lands; one over it refuses the WHOLE statement', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const pic = (thumb) => ({ type: 'blob', ref: 'blob://x', enc: { sealed: true, keyRef: 'k', format: 'b', bytes: 9, thumb } });
+
+    const ok = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', personaProperties: { profilePicture: pic('A'.repeat(1000)) } }, parent: join.hash });
+    const r1 = foldRoster([join, ok], { founders: [founder.pubKey] });
+    expect(r1.props[bob.pubKey].personaProperties.profilePicture.enc.thumb.length).toBe(1000);
+    expect(r1.props[bob.pubKey].displayName).toBe('Bob');
+
+    const tooBig = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', personaProperties: { profilePicture: pic('A'.repeat(9000)) } }, parent: join.hash });
+    const r2 = foldRoster([join, tooBig], { founders: [founder.pubKey] });
+    expect(r2.props[bob.pubKey]?.personaProperties, 'the oversize picture is refused').toBeUndefined();
+    expect(r2.props[bob.pubKey]?.displayName, 'and so is everything it travelled with').toBeUndefined();
+  });
+
+  it('a release with no picture, or a ref with no inline preview, is not capped away', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const noThumb = { type: 'blob', ref: 'blob://x', enc: { sealed: true, keyRef: 'k', format: 'b', bytes: 9 } };
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: { region: 'noord' } }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: { profilePicture: noThumb } }, parent: p1.hash });
+    const r = foldRoster([join, p1, p2], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey].personaProperties.profilePicture).toEqual(noThumb);
+  });
+
   it('the PERSONA PROPERTIES ride as one field group (step two, 2026-09-22): the released map, per circle, newest map wins whole; by reference only', async () => {
     // What a persona discloses to THIS circle (`getPersonaRelease` — coarse, reveal-gated, media by sealed reference) travels
     // as `personaProperties` on the same statement, so the admin-mediated `persona-props-update` wire can go. A map, not

@@ -199,7 +199,12 @@ export async function nameContactsFromRosters(rows = [], { rosterRow = null } = 
     const said = m?.said && typeof m.said === 'object' ? m.said : null;
     const name = (typeof said?.displayName === 'string' && said.displayName) ? said.displayName
       : (typeof said?.handle === 'string' && said.handle) ? said.handle : null;
-    return name ? { ...r, name, namedBy: 'roster' } : r;
+    // …and their FACE, from the release on the pair circle. A contact's picture is a persona attribute they
+    // disclosed to THIS pair circle, re-sealed for it — so its presence on the row is already the permission,
+    // and it reaches this device exactly the way their name does.
+    const face = said?.personaProperties?.profilePicture ?? null;
+    if (!name && !face) return r;
+    return { ...r, ...(name ? { name, namedBy: 'roster' } : {}), ...(face ? { face } : {}) };
   }));
   return sortContactRows(named);
 }

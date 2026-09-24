@@ -7,15 +7,15 @@
  * `eventLog.hydrate(...)` → late-bind a DEBOUNCED save via `eventLog.setPersist(...)`. Order matters:
  * hydrate BEFORE setPersist, so hydration never echoes into storage.
  *
- * The snapshot is the whole event array as one value (the log's own `persist` contract), and that shape
- * has a CEILING worth knowing: on Android this value is one AsyncStorage row, read back through a ~2 MB
- * cursor window, and a read past it returns EMPTY rather than throwing — the next save then writes that
- * emptiness back. Chat is `record` retention (it never drops and never compacts, because the entry IS the
- * record), so the log grows for the life of a circle and walks toward that ceiling on its own. Bytes are
- * already kept out (see `attachmentBlobStore`); the flat-snapshot shape itself is the remaining half, and
- * the trigger this comment used to defer to — chat volume — has effectively arrived.
- * (Before 2026-09-03 this said "a 14-day chat window", which was never true of `record` retention.) Saving is BEST-EFFORT: a failing storage medium degrades the app to
- * the old in-memory behaviour (logged loudly once), it never breaks an append.
+ * The log's own `persist` contract is the whole event array as one value. Until 2026-09-24 that is also how it
+ * was STORED, and that shape had a ceiling: on Android one AsyncStorage row is read back through a ~2 MB cursor
+ * window, and a read past it returns EMPTY rather than throwing — the next save then writes that emptiness back.
+ * Chat is `record` retention (it never drops), so the log walked toward that ceiling on its own. Bytes were
+ * already kept out (`attachmentBlobStore`); a face's 4 KB thumb per change brought the day closer (L120).
+ * `backendSnapshotIo` now stores the array in SEGMENTS (see its note): the contract the log sees is unchanged,
+ * every row stays small, and an append rewrites only the newest segment. The file shape (`fileSnapshotIo`, the
+ * box) stays one file — a file has no cursor window. Saving is BEST-EFFORT: a failing storage medium degrades
+ * the app to the old in-memory behaviour (logged loudly once), it never breaks an append.
  */
 
 /** Debounce a snapshot sink: bursts of appends coalesce into one trailing write. */
@@ -74,20 +74,105 @@ export async function wireEventLogPersistence({ eventLog, io, debounceMs = 400 }
 
 const REF = 'device-log/events.json';
 
-/** Snapshot io over a StorageBackend (`put(key, bytes)` / `get(key) → {bytes}|null`) — the web shape
- *  (`pickWebBackend`: IndexedDB when available, in-memory under SSR/tests). */
+/**
+ * The most JSON one SEGMENT may hold. Android's AsyncStorage reads a row through a ~2 MB cursor window and
+ * returns EMPTY past it (see the module note); sealing and base64 grow a value by ~⅓ before it lands. 256 KB of
+ * plain JSON per row keeps every segment far under the window with that growth included, and small enough that
+ * rewriting the newest one on every append is cheap.
+ */
+export const SEGMENT_MAX_CHARS = 256 * 1024;
+const SEGMENT_MAX_EVENTS = 2000;
+
+/** A cheap content hash, so an unchanged segment is recognised without a byte compare against storage. */
+function hashOf(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16).padStart(8, '0') + ':' + text.length;
+}
+
+/** Cut an OLDEST-first list into segments by size and count. Old segments stay byte-stable across saves. */
+function segment(oldestFirst) {
+  const segments = [];
+  let cur = []; let curChars = 1;   // "[" … "]"
+  for (const e of oldestFirst) {
+    const t = JSON.stringify(e);
+    if (cur.length && (curChars + t.length + 1 > SEGMENT_MAX_CHARS || cur.length >= SEGMENT_MAX_EVENTS)) {
+      segments.push(cur); cur = []; curChars = 1;
+    }
+    cur.push(t); curChars += t.length + 1;
+  }
+  if (cur.length || segments.length === 0) segments.push(cur);
+  return segments.map((parts) => '[' + parts.join(',') + ']');
+}
+
+/**
+ * Snapshot io over a StorageBackend (`put(key, bytes)` / `get(key) → {bytes}|null` / `list(prefix)` /
+ * `delete(key)`) — the web AND mobile shape (`pickWebBackend`: IndexedDB when available; the AsyncStorage
+ * adapter on the phone; in-memory under SSR/tests).
+ *
+ * THE LOG IS STORED IN SEGMENTS (L120). The log's own contract is unchanged — `save(events)` gets the whole
+ * newest-first array, `load()` returns it — but underneath the array is cut, OLDEST first, into segments of at most
+ * `SEGMENT_MAX_CHARS`, each its own row under `<ref>/seg/NNNN`, with a MANIFEST at `<ref>` naming them in order
+ * with a hash each. Why: one value for the whole log walked toward Android's cursor window, past which the read
+ * returns empty and the next save writes that emptiness back — silent loss of the record. Cutting from the oldest
+ * end means an append changes only the newest segment; a save compares hashes and rewrites only what moved.
+ *
+ * The write order is the safety: segments first, the manifest last, so a save that dies mid-way leaves the
+ * previous manifest pointing at the previous segments (a new segment nobody names is harmless). A segment that
+ * will not parse loses ITSELF — the loader warns and keeps the rest, in order — never the whole log.
+ *
+ * MIGRATION: a `<ref>` that holds an ARRAY is the old single-value snapshot; it loads as before and the next save
+ * writes it as segments and replaces the array with the manifest. No flag, no second key.
+ */
 export function backendSnapshotIo(backend, ref = REF) {
   const enc = new TextEncoder();
   const dec = new TextDecoder();
+  const segKey = (i) => `${ref}/seg/${String(i).padStart(4, '0')}`;
+  const readText = async (key) => {
+    const rec = await backend.get(key);
+    if (!rec || rec.bytes == null) return null;
+    return typeof rec.bytes === 'string' ? rec.bytes : dec.decode(rec.bytes);
+  };
+  let known = null;   // the manifest as last written/read by THIS io: [{key, hash}] — the diff's left-hand side
   return {
     async load() {
-      const rec = await backend.get(ref);
-      if (!rec || rec.bytes == null) return null;
-      const text = typeof rec.bytes === 'string' ? rec.bytes : dec.decode(rec.bytes);
-      return JSON.parse(text);
+      const head = await readText(ref);
+      if (head == null) return null;
+      const parsed = JSON.parse(head);
+      if (Array.isArray(parsed)) { known = null; return parsed; }               // the legacy single value
+      if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.segments)) throw new Error('device-log: manifest not understood');
+      const out = [];   // oldest first while reading
+      for (const seg of parsed.segments) {
+        const t = await readText(seg.key);
+        if (t == null) { console.warn(`[device-log] segment missing, skipped: ${seg.key}`); continue; }
+        try { out.push(...JSON.parse(t)); }
+        catch (err) { console.warn(`[device-log] segment unreadable, skipped: ${seg.key} — ${err?.message ?? err}`); }
+      }
+      known = parsed.segments.map((s) => ({ key: s.key, hash: s.hash }));
+      out.reverse();   // the log's snapshot is newest-first
+      return out;
     },
     async save(events) {
-      await backend.put(ref, enc.encode(JSON.stringify(events)));
+      const texts = segment([...events].reverse());
+      const next = texts.map((t, i) => ({ key: segKey(i), hash: hashOf(t), count: JSON.parse(t).length }));
+      // segments first: only the ones whose content moved
+      for (let i = 0; i < texts.length; i += 1) {
+        const prev = known?.[i];
+        if (prev && prev.key === next[i].key && prev.hash === next[i].hash) continue;
+        await backend.put(next[i].key, enc.encode(texts[i]));
+      }
+      // the manifest last — the switch
+      await backend.put(ref, enc.encode(JSON.stringify({ v: 1, segments: next, total: events.length })));
+      // then the rows no manifest names any more (a shrunk log after retention pruned it)
+      const stale = (known ?? []).slice(texts.length);
+      for (const s of stale) { try { await backend.delete?.(s.key); } catch { /* best-effort */ } }
+      if (!known && typeof backend.list === 'function') {   // first segmented save on a store: sweep any leftovers
+        try {
+          const named = new Set(next.map((n) => n.key));
+          for (const k of await backend.list(`${ref}/seg/`)) if (!named.has(k)) await backend.delete?.(k);
+        } catch { /* best-effort */ }
+      }
+      known = next.map((n) => ({ key: n.key, hash: n.hash }));
     },
   };
 }

@@ -25,6 +25,8 @@ function run(body, args = []) {
   return { out: r, text, block };
 }
 
+const BEGIN_END = '# roadmap\n<!-- asked-frits:begin -->\n<!-- asked-frits:end -->';
+
 const BODY = [
   '# roadmap',
   '<!-- asked-frits:begin -->',
@@ -53,6 +55,38 @@ describe('asked-frits — the open-questions table is a projection, not a list',
     const { text: once } = run(BODY);
     const { text: twice } = run(once);
     expect(twice).toBe(once);
+  });
+
+  // The three shapes below are how the real ledger writes a marker. The first version read only the text AFTER
+  // the marker on its own line, so a third of the table said "when]", "Opened 2026-09-09 from" or "first".
+  it('reads a question written BEFORE the marker', () => {
+    const { block } = run([BEGIN_END, '',
+      '93. **[L93] Who carries the circle?** Custodian mode keeps one key. Does revocation move from the circle to',
+      '    the node? ? Needs Frits [ledger L93]. Opened 2026-09-09 from the always-on plan.',
+    ].join('\n'));
+    expect(block).toMatch(/Does revocation move from the circle to the node\?/);
+    expect(block).not.toMatch(/Opened 2026-09-09 from/);
+  });
+
+  it('uses the item title when the marker sits in the closing ledger tag, and keeps the ask', () => {
+    const { block } = run([BEGIN_END, '',
+      '123. **[L123] A PERSONA BECOMES A PERSON ON THE WIRE — designed, NOT built (found',
+      '    2026-09-24).** Today one identity runs per person.',
+      '    The arc is three to five days. [ledger L123 — ? Needs Frits: when]',
+    ].join('\n'));
+    expect(block).toMatch(/A PERSONA BECOMES A PERSON ON THE WIRE — designed, NOT built/);
+    expect(block).toMatch(/when/);
+    expect(block).not.toMatch(/\| when\] \|/);
+  });
+
+  it('joins a question that wraps onto the next line', () => {
+    const { block } = run([BEGIN_END, '',
+      '- ? Needs Frits [ledger n/a — his call]: **purge the plan docs from the git',
+      '  HISTORY** too (they stay reachable in old commits).',
+      '- the next item, not part of the question',
+    ].join('\n'));
+    expect(block).toMatch(/purge the plan docs from the git HISTORY too/);
+    expect(block).not.toMatch(/the next item/);
   });
 
   it('does not scan its own block — a table that reads itself is a feedback loop, not a projection', () => {

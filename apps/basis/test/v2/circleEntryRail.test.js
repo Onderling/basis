@@ -202,3 +202,58 @@ describe('the rail — verified read (the receiver-enforced half)', () => {
     expect(log.entries).toHaveLength(1);
   });
 });
+
+// ── TOMBSTONES (L121) — the fold names dead member-props; the rail keeps the chain edge and sheds the bytes ──
+describe('the rail — compact (tombstones on the fold\'s word)', () => {
+  function fakeEventLogWithCompact() {
+    const log = fakeEventLog();
+    log.compactEntries = (ids, transform) => {
+      const set = new Set(ids); let n = 0;
+      for (let i = 0; i < log.entries.length; i += 1) {
+        const e = log.entries[i]; if (!set.has(e.id)) continue;
+        const next = transform(e); if (!next || next.id !== e.id) continue;
+        log.entries[i] = next; n += 1;
+      }
+      return n;
+    };
+    return log;
+  }
+  const MKINDS = ['join', 'member-props'];
+  const mrail = (log, me) => makeCircleEntryRail({ eventLog: log, signerFor: async () => ({ identity: me.identity, ref: me.ref }), entryKind: 'membership', declaredKinds: MKINDS });
+
+  it('a tombstoned statement keeps its chain fields and its place, loses its content, and is never resurrected', async () => {
+    const log = fakeEventLogWithCompact();
+    const bob = await member('webid:bob');
+    const rail = mrail(log, bob);
+    await rail.append(CIRCLE, { kind: 'join', subject: bob.ref, payload: { peerDisplay: 'bob' } });
+    await rail.append(CIRCLE, { kind: 'member-props', subject: bob.ref, payload: { displayName: 'B1', personaProperties: { profilePicture: { enc: { thumb: 'X'.repeat(3000) } } } } });
+    await rail.append(CIRCLE, { kind: 'member-props', subject: bob.ref, payload: { displayName: 'B2' } });
+    const p1entry = log.entries.find((e) => e.payload?.body?.payload?.displayName === 'B1');
+    const h1 = p1entry.payload.body.hash;
+    const original = JSON.parse(JSON.stringify(p1entry.payload));
+
+    expect(rail.compact(CIRCLE, [h1, 'not-a-hash'])).toBe(1);
+    const t = log.entries.find((e) => e.id === `membership:${h1}`);
+    expect(t.payload.tombstone).toBe(true);
+    expect(t.payload.sig).toBeUndefined();
+    expect(JSON.stringify(t.payload)).not.toContain('XXXX');                   // the bytes are gone
+    expect(t.payload.body).toMatchObject({ hash: original.body.hash, author: original.body.author, parentHash: original.body.parentHash, kind: 'member-props' });
+
+    // the verified read still yields the edge (as a payload-less body) and the live statement after it
+    const { bodies } = await rail.readVerifiedBodies(CIRCLE);
+    const tb = bodies.find((b) => b.hash === h1);
+    expect(tb.tombstone).toBe(true);
+    expect(Object.keys(tb.payload)).toEqual(['authorRef']);
+    const live = bodies.find((b) => b.payload?.displayName === 'B2');
+    expect(live).toBeTruthy();
+    expect(live.parentHash, 'the live statement still chains on the tombstone').toBe(h1);
+
+    // a redelivery of the ORIGINAL does not bring the bytes back (first-write-wins by id)
+    const r = await rail.ingest(CIRCLE, original);
+    expect(r.ok).toBe(true);
+    expect(log.entries.find((e) => e.id === `membership:${h1}`).payload.tombstone).toBe(true);
+    // compacting it again is a no-op; the governance-shaped read skips it
+    expect(rail.compact(CIRCLE, [h1])).toBe(0);
+    expect((await rail.readVerified(CIRCLE)).events.some((e) => e.hash === h1)).toBe(false);
+  });
+});

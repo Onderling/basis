@@ -106,7 +106,7 @@ export const ENTRY_KINDS = Object.freeze({
   'task-statement':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING()),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
   'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true, CIRCLE_BINDING({ accepts: ACCEPTS.KEY })),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening
-  membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.CIRCLE, SIGNS.ROOT], subject: [SUBJECT.PERSON, SUBJECT.DEVICE], accepts: ACCEPTS.MEMBERSHIP, syncPolicy: SYNC.CIRCLE }),   // the roster refolds from these — never drops
+  membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.CIRCLE, SIGNS.ROOT], subject: [SUBJECT.PERSON, SUBJECT.DEVICE], accepts: ACCEPTS.MEMBERSHIP, syncPolicy: SYNC.CIRCLE }),   // the roster refolds from these — never drops on a clock; a `member-props` the fold calls dead leaves via dropEntries, L121
   grants:            K(LANE.SYSTEM, false, RETAIN.RECORD, true, { signs: [SIGNS.DEVICE, SIGNS.PERSON], subject: SUBJECT.NONE, accepts: ACCEPTS.DEVICE_SET, syncPolicy: SYNC.SIBLINGS }),   // the connection-grant set refolds from these — a revoke that compacts away silently re-admits a view
 
   // ── the agent trail (per-agent action log) ────────────────────────────────

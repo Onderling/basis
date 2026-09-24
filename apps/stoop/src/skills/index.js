@@ -1133,6 +1133,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     exits: await readCircleExits({ store, groupId }),
     // The signed spine deltas fold ON TOP of the trail head (the cutover model — no data migration).
     spineStatements,
+    // The fold's compaction verdict goes back to the rail (L121): only on the rail path, only when the fold names
+    // something, fire-and-forget — a read never waits on a write.
+    onFolded: (typeof membershipRead?.compact === 'function')
+      ? (folded) => { if (Array.isArray(folded?.superseded) && folded.superseded.length) membershipRead.compact(groupId, folded.superseded).catch(() => {}); }
+      : null,
   });
 }
 

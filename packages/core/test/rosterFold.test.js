@@ -576,3 +576,73 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r.props[mallory.pubKey]).toEqual({ handle: 'bob', displayName: 'Mal' });
   });
 });
+
+// ── SUPERSESSION (L121, 2026-09-24) — the fold names the member-props statements every device may drop ──────────
+// A `member-props` statement is DEAD when it is accepted, sets no handle, and every field it set has a later
+// accepted setter from the same subject. Dropping the dead set changes no fold: same members, handles, props.
+describe('member-props supersession — the fold computes the dead set, and dropping it changes nothing', () => {
+  const strip = (r) => { const { superseded: _s, ...rest } = r; return rest; };
+
+  it('names the fully-overwritten, handle-free statements — and only those', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', avatarRef: 'blob:1' }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bobby' }, parent: p1.hash });
+    const p3 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'bobby' }, parent: p2.hash });
+    const p4 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Robert', avatarRef: 'blob:2' }, parent: p3.hash });
+    const r = foldRoster([join, p1, p2, p3, p4], { founders: [founder.pubKey] });
+    expect(r.superseded).toEqual([p1.hash, p2.hash].sort());   // p1: both fields overwritten; p2: displayName overwritten
+    // p3 sets a handle → never dead; p4 is the newest setter of both its fields → alive
+    expect(r.superseded).not.toContain(p3.hash);
+    expect(r.superseded).not.toContain(p4.hash);
+  });
+
+  it('a partially overwritten statement is NOT dead (one of its fields still stands)', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', avatarRef: 'blob:1' }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bobby' }, parent: p1.hash });
+    const r = foldRoster([join, p1, p2], { founders: [founder.pubKey] });
+    expect(r.superseded).toEqual([]);
+  });
+
+  it('a REFUSED statement is never named — its acceptance depends on the history compaction would remove', async () => {
+    const { founder, bob, mallory: cato } = await ids();
+    const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const jc = body(cato, 'join', cato, { payload: { peerDisplay: 'cato' } });
+    const takeX = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: jb.hash });
+    const catoX = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash });   // refused: taken
+    const bobY = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'y' }, parent: takeX.hash });
+    const r = foldRoster([jb, jc, takeX, catoX, bobY], { founders: [founder.pubKey] });
+    expect(r.handles[cato.pubKey]).toBe('cato');
+    expect(r.superseded).toEqual([]);   // handle-bearing statements are never dead, refused ones never named
+  });
+
+  it('REFOLD AGREEMENT: the fold over the log with the dead set TOMBSTONED equals the fold over the whole log — in any order', async () => {
+    const { founder, bob, mallory: cato } = await ids();
+    const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const jc = body(cato, 'join', cato, { payload: { peerDisplay: 'cato' } });
+    const b1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B1', personaProperties: { a: 1 } }, parent: jb.hash });
+    const b2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B2' }, parent: b1.hash });
+    const bx = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: b2.hash });
+    const c1 = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash });   // refused, bob holds x
+    const b3 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B3', personaProperties: { a: 2 } }, parent: bx.hash });
+    const c2 = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, displayName: 'C2' }, parent: c1.hash });
+    const all = [jb, jc, b1, b2, bx, c1, b3, c2];
+    const full = foldRoster(all, { founders: [founder.pubKey] });
+    expect(full.superseded).toEqual([b1.hash, b2.hash].sort());
+    // COMPACTION IS A TOMBSTONE, NOT A DROP: the dead statement keeps its chain fields (hash · author · parentHash
+    // · deps) and sheds its payload. Dropping it would shorten bob's chain and move every later statement's
+    // causal depth — and depth is what orders the deny-wins handle collision between bob's `x` and cato's `x`.
+    const dead = new Set(full.superseded);
+    const tomb = (s) => ({ ...s, payload: { authorRef: s.payload.authorRef } });
+    const compacted = foldRoster(all.map((s) => (dead.has(s.hash) ? tomb(s) : s)), { founders: [founder.pubKey] });
+    expect(strip(compacted)).toEqual(strip(full));
+    expect(compacted.superseded, 'a tombstone is never named again').toEqual([]);
+    // and the collision was real: exactly one of them holds x, and both folds say the same one
+    expect(Object.values(full.handles).filter((h) => h === 'x')).toHaveLength(1);
+    // …and a device that received the statements in another order agrees on the dead set too
+    const shuffled = [jc, jb, c1, b2, b1, c2, bx, b3];
+    expect(foldRoster(shuffled, { founders: [founder.pubKey] }).superseded).toEqual(full.superseded);
+  });
+});

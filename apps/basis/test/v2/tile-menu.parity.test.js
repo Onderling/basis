@@ -34,20 +34,22 @@ const MENU_KEYS = [
   'circle.tile.menu.leave_confirm',
   'circle.tile.menu.mute',
   'circle.tile.menu.pin',
+  'circle.tile.menu.put_away',   // opbergen (2026-09-24)
   'circle.tile.menu.settings',
+  'circle.tile.menu.take_out',   // …and back
   'circle.tile.menu.unmute',
   'circle.tile.menu.unpin',
 ];
 
 describe('β.5 — circle.tile.menu.* locale parity', () => {
-  it('web en + nl both expose the seven context-menu keys', () => {
+  it('web en + nl both expose the nine context-menu keys', () => {
     const e = flatKeys(enWeb).filter((k) => k.startsWith('circle.tile.menu.')).sort();
     const n = flatKeys(nlWeb).filter((k) => k.startsWith('circle.tile.menu.')).sort();
     expect(e).toEqual(MENU_KEYS);
     expect(n).toEqual(MENU_KEYS);
   });
 
-  it('mobile en + nl both expose the seven context-menu keys', () => {
+  it('mobile en + nl both expose the nine context-menu keys', () => {
     const e = flatKeys(enMob).filter((k) => k.startsWith('circle.tile.menu.')).sort();
     const n = flatKeys(nlMob).filter((k) => k.startsWith('circle.tile.menu.')).sort();
     expect(e).toEqual(MENU_KEYS);

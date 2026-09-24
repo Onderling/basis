@@ -68,7 +68,17 @@ export function isCircleMembershipRecord(v) {
   if (v.proof != null && typeof v.proof !== 'string') return false;
   if (v.relays != null && (!Array.isArray(v.relays) || v.relays.some((r) => typeof r !== 'string'))) return false;
   if (v.key != null && !isKeyRef(v.key)) return false;
+  if (v.sight != null && !isSight(v.sight)) return false;
   return true;
+}
+
+/**
+ * The SIGHT facet (opbergen, Frits 2026-09-24): `{ putAway, at }` — the person put this circle out of sight, on every
+ * device of theirs, and it wakes nobody. `at` orders the change between devices (the newer wins). A person-level fact
+ * about a circle, never a circle statement: the roster does not need to know.
+ */
+export function isSight(v) {
+  return !!v && typeof v === 'object' && !Array.isArray(v) && typeof v.putAway === 'boolean' && Number.isFinite(v.at);
 }
 
 /** Freeze-normalise a record to exactly the known facets (drops unknown fields). Invalid → null. */
@@ -79,6 +89,7 @@ export function normaliseCircleMembership(v) {
   if (v.proof != null) rec.proof = v.proof;
   if (Array.isArray(v.relays)) rec.relays = Object.freeze([...v.relays]);
   if (v.key != null) rec.key = Object.freeze({ ref: v.key.ref, ...(v.key.posture ? { posture: v.key.posture } : {}) });
+  if (v.sight != null) rec.sight = Object.freeze({ putAway: v.sight.putAway, at: v.sight.at });
   return Object.freeze(rec);
 }
 
@@ -158,6 +169,7 @@ export function setCircleMembership(properties, circleId, patch) {
   if (patch.proof != null) merged.proof = patch.proof;
   if (Array.isArray(patch.relays)) merged.relays = patch.relays;
   if (patch.key != null) merged.key = patch.key;
+  if (patch.sight != null) merged.sight = patch.sight;
   const rec = normaliseCircleMembership(merged);
   if (!rec) throw new TypeError('setCircleMembership: invalid membership record (an address is required)');
   return setOwn(properties, CIRCLE_MEMBERSHIPS_KEY, { ...curMap, [circleId]: rec });

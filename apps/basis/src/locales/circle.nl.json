@@ -397,6 +397,20 @@
     "text": "{{count}} openstaande voorstel(len)",
     "doc": "Accessible label for the voorstellen badge on a circle tile (P6.2 #341)."
   },
+  "launcher": {
+    "fold": {
+      "text": "Opgeborgen ({{count}})",
+      "doc": "The launcher's fold of circles out of sight — put away by you, or not held on this device."
+    },
+    "put_away": {
+      "text": "opgeborgen",
+      "doc": "A folded tile's note: the person put this circle away (every device)."
+    },
+    "not_here": {
+      "text": "niet op dit apparaat",
+      "doc": "A folded tile's note: this device does not hold this circle (the kring opt-out, My data)."
+    }
+  },
   "tile": {
     "menu": {
       "pin": {
@@ -426,6 +440,14 @@
       "leave_confirm": {
         "text": "{{name}} verlaten? Dit kan niet ongedaan worden.",
         "doc": "β.5 — confirm() text before dispatching /leave-group."
+      },
+      "put_away": {
+        "text": "Opbergen",
+        "doc": "Tile menu — OPBERGEN (Frits 2026-09-24): out of the list on every device, and it wakes nobody. The circle and your place in it stay."
+      },
+      "take_out": {
+        "text": "Terugzetten",
+        "doc": "Tile menu — back into the list (the same act, undone)."
       }
     }
   },

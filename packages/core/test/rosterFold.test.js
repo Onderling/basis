@@ -170,7 +170,7 @@ describe('foldRoster — the deterministic membership head', () => {
     expect(a).toEqual(c);
   });
 
-  it('an EQUIVOCATOR (two statements off one parent) is discounted wholesale', async () => {
+  it('an EQUIVOCATOR (two statements off one parent) is discounted from the fork on — its forked acts do not apply', async () => {
     const { founder, bob, mallory } = await ids();
     const join = body(mallory, 'join', mallory);
     const root = body(founder, 'join', founder);                          // founder's chain root
@@ -178,9 +178,51 @@ describe('foldRoster — the deterministic membership head', () => {
     const forkA = body(founder, 'evict', mallory, { parent: root.hash });
     const forkB = body(founder, 'evict', bob, { parent: root.hash });
     const r = foldRoster([join, root, forkA, forkB], { founders: [founder.pubKey] });
-    // founder equivocated → all founder's CHAINED statements discounted → neither eviction applies;
+    // founder equivocated → everything from the fork on is discounted → neither eviction applies;
     // mallory (whose own join is untouched) stays a member.
     expect(r.members).toContain(mallory.pubKey);
+  });
+
+  // ── FROM THE FORK ONWARD (Frits 2026-09-25, ledger L131) ────────────────────────────────────────────────────
+  // A fork (two statements off one parent) proves a key can no longer be trusted — almost always a stolen key. It
+  // used to discount EVERYTHING the author ever signed, so an admin's fork took down every member they had admitted,
+  // retroactively. Now the author loses standing FROM THE FORK'S DEPTH: what they signed before it stands; from it
+  // they are out (not a member, not an admin), and nothing they sign there counts.
+  it('an admin who forks keeps what they did BEFORE: the people they admitted stay', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinBob = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' } });
+    const bobAdmitsMal = body(bob, 'join', mallory, { parent: joinBob.hash, deps: [promote.hash] });   // bob, an admin, admits mallory
+    // later bob's key forks: two different statements off the same parent
+    const forkA = body(bob, 'role', founder, { parent: bobAdmitsMal.hash, payload: { role: 'member' } });
+    const forkB = body(bob, 'evict', mallory, { parent: bobAdmitsMal.hash });
+    const r = foldRoster([joinBob, promote, bobAdmitsMal, forkA, forkB], { founders: [founder.pubKey] });
+    expect(r.members, 'mallory, admitted before the fork, stays').toContain(mallory.pubKey);
+    expect(r.members, 'the forking key loses its place').not.toContain(bob.pubKey);
+    expect(r.admins).not.toContain(bob.pubKey);
+    expect(r.admins, 'nothing bob signed at the fork counts: the founder is not demoted').toContain(founder.pubKey);
+  });
+
+  it('what the forking key signs AFTER the fork admits nobody', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinBob = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' } });
+    const root = body(bob, 'role', bob, { parent: joinBob.hash, deps: [promote.hash], payload: { role: 'admin' } });
+    const forkA = body(bob, 'join', mallory, { parent: root.hash });
+    const forkB = body(bob, 'role', founder, { parent: root.hash, payload: { role: 'member' } });
+    const after = body(bob, 'join', mallory, { parent: forkA.hash });
+    const r = foldRoster([joinBob, promote, root, forkA, forkB, after], { founders: [founder.pubKey] });
+    expect(r.members).not.toContain(mallory.pubKey);
+  });
+
+  it('a fork is not a fork until there are two: a clean chain keeps everything (unchanged)', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinBob = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' } });
+    const admits = body(bob, 'join', mallory, { parent: joinBob.hash, deps: [promote.hash] });
+    const r = foldRoster([joinBob, promote, admits], { founders: [founder.pubKey] });
+    expect(r.members).toEqual(expect.arrayContaining([bob.pubKey, mallory.pubKey]));
+    expect(r.admins).toContain(bob.pubKey);
   });
 
   it('a SEED roster folds under the spine: seed members start IN (evictable), a seed admin can act', async () => {

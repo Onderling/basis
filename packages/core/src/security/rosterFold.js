@@ -16,8 +16,9 @@
  * cross-author edge raises depth, a promoted non-founder's later evict folds AFTER its own promotion (so it has
  * authority), and a past eviction folded before a later demotion of its evictor stays applied (deny-wins falls
  * out of the order — no separate "was it before?" test). An equivocating author (two statements off one
- * `parentHash` — including same content but a different frontier, since deps is bound in the hash) is DISCOUNTED
- * wholesale.
+ * `parentHash` — including same content but a different frontier, since deps is bound in the hash) is REMOVED at
+ * the fork's causal depth: what it signed before the fork stands, nothing it signs from there counts (Frits
+ * 2026-09-25 — it used to be discounted wholesale, which took down every member an admin had ever admitted).
  *
  * Statements in are the VERIFIED spine bodies (verifySpine passed): `{ kind, circleId, subject, author,
  * parentHash, hash, payload? }`, kind ∈ 'join' · 'leave' · 'evict' · 'role' (payload `{ role:'admin'|'member' }`).
@@ -88,17 +89,23 @@ const MEMBER_PROPS_FIELD_SET = new Set(MEMBER_PROPS_FIELDS);
 
 const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
-/** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
+/**
+ * Authors that equivocated (two statements off the same parent with different content), each with the statements
+ * that FORM its fork — the siblings off the shared parent. `author → Set<hash>`.
+ */
 function equivocators(stmts) {
   const byParent = new Map();   // `${author}\n${parentHash}` → first hash seen
-  const bad = new Set();
+  const forks = new Map();
   for (const s of stmts) {
     const key = `${s.author}\n${s.parentHash ?? ''}`;
     const prev = byParent.get(key);
     if (prev === undefined) byParent.set(key, s.hash);
-    else if (prev !== s.hash) bad.add(s.author);
+    else if (prev !== s.hash) {
+      if (!forks.has(s.author)) forks.set(s.author, new Set());
+      forks.get(s.author).add(prev).add(s.hash);
+    }
   }
-  return bad;
+  return forks;
 }
 
 /**
@@ -163,10 +170,27 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       && typeof s.author === 'string' && typeof s.subject === 'string' && typeof s.hash === 'string',
   );
 
-  const disputed = equivocators(stmts);
-  const live = stmts.filter((s) => !disputed.has(s.author));
-
-  const depth = depthOf(live);
+  // FROM THE FORK ONWARD (Frits 2026-09-25, L131). A fork proves the key can no longer be trusted — almost always a
+  // stolen key — from the fork on; it does not undo what the key did before. So the author's statements at or past
+  // the fork's causal depth are discounted, those before it stand (the people an admin admitted in March do not fall
+  // off every roster in September), and the fork itself acts as a REMOVAL of the author at that depth (below). It
+  // used to discount every statement the author ever signed. Depth is measured over ALL statements, so where the fork
+  // sits does not depend on what is dropped; with no fork this is the same depth as before.
+  const forks = equivocators(stmts);
+  const depth = depthOf(stmts);
+  const forkAt = new Map();      // author → the causal depth of their fork (the shallowest forked sibling)
+  const forkSeed = new Map();    // author → the fork's smallest sibling hash: the same name for the removal everywhere
+  for (const [author, hashes] of forks) {
+    let at = Infinity; let seedHash = null;
+    for (const h of hashes) {
+      const d = depth.get(h) ?? Infinity;
+      if (d < at) at = d;
+      if (seedHash === null || h < seedHash) seedHash = h;
+    }
+    forkAt.set(author, at);
+    forkSeed.set(author, seedHash);
+  }
+  const live = stmts.filter((s) => !(forkAt.has(s.author) && (depth.get(s.hash) ?? 0) >= forkAt.get(s.author)));
   // Deterministic total order: causal depth (parents before children), then author, then hash.
   const ordered = [...live].sort((a, b) =>
     (depth.get(a.hash) - depth.get(b.hash)) || (a.author < b.author ? -1 : a.author > b.author ? 1 : 0)
@@ -256,7 +280,8 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   // a separate, later batch where the key is already admin. And a past eviction folded before a later demotion
   // of its evictor (the demotion sees the eviction, so folds deeper) stays applied. Only genuinely CONCURRENT
   // acts (a demotion and an evict at the same depth, neither seeing the other) resolve by deny-wins here.
-  const depths = [...new Set(ordered.map((s) => depth.get(s.hash)))].sort((a, b) => a - b);
+  // …the fork depths are batches too: a key that forks at a depth where nothing else lands is still removed there.
+  const depths = [...new Set([...ordered.map((s) => depth.get(s.hash)), ...[...forkAt.values()].filter(Number.isFinite)])].sort((a, b) => a - b);
   for (const d of depths) {
     const batch = ordered.filter((s) => depth.get(s.hash) === d);
     const adminBefore = new Set(admins);
@@ -308,6 +333,11 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
 
     const removed = new Set();
     const removedBy = new Map();   // subject → the hash of the statement that removed them (the seed)
+    // A key that forks at this depth is removed here, founder or not: it loses its place and its rank, deny-wins
+    // over anything concurrent. If that empties the admin set, the caretaker rule below hands over as for a departure.
+    for (const [author, at] of forkAt) {
+      if (at === d) { removed.add(author); removedBy.set(author, forkSeed.get(author)); }
+    }
     for (const s of batch) {
       if (s.kind === 'leave' && s.author === s.subject) { removed.add(s.subject); removedBy.set(s.subject, s.hash); }
       else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject)) { removed.add(s.subject); removedBy.set(s.subject, s.hash); }

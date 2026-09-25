@@ -202,6 +202,7 @@ import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../ba
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { resolveSealedThumbUri } from '../../core/mijHost.js';
+import FaceView from './FaceView.js';
 import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource } from '../../core/circlePods.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
 import { buildCircleLlmProviders } from '../../../../basis/src/v2/circleLlmProviders.js';
@@ -332,6 +333,20 @@ const circleSearchVectorStore = (AsyncStorage && typeof AsyncStorage.getItem ===
 // SHARED composition both platforms use — reused, not reimplemented in the shell.
 const circleMediaBucket = makeDevMediaBucket();
 const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
+// One circle's picture opener, bound lazily (web parity: circleApp's `circlePictureResolver`). A roster row's picture
+// is sealed to ITS circle, a contact's to the pair circle — so a paint site names the circle and gets the opener here.
+// Cached per circle so a FaceView's `resolvePicture` keeps its identity across renders.
+const circlePictureResolvers = new Map();
+function circlePictureResolver(circleId, policy) {
+  if (typeof circleId !== 'string' || !circleId) return null;
+  if (!circlePictureResolvers.has(circleId)) {
+    circlePictureResolvers.set(circleId, async (ref) => {
+      const comp = await getCircleMediaComposition(circleId, policy).catch(() => null);
+      return resolveSealedThumbUri(ref, comp?.mediaGateway?.opener);
+    });
+  }
+  return circlePictureResolvers.get(circleId);
+}
 function getCircleMediaComposition(circleId, policy) {
   if (!circleId) return Promise.resolve(null);
   if (!circleMediaCompositions.has(circleId)) {
@@ -1753,6 +1768,7 @@ export default function CircleLauncherScreen({
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
+            resolvePicture={circlePictureResolver(contactThread?.pairCircleId)}
             onBack={() => setContactThread(null)}
             onRead={() => contactSeen.mark(contactThread?.contactId, Date.now()).then(refreshContactUnread).catch(() => {})}
           />
@@ -1761,7 +1777,7 @@ export default function CircleLauncherScreen({
     }
     return (
       <WithTabBar active="contacten" onSelect={onTab} badges={tabBadges}>
-        <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} />
+        <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)} />
       </WithTabBar>
     );
   }
@@ -1775,6 +1791,7 @@ export default function CircleLauncherScreen({
         callSkill={bundle?.callSkill}
         agent={bundle?.agent}
         groupId={selected.id}
+        resolvePicture={circlePictureResolver(selected.id)}
         onBack={() => setView('detail')}
       />
     );
@@ -2618,6 +2635,8 @@ function CircleDetail({
     getCircleMediaComposition(circle?.id, policy).then((m) => { if (alive) setCircleMedia(m || null); });
     return () => { alive = false; };
   }, [circle?.id, policy]);
+  // A member's released picture, opened with this circle's key — the members rows (the card has its own).
+  const resolveMemberFace = useCallback((ref) => resolveSealedThumbUri(ref, circleMedia?.mediaGateway?.opener), [circleMedia]);
   // S4 — seed a sealed circle's group-key roster with members who joined before the producer
   // was live (web parity with showCircle). Best-effort; no-op for unsealed circles.
   useEffect(() => {
@@ -4105,6 +4124,13 @@ function CircleDetail({
                   testID="circle-member-row"
                   onPress={() => setMemberCard({ member: m, self: isSelf })}
                 >
+                  {/* THE FACE — the same slot Contacten and the thread header use; the initial comes from the
+                      reveal-gated label, never an unreleased name. web≡mobile. */}
+                  <FaceView
+                    row={{ ...m, name: revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).primary }}
+                    resolvePicture={resolveMemberFace}
+                    size={28}
+                  />
                   <View style={{ flex: 1 }}>
                     {/* Reveal-gated via the SHARED helper (web parity): the roster row carries `realName`
                         ungated, so an unrevealed member must show their handle, never their name. */}

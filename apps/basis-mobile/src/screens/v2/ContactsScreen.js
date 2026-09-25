@@ -20,7 +20,7 @@ import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
-export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
+export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const peerGraph = bundle?.peerGraph ?? null;
@@ -96,7 +96,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {} }) {
       >
         {/* THE FACE, or this person's own first letter (web parity: contactsRoster's icon slot). A bot keeps
             its glyph — it is not a person and has no face. */}
-        <FaceView row={c} size={32} fallbackGlyph={c.isBot ? '🤖' : null} />
+        <FaceView row={c} size={32} fallbackGlyph={c.isBot ? '🤖' : null} resolvePicture={typeof resolvePictureFor === 'function' ? resolvePictureFor(c) : null} />
         <View style={styles.body}>
           <Text style={[styles.name, n > 0 && styles.nameUnread]}>
             {c.name}

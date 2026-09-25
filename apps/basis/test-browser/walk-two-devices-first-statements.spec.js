@@ -4,7 +4,7 @@
  * Each device of a person signs its own statements in a circle with its own key and chains them from its OWN head.
  * So the laptop's first `member-props` in a circle and the phone's first one both have no parent. Keyed by PERSON, the
  * fork detector read that as one author equivocating: before its fix it silently discounted both statements, and with
- * "fork onward" (#200) as first written it would have REMOVED the person from the circle on every device. The fold
+ * "fork onward" as first written it would have REMOVED the person from the circle on every device. The fold
  * test pins the rule; this is its browser twin, with the acts a tester does on day one.
  *
  * Three web apps over a local relay: A1 (the laptop) founds a circle with C in it; A2 (the phone) is enrolled from

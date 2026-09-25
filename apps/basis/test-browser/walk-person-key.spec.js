@@ -39,7 +39,7 @@ test('B revokes a device: A\'s next message to B is sealed to the new version â€
     await nameMe(A.page, 'Anna'); await nameMe(B1.page, 'Bea');
     const { aId, bId } = await becomeContacts(A, B1);
 
-    // B2 â€” enrolled from B1 (an add, by the offer), follows into the pair circle
+    // the second device: enrolled from the laptop (an add, by the offer), follows into the pair circle
     B2 = await bootPeer(browser, 'B2');
     B2.page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await gotoCircles(B2.page);

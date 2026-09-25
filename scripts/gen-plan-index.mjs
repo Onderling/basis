@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * gen-plan-index — regenerate plans/INDEX.md, a GENERATED one-row-per-file index of every plans/*.md.
+ * gen-plan-index — regenerate plans/INDEX.md, a GENERATED one-row-per-file index of the plans/ overviews and of
+ * plans/{live,notes,briefs}/*.md.
  *
  * The hand-maintained DOC-STATUS board rotted (stale rows for archived files, the active convergence arc not
  * listed at all). This derives the index from the FILESYSTEM so it cannot drift: adding / renaming / removing a
@@ -20,37 +21,35 @@ const ROOT  = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).tr
 const PLANS = path.join(ROOT, 'plans');
 const INDEX = path.join(PLANS, 'INDEX.md');
 
-const files = readdirSync(PLANS).filter((f) => f.endsWith('.md') && f !== 'INDEX.md').sort();
+// The top of plans/ (the overview files) and the three folders the living docs are sorted into (2026-09-25).
+// Paths are relative to plans/, so a row says where the doc lives. archive/ is not indexed — it is frozen.
+const FOLDERS = ['', 'live', 'notes', 'briefs'];
+const files = FOLDERS.flatMap((sub) => {
+  const dir = path.join(PLANS, sub);
+  let names = [];
+  try { names = readdirSync(dir); } catch { return []; }
+  return names.filter((f) => f.endsWith('.md') && !(sub === '' && f === 'INDEX.md')).map((f) => (sub ? `${sub}/${f}` : f));
+}).sort();
 
-// Status label for the docs that carry weight — so the active arc is unmistakable at the top of the index.
+// Status label for the docs that carry weight — so the master and the design of record are unmistakable at the top.
 const OVERRIDE = {
-  'PLAN-homes.md':                      '★ ROOT — design of record',
-  'PLAN-one-log-convergence.md':        '★ HUB — convergence arc',
-  'PLAN-membership-on-the-log.md':      '★ AUTHORITY — membership security',
-  'DESIGN-log-ordering-unification.md': '★ AUTHORITY — ordering/merge (#33–36)',
-  'NOTE-generalized-catchup.md':        'active — convergence (realizes step 5)',
-  'NOTE-claim-fold-generalization.md':  'deferred — #32 (first non-task consumer)',
-  'PREP-membership-slices-4-5-7.md':    'session — convergence (A/B/C)',
-  'PREP-session-stoop-circles.md':      'session — convergence (stoop→circles)',
-  'PREP-batch-4-key-custody.md':        'session — convergence (step 4)',
-  'PLAN-circles-migration-remainder.md':'session-map — convergence',
-  'SUMMARY-architecture-current.md':    'reference — bridge (fold into docs/architecture)',
-  'DOC-STATUS.md':                      'index (narrative; the table half is superseded by INDEX.md)',
+  'TRIAGE-plans-after-launch.md': '★ MASTER — the order, and every open plan\'s state',
+  'PLAN-homes.md':                '★ ROOT — design of record',
+  'DOC-STATUS.md':                'log — the dated record of what happened to the docs',
+  'DECISIONS-FOR-REVIEW.md':      'log — the judgement calls made without Frits',
+  'BACKLOG-ideas.md':             'backlog — every unbuilt idea from the docs that went',
 };
 
+// Where a doc lives says what it is (live/ = the design of record for work not done · notes/ = settled reference ·
+// briefs/ = dated, task-shaped, archived once its work lands); the top holds only the overviews.
 const cls = (f) => {
-  if (OVERRIDE[f]) return OVERRIDE[f];
-  if (/^PLAN-/.test(f))                                     return 'plan';
-  if (/^DESIGN-/.test(f))                                   return 'design';
-  if (/^NOTE-/.test(f))                                     return 'note';
-  if (/^PREP-/.test(f))                                     return 'prep';
-  if (/^(SESSION|DRAFT|LOG|REVIEW|STATUS|DEMO)-/.test(f))   return 'session/log';
-  if (/^(IMPL|QUEUE|AUDIT|SPEC|PROPOSAL)-/.test(f) || /^(PROGRESS|WORKLOG)/.test(f)) return 'tracker';
-  if (/^(SUMMARY|IDEAS|JOURNEYS)/.test(f) || f === 'regular-checks.md')              return 'reference';
-  if (/^(ADVICE|CHECKLIST|CODING)-/.test(f))               return 'plan';
-  return 'other';
+  const name = f.split('/').pop();
+  if (OVERRIDE[name]) return OVERRIDE[name];
+  if (f.startsWith('live/'))   return 'live';
+  if (f.startsWith('notes/'))  return 'note';
+  if (f.startsWith('briefs/')) return 'brief';
+  return 'overview';
 };
-
 const h1 = (f) => {
   try {
     const m = readFileSync(path.join(PLANS, f), 'utf8').match(/^#\s+(.+?)\s*$/m);
@@ -71,8 +70,8 @@ rows.sort((a, b) => (b.status.startsWith('★') - a.status.startsWith('★')) ||
 let out = '# plans/ INDEX — GENERATED, do not hand-edit\n\n';
 out += `*Run \`node scripts/gen-plan-index.mjs\` to regenerate after adding / renaming / removing a plan; `;
 out += `\`--check\` fails when it is stale. plans/ is gitignored (local). ${files.length} docs.*\n\n`;
-out += 'The ★ rows are the canonical active set (design of record · convergence spine · the two authorities). '
-     + 'Everything else is a plan / note / session-doc / tracker / reference; archived docs live in `plans/archive/`.\n\n';
+out += 'The ★ rows are the master and the design of record. `live/` holds the design of record for work not done, '
+     + '`notes/` settled reference, `briefs/` dated task-shaped docs; archived docs live in `plans/archive/<YYYY-MM>/`.\n\n';
 out += '| file | what (its H1) | status | modified |\n|---|---|---|---|\n';
 for (const r of rows) out += `| \`${r.f}\` | ${r.title} | ${r.status} | ${r.date} |\n`;
 

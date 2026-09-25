@@ -887,7 +887,8 @@ and bad actors, weakest concern to strongest:
 - **L3 · equivocation** — a member signing two contradictory events (telling different peers different things —
   double-voting, key-splitting) is caught by a **per-author hash-chain**: each governance-spine event carries a
   `parentHash`, so two events sharing a parent are a self-verifying **fork-proof**. Any replica holding both
-  halves mints it; the fold marks the author **disputed**, which resolves via the governance layer below.
+  halves mints it; the fold removes the author at the fork's depth (what they signed before it stands) —
+  the circle's governance layer below decides what happens next.
   *Scope: the hash-chain covers only the governance/membership/key event types — chat stays on the mergeable
   concurrent-edit path (forking chat isn't an attack).*
 - **L4 · governance** — each governed action maps to a **decision-class** in the circle policy
@@ -1116,8 +1117,10 @@ transitions are signed with a **circle-scoped identity carrying the member's ver
 roster is the **authoritative causal fold** over those statements: ordered by causal depth over the
 statement graph, authority checked at the fold point, deny-wins applied only to genuinely concurrent
 acts — so a causally later re-join re-admits, a concurrent evict-vs-rejoin resolves to the eviction,
-and every device computes the same roster. An equivocating author (two statements off one parent) is
-discounted wholesale. Compositions without the log rail keep a strengthen-only fallback (drop or
+and every device computes the same roster. An equivocating author (two statements off one parent) loses
+standing FROM THE FORK: removed at the fork's causal depth, with nothing they sign from there counted — while
+what they signed before it stands, so the members an admin admitted earlier are not taken down with a key
+that was stolen later (decided 2026-09-25). Compositions without the log rail keep a strengthen-only fallback (drop or
 demote, never admit) — safe, and honestly weaker. A founder is never evictable. A join signed by someone other than its subject — an admin confirming a remote joiner — stands
 on that author's authority at its causal depth: an admin before the depth, a member before it, and not demoted
 in it, the same test an evict answers to; a self-signed join stands on its redemption row. An author caught

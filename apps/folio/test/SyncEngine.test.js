@@ -849,9 +849,11 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
   });
 
   it('caps total wait at maxStableWaitMs for an ever-changing file + emits warning', async () => {
-    // Tight cap so the test runs fast (real wall clock).
+    // Real wall clock, so the margins must survive a loaded machine (L130 — red on CI under load): the stability
+    // window (100 ms) is far wider than the write gap (~10 ms, even when a timer runs late), so the file is never
+    // "stable"; and the churn runs until the cap fires rather than for a fixed 400 ms.
     // graceMs: 0 — capped path bypasses grace, but be explicit for v2.6 parity.
-    const e = newEngine({ watcher: { stableMs: 25, maxStableWaitMs: 200, graceMs: 0 } });
+    const e = newEngine({ watcher: { stableMs: 100, maxStableWaitMs: 300, graceMs: 0 } });
     e._armForStabilityTest();
 
     const decisions = [];
@@ -864,9 +866,8 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
     await fs.writeFile(file, 'v0');
     e._injectWatchEventForTest(file, 'add');
 
-    // Mutate the file every ~10ms until the cap fires.  Bounded by 400ms
-    // of wall clock to keep the test under the 2s budget.
-    const churnDeadline = Date.now() + 400;
+    // Mutate the file every ~10ms until the cap fires (bounded at 5 s so a broken cap cannot hang the suite).
+    const churnDeadline = Date.now() + 5000;
     let i = 0;
     while (Date.now() < churnDeadline) {
       i++;

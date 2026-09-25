@@ -831,7 +831,7 @@ function webFilePicker() {
 /** The composer's typed door for this circle: what the place offers, then what this device can do.
  *  Rebuilt per call so a rescope (an app toggled off) is reflected without a second cache to keep. */
 function circleComposerCommands() {
-  return createComposerCommands({ kind: 'circle', catalogue: circleCatalogue ?? undefined });
+  return createComposerCommands({ kind: 'circle', catalogue: circleCatalogue ?? undefined, availability: circleAvailabilityNow });
 }
 
 /**
@@ -1684,6 +1684,9 @@ async function circleOpAvailability(circleId) {
 // The attach menu, narrowed to what this circle can actually dispatch. Empty until the circle's
 // availability resolves — showing nothing briefly is honest; showing an entry that throws is not.
 let circleAttachMenu = [];
+// …and that availability itself, kept for the other surfaces that must ask the same thing (one fold) —
+// slash-suggest and the ⋯ roster read it; null until it resolves (they then fall back to their own gate).
+let circleAvailabilityNow = null;
 
 // ── THE WALK SEAM — a computer-readable GUI (2026-08-27) ─────────────────────────────────────────
 // Published beside the existing `window.onderling*` e2e seams, and for the same reason: driving the
@@ -2509,7 +2512,10 @@ function buildCircleBot(agent) {
           });
         }
       } catch { /* best-effort — no greying on error */ }
-      const inlineButtons = embedButtonsForReply({ reply, appOrigin: entry?.appOrigin, manifestsByOrigin, capabilityMatrix: capMatrix });
+      // The one fold (`opAvailability`): composed app · feature · capability — the answer the attach menu asks too.
+      let availability = null;
+      try { const cid = getActiveCircle(); if (cid) availability = await circleOpAvailability(cid); } catch { availability = null; }
+      const inlineButtons = embedButtonsForReply({ reply, appOrigin: entry?.appOrigin, manifestsByOrigin, capabilityMatrix: capMatrix, availability });
       // S6.B — if the dispatched op declares a screen surface (surfaces.ui.screen),
       // prepend an "Open …" button that opens a panel instead of dispatching.
       const screen = entry?.op?.surfaces?.ui?.screen;
@@ -6081,9 +6087,11 @@ function showCircle(id, circle, policy) {
   //
   // Resolved asynchronously, so the menu is briefly empty rather than briefly wrong.
   circleAttachMenu = [];
+  circleAvailabilityNow = null;
   (async () => {
     try {
       const av = await circleOpAvailability(id);
+      circleAvailabilityNow = av;
       // An entry declaring `via: 'media'` is exempt, and that is the same rule read correctly rather
       // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
       // over whether it works. Gating it on the catalogue would hide a working affordance to guard
@@ -6687,6 +6695,8 @@ function showCircle(id, circle, policy) {
       // The view only reads these when the members tab is active.
       members: circleRoster,
       resolvePicture: circlePictureResolver(id, policy?.revealPolicy ?? 'pairwise'),
+      // the ⋯ roster's op entries ask the one fold (`opAvailability`)
+      availability: circleAvailabilityNow,
       // Stale-rules banner: re-accept the circle's CURRENT rules version (the member's own signed
       // rules-accept on the membership spine), then reload the roster so the line updates.
       onAcceptRules: async () => {

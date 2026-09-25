@@ -70,7 +70,13 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
     await expect.poll(() => A2.page.evaluate(() => typeof window.onderlingCall === 'function'), { timeout: 60_000 }).toBe(true);
     await expect.poll(async () => (await myCircles(A2.page)).includes(thuis), { timeout: 90_000, message: 'A2 is in Thuis' }).toBe(true);
     expect((await call(A2.page, 'stoop', 'whoAmI'))?.webid, 'A2 is the same person').toBe(aId);
-    log('SETUP A2 enrolled', 'PASS', `Thuis ${String(thuis).slice(0, 10)}…`);
+    // A DEVICE ADDED FROM AN OFFER is an add, not a restore: no "finish your restore" screen, and never the
+    // one that told a person their circles were gone — while its launcher shows the circle the offer named.
+    await gotoCircles(A2.page);
+    await expect(A2.page.locator(`.circle-launcher__list [data-circle-id="${thuis}"]`).first(), 'A2\'s launcher shows Thuis').toBeVisible({ timeout: 30_000 });
+    const restoreScreen = await A2.page.evaluate(() => /Je herstel afronden|Je kringen zijn hier niet|Finishing your restore|Your circles are not here/i.test(document.body.innerText));
+    expect(restoreScreen, 'no restore screen on a device added from an offer').toBe(false);
+    log('SETUP A2 enrolled', 'PASS', `Thuis ${String(thuis).slice(0, 10)}…, on its launcher, no restore screen`);
 
     // ── 1. OPBERGEN: put away on A1 → folded on A2 ───────────────────────────────────────────────────
     await gotoCircles(A1.page);

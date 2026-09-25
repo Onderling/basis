@@ -2833,6 +2833,8 @@ async function showContacts() {
   showTabBar('contacten');   // the sum may have changed
   renderContactsRoster(rootEl, {
     contacts, unread, t,
+    // each row's picture is sealed to ITS pair circle
+    resolvePictureFor: (c) => circlePictureResolver(c?.pairCircleId),
     onOpen: showContactThread,
     onAdd: () => {
       const input = (globalThis.prompt?.(t('circle.contacts.add_prompt')) || '').trim();
@@ -3123,6 +3125,7 @@ async function showContactThread(contactId) {
   // …and their face, from the same row Contacten painted — one source, so the thread you opened shows the
   // person you tapped rather than a second guess at who they are.
   const face = row?.face ?? null;
+  const resolveFace = circlePictureResolver(row?.pairCircleId);
   const peerAddr = row?.peerAddr ?? contactThreads.get(contactId)?.peerAddr ?? contactId;
   if (!contactThreads.has(contactId)) contactThreads.set(contactId, { name, peerAddr, messages: [] });
   const thread = contactThreads.get(contactId);
@@ -3197,6 +3200,7 @@ async function showContactThread(contactId) {
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
     face,
+    resolvePicture: resolveFace,
     messages: (() => {
       const room = ensureNearbyRoom();
       const pending = room?.pendingReachFrom?.(thread.peerAddr);
@@ -6682,6 +6686,7 @@ function showCircle(id, circle, policy) {
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,
+      resolvePicture: circlePictureResolver(id, policy?.revealPolicy ?? 'pairwise'),
       // Stale-rules banner: re-accept the circle's CURRENT rules version (the member's own signed
       // rules-accept on the membership spine), then reload the roster so the line updates.
       onAcceptRules: async () => {
@@ -7485,6 +7490,18 @@ async function showMemberPersona(id, member) {
   });
 }
 
+// One circle's picture opener, bound lazily: the composition is built (and cached per circle) on the first
+// face that needs it, not on every render. A roster row's picture is sealed to ITS circle; a contact's to the
+// pair circle — so every paint site names the circle, and this is the one way it gets the opener.
+function circlePictureResolver(circleId, policy = 'pairwise') {
+  if (typeof circleId !== 'string' || !circleId) return null;
+  return async (ref) => {
+    const comp = await getCircleMediaComposition(circleId, policy).catch(() => null);
+    const open = makeCirclePictureResolver(comp?.mediaGateway?.opener);
+    return open ? open(ref) : null;
+  };
+}
+
 // Resolve a profile-picture SEALED media ref → an object-URL of its sealed inline
 // thumbnail (avatar-sized; no gate/fetch — the thumb ships in the manifest line),
 // via the circle's content opener. Undefined when no opener; null when no thumb /
@@ -7733,6 +7750,7 @@ async function showAdmin(id) {
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
     members, muted, outboundShares, outboundCanonical, busy, notice, t,
+    resolvePicture: circlePictureResolver(id),
     viewerWebid: myWebid,
     onBack: () => showDetail(id),
     // Make a member an admin, or step an admin back down. The op's `ui.confirm` declaration is what

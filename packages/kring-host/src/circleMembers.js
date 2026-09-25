@@ -234,6 +234,10 @@ export function memberToViewAs(member) {
     // admins were at all — the one governance fact a member looks at a member list to find. It rides
     // only when it is not the default 'member', so every plain row stays byte-identical.
     ...(m.role && m.role !== 'member' ? { role: m.role } : {}),
+    // THE FACE — the picture this member released to this circle (a sealed media ref; the shell opens it with the
+    // circle's opener). Only when released, so a row without one stays byte-identical.
+    ...(m.personaProperties?.profilePicture && typeof m.personaProperties.profilePicture === 'object'
+      ? { profilePicture: m.personaProperties.profilePicture } : {}),
     // …and HOW they came by it — present only where the projection can say (see memberAdminStatus).
     ...((() => { const a = memberAdminStatus(m); return a ? { admin: a } : {}; })()),
   };

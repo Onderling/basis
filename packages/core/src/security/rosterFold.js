@@ -300,7 +300,11 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     //
     // The demotion only fails to stand when there is nobody to hand to (every remaining member was
     // demoted at this same depth), and that case is restored there rather than pre-empted here.
-    const canEvict = (author) => canAct(author) && !demoted.has(author);  // a concurrent demotion voids authority
+    // AUTHORITY AT THIS DEPTH: an admin before the depth, a member before it, and NOT demoted in it — a concurrent
+    // demotion voids what that key does in the same batch, whether it narrows the circle (an evict) or widens it (an
+    // admission it signed for someone else). Deny-wins in both directions; the demotion is the deny. (L127 review.)
+    const canAuthorise = (author) => canAct(author) && !demoted.has(author);
+    const canEvict = canAuthorise;
 
     const removed = new Set();
     const removedBy = new Map();   // subject → the hash of the statement that removed them (the seed)
@@ -312,10 +316,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     for (const s of batch) {
       if (s.kind !== 'join' || !joinPassesGate(s)) continue;
       // A join signed by SOMEONE ELSE — an admin confirming a remote joiner — stands on that author's authority AT
-      // THIS DEPTH, the same `canAct` a role or an evict answers to (Frits 2026-09-24: "any admin should be able to
-      // readmit someone who left"). A self-signed join needs no authority here: it stands on its redemption row,
+      // THIS DEPTH, the same demotion-aware test an evict answers to (Frits 2026-09-24: "any admin should be able to
+      // readmit someone who left"; a concurrently demoted admin admits nobody — L127 review). A self-signed join needs no authority here: it stands on its redemption row,
       // which the roster read checks where the rows are.
-      if (s.author !== s.subject && !canAct(s.author)) continue;
+      if (s.author !== s.subject && !canAuthorise(s.author)) continue;
       joined.add(s.subject);
       // The acceptance rides the join's signed payload — record it with the membership it establishes.
       const v = s.payload && typeof s.payload === 'object' ? s.payload.rulesAccepted : undefined;

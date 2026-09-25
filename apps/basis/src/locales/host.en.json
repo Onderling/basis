@@ -421,8 +421,8 @@
       "doc": "Defensive."
     },
     "too_large": {
-      "text": "File too large ({{size}} bytes; max {{max}} bytes inline).  NKN drops messages over ~64KB silently, so we cap at 32KB to guarantee delivery.  Larger files need pod-URL hand-off (next slice).",
-      "doc": "Cap."
+      "text": "This file is too large to send in a message ({{size}} bytes; the limit is {{max}}). Photos are made smaller automatically; larger files cannot be sent yet.",
+      "doc": "The one cap on what a direct message carries (attachment.maxNoticeboardBytesPerAtt)."
     },
     "read_failed": {
       "text": "File read failed: {{error}}",

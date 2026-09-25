@@ -860,6 +860,8 @@ function mountBasisOpsOnAgent(agent) {
     eventLog,
     podAuth,
     openFilePicker: webFilePicker,
+    // /send-file resizes a photo the way a circle photo is resized (the one encoder, the one cap).
+    encodeImage: encodeImageFile,
     briefRunner: (o) => runBrief({ catalogue: circleCatalogue, callSkill: rawCallSkill, cache: _briefCache, bypassCache: o?.bypassCache }),
     findRunner:  (o) => runFind({ catalogue: circleCatalogue, callSkill: rawCallSkill, query: o?.query }),
     connectPeer: async () => {

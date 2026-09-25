@@ -54,6 +54,7 @@ PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --pr
 | a revoked device cannot read what contacts send next (the person key moves on) | `walk-person-key` |
 | a promoted admin re-admits someone who left | `walk-any-admin-readmits` |
 | a circle's + makes an appointment the other member sees (a card is the item's own "share this here") | `walk-attach-appointment` |
+| joining while the admin is offline says so, and that the invitation stays valid | `walk-join-admin-offline` |
 | a photo sent to a contact is resized like a circle photo, under the one attachment cap | `walk-dm-photo` |
 | a face is drawn where the person is — **both halves `test.fail`** until pod-less circles can seal media and a contact can be shown a picture | `walk-face` |
 | share my contact · the enrol that forgets · the persona release on the lane · leave travels (live build) | `walk-share-my-contact` · `walk-enrol-forgets` · `walk-persona-share-on-the-lane` · `walk-live-v0118` |

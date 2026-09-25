@@ -38,13 +38,15 @@
  *                            relay restart (a SLEEPING device never reconnects to
  *                            re-register, so a memory-only registry silently stops waking
  *                            everyone after a redeploy). Memory-only when unset.
+ *   QUEUE_DB                 sqlite path for what the relay HOLDS for offline addresses;
+ *                            makes held messages survive a redeploy. Memory-only when unset.
  */
 // Imported by real workspace path, not the '@onderling/relay' bare specifier: the
 // monorepo installs per-package (shared-workspace-lockfile=false), so there is no
 // root node_modules linking @onderling/relay. The package's OWN @onderling/* deps still
 // resolve from packages/relay/node_modules — only this outer hop must be relative.
 import { readFileSync } from 'node:fs';
-import { startRelay, getLanIp, ExpoPushSender, PushTokenRegistry, SqlitePushTokenStore } from '../../packages/relay/index.js';
+import { startRelay, getLanIp, ExpoPushSender, PushTokenRegistry, SqlitePushTokenStore, SqliteForwardStore } from '../../packages/relay/index.js';
 
 const port = parseInt(process.env.PORT ?? '8787', 10);
 const host = process.env.HOST ?? '0.0.0.0';
@@ -122,6 +124,14 @@ let acceptedGroups;
   }
 }
 
+// Held messages survive a restart: what the relay holds for offline addresses is kept in this sqlite file.
+// Memory only when unset — a restart (a redeploy, a crash, an update) then drops every waiting message.
+let forwardStore = null;
+if (process.env.QUEUE_DB) {
+  const { default: Database } = await import('better-sqlite3');   // throws loudly when not installed
+  forwardStore = new SqliteForwardStore({ path: process.env.QUEUE_DB, Database });
+}
+
 const { port: boundPort, tls } = await startRelay({
   peerDiscovery: process.env.PEER_DISCOVERY === '1',   // OFF by default — a presence + linkage oracle; disclose when on
   port,
@@ -129,6 +139,7 @@ const { port: boundPort, tls } = await startRelay({
   blobGate,
   pushSender,
   ...(pushTokenRegistry ? { pushTokenRegistry } : {}),
+  forwardStore,
   acceptedGroups,
   log: true,
 });

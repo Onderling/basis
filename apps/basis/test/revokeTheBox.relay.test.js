@@ -22,7 +22,7 @@
  * The one hand-off: the walk hands the box's printed card to `seedContactCard`. Everything else is the
  * production path, over a real relay.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -82,6 +82,7 @@ async function startBox(dataDir, env) {
 }
 
 describe('the box is revoked while it holds the address', () => {
+  const relayLines = [];   // the relay's own log, captured (step 5)
   let relay; let relayUrl; let dataDir; let env; let web; let bea; let box; let person; let phrase; let boxAddr; let boxDeviceIdPrefix; let oldWebAddr;
   // What the web app keeps across a reload: its vaults, its registry, its device log, and its item store
   // (IndexedDB in the browser; a file here). A reboot that forgot any of these would not be a reload.
@@ -104,7 +105,15 @@ describe('the box is revoked while it holds the address', () => {
   }
 
   beforeAll(async () => {
-    relay = await startJourneyRelay();
+    // The relay's own registration lines, captured (not printed): step 5 waits on the box RE-REGISTERING the profile
+    // address, not on a clock (L130 — a fixed 500 ms after "relay connected" lost the race under a full-suite load).
+    const origLog = console.log;
+    vi.spyOn(console, 'log').mockImplementation((...a) => {
+      const line = String(a[0] ?? '');
+      if (line.startsWith('[relay] ')) { relayLines.push(line); return; }
+      origLog(...a);
+    });
+    relay = await startJourneyRelay({ log: true });
     relayUrl = relay.url;
     dataDir = mkdtempSync(path.join(tmpdir(), 'basis-revoke-box-'));
     env = { PATH: process.env.PATH, HOME: dataDir, ONDERLING_RELAY_URL: relayUrl, BASIS_VAULT_PASSPHRASE: 'test-only-passphrase'};
@@ -156,6 +165,7 @@ describe('the box is revoked while it holds the address', () => {
   }, 300_000);
 
   afterAll(async () => {
+    vi.restoreAllMocks();   // the relay-log capture (step 5)
     try { box?.child?.kill('SIGTERM'); } catch { /* */ }
     await teardown(web, bea, person);
     try { await relay?.close?.(); } catch { /* */ }
@@ -250,6 +260,7 @@ describe('the box is revoked while it holds the address', () => {
     // phrase, which no ceremony can retire. Restarted (a reconnect is enough), it registers the profile
     // address again; the relay maps an address to its LAST registration, and knows nothing of a
     // revocation. So the person's next message lands on the box.
+    const regsBeforeRestart = relayLines.filter((l) => /\[relay\] registered/.test(l) && l.includes(web.pubKey.slice(0, 12))).length;
     try { box.child.kill('SIGTERM'); } catch { /* */ }
     await box.exited;
     const before = walkLog(dataDir).length;
@@ -264,7 +275,13 @@ describe('the box is revoked while it holds the address', () => {
     // it; the walk passed by that eviction. The relay releases an address only from the socket holding it now
     // (the primary-registration change), so a message sent before the box is back lands, correctly, on the web app.
     expect(await until(async () => (/relay connected/.test(box.out.slice(-20_000)) ? true : null), { timeout: 30_000, step: 250 }), 'the restarted box never reached the relay').toBe(true);
-    await new Promise((r) => setTimeout(r, 500));
+    // …and the relay has REGISTERED the profile address to it again — the condition, not a clock (L130). An external
+    // relay (ONDERLING_RELAY_URL) prints nothing here; there the old grace stands.
+    const profilePrefix = web.pubKey.slice(0, 12);
+    const regs = () => relayLines.filter((l) => /\[relay\] registered/.test(l) && l.includes(profilePrefix)).length;
+    if (!relay.external) {
+      expect(await until(async () => (regs() > regsBeforeRestart ? true : null), { timeout: 30_000, step: 100 }), 'the relay never re-registered the profile address to the restarted box').toBe(true);
+    } else await new Promise((r) => setTimeout(r, 500));
     await person.contactThreadChannel.sendTurn({ peerAddr: web.pubKey, threadId: web.pubKey, text: 'en nu?', messageId: 'fb-3' }).sent;
     expect(await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'en nu?') ?? null, { timeout: 30_000, step: 500 }),
       'the box did not take the address back — the window this walk states is not there').toBeTruthy();

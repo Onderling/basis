@@ -38,6 +38,19 @@ export function peerToContactRow(peer) {
 }
 
 /**
+ * The book's rows out of a `listContacts` reply, WHOLE. The waist answers with both `contacts` (the book's rows as
+ * stored) and `items` (the chat projection — id, label, handle, trust, peerAddr, personKey, pairCircleId, and not
+ * `persona`, `revealPreset`, `hidden` or `deletedAt`). A programmatic reader wants the rows: reading `items` first
+ * made every row look persona-less, and the pair roster founded every pair circle with no release (2026-09-24).
+ * `items` is read only when a reply has nothing else.
+ */
+export function bookRowsOf(reply) {
+  if (Array.isArray(reply?.contacts)) return reply.contacts;
+  if (Array.isArray(reply?.items)) return reply.items;
+  return [];
+}
+
+/**
  * One roster row from a stoop ContactBook entry (S1 #2 — member directory).
  * Stoop's `listContacts` returns MemberMap entries (`relation:'contact'`) with a
  * webid + pubKey + displayName/handle + trustLevel + tags. These are PEOPLE the
@@ -71,6 +84,8 @@ export function stoopContactToRow(c) {
     // Hidden (L106): the person took this contact out of their sight. The row stays — their circles, the thread and
     // the pair roster untouched — Contacten folds it away, and their next message brings them back.
     hidden:     c.hidden === true,
+    // …and when the person DELETED them (L114: hidden + the pair circle left) — the return marker reads it
+    ...(Number.isFinite(c.deletedAt) ? { deletedAt: c.deletedAt } : {}),
   };
 }
 
@@ -124,6 +139,7 @@ export function mergeContacts(peerRows = [], stoopRows = []) {
       // hid — and a row the book knows says so (`source`), which is what makes it hideable at all
       source: 'contact',
       hidden: book.hidden === true,
+      ...(Number.isFinite(book.deletedAt) ? { deletedAt: book.deletedAt } : {}),
     } : r);
   }
   return sortContactRows([...byId.values()]);
@@ -199,7 +215,12 @@ export async function nameContactsFromRosters(rows = [], { rosterRow = null } = 
     const said = m?.said && typeof m.said === 'object' ? m.said : null;
     const name = (typeof said?.displayName === 'string' && said.displayName) ? said.displayName
       : (typeof said?.handle === 'string' && said.handle) ? said.handle : null;
-    return name ? { ...r, name, namedBy: 'roster' } : r;
+    // …and their FACE, from the release on the pair circle. A contact's picture is a persona attribute they
+    // disclosed to THIS pair circle, re-sealed for it — so its presence on the row is already the permission,
+    // and it reaches this device exactly the way their name does.
+    const face = said?.personaProperties?.profilePicture ?? null;
+    if (!name && !face) return r;
+    return { ...r, ...(name ? { name, namedBy: 'roster' } : {}), ...(face ? { face } : {}) };
   }));
   return sortContactRows(named);
 }

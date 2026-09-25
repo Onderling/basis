@@ -278,6 +278,9 @@ import { resolveMobileRelayUrl } from '../../core/agentBundle.js';
 // invite parity (J-NP3 + the invite-carries-endpoint decision) — the same policy/storage reads web's
 // showCircleInvite does, so a mobile-built invite carries the SAME disclosure + endpoint fields.
 import { loadCircleStoragePod } from '../../../../basis/src/v2/circleStoragePolicy.js';
+// OPBERGEN (Frits 2026-09-24): out of sight — put away by the person, or not held on this device — one fact (web parity)
+import { splitBySight, SIGHT } from '../../../../basis/src/v2/circleSight.js';
+import { makeSyncSelection } from '../../../../basis/src/v2/syncSelection.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
 import { bindCircleGovernance, openPolicyProposals } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
@@ -921,6 +924,19 @@ export default function CircleLauncherScreen({
   const rulesStore        = useMemo(() => makeCircleRulesStoreRN(AsyncStorage), []);
   const [pinnedMap, setPinnedMap] = useState({});
   const [mutedMap,  setMutedMap]  = useState({});
+  // OPBERGEN — the person's put-away marks (registry records, carried between devices) and the fold's open state
+  const [sights, setSights] = useState({});
+  const [sightFoldOpen, setSightFoldOpen] = useState(false);
+  const refreshSights = useCallback(async () => {
+    try { setSights((await bundle?.agent?.circleSights?.()) ?? {}); } catch { /* keep what we had */ }
+  }, [bundle]);
+  useEffect(() => { refreshSights(); }, [refreshSights, circles]);
+  const onPutAwayCircle = useCallback(async (cid, putAway) => {
+    try { await bundle?.agent?.setCircleSight?.(cid, putAway); } catch { /* the launcher keeps what it had */ }
+    await refreshSights();
+  }, [bundle, refreshSights]);
+  const kringOn = useCallback((id) => makeSyncSelection({ getParamValue: (k) => bundle?.agent?.getParamValue?.(k) }).kringOn(id), [bundle]);
+  const bySight = useMemo(() => splitBySight(circles, { sights, kringOn }), [circles, sights, kringOn]);
   const [menuCircle, setMenuCircle] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -2161,12 +2177,27 @@ export default function CircleLauncherScreen({
             {circles.length === 0 && !bootError ? (
               <Text style={styles.muted}>{t('circle.empty')}</Text>
             ) : (
-              renderLauncherGroups(circles, {
+              renderLauncherGroups(bySight.shown, {
                 previews, proposalCounts, openCircle,
                 // β.5 — pin partition + long-press menu wiring.
                 pinnedMap, mutedMap, onOpenMenu: openTileMenu,
               }, styles)
             )}
+            {/* OPBERGEN — the fold: put away (every device) and not on this device (the kring opt-out), each saying which */}
+            {bySight.folded.length > 0 ? (
+              <View testID="circle-launcher-sight-fold">
+                <Pressable onPress={() => setSightFoldOpen((o) => !o)} accessibilityRole="button" testID="circle-launcher-sight-fold-toggle">
+                  <Text style={styles.sectionTitle}>{t('circle.launcher.fold', { count: bySight.folded.length })}</Text>
+                </Pressable>
+                {sightFoldOpen ? bySight.folded.map((c) => (
+                  <View key={`sight-${c.id}`} testID={`circle-launcher-folded-${c.id}`}>
+                    <LauncherTile circle={c} preview={previews?.[c.id]} pending={Number(proposalCounts?.[c.id]) || 0}
+                      isPinned={!!pinnedMap[c.id]} isMuted={!!mutedMap[c.id]} onOpen={openCircle} onLongPress={openTileMenu} />
+                    <Text style={styles.muted}>{t(c.sight === SIGHT.notHere ? 'circle.launcher.not_here' : 'circle.launcher.put_away')}</Text>
+                  </View>
+                )) : null}
+              </View>
+            ) : null}
 
             {/* The inline name row is gone — "+ new circle" now opens the 5-step wizard (mounted below),
                 so the button stays visible while the wizard is up. */}
@@ -2236,6 +2267,8 @@ export default function CircleLauncherScreen({
             theme={theme}
             getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
             persistPolicy={(groupId, patch) => policyStore.update?.(groupId, patch)}
+            // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
+            shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
             onClose={() => setCreating(false)}
             onDispatched={(r) => {
               setCreating(false);
@@ -2334,6 +2367,12 @@ export default function CircleLauncherScreen({
                       setView('settings');
                     },
                   },
+                  // OPBERGEN — out of sight on every device, or back; not for a circle this device does not hold
+                  ...(menuCircle.sight === SIGHT.notHere ? [] : [{
+                    key: 'put-away',
+                    label: t(sights?.[cid]?.putAway === true ? 'circle.tile.menu.take_out' : 'circle.tile.menu.put_away'),
+                    onPress: () => { closeTileMenu(); onPutAwayCircle(cid, sights?.[cid]?.putAway !== true); },
+                  }]),
                   {
                     key: 'leave',
                     label: t('circle.tile.menu.leave'),

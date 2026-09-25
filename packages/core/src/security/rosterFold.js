@@ -61,7 +61,31 @@ const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accep
 // `personaProperties` (2026-09-22, step two): the persona's RELEASE for this circle — coarse, reveal-gated, media by sealed
 // reference — as one map that wins whole (a key that leaves the release leaves the row; `{}` clears). It rides the same
 // self-subject statement, so the admin-mediated side wire for it could be retired.
-const MEMBER_PROPS_FIELDS = new Set(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+/**
+ * What a member may say about THEMSELVES. The kernel owns this list because the kernel is where it BINDS —
+ * a statement naming anything else is refused whole, on every receiver, whatever app version wrote it. The
+ * writer in `@onderling/circles` imports it rather than keeping its own: it had a second frozen copy that
+ * called itself "one place, shared with the fold's allowlist", and it went stale the moment a field landed.
+ */
+export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+
+/**
+ * The most an inline face thumbnail may be. See the note at its use: the picture itself lives behind the blob
+ * gateway, but the SEALING LINE carries a small preview inline, and this lane keeps every statement for ever.
+ */
+export const FACE_THUMB_MAX_CHARS = 4096;
+
+/** A released picture is within the cap, or there is no picture to check. Anything malformed is not a face. */
+function faceThumbWithinCap(pic) {
+  if (pic == null) return true;                                   // no picture disclosed — nothing to cap
+  if (!pic || typeof pic !== 'object' || Array.isArray(pic)) return false;
+  const src = (pic.type === 'media' && pic.source && typeof pic.source === 'object') ? pic.source : pic;
+  const thumb = src?.enc?.thumb;
+  if (thumb == null) return true;                                 // a ref with no inline preview is fine
+  return typeof thumb === 'string' && thumb.length <= FACE_THUMB_MAX_CHARS;
+}
+const MEMBER_PROPS_FIELD_SET = new Set(MEMBER_PROPS_FIELDS);
+
 const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
@@ -163,6 +187,16 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   // subject → { displayName?, avatarRef? } — what a member has said about themselves (`member-props`, 2026-09-21).
   // The handle lives in `handles` (one map for the join's and the later change); these are the rest.
   const props = Object.create(null);
+  // SUPERSESSION (L121, 2026-09-24). This lane keeps every statement for ever (`RETAIN.RECORD`), so a member who
+  // changes their face weekly grows every device's log by a thumb a week, for the life of the circle. The fold
+  // itself decides which `member-props` statements are DEAD: accepted, setting NO handle, and every field they
+  // set overwritten by a LATER accepted statement of the same subject. Dropping those changes no fold on any
+  // device — the newest setter of each field survives, `handles` is untouched at every depth (a handle-bearing
+  // statement is never dead: uniqueness is evaluated against history and the history must stay), and a refused
+  // statement is never named here (its acceptance depends on the very history compaction would remove).
+  // Computed identically everywhere, so every device drops the same statements — or none.
+  const propSetters = new Map();   // subject → Map<field, hash of the latest ACCEPTED setter>
+  const propStatements = [];       // every ACCEPTED member-props: { hash, subject, fields, setsHandle }
 
   // ── HOW EACH ADMIN CAME TO BE ONE ──────────────────────────────────────────────────────────────
   // Three ways in, and until now all three rendered as the same word. `role: 'admin'` on a roster row
@@ -277,6 +311,11 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     const joined = new Set();
     for (const s of batch) {
       if (s.kind !== 'join' || !joinPassesGate(s)) continue;
+      // A join signed by SOMEONE ELSE — an admin confirming a remote joiner — stands on that author's authority AT
+      // THIS DEPTH, the same `canAct` a role or an evict answers to (Frits 2026-09-24: "any admin should be able to
+      // readmit someone who left"). A self-signed join needs no authority here: it stands on its redemption row,
+      // which the roster read checks where the rows are.
+      if (s.author !== s.subject && !canAct(s.author)) continue;
       joined.add(s.subject);
       // The acceptance rides the join's signed payload — record it with the membership it establishes.
       const v = s.payload && typeof s.payload === 'object' ? s.payload.rulesAccepted : undefined;
@@ -318,13 +357,33 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (!p || p.authorRef !== s.subject) continue;                       // self-only
       if (!members.has(s.subject)) continue;                                // members only
       const keys = Object.keys(p).filter((k) => k !== 'authorRef');
-      if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELDS.has(k))) continue;   // the allowlist: refused whole
+      if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELD_SET.has(k))) continue;   // the allowlist: refused whole
       if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
+      // THE FACE'S CAP. A released `profilePicture` carries an inline thumbnail in its sealing line, and this
+      // lane is EXEMPT FROM COMPACTION (`entryKinds.js`: "the roster refolds from these — never drops"), so
+      // anything said here is kept by every device for ever — except what THIS fold names in `superseded`, which the
+      // rail tombstones (chain kept, bytes gone; L121). A rejected statement is never named, so the cap still binds. A photo-sized thumb would therefore grow the one
+      // lane that never sheds anything. Two numbers, on purpose: `MAX_SEALED_THUMB_CHARS` (48 KB, a device
+      // param) is the ceiling for a PHOTO's inline preview anywhere; 4 KB is the ceiling for a FACE, because a
+      // face is 96 px and a photo is not. Refused whole and deny-wins, like the handle collision above: a
+      // refused picture must not quietly land a display name with it. It binds HERE because every receiver
+      // folds independently — a writer's own limit is whatever app version the sender happens to run.
+      if (p.personaProperties && !faceThumbWithinCap(p.personaProperties.profilePicture)) continue;
       if (typeof p.handle === 'string' && p.handle) {
         const taken = [...members].some((m) => m !== s.subject && handles[m] === p.handle);
         if (taken) continue;                                                // uniqueness: deny-wins, the old handle stays
       }
       const mine = props[s.subject] ?? (props[s.subject] = {});
+      {   // record what this ACCEPTED statement set, for supersession (see `propSetters` above)
+        const setFields = [];
+        if (typeof p.handle === 'string' && p.handle) setFields.push('handle');
+        for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) setFields.push(k);
+        if (isPlainMap(p.personaProperties)) setFields.push('personaProperties');
+        const mineSetters = propSetters.get(s.subject) ?? new Map();
+        for (const f of setFields) mineSetters.set(f, s.hash);
+        propSetters.set(s.subject, mineSetters);
+        propStatements.push({ hash: s.hash, subject: s.subject, fields: setFields, setsHandle: setFields.includes('handle') });
+      }
       // the handle goes to `handles` (one map with the join's) AND to `props` — a projection needs to know a handle
       // came from the member's own later statement, which beats a cached rename, not from the join, which does not
       if (typeof p.handle === 'string' && p.handle) { handles[s.subject] = p.handle; mine.handle = p.handle; }
@@ -395,7 +454,11 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
 
   const adminProvenance = Object.create(null);
   for (const a of [...admins].sort()) adminProvenance[a] = adminVia.get(a) ?? 'role';
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props };
+  // The dead statements: see `propSetters`. Sorted so the list itself is identical on every device.
+  const superseded = propStatements
+    .filter((st) => !st.setsHandle && st.fields.length > 0 && st.fields.every((f) => propSetters.get(st.subject)?.get(f) !== st.hash))
+    .map((st) => st.hash).sort();
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded };
 }
 
 export default foldRoster;

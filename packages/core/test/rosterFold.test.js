@@ -44,6 +44,39 @@ describe('foldRoster — the deterministic membership head', () => {
     expect(afterRejoin.members).toEqual([founder.pubKey, mallory.pubKey].sort());   // re-admitted
   });
 
+  // ── WHO MAY ADMIT SOMEONE ELSE (Frits 2026-09-24, ledger L127: "any admin should be able to readmit someone who
+  // left"). A join signed by the joiner stands on its redemption row (checked where the rows are, in the roster
+  // read). A join signed by SOMEONE ELSE — an admin confirming a remote joiner — stands only when that author is an
+  // admin AT THAT CAUSAL POINT: the same `canAct` the role and evict statements already answer to. Before this the
+  // fold admitted every join and the read allowed only founders, so an organiser's promoted admin could never
+  // re-admit someone who had left (the pair roster's returning contact, when the one who deleted them had founded it).
+  it('a promoted admin re-admits someone who LEFT — the join it signs folds after its own promotion', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinBob  = body(bob, 'join', bob);
+    const joinMal  = body(mallory, 'join', mallory);
+    const promote  = body(founder, 'role', bob, { payload: { role: 'admin' } });
+    const malLeaves = body(mallory, 'leave', mallory, { parent: joinMal.hash });
+    // bob, having seen his promotion and mallory's leave, confirms mallory's return
+    const bobAdmits = body(bob, 'join', mallory, { parent: joinBob.hash, deps: [promote.hash, malLeaves.hash] });
+    const r = foldRoster([joinBob, joinMal, promote, malLeaves, bobAdmits], { founders: [founder.pubKey] });
+    expect(r.members).toContain(mallory.pubKey);
+  });
+
+  it('a join of SOMEONE ELSE signed by a non-admin admits nobody', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinBob  = body(bob, 'join', bob);
+    // bob is a plain member: his statement that mallory joined carries no authority
+    const bobAdmits = body(bob, 'join', mallory, { parent: joinBob.hash });
+    const r = foldRoster([joinBob, bobAdmits], { founders: [founder.pubKey] });
+    expect(r.members).not.toContain(mallory.pubKey);
+  });
+
+  it('the founder confirming a remote joiner still admits them (unchanged)', async () => {
+    const { founder, mallory } = await ids();
+    const r = foldRoster([body(founder, 'join', mallory)], { founders: [founder.pubKey] });
+    expect(r.members).toContain(mallory.pubKey);
+  });
+
   // ── DYNAMIC ROLE AUTHORITY — closed by the deps-DAG (DESIGN-log-ordering-unification §2–4). A cross-author
   // causal edge (`deps`: the frontier the author had SEEN) raises the causal depth, so "bob's evict is causally
   // AFTER founder's promote-of-bob" IS representable: bob's evict carries the promote in its deps, folds at a
@@ -486,6 +519,36 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r.props[bob.pubKey].handle, 'the join\'s handle is not').toBeUndefined();
   });
 
+  // ── THE FACE'S CAP (2026-09-23) ─────────────────────────────────────────────────────────────────────
+  // The picture is the persona's `profilePicture`, disclosed per circle and carried in the release. Its
+  // sealing line holds a small inline thumbnail — and this lane never drops a statement, so that thumbnail is
+  // kept by every device for ever. Capped here, where it binds on every receiver, whatever wrote it.
+  it('a released picture within the cap lands; one over it refuses the WHOLE statement', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const pic = (thumb) => ({ type: 'blob', ref: 'blob://x', enc: { sealed: true, keyRef: 'k', format: 'b', bytes: 9, thumb } });
+
+    const ok = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', personaProperties: { profilePicture: pic('A'.repeat(1000)) } }, parent: join.hash });
+    const r1 = foldRoster([join, ok], { founders: [founder.pubKey] });
+    expect(r1.props[bob.pubKey].personaProperties.profilePicture.enc.thumb.length).toBe(1000);
+    expect(r1.props[bob.pubKey].displayName).toBe('Bob');
+
+    const tooBig = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', personaProperties: { profilePicture: pic('A'.repeat(9000)) } }, parent: join.hash });
+    const r2 = foldRoster([join, tooBig], { founders: [founder.pubKey] });
+    expect(r2.props[bob.pubKey]?.personaProperties, 'the oversize picture is refused').toBeUndefined();
+    expect(r2.props[bob.pubKey]?.displayName, 'and so is everything it travelled with').toBeUndefined();
+  });
+
+  it('a release with no picture, or a ref with no inline preview, is not capped away', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const noThumb = { type: 'blob', ref: 'blob://x', enc: { sealed: true, keyRef: 'k', format: 'b', bytes: 9 } };
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: { region: 'noord' } }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, personaProperties: { profilePicture: noThumb } }, parent: p1.hash });
+    const r = foldRoster([join, p1, p2], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey].personaProperties.profilePicture).toEqual(noThumb);
+  });
+
   it('the PERSONA PROPERTIES ride as one field group (step two, 2026-09-22): the released map, per circle, newest map wins whole; by reference only', async () => {
     // What a persona discloses to THIS circle (`getPersonaRelease` — coarse, reveal-gated, media by sealed reference) travels
     // as `personaProperties` on the same statement, so the admin-mediated `persona-props-update` wire can go. A map, not
@@ -544,5 +607,78 @@ describe('member-props — a member\'s own display fields, folded onto their row
     const same = body(mallory, 'member-props', mallory, { payload: { authorRef: mallory.pubKey, handle: 'bob', displayName: 'Mal' }, parent: grab2.hash });
     r = foldRoster([jb, jm, grab, leave, grab2, same], { founders: [founder.pubKey] });
     expect(r.props[mallory.pubKey]).toEqual({ handle: 'bob', displayName: 'Mal' });
+  });
+});
+
+// ── SUPERSESSION (L121, 2026-09-24) — the fold names the member-props statements every device may drop ──────────
+// A `member-props` statement is DEAD when it is accepted, sets no handle, and every field it set has a later
+// accepted setter from the same subject. Dropping the dead set changes no fold: same members, handles, props.
+describe('member-props supersession — the fold computes the dead set, and dropping it changes nothing', () => {
+  const strip = (r) => { const { superseded: _s, ...rest } = r; return rest; };
+
+  it('names the fully-overwritten, handle-free statements — and only those', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', avatarRef: 'blob:1' }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bobby' }, parent: p1.hash });
+    const p3 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'bobby' }, parent: p2.hash });
+    const p4 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Robert', avatarRef: 'blob:2' }, parent: p3.hash });
+    const r = foldRoster([join, p1, p2, p3, p4], { founders: [founder.pubKey] });
+    expect(r.superseded).toEqual([p1.hash, p2.hash].sort());   // p1: both fields overwritten; p2: displayName overwritten
+    // p3 sets a handle → never dead; p4 is the newest setter of both its fields → alive
+    expect(r.superseded).not.toContain(p3.hash);
+    expect(r.superseded).not.toContain(p4.hash);
+  });
+
+  it('a partially overwritten statement is NOT dead (one of its fields still stands)', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const p1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob', avatarRef: 'blob:1' }, parent: join.hash });
+    const p2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bobby' }, parent: p1.hash });
+    const r = foldRoster([join, p1, p2], { founders: [founder.pubKey] });
+    expect(r.superseded).toEqual([]);
+  });
+
+  it('a REFUSED statement is never named — its acceptance depends on the history compaction would remove', async () => {
+    const { founder, bob, mallory: cato } = await ids();
+    const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const jc = body(cato, 'join', cato, { payload: { peerDisplay: 'cato' } });
+    const takeX = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: jb.hash });
+    // The ORDER is the premise, so it is written as causal edges (2026-09-24 — this test was red one run in two): cato
+    // claims x HAVING SEEN bob's claim, and bob moves on to y HAVING SEEN cato's refused claim. Without the edges the
+    // statements are concurrent and the fold's deterministic tiebreak over the random test keys decided who held x.
+    const catoX = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash, deps: [takeX.hash] });
+    const bobY = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'y' }, parent: takeX.hash, deps: [catoX.hash] });
+    const r = foldRoster([jb, jc, takeX, catoX, bobY], { founders: [founder.pubKey] });
+    expect(r.handles[cato.pubKey]).toBe('cato');
+    expect(r.superseded).toEqual([]);   // handle-bearing statements are never dead, refused ones never named
+  });
+
+  it('REFOLD AGREEMENT: the fold over the log with the dead set TOMBSTONED equals the fold over the whole log — in any order', async () => {
+    const { founder, bob, mallory: cato } = await ids();
+    const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const jc = body(cato, 'join', cato, { payload: { peerDisplay: 'cato' } });
+    const b1 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B1', personaProperties: { a: 1 } }, parent: jb.hash });
+    const b2 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B2' }, parent: b1.hash });
+    const bx = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'x' }, parent: b2.hash });
+    const c1 = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, handle: 'x' }, parent: jc.hash });   // refused, bob holds x
+    const b3 = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'B3', personaProperties: { a: 2 } }, parent: bx.hash });
+    const c2 = body(cato, 'member-props', cato, { payload: { authorRef: cato.pubKey, displayName: 'C2' }, parent: c1.hash });
+    const all = [jb, jc, b1, b2, bx, c1, b3, c2];
+    const full = foldRoster(all, { founders: [founder.pubKey] });
+    expect(full.superseded).toEqual([b1.hash, b2.hash].sort());
+    // COMPACTION IS A TOMBSTONE, NOT A DROP: the dead statement keeps its chain fields (hash · author · parentHash
+    // · deps) and sheds its payload. Dropping it would shorten bob's chain and move every later statement's
+    // causal depth — and depth is what orders the deny-wins handle collision between bob's `x` and cato's `x`.
+    const dead = new Set(full.superseded);
+    const tomb = (s) => ({ ...s, payload: { authorRef: s.payload.authorRef } });
+    const compacted = foldRoster(all.map((s) => (dead.has(s.hash) ? tomb(s) : s)), { founders: [founder.pubKey] });
+    expect(strip(compacted)).toEqual(strip(full));
+    expect(compacted.superseded, 'a tombstone is never named again').toEqual([]);
+    // and the collision was real: exactly one of them holds x, and both folds say the same one
+    expect(Object.values(full.handles).filter((h) => h === 'x')).toHaveLength(1);
+    // …and a device that received the statements in another order agrees on the dead set too
+    const shuffled = [jc, jb, c1, b2, b1, c2, bx, b3];
+    expect(foldRoster(shuffled, { founders: [founder.pubKey] }).superseded).toEqual(full.superseded);
   });
 });

@@ -10,6 +10,7 @@ import {
   generateKeypair, makeOpener, sealForAudience,
   establishKeyEvent, rotateKeyEvent, foldKeyEvents,
   readKeyChain, currentGroupKey, openAcrossKeyChain, KEY_EVENT_KIND,
+  collapseKeyEvents, MAX_KEYS_PER_VERSION,
 } from '../src/index.js';
 
 const GID = 'circle-x';
@@ -90,5 +91,102 @@ describe('no-pod rotation on removal — backward secrecy', () => {
     expect(() => openAcrossKeyChain(v2env, readKeyChain([e1], { groupId: GID, opener: opener(bob) }))).toThrow();
     // Reconnect: e2 is re-served (a durable log entry) → folded in → v2 opens.
     expect(openAcrossKeyChain(v2env, readKeyChain([e1, e2], { groupId: GID, opener: opener(bob) }))).toBe('new era');
+  });
+});
+
+// ── TWO ADMINS ROTATE AT ONCE (2026-09-23) ───────────────────────────────────────────────────────────────
+// Not an adversary: two people with the authority to rotate, doing it at the same moment. Until today the
+// collapse was `byVersion.set(e.version, e)` — last in READ ORDER wins — in two places, the local store and
+// this fold. Each device kept whichever arrived last, so members held different keys for the same version and
+// could not open each other's content. Electing one deterministically would stop the split but lose whatever
+// was sealed under the loser; keeping both loses nothing, because the reader already trials the whole chain.
+describe('two admins rotate to the same version at once', () => {
+  const twoRotations = () => {
+    const a = generateKeypair(); const b = generateKeypair(); const c = generateKeypair();
+    const { event: e1 } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey, b.publicKey, c.publicKey] });
+    // Both admins see v1 and rotate. Neither has seen the other's rotation — that is what "at once" means.
+    const { event: fromA } = rotateKeyEvent({ groupId: GID, priorEvents: [e1], recipients: [a.publicKey, b.publicKey, c.publicKey] });
+    const { event: fromB } = rotateKeyEvent({ groupId: GID, priorEvents: [e1], recipients: [a.publicKey, b.publicKey, c.publicKey] });
+    return { a, b, c, e1, fromA, fromB };
+  };
+
+  it('content sealed under EITHER key opens, on a device that saw them in either order', () => {
+    const { a, c, e1, fromA, fromB } = twoRotations();
+    // Each admin sealed something under its own new key before hearing about the other.
+    const underA = seal(currentGroupKey(readKeyChain([e1, fromA], { groupId: GID, opener: opener(a) })), 'from A');
+    const underB = seal(currentGroupKey(readKeyChain([e1, fromB], { groupId: GID, opener: opener(a) })), 'from B');
+    // A third member receives both, in whichever order the relay hands them over.
+    for (const log of [[e1, fromA, fromB], [e1, fromB, fromA]]) {
+      const chain = readKeyChain(log, { groupId: GID, opener: opener(c) });
+      expect(openAcrossKeyChain(underA, chain), 'A\'s content opens').toBe('from A');
+      expect(openAcrossKeyChain(underB, chain), 'B\'s content opens too — neither is discarded').toBe('from B');
+    }
+  });
+
+  it('every device agrees which key is CURRENT, whatever order it read them in', () => {
+    // The chain keeps both, but the next write must not fork again: `current` is one event, chosen the same
+    // way everywhere, so the race heals on the next rotation instead of persisting.
+    const { e1, fromA, fromB } = twoRotations();
+    const one = foldKeyEvents([e1, fromA, fromB], { groupId: GID });
+    const other = foldKeyEvents([fromB, e1, fromA], { groupId: GID });
+    expect(one.sealed, 'the same current envelope on both devices').toBe(other.sealed);
+    expect(one.version).toBe(2);
+  });
+
+  it('a RE-WRAP of one key still collapses — and keeps the wrap that reaches MORE people', () => {
+    // The benign case the de-dupe was built for: the same key re-sealed as the roster grows. Keeping both
+    // would grow the log for nothing; keeping the LAST READ can drop the wrap that added the new member on a
+    // device that read them the other way round. The superset always serves.
+    const a = generateKeypair(); const b = generateKeypair(); const c = generateKeypair();
+    const { event: e1, groupKey } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey, b.publicKey] });
+    const { event: wider } = rotateKeyEvent({ groupId: GID, priorEvents: [], recipients: [a.publicKey, b.publicKey, c.publicKey], groupKey });
+    const widerAtV1 = { ...wider, version: 1 };   // the same KEY, re-wrapped to one more recipient, at v1
+    for (const log of [[e1, widerAtV1], [widerAtV1, e1]]) {
+      const r = foldKeyEvents(log, { groupId: GID });
+      expect(r.version, 'still one version').toBe(1);
+      const chain = readKeyChain(log, { groupId: GID, opener: opener(c) });
+      expect(chain.length, 'the newcomer can open v1 whichever order the device read the two wraps').toBe(1);
+    }
+  });
+
+  it('a fourth key at one version is REFUSED — that is the only adversary in this item', () => {
+    // Two honest admins colliding is two keys; three is a partition healing; more is a client minting keys to
+    // grow every member's chain, which is a cost it imposes on everyone else. Every device drops the same
+    // extras, by keyId, so a refusal does not become a new way for devices to disagree.
+    const a = generateKeypair();
+    const { event: e1 } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey] });
+    const many = [e1];
+    for (let i = 0; i < 6; i += 1) {
+      const { event } = rotateKeyEvent({ groupId: GID, priorEvents: [e1], recipients: [a.publicKey] });
+      many.push(event);
+    }
+    const kept = collapseKeyEvents(many).filter((e) => e.version === 2);
+    expect(kept.length, 'capped').toBe(MAX_KEYS_PER_VERSION);
+    // …and the same ones, whatever order they arrived in.
+    const shuffled = collapseKeyEvents([...many].reverse()).filter((e) => e.version === 2);
+    expect(shuffled.map((e) => e.keyId)).toEqual(kept.map((e) => e.keyId));
+  });
+
+  it('events minted BEFORE keyIds existed are ONE legacy key per version — collapsed by the re-wrap rule, never counted toward the cap', () => {
+    // three old v1 wraps (the roster grew twice), then a v1 re-wrap minted with a keyId, then a v2 rotation
+    const old = (n) => ({ kind: 'group-key-event', groupId: 'g', version: 1, members: n, recipients: Array.from({ length: n }, (_, i) => `r${i}`), sealed: `old-${n}` });
+    const named = { kind: 'group-key-event', groupId: 'g', version: 1, keyId: 'aaaa', members: 4, recipients: ['r0', 'r1', 'r2', 'r3'], sealed: 'new-4' };
+    const v2 = { kind: 'group-key-event', groupId: 'g', version: 2, keyId: 'bbbb', members: 4, recipients: ['r0', 'r1', 'r2', 'r3'], sealed: 'v2' };
+    const kept = collapseKeyEvents([old(1), old(2), old(3), named, v2]);
+    const v1 = kept.filter((e) => e.version === 1);
+    expect(v1).toHaveLength(2);                                   // one legacy row + one named row, not four
+    expect(v1.find((e) => e.keyId == null).sealed).toBe('old-3'); // the legacy wrap that reaches MOST people
+    expect(v1.find((e) => e.keyId === 'aaaa')).toBeTruthy();      // the named wrap survives — nothing dropped by the cap
+    expect(kept.find((e) => e.version === 2)).toBeTruthy();
+  });
+
+  it('keyId names the KEY, not the wrap — the same key wrapped twice has one id, two keys have two', () => {
+    const a = generateKeypair(); const b = generateKeypair();
+    const { event: e1, groupKey } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey] });
+    const { event: rewrapped } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey, b.publicKey], groupKey });
+    const { event: different } = establishKeyEvent({ groupId: GID, recipients: [a.publicKey] });
+    expect(rewrapped.keyId, 'a re-wrap of one key keeps its name').toBe(e1.keyId);
+    expect(rewrapped.sealed, '…even though the envelope differs').not.toBe(e1.sealed);
+    expect(different.keyId, 'a different key gets a different name').not.toBe(e1.keyId);
   });
 });

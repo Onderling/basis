@@ -90,6 +90,8 @@ import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
 import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
+import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
+import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
 import { makeSyncSelection } from '../../v2/syncSelection.js';
 import { leaveCircleLocally } from '../../v2/circleMembershipHygiene.js';
@@ -1530,7 +1532,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Circle membership (registry restore-data) — carry a per-circle { handle, address, … } record on the
       // profile so a restored device knows its circles + the handle it used. Merge via the pure setter (keeps
       // the other circles' records), then re-register the FULL entry (preserves key/role/grants/disclosure).
-      setCircleMembership: async ({ profileId, circleId, handle, address, proof, relays, key }) => {
+      setCircleMembership: async ({ profileId, circleId, handle, address, proof, relays, key, sight }) => {
         const cur = await agentsRegistry.lookup(profileId);
         if (!cur) throw new Error(`setCircleMembership: no such profile ${profileId}`);
         const wasIn = !!circleMembershipsOf(cur)[circleId];
@@ -1538,6 +1540,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (proof != null) record.proof = proof;
         if (Array.isArray(relays)) record.relays = relays;
         if (key != null) record.key = key;
+        if (sight != null) record.sight = sight;   // the circle PUT AWAY (opbergen) — a field picked here, or it is dropped
         await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
         // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
         // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
@@ -1988,7 +1991,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
   const personSeedFor = (version) => (personKey?.version === version ? personKey.seed : (personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
   const contactRecords = async () => {
-    try { const r = await callSkill('stoop', 'listContacts', {}); return r?.items ?? r?.contacts ?? []; } catch { return []; }
+    try { return bookRowsOf(await callSkill('stoop', 'listContacts', {})); } catch { return []; }
   };
   /**
    * The PERSON an address names: an address this device has bound to an identity (a per-circle or mesh alias) resolves
@@ -2136,6 +2139,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
     const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+    // Names only. The PICTURE does not ride here: it is the persona's `profilePicture` attribute and travels
+    // in the per-circle RELEASE (`shareDisclosureToCircle` → `personaProperties`), re-sealed for each circle.
+    // Putting it here too would be a second road for one thing — which is what happened on 2026-09-23 and was
+    // taken out again.
     return sayOnRosters({ circleIds: circles, props: { handle: me.handle, displayName: me.displayName } });
   }
   const knownPeersSync = createKnownPeersSync({
@@ -2152,7 +2159,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       add: (contact) => rawStoop('addContact', contact),
       get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
       // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
-      setHidden: (webid, hidden, hiddenAt) => rawStoop('setContactHidden', { webid, hidden, hiddenAt }),
+      setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawStoop('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
+      // …and a newer change of what the contact sees of the person (L125), by the same rule
+      setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawStoop('setContactPersona', {
+        webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
+      }),
     },
     onLanded: () => savePeerBindings(),
   });
@@ -2177,7 +2188,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       const address = circleAddressFor(id);
       if (!address) continue;
       const rec = memberships[id] ?? null;
-      out.push({ id, handle: rec?.handle ?? null, address, relays: Array.isArray(rec?.relays) && rec.relays.length ? [...rec.relays] : onRelays });
+      out.push({
+        id, handle: rec?.handle ?? null, address, relays: Array.isArray(rec?.relays) && rec.relays.length ? [...rec.relays] : onRelays,
+        // the circle PUT AWAY (opbergen): the person's mark rides the entry, so a sibling takes the newer one
+        ...(rec?.sight ? { sight: { putAway: rec.sight.putAway, at: rec.sight.at } } : {}),
+      });
     }
     return out;
   }
@@ -2213,6 +2228,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       ? circleFollowConsume(entry)
       : Promise.resolve({ circleId: entry.id, ok: false, steps: [], error: 'no-consume' })),   // a composition without the step joins nothing
     leave: leaveFollowed,
+    // PUT AWAY (opbergen): the mark lives on the circle's registry record (restore carries it); a sibling's newer lands
+    sightOf: async (circleId) => (await readSelfCircleMemberships().catch(() => ({})))?.[circleId]?.sight ?? null,
+    setSight: (circleId, sight) => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, sight }),
     onLanded: (r) => console.info(`[circle-follow] ${r.steps.includes('left') ? (r.ok ? 'left' : 'could not leave') : (r.ok ? 'joined' : 'could not join')} ${String(r.circleId).slice(0, 12)}… after a sibling (${r.steps.join(' ')})`),
   });
   circleFollowSync.setConsume = (fn) => { circleFollowConsume = typeof fn === 'function' ? fn : null; };
@@ -2558,6 +2576,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           const fold = foldKeyEvents(events, { groupId: circleId });
           if (!fold?.recipients?.length) continue;
           const gone = retiredSealingFor(circleId);
+          // ALREADY DONE? Another admin may have rotated this circle between our read and now. If the current
+          // fold no longer names any retired address, the work exists and minting a second version off the same
+          // parent would only create the honest concurrency the fold has to resolve afterwards. This decides
+          // nothing — two admins who genuinely race still both land, and `collapseKeyEvents` keeps both keys —
+          // it just makes the race rare instead of routine.
+          if (!fold.recipients.some((r) => gone.has(r))) continue;
           const mine = sealingPublicKeyFromNetworkKey(circleAddressFor(circleId));
           const recipients = fold.recipients.filter((r) => !gone.has(r));
           if (!recipients.includes(mine)) recipients.push(mine);
@@ -3287,6 +3311,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     });
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
+    // The fold's compaction verdict comes back the same road the statements went out on (L121): stoop hands
+    // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
+    // between here and the fold has to learn a new name.
+    membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
     // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
     // full-item snapshot, fanned via broadcastCircleTask; receivers verify at their rail and causally merge
     // the head. The store's publish hook routes task types here instead of the legacy mirror (the per-type
@@ -3531,6 +3559,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   try { stoopAgent.bundle?.itemStore?.on?.('item-added', (item) => { fanNoticeboardItem(item); }); }
   catch (err) { if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan not installed:', err?.message ?? err); }
   await chatAgent.hello(stoopAgent.address);
+
+  // Contacts made before the persona field existed record NONE. Write `default` onto them once — only where the
+  // pair circle id PROVES it (`backfillContactPersonas`): a row whose pair circle is not the default identity's is
+  // reported and left alone. `personaAt: 0`, so any real choice made on any device outranks it; RAW, so a
+  // backfilled row does not fan (every device backfills its own, from the same proof). Best-effort, after boot.
+  backfillContactPersonas({
+    rows: await rawContacts().catch(() => []),
+    selfWebid: chatId.pubKey,
+    setPersona: (webid, persona) => rawStoop('setContactPersona', { webid, persona, personaAt: 0 }),
+  }).then((r) => { if (r.mismatched && typeof console !== 'undefined') console.warn(`[contact-persona] ${r.mismatched} contact row(s) not provably the default persona's — left unrecorded`); })
+    .catch(() => {});
 
   // Pre-seed the local actor's stoop handle + displayName so
   // /stoop-profile has something to show (real getMyProfile returns
@@ -4357,7 +4396,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
       // next catch-up. The landing side keeps the newer mark, so a hide and a show that cross resolve the same
       // way everywhere.
-      if (realOpId === 'setContactHidden' && rawReply?.contact) {
+      // …and what a contact sees of the person (L125), by the same carry: changed here, changed on every device.
+      if ((realOpId === 'setContactHidden' || realOpId === 'setContactPersona') && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
       }
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
@@ -5736,7 +5776,23 @@ export async function createRealHouseholdAgent(opts = {}) {
     // shell can re-run it after a late registry import/restore without a full reload. Returns
     // `{ reopened: [circleId] }`. Idempotent + best-effort per circle.
     reopenMemberCircles,
-    registryCarrierStatus: () => registryCarrierStatus(),   // where the registry rides: local / cache, and the probe outcome
+    registryCarrierStatus: () => registryCarrierStatus(),
+    /**
+     * PUT A CIRCLE AWAY, or take it out (opbergen, Frits 2026-09-24): the person's mark on the circle's registry
+     * record, carried to their other devices. Out of sight on every device; wakes nobody (the rule the notification
+     * gate reads when there is one). A person-level fact — never a circle statement.
+     */
+    setCircleSight: async (circleId, putAway) => {
+      const sight = { putAway: putAway === true, at: Date.now() };
+      const r = await callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, sight });
+      if (r?.ok) circleFollowSync?.fanSight?.(circleId).catch?.(() => {});
+      return r?.ok ? { ok: true, sight } : { ok: false, reason: r?.reason ?? 'not-recorded' };
+    },
+    /** `{ [circleId]: { putAway, at } }` — the marks this device holds. */
+    circleSights: async () => {
+      const m = await readSelfCircleMemberships().catch(() => ({}));
+      return Object.fromEntries(Object.entries(m ?? {}).filter(([, r]) => r?.sight).map(([id, r]) => [id, { ...r.sight }]));
+    },   // where the registry rides: local / cache, and the probe outcome
 
     // Transport-NEUTRAL reachability — true when ANY peer transport can carry a
     // message (NKN `.peer` OR the WebSocket `.relay`; sendPeerMessage already
@@ -5951,6 +6007,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)
     historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
     restorePending: () => restorePendingAtBoot,   // a phrase ceremony ran here and the restore-finish flow has not asked yet
+    /** The ceremony was an ADD (an offer is being consumed), not a restore: drop the note without the flow. */
+    dismissRestorePending: async () => {
+      try { await ownerRootVault.delete?.(RESTORE_PENDING_KEY); } catch { /* best-effort — the next boot asks again */ }
+      restorePendingAtBoot = false;
+    },
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.
     circleAddressFor,

@@ -861,7 +861,21 @@
   background: transparent; border: none; padding: 10px 0; text-decoration: underline; align-self: center;
 }
 .cc-contacts__hidden { margin-top: 8px; }
-.cc-contacts__icon { font-size: 22px; line-height: 1; }
+/* THE FACE SLOT. One size for every row that shows a person, so a list does not jump when one of them sets a
+   picture and the others have not. Without a face it holds the person's initial; with one it holds a square
+   image, cropped to fill rather than squashed, because a face that is stretched reads as the wrong person. */
+.cc-contacts__icon {
+  font-size: 22px; line-height: 1;
+  flex: 0 0 auto; width: 2rem; height: 2rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cc-contacts__icon.has-face { font-size: 0; }
+.cc-face__img {
+  width: 100%; height: 100%; border-radius: 50%;
+  object-fit: cover;          /* fill the circle; never distort a face to fit it */
+  display: block;
+  background: var(--cc-line, #e4e0d8);   /* the ground while it decodes, so the row does not flash */
+}
 .cc-contacts__body { flex: 1 1 auto; min-width: 0; }
 .cc-contacts__name { font-weight: 600; color: var(--ink); }
 .cc-contacts__meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
@@ -1368,3 +1382,9 @@
   border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px;
 }
 .cc-wizard-submit, .cc-wizard-cta-secondary { margin-top: 8px; }
+
+
+/* The face in a roster row and a thread header — the same slot Contacten uses, so one person looks like one
+   person wherever they appear. Sized a touch smaller in the thread header, where the name is the subject. */
+.cc-admin__member-face { margin-right: .5rem; vertical-align: middle; }
+.cc-cthread__face { width: 1.6rem; height: 1.6rem; font-size: 16px; margin-right: .4rem; }

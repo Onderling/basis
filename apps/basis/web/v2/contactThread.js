@@ -12,6 +12,8 @@
 
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
+import { paintFace } from './faceView.js';
 
 // Privacy-badge palette (§10c) — the discrete states map to Onderling status tokens (mirrors
 // apps/basis/src/v2/theme.js). Colour AMPLIFIES the shape; quiet is a NEUTRAL slate outline (never green).
@@ -33,6 +35,7 @@ function _ensurePrivacyPulseKeyframes() {
 
 export function renderContactThread(container, {
   name = '',
+  face = null,       // the contact's own face as the lane carries it (a `data:image/` thumb) — null = the initial
   messages = [],
   skills = [],
   busy = false,
@@ -53,6 +56,9 @@ export function renderContactThread(container, {
   hidden = null,           // L106: is this contact hidden from Contacten? true/false paints Verbergen/Tonen; null = not a person (a bot) → no control
   onToggleHidden = null,   // (hidden: boolean) => void — the person's own act; a message from the contact does the same as `false`
   contactId = null,        // the thread's key, on the root as data-contact-id — what a probe reads to name the open thread
+  onOpenLens = null,       // L125: () => void — "what does this contact see of you?"; a person's thread only (with `hidden`)
+  onDelete = null,         // L114: () => void — delete this contact (the shell confirms first); a person's thread only
+  deletedAt = null,        // L114: when this contact was deleted — a return after it says "verwijderd", not "verborgen"
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactThread.js');
@@ -69,6 +75,12 @@ export function renderContactThread(container, {
   back.textContent = tr('circle.contacts.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   header.appendChild(back);
+  // The contact's face beside their name — the same slot Contacten and a roster row use, so the person you
+  // opened is visibly the person you were looking at.
+  const avatar = document.createElement('span');
+  avatar.className = 'cc-cthread__face cc-contacts__icon';
+  paintFace(avatar, { face, name });
+  header.appendChild(avatar);
   const title = document.createElement('h2');
   title.className = 'cc-cthread__title';
   title.textContent = tr('circle.contacts.thread_title', { name });
@@ -138,6 +150,25 @@ export function renderContactThread(container, {
     hide.addEventListener('click', () => onToggleHidden(!hidden));
     header.appendChild(hide);
   }
+  // WHAT THEY SEE (L125, Frits 2026-09-24): which persona this contact sees you as, and how much — changed here,
+  // beside the other per-contact control. A person's thread only: a bot has no pair roster to say a release on.
+  if (typeof hidden === 'boolean' && typeof onOpenLens === 'function') {
+    const lens = document.createElement('button');
+    lens.type = 'button';
+    lens.className = 'cc-cthread__lens';
+    lens.textContent = tr('circle.contacts.lens.open');
+    lens.addEventListener('click', () => onOpenLens());
+    header.appendChild(lens);
+  }
+  // DELETE (L114): hide + leave the pair circle — a relationship act. The shell asks first (the confirm is the undo).
+  if (typeof hidden === 'boolean' && typeof onDelete === 'function') {
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'cc-cthread__delete';
+    del.textContent = tr('circle.contacts.delete');
+    del.addEventListener('click', () => onDelete());
+    header.appendChild(del);
+  }
   container.appendChild(header);
   if (typeof hidden === 'boolean' && typeof onToggleHidden === 'function') {
     const note = document.createElement('div');
@@ -161,10 +192,11 @@ export function renderContactThread(container, {
     // The turn that brought a hidden contact back carries the mark (`returned`, decided where it first landed
     // and stored with the turn): a SYSTEM line above its bubble — "Je had dit contact verborgen." — so the person
     // understands why someone they removed is back in their list. Neither side's bubble.
-    if (m.returned === true) {
+    const markerKey = returnedMarkerKey(m, deletedAt);
+    if (markerKey) {
       const sys = document.createElement('div');
       sys.className = 'cc-cthread__system';
-      sys.textContent = tr('circle.contacts.returned_marker');
+      sys.textContent = tr(markerKey);
       log.appendChild(sys);
     }
     const row = document.createElement('div');

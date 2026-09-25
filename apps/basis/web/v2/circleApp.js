@@ -46,6 +46,11 @@ import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { inviteDeepLink } from '../../src/v2/inviteDeepLink.js';
 import { alphaViewMode, isAlphaTab, ALPHA_FALLBACK_TAB } from '../../src/v2/alphaSurface.js';
 import { runPendingForget, markerVaultOver, circleIdsFrom } from '../../src/v2/enrolForgets.js';
+import { DEFAULT_PERSONA } from '../../src/v2/contactPersona.js';
+import { contactAddSheetModel, addContactAs, contactLensModel, changeContactLens } from '../../src/v2/contactLens.js';
+import { renderContactLensPanel } from './contactLensPanel.js';
+import { deleteContact } from '../../src/v2/contactDelete.js';
+import { restoreFinishOutcome } from '../../src/v2/restoreFinishView.js';
 import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
@@ -190,7 +195,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
@@ -1255,6 +1260,20 @@ function publishEventToLog(e) {
 // half and entry kind — is gone with the persona side wire, 2026-09-22: the release is a `member-props` statement
 // now and lands by the membership lane, whose `membershipChange` re-reads the roster.)
 const disclosureShareMemo = createDisclosureShareMemo(localStorageDisclosureShareIo());
+/** A persona's release said on one circle — ONE composition for every door that says it: Mij's share button, the
+ *  pair roster founding a contact's circle, the create wizard founding yours, and the walk's seam. */
+function shareCircleRelease(circleId, personaId) {
+  return shareDisclosureToCircle({
+    callSkill: rawCallSkill,
+    // The release is SAID on the circle's membership lane (`member-props`) — no admin in the loop.
+    emitMemberProps: (a) => _peerAgent?.emitMemberProps?.(a),
+    circleId, personaId,
+    // Diff-gate: an unchanged save is a true no-op (nothing said, nothing re-sealed).
+    lastShared: disclosureShareMemo,
+    // Media props (profilePicture) leave RE-SEALED to this circle: the self-sealed source → a circle-sealed copy.
+    resealMediaForCircle: resealPersonaMediaForCircle,
+  });
+}
 // The member-side PULL: a pull-me for the open circle re-reads its roster rows. Silent — the
 // MEMBERS rows / member cards just refresh; no bubble, no toast.
 const pullRosterForCircle = async ({ circleId }) => {
@@ -1725,12 +1744,7 @@ if (typeof window !== 'undefined') {
       : Promise.resolve({ error: 'callSkill-not-ready' })
   );
   // What the "share to this circle" button does, as a seam a walk can drive (the button lives inside a panel).
-  window.onderlingShareToCircle = (circleId, personaId = 'default') => shareDisclosureToCircle({
-    callSkill: rawCallSkill,
-    emitMemberProps: (a) => _peerAgent?.emitMemberProps?.(a),
-    circleId, personaId, lastShared: disclosureShareMemo,
-    resealMediaForCircle: resealPersonaMediaForCircle,
-  });
+  window.onderlingShareToCircle = (circleId, personaId = 'default') => shareCircleRelease(circleId, personaId);
   /** Invoke one of the ops the surface offers — the same `{opId, args}` a tap compiles to. */
   window.onderlingDispatch = (opId, args = {}) => (
     typeof circleDispatchReady === 'function'
@@ -2253,6 +2267,8 @@ function buildCircleBot(agent) {
     myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => connectedRelayUrls()?.[0] ?? null,
     activeEndpointUrl: () => connectedRelayUrls(),
+    // the lens: the founder says on the new pair circle what this contact's persona discloses (same road as Mij's share)
+    shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   circleContactChannel = createContactThreadChannel({
     blobStore: circleAttachmentBlobs,
@@ -2854,7 +2870,10 @@ async function contactReturned(contactId) {
 // A card that arrived with a message, already checked to name its sender: into the book through the one decoder
 // (a re-add merges over an existing row and leaves a hidden mark alone), then the row on screen gets its name.
 async function contactCardArrived({ contactId, card }) {
-  try { await rawCallSkill('stoop', 'addContactFromQr', { payload: card }); } catch { return; }
+  // The persona is recorded EXPLICITLY even here, where nobody was asked: a card arriving with a message has
+  // no moment to choose in. Writing `default` says "they see your default self", which is true and checkable;
+  // leaving it absent would mean "not recorded" and push the question onto every later reader.
+  try { await rawCallSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); } catch { return; }
   const thread = contactThreads.get(contactId);
   if (thread) {
     try { const row = (await loadAllContacts()).find((c) => c.contactId === contactId); if (row?.name && row.name !== contactId) thread.name = row.name; } catch { /* the next open names it */ }
@@ -3009,6 +3028,61 @@ async function loadTaskGrants({ taskId, circleId } = {}) {
   } catch { return []; }
 }
 
+// WHAT A CONTACT SEES OF YOU (L125, Frits 2026-09-24: "both"). Before a scanned card or a link is added, the sheet
+// asks — persona and level, prefilled with the default and your usual level; later, the thread header changes it.
+// The logic is `src/v2/contactLens.js`; the pair roster's own id function names the pair circle for both.
+function openLensForm(extra) { mountMyDataWizard(renderContactLensPanel, { t, ...extra }); }
+/** Add a card AFTER the sheet: the chosen lens, or `null` when the person closed it (nothing added). */
+async function addContactWithSheet(payload) {
+  const model = await contactAddSheetModel({ payload, callSkill: rawCallSkill });
+  // not a card this decoder reads: hand it to stoop as before, which refuses it with its own reason
+  if (!model) return rawCallSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
+  const choice = await new Promise((resolve) => openLensForm({
+    mode: 'add', model, onSubmit: (c) => resolve(c), onCancel: () => resolve(null),
+  }));
+  if (!choice) return null;
+  return addContactAs({ callSkill: rawCallSkill, payload, ...choice, pairCircleIdOf: circlePairRoster?.pairCircleIdFor });
+}
+/** The thread header's "what they see": the row's lens, changed in place, the release said on the pair circle. */
+async function openContactLens(contactId, name) {
+  let row = null;
+  try { row = ((await rawCallSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c?.webid === contactId) ?? null; } catch { row = null; }
+  const pairCircleIdOf = circlePairRoster?.pairCircleIdFor;
+  const model = await contactLensModel({ callSkill: rawCallSkill, row: row ?? { webid: contactId }, pairCircleIdOf });
+  openLensForm({
+    mode: 'change', model: { ...model, name: name || row?.displayName || row?.handle || contactId },
+    onSubmit: async (choice) => {
+      const r = await changeContactLens({ callSkill: rawCallSkill, contactId, ...choice, shareRelease: shareCircleRelease, pairCircleIdOf });
+      const personaName = model.personas.find((p) => p.id === choice.persona)?.name ?? choice.persona;
+      globalThis.alert?.(r?.error ? t('circle.contacts.lens.failed') : t('circle.contacts.lens.saved', { name: name || contactId, persona: personaName }));
+    },
+  });
+}
+
+/** Delete a contact (L114, Frits 2026-09-24): the confirm sheet, then hide + leave the pair circle (`contactDelete.js`). */
+async function deleteContactWithConfirm(contactId, name) {
+  const who = name || contactId;
+  const ok = await openCircleConfirmDialog({
+    severity: 'danger',
+    title: t('circle.contacts.delete_title', { name: who }),
+    message: t('circle.contacts.delete_body', { name: who }),
+    acceptLabel: t('circle.contacts.delete_confirm'),
+    cancelLabel: t('circle.contacts.lens.cancel'),
+    opId: 'deleteContact',
+  });
+  if (!ok) return;
+  const pairCircleId = circlePairRoster?.pairCircleIdFor?.(contactId) ?? null;
+  const r = await deleteContact({
+    agent: _peerAgent, callSkill: rawCallSkill, contactWebid: contactId, pairCircleId,
+    unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({
+      relays: _peerAgent?.relays?.list?.() ?? [], circleIds: [pairCircleId],
+      circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
+    }) : null,
+  });
+  globalThis.alert?.(r.ok ? t('circle.contacts.deleted', { name: who }) : t('circle.contacts.lens.failed'));
+  if (r.ok) showContacts();
+}
+
 // add a bot to the app PeerGraph (an https agent-card URL → discoverA2A;
 // else a raw peer address → manual upsert), then re-render the roster.  Reuses
 // the shared `addBotToGraph` (web≡mobile).  Best-effort: a bad URL/address shows
@@ -3020,10 +3094,16 @@ async function addBotFromInput(input) {
       input, peerGraph: circlePeerGraph, coreAgent: circleCoreAgent, discover: discoverA2A,
       // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one decoder);
       // the unified roster merges the ContactBook, so the person appears DM-ready right away.
-      addContact: (payload) => rawCallSkill('stoop', 'addContactFromQr', { payload }),
+      // …asking first what they will see of you (L125): the sheet, prefilled; a cancel adds nothing
+      addContact: async (payload) => {
+        const r = await addContactWithSheet(payload);
+        if (r === null) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+        return r;
+      },
     });
     globalThis.alert?.(t('circle.contacts.added', { name: rec?.name ?? rec?.displayName ?? rec?.handle ?? rec?.url ?? rec?.pubKey ?? '' }));
   } catch (err) {
+    if (err?.code === 'cancelled') return;   // the person closed the sheet — nothing was added, nothing to say
     console.warn('[circleApp] add bot failed:', err?.message ?? err);
     // A circle invite pasted in the contact box is the VERIFIED rung — point at the join flow.
     globalThis.alert?.(t(err?.code === 'circle-invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed'));
@@ -3040,6 +3120,9 @@ async function showContactThread(contactId) {
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
   catch { /* fall back to any cached thread below */ }
   const name = row?.name ?? contactThreads.get(contactId)?.name ?? contactId;
+  // …and their face, from the same row Contacten painted — one source, so the thread you opened shows the
+  // person you tapped rather than a second guess at who they are.
+  const face = row?.face ?? null;
   const peerAddr = row?.peerAddr ?? contactThreads.get(contactId)?.peerAddr ?? contactId;
   if (!contactThreads.has(contactId)) contactThreads.set(contactId, { name, peerAddr, messages: [] });
   const thread = contactThreads.get(contactId);
@@ -3113,6 +3196,7 @@ async function showContactThread(contactId) {
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
+    face,
     messages: (() => {
       const room = ensureNearbyRoom();
       const pending = room?.pendingReachFrom?.(thread.peerAddr);
@@ -3134,6 +3218,10 @@ async function showContactThread(contactId) {
     onToggleHidden: async (next) => {
       try { await setContactHidden(contactId, next); } catch { error = true; rerender(); }
     },
+    onOpenLens: () => { openContactLens(contactId, thread.name).catch(() => {}); },
+    deletedAt: row?.deletedAt ?? null,
+    // DELETE (L114): hide + leave the pair circle, asked first — the confirm is the undo
+    onDelete: hidden === null ? null : () => { deleteContactWithConfirm(contactId, thread.name).catch(() => {}); },
     onBack: showContacts,
     onSkillTap: (sk) => runSkill(sk.id),
     onButtonTap: async (b) => {
@@ -3325,6 +3413,17 @@ function writeViewMode(id, mode) {
 // and `refreshLauncherMutes` (both fire-and-forget on launcher entry).
 let launcherPinnedMap = {};
 let launcherMutedMap  = {};
+// OPBERGEN (Frits 2026-09-24): the person's put-away marks, off the registry records (carried between devices)
+let launcherSights    = {};
+async function refreshLauncherSights() {
+  try { launcherSights = (await _peerAgent?.circleSights?.()) ?? {}; } catch { launcherSights = {}; }
+}
+/** Put a circle away, or take it out — the agent's one act (registry mark + the carry), then repaint. */
+async function onPutAwayCircle(circleId, putAway) {
+  try { await _peerAgent?.setCircleSight?.(circleId, putAway); } catch { /* the launcher keeps what it had */ }
+  await refreshLauncherSights();
+  paintLauncher();
+}
 
 async function refreshLauncherPins() {
   try { launcherPinnedMap = await pinStore.get(); }
@@ -3350,7 +3449,8 @@ async function refreshLauncherMutes() {
  */
 function launcherPinMuteSignature() {
   const keys = (m) => Object.keys(m ?? {}).filter((k) => m[k]).sort().join(',');
-  return `${keys(launcherPinnedMap)}|${keys(launcherMutedMap)}`;
+  const away = Object.keys(launcherSights ?? {}).filter((k) => launcherSights[k]?.putAway === true).sort().join(',');
+  return `${keys(launcherPinnedMap)}|${keys(launcherMutedMap)}|${away}`;
 }
 
 // β.5 — paint the launcher tiles (previews + pin/mute/proposal state). PURE render, no async
@@ -3358,6 +3458,16 @@ function launcherPinMuteSignature() {
 // showLauncher (which would re-schedule that refresh and loop forever; that infinite re-render
 // starved the main thread and hung the headless e2e, 2026-06-11).
 let _bootFailure = null;   // the agent boot's error, if it died — painted on the launcher
+
+/**
+ * The circles this device is in CHANGED underneath the launcher — an enrol offer consumed, a sibling's circle carried
+ * in: re-read the list and, when the launcher is what the person is looking at, repaint it. Without this a freshly
+ * enrolled device showed none of its circles until a reload (found 2026-09-24 by the own-devices browser walk).
+ */
+async function circlesChangedUnderneath() {
+  try { circlesCache = await loadCircles(sources); } catch { return; }
+  if (getActiveCircle() == null) { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
+}
 
 function paintLauncher() {
   // project the EventLog into per-circle previews; tiles show a
@@ -3383,6 +3493,10 @@ function paintLauncher() {
     onMute:       onMuteCircle,
     onSettings:   (id) => showSettings(id),
     onLeave:      onLeaveCircle,
+    // OPBERGEN — what is out of sight folds away; the kring opt-out is this device's value of the same fact
+    sights:       launcherSights,
+    kringOn:      (id) => makeSyncSelection({ getParamValue: (k) => _peerAgent?.getParamValue?.(k) }).kringOn(id),
+    onPutAway:    onPutAwayCircle,
   });
 }
 
@@ -3405,7 +3519,7 @@ function showLauncher() {
   // (mobile's is the reload blanking the list; same shape, different mechanism). Nothing is lost by
   // skipping: the state we just read is the state the first paint already drew.
   const before = launcherPinMuteSignature();
-  Promise.all([refreshLauncherPins(), refreshLauncherMutes()])
+  Promise.all([refreshLauncherPins(), refreshLauncherMutes(), refreshLauncherSights()])
     .then(() => {
       if (getActiveCircle() != null) return;
       if (launcherPinMuteSignature() === before) return;   // nothing changed → do not rebuild under a press
@@ -5253,23 +5367,10 @@ function showRestoreFinishFlow() {
       }
     }
 
-    // terminal: say what happened, by the branch that was walked
-    const produces = inst?.produces ?? {};
-    const retireOutcome = inst?.steps?.retire?.outcome;
-    const sourceOutcome = inst?.steps?.source?.outcome;
-    let msg;
-    if (sourceOutcome === 'later') msg = t('circle.restore_finish.later_title');
-    else if (sourceOutcome === 'not-your-file') msg = t('circle.restore_finish.err_not_yours');
-    else if (sourceOutcome === 'unreadable-file') msg = t('circle.restore_finish.err_unreadable');
-    else if (produces.intent === 'adding') msg = t('circle.restore_finish.done_adding');
-    else if (retireOutcome === 'ok') msg = produces.intent === 'lost' ? t('circle.restore_finish.done_loud') : t('circle.restore_finish.done_quiet');
-    else if (retireOutcome === 'wrong-phrase' || retireOutcome === 'invalid-phrase') msg = t('circle.enroll.invalid_phrase');
-    else msg = t('circle.restore_finish.err_failed');
-    card.appendChild(para(msg));
-    if (retireOutcome === 'ok' && produces.intent === 'lost' && Array.isArray(inst?.steps?.retire?.out?.retiredDevices) && inst.steps.retire.out.retiredDevices.length) {
-      card.appendChild(para(`${t('circle.restore_finish.done_devices')} ${inst.steps.retire.out.retiredDevices.length}`, 'muted'));
-    }
-    const retry = retireOutcome && retireOutcome !== 'ok';
+    // terminal: say what happened, by the branch that was walked (the one shared decision — `restoreFinishView.js`)
+    const { messageKey, retry, retiredCount } = restoreFinishOutcome(inst);
+    card.appendChild(para(t(messageKey)));
+    if (retiredCount > 0) card.appendChild(para(`${t('circle.restore_finish.done_devices')} ${retiredCount}`, 'muted'));
     card.appendChild(button(retry ? t('circle.enroll.retry') : t('common.close', { defaultValue: 'Sluiten' }), () => {
       if (!retry) return finish();
       close(); showRestoreFinishFlow();
@@ -5626,18 +5727,7 @@ async function openAboutMePanel(personaId) {
         await draw();
       },
       // personas#2 — push a persona's current disclosure for `contextId` up to the circle roster.
-      onShareToCircle: (contextId, forPersonaId) => shareDisclosureToCircle({
-        callSkill:         rawCallSkill,
-        // The release is SAID on the circle's membership lane (`member-props`, step two 2026-09-22) — no admin in the loop.
-        emitMemberProps:   (a) => _peerAgent?.emitMemberProps?.(a),
-        circleId:          contextId,
-        personaId:         forPersonaId,
-        // Diff-gate: an unchanged save is a true no-op (nothing said, nothing re-sealed).
-        lastShared:        disclosureShareMemo,
-        // Media props (profilePicture) leave RE-SEALED to this circle (option (a)):
-        // the self-sealed source copy → a copy sealed with the circle's own key.
-        resealMediaForCircle: resealPersonaMediaForCircle,
-      }),
+      onShareToCircle: (contextId, forPersonaId) => shareCircleRelease(contextId, forPersonaId),
     });
   };
   await draw();
@@ -5821,6 +5911,8 @@ function openCreateCircleWizard() {
   if (typeof rawCallSkill !== 'function') { globalThis.alert?.(t('circle.create_unavailable')); return; }
   mountMyDataWizard(renderCreateGroupWizard, {
     getMyPeerAddr: () => circleHouseholdAgent?.householdSelfAddr ?? null,
+    // the persona the founder picked says what it discloses in the new circle
+    shareFounderRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
@@ -7956,7 +8048,12 @@ function broadcastPolicy({ circleId, policy }) {
   });
 }
 
+// Was an enrol offer waiting when this boot started? Read before anything can consume it: a ceremony with an offer
+// waiting was an ADD, and the restore-finish flow ("your circles are not here") is not for it.
+let offerPendingAtBoot = false;
+
 async function boot() {
+  try { offerPendingAtBoot = !!(await pendingEnrollOffer(window.localStorage)); } catch { offerPendingAtBoot = false; }
   // ── THE FIRST AWAITED ACT: finish a ceremony's clear, if one is owed ──────────────────────────────────
   // The add-a-device ceremony (and the owner-root restore) leaves a `forget-pending` note in the vault, and
   // this is where it is read. It must come before ANY store is touched: the IndexedDB backend opens lazily,
@@ -8247,7 +8344,9 @@ async function boot() {
       // transport being connected; a no-op otherwise.
       if (pendingRestoreFlow) { pendingRestoreFlow = false; setTimeout(() => showRestoreSettingsFlow(), 0); }
       // A phrase ceremony ran on this device and the restore-finish flow has not asked yet: ask once.
-      if (agent.restorePending?.()) setTimeout(() => showRestoreFinishFlow(), 0);
+      if (restoreFinishApplies({ restorePending: agent.restorePending?.() === true, offerPending: offerPendingAtBoot })) setTimeout(() => showRestoreFinishFlow(), 0);
+      // …an add-a-device from an offer is not a restore: drop the note without the flow (the offer brings the circles)
+      else if (agent.restorePending?.()) agent.dismissRestorePending?.().catch?.(() => {});
       // basis's ops reach the waist from here on: the drawer's rows, and anything else that dispatches
       // `callSkill('basis', …)`, now land in the table below instead of the agent's bare default.
       rawCallSkill = withCalendarOutbound(agent.callSkill, {
@@ -8624,8 +8723,9 @@ async function boot() {
             const fromLink = contactCardFromLink(window.location.hash);
             if (!fromLink.ok) return;
             try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
-            rawCallSkill('stoop', 'addContactFromQr', { payload: fromLink.payload })
+            addContactWithSheet(fromLink.payload)
               .then((r) => {
+                if (r === null) return;   // closed the sheet: nothing added
                 const c = r?.contact;
                 if (!c || r?.error) { globalThis.alert?.(t('circle.contacts.add_failed')); return; }
                 globalThis.alert?.(t('circle.shareContact.opened_added', { name: c.displayName ?? c.handle ?? c.webid ?? '' }));
@@ -8673,9 +8773,12 @@ async function boot() {
         // A circle another device of the person founded or joined: the same per-circle step, run when the
         // sibling's carry lands — and asked for on connect, for what happened while this tab was closed.
         agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+        // a circle carried in from a sibling (joined, left, or its put-away mark): the launcher follows, live
+        agent.circleFollowSync?.onLanded?.(() => { circlesChangedUnderneath().catch(() => {}); });
         agent.circleFollowSync?.requestFromSiblings().catch(() => {});
         agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
           if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+          if (r?.consumed) circlesChangedUnderneath().catch(() => {});   // the offer's circles, on screen now
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         agent.bootstrapFromStashedOffer();

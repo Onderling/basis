@@ -43,6 +43,22 @@ export const SEAMS = Object.freeze([
   { id: 'contact-channel-my-card',   pattern: /myCard:/,                          why: 'the first message to a contact carries my card — name, handle, where to write back, the person key' },
   { id: 'contact-channel-on-card',   pattern: /onCard:/,                          why: 'a card that arrives with a message (naming its sender) goes into the book; the book carry names them on every device' },
   { id: 'pair-roster',           pattern: /createPairRoster\(/,                 why: 'the hidden two-member circle every written-to contact gets; DMs ride it (L105)' },
+  { id: 'pair-roster-lens',      pattern: /shareRelease:/,                      why: 'the founder says on a new pair circle what THIS contact\'s persona discloses — which persona a contact sees you as (the lens, persona step 3)' },
+  // The create wizard founds a circle AS a persona (Frits 2026-09-24): the shell hands it the one composition that
+  // says a release. A shell that forgets it creates circles where the picker is shown and nothing rides. The box
+  // has no create wizard — it joins and holds circles, it does not found them from a form.
+  { id: 'create-founds-as-persona', pattern: /shareFounderRelease[:=]/,         shells: ['web', 'mobile'], why: 'the persona picked in the create wizard says what it discloses in the new circle' },
+  // What a contact sees of you (L125): the add sheet before a scanned card or link is added, the control on the
+  // thread header after. A person picks both; the box has nobody to ask.
+  { id: 'contact-lens-asks', pattern: /ContactLens|contactLens\./, shells: ['web', 'mobile'], why: 'a contact added by a person is asked first what they see of you, and it can be changed on their thread' },
+  // Deleting a contact (L114) is one relationship act on every painting shell: hide + leave the pair circle, asked first.
+  { id: 'contact-delete', pattern: /deleteContact\(/, shells: ['web', 'mobile'], why: 'deleting a contact hides the row AND leaves the pair circle — a shell that only hid would leave the route and its keys running' },
+  // Opbergen (Frits 2026-09-24): a circle out of sight is one fact on every painting shell — the launcher folds it and its
+  // menu sets it through the agent's one act. The box paints no launcher; the carry itself is in the shared agent.
+  { id: 'circle-sight', pattern: /setCircleSight/, shells: ['web', 'mobile'], why: 'a circle put away on one device is out of sight on every device — a shell without the fold would show it anyway' },
+  // The restore-finish flow opens after a RESTORE, never after an add-a-device from an offer (2026-09-24): both
+  // painting shells ask the one rule, and paint the one outcome. The box has no screen to paint it on.
+  { id: 'restore-finish-applies', pattern: /restoreFinishApplies\(/, shells: ['web', 'mobile'], why: 'an enrol from an offer is not a restore — "your circles are not here" would tell a person adding a device that their circles are gone' },
   { id: 'pair-roster-admits',    pattern: /onAdmitted/,                          why: 'the founder promotes the joiner and announces — the redeem handler\'s hook' },
   { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
   { id: 'known-peers-catchup',   pattern: /knownPeersSync/,                      why: 'who the person knows, on every device: bindings and the contact book' },
@@ -58,7 +74,7 @@ export const SEAMS = Object.freeze([
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs'] },
 ]);
 

@@ -15,7 +15,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 import {
   initialState, decodeInvite, fetchGroupRules,
   handleSuggestions, isValidHandle,
-  finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, isJoinDirty,
+  finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, applyPersonaHandle, isJoinDirty,
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
 } from '../../core/wizards/joinGroupState.js';
@@ -235,7 +235,16 @@ export default function JoinGroupWizardModal({
                   <RadioGroup
                     label={t('circle.join.wizard.persona.label')}
                     value={state.persona ?? ''}
-                    onChange={(id) => setState((s) => setPersona({ ...s }, id))}
+                    onChange={(id) => setState((s) => {
+                      const next = setPersona({ ...s }, id);
+                      // …and the persona brings its own handle in, when the field is still empty (web
+                      // parity). Prefill, never override — a picker a person can go back to must not undo
+                      // their own words.
+                      applyPersonaHandle({ state: next, callSkill }).then((r) => {
+                        if (r.applied) setState((cur) => ({ ...cur, handle: next.handle }));
+                      }).catch(() => {});
+                      return next;
+                    })}
                     options={[
                       { id: '', label: t('circle.join.wizard.persona.minimal') },
                       ...state.personas.map((p) => ({

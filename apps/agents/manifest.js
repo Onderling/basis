@@ -236,6 +236,8 @@ export const agentsManifest = {
         { name: 'circleId', kind: 'string', required: true, schema: { minLength: 1 } },
         { name: 'handle',   kind: 'string' },
         { name: 'address',  kind: 'string' },
+        // the circle PUT AWAY (opbergen): `{ putAway, at }` — the person's mark, carried to their other devices
+        { name: 'sight',    kind: 'object' },
       ],
       surfaces: { chat: { reply: 'record', hint: 'Record a per-circle membership on a profile (restore-data).' } },
     },

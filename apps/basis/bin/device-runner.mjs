@@ -319,6 +319,10 @@ if (relayUrl) {
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     myHandle: async () => { try { return (await callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => relayUrl,
+    // the lens (shell parity): the box founds a pair circle as any shell does and says what the persona discloses there
+    shareRelease: (cid, personaId) => shareDisclosureToCircle({
+      callSkill, emitMemberProps: (a) => agent.emitMemberProps?.(a), circleId: cid, personaId, lastShared: null, resealMediaForCircle: null,
+    }),
   });
   contactChannel = createContactThreadChannel({
     pair: pairRoster,

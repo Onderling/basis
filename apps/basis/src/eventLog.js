@@ -367,6 +367,34 @@ export class EventLog {
   }
 
   /**
+   * COMPACT named entries in place — the ONE way a RECORD-class entry ever changes after it was written, and
+   * only for a set the FOLD computed (L121: `member-props` statements every device agrees are dead —
+   * `rosterFold.superseded`). The entry is not dropped: dropping it would shorten the author's chain and move
+   * every later statement's causal depth, which is what deny-wins collisions are ordered by. Instead the rail
+   * hands in a transform that keeps the entry's id, type, circle and chain fields and sheds its payload — a
+   * TOMBSTONE the fold reads as "a statement stood here". Not `prune` (retention never touches record kinds) and
+   * not an external append (an audit kind is first-write-wins). Persists like every other mutation.
+   *
+   * @param {Iterable<string>} ids           entry ids (the rail's `${entryKind}:${statement hash}`)
+   * @param {(entry: object) => object|null} transform  the replacement; null/undefined leaves the entry as is
+   * @returns {number} how many entries were replaced
+   */
+  compactEntries(ids, transform) {
+    const set = new Set(ids ?? []);
+    if (set.size === 0 || typeof transform !== 'function') return 0;
+    let changed = 0;
+    this.#events = this.#events.map((e) => {
+      if (!set.has(e.id)) return e;
+      const next = transform(e);
+      if (!next || typeof next !== 'object' || next.id !== e.id) return e;
+      changed += 1;
+      return { ...next, seq: e.seq };   // the storage handle never moves
+    });
+    if (changed) this.#persist(this.#events.slice()).catch(() => {});
+    return changed;
+  }
+
+  /**
    * Prune by the entry's retention CLASS (one-log step D). Three fates:
    *
    *   • `short` / `chat` entries older than their window are DROPPED (as before — one window each).
@@ -395,6 +423,8 @@ export class EventLog {
       // RECORD-class kinds never expire — the entry IS the record. Membership (the roster refolds from
       // these; one dropping away silently changes who-is-in on rebuild) and chat messages (the
       // conversation's record — dropping them is data destruction). Table-driven, not a per-kind hardcode.
+      // The one exception is not here: a `member-props` statement the FOLD calls dead (every field it set
+      // overwritten, no handle) is TOMBSTONED through `compactEntries`, on the fold's word — never on a clock (L121).
       if (cls === 'record') { keep.push(e); continue; }
       const cutoff = now - (this.#retention[cls] ?? this.#retention.chat);
       if (e.ts >= cutoff) { keep.push(e); continue; }

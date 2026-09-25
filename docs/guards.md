@@ -7,12 +7,13 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 38
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 39
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
 | `alpha-surface` | — | a hidden surface cannot creep back into a shell by accident |
 | `architecture-reality` | — | docs/architecture.md describes what RUNS. It carries no plans, no considerations, no history of who |
+| `asked-frits` | — | the open-questions table matches the `? Needs Frits` markers it projects |
 | `box-runner` | — | the box runner (deploy/box) stays a working thing, not a script that rotted |
 | `branch-hygiene` | — | the trunk and the release branch move by MERGE, not by commits typed on them |
 | `callskill-literals` | — | a literal `callSkill('group', 'op')` must name an op some manifest declares |

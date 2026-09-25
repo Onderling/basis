@@ -31,7 +31,10 @@ function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book =
       has: async (webid) => book.has(webid),
       add: async (c) => { book.set(c.webid, c); },
       get: async (webid) => book.get(webid) ?? null,
-      setHidden: async (webid, hidden, hiddenAt) => { book.set(webid, { ...book.get(webid), hidden, hiddenAt }); },
+      setHidden: async (webid, hidden, hiddenAt, { deletedAt } = {}) => { book.set(webid, { ...book.get(webid), hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }); },
+      setPersona: async (webid, persona, { revealPreset = null, personaAt } = {}) => {
+        book.set(webid, { ...book.get(webid), persona, ...(revealPreset ? { revealPreset } : {}), personaAt });
+      },
     },
     onLanded: (s) => landed.push(s),
     onRefused: (reason, from) => refused.push({ reason, from }),
@@ -187,5 +190,39 @@ describe('carrying', () => {
     expect(await r.sync.fanPeer({ address: 'a', pubKey: 'a' })).toEqual({ attempted: 0 });
     expect(await r.sync.requestFromSiblings()).toEqual({ requested: 0 });
     expect(await r.sync.pushTo('x')).toEqual({ sent: false, reason: 'nothing-known' });
+  });
+});
+
+describe('what a contact sees of you follows the person (L125)', () => {
+  it('the persona, its level and WHEN cross the wire — a contact added on the phone arrives with its lens', () => {
+    const w = knownPeersToWire({ contacts: [{ webid: 'w', persona: 'buurt', revealPreset: 'handle', personaAt: 7 }] });
+    expect(w.contacts[0]).toEqual({ webid: 'w', persona: 'buurt', revealPreset: 'handle', personaAt: 7 });
+  });
+
+  it('on a row this device holds, the NEWER change wins; older news leaves it, and the rest of the row stays mine', async () => {
+    const r = rig();
+    r.book.set('w', { webid: 'w', displayName: 'Wilfred', persona: 'default', revealPreset: 'profile', personaAt: 1000 });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w', displayName: 'their edit', persona: 'buurt', revealPreset: 'handle', personaAt: 2000 }],
+    });
+    expect(r.book.get('w')).toMatchObject({ persona: 'buurt', revealPreset: 'handle', personaAt: 2000, displayName: 'Wilfred' });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w', persona: 'default', personaAt: 1500 }],
+    });
+    expect(r.book.get('w').persona, 'older news never undoes a later choice').toBe('buurt');
+  });
+});
+
+describe('a deletion follows the person too (L114)', () => {
+  it('the deletion\'s time rides with the newer hidden mark, so every device can say "verwijderd"', async () => {
+    const r = rig();
+    r.book.set('w', { webid: 'w', hidden: false, hiddenAt: 1000 });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [],
+      contacts: [{ webid: 'w', hidden: true, hiddenAt: 2000, deletedAt: 2000 }],
+    });
+    expect(r.book.get('w')).toMatchObject({ hidden: true, hiddenAt: 2000, deletedAt: 2000 });
   });
 });

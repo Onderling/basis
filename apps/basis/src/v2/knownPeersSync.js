@@ -47,7 +47,13 @@ export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
 const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr', 'points',
   'shareLocation', 'allowHopThrough', 'allowAutomatching',
   // the hidden mark and WHEN it last changed — the one field-pair a sibling may change on a row this device holds (L106)
-  'hidden', 'hiddenAt'];
+  'hidden', 'hiddenAt',
+  // what this contact sees of you — the persona, its level, and WHEN they last changed (L125): the second field-set a
+  // sibling may change on a row this device holds, by the same newer-wins rule
+  'persona', 'revealPreset', 'personaAt',
+  // …and WHEN the contact was deleted (L114): a delete is a hide that also left the pair circle, and its time rides
+  // with the hidden mark so every device's marker can say "verwijderd"
+  'deletedAt'];
 
 function bindingToWire(b) {
   if (!b || typeof b !== 'object') return null;
@@ -82,7 +88,7 @@ export function knownPeersToWire(known) {
  * @param {(to: string, payload: object) => Promise<any>} a.sendToPeer   hold-forward, like every own-devices fan
  * @param {() => Promise<{peers: object[], contacts: object[]}>} a.snapshot   everything this device knows, for a new sibling or a catch-up
  * @param {(address: string, pubKey: string) => 'established'|'unchanged'|'refused'} a.learnPeerKey   the security layer's establish-never-replace setter
- * @param {{ has: (webid: string) => Promise<boolean>, add: (contact: object) => Promise<any>, get?: (webid: string) => Promise<object|null>, setHidden?: (webid: string, hidden: boolean, hiddenAt: number) => Promise<any> }} a.contacts
+ * @param {{ has: (webid: string) => Promise<boolean>, add: (contact: object) => Promise<any>, get?: (webid: string) => Promise<object|null>, setHidden?: (webid: string, hidden: boolean, hiddenAt: number) => Promise<any>, setPersona?: (webid: string, persona: string, opts: {revealPreset?: string|null, personaAt: number}) => Promise<any> }} a.contacts
  *   the contact book, raw (not through the waist — a landed row must not fan back out). `get` + `setHidden` let a
  *   sibling's NEWER hidden mark land on a row this device holds — the one change a sibling may make to it (L106).
  * @param {(summary: {from: string, established: number, contactsAdded: number}) => void} [a.onLanded]   observability seam
@@ -126,12 +132,20 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
           // Held here: the row is this device's, except the HIDDEN mark, where the person's newest choice on any
           // of their devices wins (Frits, 2026-09-19: hidden on one device is hidden on all). Older news never
           // un-hides what this device hid later; equal times leave this device's mark.
+          const mine = typeof contacts.get === 'function' ? await contacts.get(c.webid) : null;
           if (typeof c.hidden === 'boolean' && Number.isFinite(c.hiddenAt) && typeof contacts.get === 'function' && typeof contacts.setHidden === 'function') {
-            const mine = await contacts.get(c.webid);
             const myAt = Number.isFinite(mine?.hiddenAt) ? mine.hiddenAt : -Infinity;
             if (c.hiddenAt > myAt) {
-              await contacts.setHidden(c.webid, c.hidden, c.hiddenAt);   // the newer change, with its time
+              await contacts.setHidden(c.webid, c.hidden, c.hiddenAt, Number.isFinite(c.deletedAt) ? { deletedAt: c.deletedAt } : undefined);   // the newer change, with its time
               if (mine?.hidden !== c.hidden) hiddenChanged.push({ webid: c.webid, hidden: c.hidden });
+            }
+          }
+          // The lens, by the same rule: the person's newest choice of what this contact sees wins on every device.
+          // Only the ROW moves here — the release on the pair circle was said by the device that made the change.
+          if (typeof c.persona === 'string' && c.persona && Number.isFinite(c.personaAt) && typeof contacts.get === 'function' && typeof contacts.setPersona === 'function') {
+            const myAt = Number.isFinite(mine?.personaAt) ? mine.personaAt : -Infinity;
+            if (c.personaAt > myAt) {
+              await contacts.setPersona(c.webid, c.persona, { revealPreset: c.revealPreset ?? null, personaAt: c.personaAt });
             }
           }
           continue;

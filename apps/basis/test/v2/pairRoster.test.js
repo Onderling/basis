@@ -206,3 +206,71 @@ describe('the route (8b) — a message to a contact with a pair roster goes over
     expect(sent[1].o).toBeUndefined();
   });
 });
+
+// ── THE LENS (persona step 3, 2026-09-24): which persona a contact sees you as ──────────────────────────────────
+// The contact row records the persona; the founder pushes that persona's release onto the new pair circle; the
+// joiner joins AS it. Same identity, same address, same pair id — only what the contact receives differs.
+describe('the lens — the pair circle carries the persona the contact row names', () => {
+  const inviteFor = (groupId, code = 'CODE1') => encodeMembershipCodeUrl({ groupId, code, expiresAt: 9e12, name: 'anna', adminPeerAddr: ANNA });
+
+  it('the FOUNDER pushes the contact\'s persona release onto the pair circle it just made', async () => {
+    const { callSkill } = fakeSkills({ self: ANNA });
+    const shared = [];
+    const pr = createPairRoster({
+      selfWebid: ANNA, callSkill, sendPeerRedeem: vi.fn(),
+      personaFor: async (webid) => (webid === BEA ? 'werk' : null),
+      shareRelease: async (circleId, personaId) => { shared.push([circleId, personaId]); return { ok: true }; },
+    });
+    const first = await pr.prepare(BEA, { name: 'bea' });
+    expect(first?.pairInvite).toBeTruthy();
+    expect(shared).toEqual([[pairCircleIdFor(ANNA, BEA), 'werk']]);
+  });
+
+  it('a contact row with NO persona (predates the field) pushes nothing — never a silent default', async () => {
+    const { callSkill } = fakeSkills({ self: ANNA });
+    const shared = [];
+    const pr = createPairRoster({ selfWebid: ANNA, callSkill, sendPeerRedeem: vi.fn(), personaFor: async () => null, shareRelease: async (...a) => { shared.push(a); } });
+    await pr.prepare(BEA);
+    expect(shared).toEqual([]);
+  });
+
+  it('the JOINER joins the pair circle AS the persona the contact row names — the release computed is that persona\'s', async () => {
+    const { callSkill, calls } = fakeSkills({ self: BEA });
+    let resolveJoin;
+    const sendPeerRedeem = vi.fn(() => new Promise((r) => { resolveJoin = r; }));
+    const pr = createPairRoster({ selfWebid: BEA, callSkill, sendPeerRedeem, personaFor: async (webid) => (webid === ANNA ? 'buurt' : null) });
+    const id = pairCircleIdFor(ANNA, BEA);
+    const p = pr.onInvite(ANNA, inviteFor(id));
+    await vi.waitFor(() => expect(typeof resolveJoin).toBe('function'));
+    resolveJoin({ ok: true, groupId: id });
+    expect(await p).toEqual({ joined: true, circleId: id });
+    const release = calls.find((c) => c.op === 'getPersonaRelease');
+    expect(release?.args, 'finalSubmit asked for THIS persona\'s release for THIS circle').toMatchObject({ id: 'buurt', contextId: id });
+  });
+
+  it('without a personaFor, the book is read: the row\'s `persona` field decides', async () => {
+    const { callSkill } = fakeSkills({ self: ANNA });
+    const base = callSkill.getMockImplementation();
+    callSkill.mockImplementation(async (app, op, args) => (op === 'listContacts' ? { items: [{ webid: BEA, persona: 'club' }] } : base(app, op, args)));
+    const shared = [];
+    const pr = createPairRoster({ selfWebid: ANNA, callSkill, sendPeerRedeem: vi.fn(), shareRelease: async (c, pid) => { shared.push([c, pid]); } });
+    await pr.prepare(BEA);
+    expect(shared).toEqual([[pairCircleIdFor(ANNA, BEA), 'club']]);
+  });
+
+  it('…read from the reply the WAIST really gives: full `contacts` beside the trimmed chat `items` (2026-09-24)', async () => {
+    // `adaptStoopReply` answers `listContacts` with BOTH: `contacts` (the book's rows, whole) and `items` (the chat
+    // projection — id, label, handle, trust, peerAddr, personKey, pairCircleId, and NOT `persona`). Reading `items`
+    // first found no persona on any row, so every pair circle founded with no release: the contact lens never took
+    // effect in a running app. The test above faked a reply the waist never gives.
+    const { callSkill } = fakeSkills({ self: ANNA });
+    const base = callSkill.getMockImplementation();
+    callSkill.mockImplementation(async (app, op, args) => (op === 'listContacts'
+      ? { contacts: [{ webid: BEA, persona: 'club' }], items: [{ id: BEA, type: 'contact', webid: BEA, label: BEA }] }
+      : base(app, op, args)));
+    const shared = [];
+    const pr = createPairRoster({ selfWebid: ANNA, callSkill, sendPeerRedeem: vi.fn(), shareRelease: async (c, pid) => { shared.push([c, pid]); } });
+    await pr.prepare(BEA);
+    expect(shared).toEqual([[pairCircleIdFor(ANNA, BEA), 'club']]);
+  });
+});

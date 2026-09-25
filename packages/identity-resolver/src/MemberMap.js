@@ -112,7 +112,7 @@ export class MemberMap extends Emitter {
    * @param {string} [m.displayName]
    *   Real / chosen display name.  Treated as opt-in-to-show when paired
    *   with a Reveals store (see ./Reveals.js).
-   * @param {string} [m.avatarUrl]
+   * @param {string} [m.avatarUrl]    the LOCAL display cache (private, never travels)
    *   Optional avatar image URL.
    * @param {string} [m.stableId]
    *   Stoop V1 Phase 11 (2026-05-06): the SDK-level stable user
@@ -226,8 +226,26 @@ export class MemberMap extends Emitter {
       // legacy consumers (H2/H4) leave it absent.
       handle:      m.handle ?? null,
       displayName: m.displayName ?? null,
-      // avatarUrl: optional avatar image URL (any URI).
+      // avatarUrl: optional avatar image URL (any URI). A LOCAL DISPLAY CACHE — it may point anywhere,
+      // including at a note this device keeps about somebody else, and `rosterAccessGate` marks it PRIVATE so
+      // it never leaves. It is NOT the person's face: that is the persona's `profilePicture` attribute, a
+      // sealed media ref disclosed per circle. Nothing paints this one; do not make it travel.
       avatarUrl:   m.avatarUrl ?? null,
+      // persona: WHICH OF YOUR PERSONAS this contact was made through — the profile whose release their pair
+      // roster carries, i.e. what they see of you. NOT a second identity: one key, one address, one pair
+      // circle (ledger L123 is the other thing, and it is not built). `null` means "not recorded" — a row
+      // that predates the field — and only the explicit, checkable backfill may turn that into `default`.
+      // Nothing may read a missing value AS the default: that fallback is how the persona picker stayed
+      // broken for weeks.
+      persona:     m.persona ?? null,
+      // …and the LEVEL that persona discloses to them (a reveal preset — `handle` · `profile` · `full`), recorded
+      // because `full` adds no persona keys of its own and so cannot be read back off the disclosure. `personaAt`
+      // is when either was last changed: a person's devices take the newer one (the own-devices carry, L125).
+      revealPreset: typeof m.revealPreset === 'string' ? m.revealPreset : null,
+      personaAt:   Number.isFinite(m.personaAt) ? m.personaAt : null,
+      // L114: when this contact was DELETED (hidden + the pair circle left) — kept after a return, so the thread
+      // can say "you had deleted this contact". Null for a contact never deleted.
+      deletedAt:   Number.isFinite(m.deletedAt) ? m.deletedAt : null,
       // stableId: SDK-level "this person" key (Stoop V1 Phase 11).
       // Survives handle changes + network-pubkey rotations.  Apps
       // key mute / ban / report on this.  Optional.

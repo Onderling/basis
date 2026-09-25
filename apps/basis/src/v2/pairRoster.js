@@ -24,6 +24,8 @@ import { pairCircleIdFor, isPairCircleId, pairFounderOf } from './pairCircleId.j
 import { quickCreateCircle } from './circleCreate.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from './circleInvite.js';
 import { decodeInvite } from '../core/wizards/joinGroupState.js';
+import { personaOfContact } from './contactPersona.js';
+import { bookRowsOf } from './contactsSource.js';
 
 export { PAIR_CIRCLE_PREFIX, pairCircleIdFor, isPairCircleId, pairFounderOf } from './pairCircleId.js';
 
@@ -48,10 +50,23 @@ export function createPairRoster({
   // carries the commitment without its proof, so the joiner must hear the founder's own announcement before the
   // founder's rotations can fold there — the whole point of the pair roster.
   announceOwn = null, logger = console,
+  // THE LENS (persona step 3, 2026-09-24): which persona this contact sees you as. `personaFor(webid)` reads the
+  // contact row's persona (default: the book, through `personaOfContact` — never a silent 'default'); the founder
+  // pushes that persona's RELEASE onto the pair circle through `shareRelease(circleId, personaId)` (the shells'
+  // `shareDisclosureToCircle`), and the joiner joins AS it, so the release `finalSubmit` computes is that persona's.
+  // Same identity, same address, same pair id — only what the contact receives differs (`contactPersona.js`).
+  personaFor = null, shareRelease = null,
 } = {}) {
   if (typeof selfWebid !== 'string' || !selfWebid) throw new Error('pairRoster: selfWebid required');
   if (typeof callSkill !== 'function') throw new Error('pairRoster: callSkill required');
   const inFlight = new Map();   // circleId → the join in progress (a second invite while one runs joins nothing twice)
+  const personaOf = async (webid) => {
+    if (typeof personaFor === 'function') { try { return (await personaFor(webid)) ?? null; } catch { return null; } }
+    try {
+      const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
+      return personaOfContact(rows.find((c) => c?.webid === webid));
+    } catch { return null; }
+  };
 
   /**
    * THE PERSON behind an address. A turn arrives from the sender's PERSON address (the rotating key's) or a per-circle
@@ -62,8 +77,7 @@ export function createPairRoster({
     if (typeof fromAddr !== 'string' || !fromAddr) return fromAddr;
     try { const r = typeof identityOf === 'function' ? identityOf(fromAddr) : null; if (typeof r === 'string' && r && r !== fromAddr) return r; } catch { /* next */ }
     try {
-      const res = await callSkill('stoop', 'listContacts', {});
-      const rows = res?.items ?? res?.contacts ?? [];
+      const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
       const hit = rows.find((c) => c?.webid === fromAddr || c?.personKey?.pubKey === fromAddr || c?.peerAddr === fromAddr);
       if (hit?.webid) return hit.webid;
     } catch { /* the address stands */ }
@@ -110,7 +124,22 @@ export function createPairRoster({
     // with the commitment) — the create wizard's `onDispatched` does this for a circle a person makes by hand;
     // a pair circle is made by the channel, so the same seam runs here.
     if (typeof onJoined === 'function') { try { await onJoined({ circleId }); } catch { /* the next boot registers */ } }
+    // …and says, on the new pair circle, what THIS contact's persona discloses (the lens). Best-effort: a release
+    // that fails to land is pushed again by the next Mij save; the contact's row then names by the card meanwhile.
+    if (typeof shareRelease === 'function') {
+      const persona = await personaOf(contactWebid);
+      if (persona) { try { await shareRelease(circleId, persona); } catch (err) { logger?.warn?.(`[pair-roster] the release did not land: ${err?.message ?? err}`); } }
+    }
     return { circleId, created: true };
+  }
+
+  /** An invite into a pair circle this side holds — naming ME as the admin to redeem with. `null` when none can be made. */
+  async function inviteInto(circleId) {
+    try {
+      const inv = await buildCircleInviteUri({ callSkill, circleId, adminPeerAddr: selfWebid, ...(typeof relayUrl === 'function' && relayUrl() ? { relayUrl: relayUrl() } : {}) });
+      if (!inv?.uri) { logger?.warn?.(`[pair-roster] no invite for ${circleId.slice(0, 12)}: ${inv?.error ?? 'no-code'}`); return null; }
+      return { pairInvite: inv.uri };
+    } catch (err) { logger?.warn?.(`[pair-roster] could not invite into the pair roster: ${err?.message ?? err}`); return null; }
   }
 
   return {
@@ -127,15 +156,18 @@ export function createPairRoster({
       const circleId = pairCircleIdFor(selfWebid, contactWebid);
       const mine = await myCircles();
       if (mine.has(circleId) && await memberOf(circleId, contactWebid)) return null;
-      if (pairFounderOf(selfWebid, contactWebid) !== selfWebid) return mine.has(circleId) ? null : { pairRequest: true };
+      // WHO CREATES and WHO INVITES are two questions (2026-09-24, L114). The founder rule decides who MAKES the pair
+      // circle, so the two sides never make two. Once it exists, whoever holds it invites the one who is missing — the
+      // contact who deleted you (left) and is written to again, even when they were the founder: without this, a
+      // founder who left could never be brought back, because the side still in the circle waited for a founder.
+      if (mine.has(circleId)) return inviteInto(circleId);
+      if (pairFounderOf(selfWebid, contactWebid) !== selfWebid) return { pairRequest: true };
       try {
         await ensureCircle(contactWebid, { name });
-        // the invite names ME as the admin to redeem with (the joiner's redeem is a round-trip to the founder), at
-        // the profile address the Hi established — the last thing the pair roster ever uses that address for
-        const inv = await buildCircleInviteUri({ callSkill, circleId, adminPeerAddr: selfWebid, ...(typeof relayUrl === 'function' && relayUrl() ? { relayUrl: relayUrl() } : {}) });
-        if (!inv?.uri) { logger?.warn?.(`[pair-roster] no invite for ${circleId.slice(0, 12)}: ${inv?.error ?? 'no-code'}`); return null; }
-        return { pairInvite: inv.uri };
       } catch (err) { logger?.warn?.(`[pair-roster] could not prepare the pair roster: ${err?.message ?? err}`); return null; }
+      // the invite names ME as the admin to redeem with (the joiner's redeem is a round-trip to me), at the profile
+      // address the Hi established — the last thing the pair roster ever uses that address for
+      return inviteInto(circleId);
     },
     /** The other side asked (their first turn, they do not found): make the roster, answer with the invite. */
     async onRequest(fromAddr, { name = null } = {}) {
@@ -154,7 +186,7 @@ export function createPairRoster({
       // code, so a forged claim admits nobody anywhere.
       if (webid === fromAddr && typeof invite?.adminPeerAddr === 'string' && invite.adminPeerAddr && invite.adminPeerAddr !== selfWebid) {
         try {
-          const rows = ((r) => r?.items ?? r?.contacts ?? [])(await callSkill('stoop', 'listContacts', {}));
+          const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
           if (rows.some((c) => c?.webid === invite.adminPeerAddr)) webid = invite.adminPeerAddr;
         } catch { /* the address stands */ }
       }
@@ -165,8 +197,9 @@ export function createPairRoster({
       if (inFlight.has(expected)) return inFlight.get(expected);
       const run = (async () => {
         const { handle, own } = await handleFor();
+        const persona = await personaOf(webid);   // the lens: join AS the persona this contact sees
         const r = await joinCircleFromInvite({
-          inviteUri, callSkill, sendPeerRedeem, handle, profileHandle: own,
+          inviteUri, callSkill, sendPeerRedeem, handle, profileHandle: own, persona,
           ...(typeof circleAddressFor === 'function' ? { circleAddressFor } : {}),
           ...(typeof signCircleLink === 'function' ? { signCircleLink } : {}),
           ...(typeof dialEndpoint === 'function' ? { dialEndpoint } : {}),

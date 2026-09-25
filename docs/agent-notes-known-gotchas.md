@@ -678,3 +678,10 @@ cwd the `onderling` user cannot stat. Everything that touches "." — docker com
 fails with `stat .: permission denied`, which read as a build failure. The updater now `cd "$BOX_DIR"`s
 before any work; any script a box runs under another user must do the same. The test reproduces it by
 entering a directory, `chmod 000` on it, then exec'ing the script.
+
+### `npm run coverage` prints the snapshot; it does not write it (2026-09-24)
+
+`apps/basis/scripts/surface-coverage.mjs` writes the markdown to STDOUT. `npm run coverage` therefore shows the table
+and leaves `docs/surface-coverage.md` untouched, and the fitness test (`surfaceCoverageFresh`) stays red after a
+manifest change although "coverage was run". Refresh it with
+`node scripts/surface-coverage.mjs > docs/surface-coverage.md` from `apps/basis`.

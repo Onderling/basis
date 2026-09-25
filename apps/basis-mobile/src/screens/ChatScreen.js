@@ -141,6 +141,8 @@ import MultiFieldFormBubble from '../rn/MultiFieldFormBubble.js';
 // @onderling/react-native/qr/view wraps react-native-qrcode-svg.
 import { QrCodeView }     from '@onderling/react-native/qr/view';
 import QrScannerModal     from '../rn/QrScannerModal.js';
+// L125 — a scanned contact card asks first what the contact will see of you (web parity)
+import { useContactLensSheet } from '../../../basis/src/rn/ContactLensSheet.js';
 import { classifyQrPayload } from '@onderling/react-native/qr';
 import { getBasisClassifiers } from '../core/qrClassifiers.js';
 // Extension install (feedback-extension mobile parity) — consent sheet + controller.
@@ -254,6 +256,10 @@ export default function ChatScreen({
   }
   const [logsPanelOpen, setLogsPanelOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const contactLens = useContactLensSheet({
+    callSkill: bundle?.callSkill ?? null, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor,
+    shareRelease: bundle?.shareCircleRelease, t,
+  });
   // E5 — record/mini-page "⤢ Open in full": holds the reply shown in
   // the full-height detail modal, or null when closed.
   const [expandedRecord, setExpandedRecord] = useState(null);
@@ -818,9 +824,12 @@ export default function ChatScreen({
           // A circle another device of the person founded or joined: the same per-circle step, run when the
           // sibling's carry lands — and asked for on connect, for what happened while the app was closed (web parity).
           bundle.agent.circleFollowSync?.setConsume((entry) => consumeCircleEntry(enrolDeps, entry));
+          // a circle carried in from a sibling (joined, left, or its put-away mark): the launcher's list is stale (web parity)
+          bundle.agent.circleFollowSync?.onLanded?.(() => { onCirclesChanged?.(); });
           setTimeout(() => { bundle.agent.circleFollowSync?.requestFromSiblings().catch(() => {}); }, 2700);
           bundle.agent.bootstrapFromStashedOffer = () => consumeEnrollOffer(enrolDeps).then((r) => {
             if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+            if (r?.consumed) onCirclesChanged?.();   // the offer's circles belong on the launcher now (web parity)
             return r;
           }).catch(() => { /* retried next launch — the stash only clears on full success */ });
           setTimeout(() => { bundle.agent.bootstrapFromStashedOffer(); }, 3000);
@@ -1861,6 +1870,10 @@ export default function ChatScreen({
             // AsyncStorage policy store the launcher reads.  Only consumed
             // by CreateGroupWizardModal; other wizards ignore it.
             persistPolicy={(groupId, patch) => policyStoreRef.current?.update(groupId, patch)}
+            // …and says the founding persona's release on the new circle. Only CreateGroupWizardModal reads it.
+            shareFounderRelease={bootState.kind === 'ready'
+              ? (cid, personaId) => bootState.bundle.shareCircleRelease?.(cid, personaId)
+              : undefined}
             // Bundle I (2026-05-27) — settings modal pod + relay
             // sections.  Only consumed by SettingsWizardModal; other
             // wizards ignore the unknown props.
@@ -1943,6 +1956,7 @@ export default function ChatScreen({
           classifies the scanned text and routes by kind:
           - 'contact' → callSkill('stoop','addContactFromQr',{payload})
           - 'invite'  → setPendingWizard({opId:'joinGroup', args:{invite:payload}}) */}
+      {contactLens.sheet}
       <QrScannerModal
         visible={qrScannerOpen}
         onClose={() => setQrScannerOpen(false)}
@@ -1983,9 +1997,10 @@ export default function ChatScreen({
       // Call the stoop substrate skill that decodes the URL + adds the
       // contact in one round-trip.  Then synthesise a confirmation bubble.
       try {
-        const reply = bootState.kind === 'ready'
-          ? await bootState.bundle.callSkill('stoop', 'addContactFromQr', { payload })
-          : null;
+        // …after the sheet (L125): what they will see of you, prefilled; closing it adds nothing. This path recorded
+        // no persona at all before — every add path now records one.
+        const reply = bootState.kind === 'ready' ? await contactLens.addWithSheet(payload) : null;
+        if (reply === null) return;
         if (reply?.error) appendBotText(t('chat.scan_failed', { error: reply.error }));
         else              appendBotText(t('chat.scan_contact_added'));
       } catch (err) {

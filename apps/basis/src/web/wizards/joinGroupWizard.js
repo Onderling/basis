@@ -46,6 +46,7 @@ import {
   setConsentDecline,
   loadPersonas,
   setPersona,
+  applyPersonaHandle,
   applyCharterOfferingsDefault,
   setShareOfferingsAtJoin,
   prepareJoinIdentity,
@@ -442,7 +443,12 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
       select.appendChild(opt);
     }
     select.value = state.persona ?? '';
-    select.addEventListener('change', () => { setPersona(state, select.value); });
+    select.addEventListener('change', () => {
+      setPersona(state, select.value);
+      // …and the persona brings its own handle into the field, when the field is still empty. Prefill,
+      // never override: going back to this picker must not undo what the person typed.
+      applyPersonaHandle({ state, callSkill }).then((r) => { if (r.applied) rerender(); }).catch(() => {});
+    });
     pWrap.appendChild(select);
 
     const pHint = doc.createElement('div');

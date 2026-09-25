@@ -69,7 +69,15 @@ describe('the enroll-device flow (declared → verified → run → the boot cut
     expect(inst.produces.reloadRequired).toBe(true);
     // THE SECRETS RULE, at the ceremony: the phrase never reached the persistence seam.
     expect(saved.length).toBeGreaterThan(0);
-    for (const s of saved) expect(s.includes(phrase.split(' ')[0])).toBe(false);
+    // Any THREE consecutive words of the phrase, as words — never one bare word as a substring: the phrase is random,
+    // and a first word like "act" or "art" sits inside ordinary JSON ("active", "party"), which made this red on CI
+    // one run in several with nothing leaked (2026-09-24).
+    const words = phrase.split(' ');
+    for (const s of saved) {
+      for (let i = 0; i + 3 <= words.length; i += 1) {
+        expect(new RegExp(`\\b${words.slice(i, i + 3).join('\\W+')}\\b`).test(s), `three phrase words in a row in a saved instance`).toBe(false);
+      }
+    }
 
     // ── The "reload": device 2 boots again on the same vaults — the enrolled boot. ──
     const dev2b = await boot(v2);

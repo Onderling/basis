@@ -132,6 +132,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   transport is the signal that the surface is missing an affordance — add it there.
 - **The enforceability test:** *could someone on a different app version get it anyway?* If yes, call it
   a convention/filter and put the real gate where it binds — [`enforceability.md`](docs/conventions/enforceability.md).
+- **A question put to Frits and not answered gets a ledger row with `? Needs Frits` before the session ends;
+  the table at the top of `REMAINING-WORK.md` is GENERATED from that marker (`npm run guards`), never edited.**
 - **An idea is only dropped when Frits drops it.** Silence is not rejection. If you raise an option, a
   caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
   item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more

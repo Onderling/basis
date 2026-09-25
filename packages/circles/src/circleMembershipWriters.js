@@ -1,5 +1,5 @@
 import { hasHumanRules } from './circleRulesDoc.js';
-import { personKeyAnnouncement } from '@onderling/core';
+import { personKeyAnnouncement, MEMBER_PROPS_FIELDS } from '@onderling/core';
 import { releaseUnchanged } from '@onderling/agent-registry';
 /**
  * Key-coupled membership WRITERS — pure-body lift out of stoop's `buildSkills` (the §8c migration, slice-b).
@@ -613,8 +613,13 @@ export async function acceptGroupRules({ store, emitSpine }, { a, from } = {}) {
   return { ok: true, rulesAccepted: version };
 }
 
-/** The fields a member may say about themselves on the lane — one place, shared with the fold's allowlist. */
-export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+/**
+ * The fields a member may say about themselves on the lane. RE-EXPORTED from the kernel, not restated: this
+ * was a second frozen copy that called itself "one place, shared with the fold's allowlist", and it proved the
+ * point by going stale the moment `avatarThumb` landed in the fold and not here. The fold is where the list
+ * binds, so the fold owns it.
+ */
+export { MEMBER_PROPS_FIELDS };
 // The persona properties are a MAP (the persona's release for one circle — computed whole, media by sealed reference),
 // compared whole against what the lane holds: the same `releaseUnchanged` the diff-gate memo has always used.
 const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -631,8 +636,14 @@ const sameSaid = (k, laneValue, v) => (k === 'personaProperties'
  *
  * ONE STATEMENT PER CIRCLE, carrying only the fields that differ from that circle's roster row as this device
  * holds it — the diff gate: an unchanged save appends nothing, and a circle joined later gets what it lacks. A
- * circle whose append fails is named and the loop goes on; the next save retries it. The avatar rides BY
- * REFERENCE (`avatarRef`: a hash/path into the item store), never inline — the lane is exempt from compaction.
+ * circle whose append fails is named and the loop goes on; the next save retries it.
+ *
+ * THE PICTURE, in two halves (narrowed 2026-09-23 from "never inline"). The lane is exempt from compaction —
+ * `entryKinds.js` declares the membership kind `RETAIN.RECORD`, "the roster refolds from these — never drops" —
+ * so anything said here is kept by every device for ever. That forbids an UNBOUNDED picture, not a bounded one.
+ * A face (`avatarThumb`) rides inline, hard-capped at 4 KB and `data:image/` only, refused at the fold by every
+ * receiver independently. The FULL-SIZE picture still rides by REFERENCE (`avatarRef`: a hash/path into the
+ * item store) and waits on the media carrier.
  *
  * @param {object} deps
  * @param {Function|undefined} deps.emitSpine  the membership rail's appender (`{kind, circleId, subject, actor, payload}`)

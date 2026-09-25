@@ -42,34 +42,6 @@ async function buildBundle() {
   return bundle;
 }
 
-/* ── 23.1 Avatar wiring ────────────────────────────────────────── */
-
-describe('Stoop V2 Phase 23.1 — avatarUrl wiring', () => {
-  it('setMyAvatarUrl persists to MemberMap; getMyProfile reads it back', async () => {
-    const bundle = await buildBundle();
-    const dataUrl = 'data:image/jpeg;base64,/9j/4AAQ';   // truncated stub
-    const r = await callSkill(bundle.agent, 'setMyAvatarUrl', { url: dataUrl });
-    expect(r.avatarUrl).toBe(dataUrl);
-
-    const me = await callSkill(bundle.agent, 'getMyProfile', {});
-    expect(me.entry.avatarUrl).toBe(dataUrl);
-  });
-
-  it('clearMyAvatar resets to null', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'setMyAvatarUrl', { url: 'data:image/jpeg;base64,xxx' });
-    const r = await callSkill(bundle.agent, 'clearMyAvatar', {});
-    expect(r.cleared).toBe(true);
-    const me = await callSkill(bundle.agent, 'getMyProfile', {});
-    expect(me.entry.avatarUrl).toBeNull();
-  });
-
-  it('rejects missing url', async () => {
-    const bundle = await buildBundle();
-    expect(await callSkill(bundle.agent, 'setMyAvatarUrl', {})).toEqual({ error: 'url required' });
-  });
-});
-
 /* ── 23.4 Holiday mode ─────────────────────────────────────────── */
 
 describe('Stoop V2 Phase 23.4 — holidayMode', () => {

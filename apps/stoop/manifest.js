@@ -709,11 +709,37 @@ export const stoopManifest = {
         // book becomes an item type (L97's merge); until then the enforceability rule applies: this is a filter on what
         // you see, and the string says so.
         { name: 'hiddenAt', kind: 'number',  required: false },
+        // L114: this hide is a DELETE (the caller also leaves the pair circle) — recorded as `deletedAt`, which a
+        // return keeps so the thread can say "you had deleted this contact". A landing carries the sibling's time.
+        { name: 'deleted',   kind: 'boolean', required: false },
+        { name: 'deletedAt', kind: 'number',  required: false },
       ],
       surfaces: {
         slash: { command: '/hide-contact', body: 'flags' },
         chat:  { reply: 'text', hint: 'hide a contact from Contacten, or show them again' },
         ui:    { control: 'button', labelKey: 'circle.button.stoop.setContactHidden' },
+      },
+    },
+    {
+      // WHAT A CONTACT SEES OF YOU (L125, Frits 2026-09-24): the persona whose release their pair roster carries, and
+      // the level it discloses to them. The lens, not a second you — one identity runs (L123). Changed on the thread
+      // header; the row travels to the person's other devices and the newer `personaAt` wins, like `hiddenAt`. The
+      // release itself is said on the pair circle by the device where the change was made (`contactLens.js`).
+      id:   'setContactPersona', group: 'admin', verb: 'submit',
+      appliesTo: { type: 'contact' },
+      resolves: [{ field: 'persona', policy: 'content' }],
+      params: [
+        { name: 'webid',        kind: 'webid',  required: true },
+        { name: 'persona',      kind: 'string', required: true },
+        { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
+        // A landing's time (a sibling's newer change); a tap has none. The same device-clock preference `hiddenAt` states.
+        { name: 'personaAt',    kind: 'number', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/contact-persona', body: 'flags' },
+        chat:  { reply: 'text', hint: 'change which persona a contact sees you as, and how much it discloses to them' },
+        // the thread header paints the everyday control (both shells); the page is the generic door every op has
+        ui:    { control: 'page', labelKey: 'circle.button.stoop.setContactPersona' },
       },
     },
     {
@@ -1443,10 +1469,17 @@ export const stoopManifest = {
     },
     {
       id:   'addContactFromQr', verb: 'add',
-      params: [{ name: 'payload', kind: 'object', required: true }],
+      params: [
+        { name: 'payload', kind: 'object', required: true },
+        // Which of your personas this contact is added through — what they see of you. Optional: absent
+        // means "not recorded", which is a different thing from "the default", and nothing may read it as one.
+        { name: 'persona', kind: 'string', required: false },
+        // …and the level that persona discloses to them (`handle` · `profile` · `full`), chosen in the add sheet.
+        { name: 'revealPreset', kind: 'enum', of: ['handle', 'profile', 'full'], required: false },
+      ],
       resolves: [{ field: 'contact', policy: 'content' }],
       surfaces: {
-        chat: { hint: 'Add a contact from a scanned QR payload.' },
+        chat: { hint: 'Add a contact from a scanned QR payload. `persona` records which of your personas they were added through.' },
         ui:   { control: 'button' },
       },
     },
@@ -1916,11 +1949,11 @@ export const stoopManifest = {
     //      record-level read.  Adapter has to either trust the record
     //      envelope or know to re-read per-field.  Out of scope here;
     //      page already reads holiday-mode separately.
-    //   8. `avatarUrl` is bytes (data-URL after resize), not a primitive
+    //   8. the profile PICTURE is a sealed media ref, not a primitive
     //      that fits 's `type: 'boolean' | 'enum' | string`. The
     //      avatar input is a file-picker with client-side resize
-    //      (`fileToResizedDataUrl`) + dispatch to `setMyAvatarUrl({url})`
-    //      and clear via `clearMyAvatar({})`. has no `'file'` or
+    //      (the shared `encodeImageFile`) + `onSetPicture` on the Mij persona
+    //      surface, which seals it. has no `'file'` or
     //      `'image'` field type + no notion of "client-side transform
     //      before dispatch".  Stays hand-coded.
     //   9. `skills` section is a list-shape WITHIN a record-shape view

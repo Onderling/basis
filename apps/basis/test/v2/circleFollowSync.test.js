@@ -115,3 +115,40 @@ describe('LEAVE FOLLOWS (2026-09-22) — a circle left on one device is left on 
     expect(lefts).toEqual(['c1']);
   });
 });
+
+describe('a circle PUT AWAY follows the person too (opbergen, Frits 2026-09-24)', () => {
+  function sightRig({ inCircles = [], sights = {} } = {}) {
+    const set = [];
+    const sync = createCircleFollowSync({
+      siblings: async () => [SIB],
+      sendToPeer: async () => {},
+      myEntries: async () => [],
+      isIn: async (id) => inCircles.includes(id),
+      consume: async (e) => ({ circleId: e.id, ok: true, steps: [] }),
+      sightOf: async (id) => sights[id] ?? null,
+      setSight: async (id, sight) => { sights[id] = sight; set.push([id, sight]); },
+    });
+    return { sync, set, sights };
+  }
+  const carry = (c) => ({ subtype: CIRCLE_FOLLOW_SUBTYPES.carry, circle: c });
+
+  it('on a circle this device is in, the NEWER mark lands; older news leaves it', async () => {
+    const r = sightRig({ inCircles: ['c1'], sights: { c1: { putAway: false, at: 10 } } });
+    await r.sync.handlers[CIRCLE_FOLLOW_SUBTYPES.carry](SIB, carry(entry('c1', { sight: { putAway: true, at: 20 } })));
+    expect(r.sights.c1).toEqual({ putAway: true, at: 20 });
+    await r.sync.handlers[CIRCLE_FOLLOW_SUBTYPES.carry](SIB, carry(entry('c1', { sight: { putAway: false, at: 15 } })));
+    expect(r.sights.c1, 'older news never undoes a later choice').toEqual({ putAway: true, at: 20 });
+  });
+
+  it('a circle joined from a carry takes the mark it arrived with', async () => {
+    const r = sightRig();
+    await r.sync.handlers[CIRCLE_FOLLOW_SUBTYPES.carry](SIB, carry(entry('c2', { sight: { putAway: true, at: 7 } })));
+    expect(r.sights.c2).toEqual({ putAway: true, at: 7 });
+  });
+
+  it('a stranger\'s carry moves no mark', async () => {
+    const r = sightRig({ inCircles: ['c1'], sights: { c1: { putAway: false, at: 10 } } });
+    await r.sync.handlers[CIRCLE_FOLLOW_SUBTYPES.carry](STRANGER, carry(entry('c1', { sight: { putAway: true, at: 99 } })));
+    expect(r.sights.c1).toEqual({ putAway: false, at: 10 });
+  });
+});

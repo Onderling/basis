@@ -60,8 +60,10 @@ they fit together.
 - **Pod (Solid pod)** — the user's personal, standards-based data store. In onderling it's the **portability
   layer, not a runtime dependency**: every app runs fully local; the pod is opt-in.
 - **Profile / persona** — a keyed identity in the agent **registry**: `root → profile → per-circle address`
-  (decisions 2026-07-14). One person, many profiles; each has its own derived key, so two personas are two people
-  on the wire (unlinkable by default, linkable by choice). "Persona" is the user-facing word for a profile you
+  (decisions 2026-07-14). One person, many profiles; each CAN derive its own key, and the design says two personas are
+  two people on the wire (unlinkable by default, linkable by choice). **What runs today: one identity per person —
+  the default profile's — with per-circle addresses derived from it; a persona is a disclosure lens over that
+  identity (what a circle or contact sees of you).** A profile running as its own identity is designed, not built. "Persona" is the user-facing word for a profile you
   present; every property on it is `own` or `inherit` from the default profile. A circle is joined **as** one
   profile (the join wizard's persona picker; `null` = join minimally); a **disclosure context** is a setting on the
   profile, painted by Mij. Handle and displayName are per-circle roster-row facts of the profile that joined.

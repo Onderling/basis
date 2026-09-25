@@ -31,6 +31,10 @@ import {
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
   setStoragePolicy,
+  // The persona the circle is founded as — the list, and the choice kept honest against it.
+  loadPersonas, withPersonas, founderPersonaName,
+  // The circle's id comes from its founder — one helper, both wizards and the quick create.
+  resolveFounderKey, newFounderCircleId,
 } from '../../core/wizards/createGroupState.js';
 import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 // B5 — the ceiling field. `markAxisTouched` so an explicit choice survives a kind switch (the same
@@ -42,7 +46,6 @@ import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../../v2/circlePolicyStore.js';
 import { consequenceKeyFor } from '../../v2/optionConsequences.js';
 import { t } from '../../localisation.js';
-import { deriveCircleId } from '@onderling/core';
 
 /**
  * N1+E8 — persist the wizard's chosen policy axes (features incl. the
@@ -72,15 +75,9 @@ async function persistCreatedCirclePolicy(groupId, state) {
  * @param {Function}    opts.onClose
  * @param {Function}    [opts.onDispatched]
  */
-/** 16 random bytes, so one founder's two circles differ even when named the same thing. */
-function freshNonce() {
-  const b = new Uint8Array(16);
-  (globalThis.crypto ?? {}).getRandomValues?.(b);
-  return b;
-}
 
 export function renderCreateGroupWizard(opts) {
-  const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr } = opts;
+  const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr, shareFounderRelease } = opts;
 
   const state = initialState();
 
@@ -93,15 +90,18 @@ export function renderCreateGroupWizard(opts) {
   // late — which is honest: a circle with no derivable founder should not be created at all.
   (async () => {
     if (state.groupId) return;
-    let key = null;
-    try { key = getMyPeerAddr?.() ?? null; } catch { key = null; }
-    if (!key && typeof callSkill === 'function') {
-      try { key = (await callSkill('stoop', 'whoAmI', {}))?.webid ?? null; } catch { key = null; }
-    }
-    if (!key) return;                       // no founder → no id → the wizard cannot advance
-    state.groupId = deriveCircleId(key, freshNonce());
+    const key = await resolveFounderKey({ getMyPeerAddr, callSkill });
+    if (!key || state.groupId) return;      // no founder → no id → the wizard cannot advance
+    state.groupId = newFounderCircleId(key);
     rerender();
   })();
+
+  // Which persona founds the circle: the join wizard's list, read once at mount. Until it lands the picker is
+  // not painted and the default stays chosen — the same value the picker would show preselected.
+  loadPersonas({ callSkill }).then((personas) => {
+    Object.assign(state, withPersonas(state, personas));
+    if (state.step === 1 && !state.successResult) rerender();
+  }).catch(() => {});
 
   rerender();
 
@@ -119,7 +119,7 @@ export function renderCreateGroupWizard(opts) {
     if (state.step === 5) renderTechStep(container, doc, state, advance, back, onClose, rerender);
     if (state.step === 6) renderReviewStep(container, doc, state, back, onClose, rerender, async () => {
       rerender(); // show submitting state
-      const { result } = await finalSubmit({ state, callSkill });
+      const { result } = await finalSubmit({ state, callSkill, shareRelease: shareFounderRelease });
       if (result) {
         // Stamp the current peer address on the success payload so the
         // invite URL we render carries the admin's peer-redeem target.
@@ -209,10 +209,13 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   appendField(wrap, doc, t('circle.wizard.create.name'), 'name',
     state.name, (v) => {
       state.name = v;
-      if (!state.groupId) state.groupId = deriveCircleId(founderKey(), freshNonce());
+      // The id is derived once, at mount, from the founder (above); typing never makes one. Until the founder
+      // is known the Next button stays off — this used to call a `founderKey()` that was never defined.
       refreshNextBtn();
     },
     { placeholder: 'e.g. Circle Westend' });
+
+  appendFounderPersona(wrap, doc, state);
 
   appendField(wrap, doc, t('circle.wizard.create.purpose'), 'purpose',
     state.purpose, (v) => { state.purpose = v; },
@@ -228,6 +231,39 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
       disabled: !state.name.trim() || !isValidSlug(state.groupId),
       validate: 'identityOk' },
   ]);
+}
+
+// Which persona founds the circle (Frits 2026-09-24). Painted only once the list has loaded, so a person never
+// sees an empty select; the default is preselected. Changing it does not rerender — the name field keeps focus.
+function appendFounderPersona(wrap, doc, state) {
+  if (!Array.isArray(state.personas) || state.personas.length === 0) return;
+  const pWrap = doc.createElement('div');
+  pWrap.className = 'cc-wizard-persona';
+  const pLabel = doc.createElement('div');
+  pLabel.className = 'cc-wizard-field-label';
+  pLabel.textContent = t('circle.wizard.create.persona.label');
+  pWrap.appendChild(pLabel);
+  const select = doc.createElement('select');
+  select.className = 'cc-wizard-persona-select';
+  select.setAttribute('data-testid', 'create-founder-persona');
+  const none = doc.createElement('option');
+  none.value = '';
+  none.textContent = t('circle.wizard.create.persona.minimal');
+  select.appendChild(none);
+  for (const p of state.personas) {
+    const opt = doc.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name;
+    select.appendChild(opt);
+  }
+  select.value = state.persona ?? '';
+  select.addEventListener('change', () => { state.persona = select.value || null; });
+  pWrap.appendChild(select);
+  const pHint = doc.createElement('div');
+  pHint.className = 'cc-wizard-field-hint';
+  pHint.textContent = t('circle.wizard.create.persona.hint');
+  pWrap.appendChild(pHint);
+  wrap.appendChild(pWrap);
 }
 
 // Local refresh-helper for C1 — the wizardKit's refreshActions uses
@@ -415,6 +451,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   dl.className = 'cc-wizard-review';
   appendReview(dl, doc, t('circle.wizard.create.review_name'),           state.name);
   appendReview(dl, doc, t('circle.wizard.create.review_id'),       state.groupId);
+  appendReview(dl, doc, t('circle.wizard.create.review_persona'),  founderPersonaName(state) ?? t('circle.wizard.create.review_persona_minimal'));
   if (state.purpose) appendReview(dl, doc, t('circle.wizard.create.purpose'), state.purpose);
   if (state.tags)    appendReview(dl, doc, t('circle.wizard.create.review_tags'), state.tags);
   if (state.additionalAdmins) appendReview(dl, doc, t('circle.wizard.create.review_admins'), state.additionalAdmins);

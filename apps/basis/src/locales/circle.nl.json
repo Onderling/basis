@@ -397,6 +397,20 @@
     "text": "{{count}} openstaande voorstel(len)",
     "doc": "Accessible label for the voorstellen badge on a circle tile (P6.2 #341)."
   },
+  "launcher": {
+    "fold": {
+      "text": "Opgeborgen ({{count}})",
+      "doc": "The launcher's fold of circles out of sight — put away by you, or not held on this device."
+    },
+    "put_away": {
+      "text": "opgeborgen",
+      "doc": "A folded tile's note: the person put this circle away (every device)."
+    },
+    "not_here": {
+      "text": "niet op dit apparaat",
+      "doc": "A folded tile's note: this device does not hold this circle (the kring opt-out, My data)."
+    }
+  },
   "tile": {
     "menu": {
       "pin": {
@@ -426,6 +440,14 @@
       "leave_confirm": {
         "text": "{{name}} verlaten? Dit kan niet ongedaan worden.",
         "doc": "β.5 — confirm() text before dispatching /leave-group."
+      },
+      "put_away": {
+        "text": "Opbergen",
+        "doc": "Tile menu — OPBERGEN (Frits 2026-09-24): out of the list on every device, and it wakes nobody. The circle and your place in it stay."
+      },
+      "take_out": {
+        "text": "Terugzetten",
+        "doc": "Tile menu — back into the list (the same act, undone)."
       }
     }
   },
@@ -3974,6 +3996,30 @@
       "text": "Je had dit contact verborgen.",
       "doc": "The one-line marker painted in the thread when a hidden contact writes again and comes back — so the person understands why someone they removed is in their list. Wilfred (the seeded contact) never initiates, so for him it is only ever a reply."
     },
+    "returned_deleted_marker": {
+      "text": "Je had dit contact verwijderd. Ze schreven opnieuw, dus ze zijn terug.",
+      "doc": "The one-line marker above the turn that brought a DELETED contact back (L114) — the pair circle is re-joined, the row shown again."
+    },
+    "delete": {
+      "text": "Verwijderen",
+      "doc": "Thread header — delete this contact (L114): hide + leave the pair circle. Opens a confirm sheet first."
+    },
+    "delete_title": {
+      "text": "{{name}} verwijderen?",
+      "doc": "Confirm sheet heading for deleting a contact (L114)."
+    },
+    "delete_body": {
+      "text": "{{name}} verdwijnt uit je contacten op al je apparaten en jullie gedeelde verbinding stopt. Jullie gesprek blijft op dit apparaat. Als {{name}} je opnieuw schrijft, komt die terug.",
+      "doc": "Confirm sheet body (L114) — the three facts: gone from sight everywhere, the connection closes, a message brings them back. Never promises they cannot reach you: that would be blocking."
+    },
+    "delete_confirm": {
+      "text": "Verwijderen",
+      "doc": "Confirm sheet — the destructive button."
+    },
+    "deleted": {
+      "text": "{{name}} is verwijderd.",
+      "doc": "After a delete (L114)."
+    },
     "trust": {
       "bekend": {
         "text": "bekend",
@@ -4051,6 +4097,58 @@
     "unread_tab": {
       "text": "Contacten: {{count}} nieuw",
       "doc": "Accessible label of the count on the Contacten tab: every contact's unread, summed."
+    },
+    "lens": {
+      "title": {
+        "text": "Wat ziet {{name}} van jou?",
+        "doc": "Thread header — the lens control's heading (L125). Says 'see', never 'know a different you': one identity runs (L123)."
+      },
+      "persona": {
+        "text": "Ziet je als",
+        "doc": "Lens control — the persona a contact sees you as."
+      },
+      "level": {
+        "text": "Hoeveel",
+        "doc": "Lens control — the reveal level that persona discloses to this contact."
+      },
+      "hint": {
+        "text": "Dezelfde jij, een ander beeld: dit kiest welke gegevens dit contact krijgt. Het praat nog steeds met jou.",
+        "doc": "Lens control — the honest sentence: a different VIEW of the same person, not a second identity (L123)."
+      },
+      "save": {
+        "text": "Opslaan",
+        "doc": "Lens control — save."
+      },
+      "cancel": {
+        "text": "Annuleren",
+        "doc": "Lens control / add sheet — cancel."
+      },
+      "saved": {
+        "text": "Opgeslagen — {{name}} ziet je nu als {{persona}}.",
+        "doc": "Lens control — confirmation after a change."
+      },
+      "failed": {
+        "text": "Dat is niet opgeslagen. Er is niets veranderd.",
+        "doc": "Lens control — a change that did not save."
+      },
+      "open": {
+        "text": "Wat ziet dit contact",
+        "doc": "Thread header — the button that opens the lens control."
+      }
+    },
+    "add_sheet": {
+      "title": {
+        "text": "{{name}} toevoegen",
+        "doc": "Add sheet (L125) — heading when a scanned card or a link is about to be added."
+      },
+      "intro": {
+        "text": "Je voegt {{name}} toe als contact. Kies wat dit contact van je ziet — je kunt het later aanpassen in jullie gesprek.",
+        "doc": "Add sheet — asks what the new contact sees of you, prefilled with the default persona and your usual level."
+      },
+      "add": {
+        "text": "Toevoegen",
+        "doc": "Add sheet — confirm the add."
+      }
     }
   },
   "pairedDevices": {
@@ -5882,6 +5980,28 @@
         "text": "Verversen na (dagen)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
+      "persona": {
+        "label": {
+          "text": "Je start deze kring als",
+          "doc": "Create wizard, identity step — which persona founds the circle (Frits 2026-09-24: the create wizard asks, the default preselected). It chooses the RELEASE that rides, not a second identity."
+        },
+        "minimal": {
+          "text": "Start minimaal (deel geen achtergrond)",
+          "doc": "Create wizard — the start-minimally option: no release rides onto the new circle. The join wizard's same protective choice."
+        },
+        "hint": {
+          "text": "Alleen wat deze persona in deze kring deelt, zien de mensen die meedoen — niets wat je niet zelf hebt ingesteld. Later aanpassen kan bij Mij → persona's.",
+          "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
+        }
+      },
+      "review_persona": {
+        "text": "Gestart als",
+        "doc": "Create wizard, review — the founding persona's row."
+      },
+      "review_persona_minimal": {
+        "text": "Minimaal gestart",
+        "doc": "Create wizard, review — the founding row when the founder starts minimally."
+      },
       "step_identity": {
         "text": "Een kring maken",
         "doc": "Mobile create-wizard, step 1 heading."
@@ -6341,6 +6461,10 @@
       "setContactHidden": {
         "text": "Verbergen",
         "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
+      },
+      "setContactPersona": {
+        "text": "Wat dit contact ziet",
+        "doc": "Row-action / page button for stoop:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
       },
       "conflictDisputeWizard": {
         "text": "Bezwaar maken",

@@ -1078,8 +1078,9 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // HERE (where the trail rows are at hand), per the join-proof decision:
     //   • a SELF-authored join must carry `payload.redemptionRef` naming an existing redemption row for the
     //     same subject — deny-favouring: a row that hasn't arrived yet defers the join to the next read;
-    //   • a join authored by SOMEONE ELSE stands only on a FOUNDER's authority (dynamic non-founder-admin
-    //     authority is the deferred causal-authority slice).
+    //   • a join authored by SOMEONE ELSE is passed on to the fold, which admits it only when its author is an
+    //     admin AT THAT CAUSAL POINT (`canAct`, as for role and evict — Frits 2026-09-24, L127: any admin may
+    //     re-admit someone who left). This was founders-only, so a promoted admin could never re-admit anyone.
     try {
       const { bodies } = await membershipRead(groupId);
       addGenesisFounders(bodies);          // creation first: the join filter below reads the result
@@ -1090,7 +1091,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
           return typeof ref === 'string' && !!ref
             && forGroup.some((it) => it.id === ref && it?.source?.redeemedBy === b.subject);
         }
-        return founderWebids.has(b.author);
+        return true;   // the fold decides, by the author's authority at that depth
       });
     } catch { spineStatements = []; }
   } else {
@@ -1133,6 +1134,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     exits: await readCircleExits({ store, groupId }),
     // The signed spine deltas fold ON TOP of the trail head (the cutover model — no data migration).
     spineStatements,
+    // The fold's compaction verdict goes back to the rail (L121): only on the rail path, only when the fold names
+    // something, fire-and-forget — a read never waits on a write.
+    onFolded: (typeof membershipRead?.compact === 'function')
+      ? (folded) => { if (Array.isArray(folded?.superseded) && folded.superseded.length) membershipRead.compact(groupId, folded.superseded).catch(() => {}); }
+      : null,
   });
 }
 
@@ -2314,45 +2320,6 @@ export function buildSkills({
       return { displayName: name, member: updated, _sync: simulateSync() };
     }, {
       description: 'Set the calling actor\'s display name (revealed to peers who opted in).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * setMyAvatarUrl({url})  — Phase 23.1.
-     *   Wire the calling actor's `avatarUrl` field on MemberMap. URL
-     *   convention is `mem://stoop/avatars/<webid>.<ext>` for content
-     *   stored in the local cache; once a pod is attached, the cache
-     *   write-through stages the same path under
-     *   `<pod>/stoop/avatars/...`.  Apps that don't follow the
-     *   `mem://stoop/avatars/` convention can pass any URI — Stoop
-     *   doesn't fetch or validate the content here, only stores the
-     *   reference.
-     */
-    defineSkill('setMyAvatarUrl', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const url = typeof a.url === 'string' ? a.url.trim() : '';
-      if (!url) return { error: 'url required' };
-      if (!members) return { error: 'no-member-map' };
-      const updated = await members.addMember({ webid: from, avatarUrl: url });
-      return { avatarUrl: url, member: updated, _sync: simulateSync() };
-    }, {
-      description: 'Set the calling actor\'s avatar URL (mem://stoop/avatars/<webid>.<ext> by convention).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * clearMyAvatar()  — Phase 23.1.  Reset the calling actor's
-     * `avatarUrl` to null on MemberMap.  No content delete here —
-     * leave the bytes in the cache; a future "compactor" can sweep
-     * orphaned avatars.
-     */
-    defineSkill('clearMyAvatar', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, avatarUrl: null });
-      return { cleared: true, member: updated, _sync: simulateSync() };
-    }, {
-      description: 'Clear the calling actor\'s avatar URL (does not delete cached bytes).',
       visibility:  'authenticated',
     }),
 
@@ -4687,6 +4654,13 @@ export function buildSkills({
         ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
         // The card's relays become the contact's POINTS — where a message to them goes first.
         ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
+        // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
+        // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
+        // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable
+        // from one that was. Only the explicit backfill may write `default`, and only where it can prove it.
+        ...(typeof a.persona === 'string' && a.persona.trim() ? { persona: a.persona.trim() } : {}),
+        // the level chosen in the add sheet; absent when nobody was asked (a card arriving with a message)
+        ...(['handle', 'profile', 'full'].includes(a.revealPreset) ? { revealPreset: a.revealPreset, personaAt: Date.now() } : {}),
         trustLevel,
       });
       metrics?.record?.('contact-added-from-qr');
@@ -4695,7 +4669,7 @@ export function buildSkills({
       const pk = card.personKey ? await adoptContactPersonKey(card.webid, card.personKey, card.personKeyLinks) : null;
       return { contact: m, ...(pk ? { personKey: pk } : {}) };
     }, {
-      description: 'Add a contact from a onderling-contact:// QR/URL payload.',
+      description: 'Add a contact from a onderling-contact:// QR/URL payload. `persona` records which of your personas they were added through — what they see of you.',
       visibility:  'authenticated',
     }),
 
@@ -5118,13 +5092,35 @@ export function buildSkills({
       if (!bundle?.contacts) return { error: 'no-contacts' };
       try {
         // `hiddenAt` is a landing's (a sibling's newer change carried here); a person's own tap has none and gets now.
-        const m = await bundle.contacts.setHidden(a.webid, a.hidden === true, Number.isFinite(a.hiddenAt) ? a.hiddenAt : Date.now());
+        const m = await bundle.contacts.setHidden(a.webid, a.hidden === true, Number.isFinite(a.hiddenAt) ? a.hiddenAt : Date.now(), {
+          // L114: a delete is a hide that also left the pair circle — recorded so a return can say so
+          deleted: a.deleted === true, deletedAt: Number.isFinite(a.deletedAt) ? a.deletedAt : null,
+        });
         return { contact: m };
       } catch (err) {
         return { error: err?.message ?? String(err) };
       }
     }, {
       description: 'Hide a contact from Contacten (the row stays; their next message brings them back), or show them again.',
+      visibility:  'authenticated',
+    }),
+
+    /** setContactPersona({webid, persona, revealPreset?, personaAt?}) — what a contact sees of you (L125). */
+    defineSkill('setContactPersona', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (!bundle?.contacts) return { error: 'no-contacts' };
+      try {
+        const m = await bundle.contacts.setPersona(a.webid, a.persona, {
+          revealPreset: a.revealPreset ?? null,
+          // a landing carries the sibling's time; a person's own tap gets now
+          personaAt: Number.isFinite(a.personaAt) ? a.personaAt : Date.now(),
+        });
+        return { contact: m };
+      } catch (err) {
+        return { error: err?.message ?? String(err) };
+      }
+    }, {
+      description: 'Change which persona a contact sees you as, and the level it discloses to them. The lens: the contact talks to the same you.',
       visibility:  'authenticated',
     }),
 

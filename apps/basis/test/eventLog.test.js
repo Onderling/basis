@@ -438,3 +438,24 @@ describe('makeAgentTrailEntry', () => {
     expect(makeAgentTrailEntry({ actor: 'a', op: 'x', kind: 'settings-change' }).type).toBe('settings-change');
   });
 });
+
+describe('compactEntries — the one way a record-class entry changes after it was written, on the fold\'s word (L121)', () => {
+  it('replaces exactly the named entries in place (id + seq kept), persists, and returns the count', async () => {
+    const persist = vi.fn(async () => {});
+    const log = new EventLog({ initial: [], muted: [], persist });
+    log.append({ ...ev({ id: 'membership:a' }), type: 'membership', circleId: 'c', payload: { body: { hash: 'a' }, sig: 'S' } });
+    log.append({ ...ev({ id: 'membership:b' }), type: 'membership', circleId: 'c', payload: { body: { hash: 'b' }, sig: 'S' } });
+    const seqA = log.query().find((e) => e.id === 'membership:a').seq;
+    persist.mockClear();
+    const n = log.compactEntries(['membership:a', 'membership:nope'], (e) => ({ ...e, payload: { tombstone: true, body: e.payload.body } }));
+    expect(n).toBe(1);
+    const a = log.query().find((e) => e.id === 'membership:a');
+    expect(a.payload.tombstone).toBe(true);
+    expect(a.payload.sig).toBeUndefined();
+    expect(a.seq).toBe(seqA);
+    expect(log.query().find((e) => e.id === 'membership:b').payload.sig).toBe('S');
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(log.compactEntries([], () => null)).toBe(0);
+    expect(log.compactEntries(['membership:b'], () => ({ id: 'other' })), 'a transform that changes the id is refused').toBe(0);
+  });
+});

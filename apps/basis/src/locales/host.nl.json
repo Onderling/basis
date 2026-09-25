@@ -421,8 +421,8 @@
       "doc": "Defensive."
     },
     "too_large": {
-      "text": "Bestand te groot ({{size}} bytes; max {{max}} bytes inline).  NKN dropt berichten boven ~64KB stilletjes; daarom houden we 32KB als bovengrens om levering te garanderen.  Grotere bestanden komen via pod-URL (volgende slice).",
-      "doc": "Cap."
+      "text": "Dit bestand is te groot om in een bericht te sturen ({{size}} bytes; de grens is {{max}}). Foto's worden vanzelf verkleind; grotere bestanden kunnen nog niet worden verstuurd.",
+      "doc": "The one cap on what a direct message carries (attachment.maxNoticeboardBytesPerAtt)."
     },
     "read_failed": {
       "text": "Bestand lezen mislukt: {{error}}",

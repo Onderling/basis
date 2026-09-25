@@ -230,7 +230,7 @@ export function policyPatchFromState(state) {
   const s = state && typeof state === 'object' ? state : {};
   const patch = {};
   if (s.features && typeof s.features === 'object') patch.features = s.features;
-  for (const ax of ['revealPolicy', 'llmTool', 'agents']) {
+  for (const ax of ['revealPolicy', 'llmTool', 'agents', 'storagePosture']) {
     if (s[ax] !== undefined) patch[ax] = s[ax];
   }
   // The storage choice IS the policy's `pod` axis: `setKind` seeds it from the template and
@@ -295,6 +295,9 @@ export function initialState() {
     // picking a kind gets, and it is deliberately the same number the substrate falls back to for a
     // circle whose rules say nothing. One meaning of "nobody chose", not two.
     inviteMaxRedemptions:  INVITE_CEILING_FALLBACK,
+    // Sealed by default, and the wizard does not ask (Frits, 2026-09-25): what a circle created WITHOUT a kind
+    // gets, the same posture every template pre-fills. Unsealed is a setting an admin chooses afterwards.
+    storagePosture:        'p2',
     storagePolicy:         DEFAULT_CIRCLE_STORAGE_POSTURE,
     groupPodUri:           '',
     // Which persona founds the circle (Frits 2026-09-24: the create wizard asks, the default preselected).

@@ -41,6 +41,7 @@ import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling'
  *   features:          Record<string, boolean>,
  *   revealPolicy:      'pairwise' | 'open',
  *   pod:               'none' | 'shared' | 'personal' | 'hybrid',
+ *   storagePosture:    'p0' | 'p1' | 'p2' | 'p3',
  *   llmTool:           'off' | 'local' | 'cloud',
  *   agents:            'yes' | 'admin-approval' | 'no',
  *   consensusRequired: boolean,
@@ -57,6 +58,7 @@ export const CIRCLE_TEMPLATES = Object.freeze({
     },
     revealPolicy:      'open',
     pod:               'shared',
+    storagePosture:    'p2',   // sealed by default (L79); unsealed is a setting, never the wizard's question
     llmTool:           'local',
     agents:            'admin-approval',
     consensusRequired: false,
@@ -75,6 +77,7 @@ export const CIRCLE_TEMPLATES = Object.freeze({
     },
     revealPolicy:      'pairwise',
     pod:               'personal',
+    storagePosture:    'p2',   // sealed by default (L79); unsealed is a setting, never the wizard's question
     llmTool:           'off',
     agents:            'no',
     consensusRequired: true,
@@ -87,6 +90,7 @@ export const CIRCLE_TEMPLATES = Object.freeze({
     },
     revealPolicy:      'open',
     pod:               'personal',
+    storagePosture:    'p2',   // sealed by default (L79); unsealed is a setting, never the wizard's question
     llmTool:           'local',
     agents:            'admin-approval',
     consensusRequired: false,
@@ -100,6 +104,7 @@ export const CIRCLE_TEMPLATES = Object.freeze({
     },
     revealPolicy:      'open',
     pod:               'shared',
+    storagePosture:    'p2',   // sealed by default (L79); unsealed is a setting, never the wizard's question
     llmTool:           'cloud',
     agents:            'yes',
     consensusRequired: false,
@@ -114,6 +119,7 @@ export const CIRCLE_TEMPLATES = Object.freeze({
     },
     revealPolicy:      'pairwise',
     pod:               'personal',
+    storagePosture:    'p2',   // sealed by default (L79); unsealed is a setting, never the wizard's question
     llmTool:           'off',
     agents:            'no',
     consensusRequired: false,
@@ -210,6 +216,7 @@ export function applyTemplate(state, kind) {
     features:          { ...t.features, ...userFeatures },
     revealPolicy:      kept('revealPolicy', s.revealPolicy, t.revealPolicy),
     pod:               kept('pod', s.pod, t.pod),
+    storagePosture:    kept('storagePosture', s.storagePosture, t.storagePosture),
     llmTool:           kept('llmTool', s.llmTool, t.llmTool),
     agents:            kept('agents', s.agents, t.agents),
     consensusRequired: kept('consensusRequired', s.consensusRequired, t.consensusRequired),

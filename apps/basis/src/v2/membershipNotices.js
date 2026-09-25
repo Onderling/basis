@@ -115,3 +115,73 @@ export function membershipNoticeRows({ events = [], circleId, viewerId, members 
   }
   return out;
 }
+
+/**
+ * WHEN A KEY FORKS (Frits 2026-09-25, ledger L133). Two membership statements signed by one key off the same parent
+ * prove the key can no longer be trusted from there — almost always a stolen key. The fold removes the author from the
+ * fork on (L131); these rows say so, to the two who can act on it:
+ *   • the person whose key it is — told first and plainly, on their own devices: someone else may hold their key;
+ *   • the circle's admins — named, for an admin's fork and a member's alike: they can rotate and remove.
+ * Not the whole group: they see the roster change, and an alarm reads as an accusation when most forks are theft.
+ *
+ * Rendered from the log like every membership notice — the fork IS on the log — never appended; one row per fork, its
+ * id the fork's smallest sibling hash (the same name the fold's removal carries), dated when the fork became visible.
+ * Not subject to the per-kind notice settings: a key that may be stolen is not a line a person switches off.
+ */
+export const FORK_NOTICE_KEYS = Object.freeze({
+  you:    'circle.membership.your_key_forked',
+  member: 'circle.membership.member_key_forked',
+});
+
+/**
+ * @param {object} a
+ * @param {Array<object>} a.events   the device log
+ * @param {string} a.circleId
+ * @param {string} a.viewerId        this person
+ * @param {Array<object>|null} [a.members]  the roster rows (the viewer's role, the forked member's name)
+ * @param {(key:string, args?:object)=>string} a.t
+ */
+export function forkNoticeRows({ events = [], circleId, viewerId, members = null, t } = {}) {
+  if (typeof t !== 'function' || typeof circleId !== 'string' || !circleId || typeof viewerId !== 'string' || !viewerId) return [];
+  // author key + parent → the statements off that parent (the fork is two or more with different hashes)
+  const byParent = new Map();
+  for (const e of events ?? []) {
+    if (!e || e.type !== 'membership') continue;
+    if ((e.circleId ?? e.payload?.circleId) !== circleId) continue;
+    const body = e.payload?.body;
+    if (!body || typeof body.author !== 'string' || typeof body.hash !== 'string') continue;
+    const key = `${body.author}\n${body.parentHash ?? ''}`;
+    if (!byParent.has(key)) byParent.set(key, new Map());
+    byParent.get(key).set(body.hash, e);
+  }
+  const viewerIsAdmin = Array.isArray(members) && members.some((m) => refOf(m) === viewerId && m?.role === 'admin');
+  const out = [];
+  const said = new Set();
+  for (const siblings of byParent.values()) {
+    if (siblings.size < 2) continue;
+    const entries = [...siblings.values()];
+    const any = entries[0];
+    const person = any.actor ?? any.payload?.body?.payload?.authorRef ?? any.payload?.body?.author;
+    const isMe = person === viewerId || any.payload?.body?.author === viewerId;
+    if (!isMe && !viewerIsAdmin) continue;
+    const seed = [...siblings.keys()].sort()[0];
+    const id = `notice:fork:${seed}`;
+    if (said.has(id)) continue;
+    said.add(id);
+    const ts = Math.max(...entries.map((e) => (typeof e.ts === 'number' ? e.ts : 0)));
+    let text;
+    if (isMe) text = t(FORK_NOTICE_KEYS.you);
+    else {
+      const row = members.find((m) => refOf(m) === person);
+      const name = row ? revealedMemberLabel(row, { viewerId }).primary : String(person ?? '').slice(0, 8);
+      text = t(FORK_NOTICE_KEYS.member, { name });
+    }
+    const notice = isMe ? 'keyForked' : 'memberKeyForked';
+    out.push({
+      id, ts, app: 'basis', type: 'chat-message', actor: 'bot', circleId, circleName: null,
+      event: { id, ts, app: 'basis', type: 'chat-message', actor: 'bot',
+        payload: { circleId, kind: 'chat-message', scope: 'self', text, notice } },
+    });
+  }
+  return out.sort((a, b) => a.ts - b.ts);
+}

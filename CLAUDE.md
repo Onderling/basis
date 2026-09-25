@@ -259,10 +259,12 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   sanity-check that mapping at each session's close (the wave-2 log in `DOC-STATUS.md` is the worked example).
 
 ## Where the truth is
-- **Doc layout (task #66 model — `PLAN-file-org-inventory.md`):** function is encoded in name/location and
-  drives git. **Tracked/public:** `docs/**`, `README.md`, `QUICKSTART.md`, `CLAUDE.md`/`AGENTS.md`, app-local
-  `apps/*/docs/` + CHANGELOGs. **Private/local-only (gitignored, one Obsidian vault):** `plans/` (living
-  plans/designs/notes; an archived plan goes to `plans/archive/<YYYY-MM>/`, the month it was archived), `_archive/`
+- **Doc layout (task #66 model — [`docs/repository-layout.md`](docs/repository-layout.md)):** function is encoded in
+  name/location and drives git. **Tracked/public:** `docs/**`, `README.md`, `QUICKSTART.md`, `CLAUDE.md`/`AGENTS.md`,
+  app-local `apps/*/docs/` + CHANGELOGs. **Private/local-only (gitignored, one Obsidian vault):** `plans/` (only the
+  overviews at its top — TRIAGE, INDEX, DOC-STATUS, DECISIONS-FOR-REVIEW, BACKLOG-ideas, PLAN-homes; the design of
+  record for work not done in `live/`, settled reference in `notes/`, dated task-shaped docs in `briefs/`; an archived
+  plan goes to `plans/archive/<YYYY-MM>/`, the month it was archived — `lint-plans-structure` holds the shape), `_archive/`
   (frozen NON-plan material only: old app folders, runbooks, legacy design), and root private-prefix docs (`PLAN-*`,
   `DESIGN-*`, `REMAINING-WORK.md`, …). Guard: `npm run lint:docs` — a tracked/public file must never link into `plans/`,
   `_archive/`, or outside the repo. New plan → `plans/`; a tracked doc links only to other tracked paths.

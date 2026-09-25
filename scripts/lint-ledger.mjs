@@ -145,9 +145,16 @@ const MARKER = new RegExp([
 // immediately before "ledger" and so flagged the file's own `[Frits — ledger L7]` tags as un-annotated.
 const ANNOTATED = /\bledger\s+(?:L\d+|n\/a)/i;
 
-const privateDocs = existsSync(PRIVATE_DIR)
-  ? readdirSync(PRIVATE_DIR).filter((f) => f.endsWith('.md')).map((f) => join('plans', f))
-  : [];
+// The top of plans/ and the three folders its living docs were sorted into (2026-09-25: live/ · notes/ · briefs/).
+// Exactly the docs that sat at the top before the sort — so moving a doc into its folder never hides its markers.
+// archive/ is frozen and not scanned, as before; the older subfolders were never in scope.
+const PLAN_FOLDERS = ['', 'live', 'notes', 'briefs'];
+const privateDocs = PLAN_FOLDERS.flatMap((sub) => {
+  const dir = join(PRIVATE_DIR, sub);
+  return existsSync(dir)
+    ? readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => join('plans', sub, f))
+    : [];
+});
 // QUESTIONS.md is part of the register itself (the capped queue of open Frits-decisions, agreed
 // 2026-08-20) — scanning it would demand the queue annotate itself, exactly the ledger's own
 // exemption one file over. Its generated INDEX/DOC-STATUS rows quote its H1, so they inherit the

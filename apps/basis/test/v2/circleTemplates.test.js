@@ -181,3 +181,23 @@ describe('template shape — keys match circlePolicy.js', () => {
     }
   });
 });
+
+describe('a circle starts sealed (L79: sealed by default, the wizard does not ask)', () => {
+  // Two templates set a shared pod and left the seal posture at the p0 default — so once the shared-pod write is
+  // wired, a home's content would sit in the clear on a pod host (fail-open). Every template now pre-fills the
+  // sealed posture; unsealed stays a setting an admin can choose afterwards.
+  it('every template pre-fills storagePosture p2', () => {
+    for (const kind of [...CIRCLE_KINDS, '_unknown_']) {
+      expect(applyTemplate({}, kind).storagePosture, kind).toBe('p2');
+    }
+  });
+  it('the create wizard writes it onto the new circle — with or without a kind picked', async () => {
+    const { policyPatchFromState, initialState } = await import('../../src/core/wizards/createGroupState.js');
+    expect(policyPatchFromState(applyTemplate(initialState(), 'household')).storagePosture).toBe('p2');
+    expect(policyPatchFromState(initialState()).storagePosture).toBe('p2');
+  });
+  it('an explicit choice survives a kind switch, like every other axis', () => {
+    const chosen = markAxisTouched({ ...applyTemplate({}, 'household'), storagePosture: 'p0' }, 'storagePosture');
+    expect(applyTemplate(chosen, 'team').storagePosture).toBe('p0');
+  });
+});

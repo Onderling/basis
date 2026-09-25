@@ -208,6 +208,15 @@ resolve. Each is extensible — a new item type or a plugin opts into a channel 
 mechanism (the survey that found three parallel "signed causal log" shapes is exactly the drift this names
 away):
 
+- **The log is stored in segments, and record-class entries change once at most.** On a device the whole
+  log is one snapshot to the log itself, but underneath it is cut, oldest first, into segments of at most
+  256 KB with a manifest naming them: an append rewrites only the newest segment, a corrupt segment loses only
+  itself, and a phone's single-row storage ceiling is never reached by one value. Record-class entries never
+  expire; the one thing that ever changes one is a *tombstone*: a `member-props` statement every device's fold
+  computes as dead (every field it set overwritten by a later accepted statement of the same subject, no handle
+  set) keeps its chain fields and sheds its payload — so the author's chain and every later statement's causal
+  depth stay exactly what they were, and only the bytes go. Refused statements and handle-bearing ones are never
+  dead, because their effect depends on the history around them.
 - **The spine chain** (`createAuthorChain` + the generic `signSpine`) — for events where **EQUIVOCATION is an
   attack**: governance (proposals/votes), **roles** (admin promote/demote), **membership** (join/leave/evict),
   **key rotations**. A per-author hash-chain with fork-proofs, filterable by `kind`: each entry points at its
@@ -588,7 +597,10 @@ written in plaintext (invariant #7).
   re-wraps the item's group key to the recipient and grants ACP read on the canonical resource; the recipient
   reads the single copy in place through a `shared-ref` pointer. **Revoke = rotate**: a fresh group-key version
   is wrapped to the *remaining* recipients — forward secrecy, since content sealed after revocation is
-  unreadable to the dropped member. One resource, one copy, revocable.
+  unreadable to the dropped member. One resource, one copy, revocable. Two admins who rotate at the same moment both mint the next version with different keys; every
+  device keeps both (a version is identified by its key, not its number), seals with the one whose key id sorts
+  lowest so the race heals on the next write, and refuses a fourth distinct key at one version — the only place
+  this concern meets an adversary. Keys minted before key ids existed count as one legacy key per version.
 - **Historic keys, cross-version read.** A rotation *retains* the outgoing version (appended to the resource's
   `history[]`, still wrapped to its own recipients) instead of discarding it, so an entitled member can open
   content sealed under an older version they lived through — resolved by *authenticated trial* across the
@@ -970,10 +982,18 @@ first, third and fourth are in the code; the second's identity half is not:
 
 **Contacts carry a persona as a lens, not as an identity** (2026-09-24). Every contact row records which
 persona that contact sees you as (`contactPersona.js`), and that persona's release founds and joins the pair
-circle with them. Every add path records the default today — there is no flow yet in which to choose another.
-What it does not change is who they talk to: the contact book is still one list for the whole agent and every
+circle with them; the add sheet chooses the persona and the disclosure level, with the default prefilled, and the
+thread header changes it afterwards. What it does not change is who they talk to: the contact book is still one list for the whole agent and every
 contact holds the default profile's address and pair id. So the honest sentence is "this contact sees you
 as …", never "this contact knows a different you"; the second waits on a persona running as its own person.
+
+**Out of sight is a mark that follows the person, never a statement to anyone else.** Hiding a contact is a
+mark on the book row, carried between the person's own devices newest-wins; their next message brings them
+back, marked. Deleting a contact is that hide plus leaving the pair circle, so its route and keys stop; the
+thread stays; a return re-forms the pair circle, and any admin of it may re-admit. Putting a circle away is a
+`sight` facet on the circle's registry record, carried inside the circle-follow entry, so a restored device puts
+the same circles away; the kring opt-out is the device's own value of the same fact. None of these reach a
+circle's lanes.
 
 **Adding, replacing and revoking a device — one family of operations.** They share a shape: the recovery
 phrase is the authority, it is typed on the device that is *gaining* it, and it never travels.
@@ -1098,7 +1118,11 @@ statement graph, authority checked at the fold point, deny-wins applied only to 
 acts — so a causally later re-join re-admits, a concurrent evict-vs-rejoin resolves to the eviction,
 and every device computes the same roster. An equivocating author (two statements off one parent) is
 discounted wholesale. Compositions without the log rail keep a strengthen-only fallback (drop or
-demote, never admit) — safe, and honestly weaker. A founder is never evictable.
+demote, never admit) — safe, and honestly weaker. A founder is never evictable. A join signed by someone other than its subject — an admin confirming a remote joiner — stands
+on that author's authority at its causal depth: an admin before the depth, a member before it, and not demoted
+in it, the same test an evict answers to; a self-signed join stands on its redemption row. An author caught
+equivocating (two statements off one parent) is discounted with everything they ever signed, admissions
+included.
 
 **Mute hides, eviction refuses.** Muting a person is a view-time filter at the one projection every chat
 surface reads: their messages still land on the log (an append-only record never silently discards), and

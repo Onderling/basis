@@ -59,6 +59,7 @@ import { chunkBubble } from '../../src/v2/chunkBubble.js';
 import { circleActions } from '../../src/v2/actionProjection.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { paintFace } from './faceView.js';
 
 export function renderCircleView(container, {
   circle = {},
@@ -162,6 +163,9 @@ export function renderCircleView(container, {
   selfWebid = null,
   revealPolicy = 'pairwise',   // the circle's realName reveal rule; gates the member labels
   onMemberTap = null,
+  // Opens a member's sealed picture for THIS circle (the host binds the circle's media opener). Absent → every
+  // row keeps its initial.
+  resolvePicture = null,
   // Stale-rules banner: when the viewer's OWN row accepted an older rules version than the
   // circle's current one, the members tab opens with a re-accept affordance. The host wires
   // this to the acceptGroupRules op; absent → the banner still informs, without a button.
@@ -336,7 +340,7 @@ export function renderCircleView(container, {
     });
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
-    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules });
+    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture });
   } else if (effectiveTab !== 'conversation') {
     const placeholder = document.createElement('div');
     placeholder.className = 'circle-view__placeholder';
@@ -683,7 +687,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  *
  * `members === null` → loading; `[]` → empty; otherwise the rows.
  */
-function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null } = {}) {
+function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'circle-view__members';
 
@@ -737,6 +741,13 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
     // Reveal-gated (shared with mobile): the roster row carries `realName` ungated, so the label must be
     // computed, never read straight off the row — an unrevealed member shows their handle, not their name.
     const label = revealedMemberLabel(m, { viewerId: selfWebid, policy: revealPolicy });
+    // THE FACE — the same slot Contacten and the thread header use. The picture is on the row only when this
+    // member released it to this circle; the label is what the initial is taken from, so an unrevealed member's
+    // letter is their handle's, never their real name's.
+    const face = document.createElement('span');
+    face.className = 'cc-contacts__icon circle-view__member-face';
+    paintFace(face, { ...m, name: label.primary }, { resolvePicture });
+    row.appendChild(face);
     const primary = document.createElement('span');
     primary.className = 'circle-view__member-primary';
     primary.textContent = label.primary;

@@ -239,3 +239,18 @@ describe('memberRulesStatus — the member-card rules line (one compute, both sh
     expect('rules' in plain).toBe(false);
   });
 });
+
+describe('the face rides the member-list projection', () => {
+  // The members tab draws from `normalizeCircleMembers`, whose `memberToViewAs` kept the released NAME and dropped
+  // the rest of the release — so a picture a member released to the circle reached every row on the wire and no
+  // row on screen. Carried as `profilePicture` (the key the shared face decision reads), only when released.
+  const PIC = { type: 'blob', ref: 'blob://abc', enc: { sealed: true, thumb: 'AAAA' } };
+  it('carries a released profile picture', () => {
+    const [m] = normalizeCircleMembers({ members: [{ webid: 'w1', handle: 'bea', personaProperties: { profilePicture: PIC } }] });
+    expect(m.profilePicture).toEqual(PIC);
+  });
+  it('adds no key when nothing was released', () => {
+    const [m] = normalizeCircleMembers({ members: [{ webid: 'w2', handle: 'bob', personaProperties: { realName: 'Bob' } }] });
+    expect('profilePicture' in m).toBe(false);
+  });
+});

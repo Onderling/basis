@@ -71,6 +71,23 @@ describe('foldRoster — the deterministic membership head', () => {
     expect(r.members).not.toContain(mallory.pubKey);
   });
 
+  it('an admin DEMOTED at the same depth as an admission they signed admits nobody — the concurrent demotion is the deny (L127 review)', async () => {
+    const { founder, bob, mallory } = await ids();
+    const jb = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, parent: null, deps: [jb.hash] });
+    // bob (now admin) admits mallory; the founder demotes bob — CONCURRENTLY (same deps: neither saw the other)
+    const admit = body(bob, 'join', mallory, { payload: { peerDisplay: 'mal' }, parent: jb.hash, deps: [promote.hash] });
+    const demote = body(founder, 'role', bob, { payload: { role: 'member' }, parent: promote.hash, deps: [promote.hash] });
+    const r = foldRoster([jb, promote, admit, demote], { founders: [founder.pubKey] });
+    expect(r.admins).not.toContain(bob.pubKey);                     // the demotion stands
+    expect(r.members, 'the concurrent admission does not').not.toContain(mallory.pubKey);
+    // …while an admission that SAW no demotion, one depth earlier, stands
+    const admitEarlier = body(bob, 'join', mallory, { payload: { peerDisplay: 'mal' }, parent: jb.hash, deps: [promote.hash] });
+    const demoteLater = body(founder, 'role', bob, { payload: { role: 'member' }, parent: promote.hash, deps: [admitEarlier.hash] });
+    const r2 = foldRoster([jb, promote, admitEarlier, demoteLater], { founders: [founder.pubKey] });
+    expect(r2.members).toContain(mallory.pubKey);
+  });
+
   it('the founder confirming a remote joiner still admits them (unchanged)', async () => {
     const { founder, mallory } = await ids();
     const r = foldRoster([body(founder, 'join', mallory)], { founders: [founder.pubKey] });

@@ -215,6 +215,25 @@ describe('foldRoster — the deterministic membership head', () => {
     expect(r.members).not.toContain(mallory.pubKey);
   });
 
+  it('two DEVICES of one person, each signing a first statement in the circle, are two chains — not a fork (the key forks, never the person)', async () => {
+    const { founder, bob } = await ids();
+    const laptop = await AgentIdentity.generate(new VaultMemory());   // bob's two per-circle device keys
+    const phone  = await AgentIdentity.generate(new VaultMemory());
+    // the rail resolves author → ref and keeps the signing key beside it
+    const asBob = (b, key) => ({ ...b, author: bob.pubKey, authorKey: key.pubKey });
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });                        // bob's own (a third key, parent null)
+    const fromLaptop = asBob(body(laptop, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob L' } }), laptop);
+    const fromPhone  = asBob(body(phone,  'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Bob P' } }), phone);
+    const r = foldRoster([join, fromLaptop, fromPhone], { founders: [founder.pubKey] });
+    expect(r.members, 'bob is not removed for using two devices').toContain(bob.pubKey);
+    expect(['Bob L', 'Bob P']).toContain(r.props[bob.pubKey]?.displayName);
+    // …while the SAME key signing twice off one parent is a fork, and removes the person from there
+    const twiceA = asBob(body(phone, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'X' } }), phone);
+    const twiceB = asBob(body(phone, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Y' } }), phone);
+    const r2 = foldRoster([join, fromLaptop, twiceA, twiceB], { founders: [founder.pubKey] });
+    expect(r2.members).not.toContain(bob.pubKey);
+  });
+
   it('a fork is not a fork until there are two: a clean chain keeps everything (unchanged)', async () => {
     const { founder, bob, mallory } = await ids();
     const joinBob = body(bob, 'join', bob);

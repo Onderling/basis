@@ -94,10 +94,15 @@ const isPlainMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
  * that FORM its fork — the siblings off the shared parent. `author → Set<hash>`.
  */
 function equivocators(stmts) {
-  const byParent = new Map();   // `${author}\n${parentHash}` → first hash seen
+  // A chain is PER SIGNING KEY, never per person: a member's devices each sign with their own per-circle key and
+  // each chains from its own head (`circleEntryRail.authorHead`), so two of one person's devices both signing a
+  // first statement in a circle both have a null parent — honest concurrency, not a fork. The rail hands the
+  // signing key beside the resolved ref as `authorKey`; a body without one (the legacy store path, one key per
+  // person) forks by its author as before. The REMOVAL a fork causes is still by ref: the person whose key forked.
+  const byParent = new Map();   // `${signing key}\n${parentHash}` → first hash seen
   const forks = new Map();
   for (const s of stmts) {
-    const key = `${s.author}\n${s.parentHash ?? ''}`;
+    const key = `${s.authorKey ?? s.author}\n${s.parentHash ?? ''}`;
     const prev = byParent.get(key);
     if (prev === undefined) byParent.set(key, s.hash);
     else if (prev !== s.hash) {

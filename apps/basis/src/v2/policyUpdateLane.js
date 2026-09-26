@@ -226,3 +226,19 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
     preserved: (circleId) => preservedPolicyStatementsFor({ headStore, circleId }),
   };
 }
+
+/**
+ * The `adminsOf` every shell hands the lane: the circle's admins on THIS device's roster, read through the roster op.
+ * One definition for web, mobile and the box. A shell whose `callSkill` binds after boot passes a wrapper that
+ * reaches it lazily. An unreadable roster reads as no admins, so the lane applies nothing rather than trusting anyone.
+ * @param {(app: string, op: string, args: object) => Promise<*>} callSkill
+ * @returns {(circleId: string) => Promise<Set<string>>}
+ */
+export function adminsOfViaSkill(callSkill) {
+  return async (circleId) => {
+    let res = null;
+    try { res = typeof callSkill === 'function' ? await callSkill('stoop', 'listGroupMembers', { groupId: circleId }) : null; }
+    catch { res = null; }
+    return new Set((res?.members ?? []).filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean));
+  };
+}

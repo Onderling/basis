@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   foldPolicyUpdates, denyWinsMerge, applyPolicyUpdates, makePolicyHeadStore, nextPolicyVersion,
-  preservedPolicyStatementsFor, POLICY_UPDATE_KIND,
+  preservedPolicyStatementsFor, POLICY_UPDATE_KIND, adminsOfViaSkill,
 } from '../../src/v2/policyUpdateLane.js';
 
 const body = (author, version, policy, hash) => ({ kind: POLICY_UPDATE_KIND, author, hash, payload: { policy, version } });
@@ -98,5 +98,23 @@ describe('makeCirclePolicyLane — state', () => {
     const { makeCirclePolicyLane } = await import('../../src/v2/policyUpdateLane.js');
     const lane = makeCirclePolicyLane({ emitter: () => null, headStore: makePolicyHeadStore(memIo()), readPolicy: async () => ({}), writePolicy: async () => {}, adminsOf: async () => admins });
     expect(await lane.state('c')).toBeNull();
+  });
+});
+
+describe('adminsOfViaSkill — the one roster read every shell hands the lanes', () => {
+  it('the admins\' webids, from the roster op', async () => {
+    const calls = [];
+    const callSkill = async (app, op, args) => { calls.push([app, op, args]); return { members: [
+      { webid: 'w-anna', role: 'admin' }, { webid: 'w-bram', role: 'member' }, { role: 'admin' },
+    ] }; };
+    const admins = await adminsOfViaSkill(callSkill)('c1');
+    expect([...admins]).toEqual(['w-anna']);
+    expect(calls).toEqual([['stoop', 'listGroupMembers', { groupId: 'c1' }]]);
+  });
+
+  it('no roster (or no callSkill yet) → no admins, never a throw', async () => {
+    expect((await adminsOfViaSkill(async () => null)('c1')).size).toBe(0);
+    expect((await adminsOfViaSkill(null)('c1')).size).toBe(0);
+    expect((await adminsOfViaSkill(() => null)('c1')).size).toBe(0);
   });
 });

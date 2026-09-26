@@ -71,7 +71,7 @@ import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGr
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore } from '../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../src/v2/policyUpdateLane.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
@@ -379,8 +379,7 @@ if (relayUrl) {
     headStore: makePolicyHeadStore(circlePolicyKv),
     readPolicy: (cid) => circlePolicyStore.get(cid),
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
-    adminsOf: async (cid) => new Set((((await callSkill('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
-      .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
+    adminsOf: adminsOfViaSkill(callSkill),
   });
   const lanes = buildCircleLanes({
     agent,

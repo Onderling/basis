@@ -87,7 +87,7 @@ import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStor
 // the γ.4 resolver applies / discards.
 import { makeCirclePolicyStoreRN } from './src/core/circleStoresRN.js';
 import { forgetCircleSealStrategyFor } from './src/core/circlePods.js';
-import { makeCirclePolicyLane, makePolicyHeadStore } from '../basis/src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../basis/src/v2/policyUpdateLane.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
@@ -316,8 +316,7 @@ export default function App() {
       readPolicy: (cid) => policyStore.get(cid),
       // a policy that arrives may change the circle's storage posture — drop the strategy composed from the old one
       writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy); forgetCircleSealStrategyFor(cid); return r; },
-      adminsOf: async (cid) => new Set((((await bundleRef.current?.callSkill?.('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
-        .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
+      adminsOf: adminsOfViaSkill((...a) => bundleRef.current?.callSkill?.(...a)),
     });
   }
 

@@ -86,6 +86,7 @@ import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStor
 // CircleLauncherScreen's settings editor reads on open + clears after
 // the γ.4 resolver applies / discards.
 import { makeCirclePolicyStoreRN } from './src/core/circleStoresRN.js';
+import { forgetCircleSealStrategyFor } from './src/core/circlePods.js';
 import { makeCirclePolicyLane, makePolicyHeadStore } from '../basis/src/v2/policyUpdateLane.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
@@ -313,7 +314,8 @@ export default function App() {
       emitter: () => bundleRef.current?.agent?.emitPolicyUpdate ?? null,
       headStore: makePolicyHeadStore(AsyncStorage),
       readPolicy: (cid) => policyStore.get(cid),
-      writePolicy: (cid, policy) => policyStore.update(cid, policy),
+      // a policy that arrives may change the circle's storage posture — drop the strategy composed from the old one
+      writePolicy: async (cid, policy) => { const r = await policyStore.update(cid, policy); forgetCircleSealStrategyFor(cid); return r; },
       adminsOf: async (cid) => new Set((((await bundleRef.current?.callSkill?.('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
         .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
     });

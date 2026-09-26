@@ -124,6 +124,8 @@ async function refreshCircleHistoryKeys(circleId) {
 }
 /** After a replace ceremony: drop every cached strategy so the next open re-reads the sidecar. */
 export function forgetCircleSealStrategies() { circleSealStrategies.clear(); }
+/** One circle's cached strategy — a policy that arrived may have changed its storage posture (a cached "none" included). */
+export function forgetCircleSealStrategyFor(circleId) { circleSealStrategies.delete(circleId); }
 
 /** The no-pod distribution sink for ONE circle — a membership change (notably a REMOVE → rotation) fans the
  * new versioned key AS a log key-event to the circle's REMAINING members over the SAME peer channel content

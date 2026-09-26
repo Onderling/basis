@@ -355,7 +355,12 @@ function getCircleMediaComposition(circleId, policy) {
       getSealStrategy: () => getCircleSealStrategy(circleId, policy),
       localActor: getCircleActorWebId() || 'me',
       bucket: circleMediaBucket,
-    }).catch(() => null));
+    }).catch(() => null).then((c) => {
+      // "none" is not kept: a policy that arrives later (the circle's posture on the governance lane) may make this
+      // circle able to seal, and the next ask should find out rather than reuse the old answer.
+      if (!c) circleMediaCompositions.delete(circleId);
+      return c;
+    }));
   }
   return circleMediaCompositions.get(circleId);
 }

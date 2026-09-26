@@ -1059,7 +1059,14 @@ const circlePolicyLane = makeCirclePolicyLane({
     setItem: async (k, v) => { try { globalThis.localStorage?.setItem(k, v); } catch { /* quota / disabled */ } },
   }),
   readPolicy: (cid) => policyStore.get(cid),
-  writePolicy: (cid, policy) => policyStore.update(cid, policy),
+  // A policy that arrives can change the circle's storage posture — so what was composed from the old one (the seal
+  // strategy, the media gateway, both cached per circle, a cached "none" included) is dropped and rebuilt on next use.
+  writePolicy: async (cid, policy) => {
+    const r = await policyStore.update(cid, policy);
+    circleSealStrategies.delete(cid);
+    circleMediaCompositions.delete(cid);
+    return r;
+  },
   adminsOf: async (cid) => new Set((((await rawCallSkill?.('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
     .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
 });

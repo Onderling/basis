@@ -5194,6 +5194,10 @@
       "text": "Shared ✓",
       "doc": "personas#2 — the disclosure reached the circle roster."
     },
+    "shared_without_picture": {
+      "text": "Shared — except your picture: this circle cannot carry pictures yet.",
+      "doc": "A share that went out WITHOUT the picture: the circle has no seal strategy for its media (a pod-less circle, until that arc lands), so the re-seal left the picture out. Said instead of the plain shared line, which claimed it had gone."
+    },
     "share_failed": {
       "text": "Couldn't share: {{reason}}",
       "doc": "personas#2 — the share-to-circle push failed (e.g. admin offline)."
@@ -5579,6 +5583,10 @@
     "stop_sharing": {
       "text": "Stop sharing here",
       "doc": "mij#personas — the action on a circle where nothing is disclosed any more but the circle still holds what was shared before: pushes the empty release, which the lane carries as a clear."
+    },
+    "picture_not_here": {
+      "text": "this circle cannot carry pictures yet",
+      "doc": "Mij, beside the picture for a circle with no seal strategy for its media (a pod-less circle, until that arc lands): not offered there, and why — a share would leave it out."
     },
     "stopped_sharing": {
       "text": "Stopped ✓",

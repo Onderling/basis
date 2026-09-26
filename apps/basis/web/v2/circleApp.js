@@ -5703,8 +5703,16 @@ async function openAboutMePanel(personaId) {
       const _entry = _props.profilePicture;
       currentPicture = (_entry && typeof _entry === 'object' && _entry.value !== undefined) ? _entry.value : (_entry ?? null);
     } catch { /* no picture set */ }
+    // Which circles can carry a picture right now (a seal strategy for their media) — Mij does not offer the
+    // picture where a share would have to drop it, and says why.
+    const carriesMedia = new Map();
+    for (const c of model?.circles ?? []) {
+      const pol = await policyStore.get(c.circleId).catch(() => null);
+      carriesMedia.set(c.circleId, !!(await getCircleMediaComposition(c.circleId, pol).catch(() => null)));
+    }
     renderMij(body, {
       model, t, lang: currentLang(),
+      canCarryMedia: (cid) => (carriesMedia.has(cid) ? carriesMedia.get(cid) : null),
       resolvePicture: makeCirclePictureResolver(_selfComp?.mediaGateway?.opener),
       currentPicture,
       onSetPicture: _selfComp ? async (file) => {
@@ -6696,7 +6704,7 @@ function showCircle(id, circle, policy) {
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,
-      resolvePicture: circlePictureResolver(id, policy?.revealPolicy ?? 'pairwise'),
+      resolvePicture: circlePictureResolver(id, policy),
       // the ⋯ roster's op entries ask the one fold (`opAvailability`)
       availability: circleAvailabilityNow,
       // Stale-rules banner: re-accept the circle's CURRENT rules version (the member's own signed
@@ -7505,10 +7513,12 @@ async function showMemberPersona(id, member) {
 // One circle's picture opener, bound lazily: the composition is built (and cached per circle) on the first
 // face that needs it, not on every render. A roster row's picture is sealed to ITS circle; a contact's to the
 // pair circle — so every paint site names the circle, and this is the one way it gets the opener.
-function circlePictureResolver(circleId, policy = 'pairwise') {
+function circlePictureResolver(circleId, policy = null) {
   if (typeof circleId !== 'string' || !circleId) return null;
   return async (ref) => {
-    const comp = await getCircleMediaComposition(circleId, policy).catch(() => null);
+    // the circle's own policy when the caller has none at hand — its storage posture decides the composition
+    const pol = policy ?? await policyStore.get(circleId).catch(() => null);
+    const comp = await getCircleMediaComposition(circleId, pol).catch(() => null);
     const open = makeCirclePictureResolver(comp?.mediaGateway?.opener);
     return open ? open(ref) : null;
   };

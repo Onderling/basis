@@ -20,6 +20,7 @@
  */
 
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { shareOutcome, mediaRefusedHere } from '../../src/v2/shareOutcome.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -57,6 +58,10 @@ export function renderMij(container, {
   onSetPicture,
   resolvePicture,
   currentPicture = null,
+  // Can this circle carry a picture (a seal strategy for its media)? Where it cannot, a picture disclosed to it says
+  // so on its row — a share there leaves it out. Absent → no claim either way. (The add form never lists the picture:
+  // it offers the charter's coarse keys only.)
+  canCarryMedia = null,
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleMij.js');
@@ -70,7 +75,7 @@ export function renderMij(container, {
 
   container.appendChild(renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture, lang }));
   container.appendChild(renderPersonas(tr, model, { onCreatePersona }));
-  container.appendChild(renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }));
+  container.appendChild(renderCircles(tr, model, { onToggleDisclosure, onShareToCircle, canCarryMedia }));
   return container;
 }
 
@@ -294,7 +299,7 @@ function renderPersonas(tr, model, { onCreatePersona }) {
 }
 
 // ── 3 · PER CIRCLE — wie ziet wat ────────────────────────────────────────────
-function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }) {
+function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle, canCarryMedia = null }) {
   const sec = section(tr, 'circle.mij.circles_eyebrow', 'circle.mij.circles_tagline');
   const circles = model.circles || [];
   if (!circles.length) {
@@ -345,9 +350,8 @@ function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }) {
           let res;
           try { res = await onShareToCircle(c.circleId, model.defaultId); }
           catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
-          status.textContent = res?.ok
-            ? tr('circle.mij.stopped_sharing')
-            : tr('circle.aboutme.share_failed', { reason: res?.reason ?? '' });
+          const said = shareOutcome(res, { stopping: true });
+          status.textContent = tr(said.key, said.params);
           stop.disabled = false;
         });
         action.append(stop, status);
@@ -364,7 +368,12 @@ function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }) {
       const firstOfGroup = r.personaId !== prevPersona;
       trEl.appendChild(el('td', null, firstOfGroup ? r.personaName : ''));
       prevPersona = r.personaId;
-      trEl.appendChild(el('td', 'cc-mij__key', tr(`circle.aboutme.key.${r.key}`, { defaultValue: r.key })));
+      const keyCell = el('td', 'cc-mij__key', tr(`circle.aboutme.key.${r.key}`, { defaultValue: r.key }));
+      // a picture disclosed to a circle that cannot carry it: the row stays (it is the person's intent), and says so
+      if (mediaRefusedHere(r.key, c.circleId, canCarryMedia)) {
+        keyCell.appendChild(el('span', 'cc-mij__not-here', tr('circle.mij.picture_not_here')));
+      }
+      trEl.appendChild(keyCell);
       trEl.appendChild(el('td', 'cc-mij__cell-level',
         r.rung ? tr(`circle.mij.rung.${r.rung}`, { defaultValue: r.rung }) : tr('circle.mij.level_all')));
       const relDisp = (r.l10n && r.released != null)
@@ -386,9 +395,8 @@ function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }) {
           let res;
           try { res = await onShareToCircle(c.circleId, r.personaId); }
           catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
-          status.textContent = res?.ok
-            ? tr('circle.aboutme.shared_ok')
-            : tr('circle.aboutme.share_failed', { reason: res?.reason ?? '' });
+          const said = shareOutcome(res);
+          status.textContent = tr(said.key, said.params);
           push.disabled = false;
         });
         action.append(push, status);

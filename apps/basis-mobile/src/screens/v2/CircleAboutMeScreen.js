@@ -15,6 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, Switch } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { shareOutcome, SHARING_NOW } from '../../../../basis/src/v2/shareOutcome.js';
 import { buildPersonaViewModel } from '../../../../basis/src/v2/personaView.js';
 import { shareDisclosureToCircle } from '../../../../basis/src/core/handlers/personaPropsUpdate.js';
 import { DRIVER_KINDS } from '@onderling/agent-registry';
@@ -27,7 +28,7 @@ export default function CircleAboutMeScreen({ callSkill, emitMemberProps, lastSh
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState(null);
   const [placeDrafts, setPlaceDrafts] = useState({});   // free-text edits before save, keyed by property key
-  const [shareState, setShareState] = useState({});     // circleId → 'sharing' | 'ok' | reason string
+  const [shareState, setShareState] = useState({});     // circleId → 'sharing' | the share's result
   const [driverDraft, setDriverDraft] = useState({ label: '', kind: 'driver', text: '', tags: '' });
 
   const load = useCallback(async () => {
@@ -65,7 +66,7 @@ export default function CircleAboutMeScreen({ callSkill, emitMemberProps, lastSh
     let res;
     try { res = await shareDisclosureToCircle({ callSkill, emitMemberProps, lastShared, circleId, personaId }); }
     catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
-    setShareState((s) => ({ ...s, [circleId]: res?.ok ? 'ok' : (res?.reason ?? 'failed') }));
+    setShareState((s) => ({ ...s, [circleId]: res ?? { ok: false, reason: 'failed' } }));
   }, [callSkill, emitMemberProps, lastShared, personaId]);
 
   return (
@@ -221,9 +222,8 @@ export default function CircleAboutMeScreen({ callSkill, emitMemberProps, lastSh
                     </Pressable>
                     {shareState[c.circleId] ? (
                       <Text style={styles.shareStatus}>
-                        {shareState[c.circleId] === 'sharing' ? t('circle.aboutme.sharing_now')
-                          : shareState[c.circleId] === 'ok' ? (c.rows.some((r) => r.enabled) ? t('circle.aboutme.shared_ok') : t('circle.mij.stopped_sharing'))
-                          : t('circle.aboutme.share_failed', { reason: shareState[c.circleId] })}
+                        {shareState[c.circleId] === 'sharing' ? t(SHARING_NOW.key)
+                          : (({ key, params }) => t(key, params))(shareOutcome(shareState[c.circleId], { stopping: !c.rows.some((r) => r.enabled) }))}
                       </Text>
                     ) : null}
                   </View>

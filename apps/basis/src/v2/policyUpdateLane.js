@@ -228,9 +228,13 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
       if (!policy || typeof policy !== 'object') return null;
       if (knownRail) await apply(circleId, knownRail).catch(() => {});
       const version = await nextPolicyVersion(headStore, circleId);
-      const statement = await emit({ groupId: circleId, policy, version });
-      if (statement?.body?.hash) {
-        await headStore.write(circleId, { version, key: statement.body.hash, statement });
+      let statement = null;
+      try {
+        statement = await emit({ groupId: circleId, policy, version });
+        if (statement?.body?.hash) await headStore.write(circleId, { version, key: statement.body.hash, statement });
+      } finally {
+        // The admin's save stays the local truth whether or not the lane took it: applying the lane above may have
+        // written an older policy here, and a failed emit must not leave that older one in the store the screen shows.
         await writePolicy(circleId, policy).catch(() => {});
       }
       return statement;

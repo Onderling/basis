@@ -17,6 +17,8 @@
  *   PUSH_TOKENS_DB   sqlite path for the address↔token map; makes wakes survive a relay
  *                    restart (a sleeping device never reconnects to re-register). Memory-only
  *                    when unset.
+ *   QUEUE_DB         sqlite path for what the relay HOLDS for offline addresses; makes held
+ *                    messages survive a relay restart. Memory-only when unset.
  *   PEER_DISCOVERY   '1' broadcasts the connected-address list to every registered client (and
  *                    answers peer-list requests). OFF by default: it is a presence and linkage
  *                    oracle (see server.js). An operator who turns it on must disclose it.
@@ -30,6 +32,7 @@
 import { readFileSync } from 'node:fs';
 import { startRelay, getLanIp } from '../src/server.js';
 import { ExpoPushSender, PushTokenRegistry, SqlitePushTokenStore } from '../src/push/index.js';
+import { SqliteForwardStore } from '../src/queueStores/SqliteForwardStore.js';
 
 const port     = parseInt(process.argv[2] ?? process.env.PORT ?? '8787', 10);
 const host     = process.env.HOST ?? '0.0.0.0';
@@ -68,6 +71,14 @@ if ((process.env.PUSH_PROVIDER ?? '').toLowerCase() === 'expo') {
   throw new Error(`PUSH_PROVIDER=${process.env.PUSH_PROVIDER} is not a known push sender (only 'expo')`);
 }
 
+// Held messages survive a restart: what the relay holds for offline addresses is kept in this sqlite file.
+// Memory only when unset — a restart (a redeploy, a crash, an update) then drops every waiting message.
+let forwardStore = null;
+if (process.env.QUEUE_DB) {
+  const { default: Database } = await import('better-sqlite3');   // throws loudly when not installed
+  forwardStore = new SqliteForwardStore({ path: process.env.QUEUE_DB, Database });
+}
+
 const { tls } = await startRelay({
   port, host,
   tlsCert, tlsKey,
@@ -75,6 +86,7 @@ const { tls } = await startRelay({
   acceptedGroups,
   pushSender,
   ...(pushTokenRegistry ? { pushTokenRegistry } : {}),
+  forwardStore,
   peerDiscovery: process.env.PEER_DISCOVERY === '1',
   log: true,
 });

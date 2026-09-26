@@ -22,6 +22,7 @@ services:
       PUSH_PROVIDER: "${PUSH_PROVIDER:-}"
       EXPO_ACCESS_TOKEN: "${EXPO_ACCESS_TOKEN:-}"
       PUSH_TOKENS_DB: "/data/push-tokens.sqlite"
+      QUEUE_DB: "/data/queue.sqlite"
     volumes:
       - relay-data:/data
 volumes:

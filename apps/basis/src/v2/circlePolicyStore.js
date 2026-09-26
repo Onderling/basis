@@ -81,7 +81,7 @@ export function localStoragePolicyIo(storage = globalThis.localStorage) {
   return {
     load: async (id) => {
       try {
-        const s = storage?.getItem(key(id));
+        const s = await storage?.getItem(key(id));   // awaited: a file-backed store (the box) answers async
         return s ? JSON.parse(s) : null;
       } catch {
         return null;

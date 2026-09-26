@@ -70,7 +70,9 @@ import { makeCircleAddressAnnouncePeerHandler, announceOwnCircleAddress, propaga
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../src/core/handlers/groupRedeem.js';
 import { createPairRoster } from '../src/v2/pairRoster.js';
 import { makeCircleReachable } from '../src/v2/householdRosterPairing.js';
-import { applyRulesUpdates } from '../src/v2/rulesUpdateLane.js';
+import { applyRulesUpdates, preservedRulesStatementsFor } from '../src/v2/rulesUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore } from '../src/v2/policyUpdateLane.js';
+import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
 
@@ -367,12 +369,36 @@ if (relayUrl) {
   const govRail = agent.circleIdentityFor
     ? makeGovernanceRail({ eventLog: deviceLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill })
     : null;
+  // THE CIRCLE'S POLICY, folded here like on every shell (web ≡ mobile ≡ box). Nothing on this device reads the
+  // posture today — but this is the always-on member a joiner catches up from, and after the governance lane's audit
+  // window only a device that kept the winning statement can hand it over. So the box folds it and serves the head.
+  const circlePolicyKv = fileKeyValueStorage(path.join(dataDir, 'circle-policy.json'));
+  const circlePolicyStore = createCirclePolicyStore(localStoragePolicyIo(circlePolicyKv));
+  const circlePolicyLane = makeCirclePolicyLane({
+    emitter: () => agent.emitPolicyUpdate ?? null,
+    headStore: makePolicyHeadStore(circlePolicyKv),
+    readPolicy: (cid) => circlePolicyStore.get(cid),
+    writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
+    adminsOf: async (cid) => new Set((((await callSkill('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
+      .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
+  });
   const lanes = buildCircleLanes({
     agent,
     govRail,
     eventLog: deviceLog,
+    // The durable heads a member offline past the audit window still needs: the rules and the policy.
+    extraGovStatementsFor: async (cid) => [
+      ...await preservedRulesStatementsFor({ callSkill, circleId: cid }),
+      ...await circlePolicyLane.preserved(cid),
+    ],
     on: {
-      govChange: (cid) => { if (govRail) applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); },
+      govChange: (cid) => {
+        if (!govRail) return;
+        applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
+        circlePolicyLane.apply(cid, govRail)
+          .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
+          .catch(() => {});
+      },
       // Nothing here asks a person whether to accept a big catch-up: there is no person at this
       // machine, and what it is catching up on is its owner's own circles. Allowing is therefore the
       // honest default rather than a silent refusal that would leave this device permanently behind —

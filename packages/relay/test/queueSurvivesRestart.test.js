@@ -7,7 +7,7 @@
  * new one started on the same db, and the address registers with the new one → the message is delivered.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
@@ -74,5 +74,17 @@ describe('the relay\'s held messages survive a restart', () => {
     await waitFor(() => bob.messages.some((m) => m.type === 'message'));
     expect(s.load(), 'the drain forgot what it delivered').toEqual([]);
     alice.close(); bob.close();
+  });
+
+  it('gone means gone on disk too: a delivered envelope leaves no bytes behind (secure_delete)', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'relay-queue-')); dirs.push(dir);
+    const dbPath = path.join(dir, 'queue.sqlite');
+    const s = new SqliteForwardStore({ path: dbPath, Database });
+    const marker = 'MARKER-' + 'x'.repeat(64) + '-held-then-forgotten';
+    const id = s.add('addr', null, { payload: marker }, Date.now());
+    s.remove(id);
+    s.close();   // checkpoints and drops the WAL, so the main file is all there is
+    const bytes = readFileSync(dbPath, 'latin1');
+    expect(bytes.includes(marker), 'the forgotten envelope is still readable from the file').toBe(false);
   });
 });

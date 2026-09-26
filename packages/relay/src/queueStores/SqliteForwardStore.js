@@ -29,6 +29,10 @@ export class SqliteForwardStore {
     }
     this.#db = new Database(path);
     this.#db.pragma('journal_mode = WAL');
+    // "Delivered once means gone" must hold on the DISK too: without this, a deleted row's bytes — the cleartext
+    // routing header and the sealed payload — stay in the file's free pages until something overwrites them, so a
+    // forensic read of the volume would still find what the relay had "forgotten". Zeroed at delete instead.
+    this.#db.pragma('secure_delete = ON');
     this.#db.exec(`
       CREATE TABLE IF NOT EXISTS held (
         id        INTEGER PRIMARY KEY AUTOINCREMENT,

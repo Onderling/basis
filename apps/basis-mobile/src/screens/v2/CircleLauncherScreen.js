@@ -3305,9 +3305,8 @@ function CircleDetail({
     // (runCircleCommandResolved → scope-injected to the active circle), then refresh the tab.
     if (a?.action === 'claim' || a?.action === 'done') {
       const taskId = a?.payload?.taskId ?? a?.payload?.ref ?? null;
-      if (taskId) {
-        const opId = a.action === 'claim' ? 'claimTask' : 'completeTask';
-        await runCircleCommandResolved({ opId, args: { id: taskId }, appOrigin: 'tasks' });
+      if (taskId && a.opId) {
+        await runCircleCommandResolved({ opId: a.opId, args: { id: taskId }, appOrigin: 'tasks' });
         setTasksReloadTick((n) => n + 1);
       }
       return;
@@ -4197,11 +4196,13 @@ function CircleDetail({
                     {actionsForStreamRow(row, {
                       viewerWebid: mandateViewer.viewerWebid ?? null,
                       isAdmin: mandateViewer.isAdmin ?? false,
+                      availability: circleAvailability,
                     }).map((a) => (
                       <Pressable
                         key={a.id}
-                        style={[styles.rowActionBtn, a.action === 'mandate' && styles.taskChipMandate]}
+                        style={[styles.rowActionBtn, a.action === 'mandate' && styles.taskChipMandate, a.disabled ? { opacity: 0.45 } : null]}
                         accessibilityRole="button"
+                        disabled={a.disabled === true}   // greyed by the one fold
                         testID={`circle-task-chip-${a.action}`}
                         onPress={() => onRowAction(a, row)}
                       >
@@ -4233,6 +4234,8 @@ function CircleDetail({
             // Entrust (mandate) — owner-visibility signals + the row-action dispatcher (opens the picker).
             mandateViewer: { ...mandateViewer, localActor: 'me' },
             onRowAction,
+            // The circle's one fold — a chip or button whose op the circle withholds is left out or greyed.
+            availability: circleAvailability,
             // §8 — report another member's message (a governance `message` report).
             onReportMessage,
           }, styles)
@@ -4567,6 +4570,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
     viewerWebid: mandateViewer.viewerWebid ?? null,
     isAdmin: !!mandateViewer.isAdmin,
     isOwn: rowIsOwn,
+    availability: deliveryOpts?.availability ?? null,
   });
   const onRowAction = typeof deliveryOpts?.onRowAction === 'function' ? deliveryOpts.onRowAction : null;
   // B (clarification) — per-message candidate buttons carried in the payload (e.g. "which item?").
@@ -4687,7 +4691,8 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
           {actions.map((a) => (
             <Pressable
               key={a.id}
-              style={styles.rowActionBtn}
+              style={[styles.rowActionBtn, a.disabled ? { opacity: 0.45 } : null]}
+              disabled={a.disabled === true}   // greyed by the one fold
               testID={`circle-rowaction-${a.action}`}
               onPress={() => { if (onRowAction) onRowAction(a, row); else console.info('[circle] action', a.action, row.id); }}
             >
@@ -4713,8 +4718,9 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
             return (
               <Pressable
                 key={b.id}
-                style={[styles.rowActionBtn, primary && styles.consentBtnPrimary, secondary && styles.consentBtnSecondary]}
+                style={[styles.rowActionBtn, primary && styles.consentBtnPrimary, secondary && styles.consentBtnSecondary, b.disabled ? { opacity: 0.45 } : null]}
                 accessibilityRole="button"
+                disabled={b.disabled === true}   // an inline button whose op the circle greys
                 testID={`circle-msgbtn-${b.id}`}
                 onPress={() => { if (onBubbleButton) onBubbleButton(b); }}
               >

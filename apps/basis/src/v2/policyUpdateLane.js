@@ -204,25 +204,44 @@ export async function preservedPolicyStatementsFor({ headStore, circleId } = {})
  * @param {(circleId: string) => Promise<Set<string>>} a.adminsOf
  */
 export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePolicy, adminsOf } = {}) {
-  const apply = (circleId, rail) => applyPolicyUpdates({ rail, circleId, adminsOf, headStore, writePolicy });
+  // The receive rail this device folds the lane with — handed over by the shell when it builds it, and remembered from
+  // every apply, so a SAVE can bring the head up to date before it counts one past it.
+  let knownRail = null;
+  const apply = (circleId, rail) => {
+    if (rail) knownRail = rail;
+    return applyPolicyUpdates({ rail: rail ?? knownRail, circleId, adminsOf, headStore, writePolicy });
+  };
   return {
     /**
-     * State this device's current policy for the circle (an admin's save, the founder's first write). The local
-     * store already holds it; this puts it on the lane one version past the head, and makes its own statement the
-     * new head at once — so the next save counts up rather than colliding with this one, whether or not the shell
-     * has its receive rail at hand.
+     * State this device's current policy for the circle (an admin's save, the founder's first write).
+     *
+     * The policy is read FIRST — it is what the admin just saved — then the lane is applied, so the head is the
+     * lane's and not only this device's: a device that had not caught up (offline, a fresh enrol) used to state
+     * head+1 from its OWN head, a version the lane had passed, and its save was ignored on every device while the
+     * admin saw "saved" (L144). It states one past the lane's head, makes its own statement the head, and puts the
+     * saved policy back locally — applying the lane may have written the older one there, and the save is now newest.
      */
     async state(circleId) {
       const emit = typeof emitter === 'function' ? emitter() : null;
       if (typeof emit !== 'function' || typeof circleId !== 'string' || !circleId) return null;
       const policy = await readPolicy(circleId).catch(() => null);
       if (!policy || typeof policy !== 'object') return null;
+      if (knownRail) await apply(circleId, knownRail).catch(() => {});
       const version = await nextPolicyVersion(headStore, circleId);
-      const statement = await emit({ groupId: circleId, policy, version });
-      if (statement?.body?.hash) await headStore.write(circleId, { version, key: statement.body.hash, statement });
+      let statement = null;
+      try {
+        statement = await emit({ groupId: circleId, policy, version });
+        if (statement?.body?.hash) await headStore.write(circleId, { version, key: statement.body.hash, statement });
+      } finally {
+        // The admin's save stays the local truth whether or not the lane took it: applying the lane above may have
+        // written an older policy here, and a failed emit must not leave that older one in the store the screen shows.
+        await writePolicy(circleId, policy).catch(() => {});
+      }
       return statement;
     },
     apply,
+    /** The shell hands over its receive rail when it builds it. */
+    useRail(rail) { if (rail) knownRail = rail; },
     preserved: (circleId) => preservedPolicyStatementsFor({ headStore, circleId }),
   };
 }

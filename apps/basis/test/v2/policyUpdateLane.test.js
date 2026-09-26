@@ -101,6 +101,47 @@ describe('makeCirclePolicyLane — state', () => {
   });
 });
 
+describe('makeCirclePolicyLane — a device behind the lane (L144)', () => {
+  // A device that has not applied the lane's newer head (offline; a fresh enrol) stated head+1 from its OWN head: a
+  // version the lane had passed, so its save was ignored on every device while the admin saw "saved". It applies the
+  // lane first and states past what it finds — and the admin's save is what the circle ends up with.
+  it('applies the lane before stating, states past the lane\'s head, and keeps the admin\'s save', async () => {
+    const { makeCirclePolicyLane } = await import('../../src/v2/policyUpdateLane.js');
+    const headStore = makePolicyHeadStore(memIo());
+    await headStore.write('c', { version: 1, key: 'h1' });                      // this device last saw v1
+    const onLane = [{ body: body('anna', 3, { storagePosture: 'p0' }, 'h3'), sig: 's' }];   // the lane is at v3
+    let local = { storagePosture: 'p2', llmTool: 'off' };                       // what the admin just saved
+    const said = [];
+    const lane = makeCirclePolicyLane({
+      emitter: () => async (u) => { said.push(u); return { body: { hash: `h${u.version}` }, sig: 's' }; },
+      headStore,
+      readPolicy: async () => local,
+      writePolicy: async (c, p) => { local = p; },
+      adminsOf: async () => admins,
+    });
+    lane.useRail(rail(onLane));
+    await lane.state('c');
+    expect(said.map((u) => u.version)).toEqual([4]);
+    expect(said[0].policy).toEqual({ storagePosture: 'p2', llmTool: 'off' });
+    expect(local).toEqual({ storagePosture: 'p2', llmTool: 'off' });          // not the lane's older v3
+  });
+
+  it('when the lane refuses the statement, the admin\'s save still stays the local policy', async () => {
+    const { makeCirclePolicyLane } = await import('../../src/v2/policyUpdateLane.js');
+    const headStore = makePolicyHeadStore(memIo());
+    await headStore.write('c', { version: 1, key: 'h1' });
+    const onLane = [{ body: body('anna', 3, { storagePosture: 'p0' }, 'h3'), sig: 's' }];
+    let local = { storagePosture: 'p2' };
+    const lane = makeCirclePolicyLane({
+      emitter: () => async () => { throw new Error('rail down'); },
+      headStore, readPolicy: async () => local, writePolicy: async (c, p) => { local = p; }, adminsOf: async () => admins,
+    });
+    lane.useRail(rail(onLane));
+    await expect(lane.state('c')).rejects.toThrow('rail down');
+    expect(local).toEqual({ storagePosture: 'p2' });   // not the lane's p0 that apply() wrote in between
+  });
+});
+
 describe('adminsOfViaSkill — the one roster read every shell hands the lanes', () => {
   it('the admins\' webids, from the roster op', async () => {
     const calls = [];

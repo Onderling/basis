@@ -8380,6 +8380,8 @@ async function boot() {
           myRef: _who?.webid ?? _who?.webId ?? '', callSkill: rawCallSkill,
         });
       } catch { govShellRail = null; }
+      // the policy lane folds with the same rail — a save brings the lane's head up to date before it counts past it
+      circlePolicyLane.useRail(govShellRail);
       // The offline-device half of the reliable tier: on reconnect, pull every circle's governance
       // statements from its reachable members; each passes the rail's full ingest gate.
       // Any governance change (live fan below, or a catch-up batch here) may carry a rules-update

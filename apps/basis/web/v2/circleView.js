@@ -166,6 +166,8 @@ export function renderCircleView(container, {
   // Opens a member's sealed picture for THIS circle (the host binds the circle's media opener). Absent → every
   // row keeps its initial.
   resolvePicture = null,
+  // The one fold (`opAvailability`) for this circle — the ⋯ roster's op entries ask it. Absent → their own gate.
+  availability = null,
   // Stale-rules banner: when the viewer's OWN row accepted an older rules version than the
   // circle's current one, the members tab opens with a re-accept affordance. The host wires
   // this to the acceptGroupRules op; absent → the banner still informs, without a button.
@@ -241,7 +243,7 @@ export function renderCircleView(container, {
     header.appendChild(toggle);
   }
 
-  const moreActions = collectMoreActions(more, tr, policy);
+  const moreActions = collectMoreActions(more, tr, policy, availability);
   if (moreActions.length > 0) {
     const moreBtn = document.createElement('button');
     moreBtn.type = 'button';
@@ -272,9 +274,11 @@ export function renderCircleView(container, {
       item.className = 'circle-view__more-item';
       item.dataset.action = a.id;
       item.textContent = a.label;
+      // greyed by the one fold: shown, and not runnable — the op exists here, this member may not do it
+      if (a.disabled) item.disabled = true;
       item.addEventListener('click', () => {
         menu.classList.remove('is-open');
-        a.run();
+        if (!a.disabled) a.run();
       });
       menu.appendChild(item);
     }
@@ -1269,13 +1273,13 @@ function pickKindLabel(row) {
 // AND (b) the host wired a `more[id]` callback for it.  Keyed by the projected
 // action id, so the host's `more` object keys match the manifest ids directly
 // (the mobile shell projects the SAME roster → web ≡ mobile by construction).
-function collectMoreActions(more, tr, policy) {
+function collectMoreActions(more, tr, policy, availability = null) {
   if (!more || typeof more !== 'object') return [];
   const out = [];
-  for (const action of circleActions(basisManifest, { policy, platform: 'web' })) {
+  for (const action of circleActions(basisManifest, { policy, platform: 'web', availability })) {
     const fn = more[action.id];
     if (typeof fn === 'function') {
-      out.push({ id: action.id, label: tr(action.labelKey), run: fn });
+      out.push({ id: action.id, label: tr(action.labelKey), run: fn, ...(action.disabled ? { disabled: true } : {}) });
     }
   }
   return out;

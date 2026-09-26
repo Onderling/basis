@@ -60,6 +60,7 @@ function poolFromSkills(skills) {
  * @param {'circle'|'contact'} ctx.kind
  * @param {object} [ctx.catalogue]  circle: the merged + per-circle scoped catalogue
  * @param {Array}  [ctx.skills]     contact: the peer's exposed skill cards
+ * @param {{of: Function}} [ctx.availability]  circle: the one fold (`opAvailability`) — hidden ops are not offered
  * @returns {{kind: string, pool: Array<{command,hint,opId}>,
  *           suggest: (input: string, opts?: {limit?: number}) => Array<{command,hint,opId}>,
  *           parse: (text: string) => {opId: string, rest: string}|null}}
@@ -69,11 +70,14 @@ export function createComposerCommands(ctx = {}) {
   // A circle offers what it composes, THEN what this device can do. The place wins a collision — a
   // circle that declares `/help` means its own help, and a command that changed meaning under someone
   // because a device op shared its name would be the worst kind of surprise.
-  const placePool = kind === 'contact' ? poolFromSkills(ctx.skills) : buildCommandPool(ctx.catalogue);
+  // THE ONE FOLD (`opAvailability`): a circle's command is offered only when the circle's availability says it may happen here —
+  // the same answer the attach menu, the reply buttons and the ⋯ roster ask. Absent → no filter (a contact thread).
+  const offered = (e) => ctx.availability?.of?.(e.opId)?.state !== 'hidden';
+  const placePool = kind === 'contact' ? poolFromSkills(ctx.skills) : buildCommandPool(ctx.catalogue).filter(offered);
   const taken = new Set(placePool.map((e) => e.command));
   const pool = kind === 'contact'
     ? placePool
-    : [...placePool, ...BASIS_POOL.filter((e) => !taken.has(e.command))];
+    : [...placePool, ...BASIS_POOL.filter((e) => !taken.has(e.command) && offered(e))];
 
   return {
     kind,
@@ -90,7 +94,7 @@ export function createComposerCommands(ctx = {}) {
       // Ranked by the shared `suggestCommands` where the place has a catalogue, then topped up from the
       // device's own commands — one list, in the order "what is here, then what I can always do".
       const ranked = kind === 'circle' && ctx.catalogue
-        ? suggestCommands(ctx.catalogue, input, { limit })
+        ? suggestCommands(ctx.catalogue, input, { limit }).filter(offered)
         : [];
       const seen = new Set(ranked.map((e) => e.command));
       const rest = pool.filter((e) => !seen.has(e.command) && e.command.slice(1).toLowerCase().startsWith(q));

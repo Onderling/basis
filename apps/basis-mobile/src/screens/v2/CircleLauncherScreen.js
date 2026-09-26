@@ -2770,15 +2770,34 @@ function CircleDetail({
   // appointment in a conversation by any route. Same projected entries as web, narrowed the same way.
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachForm, setAttachForm] = useState(null);   // the entry whose params must be filled first
+  // THE ONE FOLD (`opAvailability`) for this circle — composed app · feature · capability, deny-wins. Every surface below asks
+  // it: the attach menu, slash-suggest, the reply buttons and the ⋯ roster (web parity: `circleOpAvailability`).
+  // The capability half reads the member's overrides, which are async, so the matrix is kept per circle.
+  const [circleCapMatrix, setCircleCapMatrix] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const ovr = circle?.id ? (await overrideStore.get(circle.id)) : null;
+        const m = buildCapabilityMatrix(capabilitySources, {
+          enabledApps: Array.isArray(policy?.apps) && policy.apps.length ? policy.apps : null,
+          template: policy?.capabilities || {}, optOuts: ovr?.capabilityOptOuts || [],
+        });
+        if (alive) setCircleCapMatrix(m);
+      } catch { if (alive) setCircleCapMatrix([]); }
+    })();
+    return () => { alive = false; };
+  }, [circle?.id, policy]);
+  const circleAvailability = useMemo(() => makeOpAvailability({
+    catalogue: catalogue ?? null, manifestsByOrigin, policy: policy ?? null, capabilityMatrix: circleCapMatrix,
+  }), [catalogue, manifestsByOrigin, policy, circleCapMatrix]);
   const attachEntries = useMemo(() => attachEntriesFor({
     manifestsByOrigin,
-    availability: makeOpAvailability({
-      catalogue: catalogue ?? null, manifestsByOrigin, policy: policy ?? null,
-    }),
+    availability: circleAvailability,
     // An entry whose dispatch path is not wired is NOT painted (never offer what does not work): the
     // file entry rides the sealed-media pipeline, which a circle with no media composition lacks.
     mediaWired: !!circleMedia,
-  }), [catalogue, manifestsByOrigin, policy, circleMedia]);
+  }), [manifestsByOrigin, circleAvailability, circleMedia]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   const [pendingFollowUp, setPendingFollowUp] = useState(null);
   const [pendingForm, setPendingForm] = useState(null);   // 2+-field needsForm → inline form (parity with web)
@@ -2797,7 +2816,7 @@ function CircleDetail({
   // Through the shared composer seam, which the contact thread uses too: one entry point, one filter
   // rule, two contexts (a circle's scoped catalogue here; the peer's exposed skills there).
   const composerCommands = useMemo(
-    () => createComposerCommands({ kind: 'circle', catalogue }), [catalogue]);
+    () => createComposerCommands({ kind: 'circle', catalogue, availability: circleAvailability }), [catalogue, circleAvailability]);
   const suggestMatches = useMemo(
     () => composerCommands.suggest(composerText), [composerCommands, composerText],
   );
@@ -3225,7 +3244,7 @@ function CircleDetail({
           template: policy?.capabilities || {}, optOuts: ovr?.capabilityOptOuts || [],
         });
       } catch { /* best-effort — no greying on error */ }
-      const inlineButtons = embedButtonsForReply({ reply, appOrigin: entry?.appOrigin, manifestsByOrigin, capabilityMatrix: capMatrix });
+      const inlineButtons = embedButtonsForReply({ reply, appOrigin: entry?.appOrigin, manifestsByOrigin, capabilityMatrix: capMatrix, availability: circleAvailability });
       // S6.B/C — a screen surface (surfaces.ui.screen) becomes an "Open …" button,
       // gated by the circle's policy.features for that app (web parity).
       const screen = entry?.op?.surfaces?.ui?.screen;
@@ -3977,7 +3996,7 @@ function CircleDetail({
               host-wired handler; each shell wires its own mechanism for a
               destination (e.g. `contacts` → setScreenPanel here, openCircleScreenPanel
               on web — the doorgeefluik model).  web ≡ mobile by construction. */}
-          {circleActionsMobile(basisManifest, { policy })
+          {circleActionsMobile(basisManifest, { policy, availability: circleAvailability })
             .filter((action) => action.id !== 'back')
             .map((action) => {
               const handlers = {
@@ -3992,8 +4011,9 @@ function CircleDetail({
               return (
                 <Pressable
                   key={action.id}
-                  onPress={() => { setMenuOpen(false); on?.(); }}
-                  style={styles.moreItem}
+                  onPress={() => { setMenuOpen(false); if (!action.disabled) on?.(); }}
+                  disabled={action.disabled === true}   // greyed by the one fold: there, and not this member's to run
+                  style={[styles.moreItem, action.disabled ? { opacity: 0.45 } : null]}
                   testID={`circle-detail-${token}`}
                 >
                   <Text style={styles.moreItemText}>{t(action.labelKey)}</Text>

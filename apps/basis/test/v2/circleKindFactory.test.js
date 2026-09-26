@@ -33,7 +33,6 @@ import {
   createCircleRecipePendingStoreLocal,
 } from '../../src/v2/circleRecipePendingStorage.js';
 
-import { detectPolicyConflicts, applyPolicyResolution } from '../../src/v2/policyConflict.js';
 import { detectRulesConflicts,  applyRulesResolution }  from '../../src/v2/rulesConflict.js';
 import { detectRecipeConflicts } from '../../src/v2/recipeConflict.js';
 
@@ -129,24 +128,16 @@ describe('circle triplet · anti-drift guard (one factory, three kinds)', () => 
     expect(new Set(prefixes).size).toBe(prefixes.length);
   });
 
-  it('policy + rules conflict share the flat-doc factory (empty blockConflicts, identical detect)', () => {
+  it('rules conflict is the flat-doc factory shape (empty blockConflicts)', () => {
+    // (The circle policy used the same shape until 2026-09-26: it now arrives on the governance lane and is
+    // applied, so it has no incoming copy to reconcile and its resolver is gone.)
     const local    = { purpose: 'a', extra: 'keep' };
     const incoming = { purpose: 'b', extra: 'keep' };
     const base     = { purpose: 'a', extra: 'keep' };
-
-    const p = detectPolicyConflicts(local, incoming, base);
     const r = detectRulesConflicts(local, incoming, base);
-    // Flat-doc shape: no blocks array, ever.
-    expect(p.blockConflicts).toEqual([]);
     expect(r.blockConflicts).toEqual([]);
-    // Same underlying objectDiff → identical report for identical input.
-    expect(p).toEqual(r);
-
-    // Missing decision defaults to 'theirs' (incoming wins) for both.
-    expect(applyPolicyResolution(local, incoming, {}).purpose).toBe('b');
+    // Missing decision defaults to 'theirs' (incoming wins); a local-only key is preserved (lossless).
     expect(applyRulesResolution(local, incoming, {}).purpose).toBe('b');
-    // Local-only key preserved (lossless) for both.
-    expect(applyPolicyResolution(local, incoming, {}).extra).toBe('keep');
     expect(applyRulesResolution(local, incoming, {}).extra).toBe('keep');
   });
 

@@ -2062,12 +2062,6 @@
         "doc": "auto: an admin device carries out an approved decision the moment it sees one, with no explicit step. Still admin-only and still signed + quorate."
       }
     },
-    "conflict": {
-      "title": {
-        "text": "Two of you edited the settings",
-        "doc": "γ.4 — modal heading when an incoming policy diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
-      }
-    },
     "storagePosture": {
       "text": "Storage (at rest)",
       "doc": "Circle settings — at-rest storage posture axis (menukaart P0–P3)."

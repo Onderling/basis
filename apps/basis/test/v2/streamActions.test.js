@@ -196,3 +196,24 @@ describe('buildStreamComposeContext', () => {
     expect(ctx.placeholder).toBe('circle.stream.compose_placeholder_default');
   });
 });
+
+describe('actionsForStreamRow — the chips ask the one fold', () => {
+  const chore = { id: 'r1', type: 'chore', event: { type: 'chore', payload: { kind: 'chore', ref: 't1' } } };
+  const fold = (states) => ({ of: (opId) => ({ state: states[opId] ?? 'available' }) });
+
+  it('names the op a lifecycle chip runs', () => {
+    const [claim] = actionsForStreamRow(chore);
+    expect(claim).toMatchObject({ action: 'claim', opId: 'claimTask' });
+  });
+
+  it('a chip whose op the circle hides is not offered', () => {
+    const ids = actionsForStreamRow(chore, { availability: fold({ claimTask: 'hidden' }) }).map((a) => a.action);
+    expect(ids).not.toContain('claim');
+    expect(ids).toContain('snooze');
+  });
+
+  it('a chip whose op the circle greys is offered disabled', () => {
+    const claim = actionsForStreamRow(chore, { availability: fold({ claimTask: 'greyed' }) }).find((a) => a.action === 'claim');
+    expect(claim?.disabled).toBe(true);
+  });
+});

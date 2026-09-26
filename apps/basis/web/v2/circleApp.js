@@ -7071,9 +7071,8 @@ function showCircle(id, circle, policy) {
         // dispatch waist (scope-injected to the active circle), then refresh the tab.
         if (action?.action === 'claim' || action?.action === 'done') {
           const taskId = action.payload?.taskId ?? action.payload?.ref ?? null;
-          if (taskId && typeof circleDispatchReady === 'function') {
-            const opId = action.action === 'claim' ? 'claimTask' : 'completeTask';
-            try { await circleDispatchReady({ opId, args: { id: taskId }, appOrigin: 'tasks' }); }
+          if (taskId && action.opId && typeof circleDispatchReady === 'function') {
+            try { await circleDispatchReady({ opId: action.opId, args: { id: taskId }, appOrigin: 'tasks' }); }
             catch { /* the reload reflects the real state */ }
             await loadTasks();
           }

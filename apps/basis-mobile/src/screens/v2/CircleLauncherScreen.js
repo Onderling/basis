@@ -407,6 +407,26 @@ function PersonaPanel({
   personaId, onClose, styles, callSkill, circles = [],
   emitMemberProps = null, lastShared = null, resealMediaForCircle = null, profilePicture = null,
 }) {
+  // Which circles can carry a picture right now (a seal strategy for their media) — Mij does not offer the picture
+  // where a share would have to drop it, and says why (web parity: circleApp's `carriesMedia`).
+  const [carriesMedia, setCarriesMedia] = useState(() => new Map());
+  useEffect(() => {
+    if (!personaId) return undefined;
+    let alive = true;
+    (async () => {
+      const store = makeCirclePolicyStoreRN(AsyncStorage);
+      const m = new Map();
+      for (const c of circles) {
+        const cid = c?.id ?? c?.circleId;
+        if (!cid) continue;
+        const pol = await store.get(cid).catch(() => null);
+        m.set(cid, !!(await getCircleMediaComposition(cid, pol).catch(() => null)));
+      }
+      if (alive) setCarriesMedia(m);
+    })();
+    return () => { alive = false; };
+  }, [personaId, circles]);
+  const canCarryMedia = useCallback((cid) => (carriesMedia.has(cid) ? carriesMedia.get(cid) : null), [carriesMedia]);
   return (
     <Modal visible={!!personaId} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.panelBackdrop}>
@@ -421,7 +441,7 @@ function PersonaPanel({
             <CircleMijScreen
               callSkill={callSkill} emitMemberProps={emitMemberProps} lastShared={lastShared}
               resealMediaForCircle={resealMediaForCircle} profilePicture={profilePicture}
-              personaId={personaId} circles={circles}
+              personaId={personaId} circles={circles} canCarryMedia={canCarryMedia}
             />
           ) : null}
         </View>

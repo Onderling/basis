@@ -56,12 +56,15 @@ describe('taking a disclosure back — parity', () => {
     expect(model).toMatch(/canWithdraw/);
     expect(loader, 'the loader reads my own roster row').toMatch(/sharedOnLane/);
   });
-  it('both Mij surfaces offer it, with the same two keys', () => {
+  it('both Mij surfaces offer it, and say what it did through the ONE shared sentence', () => {
     for (const src of [webMij, mobMij]) {
       expect(src).toMatch(/canWithdraw/);
       expect(src).toMatch(/circle\.mij\.stop_sharing\b/);
-      expect(src).toMatch(/circle\.mij\.stopped_sharing\b/);
+      // "stopped sharing" is decided once (shareOutcome, stopping) — no surface spells it any more
+      expect(src).toMatch(/shareOutcome/);
+      expect(src).toMatch(/stopping: true|saidFor\([^)]*, true\)/);
     }
+    expect(read('../../basis/src/v2/shareOutcome.js')).toMatch(/circle\.mij\.stopped_sharing\b/);
   });
   it('both About-me surfaces say "stop" when every toggle is off — the word follows the act', () => {
     for (const src of [webAbout, mobAbout]) {

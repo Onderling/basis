@@ -34,7 +34,7 @@ export const POLICY_UPDATE_KIND = 'policy-update';
  * hash-deciding statement's value — where no value is plainly the protective one, the convergent pick is enough.
  */
 const DENY_ORDER = Object.freeze({
-  storagePosture:   ['p2', 'p1', 'p3', 'p0'],        // client-side sealing first, plaintext last
+  storagePosture:   ['p2', 'p3', 'p1', 'p0'],        // the two CLIENT-sealed postures first (group-key, then recipient-wrap), the enclave's p1, plaintext last
   llmTool:          ['off', 'local', 'user', 'cloud'],
   sharePosture:     ['closed'],
   shareOutOfCircle: ['prohibit', 'notify', 'silent'],

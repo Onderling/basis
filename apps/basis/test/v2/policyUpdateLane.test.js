@@ -36,6 +36,13 @@ describe('foldPolicyUpdates', () => {
 });
 
 describe('denyWinsMerge', () => {
+  it('a client-sealed posture beats a host-side one at a tie: p3 (sealed at rest) outranks p1 (TEE, no client seal)', () => {
+    // p2 and p3 are the two CLIENT-sealed postures (resolveCircleStorage: group-key · recipient-wrap); p1 leaves the seal
+    // to an enclave, p0 is plaintext. The first table ranked p1 above p3 — a tie would have unsealed a sealed circle.
+    expect(denyWinsMerge([{ storagePosture: 'p1' }, { storagePosture: 'p3' }]).storagePosture).toBe('p3');
+    expect(denyWinsMerge([{ storagePosture: 'p3' }, { storagePosture: 'p2' }]).storagePosture).toBe('p2');
+    expect(denyWinsMerge([{ storagePosture: 'p0' }, { storagePosture: 'p1' }]).storagePosture).toBe('p1');
+  });
   it('one policy is itself', () => { const p = { storagePosture: 'p1' }; expect(denyWinsMerge([p])).toBe(p); });
 });
 

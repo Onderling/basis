@@ -8,26 +8,19 @@
  * store (AsyncStorage-backed).  When consensus is active (consensusRequired
  * + ≥2 admins) Save records a pending proposal instead of applying.
  *
- * γ.4 — conflict resolution for the circle policy.  When `incomingPolicy`
- * is non-null (the source plumbing — peer broadcast / pod-sync — is
- * deferred to a later slice; today every existing call site passes none
- * of these opts and the screen behaves exactly as before), the screen
- * runs a 3-way diff against the last captured version (γ.2) and — if
- * conflicts surface — overlays the SAME modal (CircleRecipeConflictScreen)
- * used by the recipe editor with a settings-namespaced heading.
+ * The circle's policy arrives from its admins on the governance lane and is applied (the policy lane), so there
+ * is no incoming copy to reconcile by hand here — the γ.4 conflict resolver that did so had no source and is gone.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import {
   CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, DEFAULT_CIRCLE_ORIGINS,
-  detectPolicyConflicts, applyPolicyResolution,
 } from '@onderling-app/basis';
 // the shared manifest-driven settings form + per-skill freedom matrix (web≡mobile).
 import { buildSettingsForm, buildCapabilityMatrix, FREEDOM_LEVELS, OPT_OUT_CONSEQUENCES } from '@onderling/app-manifest';
 import { buildManifestsByOrigin } from '../../core/composeManifests.js';
 import { t } from '../../core/localisation.js';
-import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
 import GuidedSetupPanel from './GuidedSetupPanel.js';
 import PairedDevices from './PairedDevices.js';
 import RecipeConsentCard from './RecipeConsentCard.js';
@@ -88,9 +81,6 @@ export default function CircleSettingsScreen({
   podFetch,
   // γ.4 — opt-in conflict resolver.  See file header for the deferred
   // source plumbing; existing call sites pass none of these opts.
-  incomingPolicy = null,
-  onIncomingApplied,
-  onIncomingDiscarded,
   // OBJ-2 — paired devices (no-pod sync). Host wires these from the agent bundle when
   // household sync is available; add/remove persist + return the updated roster.
   householdSelfAddr = null,
@@ -121,8 +111,6 @@ export default function CircleSettingsScreen({
   const [reviewModel, setReviewModel] = useState(null);     // buildRecipeConsentModel result → drives the card
 
   // γ.4 — conflict resolver state (parallel to recipe-editor pattern).
-  const [conflictReport, setConflictReport] = useState(null);
-  const [localForCompare, setLocalForCompare] = useState(null);
 
   // Phase 4 §9 — relay endpoint input buffer (seeded from the current transport state).
   const [relayInput, setRelayInput] = useState(typeof transport?.relayUrl === 'string' ? transport.relayUrl : '');
@@ -141,55 +129,6 @@ export default function CircleSettingsScreen({
     });
     return () => { live = false; };
   }, [store, circleId]);
-
-  // γ.4 — when `incomingPolicy` is present, fetch base + detect + maybe
-  // open the modal.  Triggered separately from the initial load so the
-  // editor can render its regular form underneath while detection runs.
-  useEffect(() => {
-    if (incomingPolicy == null || working == null) { return; }
-    let live = true;
-    (async () => {
-      let base = null;
-      try {
-        if (store && typeof store.listVersions === 'function' && circleId) {
-          const versions = await store.listVersions(circleId);
-          const head = Array.isArray(versions) && versions.length > 0 ? versions[0] : null;
-          base = head && typeof head === 'object' && head.value != null ? head.value : null;
-        }
-      } catch { /* best-effort */ }
-
-      const report = detectPolicyConflicts(working, incomingPolicy, base);
-      if (!live) return;
-      setLocalForCompare(working);
-
-      if (report.identical
-          || (report.blockConflicts.length === 0 && report.metaConflicts.length === 0)) {
-        const merged = applyPolicyResolution(working, incomingPolicy, {});
-        try {
-          if (store && typeof store.update === 'function' && circleId) {
-            await store.update(circleId, merged);
-          }
-        } catch { /* best-effort */ }
-        onIncomingApplied?.(merged);
-        return;
-      }
-      setConflictReport(report);
-    })();
-    return () => { live = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomingPolicy, working, store, circleId]);
-
-  const handleConflictResolve = async (decisions) => {
-    if (!localForCompare || !incomingPolicy) { setConflictReport(null); return; }
-    const merged = applyPolicyResolution(localForCompare, incomingPolicy, decisions);
-    try {
-      if (store && typeof store.update === 'function' && circleId) {
-        await store.update(circleId, merged);
-      }
-    } catch { /* best-effort */ }
-    setConflictReport(null);
-    onIncomingApplied?.(merged);
-  };
 
   const patch = useCallback((p) => {
     setStorageNote(null);   // §4 — any edit dismisses a stale storage-policy note
@@ -296,27 +235,12 @@ export default function CircleSettingsScreen({
     onBack?.();
   }, [working, consensusActive, store, onProposePolicy, circleId, onBack, callSkill]);
 
-  // γ.4 — overlay rendered on top of the regular screen when a conflict
-  // is detected.  Mirrors CircleRecipeEditorScreen's pattern (β.5).
-  const conflictOverlay = conflictReport ? (
-    <CircleRecipeConflictScreen
-      visible
-      conflicts={conflictReport}
-      local={localForCompare}
-      incoming={incomingPolicy}
-      title="circle.settings.conflict.title"
-      onResolve={handleConflictResolve}
-      onCancel={() => { setConflictReport(null); onIncomingDiscarded?.(); }}
-    />
-  ) : null;
-
   if (!working) {
     return (
       <>
         <View style={styles.page} testID="circle-settings">
           <Text style={styles.muted}>{t('circle.loading')}</Text>
         </View>
-        {conflictOverlay}
       </>
     );
   }
@@ -738,7 +662,6 @@ export default function CircleSettingsScreen({
         </Text>
       </Pressable>
     </View>
-    {conflictOverlay}
     <GuidedSetupPanel
       visible={guidedOpen}
       templateUrl={SETTINGS_TEMPLATE_URL}

@@ -9,14 +9,8 @@
  * 4A ⓘ,) sourced from `circle.settings.consequence.<opt>`;
  * the ⓘ only appears when a consequence string is actually translated.
  *
- * γ.4 — conflict resolution for the circle policy.  When `incomingPolicy`
- * is non-null (the source plumbing — peer broadcast / pod-sync — is
- * deferred to a later slice; today every existing call site passes
- * none of the γ.4 opts and the renderer behaves exactly as before),
- * the editor runs a 3-way diff against the last captured version
- * (γ.2) and — if conflicts surface — overlays the SAME modal as
- * recipes (with a settings-namespaced heading via the resolver's
- * `title` opt).
+ * The circle's policy arrives from its admins on the governance lane and is applied (the policy lane), so there is
+ * no incoming copy to reconcile by hand here — the γ.4 conflict resolver that did so had no source and is gone.
  */
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
 import { multiControlRows } from '../../src/v2/settingsMultiRows.js';
@@ -26,8 +20,6 @@ import { resolveControlEnablement } from '../../src/v2/circleSettingsControls.js
 import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';   // S6.C — composable apps
 // the manifest-driven settings form + the per-skill freedom matrix (rulings).
 import { buildSettingsForm, buildCapabilityMatrix, FREEDOM_LEVELS, OPT_OUT_CONSEQUENCES } from '@onderling/app-manifest';
-import { detectPolicyConflicts, applyPolicyResolution } from '../../src/v2/policyConflict.js';
-import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
 import { renderPairedDevices } from './pairedDevices.js';
 // B · consent-card — REVIEWED recipe apply: load → show the consent card → Agree/Decline (no silent apply).
 import { renderRecipeConsentCard } from './recipeConsentCard.js';
@@ -64,25 +56,12 @@ export { SETTINGS_ENUM_AXES as ENUM_AXES } from '../../src/v2/circlePolicy.js';
  * @param {Function} [args.onSave]
  * @param {string} [args.saveLabel]
  * @param {string} [args.note]
- *
- * γ.4 — additive conflict-resolver opts (see file header).  Existing
- * call sites that pass NONE of these get pre-γ.4 behaviour bit-for-bit.
- * @param {object|null} [args.incomingPolicy]   Incoming policy doc.
- * @param {object} [args.policyStore]           γ.2 store — for listVersions + update.
- * @param {string} [args.circleId]              Required when incomingPolicy is non-null.
- * @param {Function} [args.onIncomingApplied]   (mergedPolicy) => void
- * @param {Function} [args.onIncomingDiscarded] () => void
  */
 export function renderCircleSettings(container, {
   policy, t, onChange, onBack, onSave, saveLabel, note,
   // Display theme — surfaced HERE as well as in "Mijn gegevens", where nobody looked for it (2026-07-22
   // demo feedback). Same shared renderer, so the two can't drift; absent deps ⇒ the block is simply omitted.
   themePref, onSetTheme,
-  incomingPolicy = null,
-  policyStore,
-  circleId,
-  onIncomingApplied,
-  onIncomingDiscarded,
   onGuidedSetup,   // Theme B — open the guided-setup chatbot (pre-fills these fields)
   // B #64 — apply an AUTHORED REMOTE recipe (URL/JSON) as this circle's active policy. Host wires the
   // async load+apply (shared `loadAndApplyRecipe`); the shell only collects the source + shows a status.
@@ -372,77 +351,7 @@ export function renderCircleSettings(container, {
   // and applies instantly, so it must not read as something the Save button commits.
   appendThemeSection(container, { tr, themePref, onSetTheme });
 
-  // γ.4 — conflict resolver.  Opt-in via `incomingPolicy`.  When set, we
-  // fetch the latest captured version (γ.2 versions adapter) through
-  // `policyStore` + `circleId`, run the 3-way diff, and — if anything
-  // diverges — overlay the SAME modal used by the recipe editor with a
-  // settings-namespaced heading.  Detection is async because
-  // `policyStore.listVersions(...)` may need IO.
-  if (incomingPolicy != null) {
-    maybeRenderPolicyConflict(container, {
-      policy, incomingPolicy, policyStore, circleId, tr,
-      onIncomingApplied, onIncomingDiscarded,
-    });
-  }
   return container;
-}
-
-/**
- * γ.4 — fetch last captured version, detect, maybe modal.  Apply path
- * persists via `policyStore.update` (which already runs version capture
- * + the deep-merge); cancel just drops the overlay.
- */
-async function maybeRenderPolicyConflict(container, {
-  policy, incomingPolicy, policyStore, circleId, tr,
-  onIncomingApplied, onIncomingDiscarded,
-}) {
-  let base = null;
-  try {
-    if (policyStore && typeof policyStore.listVersions === 'function' && circleId) {
-      const versions = await policyStore.listVersions(circleId);
-      const head = Array.isArray(versions) && versions.length > 0 ? versions[0] : null;
-      base = head && typeof head === 'object' && head.value != null ? head.value : null;
-    }
-  } catch { /* best-effort */ }
-
-  const report = detectPolicyConflicts(policy, incomingPolicy, base);
-  if (report.identical
-      || (report.blockConflicts.length === 0 && report.metaConflicts.length === 0)) {
-    const merged = applyPolicyResolution(policy, incomingPolicy, {});
-    await persistMergedPolicy({ policyStore, circleId, merged });
-    if (typeof onIncomingApplied === 'function') onIncomingApplied(merged);
-    return;
-  }
-
-  const overlay = document.createElement('div');
-  overlay.className = 'circle-settings__conflict-overlay';
-  container.appendChild(overlay);
-
-  renderRecipeConflictResolver(overlay, {
-    conflicts: report,
-    local: policy,
-    incoming: incomingPolicy,
-    t: tr,
-    title: 'circle.settings.conflict.title',
-    onResolve: async (decisions) => {
-      try {
-        const merged = applyPolicyResolution(policy, incomingPolicy, decisions);
-        await persistMergedPolicy({ policyStore, circleId, merged });
-        if (typeof onIncomingApplied === 'function') onIncomingApplied(merged);
-      } finally {
-        overlay.remove();
-      }
-    },
-    onCancel: () => {
-      overlay.remove();
-      if (typeof onIncomingDiscarded === 'function') onIncomingDiscarded();
-    },
-  });
-}
-
-async function persistMergedPolicy({ policyStore, circleId, merged }) {
-  if (!policyStore || typeof policyStore.update !== 'function' || !circleId) return;
-  try { await policyStore.update(circleId, merged); } catch { /* best-effort */ }
 }
 
 /**

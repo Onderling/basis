@@ -22,7 +22,7 @@
  * those shapes have no `blocks` array, so detection produces an
  * empty `blockConflicts` and only `metaConflicts`.  The `title` opt
  * lets the host pick a namespace-appropriate heading
- * (`circle.rules.conflict.title` / `circle.settings.conflict.title`)
+ * (`circle.rules.conflict.title`)
  * while every other locale key stays under `circle.recipe.conflict.*`
  * — the picker copy is identical across the three flows.
  */

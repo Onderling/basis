@@ -7967,10 +7967,6 @@ async function showSettings(id) {
     sources: circleBaseSources,
     saveLabel: consensusActive() ? t('circle.settings.send_proposal') : undefined,
     note: [pendingNote(), storageNote].filter(Boolean).join(' · ') || undefined,
-    // No incoming-policy conflict any more: the policy arrives on the governance lane from an admin and is applied
-    // (circlePolicyLane) — there is no second copy to reconcile by hand.
-    policyStore,
-    circleId: id,
     // OBJ-2 — paired devices (no-pod sync). Only wired when the agent exposes the household
     // sync hooks; add/remove persist + return the updated roster (the panel re-draws itself).
     householdSelfAddr:     circleHouseholdAgent?.householdSelfAddr ?? null,

@@ -85,7 +85,8 @@ import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStor
 // Mirrors the rules wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen's settings editor reads on open + clears after
 // the γ.4 resolver applies / discards.
-import { makeCirclePolicyPendingStoreRN } from './src/core/circlePolicyPendingStorageRN.js';
+import { makeCirclePolicyStoreRN } from './src/core/circleStoresRN.js';
+import { makeCirclePolicyLane, makePolicyHeadStore } from '../basis/src/v2/policyUpdateLane.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 import { runPendingForget, markerVaultOver } from '../basis/src/v2/enrolForgets.js';
@@ -302,19 +303,20 @@ export default function App() {
   if (!circleRulesDedupRef.current) {
     circleRulesDedupRef.current = new Set();
   }
-  // γ-next.policy — shared circle-policy-broadcast pending store.
-  // ChatScreen's peer-router writes via the receiver handler;
-  // CircleLauncherScreen's settings editor reads on mount + clears after
-  // the γ.4 resolver applies/discards.  Completes the γ-next trio
-  // (recipe / rules / policy).
-  const circlePolicyPendingStoreRef = useRef(null);
-  if (!circlePolicyPendingStoreRef.current) {
-    circlePolicyPendingStoreRef.current = makeCirclePolicyPendingStoreRN(AsyncStorage);
-  }
-  // γ-next.policy — shared LRU dedup for the policy-broadcast handler.
-  const circlePolicyDedupRef = useRef(null);
-  if (!circlePolicyDedupRef.current) {
-    circlePolicyDedupRef.current = new Set();
+  // THE CIRCLE'S POLICY ON THE GOVERNANCE LANE (web parity: circleApp's `circlePolicyLane`) — built once and handed
+  // to both screens: ChatScreen APPLIES it (it holds the governance rail), the launcher STATES it (an admin's save,
+  // the founder's first write). It replaced the settings-save broadcast, which a joiner never received.
+  const circlePolicyLaneRef = useRef(null);
+  if (!circlePolicyLaneRef.current) {
+    const policyStore = makeCirclePolicyStoreRN(AsyncStorage);
+    circlePolicyLaneRef.current = makeCirclePolicyLane({
+      emitter: () => bundleRef.current?.agent?.emitPolicyUpdate ?? null,
+      headStore: makePolicyHeadStore(AsyncStorage),
+      readPolicy: (cid) => policyStore.get(cid),
+      writePolicy: (cid, policy) => policyStore.update(cid, policy),
+      adminsOf: async (cid) => new Set((((await bundleRef.current?.callSkill?.('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
+        .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
+    });
   }
 
   // 5.4c (2026-05-30) — single OidcSessionRN, lifted from ChatScreen so
@@ -780,8 +782,7 @@ export default function App() {
             circleRecipeDedup={circleRecipeDedupRef.current}
             circleRulesPendingStore={circleRulesPendingStoreRef.current}
             circleRulesDedup={circleRulesDedupRef.current}
-            circlePolicyPendingStore={circlePolicyPendingStoreRef.current}
-            circlePolicyDedup={circlePolicyDedupRef.current}
+            circlePolicyLane={circlePolicyLaneRef.current}
             sessionRef={sessionRef}
             onSessionChanged={refreshCirclePodWriter}
             onPodAuthReady={setPodAuth}
@@ -800,7 +801,7 @@ export default function App() {
           eventLog={eventLogRef.current}
           circleRecipePendingStore={circleRecipePendingStoreRef.current}
           circleRulesPendingStore={circleRulesPendingStoreRef.current}
-          circlePolicyPendingStore={circlePolicyPendingStoreRef.current}
+          circlePolicyLane={circlePolicyLaneRef.current}
           /* no onBack (no chat shell to fall back to) +
              no onChatRoute (the circle view IS the chat, no route). */
         />

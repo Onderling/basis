@@ -63,7 +63,6 @@ import { pushContactReply }    from '../core/contactReplyInbox.js';
 import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
 import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
-import { makeCirclePolicyPeerHandler } from '../../../basis/src/v2/circlePolicyReceiver.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
@@ -198,11 +197,8 @@ export default function ChatScreen({
   // Launcher's rules editor reads from this store; receiver writes here.
   circleRulesPendingStore = null,
   circleRulesDedup = null,
-  // γ-next.policy — pending-policy cache + dedup.  Launcher's settings
-  // editor reads from this store; receiver writes here.  Completes the
-  // γ-next trio (recipe / rules / policy).
-  circlePolicyPendingStore = null,
-  circlePolicyDedup = null,
+  // The circle's policy on the governance lane (App.js builds it): applied here, where the governance rail is.
+  circlePolicyLane = null,
   // 5.4c (2026-05-30) — App.js owns the OidcSessionRN so the v2 circle
   // launcher can build a podWriter from the SAME session.  If absent
   // (standalone mounts / older tests) we fall back to creating one
@@ -692,16 +688,6 @@ export default function ChatScreen({
           dedup:        circleRulesDedup,
         }),
       } : {}),
-      // γ-next.policy — circle circlePolicy broadcast.  Caches the
-      // inbound policy doc per-circle; the settings editor pulls on
-      // next open and passes via γ.4's `incomingPolicy` opt.  No
-      // bubble UI.  Completes the γ-next trio (recipe / rules / policy).
-      ...(circlePolicyPendingStore ? {
-        'circle-policy-broadcast': makeCirclePolicyPeerHandler({
-          pendingStore: circlePolicyPendingStore,
-          dedup:        circlePolicyDedup,
-        }),
-      } : {}),
       // Wave C tail A — ingest fanned governance/report events into the one log so a
       // vote/report raised on another device replicates here (deduped by the stable id).
       // notify: an in-app nudge when a decision OPENS (governanceWakeHint gates to propose).
@@ -721,6 +707,8 @@ export default function ChatScreen({
         // fold it into the local rules head; the pre-scan is cheap and no-ops for vote churn.
         const govChanged = (cid) => {
           if (govRail) applyRulesUpdates({ rail: govRail, callSkill: bundle.callSkill, circleId: cid }).catch(() => {});
+          // …and the circle's policy, the same way (a joiner catches the founder's up here)
+          if (govRail) circlePolicyLane?.apply(cid, govRail).catch(() => {});
         };
         const lanes = buildCircleLanes({
           agent: bundle?.agent,
@@ -732,7 +720,10 @@ export default function ChatScreen({
           dataMoveFor: circleSendDataMove,
           // The durable-head serve: the preserved rules-update statement still reaches a member who was
           // offline past the lane's audit window.
-          extraGovStatementsFor: (cid) => preservedRulesStatementsFor({ callSkill: bundle.callSkill, circleId: cid }),
+          extraGovStatementsFor: async (cid) => [
+            ...await preservedRulesStatementsFor({ callSkill: bundle.callSkill, circleId: cid }),
+            ...(circlePolicyLane ? await circlePolicyLane.preserved(cid) : []),
+          ],
           on: {
             govChange: govChanged,
             keyChange: (cid) => refreshCircleKeyEventsFromLane(bundle?.agent?.keyRail, cid).catch(() => {}),

@@ -477,11 +477,9 @@ export default function CircleLauncherScreen({
   // A failed agent boot, said HERE (web parity: `bootFailure` on the launcher). App.js used to hand it
   // only to the hidden ChatScreen, so the person saw "No circles yet." and concluded their data was gone.
   bootError = null,
-  // γ-next.policy — per-circle pending-policy cache (AsyncStorage-backed,
-  // owned by App.js).  Receiver writes; settings editor reads on mount +
-  // clears after the γ.4 resolver applies / discards.  Completes the
-  // γ-next trio (recipe / rules / policy).
-  circlePolicyPendingStore = null,
+  // The circle's policy on the governance lane (App.js builds it): stated here when an admin saves and when the
+  // create wizard writes a new circle's first policy.
+  circlePolicyLane = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -645,7 +643,6 @@ export default function CircleLauncherScreen({
   // γ-next.policy — pending incoming policy doc (from peer broadcast).
   // Loaded when the settings screen opens; cleared after the γ.4
   // resolver applies or discards.
-  const [incomingPolicy, setIncomingPolicy] = useState(null);
   // α.1d.3 — recipe editor state (lives in the parent so book + mode
   // survive the BOOK ↔ RECIPE round-trip).  Callbacks land below
   // after recipeStore is declared.
@@ -1061,35 +1058,6 @@ export default function CircleLauncherScreen({
       try { await circleRulesPendingStore.clear(selected.id); } catch { /* ignore */ }
     }
   }, [selected, circleRulesPendingStore]);
-
-  // γ-next.policy — pull cached pending policy doc whenever the settings
-  // screen opens for a selected circle.  γ.4's resolver runs
-  // automatically from inside the screen when incomingPolicy is
-  // non-null + diverges from local.
-  useEffect(() => {
-    if (view !== 'settings' || !selected?.id || !circlePolicyPendingStore) {
-      setIncomingPolicy(null);
-      return;
-    }
-    let alive = true;
-    (async () => {
-      try {
-        const cached = await circlePolicyPendingStore.get(selected.id);
-        if (alive) setIncomingPolicy(cached ?? null);
-      } catch { if (alive) setIncomingPolicy(null); }
-    })();
-    return () => { alive = false; };
-  }, [view, selected, circlePolicyPendingStore]);
-
-  // γ-next.policy — clear the cached pending policy after the γ.4
-  // resolver applies or discards.  Both paths route through here so
-  // a fresh broadcast can land in the slot again.
-  const clearIncomingPolicy = useCallback(async () => {
-    setIncomingPolicy(null);
-    if (selected?.id && circlePolicyPendingStore) {
-      try { await circlePolicyPendingStore.clear(selected.id); } catch { /* ignore */ }
-    }
-  }, [selected, circlePolicyPendingStore]);
 
   // α.3 — Screens helpers.
   const refreshScreensBook = useCallback(async () => {
@@ -1833,31 +1801,14 @@ export default function CircleLauncherScreen({
     );
   }
   if (selected && view === 'settings') {
-    // γ-next.policy — broadcast cache → editor → γ.4 resolver.  The
-    // resolver is opt-in; when `incomingPolicy` is null the editor
-    // renders untouched.  Applied / discarded both clear the cache.
-    //
-    // Send-side: the settings editor owns the `store.update` call (so
-    // proposal + commit paths route through one place); we wrap the
-    // store here so a fresh update fans the post-save policy out to
-    // peers via stoop's `broadcastCirclePolicy`.  Fire-and-forget;
-    // per-peer errors land in result.errors which we log.  No-op when
-    // callSkill / no agent.
+    // The settings editor owns the `store.update` call (proposal and commit paths route through one place); the
+    // store is wrapped here so every save also STATES the policy on the governance lane (circlePolicyLane).
     const broadcastingStore = {
       ...policyStore,
       update: async (cid, next) => {
         const r = await policyStore.update(cid, next);
-        if (next && typeof next === 'object' && typeof bundle?.callSkill === 'function') {
-          const msgId = `circle-policy-${cid}-${Date.now()}`;
-          const ts    = Date.now();
-          bundle.callSkill('stoop', 'broadcastCirclePolicy', {
-            groupId: cid, policy: next, msgId, ts,
-          }).then((res) => {
-            if (res?.error) console.warn('[circle-policy] fan-out skipped:', res.error);
-          }).catch((err) => {
-            console.warn('[circle-policy] fan-out failed:', err?.message ?? err);
-          });
-        }
+        // the saved policy goes on the governance lane — every member, and whoever joins later, catches it up
+        circlePolicyLane?.state(cid).catch(() => { /* catch-up reconciles */ });
         return r;
       },
     };
@@ -1877,9 +1828,6 @@ export default function CircleLauncherScreen({
         // capabilityOptOuts) + the pod session's authed fetch, exactly as web circleApp.js does.
         overrideStore={overrideStore}
         podFetch={getCirclePodFetch() || undefined}
-        incomingPolicy={incomingPolicy}
-        onIncomingApplied={clearIncomingPolicy}
-        onIncomingDiscarded={clearIncomingPolicy}
         // OBJ-2 — paired devices (no-pod sync). The agent exposes the household roster surface.
         householdSelfAddr={bundle?.agent?.householdSelfAddr ?? null}
         householdPeers={bundle?.agent?.listHouseholdPeers?.(selected.id) ?? []}
@@ -2283,7 +2231,10 @@ export default function CircleLauncherScreen({
             t={t}
             theme={theme}
             getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
-            persistPolicy={(groupId, patch) => policyStore.update?.(groupId, patch)}
+            persistPolicy={async (groupId, patch) => {
+              await policyStore.update?.(groupId, patch);
+              circlePolicyLane?.state(groupId).catch(() => {});   // the founder's first policy, on the lane
+            }}
             // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
             shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
             onClose={() => setCreating(false)}

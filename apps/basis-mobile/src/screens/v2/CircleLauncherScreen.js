@@ -199,7 +199,7 @@ import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.j
 // no DOM). Mobile reuses it verbatim — same seal path as web's stoop noticeboard — so a noticeboard
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
-import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
+import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { resolveSealedThumbUri } from '../../core/mijHost.js';
 import FaceView from './FaceView.js';
@@ -425,7 +425,7 @@ function PersonaPanel({
         const cid = c?.id ?? c?.circleId;
         if (!cid) continue;
         const pol = await store.get(cid).catch(() => null);
-        m.set(cid, !!(await getCircleMediaComposition(cid, pol).catch(() => null)));
+        m.set(cid, circleCarriesMedia(pol, await getCircleMediaComposition(cid, pol).catch(() => null)));
       }
       if (alive) setCarriesMedia(m);
     })();

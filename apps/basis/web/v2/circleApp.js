@@ -190,7 +190,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // the circle composer shows NO attach affordance. Swap point for real infra (S3/R2 +
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
-import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
+import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
@@ -5723,7 +5723,7 @@ async function openAboutMePanel(personaId) {
     const carriesMedia = new Map();
     for (const c of model?.circles ?? []) {
       const pol = await policyStore.get(c.circleId).catch(() => null);
-      carriesMedia.set(c.circleId, !!(await getCircleMediaComposition(c.circleId, pol).catch(() => null)));
+      carriesMedia.set(c.circleId, circleCarriesMedia(pol, await getCircleMediaComposition(c.circleId, pol).catch(() => null)));
     }
     renderMij(body, {
       model, t, lang: currentLang(),

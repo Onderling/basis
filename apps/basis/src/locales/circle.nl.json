@@ -2062,12 +2062,6 @@
         "doc": "auto: een beheerdersapparaat voert een aangenomen besluit meteen uit, zonder aparte stap. Nog steeds alleen beheerder, en nog steeds ondertekend + met quorum."
       }
     },
-    "conflict": {
-      "title": {
-        "text": "Twee van jullie hebben de instellingen bewerkt",
-        "doc": "γ.4 — modal heading when an incoming policy diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
-      }
-    },
     "storagePosture": {
       "text": "Opslag (in rust)",
       "doc": "Circle-instellingen — opslaghouding in rust (menukaart P0–P3)."

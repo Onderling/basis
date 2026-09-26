@@ -203,7 +203,6 @@ export {
 export { detectRecipeConflicts, applyResolution } from './v2/recipeConflict.js';
 // γ.4 — rules-doc + circle-policy conflict detection + resolution (same flow).
 export { detectRulesConflicts,  applyRulesResolution, decisionsForMerges } from './v2/rulesConflict.js';
-export { detectPolicyConflicts, applyPolicyResolution } from './v2/policyConflict.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 export { makeCircleRecipePeerHandler }              from './v2/circleRecipeReceiver.js';
 export { createCircleRecipePendingStore }           from './v2/circleRecipePending.js';

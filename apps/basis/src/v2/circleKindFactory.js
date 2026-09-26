@@ -184,7 +184,7 @@ export function makeCircleKindPendingLocalIo(keyPrefix, storage = globalThis.loc
 
 /**
  * Build the detect/apply pair for a FLAT keyed conflict doc — the shared
- * shape behind `policyConflict.js` and `rulesConflict.js`.  Both are a
+ * shape behind `rulesConflict.js` (the circle policy used it too, until it moved onto the governance lane).  A
  * pure portable layer over `objectDiff` with NO `blocks` array, so every
  * divergence surfaces as a meta-conflict (`blockConflicts` always empty),
  * and both default missing decisions to 'theirs' (incoming wins).

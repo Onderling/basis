@@ -101,6 +101,8 @@ import { isRosterTrailItem, emitMemberProps } from '@onderling/circles';
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
 import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
+// …and the circle POLICY, the same way: a signed statement on the governance lane, caught up by joiners.
+import { makePolicyUpdateEmitter } from '../../v2/policyUpdateLane.js';
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
@@ -3411,6 +3413,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
   });
+  // THE POLICY-UPDATE RIDER — the same rail and fan as the rules one, a different kind. The shells call it (as
+  // `emitPolicyUpdate`) when an admin saves the circle's policy and when the create wizard writes the first one.
+  const policyUpdateEmit = makePolicyUpdateEmitter({
+    rail: makeGovernanceRail({
+      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+      circleIdentityFor,
+      myRef: chatId.pubKey,
+      callSkill: (...a) => callSkill(...a),
+    }),
+    fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
+      groupId: circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now(),
+    }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
+      .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
+  });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan
    * (stoop's `reliableSend`) AND the shells' `sendPeerMessage` (delivery receipts, replies). With a
@@ -6088,6 +6104,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // catch-up pair over the rail, and refresh their key-event store as the lane's projection.
     keyRail,
     keyEmit,
+    /** State the circle's policy on the governance lane: `{groupId, policy, version}` → the signed statement or null. */
+    emitPolicyUpdate: policyUpdateEmit,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
     forgetSelfIdentity:   (address) => sa.forgetSelfIdentity?.(address) ?? false,
     installCircleIdentities: (circleIds) => installCircleSigningIdentities({

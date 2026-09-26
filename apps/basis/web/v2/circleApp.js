@@ -195,6 +195,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
@@ -352,8 +353,6 @@ import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePe
 import { makeCircleRulesPeerHandler } from '../../src/v2/circleRulesReceiver.js';
 import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPendingStorage.js';
 // γ-next.policy — receiver + pending-cache substrate for the policy broadcast.
-import { makeCirclePolicyPeerHandler } from '../../src/v2/circlePolicyReceiver.js';
-import { createCirclePolicyPendingStoreLocal } from '../../src/v2/circlePolicyPendingStorage.js';
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
 import {
@@ -1050,6 +1049,20 @@ const recipeVersions = localStorageObjectVersions('recipe');
 const rulesVersions  = localStorageObjectVersions('rules');
 
 const policyStore = createCirclePolicyStore({ ...localStoragePolicyIo(), versions: policyVersions });
+// THE CIRCLE'S POLICY ON THE GOVERNANCE LANE — an admin's save (and the founder's first write) states it as a signed
+// statement; every member, a joiner included, catches it up and applies it here. The local store is this device's
+// copy of circle state, no longer a per-device setting that only a settings save ever broadcast.
+const circlePolicyLane = makeCirclePolicyLane({
+  emitter: () => _peerAgent?.emitPolicyUpdate ?? null,
+  headStore: makePolicyHeadStore({
+    getItem: async (k) => { try { return globalThis.localStorage?.getItem(k) ?? null; } catch { return null; } },
+    setItem: async (k, v) => { try { globalThis.localStorage?.setItem(k, v); } catch { /* quota / disabled */ } },
+  }),
+  readPolicy: (cid) => policyStore.get(cid),
+  writePolicy: (cid, policy) => policyStore.update(cid, policy),
+  adminsOf: async (cid) => new Set((((await rawCallSkill?.('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
+    .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
+});
 // α.1c — per-circle recipe book store (multi-recipe per circle, one active).
 // localStorage now; pod io can swap in later without touching callers.
 const recipeStore = createCircleRecipeStore({ io: localStorageRecipeIo(), versions: recipeVersions });
@@ -1120,11 +1133,6 @@ const circleRecipePendingStore = createCircleRecipePendingStoreLocal();
 // editor reads on mount + passes the cached doc via γ.4's
 // `incomingRules` opt.  Same shape as the recipe store.
 const circleRulesPendingStore = createCircleRulesPendingStoreLocal();
-// γ-next.policy — per-circle "incoming policy" cache.  Receiver writes
-// here on every valid circle-policy-broadcast envelope; the settings
-// editor reads on mount + passes the cached doc via γ.4's
-// `incomingPolicy` opt.  Same shape as the rules + recipe stores.
-const circlePolicyPendingStore = createCirclePolicyPendingStoreLocal();
 // δ.1 — per-screen materialized-blocks cache.  The Screens view-mode
 // reads this on open to render instantly while the fresh materialize
 // runs in the background; on result the view swaps + the cache
@@ -5928,6 +5936,8 @@ function openCreateCircleWizard() {
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
+      // the founder's first policy (the wizard wrote it locally) goes on the lane, so a joiner catches it up
+      if (gid) circlePolicyLane.state(gid).catch(() => {});
       try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
     },
   });
@@ -7603,7 +7613,7 @@ async function showGovernance(id) {
     removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      try { broadcastPolicy({ circleId: cid, policy: patch }); } catch { /* fan is best-effort */ }
+      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;
     }),
   });
@@ -7874,7 +7884,7 @@ async function showSettings(id) {
     myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      try { broadcastPolicy({ circleId: cid, policy: patch }); } catch { /* fan is best-effort */ }
+      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
       return r;
     }),
   });
@@ -7902,19 +7912,6 @@ async function showSettings(id) {
       ? t('circle.settings.pending_waiting', { who: waiting.join(', ') })
       : t('circle.settings.pending');
   };
-  // γ-next.policy — pull the cached broadcast (if any).  Editor's γ.4
-  // resolver decides whether anything actually conflicts; if not, it
-  // applies straight through.  When the slot is empty `incomingPolicy`
-  // stays null and the editor renders untouched.
-  let incomingPolicy = null;
-  try { incomingPolicy = await circlePolicyPendingStore.get(id); }
-  catch { incomingPolicy = null; }
-
-  const clearPending = () => {
-    incomingPolicy = null;
-    circlePolicyPendingStore.clear(id).catch(() => { /* ignore */ });
-  };
-
   // B · consent-card — the recipe reviewed in the consent card (cached between review + Agree so the loaded
   // recipe is reused for apply, avoiding a second load/verify round-trip).
   let _reviewedRecipe = null;
@@ -7953,10 +7950,8 @@ async function showSettings(id) {
     sources: circleBaseSources,
     saveLabel: consensusActive() ? t('circle.settings.send_proposal') : undefined,
     note: [pendingNote(), storageNote].filter(Boolean).join(' · ') || undefined,
-    // γ-next.policy — broadcast cache → editor → γ.4 resolver.  The
-    // resolver is opt-in; when `incomingPolicy` is null the editor
-    // renders untouched.  Applied / discarded both clear the cache.
-    incomingPolicy,
+    // No incoming-policy conflict any more: the policy arrives on the governance lane from an admin and is applied
+    // (circlePolicyLane) — there is no second copy to reconcile by hand.
     policyStore,
     circleId: id,
     // OBJ-2 — paired devices (no-pod sync). Only wired when the agent exposes the household
@@ -7969,8 +7964,6 @@ async function showSettings(id) {
         ? (addr) => circleHouseholdAgent.addCirclePeer(id, addr) : undefined),
     onRemoveHouseholdPeer: typeof circleHouseholdAgent?.removeHouseholdPeer === 'function'
       ? (addr) => circleHouseholdAgent.removeHouseholdPeer(id, addr) : undefined,
-    onIncomingApplied:   () => clearPending(),
-    onIncomingDiscarded: () => clearPending(),
     onChange: (patch) => { working = mergeCirclePolicy(working, patch); rerender(); },
     // Theme B — the guided-setup chatbot: walk the basics, then pre-fill these
     // fields (the user still reviews + Saves). Template is remote-loadable; bundled fallback.
@@ -8015,10 +8008,9 @@ async function showSettings(id) {
     onSave: async () => {
       if (!consensusActive()) {
         await policyStore.update(id, working);
-        // γ-next.policy — fan the just-saved policy doc out to peers.
-        // Fire-and-forget; per-peer errors are logged inside.
-        try { broadcastPolicy({ circleId: id, policy: working }); }
-        catch (err) { console.warn('[circle-policy] broadcast scheduling failed:', err?.message ?? err); }
+        // The just-saved policy goes on the governance lane as a signed statement — every member, and whoever
+        // joins later, catches it up.
+        circlePolicyLane.state(id).catch(() => { /* catch-up reconciles */ });
         // §4 storage-policy bridge — when the pod tier changed, drive stoop's
         // authoritative circle storage policy. The skill owns admin-gating + the
         // one-way guard; on failure we keep the local save and show a note.
@@ -8053,29 +8045,6 @@ async function showSettings(id) {
     },
   });
   rerender();
-}
-
-/**
- * γ-next.policy — fan the policy document out to every other circle
- * member via stoop's `broadcastCirclePolicy` skill.  Fire-and-forget:
- * per-peer failures land in the result.errors array; we just log.
- * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
- */
-function broadcastPolicy({ circleId, policy }) {
-  if (typeof rawCallSkill !== 'function') return;
-  if (!policy || typeof policy !== 'object') return;
-  const msgId = `circle-policy-${circleId}-${Date.now()}`;
-  const ts    = Date.now();
-  rawCallSkill('stoop', 'broadcastCirclePolicy', {
-    groupId: circleId,
-    policy,
-    msgId,
-    ts,
-  }).then((r) => {
-    if (r?.error) console.warn('[circle-policy] fan-out skipped:', r.error);
-  }).catch((err) => {
-    console.warn('[circle-policy] fan-out failed:', err?.message ?? err);
-  });
 }
 
 // Was an enrol offer waiting when this boot started? Read before anything can consume it: a ceremony with an offer
@@ -8407,6 +8376,7 @@ async function boot() {
       // pre-scans the lane cheaply and no-ops when nothing rules-shaped landed.
       const govChanged = (cid) => {
         applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
+        circlePolicyLane.apply(cid, govShellRail).catch(() => {});
         if (getActiveCircle() === cid) _govRerender?.();
       };
       // The five lanes' catch-ups are built once, further down, together with the chat lane's —
@@ -8519,7 +8489,10 @@ async function boot() {
         dataMoveFor: circleSendDataMove,
         // The durable-head serve: a member offline past the lane's audit window still receives the
         // preserved (original, signed) rules-update statement — the final setting never deletes.
-        extraGovStatementsFor: (cid) => preservedRulesStatementsFor({ callSkill: rawCallSkill, circleId: cid }),
+        extraGovStatementsFor: async (cid) => [
+          ...await preservedRulesStatementsFor({ callSkill: rawCallSkill, circleId: cid }),
+          ...await circlePolicyLane.preserved(cid),
+        ],
         on: {
           govChange: govChanged,
           keyChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
@@ -8573,16 +8546,6 @@ async function boot() {
         dedup:        circleRulesDedup,
         logger:       console,
       });
-      // γ-next.policy — policy-broadcast receiver.  Stashes inbound policy
-      // docs per-circle; the settings editor pulls on mount + passes via
-      // γ.4's `incomingPolicy` opt.  Completes the γ-next trio
-      // (recipe / rules / policy).
-      const circlePolicyDedup   = new Set();
-      const circlePolicyHandler = makeCirclePolicyPeerHandler({
-        pendingStore: circlePolicyPendingStore,
-        dedup:        circlePolicyDedup,
-        logger:       console,
-      });
       const sendToPeerForCU = (addr, env) =>
         (typeof agent?.sendPeerMessage === 'function')
           ? agent.sendPeerMessage(addr, env)
@@ -8601,11 +8564,11 @@ async function boot() {
           'delivery-receipt':        (from, payload) => { ensureNearbyRoom(agent)?.onReceipt(from, payload); applyIncomingReceipt(payload, from); },
           'circle-recipe-broadcast':  circleRecipeHandler,
           'circle-rules-broadcast':   circleRulesHandler,
-          'circle-policy-broadcast':  circlePolicyHandler,
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onLanded: circleLanes.landedCarrier?.governance, onChange: (cid) => {
             // A landed statement may be a rules-update — fold it into the local rules head (cheap
             // pre-scan; no-op for vote churn), then re-render.
             applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
+            circlePolicyLane.apply(cid, govShellRail).catch(() => {});
             if (getActiveCircle() === cid) _govRerender?.();
           } }),
           'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),

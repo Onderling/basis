@@ -44,7 +44,7 @@ const DEFAULT_DEDUP_CAP = param({ key: 'circleKind.dedupCap', scope: PARAM_SCOPE
  * All that differs between kinds is the descriptor:
  *
  * @param {object} descriptor
- * @param {string} descriptor.subtype     wire subtype, e.g. 'circle-policy-broadcast'
+ * @param {string} descriptor.subtype     wire subtype, e.g. 'circle-rules-broadcast'
  * @param {string} descriptor.payloadKey  envelope field holding the doc, e.g. 'policy'
  * @param {string} descriptor.logTag      log prefix, e.g. '[circle-policy]'
  * @returns {(args?: object) => (fromPeerAddr: string, payload: object) => Promise<void>}

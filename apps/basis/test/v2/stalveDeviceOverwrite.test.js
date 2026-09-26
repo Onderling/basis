@@ -1,59 +1,68 @@
 /**
- * A stale second device must not clobber a fresher change — story 6.2 of
- * `plans/NOTE-multi-device-user-stories.md`.
+ * A stale second device must not clobber a fresher change — story 6.2 of the multi-device user stories.
  *
- * This is the SAME shape as the bugs found on 2026-07-26 (a second operation re-derives from a partial base
- * and silently overwrites the first), but on the multi-device axis: Anna edits a circle rule on her PHONE
- * while her LAPTOP is offline holding the old document; the laptop reconnects and fans its stale copy.
+ * The same shape as the bugs found on 2026-07-26 (a second operation re-derives from a partial base and silently
+ * overwrites the first), on the multi-device axis: Anna changes the circle on her PHONE while her LAPTOP is offline
+ * holding the old document; the laptop comes back.
  *
- * The property: an inbound document is never applied silently. `makeCircleKindReceiver` caches it as PENDING
- * and the human resolves — so a stale broadcast cannot overwrite a newer local edit behind the user's back.
- * These tests pin that, plus the conflict detection the resolver UI reads.
+ * THE POLICY now rides the governance lane as a versioned admin statement (2026-09-26), so the property is the
+ * lane's: a statement at a LOWER version never overwrites a higher one on any device, in any arrival order; two
+ * statements at the same version fold the same way everywhere (deny-wins); and a third member converges on that
+ * one answer. (Until then the policy arrived as a broadcast parked for a person to resolve — the retired path.)
+ *
+ * THE RULES document keeps its conflict resolver, and its two cases stay here: the 3-way diff and the auto-merge
+ * that must not revert a fresher local edit.
  *
  * Cast: Anna's phone (fresh) · Anna's laptop (stale) · Bram (a third member who must converge, not diverge).
  */
-import { describe, it, expect, vi } from 'vitest';
-import { makeCirclePolicyPeerHandler } from '../../src/v2/circlePolicyReceiver.js';
+import { describe, it, expect } from 'vitest';
 import { detectRulesConflicts, applyRulesResolution, decisionsForMerges } from '../../src/v2/rulesConflict.js';
-
-/** A device's local doc + the pending slot an inbound broadcast lands in. */
-function device(initialDoc) {
-  let applied = initialDoc;
-  const pending = new Map();
-  return {
-    applied: () => applied,
-    pendingFor: (circleId) => pending.get(circleId) ?? null,
-    /** The human accepting the pending doc — the ONLY way an inbound doc becomes local. */
-    resolve: (circleId, decisions = {}) => {
-      const incoming = pending.get(circleId);
-      if (!incoming) return applied;
-      applied = applyRulesResolution(applied, incoming, decisions);
-      pending.delete(circleId);
-      return applied;
-    },
-    handler: makeCirclePolicyPeerHandler({
-      pendingStore: { set: async (circleId, doc) => { pending.set(circleId, doc); } },
-      logger: { warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
-    }),
-  };
-}
-
-const envelope = (policy, msgId) => ({
-  subtype: 'circle-policy-broadcast', circleId: 'c1', msgId, ts: Date.now(), policy,
-});
+import { applyPolicyUpdates, makePolicyHeadStore, POLICY_UPDATE_KIND } from '../../src/v2/policyUpdateLane.js';
 
 const OLD = { houseRules: ['wees aardig'], quietHours: '22:00' };
 const NEW = { houseRules: ['wees aardig', 'geen fietsen in de gang'], quietHours: '22:00' };
 
-describe('6.2 — a stale device cannot silently overwrite a fresher change', () => {
-  it('a stale inbound policy lands as PENDING and does NOT touch the applied doc', async () => {
-    const phone = device(NEW);                                  // the phone made the fresh edit
-    await phone.handler('laptop-addr', envelope(OLD, 'm1'));    // the laptop fans its stale copy
+const admins = new Set(['anna']);
+const stmt = (version, policy, hash) => ({ body: { kind: POLICY_UPDATE_KIND, author: 'anna', hash, payload: { policy, version } }, sig: 's' });
+function device() {
+  const m = new Map();
+  const headStore = makePolicyHeadStore({ getItem: async (k) => m.get(k) ?? null, setItem: async (k, v) => { m.set(k, v); } });
+  let policy = null;
+  return {
+    policy: () => policy,
+    async receive(stored) {
+      const rail = { storedStatements: () => stored, readVerifiedBodies: async () => ({ bodies: stored.map((s) => s.body) }) };
+      return applyPolicyUpdates({ rail, circleId: 'c1', adminsOf: async () => admins, headStore, writePolicy: async (c, p) => { policy = p; } });
+    },
+  };
+}
 
-    expect(phone.applied()).toBe(NEW);                          // untouched — no silent clobber
-    expect(phone.pendingFor('c1')).toEqual(OLD);                // parked for the human instead
+describe('6.2 — the policy: a stale device cannot overwrite a fresher change', () => {
+  const fresh = stmt(3, { storagePosture: 'p2', llmTool: 'off' }, 'h-fresh');   // the phone, caught up, saved v3
+  const stale = stmt(2, { storagePosture: 'p0', llmTool: 'cloud' }, 'h-stale'); // the laptop, behind, saved v2
+
+  it('the fresher version wins, whichever arrives first', async () => {
+    const a = device(); await a.receive([fresh]); await a.receive([fresh, stale]);
+    const b = device(); await b.receive([stale]); await b.receive([stale, fresh]);
+    expect(a.policy()).toEqual(fresh.body.payload.policy);
+    expect(b.policy()).toEqual(fresh.body.payload.policy);
   });
 
+  it('a third member converges on the same answer as the other two', async () => {
+    const bram = device(); await bram.receive([stale, fresh]);
+    expect(bram.policy()).toEqual(fresh.body.payload.policy);
+  });
+
+  it('two saves at the SAME version (the laptop never caught up) fold the same everywhere — deny-wins', async () => {
+    const twin = stmt(3, { storagePosture: 'p0', llmTool: 'cloud' }, 'h-twin');
+    const a = device(); await a.receive([fresh, twin]);
+    const b = device(); await b.receive([twin]); await b.receive([twin, fresh]);
+    expect(a.policy()).toEqual(b.policy());
+    expect(a.policy()).toMatchObject({ storagePosture: 'p2', llmTool: 'off' });
+  });
+});
+
+describe('6.2 — the rules document keeps its resolver', () => {
   it('the 3-way diff records WHICH side diverged, so an auto-merge can resolve correctly', () => {
     const base = OLD;                                           // what both devices last agreed on
     const localChanged = detectRulesConflicts(NEW, OLD, base);  // the phone edited; the laptop is at base
@@ -80,28 +89,5 @@ describe('6.2 — a stale device cannot silently overwrite a fresher change', ()
     // Symmetry: a genuinely NEWER incoming change is still taken.
     const r2 = detectRulesConflicts(OLD, NEW, base);
     expect(applyRulesResolution(OLD, NEW, decisionsForMerges(r2.toMerge)).houseRules).toEqual(NEW.houseRules);
-  });
-
-  it('a duplicate stale broadcast is ignored (msgId dedup), not re-parked repeatedly', async () => {
-    const phone = device(NEW);
-    await phone.handler('laptop-addr', envelope(OLD, 'm1'));
-    phone.resolve('c1', { houseRules: 'yours' });               // human dismisses it, keeping the fresh value
-    await phone.handler('laptop-addr', envelope(OLD, 'm1'));    // the same broadcast arrives again
-
-    expect(phone.pendingFor('c1')).toBeNull();                  // not resurrected by the replay
-    expect(phone.applied().houseRules).toEqual(NEW.houseRules);
-  });
-
-  it('the third member converges on the ACCEPTED doc, not on arrival order', async () => {
-    const bram = device(OLD);
-    // Bram receives the phone's fresh doc and accepts it (default: incoming wins).
-    await bram.handler('phone-addr', envelope(NEW, 'm2'));
-    const after = bram.resolve('c1');
-
-    expect(after.houseRules).toEqual(NEW.houseRules);
-    // A LATER stale fan from the laptop parks as pending and still does not overwrite what Bram applied.
-    await bram.handler('laptop-addr', envelope(OLD, 'm3'));
-    expect(bram.applied().houseRules).toEqual(NEW.houseRules);
-    expect(bram.pendingFor('c1')).toEqual(OLD);
   });
 });

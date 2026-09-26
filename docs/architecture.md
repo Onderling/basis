@@ -899,6 +899,15 @@ and bad actors, weakest concern to strongest:
   **deterministic caretaker** is appointed — the member the whole circle independently computes from the log (a
   hash-of-the-departure pick, next-in-line if unreachable), never a locally-rolled random that would itself fork.
 
+**Circle state an admin sets rides the same governance lane, as carried facts rather than decisions:** the rules
+document (`rules-update`) and the circle **policy** (`policy-update` — storage posture, pod, features, sharing, the
+decision classes above). Each is a signed statement carrying the whole document and a monotonic version; a receiver
+applies it only when its author is an admin on its own roster, the highest version wins, and two admins at one
+version fold **deny-wins** per axis (sealed over plaintext, off over on). A joiner and a following device catch it
+up exactly as they catch up the roster, and a device keeps the winning statement so it can serve it after the lane's
+audit window — so a policy is the same on every member's device, not a per-device setting that only a settings save
+ever broadcast.
+
 Anything that must be *agreed* is computed identically everywhere (the tally, the caretaker), never decided
 locally — the same discipline the hash-chain enforces. Full record: [decisions.md](decisions.md) (2026-07-25).
 

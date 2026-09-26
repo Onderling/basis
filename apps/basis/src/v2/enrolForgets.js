@@ -99,7 +99,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
                                 // identity in it, so on `cc-help` — whose id is a constant — the two selves
                                 // collide exactly and a stale memo answers "unchanged" to a real first disclosure.
     'cc.circlePolicy.',
-    'cc.circlePolicyPending.',
+    'cc.circlePolicyHead.',     // the version + statement of the circle's policy lane this device applied
     'cc.circleRules.',
     'cc.circleRulesPending.',
     'cc.circleRecipe.',

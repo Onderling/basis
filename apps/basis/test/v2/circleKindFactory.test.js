@@ -18,18 +18,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
-import { makeCirclePolicyPeerHandler } from '../../src/v2/circlePolicyReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../src/v2/circleRulesReceiver.js';
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 
-import { createCirclePolicyPendingStore } from '../../src/v2/circlePolicyPending.js';
 import { createCircleRulesPendingStore }  from '../../src/v2/circleRulesPending.js';
 import { createCircleRecipePendingStore } from '../../src/v2/circleRecipePending.js';
 
-import {
-  localStorageCirclePolicyPendingIo,
-  createCirclePolicyPendingStoreLocal,
-} from '../../src/v2/circlePolicyPendingStorage.js';
 import {
   localStorageCircleRulesPendingIo,
   createCircleRulesPendingStoreLocal,
@@ -47,19 +41,16 @@ const silentLogger = { warn: () => {}, info: () => {}, debug: () => {} };
 
 /** One row per kind: the factory + the wire subtype + the envelope payload field. */
 const RECEIVER_KINDS = [
-  { name: 'policy', make: makeCirclePolicyPeerHandler, subtype: 'circle-policy-broadcast', key: 'policy' },
   { name: 'rules',  make: makeCircleRulesPeerHandler,  subtype: 'circle-rules-broadcast',  key: 'rulesDoc' },
   { name: 'recipe', make: makeCircleRecipePeerHandler, subtype: 'circle-recipe-broadcast', key: 'recipe' },
 ];
 
 const PENDING_KINDS = [
-  { name: 'policy', make: createCirclePolicyPendingStore },
   { name: 'rules',  make: createCircleRulesPendingStore },
   { name: 'recipe', make: createCircleRecipePendingStore },
 ];
 
 const STORAGE_KINDS = [
-  { name: 'policy', io: localStorageCirclePolicyPendingIo, local: createCirclePolicyPendingStoreLocal, prefix: 'cc.circlePolicyPending.' },
   { name: 'rules',  io: localStorageCircleRulesPendingIo,  local: createCircleRulesPendingStoreLocal,  prefix: 'cc.circleRulesPending.' },
   { name: 'recipe', io: localStorageCircleRecipePendingIo, local: createCircleRecipePendingStoreLocal, prefix: 'cc.circleRecipePending.' },
 ];

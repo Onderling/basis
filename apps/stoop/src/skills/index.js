@@ -3836,47 +3836,10 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastCirclePolicy({groupId, policy, msgId, ts?})
-     *   — γ-next.policy — circle circlePolicy document fan-out to every
-     *   member of a circle.  Sibling of `broadcastCircleRules`: same fan-out
-     *   plumbing (chat.send, WebID→pubKey resolution, signing,
-     *   transport routing), different subtype + payload.
-     *
-     *   Receivers route the envelope to basis's
-     *   `makeCirclePolicyPeerHandler`, which stashes the policy doc in a
-     *   per-circle "pending" cache.  The settings editor reads the cache
-     *   on next open and passes it via γ.4's `incomingPolicy` opt; the
-     *   resolver pops if the incoming diverges from local.
-     *
-     *   Best-effort + fire-and-forget: per-peer failures land in the
-     *   returned `errors[]` array but never throw.
-     */
-    defineSkill('broadcastCirclePolicy', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const _groupId = a.groupId ?? groupId;
-      if (!_groupId)                                                  return { error: 'groupId-required' };
-      if (!a.policy || typeof a.policy !== 'object')                  return { error: 'policy-required' };
-      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
-
-      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
-
-      // Fan the policy doc out via the ONE shared circle-broadcast core (chat.send
-      // subtype `circle-policy-broadcast`); receivers cache it as pending.
-      return broadcastToCircle({
-        circleId: _groupId, kind: 'circle-policy-broadcast', from,
-        extras: { circleId: _groupId, msgId: a.msgId, ts, policy: a.policy, fromActor: a.fromActor ?? from ?? null },
-        metric: 'circle-policy-fanout',
-      });
-    }, {
-      description: 'Fan a circle circlePolicy document out to every other member via chat.send subtype:circle-policy-broadcast; receivers cache as pending incomingPolicy for the γ.4 conflict resolver.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * broadcastCircleGovernance({groupId, event, msgId, ts?})
      *   — Wave C: fan a governance event (a propose / vote / resolve) out to every member
      *   so the one circle log replicates. Receivers ingest it into their local EventLog
-     *   (deduped by the event's stable id). Sibling of broadcastCirclePolicy; same plumbing.
+     *   (deduped by the event's stable id). Sibling of broadcastCircleRules; same plumbing.
      */
     defineSkill('broadcastCircleGovernance', async ({ parts, from }) => {
       const a = dataArgs(parts);

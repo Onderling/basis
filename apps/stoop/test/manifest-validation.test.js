@@ -151,9 +151,11 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // three picture roads became one.
   // This number is a snapshot on purpose: adding an op to the waist should be a deliberate act
   // that someone updates a count for, not something that slips in unremarked.
-  // 2026-09-24: 97 — `setContactPersona`, what a contact sees of you, changed on the thread (L125).
-  it('ships the full chat+slash surface (one stoop manifest, 97 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(97);
+  // 2026-09-24: 97 — `setContactPersona`, what a contact sees of you, changed on the thread.
+  // 2026-09-26: 96 — `broadcastCirclePolicy` retired: the circle's policy rides the governance lane as a signed
+  // admin statement, caught up by joiners (the broadcast fired only on a settings save and never reached them).
+  it('ships the full chat+slash surface (one stoop manifest, 96 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(96);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

@@ -5194,6 +5194,10 @@
       "text": "Gedeeld ✓",
       "doc": "personas#2 — de openbaarmaking is bij de circle-ledenlijst aangekomen."
     },
+    "shared_without_picture": {
+      "text": "Gedeeld — behalve je foto: deze kring kan nog geen foto's dragen.",
+      "doc": "A share that went out WITHOUT the picture: the circle has no seal strategy for its media (a pod-less circle, until that arc lands), so the re-seal left the picture out. Said instead of the plain shared line, which claimed it had gone."
+    },
     "share_failed": {
       "text": "Delen mislukt: {{reason}}",
       "doc": "personas#2 — de deel-actie is mislukt (bijv. beheerder offline)."
@@ -5579,6 +5583,10 @@
     "stop_sharing": {
       "text": "Stoppen met delen in deze kring",
       "doc": "mij#personas — the action on a circle where nothing is disclosed any more but the circle still holds what was shared before: pushes the empty release, which the lane carries as a clear."
+    },
+    "picture_not_here": {
+      "text": "deze kring kan nog geen foto's dragen",
+      "doc": "Mij, beside the picture for a circle with no seal strategy for its media (a pod-less circle, until that arc lands): not offered there, and why — a share would leave it out."
     },
     "stopped_sharing": {
       "text": "Gestopt ✓",

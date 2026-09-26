@@ -18,6 +18,7 @@
 
 import { DRIVER_KINDS } from '@onderling/agent-registry';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { shareOutcome } from '../../src/v2/shareOutcome.js';
 
 function section(titleText) {
   const el = document.createElement('section');
@@ -283,9 +284,8 @@ export function renderAboutMe(container, {
         let res;
         try { res = await onShareToCircle(c.circleId); }
         catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
-        status.textContent = res?.ok
-          ? (sharingNothing ? tr('circle.mij.stopped_sharing') : tr('circle.aboutme.shared_ok'))
-          : tr('circle.aboutme.share_failed', { reason: res?.reason ?? '' });
+        const said = shareOutcome(res, { stopping: sharingNothing });
+        status.textContent = tr(said.key, said.params);
         shareBtn.disabled = false;
       });
       card.append(shareBtn, status);

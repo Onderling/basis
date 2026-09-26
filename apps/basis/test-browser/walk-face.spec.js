@@ -12,6 +12,9 @@
  *                 in Mij's table and the contact lens's levels release no picture. Marked `test.fail`, so it turns
  *                 red the day the road exists and the mark comes off.
  *
+ * TODAY (the third test, passing): a picture disclosed to such a circle says on its Mij row that it cannot go there,
+ * and a share says it went without the picture — the honest line until the arc lands (then that test fails on purpose).
+ *
  * BOTH HALVES ARE MARKED `test.fail` TODAY. The circle half stops at "the release landed": in a circle with no pod
  * (`pod: 'none'`, the default policy) the shell has no seal strategy for the circle (`getCircleSealStrategy` comes
  * from `ensureCirclePod`'s control agent), so there is no media composition, the re-seal returns null, the picture
@@ -180,6 +183,37 @@ test('to a contact: the face shown to a contact is drawn on their Contacten row'
     await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(1500);
     const icon = A.page.locator(`.cc-contacts__row[data-contact-id="${bId}"] .cc-contacts__icon`).first();
     await expect.poll(() => slotState(icon), { timeout: 60_000, message: 'the Contacten row draws B\'s face' }).toBe('img');
+  } finally {
+    await teardown([A, B].filter(Boolean));
+  }
+});
+
+test('today, in a circle that cannot carry a picture: its Mij row says so, and a share says it left it out', async ({ browser }) => {
+  // The honest line while a pod-less circle cannot seal media (Fable's ruling on L140: the arc comes after the testers).
+  // When that arc lands this test FAILS — the picture will travel — and it is rewritten with the halves above.
+  test.setTimeout(420_000);
+  let A = null; let B = null;
+  try {
+    A = await bootPeer(browser, 'A'); B = await bootPeer(browser, 'B');
+    const p = await pair(A, B, { name: 'Eerlijk', re: /eerlijk/i, handle: 'bea' });
+    expect(p.joined, `B joined: ${p.outcome}`).toBe(true);
+    for (const peer of [A, B]) peer.page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    const circle = (await circleIds(B.page)).find((id) => !/^pair-|^cc-help$/.test(String(id)));
+    await setPicture(B.page);
+    await call(B.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: circle, key: 'profilePicture', enabled: true });
+
+    // the row for the disclosed picture says it cannot go here
+    await openPersonaPanel(B.page);
+    const note = B.page.locator(`.cc-mij__table tr[data-circle-id="${circle}"][data-key="profilePicture"] .cc-mij__not-here`).first();
+    await expect(note, 'the picture row says why').toHaveText(/geen foto's dragen|cannot carry pictures/i, { timeout: 20_000 });
+    await closePanel(B.page);
+    log('STEP1 the row says why', 'PASS', '');
+
+    // shared anyway: the status says it went WITHOUT the picture — not "Gedeeld ✓"
+    const s = await pressShareFor(B.page, circle);
+    expect(s.pressed, s.why ?? '').toBe(true);
+    expect(s.status, 'the share says what it left out').toMatch(/behalve je foto|except your picture/i);
+    log('STEP2 the share is honest', 'PASS', s.status);
   } finally {
     await teardown([A, B].filter(Boolean));
   }

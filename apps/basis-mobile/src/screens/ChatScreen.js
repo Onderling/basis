@@ -703,6 +703,8 @@ export default function ChatScreen({
         const govRail = bundle?.agent?.circleIdentityFor
           ? makeGovernanceRail({ eventLog: eventLogRef.current, circleIdentityFor: bundle.agent.circleIdentityFor, myRef: '', callSkill: bundle.callSkill })
           : null;
+        // the policy lane folds with this rail — a save brings the lane's head up to date before it counts past it
+        if (govRail) circlePolicyLane?.useRail(govRail);
         // Any governance change (the live fan, or a catch-up batch) may carry a rules-update statement —
         // fold it into the local rules head; the pre-scan is cheap and no-ops for vote churn.
         const govChanged = (cid) => {

@@ -26,6 +26,7 @@ import { VaultMemory } from '@onderling/vault';
 import { deviceDelegationsOf } from '@onderling/agent-registry';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, sendCircleChat, until, teardown } from './support/pairRealAgents.js';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const CIRCLE = 'thuis-box-used-dir';
@@ -47,7 +48,7 @@ function run(args, { env, stdin = null }) {
 function cardFrom(out) {
   const m = out.match(/onderling-contact:\/\/([A-Za-z0-9_-]+)/);
   if (!m) return null;
-  try { return JSON.parse(Buffer.from(m[1], 'base64').toString('utf8')); } catch { return null; }
+  return decodeCardBody(m[1]);
 }
 
 const stop = async (proc) => {

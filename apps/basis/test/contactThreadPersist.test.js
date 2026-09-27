@@ -12,6 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
+import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
 
 /** A minimal itemStore stub matching wireChat's `{ addItems, listOpen }` surface. */
 function memItemStore() {
@@ -415,7 +416,7 @@ describe('the first message carries my card, and a card that arrives names the s
   // a message carried no name: whoever wrote to you was a row named by its key on every device but the one that
   // scanned their card. Now: while no pair roster exists with the peer (the first exchange), the turn carries the
   // sender's card inside the seal; the receiver hands it to `onCard` only when it names the sender.
-  const encode = (obj) => 'onderling-contact://' + Buffer.from(JSON.stringify(obj)).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  const encode = (obj) => 'onderling-contact://' + encodeContactCard(obj);
   const MY_CARD = encode({ webid: 'me', displayName: 'Anna', peerAddr: 'me' });
   it('rides the FIRST message to a contact each session — the introduction; a changed name does not re-send it (the roster carries that)', async () => {
     // Frits 2026-09-21: "aren't card updates fanned out anyway?" — a name changed under Mij is a `member-props`

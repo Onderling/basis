@@ -20,8 +20,10 @@ import QRCode from 'react-native-qrcode-svg';
  * @param {number} [args.size=240]     side length in DIPs
  * @param {string} [args.backgroundColor='#fff']
  * @param {string} [args.color='']
+ * @param {'L'|'M'|'Q'|'H'} [args.ecl='M']  error-correction level — L leaves the most room per module (a long payload on a screen)
+ * @param {number} [args.quietZone]        the white border in DIPs; absent → the frame's padding alone
  */
-export function QrCodeView({ value, size = 240, backgroundColor = '#fff', color = '#000' }) {
+export function QrCodeView({ value, size = 240, backgroundColor = '#fff', color = '#000', ecl = 'M', quietZone = undefined }) {
   if (typeof value !== 'string' || value.length === 0) return null;
   return (
     <View style={[styles.frame, { backgroundColor, padding: size * 0.04 }]}>
@@ -30,6 +32,8 @@ export function QrCodeView({ value, size = 240, backgroundColor = '#fff', color 
         size={size}
         backgroundColor={backgroundColor}
         color={color}
+        ecl={ecl}
+        {...(quietZone != null ? { quietZone } : {})}
       />
     </View>
   );

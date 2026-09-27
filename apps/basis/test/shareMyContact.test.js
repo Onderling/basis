@@ -54,3 +54,35 @@ describe('renderShareMyContact', () => {
     expect(el.querySelector('canvas.cc-share__qr')).toBeTruthy();
   });
 });
+
+describe('the contact QR is drawn to be read by a phone camera', () => {
+  it('one set of drawing settings for both shells: level L, the standard four-module quiet zone', async () => {
+    const { CONTACT_QR } = await import('../src/v2/contactCardLink.js');
+    expect(CONTACT_QR).toMatchObject({ errorCorrectionLevel: 'L', quietZoneModules: 4 });
+  });
+
+  it('web draws with those settings, sharp on a high-density screen', async () => {
+    const toCanvas = vi.fn();
+    vi.doMock('qrcode', () => ({ default: { toCanvas } }));
+    vi.resetModules();
+    const { renderShareMyContact: render } = await import('../web/v2/shareMyContact.js');
+    Object.defineProperty(globalThis, 'devicePixelRatio', { value: 2, configurable: true });
+    render(document.createElement('div'), { payload: CARD, link: LINK, qr: LINK, t, onBack: () => {} });
+    await vi.waitFor(() => expect(toCanvas).toHaveBeenCalled());
+    const [, value, opts] = toCanvas.mock.calls[0];
+    expect(value).toBe(LINK);
+    expect(opts).toMatchObject({ errorCorrectionLevel: 'L', margin: 4 });
+    expect(opts.width).toBeGreaterThanOrEqual(2 * 280);   // drawn at the screen's pixel density
+    vi.doUnmock('qrcode');
+    vi.resetModules();
+  });
+
+  it('a tap enlarges the QR, and a second tap brings it back', () => {
+    const el = renderShareMyContact(document.createElement('div'), { payload: CARD, link: LINK, qr: LINK, t, onBack: () => {} });
+    const qr = el.querySelector('canvas.cc-share__qr');
+    qr.click();
+    expect(qr.classList.contains('cc-share__qr--large')).toBe(true);
+    qr.click();
+    expect(qr.classList.contains('cc-share__qr--large')).toBe(false);
+  });
+});

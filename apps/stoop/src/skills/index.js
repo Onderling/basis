@@ -137,6 +137,7 @@ import {
 } from '../lib/Attachments.js';
 import { update as updateInterest, score as scoreInterest, combinedRelevance } from '../lib/InterestProfile.js';
 import { matchesProfile } from '../lib/offeringsMatch.js';
+import { encodeContactCard, decodeContactCard } from '../lib/contactCard.js';
 
 /**
  * Canonical circle-admin authority check (roles-authority reconciliation).
@@ -215,9 +216,8 @@ function dataArgs(parts) {
 }
 
 /**
- * Encode an object as a base64url-encoded compact JSON string —
- * the canonical body of `onderling-invite://` and `onderling-contact://`
- * QR/URL payloads.
+ * Encode an object as a base64url-encoded compact JSON string — the body of
+ * `onderling-invite://` payloads. A contact card has its own compact codec (`lib/contactCard.js`).
  */
 function _encodeQrPayload(obj) {
   const json = JSON.stringify(obj);
@@ -228,19 +228,6 @@ function _encodeQrPayload(obj) {
     ? btoa(bin)
     : Buffer.from(bytes).toString('base64');
   return std.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
-
-/** Inverse of `_encodeQrPayload`.  Returns null on parse failure. */
-function _decodeQrPayload(b64url) {
-  if (typeof b64url !== 'string' || !b64url) return null;
-  const std = b64url.replaceAll('-', '+').replaceAll('_', '/');
-  const pad = std + '='.repeat((4 - std.length % 4) % 4);
-  try {
-    const bin = (typeof atob === 'function') ? atob(pad) : Buffer.from(pad, 'base64').toString('binary');
-    return JSON.parse(bin);
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -4578,7 +4565,7 @@ export function buildSkills({
         ...(a.personKey && typeof a.personKey === 'object' ? { personKey: a.personKey } : {}),
         ...(Array.isArray(a.personKeyLinks) && a.personKeyLinks.length ? { personKeyLinks: a.personKeyLinks } : {}),
       };
-      return { payload: `onderling-contact://${_encodeQrPayload(card)}`, ...(card.relays ? { relays: card.relays } : {}) };
+      return { payload: `onderling-contact://${encodeContactCard(card)}`, ...(card.relays ? { relays: card.relays } : {}) };
     }, {
       description: 'Canonical QR/URL payload for sharing this actor as a contact.',
       visibility:  'authenticated',
@@ -4598,7 +4585,7 @@ export function buildSkills({
         return { error: 'invalid-payload' };
       }
       if (!bundle?.contacts) return { error: 'no-contacts' };
-      const card = _decodeQrPayload(a.payload.slice('onderling-contact://'.length));
+      const card = decodeContactCard(a.payload.slice('onderling-contact://'.length));
       if (!card?.webid) return { error: 'malformed-card' };
       if (typeof console !== 'undefined') {
         console.log('[stoop/addContactFromQr] card.peerAddr=' + (card.peerAddr ? (card.peerAddr.slice(0,16)+'…') : 'NONE') + ' for webid=' + String(card.webid).slice(0, 32));

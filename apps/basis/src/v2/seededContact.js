@@ -20,19 +20,12 @@
  * Pure — no DOM, no RN, no env read; each shell hands in its variable.
  */
 import { CONTACT_CARD_PREFIX } from './addBot.js';
+import { decodeContactCard } from './contactCardLink.js';
 
 /** The card's webid, or null when the payload is not a readable contact card. */
 export function seededContactWebid(payload) {
   if (typeof payload !== 'string' || !payload.startsWith(CONTACT_CARD_PREFIX)) return null;
-  const b64url = payload.slice(CONTACT_CARD_PREFIX.length);
-  if (!b64url) return null;
-  const std = b64url.replaceAll('-', '+').replaceAll('_', '/');
-  const pad = std + '='.repeat((4 - (std.length % 4)) % 4);
-  try {
-    const bin = (typeof atob === 'function') ? atob(pad) : Buffer.from(pad, 'base64').toString('binary');
-    const card = JSON.parse(bin);
-    return (card && typeof card.webid === 'string' && card.webid) ? card.webid : null;
-  } catch { return null; }
+  return decodeContactCard(payload.trim())?.webid ?? null;
 }
 
 /**

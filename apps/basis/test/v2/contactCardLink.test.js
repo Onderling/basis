@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { contactCardLink, contactCardFromLink, loadShareMyContact, decodeContactCard, cardNamesSender, CONTACT_LINK_PARAM } from '../../src/v2/contactCardLink.js';
+import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
 
 const CARD = 'onderling-contact://eyJ3ZWJpZCI6Ind4In0';
 
@@ -54,7 +55,7 @@ describe('loadShareMyContact — what the panel shows, for both shells', () => {
 });
 
 describe('a card that rides a message is taken only when it names the sender (2026-09-21)', () => {
-  const encode = (obj) => 'onderling-contact://' + Buffer.from(JSON.stringify(obj)).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  const encode = (obj) => 'onderling-contact://' + encodeContactCard(obj);
   const bea = encode({ webid: 'bea-webid', pubKey: 'bea-device-key', displayName: 'Bea', peerAddr: 'bea-webid', relays: ['wss://r'] });
   it('decodes the card, and refuses junk', () => {
     expect(decodeContactCard(bea)).toMatchObject({ webid: 'bea-webid', displayName: 'Bea' });

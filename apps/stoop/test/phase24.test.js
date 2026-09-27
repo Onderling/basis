@@ -10,6 +10,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighbourhoodAgent } from '../src/index.js';
+import { decodeContactCard } from '../src/lib/contactCard.js';
 
 const ANNE = 'https://id.example/anne';
 const BOB  = 'https://id.example/bob';
@@ -235,7 +236,7 @@ describe('Stoop V2 Phase 24 — QR contact-share', () => {
     await callSkill(srcBundle.agent, 'setMyHandle', { handle: 'anne-handle' });
 
     const r = await callSkill(srcBundle.agent, 'getContactShareQr', { trustOffer: 'vertrouwd', peerAddr: 'peer-anne' });
-    const card = JSON.parse(Buffer.from(r.payload.slice('onderling-contact://'.length), 'base64url').toString());
+    const card = decodeContactCard(r.payload.slice('onderling-contact://'.length));
     const add = await callSkill(dst.bundle.agent, 'addContactFromQr', { payload: r.payload }, 'https://id.example/dst3');
 
     // `trustOffer` is the card's name for what the contact stores as `trustLevel`; every other field keeps its name.

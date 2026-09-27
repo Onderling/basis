@@ -12,6 +12,16 @@
 
 export const CONTACT_SCHEME = 'onderling-contact://';
 export const CONTACT_LINK_PARAM = 'contact';
+
+/**
+ * How the contact QR is DRAWN, one answer for both shells (their QR libraries differ; the settings do not). A card
+ * link is several hundred characters, so the code is dense and a phone camera is the test it must pass
+ * (Frits 2026-09-26: a friend's camera could not read it). Level L gives the most room per module, since a screen
+ * is not a torn label; the quiet zone is the four modules the QR standard asks for (the panel drew one, and
+ * cameras look for the white border to find the code); `size` is the resting side in CSS px / DIPs, and a tap
+ * enlarges it.
+ */
+export const CONTACT_QR = Object.freeze({ errorCorrectionLevel: 'L', quietZoneModules: 4, size: 280 });
 const B64URL = /^[A-Za-z0-9_-]+$/;
 
 /**

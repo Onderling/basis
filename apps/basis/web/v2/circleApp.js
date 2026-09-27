@@ -195,7 +195,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { makeCirclePolicyLane, makePolicyHeadStore } from '../../src/v2/policyUpdateLane.js';
+import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
@@ -1067,8 +1067,7 @@ const circlePolicyLane = makeCirclePolicyLane({
     circleMediaCompositions.delete(cid);
     return r;
   },
-  adminsOf: async (cid) => new Set((((await rawCallSkill?.('stoop', 'listGroupMembers', { groupId: cid })) ?? {}).members ?? [])
-    .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
+  adminsOf: adminsOfViaSkill((...a) => rawCallSkill?.(...a)),
 });
 // α.1c — per-circle recipe book store (multi-recipe per circle, one active).
 // localStorage now; pod io can swap in later without touching callers.

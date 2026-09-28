@@ -52,7 +52,7 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -60,8 +60,11 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
 
   const open = allowedChatIds === '*' || !Array.isArray(allowedChatIds) || allowedChatIds.length === 0;
   const allowed = new Set(open ? [] : allowedChatIds.map(String));
-  /** chatId → a pending follow-up (single/multi field) or a pending confirmation. */
-  const pending = new Map();
+  /** threadId → a pending follow-up (single/multi field) or a pending confirmation — on the thread's row when the
+   *  door keeps its threads (it survives a restart), else for this process. */
+  const pending = threads
+    ? { get: (id) => threads.pendingOf(id), set: (id, v) => threads.setPending(id, v), delete: (id) => threads.setPending(id, null) }
+    : new Map();
 
   /** The turn under way (one per chat at a time) — the walk log's record in the making. */
   const turns = new Map();
@@ -176,7 +179,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
         const p = single ?? beginFormFollowUp({ dispatch: r, t });
         if (!p) return say(chatId, t('circle.telegram.unknown'));
         if (p.kind === 'multi') p.values = {};
-        pending.set(chatId, { kind: 'form', p });
+        pending.set(threadId, { kind: 'form', p });
         const fields = p.kind === 'single' ? p.missingParam : p.fields.map((f) => f.name).join(', ');
         // An enum field asks with BUTTONS: the declared values, named the way people say them.
         const op = catalogue.opsById?.get?.(r.opId)?.op;
@@ -186,7 +189,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
         return say(chatId, `${t('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`, buttons);
       }
       case 'needsConfirm': {
-        pending.set(chatId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
+        pending.set(threadId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
         return say(chatId, t('circle.telegram.confirm', { message: r.message ?? '' }), [
           { id: CONFIRM_YES, label: t('circle.telegram.confirm_yes') },
           { id: CONFIRM_NO,  label: t('circle.telegram.confirm_no') },
@@ -208,6 +211,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   // the turn before it; quick free-text lines are gathered into one turn by the engine's collect window.
   const engine = engineIn ?? createAssistantEngine({
     catalogue, lang, llm, interpret, loadItems, botName,
+    ...(threads ? { memory: threads.memory } : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
@@ -220,13 +224,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
 
   /** Does this shell take the line itself? Asked when the line's turn comes, so an ask the turn before made counts. */
   function claims(chatId, threadId, text) {
-    const pend = pending.get(chatId);
+    const pend = pending.get(threadId);
     if (pend && (pend.kind === 'form' || text === CONFIRM_YES || text === CONFIRM_NO)) return true;
     return text.startsWith('/') || Boolean(tapToParse(text, threadId));
   }
   /** A line this shell takes: the answer to its pending ask, else a command or a tap. */
   async function doorLine(chatId, threadId, text) {
-    if (await continuePending(chatId, text)) return { via: 'door' };
+    if (await continuePending(chatId, threadId, text)) return { via: 'door' };
     await route(chatId, threadId, text);
     return { via: 'door' };
   }
@@ -260,17 +264,17 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   /** Continue a pending follow-up or confirmation with this line; false when nothing was pending. */
-  async function continuePending(chatId, text) {
-    const pend = pending.get(chatId);
+  async function continuePending(chatId, threadId, text) {
+    const pend = pending.get(threadId);
     if (!pend) return false;
     if (pend.kind === 'confirm') {
       if (text !== CONFIRM_YES && text !== CONFIRM_NO) return false;   // something else — leave the confirm standing
-      pending.delete(chatId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
+      pending.delete(threadId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
       if (text === CONFIRM_YES) await run(chatId, pend.ready);
       return true;
     }
-    if (text.startsWith('/')) { pending.delete(chatId); return false; }   // a new command cancels the ask
-    pending.delete(chatId); note(chatId, { via: 'form' });
+    if (text.startsWith('/')) { pending.delete(threadId); return false; }   // a new command cancels the ask
+    pending.delete(threadId); note(chatId, { via: 'form' });
     // The answer is typed the way people say it ("boodschappen"): an enum field takes its declared value.
     if (pend.p.kind === 'single') { await run(chatId, coerceEnums(completeFollowUp({ pending: pend.p, text }))); return true; }
     // multi: one field per line, in order
@@ -278,7 +282,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const next = p.fields[Object.keys(p.values).length];
     p.values[next.name] = text;
     if (Object.keys(p.values).length < p.fields.length) {
-      pending.set(chatId, pend);
+      pending.set(threadId, pend);
       await say(chatId, p.fields[Object.keys(p.values).length].label);
       return true;
     }
@@ -300,7 +304,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       } catch { caller = null; }
       if (!caller) { await say(chatId, t('circle.telegram.unknown')); return; }
     }
-    await engine.ask(threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
+    // The thread is the PERSON's when the door admits people (their contact id), so what one said is never another's
+    // memory, in a group chat too; without admission, the chat's.
+    await engine.ask(caller ?? threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
   }
 
   // The bridge is let go as soon as the line is in its lane: a long-polling bridge fetches the next updates only when
@@ -316,6 +322,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     /** test seam: the memory lines for a thread. */
     recentTurns: (threadId) => engine.recentTurns(threadId),
     /** test seam: is a follow-up or confirmation pending for this chat? */
-    pendingFor: (chatId) => pending.get(String(chatId))?.kind ?? null,
+    /** test seam: is a follow-up or confirmation pending — for a thread id, or a chat's own thread? */
+    pendingFor: (id) => (pending.get(String(id)) ?? pending.get(threadFor(String(id))))?.kind ?? null,
   };
 }

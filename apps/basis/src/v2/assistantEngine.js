@@ -58,6 +58,8 @@ const DEFAULT_THREAD = '__default__';
  * @param {Function} [a.embed]             the older bare `embed(texts)` form
  * @param {object} [a.vectorStore] @param {number} [a.minScore] @param {string} [a.retrieverScope]
  * @param {() => string[]} [a.recentTurns] the door's own memory getter (rows on screen); absent → `remember()` memory
+ * @param {{remember:(threadId:string, who:string, text:string) => void, recent:(threadId:string) => string[]}} [a.memory]
+ *        where `remember()` keeps turns and what a thread reads back (a door's durable threads); absent → this process
  * @param {string} [a.botName='assistant']
  * @param {number} [a.memoryTurns]
  * @param {Function} [a.postToCircle]      the chat sink for a line that is not for the bot (circle doors)
@@ -73,7 +75,7 @@ const DEFAULT_THREAD = '__default__';
 export function createAssistantEngine({
   catalogue, dispatch, lang = 'nl', llm = null, llmProviders = null, policy, userDefault, interpret = null,
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
-  recentTurns: recentTurnsIn = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
+  recentTurns: recentTurnsIn = null, memory: memoryIn = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
   collectMs = COLLECT_MS, claim = null, around = null,
 } = {}) {
@@ -99,19 +101,13 @@ export function createAssistantEngine({
     : undefined;
   const gate = gateIn ?? createTokenGate({ rules: circleGateRules(lang), ...(retrieve ? { retrieve } : {}) });
 
-  /** threadId → the last turns, oldest → newest, as self-describing lines. */
-  const memory = new Map();
-  const linesFor = (threadId) => memory.get(threadId) ?? [];
-  function remember(threadId, who, text) {
-    const t = String(text ?? '').trim();
-    if (!threadId || !t) return;
-    const lines = memory.get(threadId) ?? [];
-    // Three voices: you · assistant (the model's own words) · system (an op's result). Keeping the
-    // op results apart stops the model imitating "✓ added …" instead of calling the tool.
-    lines.push(`${who === 'assistant' ? 'assistant' : who === 'system' ? 'system' : 'you'}: ${t}`);
-    while (lines.length > memoryTurns) lines.shift();
-    memory.set(threadId, lines);
-  }
+  // Three voices: you · assistant (the model's own words) · system (an op's result). Keeping the op results apart
+  // stops the model imitating "✓ added …" instead of calling the tool.
+  const memory = memoryIn && typeof memoryIn.remember === 'function' && typeof memoryIn.recent === 'function'
+    ? memoryIn
+    : processMemory(memoryTurns);
+  const linesFor = (threadId) => memory.recent(threadId) ?? [];
+  const remember = (threadId, who, text) => memory.remember(threadId, who, text);
 
   /** One engine per thread — its `recentTurns` is bound to that thread (the door's getter, or the memory). */
   const engines = new Map();
@@ -184,6 +180,25 @@ export function createAssistantEngine({
     idle: (threadId) => lanes.idle(threadId === undefined ? undefined : (threadId ?? DEFAULT_THREAD)),
     /** Retrieval on its own (tests, diagnostics). */
     retrieve: retrieve ? (text, ctx = {}) => retrieve(text, ctx) : null,
+  };
+}
+
+/**
+ * Memory that lasts as long as the process: threadId → the last turns, oldest → newest, as self-describing lines.
+ * @param {number} memoryTurns
+ */
+function processMemory(memoryTurns) {
+  const lines = new Map();
+  return {
+    remember(threadId, who, text) {
+      const t = String(text ?? '').trim();
+      if (!threadId || !t) return;
+      const own = lines.get(threadId) ?? [];
+      own.push(`${who === 'assistant' ? 'assistant' : who === 'system' ? 'system' : 'you'}: ${t}`);
+      while (own.length > memoryTurns) own.shift();
+      lines.set(threadId, own);
+    },
+    recent: (threadId) => lines.get(threadId) ?? [],
   };
 }
 

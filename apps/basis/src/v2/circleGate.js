@@ -89,6 +89,24 @@ export function householdListType(word) {
   const w = String(word ?? '').trim().toLowerCase().replace(/(?:lijstje|lijst|list)$/, '');
   return HH_LIST_ALIASES[w] ?? HH_LIST_ALIASES[String(word ?? '').trim().toLowerCase()] ?? null;
 }
+/**
+ * A command's enum args named the way people say them ("boodschappen") → the declared value ("shopping"), for the ops
+ * whose enum is a household list type. Anything the op does not declare, or that is already a declared value, stays.
+ * @param {{opId: string, args?: object}} cmd
+ * @param {{opsById?: Map<string, {op?: object}>}} catalogue
+ */
+export function coerceListArgs(cmd, catalogue) {
+  const op = catalogue?.opsById?.get?.(cmd.opId)?.op;
+  const args = { ...(cmd.args ?? {}) };
+  for (const p of (op?.params ?? [])) {
+    if (p?.kind !== 'enum' || !Array.isArray(p.of)) continue;
+    const v = args[p.name];
+    if (typeof v !== 'string' || p.of.includes(v)) continue;
+    const alt = householdListType(v);
+    if (alt && p.of.includes(alt)) args[p.name] = alt;
+  }
+  return { ...cmd, args };
+}
 // "<item> is gekocht/gedaan/klaar/af" · "<item> is bought/done" — a statement, not a command.
 const HH_STATED_DONE = /^(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:is|zijn|are)\s+(?:al\s+|already\s+)?(gekocht|gehaald|gedaan|klaar|af|binnen|bought|done|finished)[.!]?$/i;
 function householdStatedDone(text) {

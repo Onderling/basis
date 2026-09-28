@@ -45,7 +45,6 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { VaultNodeFs } from '@onderling/vault';
-import { buildHouseholdDataSource } from '@onderling-app/household';
 
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { initLocalisation, t } from '../src/localisation.js';
@@ -58,7 +57,8 @@ import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js
 import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 
 import { EventLog } from '../src/eventLog.js';
-import { wireEventLogPersistence, fileSnapshotIo, fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
+import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
+import { boxStores } from '../src/v2/boxStorage.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
@@ -123,16 +123,16 @@ const contentPaths = {
   tasks:     path.join(dataDir, 'tasks-items.json'),
   settings:  path.join(dataDir, 'settings.json'),
   outbox:    path.join(dataDir, 'outbox.json'),
-  deviceLog: path.join(dataDir, 'device-log.json'),
-  contactDm: path.join(dataDir, 'contact-dm.json'),
 };
-// The device log is the record every lane rides, so it is hydrated from disk BEFORE the agent boots:
-// a device that forgets its log on restart would re-admit a connection its owner revoked, and would
-// come back to its circles as if it had never been in them.
+// The stores that are not item stores — the device log, the contact DM state, the circle policy — sealed at rest
+// like the item stores, composed once in `boxStores` (the at-rest test uses the same function).
+const stores = boxStores(dataDir);
+contentPaths.deviceLog = stores.paths.deviceLog;
+contentPaths.contactDm = stores.paths.contactDm;
+// The device log is the record every lane rides: a device that forgets it on restart would re-admit a connection
+// its owner revoked, and would come back to its circles as if it had never been in them. It is SEALED, so the agent
+// hydrates it (`deviceLogIo`) the moment its content key exists and before anything appends — as on web.
 const deviceLog = new EventLog({ initial: [], muted: [] });
-const { hydrated } = await wireEventLogPersistence({
-  eventLog: deviceLog, io: fileSnapshotIo(contentPaths.deviceLog),
-});
 
 // Where an add-a-device offer waits between the enrol ceremony and the next start — the node shape of
 // what the shells keep in plain storage. Public data (the offer grants nothing without the phrase).
@@ -147,7 +147,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 {
   const boxPathFor = {
     'cc-agent-registry': contentPaths.registry,
-    'cc-device-log': contentPaths.deviceLog,
+    'cc-device-log': [contentPaths.deviceLog, path.join(dataDir, 'device-log.json')],   // + the plain file a box kept before
     'cc-contact-dm-state': contentPaths.contactDm,
     'cc-outbox-state': contentPaths.outbox,
     'cc-outbox-cache': contentPaths.outbox,
@@ -166,7 +166,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
         dropStore: (name) => {
           const p = boxPathFor[name];
           if (!p) return;                                  // a store only the painting shells have
-          rmSync(p, { recursive: true, force: true });      // a throw here counts as a refusal: the note stays
+          for (const one of [].concat(p)) rmSync(one, { recursive: true, force: true });   // a throw counts as a refusal: the note stays
         },
         dropKey: () => {},                                  // no flat key-value store: settings are a file
       },
@@ -191,6 +191,7 @@ const agent = await createRealHouseholdAgent({
   settingsPersistDb:  { path: contentPaths.settings },
   outboxPersistDb:    { path: contentPaths.outbox },
   deviceLog,
+  deviceLogIo: stores.deviceLogIo,
   // The lists' default table (and basis's) speak through this translator: a reply to Telegram is a sentence,
   // not a locale key.
   t,
@@ -309,7 +310,7 @@ let pairRoster = null;         // the pair roster for contacts (L105) — compos
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
   // constructor both shells use; only the backing differs, which is the whole of what a shell decides.
-  const dmSource = await buildHouseholdDataSource({ path: contentPaths.contactDm }).catch(() => null);
+  const dmSource = await stores.contactDmSource().catch(() => null);
   // THE PAIR ROSTER (L105), composed as both shells compose it: the hidden two-member circle every written-to
   // contact gets, made on the first exchange from the circle mechanics — the redeem sender, the admitting side's
   // hook, the post-join reachability. The box did not speak it until 2026-09-19: a visitor's second message rode
@@ -379,7 +380,7 @@ if (relayUrl) {
   // THE CIRCLE'S POLICY, folded here like on every shell (web ≡ mobile ≡ box). Nothing on this device reads the
   // posture today — but this is the always-on member a joiner catches up from, and after the governance lane's audit
   // window only a device that kept the winning statement can hand it over. So the box folds it and serves the head.
-  const circlePolicyKv = fileKeyValueStorage(path.join(dataDir, 'circle-policy.json'));
+  const circlePolicyKv = stores.circlePolicyKv;
   const circlePolicyStore = createCirclePolicyStore(localStoragePolicyIo(circlePolicyKv));
   const circlePolicyLane = makeCirclePolicyLane({
     emitter: () => agent.emitPolicyUpdate ?? null,
@@ -668,7 +669,7 @@ if (tgToken) {
 const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null);
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
-console.log(`  log       ${hydrated} entr${hydrated === 1 ? 'y' : 'ies'} restored from disk`);
+console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
 if (card?.payload) {

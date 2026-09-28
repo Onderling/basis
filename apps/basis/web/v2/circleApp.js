@@ -92,6 +92,7 @@ import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
 import { createCircleCacheMedium } from '../../src/v2/circleCacheMedium.js';
 import { addressesBot } from '../../src/v2/circleDispatch.js';
 import { createAssistantEngine, assistantReplyText } from '../../src/v2/assistantEngine.js';
+import { followUpClaim } from '../../src/v2/assistantFollowUp.js';
 // Conversation memory — recent circle turns woven into the bot's interpret context.
 import { recentCircleTurns } from '../../src/v2/circleMemory.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
@@ -111,7 +112,7 @@ import {
   drilldownForSection, selectionContextFor, fetchScreenItems, itemsFromReply, recordFromReply,
 } from '../../src/v2/screenDrilldown.js';
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
-import { beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
+import { beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
@@ -2750,6 +2751,17 @@ function buildCircleBot(agent) {
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { _circleRender?.botBubble(t('circle.bot.basic_mode')); },
     botName: CIRCLE_BOT_NAME,
+    // No collect window here: in a circle composer a person types one line on purpose, and a wait on every bot reply
+    // would read as a slow app. The lane still takes the circle's lines one turn at a time.
+    collectMs: 0,
+    // The pending ask ("which list?") is answered in the lane, so a line typed while the turn that asks is still
+    // running answers it, instead of going to the circle or to the model as a new request.
+    claim: followUpClaim({
+      pending: () => circlePendingFollowUp,
+      clear: () => { circlePendingFollowUp = null; },
+      dispatchReady: (cmd) => circleDispatchReady?.(cmd),
+      catalogue: () => catalogue,
+    }),
   });
 
   // Task #13 Phase 2 (#38) — bind the help layer-2 executor to the SAME consent-gated circle LLM route the
@@ -6977,23 +6989,14 @@ function showCircle(id, circle, policy) {
             : t('circle.share.empty'));
           return;
         }
-        // Conversational follow-up: the bot previously asked for a missing field (needsForm → beginFollowUp);
-        // THIS message is the answer. Append it, complete the pending dispatch, and run it — don't
-        // re-interpret it as a new command.
-        if (circlePendingFollowUp) {
-          const pending = circlePendingFollowUp;
-          circlePendingFollowUp = null;
-          const fMsgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
-          eventLog.append(circleChatMessageEvent({ msgId: fMsgId, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text: line }));
-          rerender();
-          const ready = completeFollowUp({ pending, text: line });
-          if (circleDispatchReady) await circleDispatchReady({ opId: ready.opId, args: ready.args });
-          return;
-        }
+        // An answer to the bot's pending ask ("which list?") is not handled here: it goes to the bot below like any line,
+        // and the assistant's lane hands it to the ask (`followUpClaim`) when its turn comes — also when the turn that
+        // asks was still running as it was typed. So nothing else may take the line first while an ask is pending.
+        const answering = circlePendingFollowUp != null;
         // Conversational follow-up: the bot just asked a free-text question. Route THIS line back to it —
         // force-addressed so it's interpreted (the prior Q&A threaded as `history`) — instead of fanning
         // out to the circle. So "which list?" → "shopping" continues the conversation, no @assistant needed.
-        if (circleAwaitingBotReply && !line.startsWith('/')) {
+        if (!answering && circleAwaitingBotReply && !line.startsWith('/')) {
           const prev = circleAwaitingBotReply;
           circleAwaitingBotReply = null;
           const aMsgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
@@ -7022,7 +7025,7 @@ function showCircle(id, circle, policy) {
         // answer from the deterministic kaartjes engine BEFORE the command bot / fan-out. A miss offers
         // the consent-gated LLM (when one is connected) or the honest set topics.
         const helpBot = (circleMembers || []).find((m) => m && (m.relation === 'agent' || m.isBot === true));
-        if (helpBot && botIsAddressed({ text: line, circleMembers: circleMembers, selfWebid: myWebid || null, botMember: helpBot })) {
+        if (!answering && helpBot && botIsAddressed({ text: line, circleMembers: circleMembers, selfWebid: myWebid || null, botMember: helpBot })) {
           // Strip the @-tag from a GROUP mention before matching; a 1:1 line (no tag) is passed verbatim
           // so a question like "ben jij een bot?" isn't gutted by the tag-stripper's bare-"bot" rule.
           const solo = oneToOneBotLabel({ members: circleMembers, selfWebid: myWebid || null, fallbackLabel: 'bot' }) != null;

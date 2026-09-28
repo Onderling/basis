@@ -15,7 +15,7 @@ describe('createAssistantEngine', () => {
     const seen = [];
     const interpret = async (text, { history }) => { seen.push({ text, history }); return { opId: 'listOpen', args: {} }; };
     const dispatched = [];
-    const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), llm, interpret });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: (i) => dispatched.push(i), llm, interpret });
     e.remember('a', 'you', 'welke lijst?');
     e.remember('a', 'assistant', 'Welke lijst bedoel je — boodschappen of klusjes?');
     await e.ask('a', 'boodschappen');
@@ -29,7 +29,7 @@ describe('createAssistantEngine', () => {
     expect(dispatched).toHaveLength(2);
   });
   it('three voices: you, assistant, system — an op result is never the assistant speaking', () => {
-    const e = createAssistantEngine({ catalogue, dispatch: () => {} });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {} });
     e.remember('t', 'you', 'zet kaas op de lijst');
     e.remember('t', 'system', '✓ added to shopping: kaas');
     e.remember('t', 'assistant', 'Nog iets?');
@@ -37,7 +37,7 @@ describe('createAssistantEngine', () => {
   });
 
   it('memory is bounded to the last N turns', () => {
-    const e = createAssistantEngine({ catalogue, dispatch: () => {}, memoryTurns: 3 });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {}, memoryTurns: 3 });
     for (let i = 0; i < 5; i += 1) e.remember('t', 'you', `turn ${i}`);
     expect(e.recentTurns('t')).toEqual(['you: turn 2', 'you: turn 3', 'you: turn 4']);
   });
@@ -45,7 +45,7 @@ describe('createAssistantEngine', () => {
     const seen = [];
     const interpret = async (text, { context }) => { seen.push(context); return null; };
     const loadItems = async () => [{ id: '1', type: 'shopping', text: 'melk' }, { id: '2', type: 'shopping', text: 'kaas' }, { id: '3', type: 'task', text: 'stofzuigen' }];
-    const e = createAssistantEngine({ catalogue, dispatch: () => {}, llm, interpret, loadItems, onNoMatch: () => {} });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {}, llm, interpret, loadItems, onNoMatch: () => {} });
     // lexical retrieval matches on the item's words (a full question is the embedder's job — semantic tier)
     await e.ask('t', 'melk');
     const lines = (seen[0] ?? []).map((c) => (c?.entry ?? c)?.text ?? c);
@@ -54,7 +54,7 @@ describe('createAssistantEngine', () => {
   it('without a model the gate still routes a verb and free text reports llm-unavailable', async () => {
     const dispatched = [];
     const unavailable = [];
-    const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), lang: 'en', onLlmUnavailable: () => unavailable.push(1) });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: (i) => dispatched.push(i), lang: 'en', onLlmUnavailable: () => unavailable.push(1) });
     expect(e.smart).toBe(false);
     const r = await e.ask('t', 'what is the weather');
     expect(r.via).toBe('llm-unavailable');
@@ -64,7 +64,7 @@ describe('createAssistantEngine', () => {
     const posted = [];
     const interpret = async () => ({ opId: 'listOpen', args: {} });
     const dispatched = [];
-    const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), llm, interpret, postToCircle: (text) => posted.push(text) });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: (i) => dispatched.push(i), llm, interpret, postToCircle: (text) => posted.push(text) });
     const r1 = await e.handle('ik koop straks melk', { id: 'c1' });
     expect(r1.via).toBe('circle');
     expect(posted).toEqual(['ik koop straks melk']);
@@ -75,7 +75,7 @@ describe('createAssistantEngine', () => {
   it('the circle composers\' form: a policy getter, a user default and two providers, plus their own recentTurns', async () => {
     const seen = [];
     const interpret = async (text, { history }) => { seen.push(history); return null; };
-    const e = createAssistantEngine({
+    const e = createAssistantEngine({ collectMs: 0,
       catalogue, dispatch: () => {}, interpret, onNoMatch: () => {},
       policy: async () => ({ llmTool: 'user' }), userDefault: () => ({ mode: 'cloud' }),
       llmProviders: { cloud: { invoke: async () => null } },
@@ -90,7 +90,7 @@ describe('createAssistantEngine', () => {
     // The phrasings are part of the stable instruction; the reply language rides as this turn's hint (below the
     // prompt's turn marker, where the interpreter places it).
     const interpret = async (text, o) => { seen.push(o); return null; };
-    const e = createAssistantEngine({ catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {} });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {} });
     await e.ask('t', 'kun je nog wat melk toevoegen');
     expect(seen[0].system).toContain("Reply in the member's language; when you cannot tell, in Dutch.");
     expect(seen[0].hints).toContain('The member wrote in: nl.');
@@ -102,7 +102,7 @@ describe('createAssistantEngine', () => {
   it('three items named → three dispatches in one turn (the interpreter\'s `more`)', async () => {
     const dispatched = [];
     const interpret = async () => ({ opId: 'addItem', args: { type: 'shopping', text: 'a' }, more: [{ opId: 'addItem', args: { type: 'shopping', text: 'b' } }, { opId: 'addItem', args: { type: 'shopping', text: 'c' } }] });
-    const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), llm, interpret });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: (i) => dispatched.push(i), llm, interpret });
     await e.ask('t', 'a, b en c');
     expect(dispatched.map((d) => d.args.text)).toEqual(['a', 'b', 'c']);
   });

@@ -49,6 +49,19 @@ describe('searchable-sources guard', () => {
     expect(r.stderr).toMatch(/control byte 0x00 at line 1/);
   });
 
+  it('goes RED on a byte past the first 8 KB — where git\'s binary check stops looking but ugrep does not', () => {
+    // `git grep -I` decides "binary" from the first ~8000 bytes; other search tools read further and skip the
+    // file. A NUL on line 160 of a 44 KB file was invisible to them and green here (2026-09-29).
+    const filler = Array.from({ length: 400 }, (_, i) => `export const line${i} = ${i};`).join('\n');
+    writeFileSync(PROBE, `${filler}\nconst SEP = '${String.fromCharCode(0)}';\nexport default SEP;\n`);
+    git(`add -f ${PROBE_REL}`);
+
+    const r = run();
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain(PROBE_REL);
+    expect(r.stderr).toMatch(/control byte 0x00 at line 401/);
+  });
+
   it('is green again once the byte is written as an escape — the identical string', () => {
     writeFileSync(PROBE, "const SEP = '\\u0000';\nexport default SEP;\n");
     git(`add -f ${PROBE_REL}`);

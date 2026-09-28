@@ -170,7 +170,7 @@ async function addTaskCore(circle, a, ctx) {
   // (createTaskStore.addItems → detectCycle over the open set, throwing the
   // same `DEPENDENCY_CYCLE` code). The consumer-side re-check was removed in
   // the step-2 migration (2026-07-18) — the substrate owns the guard.
-  const [task] = await circle.itemStore.addItems([partial], { actor: ctx.from, actorDisplayName: ctx.actorDisplayName });
+  const [task] = await circle.itemStore.addItems([partial], byCaller(ctx));
 
   // Phase 52.7 — warn-only canonical-shape validation. Adoption is
   // observational at first: the substrate flags drift but never blocks
@@ -214,6 +214,18 @@ async function claimTaskCore(circle, a, ctx) {
 }
 
 /**
+ * The ctx a lifecycle verb gets: the key with authority, and — when the host vouched for someone — the person,
+ * whom the item records as the one who did it (`completedBy`, a review entry's `by`). The gate reads the key.
+ */
+function byCaller(ctx) {
+  return {
+    actor: ctx.from,
+    actorDisplayName: ctx.actorDisplayName,
+    ...(ctx.onBehalfOf ? { onBehalfOf: ctx.onBehalfOf } : {}),
+  };
+}
+
+/**
  * completeTask({id})
  */
 async function completeTaskCore(circle, a, ctx) {
@@ -221,7 +233,7 @@ async function completeTaskCore(circle, a, ctx) {
   try {
     const [completed] = await circle.itemStore.markComplete(
       [{ id: a.id }],
-      { actor: ctx.from, actorDisplayName: ctx.actorDisplayName },
+      byCaller(ctx),
     );
     // Phase 52.9.3 — fan-out the completion.
     if (completed) {
@@ -256,7 +268,7 @@ async function removeTaskCore(circle, a, ctx) {
   const localItem = (await circle.itemStore.listOpen()).find((i) => i.id === a.id)
                  ?? (await circle.itemStore.listClosed()).find((i) => i.id === a.id);
   const originalId = localItem?.source?.syncedFromId ?? a.id;
-  const [id] = await circle.itemStore.removeItems([{ id: a.id }], { actor: ctx.from, actorDisplayName: ctx.actorDisplayName });
+  const [id] = await circle.itemStore.removeItems([{ id: a.id }], byCaller(ctx));
   // Phase 52.9.3 — fan-out the removal.
   circle?.tasksMirror?.publishTaskRemoved?.(originalId).catch(() => {});
   // cancelling/removing a task is a task-end too: revoke its grants so no
@@ -375,7 +387,7 @@ async function submitTaskCore(circle, a, ctx) {
   const updated = await circle.itemStore.submit(a.id, {
     ...(a.deliverable !== undefined ? { deliverable: a.deliverable } : {}),
     ...(a.note        !== undefined ? { note:        a.note        } : {}),
-  }, { actor: ctx.from, actorDisplayName: ctx.actorDisplayName });
+  }, byCaller(ctx));
   // Phase 52.9.3 — fan-out the submission.
   if (updated) circle?.tasksMirror?.publishTask?.(updated).catch(() => {});
   return { task: updated };
@@ -390,7 +402,7 @@ async function approveTaskCore(circle, a, ctx) {
   try {
     const updated = await circle.itemStore.approve(a.id, {
       ...(a.note !== undefined ? { note: a.note } : {}),
-    }, { actor: ctx.from, actorDisplayName: ctx.actorDisplayName });
+    }, byCaller(ctx));
     // Phase 52.9.3 — fan-out the approval.
     if (updated) circle?.tasksMirror?.publishTask?.(updated).catch(() => {});
     return { task: updated };
@@ -408,7 +420,7 @@ async function approveTaskCore(circle, a, ctx) {
  */
 async function rejectTaskCore(circle, a, ctx) {
   if (!circle) return { error: 'circleId required' };
-  const updated = await circle.itemStore.reject(a.id, { note: a.note }, { actor: ctx.from, actorDisplayName: ctx.actorDisplayName });
+  const updated = await circle.itemStore.reject(a.id, { note: a.note }, byCaller(ctx));
   // Phase 52.9.3 — fan-out the rejection.
   if (updated) circle?.tasksMirror?.publishTask?.(updated).catch(() => {});
   return { task: updated };
@@ -421,7 +433,7 @@ async function rejectTaskCore(circle, a, ctx) {
  */
 async function revokeTaskCore(circle, a, ctx) {
   if (!circle) return { error: 'circleId required' };
-  const updated = await circle.itemStore.revoke(a.id, { reason: a.reason }, { actor: ctx.from, actorDisplayName: ctx.actorDisplayName });
+  const updated = await circle.itemStore.revoke(a.id, { reason: a.reason }, byCaller(ctx));
   // Phase 52.9.3 — fan-out the revocation.
   if (updated) circle?.tasksMirror?.publishTask?.(updated).catch(() => {});
   return { task: updated, previousAssignee: a.previousAssignee };

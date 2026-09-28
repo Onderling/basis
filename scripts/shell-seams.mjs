@@ -35,6 +35,12 @@ export const SEAMS = Object.freeze([
   { id: 'circle-policy-lane-folds',  pattern: /circlePolicyLane\??\.apply\(/,     why: 'the policy is applied where governance changes land — a shell that never folds it keeps the default posture' },
   { id: 'circle-policy-lane-serves', pattern: /circlePolicyLane\??\.preserved\(/, why: 'the winning statement is served at catch-up after the audit window — a later joiner converges from any peer' },
   { id: 'assistant-reply-line',  pattern: /assistantReplyText\(/,               why: 'the line a door speaks when the assistant did not act or was cut short ("en verder?") — one answer for every door' },
+  // The assistant takes a thread's lines one turn at a time. A line the door answers itself (its pending ask, a
+  // confirmation, a command) is claimed in that lane, so a line typed while the turn that asks is running answers it.
+  { id: 'assistant-lane-claims-the-ask', pattern: /\bclaim:\s/,              why: 'an answer typed during the turn that asks is the answer — not a new request, not a chat line for the circle' },
+  // The collect window is for a chat app (the box's Telegram door, where quick lines arrive as separate messages).
+  // A circle composer passes 0: a person types one line on purpose there, and a wait on every reply reads as slow.
+  { id: 'circle-composer-does-not-collect', pattern: /collectMs:\s*0\b/,   shells: ['web', 'mobile'], why: 'a circle composer does not wait for more lines before the bot answers' },
   { id: 'contact-channel',       pattern: /createContactThreadChannel\(/,        why: 'direct messages: durable threads, the person seal, the own-devices carry' },
   // A ROW is a view: only the shells that paint Contacten compose it. The box stores the thread and carries it; the
   // row appears on each painting device when the carried turn lands there. Scoped on purpose, and said here so

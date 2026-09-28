@@ -87,7 +87,7 @@ import {
   // Composer parity — the classic shell's slash-command suggest, shared so mobile renders the same set.
   // Conversational follow-up for needsForm (shared) — ask for a missing field, next message answers.
   // beginFormFollowUp/completeMultiFieldFollowUp drive the 2+-field inline form (parity with web).
-  beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp,
+  beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp,
   // Shared one-line bot reply (verb-aware Added:/Completed:) + Part D catalogue scoping (drops /me etc.).
   circleReplyText, scopeCatalogueToApps,
   // B (circle bot) — dispatch primitives to run an interpreted command in the circle.
@@ -130,6 +130,7 @@ import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import MultiFieldFormBubble from '../../rn/MultiFieldFormBubble.js';   // 2+-field inline form (parity with web)
 import { addressesBot, stripBotTag } from '../../../../basis/src/v2/circleDispatch.js';
 import { createAssistantEngine, assistantReplyText } from '../../../../basis/src/v2/assistantEngine.js';
+import { followUpClaim } from '../../../../basis/src/v2/assistantFollowUp.js';
 import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
@@ -2775,7 +2776,8 @@ function CircleDetail({
     mediaWired: !!circleMedia,
   }), [manifestsByOrigin, circleAvailability, circleMedia]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
-  const [pendingFollowUp, setPendingFollowUp] = useState(null);
+  // A ref, not state: the assistant's lane reads it when a line's turn comes (`followUpClaim`), after the turn before it.
+  const pendingFollowUpRef = useRef(null);
   const [pendingForm, setPendingForm] = useState(null);   // 2+-field needsForm → inline form (parity with web)
   // The bot asked a free-text QUESTION (an llm-reply containing '?') — route the user's NEXT line straight
   // back to it (no '@assistant' needed) so the conversation continues. We stash {question, query} so the
@@ -3154,7 +3156,7 @@ function CircleDetail({
       // Conversational elicitation (parity with web): single missing field → ask in the circle + capture
       // the user's next message (sendCircleChat's pending branch); 2+ missing fields → an inline form bubble.
       const pending = beginFollowUp({ dispatch, t });
-      if (pending) { setPendingFollowUp(pending); appendCircleMessage({ actor: 'bot', text: pending.promptText }); return; }
+      if (pending) { pendingFollowUpRef.current = pending; appendCircleMessage({ actor: 'bot', text: pending.promptText }); return; }
       const form = beginFormFollowUp({ dispatch, t });
       if (form) { setPendingForm(form); return; }   // renderer draws MultiFieldFormBubble
       appendCircleMessage({ actor: 'bot', text: t('circle.bot.needsInfo') });   // no missing param names
@@ -3620,7 +3622,18 @@ function CircleDetail({
     onNoMatch: (_text, _ctx, opts) => { appendCircleMessage({ actor: 'bot', text: assistantReplyText(opts, t, 'circle.bot.unknown') }); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { appendCircleMessage({ actor: 'bot', text: t('circle.bot.basic_mode') }); },
-  }), [catalogue, clarify, circle?.id, resolveSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk]);
+    // No collect window here (web parity): in a circle composer a person types one line on purpose, and a wait on
+    // every bot reply would read as a slow app. The lane still takes the circle's lines one turn at a time.
+    collectMs: 0,
+    // The pending ask ("which list?") is answered in the lane, so a line typed while the turn that asks is still
+    // running answers it, instead of going to the circle or to the model as a new request.
+    claim: followUpClaim({
+      pending: () => pendingFollowUpRef.current,
+      clear: () => { pendingFollowUpRef.current = null; },
+      dispatchReady: (cmd) => runCircleCommandResolved(cmd),
+      catalogue,
+    }),
+  }), [catalogue, clarify, circle?.id, resolveSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk, runCircleCommandResolved]);
 
   // ── Task #13 — onboarding-as-bot-chat + standing help Q&A (thin twin of web circleApp.js) ──────────
   // The confidential-route-aware help LLM binding (parity with web's circleHelpLlm): ready() reflects
@@ -3840,20 +3853,14 @@ function CircleDetail({
       return;
     }
     setComposerText('');
-    // Conversational follow-up: the bot asked for a missing field (needsForm); THIS message is the answer.
-    // Append it, complete the pending dispatch, and run it — don't re-interpret it.
-    if (pendingFollowUp) {
-      const pending = pendingFollowUp;
-      setPendingFollowUp(null);
-      appendCircleMessage({ actor: 'me', text });
-      const ready = completeFollowUp({ pending, text });
-      await runCircleCommandResolved({ opId: ready.opId, args: ready.args });
-      return;
-    }
+    // An answer to the bot's pending ask ("which list?") is not handled here: it goes to the bot below like any line,
+    // and the assistant's lane hands it to the ask (`followUpClaim`) when its turn comes — also when the turn that
+    // asks was still running as it was typed. So nothing else may take the line first while an ask is pending.
+    const answering = pendingFollowUpRef.current != null;
     // Conversational follow-up: the bot just asked a free-text question (llm-reply '?'). Route THIS line
     // back to it — force-addressed so handle() interprets it (recent turns give it the context) — instead
     // of broadcasting it to the circle. So "which list?" → "shopping" continues the conversation, no tag.
-    if (awaitingBotReply && !text.startsWith('/')) {
+    if (!answering && awaitingBotReply && !text.startsWith('/')) {
       const prev = awaitingBotReply;
       setAwaitingBotReply(null);
       const appended = appendCircleMessage({ actor: 'me', text });
@@ -3875,7 +3882,7 @@ function CircleDetail({
     // (when one is connected) or the honest set topics. Uses the #37 route-conditional wording (shared).
     const members = circleMembersRef.current;
     const helpBot = (members || []).find((m) => m && (m.relation === 'agent' || m.isBot === true));
-    if (helpBot && botIsAddressed({ text, circleMembers: members, selfWebid: myWebidRef.current || null, botMember: helpBot })) {
+    if (!answering && helpBot && botIsAddressed({ text, circleMembers: members, selfWebid: myWebidRef.current || null, botMember: helpBot })) {
       // Strip the @-tag from a GROUP mention before matching; a 1:1 line (no tag) is passed verbatim.
       const solo = oneToOneBotLabel({ members, selfWebid: myWebidRef.current || null, fallbackLabel: 'bot' }) != null;
       const q = solo ? text : stripBotTag(text, helpBot.name ?? helpBot.displayName ?? helpBot.label ?? '');
@@ -3894,7 +3901,7 @@ function CircleDetail({
       // so a newly-created task appears there without a manual reload.
       if (activeTab === 'tasks') setTasksReloadTick((n) => n + 1);
     }).catch(() => {});
-  }, [composerText, eventLog, circle?.id, appendCircleMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, composerCommands, t]);
+  }, [composerText, eventLog, circle?.id, appendCircleMessage, circleBot, awaitingBotReply, noteBotTurn, manifestsByOrigin, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, composerCommands, t]);
 
   // δ.2 — tap-to-retry on the failed icon.  Looks up the original
   // text from the eventLog so we don't have to remember it elsewhere.

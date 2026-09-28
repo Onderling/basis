@@ -141,7 +141,10 @@ Two declarations say how far an app reaches. They are checked by the guard `scri
   `writes` on it; when one does declare it, the value is checked. The key is `writes`, not `scope` — `scope`
   already means who a setting or param applies to.
 - **`hosts: string[]` at the top level** — every network host the app's own code reaches (`[]` for none). An
-  endpoint the person configures — their pod, their relay — is not a fixed host and is not listed.
+  endpoint the person configures — their pod, their relay — is not a fixed host and is not listed. **A
+  declaration, not a check:** the guard verifies that the array is there, not that it is complete — a new
+  `fetch` to an undeclared host fails nothing. It binds where the realm host starts an extension with
+  `--allow-net` set from it; until then, and for code in the main bundle, it is a convention kept by review.
 
 Nothing at runtime reads either declaration yet; the extension contract (`docs/extending.md`) is where they
 will bind.

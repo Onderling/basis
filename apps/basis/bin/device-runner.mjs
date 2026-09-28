@@ -661,7 +661,11 @@ if (tgToken) {
   const apps = doorCatalogue.apps();
   // The model is the optional half of this optional half: a key without its SDK is a warning and a
   // Telegram that answers without a model, never a device that is not there.
-  const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
+  const built = await buildAssistantLlm({
+    model: process.env.PRIVATEMODE_MODEL,
+    // One retry on the fallback model after a timeout — said in the walk log, so a slow route is visible.
+    onFallback: (e) => walkLog({ kind: 'llm-fallback', ...e }),
+  });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
   const tgBridge = new TelegramBridge({ botToken: tgToken, mode: 'long-polling' });

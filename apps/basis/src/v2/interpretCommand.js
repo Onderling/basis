@@ -64,7 +64,7 @@ const KIND_TO_JSON_TYPE = { string: 'string', number: 'number', integer: 'intege
  * @param {{opsById?: Map<string, {op: object, appOrigin?: string}>}} catalogue
  * @returns {Array<{id:string, description:string, schema:object}>}
  */
-export function buildToolDescriptors(catalogue) {
+export function buildToolDescriptors(catalogue, { lang = null, hintFor = null } = {}) {
   const tools = [];
   const opsById = catalogue && catalogue.opsById;
   if (!opsById || typeof opsById.forEach !== 'function') return tools;
@@ -89,9 +89,15 @@ export function buildToolDescriptors(catalogue) {
       properties[p.name] = prop;
       if (p.required) required.push(p.name);
     }
+    const english = (op.surfaces && op.surfaces.chat && op.surfaces.chat.hint) || op.verb || op.id || String(key);
+    // The member's language first, the other in brackets: a Dutch thread reads "<nl> (<en>)", an English one the
+    // reverse. The English stays in both — it is what the prompt's rules speak.
+    const appOrigin = entry && entry.appOrigin;
+    const other = lang && typeof hintFor === 'function' && appOrigin ? hintFor(appOrigin, op.id, lang === 'en' ? 'nl' : lang) : null;
+    const description = !other ? english : lang === 'en' ? `${english} (${other})` : `${other} (${english})`;
     tools.push({
       id: String(key),
-      description: (op.surfaces && op.surfaces.chat && op.surfaces.chat.hint) || op.verb || op.id || String(key),
+      description,
       schema: { type: 'object', properties, ...(required.length ? { required } : {}) },
     });
   }
@@ -108,15 +114,16 @@ export function buildToolDescriptors(catalogue) {
  *        `system` = the STABLE instruction (rules + phrasing hints); `hints` = this turn's lines (the language),
  *        placed below the turn marker with the retrieved items and the date.
  *        `context` = RAG items (e.g. from the token gate's `retrieve`) woven into the system prompt.
+ *        `toolLang` / `hintFor` = the language the tools are described in first, and the lookup for it (`chatHints.js`).
  *        `history` = prior conversation turns threaded as real messages — so a clarifying follow-up
  *        ("which list?" → "shopping") resolves against what the bot just asked, not a stateless guess.
  * @returns {Promise<{opId:string, args:object, more?:Array<{opId:string,args:object}>}|{reply:string}|null>}
  *   `more` carries the SECOND and later tool calls of the same turn (a member naming three items).
  */
-export async function interpretToCommand(text, { catalogue, llm, system, hints, options, context, history, now } = {}) {
+export async function interpretToCommand(text, { catalogue, llm, system, hints, options, context, history, now, toolLang = null, hintFor = null } = {}) {
   const q = String(text ?? '').trim();
   if (!q || !llm || typeof llm.invoke !== 'function') return null;
-  const tools = buildToolDescriptors(catalogue);
+  const tools = buildToolDescriptors(catalogue, { lang: toolLang, hintFor });
   if (tools.length === 0) return null;                       // nothing dispatchable → never call the LLM
 
   const priorMsgs = Array.isArray(history)

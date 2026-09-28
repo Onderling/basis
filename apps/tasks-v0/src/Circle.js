@@ -297,6 +297,9 @@ export async function createCircleAgent({
   // BotAgentRegistry: the host turns each revoke into a grants-lane statement.
   onTaskGrantsRevoked,
   onBotTokenRevoked,
+  // The HOST of this engine — the one invoking key allowed to name an `actor` (skills/actor.js).
+  // Absent ⇒ the agent's own key.
+  hostKey,
 } = {}) {
   const circle = _normaliseConfig(circleConfig ?? { ...IMPLICIT_HOUSEHOLD_CONFIG });
 
@@ -377,6 +380,7 @@ export async function createCircleAgent({
     // One-store-per-circle — pass the host's store through when supplied.
     circleStore:  injectedCircleStore,
     onTaskGrantsRevoked,
+    hostKey,
     // Multi-circle runtime — when a shared agent is supplied (the CLI's
     // multi-circle path), each circle bundle MUST use its own item-store
     // root so writes don't leak across circles on the same localStore.

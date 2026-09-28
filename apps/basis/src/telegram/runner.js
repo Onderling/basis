@@ -132,12 +132,18 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   /** An enum arg named the way people say it ("boodschappen") → the declared value ("shopping"). */
   const coerceEnums = (ready) => coerceListArgs(ready, catalogue);
 
-  /** A button tap arrives as its callbackData `opId:itemId` — dispatch it like `/command item`. */
+  /**
+   * A button tap arrives as its callbackData `opId:itemId` — dispatch it like `/command item`. Only an op OFFERED as a
+   * button (`surfaces.ui.control === 'button'`, what the reply buttons are built from) can be tapped: the text of a tap
+   * is typeable, and an op with no surface — the owner's recovery phrase, device enrolment — is on the manifest for the
+   * host to call, never for a chat. Anything else falls through to the normal paths, which offer only what they offer.
+   */
   function tapToParse(text, threadId) {
     const m = /^([A-Za-z][\w-]*):(.*)$/.exec(text);
     if (!m) return null;
     const op = catalogue.opsById?.get?.(m[1]);
     if (!op) return null;
+    if ((op.op ?? op)?.surfaces?.ui?.control !== 'button') return null;
     return { kind: 'slash', opId: m[1], args: m[2] ? { _match: m[2] } : {}, threadId };
   }
 

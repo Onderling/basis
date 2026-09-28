@@ -157,7 +157,7 @@ export function claimState(item) {
  * @param {{taskId?:string, confirmedAssignee?:string, confirmedAt?:number, claimSeq?:number}} facts
  */
 export function claimConfirmationStatement({ taskId, confirmedAssignee, confirmedAt, claimSeq } = {}) {
-  return ['claim-confirmed', taskId ?? '', confirmedAssignee ?? '', confirmedAt ?? '', claimSeq ?? ''].join(' ');
+  return ['claim-confirmed', taskId ?? '', confirmedAssignee ?? '', confirmedAt ?? '', claimSeq ?? ''].join('\u0000');
 }
 
 /**
@@ -218,6 +218,29 @@ async function assertDepsClosed(store, item) {
   }
 }
 
+/**
+ * The person a verb records: `ctx.onBehalfOf` when the authority acts for someone, else the authority
+ * itself. A present-but-empty or non-string `onBehalfOf` is a caller bug, refused rather than ignored.
+ * The gate and the write's `by` keep reading the authority; only what the item SAYS about who did it
+ * (the claimant, `completedBy`, a review entry's `by`) reads the person.
+ */
+function personOf(ctx, actor, verb) {
+  if (ctx.onBehalfOf === undefined || ctx.onBehalfOf === null) return actor;
+  if (typeof ctx.onBehalfOf !== 'string' || ctx.onBehalfOf.length === 0) {
+    throw new TypeError(`${verb}: ctx.onBehalfOf must be a non-empty string when given`);
+  }
+  return ctx.onBehalfOf;
+}
+
+/** Who completed it, as the item records it: the person, and the display name only when it is theirs. */
+function completedByOf(ctx, actor) {
+  const person = personOf(ctx, actor, 'complete');
+  return {
+    completedBy: person,
+    ...(ctx.actorDisplayName && person === actor ? { completedByDisplayName: ctx.actorDisplayName } : {}),
+  };
+}
+
 // ── Lifecycle verbs ──────────────────────────────────────────────────────────
 
 /**
@@ -234,12 +257,18 @@ async function assertDepsClosed(store, item) {
  *
  * @param {import('./CircleItemStore.js').CircleItemStore} store
  * @param {string} id
- * @param {object} ctx  see module doc (`actor` required; `rolePolicy`,
+ * ON BEHALF OF someone: `ctx.onBehalfOf` names the person the claim is for when the key with authority
+ * (`ctx.actor`) acts for them — a host serving several people through one key. The GATE reads `ctx.actor`;
+ * the co-owner set, the "already a co-owner" test and the confirmed claimant read the person. Who may vouch
+ * is the caller's rule, not this layer's.
+ *
+ * @param {object} ctx  see module doc (`actor` required; `onBehalfOf`, `rolePolicy`,
  *   `expectedEtag`, `emit` optional).
  * @returns {Promise<object | {error:'already-claimed', current: object|null}>}
  */
 export async function claim(store, id, ctx = {}) {
   const actor = requireActor(ctx);
+  const claimant = personOf(ctx, actor, 'claim');
   const current = await store.get(id);
   if (!current) throw new ItemNotFoundError(id);
   if (current.completedAt) {
@@ -251,13 +280,13 @@ export async function claim(store, id, ctx = {}) {
   const expired = isClaimExpired(current, at);
   // Already a co-owner, OR the set is full (default maxAssignees:1 ⇒ full after the first claim = today's
   // EXCLUSIVE first-come) → ItemStore's already-claimed — UNLESS the current claim has expired.
-  if (!expired && (roster.includes(actor) || roster.length >= maxAssigneesOf(current))) {
+  if (!expired && (roster.includes(claimant) || roster.length >= maxAssigneesOf(current))) {
     return { error: 'already-claimed', current };
   }
   gate(ctx.rolePolicy, 'canClaim', actor, current);
 
   // A fresh claim over an EXPIRED one drops the lapsed roster + its (now void) confirmation; otherwise CAS-ADD.
-  const assignees = expired ? [actor] : [...roster, actor];
+  const assignees = expired ? [claimant] : [...roster, claimant];
   const updated = {
     ...current, assignees, assignee: assignees[0], claimedAt: at,
     claimSeq: (current.claimSeq ?? 0) + 1,     // advance the claim's monotonic sequence (immutable-once-set)
@@ -274,12 +303,12 @@ export async function claim(store, id, ctx = {}) {
   // confirmation is void, so the superseding claim re-confirms per the mode.
   const autoConfirm = confirmationModeOf(current) !== 'explicit' && (expired || current.confirmedAssignee == null);
   if (autoConfirm) {
-    updated.confirmedAssignee = actor;
+    updated.confirmedAssignee = claimant;
     updated.confirmedAt = at;
     updated.confirmedBy = current.master ?? current.addedBy ?? actor;   // the pre-delegating authority
     if (typeof ctx.sign === 'function') {
       updated.confirmedSig = ctx.sign(claimConfirmationStatement({
-        taskId: id, confirmedAssignee: actor, confirmedAt: at, claimSeq: updated.claimSeq,
+        taskId: id, confirmedAssignee: claimant, confirmedAt: at, claimSeq: updated.claimSeq,
       }));
     }
   }
@@ -469,8 +498,7 @@ export async function markComplete(store, refs, ctx = {}) {
     const updated = {
       ...item,
       completedAt: at,
-      completedBy: actor,
-      ...(ctx.actorDisplayName ? { completedByDisplayName: ctx.actorDisplayName } : {}),
+      ...completedByOf(ctx, actor),
     };
     const res = await store.put(updated, { by: actor });
     completed.push(res);
@@ -499,7 +527,7 @@ export async function submit(store, id, args, ctx = {}) {
   gate(ctx.rolePolicy, 'canSubmit', actor, current);
 
   const at = Date.now();
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'submit', note: args?.note });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'submit'), decision: 'submit', note: args?.note });
   const deliverable = args?.deliverable ? { ...args.deliverable, submittedAt: at } : current.deliverable;
   const updated = {
     ...current,
@@ -537,13 +565,12 @@ export async function approve(store, id, args, ctx = {}) {
   }
 
   const at = Date.now();
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'approve', note: args?.note });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'approve'), decision: 'approve', note: args?.note });
   const updated = {
     ...current,
     reviewLog,
     completedAt: at,
-    completedBy: actor,
-    ...(ctx.actorDisplayName ? { completedByDisplayName: ctx.actorDisplayName } : {}),
+    ...completedByOf(ctx, actor),
   };
   const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
   if (res && res.error === 'conflict') return res;
@@ -574,7 +601,7 @@ export async function reject(store, id, args, ctx = {}) {
   gate(ctx.rolePolicy, 'canReject', actor, current);
 
   const at = Date.now();
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'reject', note: args.note });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'reject'), decision: 'reject', note: args.note });
   const res = await store.put({ ...current, reviewLog }, { by: actor });
   emit(ctx, 'item-rejected', res);
   return res;
@@ -611,7 +638,7 @@ export async function revoke(store, id, args, ctx = {}) {
   const at = Date.now();
   const roster = assigneesOf(current);
   const target = args?.assignee ?? args?.target ?? null;
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'revoke', note: args.reason });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'revoke'), decision: 'revoke', note: args.reason });
   // Revoke is an AUTHORITATIVE transition — advance the claim sequence so it supersedes a stale claim on a peer.
   const updated = { ...current, reviewLog, claimSeq: (current.claimSeq ?? 0) + 1 };
   let previousAssignee;

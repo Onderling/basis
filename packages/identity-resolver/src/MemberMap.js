@@ -367,6 +367,10 @@ export class MemberMap extends Emitter {
         : null,
       externalIds: m.externalIds ? { ...m.externalIds } : {},
       role:        m.role ?? null,
+      // channel: the door a keyless contact came in by (`telegram` · `web` · `whatsapp` — the closed set is the contact
+      //   type's `CHANNELS` in `@onderling/item-types`, checked where the contact is admitted). A person a hosting bot
+      //   admitted has this and no key. Same whitelist lesson as `peerAddr`: named here or dropped.
+      channel:     (typeof m.channel === 'string' && m.channel) ? m.channel : null,
     };
   }
 }

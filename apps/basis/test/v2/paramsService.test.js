@@ -51,8 +51,9 @@ describe('the set-param op — the kind gate (decision D)', () => {
     const { params } = await svc.callSkill('list-user-params');
     // The kind:user params basis governs today (the history-mirror switch + the instant-restore
     // recency window joined with the personal history store — all flipped through this same gate).
+    // `assistant.apps`: which apps a non-circle door's assistant (the box's Telegram chat) may act in.
     expect(params.map((p) => p.key).sort()).toEqual([
-      'app.lang', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
+      'app.lang', 'assistant.apps', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
       'history.restore.maxPerCircle', 'history.restore.recencyDays',
       'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
       'privacy.shareNknAddress', 'relay.url', 'surface.pref',

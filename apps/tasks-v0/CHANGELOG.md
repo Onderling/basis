@@ -10,6 +10,7 @@
   through the door that admitted them, with the household nudges and digests). They are skipped, and no longer
   written into the host device's own inbox, where they read as the owner's. Notices to keyed members are
   unchanged.
+
 ## [Unreleased] — 2026-09-29 — `actor` on complete and review: who did it is the person
 
 - With a host-vouched `actor`, `completeTask` and `approveTask` record the actor as `completedBy` (the host's

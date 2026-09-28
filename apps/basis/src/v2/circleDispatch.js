@@ -14,6 +14,7 @@
 
 import { resolveCircleLlm } from './llmPicker.js';
 import { scopeCatalogueToApps } from './circleCatalogueScope.js';
+import { splitRecentTurns } from './circleMemory.js';
 
 /**
  * @param {object} a
@@ -84,17 +85,19 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
 
         // The turn needs free-text UNDERSTANDING → the LLM, but only if smart chat is available.
         if (llm) {
-          // Conversation memory — prepend the recent circle turns so follow-ups ("en schoenen ook",
-          // "that one") resolve against what was just said. interpret weaves them into the prompt.
-          const turns = typeof recentTurns === 'function' ? (recentTurns() || []) : [];
-          if (turns.length) context = [...turns, ...(Array.isArray(context) ? context : [])];
+          // Conversation memory, so follow-ups ("en schoenen ook", "that one") resolve against what was just said:
+          // the member's and the assistant's turns as messages, an op's result as a context line.
+          const remembered = splitRecentTurns(typeof recentTurns === 'function' ? (recentTurns() || []) : []);
+          if (remembered.context.length) context = [...remembered.context, ...(Array.isArray(context) ? context : [])];
           // Part D — scope the LLM's tool list to the circle's apps. Gate/dispatch unaffected.
           const scopedCatalogue = scopeCatalogueToApps(getCatalogue(), circlePolicy?.apps);
           let cmd = null;
           try {
             // `ctx.history` carries a follow-up's prior turns (the bot's question + the original ask) so a
             // bare answer ("shopping") resolves against what was just asked. interpret threads it as messages.
-            cmd = await interpret(stripped, { catalogue: scopedCatalogue, llm, context, history: Array.isArray(ctx?.history) ? ctx.history : undefined });   // → {opId,args}|{reply}|null
+            // A follow-up's own history (the bot's question + the ask) wins: it already carries those turns.
+            const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
+            cmd = await interpret(stripped, { catalogue: scopedCatalogue, llm, context, history });   // → {opId,args,partial?}|{reply}|{partial}|null
           } catch (err) {
             // Smart chat is configured but the endpoint is UNREACHABLE (server down). Reply in plain
             // words ("basic mode") rather than failing the turn — buttons + commands still work.
@@ -110,13 +113,16 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             for (const m of (Array.isArray(cmd.more) ? cmd.more : [])) {
               if (m && m.opId) await dispatch({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} }, ctx);
             }
+            // The turn was cut (the per-turn cap, or a call the output cut off): ask the member for the rest.
+            if (cmd.partial && typeof onNoMatch === 'function') await onNoMatch(stripped, ctx, { partial: true });
             return { via: 'llm', cmd };
           }
           // The LLM ran but mapped the message to NO tool. If it spoke a conversational reply (a clarifying
           // question / answer), SHOW that — the bot can converse — rather than a dead-end. Otherwise the
           // shell falls back to its generic "couldn't turn that into an action" via onNoMatch.
           const reply = cmd && typeof cmd.reply === 'string' && cmd.reply ? cmd.reply : null;
-          if (typeof onNoMatch === 'function') { await onNoMatch(stripped, ctx, reply ? { reply } : undefined); return reply ? { via: 'llm-reply', reply } : { via: 'llm-nomatch' }; }
+          const partial = !reply && cmd?.partial === true;   // every call was cut off: ask for it again
+          if (typeof onNoMatch === 'function') { await onNoMatch(stripped, ctx, reply ? { reply } : partial ? { partial: true } : undefined); return reply ? { via: 'llm-reply', reply } : { via: 'llm-nomatch' }; }
           // couldn't map it to a command → fall through to the sink.
         } else {
           // Smart chat is OFF (not configured / circle opted out). The bot was addressed with free text the

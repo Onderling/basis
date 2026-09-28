@@ -93,7 +93,7 @@ import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
 import { createCircleCacheMedium } from '../../src/v2/circleCacheMedium.js';
 import { addressesBot } from '../../src/v2/circleDispatch.js';
-import { createAssistantEngine } from '../../src/v2/assistantEngine.js';
+import { createAssistantEngine, assistantReplyText } from '../../src/v2/assistantEngine.js';
 // Conversation memory — recent circle turns woven into the bot's interpret context.
 import { recentCircleTurns } from '../../src/v2/circleMemory.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
@@ -2766,7 +2766,7 @@ function buildCircleBot(agent) {
     // + passed its msgId in ctx) — same as mobile.
     postToCircle: (text, ctx) => { if (ctx?.msgId) _circleRender?.fanOut(ctx.msgId, text, ctx.ts); },
     // Addressed the bot, but the LLM mapped it to no tool → reply instead of going silent.
-    onNoMatch: (_text, _ctx, opts) => { _circleRender?.botBubble((opts && opts.reply) || t('circle.bot.unknown')); },
+    onNoMatch: (_text, _ctx, opts) => { _circleRender?.botBubble(assistantReplyText(opts, t, 'circle.bot.unknown')); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { _circleRender?.botBubble(t('circle.bot.basic_mode')); },
     botName: CIRCLE_BOT_NAME,

@@ -11,6 +11,9 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
  * The retrieved items' share of the prompt, in characters. Past it the list is cut and the prompt says so ("some
  * items were left out; ask to list them"), so a large circle neither floods the model nor silently hides items.
  */
+export const MAX_CALLS_PER_TURN = param({ key: 'assistant.maxCallsPerTurn', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
+
+/** The retrieved items' share of the prompt, in characters (see below). */
 export const CONTEXT_MAX_CHARS = param({ key: 'assistant.contextMaxChars', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2000 });
 
 /**
@@ -126,14 +129,18 @@ export async function interpretToCommand(text, { catalogue, llm, system, hints, 
     ...(options ? { options } : {}),
   });
 
-  const call = result && result.toolCall;
-  if (call && call.id) {
-    const rest = Array.isArray(result.toolCalls) ? result.toolCalls.slice(1).filter((c) => c && c.id) : [];
-    if (rest.length) {
-      return { opId: call.id, args: call.args && typeof call.args === 'object' ? call.args : {}, more: rest.map((c) => ({ opId: c.id, args: c.args && typeof c.args === 'object' ? c.args : {} })) };
-    }
-    return { opId: String(call.id), args: call.args && typeof call.args === 'object' ? call.args : {} };
+  // Every call the model made this turn, whole ones only, up to the per-turn cap. A call the output cut off, or one
+  // past the cap, is not acted on; `partial` tells the door to ask the member for the rest.
+  const allCalls = Array.isArray(result?.toolCalls) && result.toolCalls.length ? result.toolCalls : (result?.toolCall ? [result.toolCall] : []);
+  const named = allCalls.filter((c) => c && c.id);
+  const whole = named.filter((c) => !c.truncated);
+  const acted = whole.slice(0, MAX_CALLS_PER_TURN);
+  const partial = acted.length < named.length;
+  if (acted.length) {
+    const [first, ...rest] = acted.map((c) => ({ opId: String(c.id), args: c.args && typeof c.args === 'object' ? c.args : {} }));
+    return { ...first, ...(rest.length ? { more: rest } : {}), ...(partial ? { partial: true } : {}) };
   }
+  if (partial) return { partial: true };
   // No tool — surface the model's conversational reply (a clarifying question, a short answer) so the
   // bot can CONVERSE instead of dead-ending on "couldn't turn that into an action". `{reply}` carries
   // no opId, so dispatch treats it as a spoken reply rather than a command. null = nothing usable.

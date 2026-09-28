@@ -22,7 +22,7 @@ import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
-import { createAssistantEngine } from '../v2/assistantEngine.js';
+import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
 import { householdListType } from '../v2/circleGate.js';
 
 const CONFIRM_YES = '__confirm:yes';
@@ -207,7 +207,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
     onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
     onLlmUnavailable: (_text, ctx) => say(ctx.chatId, t('circle.telegram.unknown')),
-    onNoMatch: (_text, ctx, extra) => say(ctx.chatId, extra?.reply || t('circle.telegram.unknown')),
+    onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),
   });
 
   /** Continue a pending follow-up or confirmation with this line; false when nothing was pending. */

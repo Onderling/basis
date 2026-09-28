@@ -2,7 +2,8 @@
  * The assistant's golden set — utterances with what we accept as right. Lifted from the 2026-09-05
  * walks where marked. `expect`: `{ op, args?, count? }` (args match case-insensitively; a RegExp
  * matches), `{ reply: 'asks' | 'declines' }`, or null (must do nothing). `before`: memory lines.
- * `items`: what retrieval may see.
+ * `items`: what retrieval may see. `lines` (instead of `text`): lines sent at once, which the collect window makes one
+ * turn — one model call.
  */
 export const FIXTURES = [
   // ── the deterministic gate (no model should be needed; via=rule) ──
@@ -18,6 +19,8 @@ export const FIXTURES = [
   // ── multi-item (walk 1: only the first landed) ──
   { id: 'add-multi-nl',       text: 'Hoi, ik wil vandaag het volgende halen bij de winkel: stokbrood, braadlappen en geurkazen', expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
   { id: 'add-two-nl',         text: 'zet brood en eieren op de boodschappen', expect: { op: 'addItem', args: { type: 'shopping' } } },
+  // three quick lines, one turn (the collect window): one model call, three adds
+  { id: 'collect-three-lines-nl', lines: ['melk', 'brood', 'eieren'], expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
   { id: 'add-three-plain-nl', text: 'zet stokbrood, melk en eieren op de boodschappenlijst', expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
   // ── an untyped add ASKS which list (L90): the gate hands addItem without a type; the shell asks ──
   { id: 'gate-add-untyped-nl', text: 'voeg ook de braadlappen en geurkazen toe', expect: { op: 'addItem', args: { text: /braadlappen/ } } },

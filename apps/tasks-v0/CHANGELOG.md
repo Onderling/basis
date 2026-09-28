@@ -3,6 +3,13 @@
 > Package renamed `@onderling-app/tasks-v0` → **`@onderling-app/tasks`** (2026-07-18); the directory
 > stays `apps/tasks-v0`.
 
+## [Unreleased] — 2026-09-29 — `actor` on complete and review: who did it is the person
+
+- With a host-vouched `actor`, `completeTask` and `approveTask` record the actor as `completedBy` (the host's
+  display name is no longer stamped as `completedByDisplayName` then), and `submitTask` / `rejectTask` /
+  `approveTask` / `revokeTask` write the actor as the review log's `by`. The gate still reads the host's key;
+  the audit entry keeps the key as `actor` and adds `onBehalfOf`. Without an `actor`, nothing changes.
+
 ## [Unreleased] — 2026-09-28 — `actor`: the person a host's call is for
 
 - A host serving several people through one key may name the person a call is for in `args.actor` (a

@@ -11,9 +11,9 @@
  * Unset ⇒ no link row; the QR and the code still stand.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Share } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Share, useWindowDimensions } from 'react-native';
 import { QrCodeView } from '@onderling/react-native/qr/view';
-import { loadShareMyContact } from '../../../../basis/src/v2/contactCardLink.js';
+import { loadShareMyContact, CONTACT_QR } from '../../../../basis/src/v2/contactCardLink.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 
@@ -23,6 +23,10 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [state, setState] = useState({ loading: true, payload: null, link: null, qr: null });
+  // A tap enlarges the QR to the screen's width, for a camera across the table; a second tap brings it back.
+  const [large, setLarge] = useState(false);
+  const { width: screenW } = useWindowDimensions();
+  const qrSize = large ? Math.max(CONTACT_QR.size, Math.min(screenW - 48, 560)) : Math.min(CONTACT_QR.size, screenW - 48);
 
   useEffect(() => {
     let alive = true;
@@ -52,9 +56,10 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
         <View>
           <Text style={styles.note}>{t('circle.shareContact.hint')}</Text>
           {/* the QR is the LINK when there is one (a camera opens it), else the code — the shared loader decides */}
-          <View style={styles.qrBox} testID="share-contact-qr">
-            <QrCodeView value={state.qr ?? state.payload} size={240} />
-          </View>
+          {/* drawn with the shared contact-QR settings (level L, the standard quiet zone) — a phone camera is the test */}
+          <Pressable style={styles.qrBox} onPress={() => setLarge((v) => !v)} accessibilityRole="imagebutton" testID="share-contact-qr">
+            <QrCodeView value={state.qr ?? state.payload} size={qrSize} ecl={CONTACT_QR.errorCorrectionLevel} />
+          </Pressable>
           <Text style={styles.label}>{t('circle.shareContact.code_label')}</Text>
           <Text style={styles.value} selectable numberOfLines={3} testID="share-contact-code">{state.payload}</Text>
           {state.link ? (

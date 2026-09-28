@@ -24,6 +24,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, Image } from 'react-native';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { shareOutcome, SHARING_NOW, mediaRefusedHere } from '../../../../basis/src/v2/shareOutcome.js';
 import {
   loadMijModel, setGeneralProperty, addGeneralOffering, createPersona,
   toggleDisclosure, shareDisclosureToCircle,
@@ -60,7 +61,7 @@ function Section({ eyebrowKey, taglineKey, children }) {
   );
 }
 
-export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared = null, resealMediaForCircle = null, profilePicture = null, personaId, circles = [] }) {
+export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared = null, resealMediaForCircle = null, profilePicture = null, personaId, circles = [], canCarryMedia = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState(null);
@@ -70,7 +71,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
   const [offeringForm, setOfferingForm] = useState(null);       // {text, tags} | null — the dashed add-offering form
   const [personaForm, setPersonaForm] = useState(null);   // {name} | null — the dashed new-persona form
   const [addShareFor, setAddShareFor] = useState(null);   // circleId whose share-affordance is open
-  const [shareState, setShareState] = useState({});       // `${circleId}:${personaId}` → 'sharing' | 'ok' | reason
+  const [shareState, setShareState] = useState({});       // `${circleId}:${personaId}` → 'sharing' | the share's result
 
   const load = useCallback(async () => {
     const m = await loadMijModel({ callSkill, personaId, circles });
@@ -138,8 +139,14 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
     let res;
     try { res = await shareDisclosureToCircle({ callSkill, emitMemberProps, lastShared, resealMediaForCircle, circleId, personaId: forPersonaId }); }
     catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
-    setShareState((s) => ({ ...s, [k]: res?.ok ? 'ok' : (res?.reason ?? 'failed') }));
+    setShareState((s) => ({ ...s, [k]: res ?? { ok: false, reason: 'failed' } }));
   }, [callSkill, emitMemberProps, lastShared, resealMediaForCircle]);
+  /** What a share says it did — the one shared sentence (web parity: shareOutcome). */
+  const saidFor = (state, stopping = false) => {
+    if (state === 'sharing') return t(SHARING_NOW.key);
+    const o = shareOutcome(state, { stopping });
+    return t(o.key, o.params);
+  };
 
   // A whenField property (availability) can carry an optional free-text "when" note (the
   // descriptor's finest 'detail' rung). Compose { state, when } when a when is present; a bare
@@ -398,9 +405,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
                   </Pressable>
                   {shareState[`${circle.circleId}:stop`] ? (
                     <Text style={styles.shareStatus}>
-                      {shareState[`${circle.circleId}:stop`] === 'sharing' ? t('circle.aboutme.sharing_now')
-                        : shareState[`${circle.circleId}:stop`] === 'ok' ? t('circle.mij.stopped_sharing')
-                        : t('circle.aboutme.share_failed', { reason: shareState[`${circle.circleId}:stop`] })}
+                      {saidFor(shareState[`${circle.circleId}:stop`], true)}
                     </Text>
                   ) : null}
                 </View>
@@ -425,15 +430,16 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
                         </Pressable>
                         {shareState[sk] ? (
                           <Text style={styles.shareStatus}>
-                            {shareState[sk] === 'sharing' ? t('circle.aboutme.sharing_now')
-                              : shareState[sk] === 'ok' ? t('circle.aboutme.shared_ok')
-                              : t('circle.aboutme.share_failed', { reason: shareState[sk] })}
+                            {saidFor(shareState[sk])}
                           </Text>
                         ) : null}
                       </View>
                     ) : null}
                     <View style={styles.shareKeyLine}>
-                      <Text style={styles.key}>{keyLabel(r.key)}</Text>
+                      <Text style={styles.key}>
+                        {keyLabel(r.key)}
+                        {mediaRefusedHere(r.key, circle.circleId, canCarryMedia) ? ` — ${t('circle.mij.picture_not_here')}` : ''}
+                      </Text>
                       <Text style={styles.levelCell}>{r.rung ? rungLabel(r.rung) : t('circle.mij.level_all')}</Text>
                       <Text style={r.released != null ? styles.released : styles.releasedEmpty}>
                         {(r.l10n && r.released != null ? trOr(`${r.l10n}.${r.released}`, r.released) : r.released) ?? '—'}

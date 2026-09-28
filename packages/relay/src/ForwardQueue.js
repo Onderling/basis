@@ -32,13 +32,18 @@
  *                       a timer (the server.js shape).
  *   - `onWake(to)`    — optional hook fired after an envelope is buffered
  *                       for an offline address (server.js push-wake).
+ *   - `store`         — optional durable copy of the buffers (`SqliteForwardStore`).
+ *                       Written through on every enqueue and removal, read back
+ *                       once here at construction — so a relay restart no longer
+ *                       drops what it was holding. The Map stays the working set.
  *
- * NOTE (seam for C8 / G7): this is hold-and-forward, a DIFFERENT concern
- * from the relay's `QueueStore` port (`queueStores/QueueStore.js`), which
- * models in-flight *multi-recipient request* aggregates (putRequest /
- * addResponse / closeRequest). A later slice may make ForwardQueue conform
- * to a dedicated hold-and-forward port shared with a companion adapter;
- * that port does not exist yet, so this class is the single owner for now.
+ * NOTE: this is hold-and-forward, a DIFFERENT concern from the relay's
+ * `QueueStore` port (`queueStores/QueueStore.js`), which models in-flight
+ * *multi-recipient request* aggregates (putRequest / addResponse /
+ * closeRequest) — which is why that store could not be plugged in here. The
+ * durable copy of THIS hold is `queueStores/SqliteForwardStore.js` (the
+ * `store` option). A companion adapter sharing one hold-and-forward port is
+ * still a later slice; this class remains the single owner.
  */
 
 /** WebSocket.OPEN — the numeric readyState both prior copies checked against. */
@@ -55,6 +60,7 @@ export class ForwardQueue {
   #evictOnWrite;
   #onGiveUp;
   #onWake;
+  #store;
 
   /**
    * @param {object}   [opts]
@@ -73,6 +79,7 @@ export class ForwardQueue {
     evictOnWrite  = false,
     onWake        = null,
     onGiveUp      = null,
+    store         = null,
   } = {}) {
     this.#ttlMs         = ttlMs;
     this.#topicAware    = topicAware;
@@ -81,6 +88,13 @@ export class ForwardQueue {
     this.#evictOnWrite  = evictOnWrite;
     this.#onWake        = onWake;
     this.#onGiveUp      = onGiveUp;
+    this.#store         = store;
+    // What the last run was holding, back in the working set. An entry that expired while the relay was down is
+    // dropped by the next sweep like any other — its `at` is the original enqueue time, so the TTL is unchanged.
+    for (const row of store?.load?.() ?? []) {
+      if (!this.#buffers.has(row.address)) this.#buffers.set(row.address, []);
+      this.#buffers.get(row.address).push({ envelope: row.envelope, topic: row.topic ?? null, at: row.at, id: row.id });
+    }
   }
 
   /**
@@ -91,6 +105,7 @@ export class ForwardQueue {
    * one removal that means success.
    */
   #giveUp(to, entry, reason) {
+    this.#forget(entry);
     try { this.#onGiveUp?.({ to, envelope: entry?.envelope ?? null, reason, at: entry?.at ?? null }); }
     catch { /* a reporting failure must never break the queue it reports on */ }
   }
@@ -136,7 +151,11 @@ export class ForwardQueue {
     if (!this.#buffers.has(to)) this.#buffers.set(to, []);
     const buf       = this.#buffers.get(to);
     const bucketKey = this.#topicAware ? (topic ?? null) : null;
-    buf.push({ envelope, topic: bucketKey, at: Date.now() });
+    const at = Date.now();
+    let id = null;
+    try { id = this.#store?.add?.(to, bucketKey, envelope, at) ?? null; }
+    catch { /* a disk failure costs durability, never the delivery path */ }
+    buf.push({ envelope, topic: bucketKey, at, id });
 
     // Per-bucket cap (topic-aware path): evict the oldest entry in this bucket.
     if (this.#queueCap != null) {
@@ -167,6 +186,7 @@ export class ForwardQueue {
     let buf = this.#buffers.get(to) ?? [];
     if (evictFirst) buf = buf.filter(m => !this.#isExpired(m));
     this.#buffers.delete(to);
+    try { this.#store?.removeAddress?.(to); } catch { /* see enqueue */ }
     for (const { envelope } of buf) {
       if (socket.readyState === WS_OPEN) {
         if (onEach) onEach(envelope);
@@ -206,6 +226,12 @@ export class ForwardQueue {
     }
     if (fresh.length === 0) this.#buffers.delete(to);
     else this.#buffers.set(to, fresh);
+  }
+
+  /** Drop one entry's durable copy (it was delivered, evicted or given up on). */
+  #forget(entry) {
+    if (entry?.id == null) return;
+    try { this.#store?.remove?.(entry.id); } catch { /* see enqueue */ }
   }
 
   #isExpired(m) {

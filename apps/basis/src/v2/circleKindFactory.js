@@ -44,7 +44,7 @@ const DEFAULT_DEDUP_CAP = param({ key: 'circleKind.dedupCap', scope: PARAM_SCOPE
  * All that differs between kinds is the descriptor:
  *
  * @param {object} descriptor
- * @param {string} descriptor.subtype     wire subtype, e.g. 'circle-policy-broadcast'
+ * @param {string} descriptor.subtype     wire subtype, e.g. 'circle-rules-broadcast'
  * @param {string} descriptor.payloadKey  envelope field holding the doc, e.g. 'policy'
  * @param {string} descriptor.logTag      log prefix, e.g. '[circle-policy]'
  * @returns {(args?: object) => (fromPeerAddr: string, payload: object) => Promise<void>}
@@ -184,7 +184,7 @@ export function makeCircleKindPendingLocalIo(keyPrefix, storage = globalThis.loc
 
 /**
  * Build the detect/apply pair for a FLAT keyed conflict doc — the shared
- * shape behind `policyConflict.js` and `rulesConflict.js`.  Both are a
+ * shape behind `rulesConflict.js` (the circle policy used it too, until it moved onto the governance lane).  A
  * pure portable layer over `objectDiff` with NO `blocks` array, so every
  * divergence surfaces as a meta-conflict (`blockConflicts` always empty),
  * and both default missing decisions to 'theirs' (incoming wins).

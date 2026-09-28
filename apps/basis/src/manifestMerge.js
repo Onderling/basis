@@ -100,6 +100,8 @@ export function mergeManifests(sources, opts = {}) {
   const appOrigins  = [];
   /** @type {object[]} manifests that mounted OK — replayed in the §1b synthetic-op pass below. */
   const mountedManifests = [];
+  /** @type {Map<string, string>} appOrigin → the app's own background prompt (`manifest.systemPrompt`), when it declares one */
+  const systemPrompts = new Map();
   /** @type {Map<string, string>} command → first-mounting appId */
   const commandOwner = new Map();
   const commandMenu = [];
@@ -166,6 +168,7 @@ export function mergeManifests(sources, opts = {}) {
 
     appOrigins.push(m.app);
     mountedManifests.push(m);
+    if (typeof m.systemPrompt === 'string' && m.systemPrompt.trim()) systemPrompts.set(m.app, m.systemPrompt);
 
     for (const op of m.operations ?? []) {
       // runtime filter — drop ops that don't run in our runtime.
@@ -337,6 +340,9 @@ export function mergeManifests(sources, opts = {}) {
     searchAggregations: () => [...searchDecls.entries()]
       .map(([opId, decl]) => ({ opId, ...decl })),
     appOrigins,
+    // The app's own background for the language model — the interpreter appends it after its generic prompt when
+    // the app's ops are in the catalogue it was handed.
+    systemPromptFor: (appOrigin) => systemPrompts.get(appOrigin) ?? null,
     warnings,
   };
 }

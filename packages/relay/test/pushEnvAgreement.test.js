@@ -15,7 +15,7 @@ const cli = readFileSync(join(here, '../bin/relay.js'), 'utf8');
 const paas = readFileSync(join(here, '../../../deploy/relay/entrypoint.mjs'), 'utf8');
 
 describe('push env agreement — one knob, one name, both boot doors', () => {
-  it.each(['PUSH_PROVIDER', 'EXPO_ACCESS_TOKEN', 'PUSH_TOKENS_DB'])('%s is read by both doors', (name) => {
+  it.each(['PUSH_PROVIDER', 'EXPO_ACCESS_TOKEN', 'PUSH_TOKENS_DB', 'QUEUE_DB'])('%s is read by both doors', (name) => {
     expect(cli).toContain(`process.env.${name}`);
     expect(paas).toContain(`process.env.${name}`);
   });

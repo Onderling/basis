@@ -1574,20 +1574,6 @@ export const stoopManifest = {
       },
     },
     {
-      id:   'broadcastCirclePolicy', verb: 'share',
-      params: [
-        { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'policy',     kind: 'object', required: true },
-        { name: 'fromActor',  kind: 'string' },
-        { name: 'msgId',      kind: 'string' },
-        { name: 'ts',         kind: 'number' },
-      ],
-      surfaces: {
-        chat: { hint: "Fan a circle's policy to its members." },
-        ui:   { control: 'page' },
-      },
-    },
-    {
       id:   'broadcastCircleRules', verb: 'share',
       params: [
         { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },

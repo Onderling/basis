@@ -279,6 +279,13 @@ export const PERSISTED_COLUMNS = Object.freeze([
   { file: 'blobAclStore.js',                 table: 'blob_acl',  column: 'key',          holds: 'an opaque blob ref' },
   { file: 'blobAclStore.js',                 table: 'blob_acl',  column: 'actorId',      holds: '⚠ A MEMBER LIST. See KNOWN_HOLES "blob-gate-acl" — the rows for one key are the circle members the uploader granted, under a stable cross-circle identity.' },
   { file: 'blobAclStore.js',                 table: 'blob_acl',  column: 'grantedAt',    holds: 'a timestamp' },
+  // What the relay HOLDS for an offline address, on disk only when QUEUE_DB is set. The same facts the in-memory hold
+  // already had (message-hop, queue-depth) — kept until delivery, give-up or the TTL, instead of until a restart.
+  { file: 'queueStores/SqliteForwardStore.js', table: 'held', column: 'id',       holds: 'a row counter' },
+  { file: 'queueStores/SqliteForwardStore.js', table: 'held', column: 'address',  holds: 'an address — the offline recipient' },
+  { file: 'queueStores/SqliteForwardStore.js', table: 'held', column: 'topic',    holds: 'the topic label AS GIVEN on the send frame, if any (message-hop)' },
+  { file: 'queueStores/SqliteForwardStore.js', table: 'held', column: 'envelope', holds: 'the envelope AS GIVEN: its cleartext routing header and its payload, sealed if the sender sealed it' },
+  { file: 'queueStores/SqliteForwardStore.js', table: 'held', column: 'at',       holds: 'a timestamp — when it was handed over' },
 ]);
 
 /**
@@ -430,7 +437,8 @@ export const DERIVABLE_FACTS = Object.freeze([
   {
     id: 'queue-depth',
     fact: 'That a recipient was offline, how many frames are buffered for it, and that a drain '
-        + 'happened when it came back.',
+        + 'happened when it came back. With QUEUE_DB set the buffered frames are kept on disk until '
+        + 'delivery, give-up or the TTL, so they outlive a restart — the same facts, held longer.',
   },
   {
     id: 'peer-list',

@@ -136,7 +136,8 @@ describe('persistence — wizard policy reaches the circle store (E8 link)', () 
     // The pod axis is NOT a template axis any more: the storage radio is the authority and its default is
     // "No pod" — a template's `personal` only means something once a pod is attached (W27, 2026-08-30).
     expect(patch.pod).toBe('none');
-    // A bare state (no template) yields an empty patch.
-    expect(policyPatchFromState(initialState())).toEqual({});
+    // A bare state (no template) writes one thing: the sealed posture every new circle starts with (Frits,
+    // 2026-09-25 — sealed by default, the wizard does not ask). Nothing else.
+    expect(policyPatchFromState(initialState())).toEqual({ storagePosture: 'p2' });
   });
 });

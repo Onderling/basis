@@ -185,7 +185,9 @@ export const agentsManifest = {
       params: [
         { name: 'id',    kind: 'string', required: true, schema: { minLength: 1 } },
         { name: 'key',   kind: 'string', required: true, schema: { minLength: 1 } },
-        { name: 'value', kind: 'string' },
+        // A coarse value is a string; a MEDIA-typed attribute (the profile picture) is its sealed media ref — an
+        // object. Declared as a string alone, the waist refused every picture, and Mij swallowed the refusal.
+        { name: 'value', kind: 'object', schema: { type: ['string', 'object'] } },
       ],
       surfaces: { chat: { reply: 'record', hint: 'Set a coarse property (e.g. place) on a profile — curated once, reusable across apps.' } },
     },

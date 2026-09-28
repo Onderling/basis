@@ -25,6 +25,16 @@ describe('faceOf — the released picture, or the person\'s own first letter', (
     }
   });
 
+  it('a Contacten row and a thread header carry it as `face` — the shape contactsSource hands them', () => {
+    // `nameContactsFromRosters` puts the pair circle's released picture on the row as `face`, and the thread
+    // header is drawn from `{ face, name }`. The decision read only the three release shapes above, so a
+    // contact's picture was on the row and never drawn, on either shell.
+    for (const row of [{ face: PIC, name: 'Bram' }, { face: PIC, contactId: 'x', name: 'Bram', namedBy: 'roster' }]) {
+      expect(faceOf(row)).toEqual({ kind: 'picture', picture: PIC, initial: 'B', alt: 'Bram' });
+    }
+    expect(faceOf({ face: 'https://example.org/me.jpg', name: 'Bram' }).kind, 'an unsealed `face` is still not a face').toBe('initial');
+  });
+
   it('hands back the REF, not an image — the thumbnail is sealed and only a shell can open it', () => {
     // The decision is shared; the unsealing is the shell's, because only it holds the circle's media opener.
     expect(faceOf({ personaProperties: { profilePicture: PIC } }).picture).toBe(PIC);

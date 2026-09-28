@@ -23,7 +23,7 @@ import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/conta
 import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
-export default function ContactThreadScreen({ bundle, contact, onBack, onRead }) {
+export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null }) {
   const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -221,7 +221,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead })
         </Pressable>
         {/* The contact's face beside their name (web parity: contactThread's header slot) — so the person you
             opened is visibly the person you tapped in Contacten. */}
-        <FaceView row={contact ?? { name }} size={26} />
+        <FaceView row={contact ?? { name }} size={26} resolvePicture={resolvePicture} />
         <Text style={styles.title}>{t('circle.contacts.thread_title', { name })}</Text>
         {sealedMark ? (
           <Text style={[styles.sealed, sealedMark.level === 'person' ? styles.sealedPerson : null]} testID="contact-thread-sealed" accessibilityLabel={t(sealedMark.key)}>

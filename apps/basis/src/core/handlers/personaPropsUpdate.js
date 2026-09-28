@@ -132,6 +132,9 @@ export async function shareDisclosureToCircle({
   if (r?.error) return { ok: false, reason: r.error };
   if (Array.isArray(r?.failed) && r.failed.includes(circleId)) return { ok: false, reason: 'append-failed' };
   try { await lastShared?.set?.(circleId, personaId, personaProperties); } catch { /* best-effort */ }
-  if (Array.isArray(r?.unchanged) && r.unchanged.includes(circleId)) return { ok: true, via: 'lane', unchanged: true, changedKeys: [] };
-  return { ok: true, via: 'lane', changedKeys: changedKeys ?? Object.keys(personaProperties) };
+  // What the re-seal LEFT OUT (a media prop this circle cannot carry) — said, so the screen does not claim it shared it.
+  const dropped = Object.keys(personaProperties).filter((k) => !(k in (toSay ?? {})));
+  const said = dropped.length ? { dropped } : {};
+  if (Array.isArray(r?.unchanged) && r.unchanged.includes(circleId)) return { ok: true, via: 'lane', unchanged: true, changedKeys: [], ...said };
+  return { ok: true, via: 'lane', changedKeys: changedKeys ?? Object.keys(personaProperties), ...said };
 }

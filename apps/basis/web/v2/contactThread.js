@@ -35,7 +35,8 @@ function _ensurePrivacyPulseKeyframes() {
 
 export function renderContactThread(container, {
   name = '',
-  face = null,       // the contact's own face as the lane carries it (a `data:image/` thumb) — null = the initial
+  face = null,       // the contact's picture as the pair circle carries it (a sealed media ref) — null = the initial
+  resolvePicture = null,   // opens it with the pair circle's media opener; absent → the initial
   messages = [],
   skills = [],
   busy = false,
@@ -79,7 +80,7 @@ export function renderContactThread(container, {
   // opened is visibly the person you were looking at.
   const avatar = document.createElement('span');
   avatar.className = 'cc-cthread__face cc-contacts__icon';
-  paintFace(avatar, { face, name });
+  paintFace(avatar, { face, name }, { resolvePicture });
   header.appendChild(avatar);
   const title = document.createElement('h2');
   title.className = 'cc-cthread__title';

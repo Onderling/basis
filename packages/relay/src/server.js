@@ -334,6 +334,9 @@ export async function startRelay(opts = {}) {
     // backward compatible with existing tests and deployments.
     pushSender                = null,
     pushTokenRegistry         = undefined,
+    // The durable copy of what the relay is holding for offline addresses (`SqliteForwardStore`); without it the
+    // hold is memory only and a restart drops it. Opt-in via QUEUE_DB at both boot doors.
+    forwardStore              = null,
     pushThrottleMs            = DEFAULT_PUSH_THROTTLE_MS,
     // J-security: default per-connection message rate limit. `false` disables.
     messageRateLimit          = undefined,
@@ -497,6 +500,7 @@ export async function startRelay(opts = {}) {
     onWake:        (to) => tryWakePush(to),
     // Deferred by an arrow: tellSenderWeGaveUp is declared below, and only ever CALLED later.
     onGiveUp:      (info) => tellSenderWeGaveUp(info),
+    store:         forwardStore,
   });
   /**
    * address → groupId — the relay's ONE surviving membership map, and it survives for exactly one

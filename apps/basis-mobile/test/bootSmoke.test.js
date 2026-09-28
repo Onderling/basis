@@ -16,6 +16,10 @@ import { buildNavModels }                  from '../src/core/navModel.js';
 import { bootAgentBundle }                 from '../src/core/agentBundle.js';
 import { t, initLocalisation, setLang }    from '../src/core/localisation.js';
 
+// A real boot awaits its own completion; the limit only catches a hang. vitest's 5 s default is less than a real
+// boot takes under a parallel run, so every test that boots for real gets the same, wider budget.
+const REAL_BOOT = { timeout: 30_000 };
+
 describe('#222 basis-mobile portable-core boot', () => {
   it('composeManifests merges all 6 apps without validator errors', () => {
     const catalogue = composeManifests();
@@ -87,7 +91,7 @@ describe('#222 basis-mobile portable-core boot', () => {
   // write + 6 wireSkill registrations — joined the composition): under the
   // FULL parallel suite's CPU contention the default 5s times out, while the
   // isolated run takes ~2s. Same assertions, honest budget for a real boot.
-  it('V1: real boot with VaultMemory wires createRealHouseholdAgent', { timeout: 20_000 }, async () => {
+  it('V1: real boot with VaultMemory wires createRealHouseholdAgent', REAL_BOOT, async () => {
     const { VaultMemory } = await import('@onderling/vault');
     const bundle = await bootAgentBundle({
       chatVault: new VaultMemory(),
@@ -115,7 +119,7 @@ describe('#222 basis-mobile portable-core boot', () => {
     await bundle.dispose();
   });
 
-  it('V1: real boot with mocked nknLib registers NKN transport', async () => {
+  it('V1: real boot with mocked nknLib registers NKN transport', REAL_BOOT, async () => {
     const { VaultMemory } = await import('@onderling/vault');
     // Minimal nknLib mock — just enough surface to let
     // sa.peer.connect() resolve without going to the real network.
@@ -138,7 +142,7 @@ describe('#222 basis-mobile portable-core boot', () => {
     await bundle.dispose();
   });
 
-  it('V1: opts.asyncStorage synthesises VaultAsyncStorage for chat + host (#222.5)', async () => {
+  it('V1: opts.asyncStorage synthesises VaultAsyncStorage for chat + host (#222.5)', REAL_BOOT, async () => {
     // Mock AsyncStorage (same shape real RN exposes).
     const store = new Map();
     const mockAS = {
@@ -161,7 +165,7 @@ describe('#222 basis-mobile portable-core boot', () => {
     await bundle.dispose();
   });
 
-  it('M1: bundle exposes attachPeerWiring for post-boot router attach', async () => {
+  it('M1: bundle exposes attachPeerWiring for post-boot router attach', REAL_BOOT, async () => {
     const { VaultMemory } = await import('@onderling/vault');
     const fakeNknLib = { MultiClient: class { constructor() {} on() {} } };
     const bundle = await bootAgentBundle({

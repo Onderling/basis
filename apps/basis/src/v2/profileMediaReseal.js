@@ -75,6 +75,18 @@ export async function resealMediaRefForCircle({ ref, selfComposition, circleComp
  *          getCircleComposition: (circleId: string, policy: object) => Promise<object|null>,
  *          getPolicy?: (circleId: string) => Promise<object|null>}} deps
  */
+/**
+ * Can a picture shared into this circle reach its other members, today? It needs the circle's media composition
+ * AND a pod. A pod-less circle can still seal on this device (its producer makes a group key), but nothing carries
+ * that key to anyone else, so a copy sealed there opens for no one. The pod-less carrier comes with the key-chain
+ * strategy; until then the answer is no, and Mij and the share both say so. An absent `pod` is the default, none.
+ * @param {object|null} policy       the circle policy
+ * @param {object|null} composition  the circle's media composition on this device
+ */
+export function circleCarriesMedia(policy, composition) {
+  return !!composition && typeof policy?.pod === 'string' && policy.pod !== 'none';
+}
+
 export function makeResealMediaForCircle({ getSelfComposition, getCircleComposition, getPolicy }) {
   return async function resealMediaForCircle(props, circleId) {
     if (!props || typeof props !== 'object') return props;
@@ -83,7 +95,8 @@ export function makeResealMediaForCircle({ getSelfComposition, getCircleComposit
     const selfComposition = await getSelfComposition().catch(() => null);
     let policy = null;
     if (typeof getPolicy === 'function') { try { policy = await getPolicy(circleId); } catch { /* defaults */ } }
-    const circleComposition = await getCircleComposition(circleId, policy).catch(() => null);
+    const composed = await getCircleComposition(circleId, policy).catch(() => null);
+    const circleComposition = circleCarriesMedia(policy, composed) ? composed : null;   // no carriage → dropped below
     const out = { ...props };
     for (const k of mediaKeys) {
       const resealed = await resealMediaRefForCircle({ ref: props[k], selfComposition, circleComposition }).catch(() => null);

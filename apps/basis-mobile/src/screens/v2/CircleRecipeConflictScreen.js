@@ -14,8 +14,7 @@
  * γ.4 — the modal is reused for the rules doc and the circle policy:
  * those shapes have no `blocks` array, so detection produces only
  * `metaConflicts`.  The `title` prop lets the host override the
- * heading translation key (`circle.rules.conflict.title` /
- * `circle.settings.conflict.title`) while every other locale key stays
+ * heading translation key (`circle.rules.conflict.title`) while every other locale key stays
  * under `circle.recipe.conflict.*` — the picker copy is identical.
  */
 import React, { useState, useMemo } from 'react';

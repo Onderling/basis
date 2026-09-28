@@ -8,7 +8,7 @@
  * complete (dropped, never leaked as the un-openable source).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makeResealMediaForCircle } from '../src/v2/profileMediaReseal.js';
+import { makeResealMediaForCircle, circleCarriesMedia } from '../src/v2/profileMediaReseal.js';
 
 const SEALED_PIC = { type: 'blob', ref: 'blob://self/pic1', enc: { sealed: true, keyRef: 'self', mime: 'image/jpeg' } };
 
@@ -76,7 +76,7 @@ describe('makeResealMediaForCircle', () => {
     const reseal = freshMake({
       getSelfComposition: async () => selfComposition,
       getCircleComposition: async () => circleComposition,
-      getPolicy: async () => ({}),
+      getPolicy: async () => ({ pod: 'shared' }),   // a circle with a pod: its members hold the key the copy is sealed to
     });
     const out = await reseal({ handle: 'jan', profilePicture: SEALED_PIC }, 'c1');
 
@@ -86,4 +86,38 @@ describe('makeResealMediaForCircle', () => {
     vi.doUnmock('@onderling/blob-gateway');
     vi.resetModules();
   });
+});
+
+describe('circleCarriesMedia — where a picture can go today', () => {
+  const comp = { mediaGateway: {} };
+  it('a circle with a pod and a composition carries it', () => {
+    expect(circleCarriesMedia({ pod: 'shared' }, comp)).toBe(true);
+  });
+  it('a pod-less circle does not, even when this device can seal — its key reaches no other member', () => {
+    expect(circleCarriesMedia({ pod: 'none', storagePosture: 'p2' }, comp)).toBe(false);
+    expect(circleCarriesMedia({}, comp)).toBe(false);   // absent = the default, none
+  });
+  it('no composition, no carriage', () => {
+    expect(circleCarriesMedia({ pod: 'shared' }, null)).toBe(false);
+  });
+  it('the re-seal drops the picture for a pod-less circle, however sealable', async () => {
+    // The same working gateways as the re-seal above — only the circle's pod differs.
+    vi.doMock('@onderling/blob-gateway', () => ({
+      openBlob: async () => new Uint8Array([1]),
+      openThumbnail: () => new Uint8Array([9]),
+      uploadBlob: async ({ keyRef }) => ({ type: 'blob', ref: 'blob://c1/copy1', enc: { sealed: true, keyRef } }),
+    }));
+    vi.resetModules();
+    const { makeResealMediaForCircle: freshMake } = await import('../src/v2/profileMediaReseal.js');
+    const gateways = (pod) => freshMake({
+      getSelfComposition: async () => ({ mediaGateway: { opener: () => new Uint8Array([1]), gate: async () => ({ url: 'dev://ok' }), token: 't' } }),
+      getCircleComposition: async () => ({ mediaGateway: { bucket: { async put() {} }, sealer: (b) => b, keyRef: 'k' } }),
+      getPolicy: async () => ({ pod, storagePosture: 'p2' }),
+    });
+    expect((await gateways('shared')({ handle: 'jan', profilePicture: SEALED_PIC }, 'c1')).profilePicture).toBeTruthy();
+    expect(await gateways('none')({ handle: 'jan', profilePicture: SEALED_PIC }, 'c1')).toEqual({ handle: 'jan' });
+    vi.doUnmock('@onderling/blob-gateway');
+    vi.resetModules();
+  });
+
 });

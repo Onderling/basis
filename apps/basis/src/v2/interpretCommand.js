@@ -21,6 +21,21 @@ export const DEFAULT_INTERPRET_SYSTEM =
   + 'do not say things like "no tool call needed" or "this is a general question"; the member must never '
   + 'see that. When in doubt between acting and asking, ASK a short question rather than guessing a tool.';
 
+/**
+ * The generic prompt, then the background of every app whose ops are in this catalogue (the manifest's own
+ * `systemPrompt`, e.g. household's). APPENDED, never replacing: the generic rules — call a tool, never claim a thing
+ * was done — hold for every app; an app's background adds what its domain means. A catalogue scoped to a circle's
+ * apps brings only theirs.
+ */
+function withAppBackgrounds(system, catalogue) {
+  const promptFor = catalogue?.systemPromptFor;
+  if (typeof promptFor !== 'function' || !catalogue?.opsById) return system;
+  const origins = new Set();
+  for (const entry of catalogue.opsById.values()) if (entry?.appOrigin) origins.add(entry.appOrigin);
+  const backgrounds = [...origins].map((o) => promptFor(o)).filter((p) => typeof p === 'string' && p.trim());
+  return backgrounds.length ? [system, ...backgrounds].join('\n\n') : system;
+}
+
 const KIND_TO_JSON_TYPE = { string: 'string', number: 'number', integer: 'integer', boolean: 'boolean' };
 
 /**
@@ -88,7 +103,7 @@ export async function interpretToCommand(text, { catalogue, llm, system, options
     ? history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content)
     : [];
   const result = await llm.invoke({
-    system: withContext(system || DEFAULT_INTERPRET_SYSTEM, context),
+    system: withContext(withAppBackgrounds(system || DEFAULT_INTERPRET_SYSTEM, catalogue), context),
     messages: [...priorMsgs, { role: 'user', content: q }],
     tools,
     ...(options ? { options } : {}),

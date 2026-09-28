@@ -3,8 +3,7 @@
  * (Plan γ.4, Phase 9 sync-engine absorption).
  *
  * Thin instantiation of the shared flat-doc conflict layer
- * (`makeCircleFlatDocConflict` in `circleKindFactory.js`) — the same shape
- * as `policyConflict.js`.  Rules are a FLAT keyed JSON blob (purpose /
+ * (`makeCircleFlatDocConflict` in `circleKindFactory.js`).  Rules are a FLAT keyed JSON blob (purpose /
  * admins / agreements / conflict / admission / leaving / responsibility)
  * with NO `blocks` array, so every divergence surfaces as a meta-conflict
  * (`blockConflicts` always empty) and the output mirrors γ.3's

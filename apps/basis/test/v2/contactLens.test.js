@@ -15,10 +15,10 @@ import {
 } from '../../src/v2/contactLens.js';
 import { pairCircleIdFor } from '../../src/v2/pairCircleId.js';
 import { personaPresetKeys } from '../../src/v2/memberCards.js';
+import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
 
 const card = (o = {}) => {
-  const json = JSON.stringify({ webid: 'them', displayName: 'Anne', handle: 'anne', ...o });
-  return `onderling-contact://${Buffer.from(json).toString('base64url')}`;
+  return `onderling-contact://${encodeContactCard({ webid: 'them', displayName: 'Anne', handle: 'anne', ...o })}`;
 };
 
 function fakeSkills({ personas = [{ agentId: 'default', name: 'Frits', role: 'profile' }, { agentId: 'buurt', name: 'Buurt', role: 'profile' }], usual = 'profile', perContext = {} } = {}) {

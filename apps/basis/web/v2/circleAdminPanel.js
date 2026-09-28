@@ -24,6 +24,7 @@ import { paintFace } from './faceView.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
+  resolvePicture = null,   // opens a member's sealed picture for this circle; absent → the initial
   muted = [],
   outboundShares = [],
   outboundCanonical = false,
@@ -86,11 +87,11 @@ export function renderCircleAdminPanel(container, {
       const li = document.createElement('li');
       li.className = 'cc-admin__member';
       li.dataset.webid = m.webid ?? '';
-      // The member's face, from what they said on this circle's lane — the same slot Contacten and the thread
-      // header use. These are RAW `listGroupMembers` rows, which is exactly where `said.avatarThumb` lives.
+      // The member's face, from what they released on this circle's lane — the same slot Contacten and the
+      // thread header use. RAW `listGroupMembers` rows carry it as `said.personaProperties.profilePicture`.
       const avatar = document.createElement('span');
       avatar.className = 'cc-contacts__icon cc-admin__member-face';
-      paintFace(avatar, m);
+      paintFace(avatar, m, { resolvePicture });
       li.appendChild(avatar);
       const name = document.createElement('span');
       name.className = 'cc-admin__member-name';

@@ -17,6 +17,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, until, teardown } from './support/pairRealAgents.js';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
 
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
 const textsAt = (node) => node.received.map((m) => m?.payload?.text).filter(Boolean);
@@ -88,7 +89,7 @@ describe('with NKN up beside the relay, the card still names the RELAY address',
   it('the card names the address the relay reaches, and a message to it arrives over the relay', async () => {
     expect(carl.agent.peer?.address, 'NKN is up on Carl (the shape of the finding)').toMatch(/^d9b44acc/);
     const card = await carl.agent.callSkill('stoop', 'getContactShareQr', {});
-    const decoded = JSON.parse(Buffer.from(String(card.payload).replace(/^onderling-contact:\/\//, ''), 'base64').toString('utf8'));
+    const decoded = decodeCardBody(String(card.payload).replace(/^onderling-contact:\/\//, ''));
     expect(decoded.peerAddr, 'the card names the relay address, not the mesh one').toBe(carl.agent.relay?.address ?? carl.pubKey);
     expect(decoded.relays).toEqual([relay.url]);
     const added = await dana.agent.callSkill('stoop', 'addContactFromQr', { payload: card.payload });

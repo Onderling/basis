@@ -29,8 +29,10 @@ const ACTION_DEFS = {
   help:    { label: 'circle.streamAction.help'    },
   offer:   { label: 'circle.streamAction.offer'   },
   take:    { label: 'circle.streamAction.take'    },
-  claim:   { label: 'circle.streamAction.claim'   },
-  done:    { label: 'circle.streamAction.done'    },
+  // A chip that runs an op names it, so the chip asks the circle's availability (the one fold) like every other
+  // surface that offers an op — and a shell dispatches the op named here rather than keeping its own map.
+  claim:   { label: 'circle.streamAction.claim', opId: 'claimTask'    },
+  done:    { label: 'circle.streamAction.done',  opId: 'completeTask' },
   snooze:  { label: 'circle.streamAction.snooze'  },
   ignore:  { label: 'circle.streamAction.ignore'  },
   // "entrust" / toevertrouwen — open the mandate picker for a task-like row. Not
@@ -115,7 +117,9 @@ function viewerMayMandate(row, { viewerWebid = null, isAdmin = false, isOwn = fa
  * @param {string|null} [viewer.viewerWebid]  the viewer's WebID
  * @param {boolean}     [viewer.isAdmin]      viewer is a circle admin
  * @param {boolean}     [viewer.isOwn]        the viewer authored this row
- * @returns {Array<{id:string, label:string, action:string, payload:object}>}
+ * @param {{of: Function}} [viewer.availability]  the circle's one fold (`opAvailability`): a chip whose op it
+ *   hides is left out, one it greys is `disabled`. Absent → no filter.
+ * @returns {Array<{id:string, label:string, action:string, payload:object, opId?:string, disabled?:true}>}
  */
 export function actionsForStreamRow(row, viewer = {}) {
   if (!row || typeof row !== 'object') return [];
@@ -125,12 +129,20 @@ export function actionsForStreamRow(row, viewer = {}) {
   const chips = KIND_CHIPS[kindKey] ?? [];
   const ref = payload.ref ?? null;
   const rowId = row.id ?? null;
-  const out = chips.map((action) => ({
-    id:      `${row.id ?? ev.id ?? 'row'}-${action}`,
-    action,
-    label:   ACTION_DEFS[action]?.label ?? `circle.streamAction.${action}`,
-    payload: { rowId, circleId: row.circleId ?? null, kind: kindKey, ref },
-  }));
+  const out = [];
+  for (const action of chips) {
+    const opId = ACTION_DEFS[action]?.opId ?? null;
+    const state = opId && viewer?.availability?.of ? viewer.availability.of(opId)?.state : 'available';
+    if (state === 'hidden') continue;
+    out.push({
+      id:      `${row.id ?? ev.id ?? 'row'}-${action}`,
+      action,
+      label:   ACTION_DEFS[action]?.label ?? `circle.streamAction.${action}`,
+      payload: { rowId, circleId: row.circleId ?? null, kind: kindKey, ref },
+      ...(opId ? { opId } : {}),
+      ...(state === 'greyed' ? { disabled: true } : {}),
+    });
+  }
 
   // "Entrust" (mandate) — appended for a task-like row, owner-only. Carries the
   // taskId (the row's item ref) so the picker can dispatch `attachTaskGrant`.

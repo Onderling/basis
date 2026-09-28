@@ -56,6 +56,7 @@ function actionAllowed(action, policy, platform) {
  * @param {object|null} [opts.policy]     — circle policy for the feature gate
  * @param {string}      [opts.platform]   — 'web' | 'mobile' (default 'web')
  * @param {Function}    [opts.renderer]   — the pure projector (renderWeb | renderMobile)
+ * @param {{of: Function}} [opts.availability] — the one fold (`opAvailability`) for entries that run an op
  * @returns {Array<object>}
  */
 export function circleActions(manifest, opts = {}) {
@@ -69,10 +70,20 @@ export function circleActions(manifest, opts = {}) {
  * platform allow. What a shell would paint once the alpha widens; what tests of the feature gate and
  * the platform gate assert on, since the trim hides most of the gated ids from the DOM today.
  */
-export function gatedActions(manifest, { policy = null, platform = 'web', renderer = renderWeb } = {}) {
+export function gatedActions(manifest, { policy = null, platform = 'web', renderer = renderWeb, availability = null } = {}) {
   const nav = renderer(manifest);
   const actions = Array.isArray(nav.actions) ? nav.actions : [];
-  return actions.filter((action) => actionAllowed(action, policy, platform));
+  const out = [];
+  for (const action of actions) {
+    if (!actionAllowed(action, policy, platform)) continue;
+    // An entry that RUNS an op asks the one fold (`opAvailability`) — the same answer every other surface asks; hidden is
+    // dropped, greyed stays and says so. A navigation entry is not an op, and keeps its own gate above.
+    const opId = action?.target?.kind === 'op' ? action.target.opId : null;
+    const st = opId && availability?.of ? availability.of(opId)?.state : 'available';
+    if (st === 'hidden') continue;
+    out.push(st === 'greyed' ? { ...action, disabled: true } : action);
+  }
+  return out;
 }
 
 /**

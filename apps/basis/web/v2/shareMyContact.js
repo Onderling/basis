@@ -17,6 +17,7 @@
  * @param {() => void} a.onBack
  */
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { CONTACT_QR } from '../../src/v2/contactCardLink.js';
 
 export function renderShareMyContact(container, { payload = null, link = null, qr = null, t, onBack } = {}) {
   if (!container) return container;
@@ -51,18 +52,36 @@ export function renderShareMyContact(container, { payload = null, link = null, q
 
   // The QR: the LINK when there is one — a phone's camera opens it in the browser, where the app adds the contact;
   // the in-app scanner reads it too. Else the raw code (only the in-app scanner reads that). Drawn lazily by the
-  // qrcode lib — the copyable rows below are the fallback when it cannot load. A card-length link is ~650 bytes:
-  // 260px at level L keeps the modules ~3px on a laptop screen, which a phone camera reads; 220px/M was ~2px.
+  // qrcode lib with the shared contact-QR settings (level L, the standard quiet zone), at the screen's pixel
+  // density so a module is a crisp block rather than a blurred one; a tap enlarges it for a camera across the table.
+  // The copyable rows below are the fallback when the lib cannot load.
   const qrValue = qr ?? payload;
   const canvas = document.createElement('canvas');
   canvas.className = 'cc-share__qr';
   canvas.dataset.encodes = qrValue === link ? 'link' : 'code';
-  canvas.width = 260; canvas.height = 260;
-  canvas.style.cssText = 'display:block;max-width:260px;margin:8px 0;background:#fff'; // hex-ok: QR scanner contrast
+  canvas.style.cssText = 'display:block;margin:8px 0;background:#fff;cursor:zoom-in'; // hex-ok: QR scanner contrast
   container.appendChild(canvas);
-  import('qrcode').then((mod) => {
-    (mod.default ?? mod).toCanvas(canvas, qrValue, { width: 260, margin: 1, errorCorrectionLevel: 'L' }, () => {});
-  }).catch(() => { canvas.remove(); });
+  const draw = (cssPx) => {
+    const dpr = Math.max(1, Number(globalThis.devicePixelRatio) || 1);
+    canvas.style.width = `${cssPx}px`;
+    canvas.style.height = `${cssPx}px`;
+    import('qrcode').then((mod) => {
+      (mod.default ?? mod).toCanvas(canvas, qrValue, {
+        width: Math.round(cssPx * dpr), margin: CONTACT_QR.quietZoneModules, errorCorrectionLevel: CONTACT_QR.errorCorrectionLevel,
+      }, () => {
+        // the lib sizes the canvas in device pixels; keep it at the CSS size asked for
+        canvas.style.width = `${cssPx}px`;
+        canvas.style.height = `${cssPx}px`;
+      });
+    }).catch(() => { canvas.remove(); });
+  };
+  const enlarged = () => Math.max(CONTACT_QR.size, Math.min((globalThis.innerWidth || 0) - 32, (globalThis.innerHeight || 0) - 32, 560));
+  canvas.addEventListener('click', () => {
+    const large = canvas.classList.toggle('cc-share__qr--large');
+    canvas.style.cursor = large ? 'zoom-out' : 'zoom-in';
+    draw(large ? enlarged() : CONTACT_QR.size);
+  });
+  draw(CONTACT_QR.size);
 
   const copyRow = (cls, value, label) => {
     const row = document.createElement('div');

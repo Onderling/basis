@@ -100,6 +100,18 @@ describe('opAvailability', () => {
     expect(ok.of('embed').state).toBe('available');
   });
 
+  it('a REAL matrix row carries a noun and an opId — the gate must find it (found reviewing #210)', () => {
+    // `buildCapabilityMatrix` keys every row (app × atom × noun) and stamps the implementing `opId`. The fold used to
+    // ask with `noun: null`, so no real row ever matched and rung 3 silently answered "allowed" for every capability
+    // an admin had withheld — and the reply buttons, which had asked with the item's type, now asked the fold.
+    const withheld = [{ app: 'tasks', atom: 'add', noun: 'task', opId: 'addTask', enabled: false, optedOut: false, consequence: 'hidden' }];
+    const a = makeOpAvailability({ manifestsByOrigin, catalogue: catalogueWith('addTask'), capabilityMatrix: withheld });
+    expect(a.of('addTask')).toEqual({ state: 'hidden', reason: UNAVAILABLE.CAPABILITY });
+    // …and a row for ANOTHER op of the same app/atom does not spill over
+    const other = [{ app: 'tasks', atom: 'add', noun: 'note', opId: 'addNote', enabled: false, optedOut: false, consequence: 'hidden' }];
+    expect(makeOpAvailability({ manifestsByOrigin, catalogue: catalogueWith('addTask'), capabilityMatrix: other }).of('addTask').state).toBe('available');
+  });
+
   it('an op no manifest declares is unknown — a typo must not read as "not switched on"', () => {
     const a = makeOpAvailability({ manifestsByOrigin, catalogue: catalogueWith('embed') });
     expect(a.of('nonesuch').reason).toBe(UNAVAILABLE.UNKNOWN);

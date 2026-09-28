@@ -685,3 +685,38 @@ entering a directory, `chmod 000` on it, then exec'ing the script.
 and leaves `docs/surface-coverage.md` untouched, and the fitness test (`surfaceCoverageFresh`) stays red after a
 manifest change although "coverage was run". Refresh it with
 `node scripts/surface-coverage.mjs > docs/surface-coverage.md` from `apps/basis`.
+
+## Driving the phone by hand (`adb`) — the traps, collected from the 2026-08-29/30 walks
+
+Use the Detox suite (`apps/basis-mobile/e2e/`) first. When you must hand-drive:
+
+- **Boot is not "data is empty".** A screen with no rows 30 s after launch is usually a bundle still
+  booting, not a device without data. Wait for `bundle ready` and the transport lines before reading
+  anything.
+- **A deep link to a dev-client build does not reach JS on its own.** After launching via
+  `basis://expo-development-client/?url=…`, RN's `Linking` does not fire for a VIEW intent. Start the
+  activity first (`adb shell am start -n org.onderling.basis/.MainActivity`), THEN
+  `am start -a android.intent.action.VIEW -d "<onderling-invite://…>"`. The app logs
+  `[link] received … drained → kind=invite` when it worked; no `[link]` line means the link never
+  arrived — do not tap blind.
+- **Taps during NKN bootstrap are eaten.** For ~30–60 s after `bundle ready` every pointer is logged and
+  no Pressable fires: the JS thread is bootstrapping the NKN MultiClient. Wait for
+  `[NknTransport] connected` (or ~45 s), and verify every tap by re-dumping the UI (`uiautomator dump`).
+  Tap targets come from the dump's `bounds` on the nearest `clickable="true"` ancestor, never from memory.
+- **`input tap` is dropped when JS is busy.** A 200 ms `input swipe x y x y 200` press lands more often;
+  for TABS the reliable idiom is three presses 1.2 s apart then one dump — never for buttons that open a
+  modal, where the second press hits the backdrop and closes it. A modal wizard's title has the backdrop
+  as its nearest clickable ancestor: dismiss the keyboard with ENTER (`keyevent 66`), never by tapping
+  the title, and never BACK (`keyevent 4`). `uiautomator dump` writes ONE line: count nodes with
+  `grep -o '<node' | wc -l`, not `grep -c`.
+- **Do not edit source while the phone is mid-test.** Metro reloads the app and an inbound hello lands
+  on a dying JS instance, which reads as "the phone never keyed the hello". Stacked reloads also leave
+  old instances' native mDNS listeners alive (`Calling JS function after bridge has been destroyed`).
+  For any transport-level check do a CLEAN relaunch: `adb shell am force-stop org.onderling.basis`, then
+  `monkey -p org.onderling.basis -c android.intent.category.LAUNCHER 1`, and poll the log for
+  `mDNS injected into router` (~2 min) before opening Nearby.
+- **Ground truth for "is the phone advertising"** is `avahi-browse -rt _onderling._tcp` from the laptop
+  (give it 8 s). A raw framed hello from `node` (`writeUInt32BE` + JSON) is the cheapest proof of the
+  phone's inbound path, independent of any companion.
+- **The routing log line names transports that exist, not ones that worked.** Say which transport carried
+  each step from the transport's own log, never from the router's summary.

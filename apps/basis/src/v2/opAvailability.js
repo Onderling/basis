@@ -132,9 +132,16 @@ export function makeOpAvailability({
 
     // 3 · May this member do it? The same call the inline buttons make, so a button and this answer
     // cannot disagree about the same person.
-    const treatment = affordanceTreatment(capabilityMatrix, {
-      app: appOrigin, atom: op.verb ? canonicalAtom(op.verb) : null, noun: null,
-    });
+    // A matrix row is keyed (app × atom × noun) and stamped with the op that implements it — so the row for THIS
+    // op is found by its id, never by guessing the noun: asked with `noun: null` no real row ever matched, and the
+    // gate answered "allowed" for every withheld capability. The (atom × noun) lookup is only the fallback for a
+    // row that names no op.
+    const byOp = (Array.isArray(capabilityMatrix) ? capabilityMatrix : []).find((r) => r?.opId === opId);
+    const treatment = byOp
+      ? affordanceTreatment([byOp], { app: byOp.app, atom: byOp.atom, noun: byOp.noun })
+      : affordanceTreatment(capabilityMatrix, {
+        app: appOrigin, atom: op.verb ? canonicalAtom(op.verb) : null, noun: op.appliesTo?.type ?? null,
+      });
     if (treatment === 'hide') return { state: 'hidden', reason: UNAVAILABLE.CAPABILITY };
     if (treatment === 'grey') return { state: 'greyed', reason: UNAVAILABLE.CAPABILITY };
 

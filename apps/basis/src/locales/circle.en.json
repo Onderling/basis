@@ -334,6 +334,14 @@
       "text": "You are no longer a member of this circle. An admin removed you. What was already here stays yours and you can keep reading it; new messages will not arrive.",
       "doc": "Said in the circle, to the ONE person an admin removed, on their own device. Until 2026-08-27 this was said nowhere: the eviction was correct — signed, folded, key rotated — and their screen looked exactly as it had a second earlier, so they went on typing into a circle that could not hear them. Three facts, none optional: they are out; a person did it (not a fault or a glitch); and what they already have is not taken away, because it is theirs and a restriction there would be a costume anyway. The REASON the admin recorded is deliberately not shown — see SHOW_REMOVAL_REASON in removalNotice.js."
     },
+    "your_key_forked": {
+      "text": "Your key signed two different versions of your history in this circle. That usually means someone else has your key. From that moment you are out of this circle; what you did before stands. Replace your recovery phrase, or revoke the device you no longer have.",
+      "doc": "Fork notice to the person whose key forked (L133, 2026-09-25) — the one who must act. Says what happened, what it most likely means, and what to do; never accuses."
+    },
+    "member_key_forked": {
+      "text": "{{name}}'s key signed two different versions of their history in this circle. That usually means someone else has their key. From that moment {{name}} is out of this circle; what they did before stands. You may want to tell them.",
+      "doc": "Fork notice to the circle's admins (L133) — named, for an admin's fork and a member's alike. Theft, not guilt: 'usually means someone else has their key'."
+    },
     "you_were_removed_reason": {
       "text": "You are no longer a member of this circle. An admin removed you, giving the reason: “{{reason}}”. What was already here stays yours and you can keep reading it.",
       "doc": "UNUSED while SHOW_REMOVAL_REASON is false (decided 2026-08-28). Kept written so flipping that flag is a one-line change rather than a translation task — and so the wording is decided in the calm rather than at the moment someone wants the feature. The reason was typed by one person ABOUT another and never for their eyes, and the removed member has no channel left to answer it."
@@ -2052,12 +2060,6 @@
       "auto": {
         "text": "Automatically, on an admin device",
         "doc": "auto: an admin device carries out an approved decision the moment it sees one, with no explicit step. Still admin-only and still signed + quorate."
-      }
-    },
-    "conflict": {
-      "title": {
-        "text": "Two of you edited the settings",
-        "doc": "γ.4 — modal heading when an incoming policy diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
       }
     },
     "storagePosture": {
@@ -5186,6 +5188,10 @@
       "text": "Shared ✓",
       "doc": "personas#2 — the disclosure reached the circle roster."
     },
+    "shared_without_picture": {
+      "text": "Shared — except your picture: this circle cannot carry pictures yet.",
+      "doc": "A share that went out WITHOUT the picture: the circle has no seal strategy for its media (a pod-less circle, until that arc lands), so the re-seal left the picture out. Said instead of the plain shared line, which claimed it had gone."
+    },
     "share_failed": {
       "text": "Couldn't share: {{reason}}",
       "doc": "personas#2 — the share-to-circle push failed (e.g. admin offline)."
@@ -5571,6 +5577,10 @@
     "stop_sharing": {
       "text": "Stop sharing here",
       "doc": "mij#personas — the action on a circle where nothing is disclosed any more but the circle still holds what was shared before: pushes the empty release, which the lane carries as a clear."
+    },
+    "picture_not_here": {
+      "text": "this circle cannot carry pictures yet",
+      "doc": "Mij, beside the picture for a circle with no seal strategy for its media (a pod-less circle, until that arc lands): not offered there, and why — a share would leave it out."
     },
     "stopped_sharing": {
       "text": "Stopped ✓",

@@ -26,10 +26,12 @@ function run(args, { env }) {
   state.exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
   return state;
 }
+// "Up" is the banner's LAST line — the walk-log path — not its first: the banner is several writes, and under
+// load the pipe hands them over in separate chunks, so reading at "device-runner: up" could miss the path.
 const untilUp = async (proc, ms = 60_000) => {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) {
-    if (proc.out.includes('device-runner: up')) return true;
+    if (/device-runner: up[\s\S]*\n {2}walk log {2}\S+\n/.test(proc.out)) return true;
     await new Promise((r) => { setTimeout(r, 200); });
   }
   return false;

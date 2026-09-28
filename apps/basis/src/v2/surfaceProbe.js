@@ -180,7 +180,7 @@ export function probeSurface({
   // in the web shell applies exactly this pair, and mobile projects the same roster.
   const wired = Array.isArray(wiredActionIds) ? new Set(wiredActionIds) : null;
   const nav = navManifest
-    ? circleActions(navManifest, { policy, platform, renderer })
+    ? circleActions(navManifest, { policy, platform, renderer, availability })
         .filter((a) => (wired ? wired.has(a.id) : true))
         .map((a) => ({ id: a.id, labelKey: a.labelKey ?? null, target: a.target ?? null }))
     : [];

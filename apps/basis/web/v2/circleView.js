@@ -59,6 +59,7 @@ import { chunkBubble } from '../../src/v2/chunkBubble.js';
 import { circleActions } from '../../src/v2/actionProjection.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { paintFace } from './faceView.js';
 
 export function renderCircleView(container, {
   circle = {},
@@ -162,6 +163,11 @@ export function renderCircleView(container, {
   selfWebid = null,
   revealPolicy = 'pairwise',   // the circle's realName reveal rule; gates the member labels
   onMemberTap = null,
+  // Opens a member's sealed picture for THIS circle (the host binds the circle's media opener). Absent → every
+  // row keeps its initial.
+  resolvePicture = null,
+  // The one fold (`opAvailability`) for this circle — the ⋯ roster's op entries ask it. Absent → their own gate.
+  availability = null,
   // Stale-rules banner: when the viewer's OWN row accepted an older rules version than the
   // circle's current one, the members tab opens with a re-accept affordance. The host wires
   // this to the acceptGroupRules op; absent → the banner still informs, without a button.
@@ -237,7 +243,7 @@ export function renderCircleView(container, {
     header.appendChild(toggle);
   }
 
-  const moreActions = collectMoreActions(more, tr, policy);
+  const moreActions = collectMoreActions(more, tr, policy, availability);
   if (moreActions.length > 0) {
     const moreBtn = document.createElement('button');
     moreBtn.type = 'button';
@@ -268,9 +274,11 @@ export function renderCircleView(container, {
       item.className = 'circle-view__more-item';
       item.dataset.action = a.id;
       item.textContent = a.label;
+      // greyed by the one fold: shown, and not runnable — the op exists here, this member may not do it
+      if (a.disabled) item.disabled = true;
       item.addEventListener('click', () => {
         menu.classList.remove('is-open');
-        a.run();
+        if (!a.disabled) a.run();
       });
       menu.appendChild(item);
     }
@@ -332,11 +340,11 @@ export function renderCircleView(container, {
     // the Mandate/entrust picker reachable in the GUI.
     renderTakenTab(body, {
       tasks: Array.isArray(tasks) ? tasks : [],
-      tr, onAction, onAddTask, viewerWebid, viewerIsAdmin,
+      tr, onAction, onAddTask, viewerWebid, viewerIsAdmin, availability,
     });
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
-    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules });
+    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture });
   } else if (effectiveTab !== 'conversation') {
     const placeholder = document.createElement('div');
     placeholder.className = 'circle-view__placeholder';
@@ -366,7 +374,7 @@ export function renderCircleView(container, {
         deliveryStateFor, localActor, onRetryDelivery,
         onEmbedButton, onEmbedOpen,
         media,
-        viewerWebid, viewerIsAdmin,
+        viewerWebid, viewerIsAdmin, availability,
         onReportMessage,
       }));
     }
@@ -501,7 +509,8 @@ export function renderCircleView(container, {
     // shells and both kinds of thread ask, so a person sees the same list wherever they type. It used to
     // read the catalogue directly, which is scoped to the circle's apps, so `/whoami` and `/logs` were
     // typeable-in-principle and undiscoverable in practice.
-    const composerCommands = createComposerCommands({ kind: 'circle', catalogue });
+    // …and asks the one fold, as the typed door does: a command the circle withholds is not offered.
+    const composerCommands = createComposerCommands({ kind: 'circle', catalogue, availability });
     const refreshSuggest = () => paintSuggest(composerCommands.suggest(input.value));
     const acceptSuggest = (i) => {
       const m = entries[i];
@@ -609,7 +618,7 @@ export function renderCircleView(container, {
  * The chips come from the SAME selector the chat stream uses (invariant #1/#3); the
  * host wires their taps (`onAction`) to the tasks agent + the mandate picker.
  */
-function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid = null, viewerIsAdmin = false } = {}) {
+function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid = null, viewerIsAdmin = false, availability = null } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'circle-view__taken';
 
@@ -650,7 +659,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
     card.appendChild(statusEl);
 
     // Lifecycle + owner-only mandate chips — the SAME selector the chat stream uses.
-    const actions = actionsForStreamRow(row, { viewerWebid, isAdmin: viewerIsAdmin });
+    const actions = actionsForStreamRow(row, { viewerWebid, isAdmin: viewerIsAdmin, availability });
     if (actions.length) {
       const actRow = document.createElement('div');
       actRow.className = 'circle-view__task-actions';
@@ -660,6 +669,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
         btn.className = 'circle-view__bubble-action';
         if (a.action === 'mandate') btn.classList.add('circle-view__bubble-action--mandate');
         btn.dataset.action = a.action;
+        if (a.disabled) btn.disabled = true;
         btn.textContent = tr(a.label);
         btn.addEventListener('click', () => { if (typeof onAction === 'function') onAction(a, row); });
         actRow.appendChild(btn);
@@ -683,7 +693,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  *
  * `members === null` → loading; `[]` → empty; otherwise the rows.
  */
-function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null } = {}) {
+function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'circle-view__members';
 
@@ -737,6 +747,13 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
     // Reveal-gated (shared with mobile): the roster row carries `realName` ungated, so the label must be
     // computed, never read straight off the row — an unrevealed member shows their handle, not their name.
     const label = revealedMemberLabel(m, { viewerId: selfWebid, policy: revealPolicy });
+    // THE FACE — the same slot Contacten and the thread header use. The picture is on the row only when this
+    // member released it to this circle; the label is what the initial is taken from, so an unrevealed member's
+    // letter is their handle's, never their real name's.
+    const face = document.createElement('span');
+    face.className = 'cc-contacts__icon circle-view__member-face';
+    paintFace(face, { ...m, name: label.primary }, { resolvePicture });
+    row.appendChild(face);
     const primary = document.createElement('span');
     primary.className = 'circle-view__member-primary';
     primary.textContent = label.primary;
@@ -873,6 +890,8 @@ function renderBubble(row, {
   media = null,
   // Mandate — viewer identity signals for the owner-only "entrust" action.
   viewerWebid = null, viewerIsAdmin = false,
+  // The circle's one fold — a chip whose op the circle withholds is left out or greyed.
+  availability = null,
   // §8 — report this message to the circle's admins (shown on others' human messages).
   onReportMessage = null,
 } = {}) {
@@ -1002,7 +1021,7 @@ function renderBubble(row, {
   // already picks the right set per row kind.  The owner-only "entrust"
   // (mandate) action rides the same seam, gated by the viewer signals.
   const rowIsOwn = localActor != null && row?.actor === localActor;
-  const actions = actionsForStreamRow(row, { viewerWebid, isAdmin: viewerIsAdmin, isOwn: rowIsOwn });
+  const actions = actionsForStreamRow(row, { viewerWebid, isAdmin: viewerIsAdmin, isOwn: rowIsOwn, availability });
   if (actions.length) {
     const actRow = document.createElement('div');
     actRow.className = 'circle-view__bubble-actions';
@@ -1012,6 +1031,7 @@ function renderBubble(row, {
       btn.className = 'circle-view__bubble-action';
       if (a.action === 'mandate') btn.classList.add('circle-view__bubble-action--mandate');
       btn.dataset.action = a.action;
+      if (a.disabled) btn.disabled = true;
       btn.textContent = tr(a.label);
       btn.addEventListener('click', () => {
         if (typeof onAction === 'function') onAction(a, row);
@@ -1094,6 +1114,8 @@ function renderBubble(row, {
       // A `labelKey` is resolved; a literal `label` is printed as given. An op that declares neither
       // shows its id, which is honest and ugly enough to get noticed — the state 31 stoop buttons were
       // in while `labelKey` was validated and read by nothing.
+      // A button whose op the circle greys (`embedButtonsForReply` → the one fold) is shown but cannot be pressed.
+      if (b.disabled) btn.disabled = true;
       btn.textContent = embedButtonText(b, tr);
       btn.addEventListener('click', () => onEmbedButton(b));   // pass the whole button so a non-circle source survives
       bRow.appendChild(btn);
@@ -1258,13 +1280,13 @@ function pickKindLabel(row) {
 // AND (b) the host wired a `more[id]` callback for it.  Keyed by the projected
 // action id, so the host's `more` object keys match the manifest ids directly
 // (the mobile shell projects the SAME roster → web ≡ mobile by construction).
-function collectMoreActions(more, tr, policy) {
+function collectMoreActions(more, tr, policy, availability = null) {
   if (!more || typeof more !== 'object') return [];
   const out = [];
-  for (const action of circleActions(basisManifest, { policy, platform: 'web' })) {
+  for (const action of circleActions(basisManifest, { policy, platform: 'web', availability })) {
     const fn = more[action.id];
     if (typeof fn === 'function') {
-      out.push({ id: action.id, label: tr(action.labelKey), run: fn });
+      out.push({ id: action.id, label: tr(action.labelKey), run: fn, ...(action.disabled ? { disabled: true } : {}) });
     }
   }
   return out;

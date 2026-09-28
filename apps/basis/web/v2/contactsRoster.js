@@ -12,7 +12,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitShownHidden } from '../../src/v2/contactsSource.js';
 import { paintFace } from './faceView.js';
 
-export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd } = {}) {
+export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, resolvePictureFor = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
@@ -55,7 +55,7 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     // THE FACE, or this person's own first letter. A bot keeps its glyph: it is not a person and has no face.
     const icon = document.createElement('span');
     icon.className = 'cc-contacts__icon';
-    paintFace(icon, c, { fallbackGlyph: c.isBot ? '🤖' : null });
+    paintFace(icon, c, { fallbackGlyph: c.isBot ? '🤖' : null, resolvePicture: typeof resolvePictureFor === 'function' ? resolvePictureFor(c) : null });
     li.appendChild(icon);
 
     const body = document.createElement('div');

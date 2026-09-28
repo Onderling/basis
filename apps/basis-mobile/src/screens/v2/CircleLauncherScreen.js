@@ -199,9 +199,10 @@ import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.j
 // no DOM). Mobile reuses it verbatim — same seal path as web's stoop noticeboard — so a noticeboard
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
-import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
+import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { resolveSealedThumbUri } from '../../core/mijHost.js';
+import FaceView from './FaceView.js';
 import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource } from '../../core/circlePods.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
 import { buildCircleLlmProviders } from '../../../../basis/src/v2/circleLlmProviders.js';
@@ -332,6 +333,20 @@ const circleSearchVectorStore = (AsyncStorage && typeof AsyncStorage.getItem ===
 // SHARED composition both platforms use — reused, not reimplemented in the shell.
 const circleMediaBucket = makeDevMediaBucket();
 const circleMediaCompositions = new Map();   // circleId → Promise<composition|null>
+// One circle's picture opener, bound lazily (web parity: circleApp's `circlePictureResolver`). A roster row's picture
+// is sealed to ITS circle, a contact's to the pair circle — so a paint site names the circle and gets the opener here.
+// Cached per circle so a FaceView's `resolvePicture` keeps its identity across renders.
+const circlePictureResolvers = new Map();
+function circlePictureResolver(circleId, policy) {
+  if (typeof circleId !== 'string' || !circleId) return null;
+  if (!circlePictureResolvers.has(circleId)) {
+    circlePictureResolvers.set(circleId, async (ref) => {
+      const comp = await getCircleMediaComposition(circleId, policy).catch(() => null);
+      return resolveSealedThumbUri(ref, comp?.mediaGateway?.opener);
+    });
+  }
+  return circlePictureResolvers.get(circleId);
+}
 function getCircleMediaComposition(circleId, policy) {
   if (!circleId) return Promise.resolve(null);
   if (!circleMediaCompositions.has(circleId)) {
@@ -340,7 +355,12 @@ function getCircleMediaComposition(circleId, policy) {
       getSealStrategy: () => getCircleSealStrategy(circleId, policy),
       localActor: getCircleActorWebId() || 'me',
       bucket: circleMediaBucket,
-    }).catch(() => null));
+    }).catch(() => null).then((c) => {
+      // "none" is not kept: a policy that arrives later (the circle's posture on the governance lane) may make this
+      // circle able to seal, and the next ask should find out rather than reuse the old answer.
+      if (!c) circleMediaCompositions.delete(circleId);
+      return c;
+    }));
   }
   return circleMediaCompositions.get(circleId);
 }
@@ -392,6 +412,26 @@ function PersonaPanel({
   personaId, onClose, styles, callSkill, circles = [],
   emitMemberProps = null, lastShared = null, resealMediaForCircle = null, profilePicture = null,
 }) {
+  // Which circles can carry a picture right now (a seal strategy for their media) — Mij does not offer the picture
+  // where a share would have to drop it, and says why (web parity: circleApp's `carriesMedia`).
+  const [carriesMedia, setCarriesMedia] = useState(() => new Map());
+  useEffect(() => {
+    if (!personaId) return undefined;
+    let alive = true;
+    (async () => {
+      const store = makeCirclePolicyStoreRN(AsyncStorage);
+      const m = new Map();
+      for (const c of circles) {
+        const cid = c?.id ?? c?.circleId;
+        if (!cid) continue;
+        const pol = await store.get(cid).catch(() => null);
+        m.set(cid, circleCarriesMedia(pol, await getCircleMediaComposition(cid, pol).catch(() => null)));
+      }
+      if (alive) setCarriesMedia(m);
+    })();
+    return () => { alive = false; };
+  }, [personaId, circles]);
+  const canCarryMedia = useCallback((cid) => (carriesMedia.has(cid) ? carriesMedia.get(cid) : null), [carriesMedia]);
   return (
     <Modal visible={!!personaId} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.panelBackdrop}>
@@ -406,7 +446,7 @@ function PersonaPanel({
             <CircleMijScreen
               callSkill={callSkill} emitMemberProps={emitMemberProps} lastShared={lastShared}
               resealMediaForCircle={resealMediaForCircle} profilePicture={profilePicture}
-              personaId={personaId} circles={circles}
+              personaId={personaId} circles={circles} canCarryMedia={canCarryMedia}
             />
           ) : null}
         </View>
@@ -462,11 +502,9 @@ export default function CircleLauncherScreen({
   // A failed agent boot, said HERE (web parity: `bootFailure` on the launcher). App.js used to hand it
   // only to the hidden ChatScreen, so the person saw "No circles yet." and concluded their data was gone.
   bootError = null,
-  // γ-next.policy — per-circle pending-policy cache (AsyncStorage-backed,
-  // owned by App.js).  Receiver writes; settings editor reads on mount +
-  // clears after the γ.4 resolver applies / discards.  Completes the
-  // γ-next trio (recipe / rules / policy).
-  circlePolicyPendingStore = null,
+  // The circle's policy on the governance lane (App.js builds it): stated here when an admin saves and when the
+  // create wizard writes a new circle's first policy.
+  circlePolicyLane = null,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -630,7 +668,6 @@ export default function CircleLauncherScreen({
   // γ-next.policy — pending incoming policy doc (from peer broadcast).
   // Loaded when the settings screen opens; cleared after the γ.4
   // resolver applies or discards.
-  const [incomingPolicy, setIncomingPolicy] = useState(null);
   // α.1d.3 — recipe editor state (lives in the parent so book + mode
   // survive the BOOK ↔ RECIPE round-trip).  Callbacks land below
   // after recipeStore is declared.
@@ -1046,35 +1083,6 @@ export default function CircleLauncherScreen({
       try { await circleRulesPendingStore.clear(selected.id); } catch { /* ignore */ }
     }
   }, [selected, circleRulesPendingStore]);
-
-  // γ-next.policy — pull cached pending policy doc whenever the settings
-  // screen opens for a selected circle.  γ.4's resolver runs
-  // automatically from inside the screen when incomingPolicy is
-  // non-null + diverges from local.
-  useEffect(() => {
-    if (view !== 'settings' || !selected?.id || !circlePolicyPendingStore) {
-      setIncomingPolicy(null);
-      return;
-    }
-    let alive = true;
-    (async () => {
-      try {
-        const cached = await circlePolicyPendingStore.get(selected.id);
-        if (alive) setIncomingPolicy(cached ?? null);
-      } catch { if (alive) setIncomingPolicy(null); }
-    })();
-    return () => { alive = false; };
-  }, [view, selected, circlePolicyPendingStore]);
-
-  // γ-next.policy — clear the cached pending policy after the γ.4
-  // resolver applies or discards.  Both paths route through here so
-  // a fresh broadcast can land in the slot again.
-  const clearIncomingPolicy = useCallback(async () => {
-    setIncomingPolicy(null);
-    if (selected?.id && circlePolicyPendingStore) {
-      try { await circlePolicyPendingStore.clear(selected.id); } catch { /* ignore */ }
-    }
-  }, [selected, circlePolicyPendingStore]);
 
   // α.3 — Screens helpers.
   const refreshScreensBook = useCallback(async () => {
@@ -1753,6 +1761,7 @@ export default function CircleLauncherScreen({
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
+            resolvePicture={circlePictureResolver(contactThread?.pairCircleId)}
             onBack={() => setContactThread(null)}
             onRead={() => contactSeen.mark(contactThread?.contactId, Date.now()).then(refreshContactUnread).catch(() => {})}
           />
@@ -1761,7 +1770,7 @@ export default function CircleLauncherScreen({
     }
     return (
       <WithTabBar active="contacten" onSelect={onTab} badges={tabBadges}>
-        <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} />
+        <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)} />
       </WithTabBar>
     );
   }
@@ -1775,6 +1784,7 @@ export default function CircleLauncherScreen({
         callSkill={bundle?.callSkill}
         agent={bundle?.agent}
         groupId={selected.id}
+        resolvePicture={circlePictureResolver(selected.id)}
         onBack={() => setView('detail')}
       />
     );
@@ -1816,31 +1826,14 @@ export default function CircleLauncherScreen({
     );
   }
   if (selected && view === 'settings') {
-    // γ-next.policy — broadcast cache → editor → γ.4 resolver.  The
-    // resolver is opt-in; when `incomingPolicy` is null the editor
-    // renders untouched.  Applied / discarded both clear the cache.
-    //
-    // Send-side: the settings editor owns the `store.update` call (so
-    // proposal + commit paths route through one place); we wrap the
-    // store here so a fresh update fans the post-save policy out to
-    // peers via stoop's `broadcastCirclePolicy`.  Fire-and-forget;
-    // per-peer errors land in result.errors which we log.  No-op when
-    // callSkill / no agent.
+    // The settings editor owns the `store.update` call (proposal and commit paths route through one place); the
+    // store is wrapped here so every save also STATES the policy on the governance lane (circlePolicyLane).
     const broadcastingStore = {
       ...policyStore,
       update: async (cid, next) => {
         const r = await policyStore.update(cid, next);
-        if (next && typeof next === 'object' && typeof bundle?.callSkill === 'function') {
-          const msgId = `circle-policy-${cid}-${Date.now()}`;
-          const ts    = Date.now();
-          bundle.callSkill('stoop', 'broadcastCirclePolicy', {
-            groupId: cid, policy: next, msgId, ts,
-          }).then((res) => {
-            if (res?.error) console.warn('[circle-policy] fan-out skipped:', res.error);
-          }).catch((err) => {
-            console.warn('[circle-policy] fan-out failed:', err?.message ?? err);
-          });
-        }
+        // the saved policy goes on the governance lane — every member, and whoever joins later, catches it up
+        circlePolicyLane?.state(cid).catch(() => { /* catch-up reconciles */ });
         return r;
       },
     };
@@ -1860,9 +1853,6 @@ export default function CircleLauncherScreen({
         // capabilityOptOuts) + the pod session's authed fetch, exactly as web circleApp.js does.
         overrideStore={overrideStore}
         podFetch={getCirclePodFetch() || undefined}
-        incomingPolicy={incomingPolicy}
-        onIncomingApplied={clearIncomingPolicy}
-        onIncomingDiscarded={clearIncomingPolicy}
         // OBJ-2 — paired devices (no-pod sync). The agent exposes the household roster surface.
         householdSelfAddr={bundle?.agent?.householdSelfAddr ?? null}
         householdPeers={bundle?.agent?.listHouseholdPeers?.(selected.id) ?? []}
@@ -2266,7 +2256,10 @@ export default function CircleLauncherScreen({
             t={t}
             theme={theme}
             getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
-            persistPolicy={(groupId, patch) => policyStore.update?.(groupId, patch)}
+            persistPolicy={async (groupId, patch) => {
+              await policyStore.update?.(groupId, patch);
+              circlePolicyLane?.state(groupId).catch(() => {});   // the founder's first policy, on the lane
+            }}
             // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
             shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
             onClose={() => setCreating(false)}
@@ -2618,6 +2611,8 @@ function CircleDetail({
     getCircleMediaComposition(circle?.id, policy).then((m) => { if (alive) setCircleMedia(m || null); });
     return () => { alive = false; };
   }, [circle?.id, policy]);
+  // A member's released picture, opened with this circle's key — the members rows (the card has its own).
+  const resolveMemberFace = useCallback((ref) => resolveSealedThumbUri(ref, circleMedia?.mediaGateway?.opener), [circleMedia]);
   // S4 — seed a sealed circle's group-key roster with members who joined before the producer
   // was live (web parity with showCircle). Best-effort; no-op for unsealed circles.
   useEffect(() => {
@@ -2751,15 +2746,34 @@ function CircleDetail({
   // appointment in a conversation by any route. Same projected entries as web, narrowed the same way.
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachForm, setAttachForm] = useState(null);   // the entry whose params must be filled first
+  // THE ONE FOLD (`opAvailability`) for this circle — composed app · feature · capability, deny-wins. Every surface below asks
+  // it: the attach menu, slash-suggest, the reply buttons and the ⋯ roster (web parity: `circleOpAvailability`).
+  // The capability half reads the member's overrides, which are async, so the matrix is kept per circle.
+  const [circleCapMatrix, setCircleCapMatrix] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const ovr = circle?.id ? (await overrideStore.get(circle.id)) : null;
+        const m = buildCapabilityMatrix(capabilitySources, {
+          enabledApps: Array.isArray(policy?.apps) && policy.apps.length ? policy.apps : null,
+          template: policy?.capabilities || {}, optOuts: ovr?.capabilityOptOuts || [],
+        });
+        if (alive) setCircleCapMatrix(m);
+      } catch { if (alive) setCircleCapMatrix([]); }
+    })();
+    return () => { alive = false; };
+  }, [circle?.id, policy]);
+  const circleAvailability = useMemo(() => makeOpAvailability({
+    catalogue: catalogue ?? null, manifestsByOrigin, policy: policy ?? null, capabilityMatrix: circleCapMatrix,
+  }), [catalogue, manifestsByOrigin, policy, circleCapMatrix]);
   const attachEntries = useMemo(() => attachEntriesFor({
     manifestsByOrigin,
-    availability: makeOpAvailability({
-      catalogue: catalogue ?? null, manifestsByOrigin, policy: policy ?? null,
-    }),
+    availability: circleAvailability,
     // An entry whose dispatch path is not wired is NOT painted (never offer what does not work): the
     // file entry rides the sealed-media pipeline, which a circle with no media composition lacks.
     mediaWired: !!circleMedia,
-  }), [catalogue, manifestsByOrigin, policy, circleMedia]);
+  }), [manifestsByOrigin, circleAvailability, circleMedia]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   const [pendingFollowUp, setPendingFollowUp] = useState(null);
   const [pendingForm, setPendingForm] = useState(null);   // 2+-field needsForm → inline form (parity with web)
@@ -2778,7 +2792,7 @@ function CircleDetail({
   // Through the shared composer seam, which the contact thread uses too: one entry point, one filter
   // rule, two contexts (a circle's scoped catalogue here; the peer's exposed skills there).
   const composerCommands = useMemo(
-    () => createComposerCommands({ kind: 'circle', catalogue }), [catalogue]);
+    () => createComposerCommands({ kind: 'circle', catalogue, availability: circleAvailability }), [catalogue, circleAvailability]);
   const suggestMatches = useMemo(
     () => composerCommands.suggest(composerText), [composerCommands, composerText],
   );
@@ -3206,7 +3220,7 @@ function CircleDetail({
           template: policy?.capabilities || {}, optOuts: ovr?.capabilityOptOuts || [],
         });
       } catch { /* best-effort — no greying on error */ }
-      const inlineButtons = embedButtonsForReply({ reply, appOrigin: entry?.appOrigin, manifestsByOrigin, capabilityMatrix: capMatrix });
+      const inlineButtons = embedButtonsForReply({ reply, appOrigin: entry?.appOrigin, manifestsByOrigin, capabilityMatrix: capMatrix, availability: circleAvailability });
       // S6.B/C — a screen surface (surfaces.ui.screen) becomes an "Open …" button,
       // gated by the circle's policy.features for that app (web parity).
       const screen = entry?.op?.surfaces?.ui?.screen;
@@ -3291,9 +3305,8 @@ function CircleDetail({
     // (runCircleCommandResolved → scope-injected to the active circle), then refresh the tab.
     if (a?.action === 'claim' || a?.action === 'done') {
       const taskId = a?.payload?.taskId ?? a?.payload?.ref ?? null;
-      if (taskId) {
-        const opId = a.action === 'claim' ? 'claimTask' : 'completeTask';
-        await runCircleCommandResolved({ opId, args: { id: taskId }, appOrigin: 'tasks' });
+      if (taskId && a.opId) {
+        await runCircleCommandResolved({ opId: a.opId, args: { id: taskId }, appOrigin: 'tasks' });
         setTasksReloadTick((n) => n + 1);
       }
       return;
@@ -3958,7 +3971,7 @@ function CircleDetail({
               host-wired handler; each shell wires its own mechanism for a
               destination (e.g. `contacts` → setScreenPanel here, openCircleScreenPanel
               on web — the doorgeefluik model).  web ≡ mobile by construction. */}
-          {circleActionsMobile(basisManifest, { policy })
+          {circleActionsMobile(basisManifest, { policy, availability: circleAvailability })
             .filter((action) => action.id !== 'back')
             .map((action) => {
               const handlers = {
@@ -3973,8 +3986,9 @@ function CircleDetail({
               return (
                 <Pressable
                   key={action.id}
-                  onPress={() => { setMenuOpen(false); on?.(); }}
-                  style={styles.moreItem}
+                  onPress={() => { setMenuOpen(false); if (!action.disabled) on?.(); }}
+                  disabled={action.disabled === true}   // greyed by the one fold: there, and not this member's to run
+                  style={[styles.moreItem, action.disabled ? { opacity: 0.45 } : null]}
                   testID={`circle-detail-${token}`}
                 >
                   <Text style={styles.moreItemText}>{t(action.labelKey)}</Text>
@@ -4105,6 +4119,13 @@ function CircleDetail({
                   testID="circle-member-row"
                   onPress={() => setMemberCard({ member: m, self: isSelf })}
                 >
+                  {/* THE FACE — the same slot Contacten and the thread header use; the initial comes from the
+                      reveal-gated label, never an unreleased name. web≡mobile. */}
+                  <FaceView
+                    row={{ ...m, name: revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).primary }}
+                    resolvePicture={resolveMemberFace}
+                    size={28}
+                  />
                   <View style={{ flex: 1 }}>
                     {/* Reveal-gated via the SHARED helper (web parity): the roster row carries `realName`
                         ungated, so an unrevealed member must show their handle, never their name. */}
@@ -4175,11 +4196,13 @@ function CircleDetail({
                     {actionsForStreamRow(row, {
                       viewerWebid: mandateViewer.viewerWebid ?? null,
                       isAdmin: mandateViewer.isAdmin ?? false,
+                      availability: circleAvailability,
                     }).map((a) => (
                       <Pressable
                         key={a.id}
-                        style={[styles.rowActionBtn, a.action === 'mandate' && styles.taskChipMandate]}
+                        style={[styles.rowActionBtn, a.action === 'mandate' && styles.taskChipMandate, a.disabled ? { opacity: 0.45 } : null]}
                         accessibilityRole="button"
+                        disabled={a.disabled === true}   // greyed by the one fold
                         testID={`circle-task-chip-${a.action}`}
                         onPress={() => onRowAction(a, row)}
                       >
@@ -4211,6 +4234,8 @@ function CircleDetail({
             // Entrust (mandate) — owner-visibility signals + the row-action dispatcher (opens the picker).
             mandateViewer: { ...mandateViewer, localActor: 'me' },
             onRowAction,
+            // The circle's one fold — a chip or button whose op the circle withholds is left out or greyed.
+            availability: circleAvailability,
             // §8 — report another member's message (a governance `message` report).
             onReportMessage,
           }, styles)
@@ -4545,6 +4570,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
     viewerWebid: mandateViewer.viewerWebid ?? null,
     isAdmin: !!mandateViewer.isAdmin,
     isOwn: rowIsOwn,
+    availability: deliveryOpts?.availability ?? null,
   });
   const onRowAction = typeof deliveryOpts?.onRowAction === 'function' ? deliveryOpts.onRowAction : null;
   // B (clarification) — per-message candidate buttons carried in the payload (e.g. "which item?").
@@ -4665,7 +4691,8 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
           {actions.map((a) => (
             <Pressable
               key={a.id}
-              style={styles.rowActionBtn}
+              style={[styles.rowActionBtn, a.disabled ? { opacity: 0.45 } : null]}
+              disabled={a.disabled === true}   // greyed by the one fold
               testID={`circle-rowaction-${a.action}`}
               onPress={() => { if (onRowAction) onRowAction(a, row); else console.info('[circle] action', a.action, row.id); }}
             >
@@ -4691,8 +4718,9 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
             return (
               <Pressable
                 key={b.id}
-                style={[styles.rowActionBtn, primary && styles.consentBtnPrimary, secondary && styles.consentBtnSecondary]}
+                style={[styles.rowActionBtn, primary && styles.consentBtnPrimary, secondary && styles.consentBtnSecondary, b.disabled ? { opacity: 0.45 } : null]}
                 accessibilityRole="button"
+                disabled={b.disabled === true}   // an inline button whose op the circle greys
                 testID={`circle-msgbtn-${b.id}`}
                 onPress={() => { if (onBubbleButton) onBubbleButton(b); }}
               >

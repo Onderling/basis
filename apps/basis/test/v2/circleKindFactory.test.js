@@ -18,18 +18,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
-import { makeCirclePolicyPeerHandler } from '../../src/v2/circlePolicyReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../src/v2/circleRulesReceiver.js';
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 
-import { createCirclePolicyPendingStore } from '../../src/v2/circlePolicyPending.js';
 import { createCircleRulesPendingStore }  from '../../src/v2/circleRulesPending.js';
 import { createCircleRecipePendingStore } from '../../src/v2/circleRecipePending.js';
 
-import {
-  localStorageCirclePolicyPendingIo,
-  createCirclePolicyPendingStoreLocal,
-} from '../../src/v2/circlePolicyPendingStorage.js';
 import {
   localStorageCircleRulesPendingIo,
   createCircleRulesPendingStoreLocal,
@@ -39,7 +33,6 @@ import {
   createCircleRecipePendingStoreLocal,
 } from '../../src/v2/circleRecipePendingStorage.js';
 
-import { detectPolicyConflicts, applyPolicyResolution } from '../../src/v2/policyConflict.js';
 import { detectRulesConflicts,  applyRulesResolution }  from '../../src/v2/rulesConflict.js';
 import { detectRecipeConflicts } from '../../src/v2/recipeConflict.js';
 
@@ -47,19 +40,16 @@ const silentLogger = { warn: () => {}, info: () => {}, debug: () => {} };
 
 /** One row per kind: the factory + the wire subtype + the envelope payload field. */
 const RECEIVER_KINDS = [
-  { name: 'policy', make: makeCirclePolicyPeerHandler, subtype: 'circle-policy-broadcast', key: 'policy' },
   { name: 'rules',  make: makeCircleRulesPeerHandler,  subtype: 'circle-rules-broadcast',  key: 'rulesDoc' },
   { name: 'recipe', make: makeCircleRecipePeerHandler, subtype: 'circle-recipe-broadcast', key: 'recipe' },
 ];
 
 const PENDING_KINDS = [
-  { name: 'policy', make: createCirclePolicyPendingStore },
   { name: 'rules',  make: createCircleRulesPendingStore },
   { name: 'recipe', make: createCircleRecipePendingStore },
 ];
 
 const STORAGE_KINDS = [
-  { name: 'policy', io: localStorageCirclePolicyPendingIo, local: createCirclePolicyPendingStoreLocal, prefix: 'cc.circlePolicyPending.' },
   { name: 'rules',  io: localStorageCircleRulesPendingIo,  local: createCircleRulesPendingStoreLocal,  prefix: 'cc.circleRulesPending.' },
   { name: 'recipe', io: localStorageCircleRecipePendingIo, local: createCircleRecipePendingStoreLocal, prefix: 'cc.circleRecipePending.' },
 ];
@@ -138,24 +128,16 @@ describe('circle triplet · anti-drift guard (one factory, three kinds)', () => 
     expect(new Set(prefixes).size).toBe(prefixes.length);
   });
 
-  it('policy + rules conflict share the flat-doc factory (empty blockConflicts, identical detect)', () => {
+  it('rules conflict is the flat-doc factory shape (empty blockConflicts)', () => {
+    // (The circle policy used the same shape until 2026-09-26: it now arrives on the governance lane and is
+    // applied, so it has no incoming copy to reconcile and its resolver is gone.)
     const local    = { purpose: 'a', extra: 'keep' };
     const incoming = { purpose: 'b', extra: 'keep' };
     const base     = { purpose: 'a', extra: 'keep' };
-
-    const p = detectPolicyConflicts(local, incoming, base);
     const r = detectRulesConflicts(local, incoming, base);
-    // Flat-doc shape: no blocks array, ever.
-    expect(p.blockConflicts).toEqual([]);
     expect(r.blockConflicts).toEqual([]);
-    // Same underlying objectDiff → identical report for identical input.
-    expect(p).toEqual(r);
-
-    // Missing decision defaults to 'theirs' (incoming wins) for both.
-    expect(applyPolicyResolution(local, incoming, {}).purpose).toBe('b');
+    // Missing decision defaults to 'theirs' (incoming wins); a local-only key is preserved (lossless).
     expect(applyRulesResolution(local, incoming, {}).purpose).toBe('b');
-    // Local-only key preserved (lossless) for both.
-    expect(applyPolicyResolution(local, incoming, {}).extra).toBe('keep');
     expect(applyRulesResolution(local, incoming, {}).extra).toBe('keep');
   });
 

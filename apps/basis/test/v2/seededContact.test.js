@@ -4,8 +4,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { seedContactCard, seededContactWebid } from '../../src/v2/seededContact.js';
+import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
 
-const card = (obj) => 'onderling-contact://' + Buffer.from(JSON.stringify(obj)).toString('base64url');
+const card = (obj) => 'onderling-contact://' + encodeContactCard(obj);
 const FRITS = card({ webid: 'frits-key', pubKey: 'frits-key', displayName: 'Frits', relays: ['wss://relay.onderling.org'] });
 
 function rig({ known = [] } = {}) {

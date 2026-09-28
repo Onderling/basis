@@ -14,7 +14,7 @@
 import { taskRowProvenance } from './streamActions.js';
 import { circleAddressSetOf } from './circleAddressKeys.js';
 import { isSilentEntry } from '../eventLog.js';
-import { membershipNoticeRows } from './membershipNotices.js';
+import { membershipNoticeRows, forkNoticeRows } from './membershipNotices.js';
 import { governanceNoticeRows } from './governanceNotices.js';
 import { revealedMemberLabel } from './circleViewAs.js';
 
@@ -209,6 +209,8 @@ export function chatRows(opts = {}) {
   if (typeof t === 'function' && typeof viewerId === 'string' && viewerId && typeof rest.circleId === 'string') {
     const notices = [
       ...membershipNoticeRows({ events: rest.events, circleId: rest.circleId, viewerId, members, t, wants }),
+      // a key that forked — to its person and to the admins (L133); not switchable off
+      ...forkNoticeRows({ events: rest.events, circleId: rest.circleId, viewerId, members, t }),
       ...governanceNoticeRows({ events: rest.events, circleId: rest.circleId, viewerId, t, wants }),
     ];
     if (notices.length) rows = [...rows, ...notices].sort((a, b) => b.ts - a.ts);

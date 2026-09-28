@@ -98,7 +98,7 @@ export function embedsFromReply(reply, { appOrigin } = {}) {
  * @returns {Array<{id, label, opId, itemId}>}  ride `payload.buttons`; the host's
  *          tap handler resolves the op's target arg from the catalogue + dispatches.
  */
-export function embedButtonsForReply({ reply, appOrigin, manifestsByOrigin, maxButtons = 12, capabilityMatrix = [] } = {}) {
+export function embedButtonsForReply({ reply, appOrigin, manifestsByOrigin, maxButtons = 12, capabilityMatrix = [], availability = null } = {}) {
   if (!appOrigin || !manifestsByOrigin) return [];
   const snaps = snapshotsFromReply(reply, { appOrigin });
   const ops = manifestsByOrigin?.[appOrigin]?.operations;
@@ -110,9 +110,16 @@ export function embedButtonsForReply({ reply, appOrigin, manifestsByOrigin, maxB
       const key = `${b.opId}:${b.itemId}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      // B · (4c) — grey/hide the affordance per the member's effective capability + consequence.
-      const verb = Array.isArray(ops) ? ops.find((o) => o?.id === b.opId)?.verb : undefined;
-      const treatment = affordanceTreatment(capabilityMatrix, { app: appOrigin, atom: verb ? canonicalAtom(verb) : null, noun: snap.type });
+      // Grey/hide the affordance. With the circle's availability (the one fold, `opAvailability` — composed app · feature ·
+      // capability, deny-wins) that answer decides; without one, the capability gate alone, as before.
+      let treatment;
+      if (availability?.of) {
+        const st = availability.of(b.opId)?.state;
+        treatment = st === 'hidden' ? 'hide' : st === 'greyed' ? 'grey' : 'allow';
+      } else {
+        const verb = Array.isArray(ops) ? ops.find((o) => o?.id === b.opId)?.verb : undefined;
+        treatment = affordanceTreatment(capabilityMatrix, { app: appOrigin, atom: verb ? canonicalAtom(verb) : null, noun: snap.type });
+      }
       if (treatment === 'hide') continue;
       out.push({
         id: key, label: `${b.label} · ${clip(snap.label)}`, opId: b.opId, itemId: b.itemId,

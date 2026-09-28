@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 
@@ -27,8 +28,7 @@ const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url
 function cardFrom(stdout) {
   const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout);
   if (!m) return null;
-  const b64 = m[1] + '='.repeat((4 - (m[1].length % 4)) % 4);
-  try { return JSON.parse(Buffer.from(b64, 'base64url').toString('utf8')); } catch { return null; }
+  return decodeCardBody(m[1]);
 }
 
 /** Everything the runner has written to its walk log so far, one object per line. */

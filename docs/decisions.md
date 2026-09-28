@@ -1244,3 +1244,25 @@ on THIS device may now ask this device what it already knows.
 doors take it as a seam and emit the person alongside the route; the circle stream indexes every
 identifier a member can prove (`circleAddressSetOf` + pubKey + stableId) rather than the first address
 recorded. An unresolvable address still keys on itself — a stranger is a stranger, not an error.
+
+---
+
+## 2026-09-25 — A key that forks loses its standing from the fork onward, not retroactively
+
+**Context.** Every member's circle statements form a signed chain; two statements off the same parent are a
+self-verifying fork — almost always a stolen key (a thief signing beside the owner), sometimes a malicious build.
+The roster fold used to discount EVERYTHING a forking author had ever signed. Since any admin may admit (the same
+day's change to admission authority), that reached every admin: a key stolen in September took down, on every
+device, every member its owner had admitted in March.
+
+**Decision (Frits).** From the fork onward. The author is removed at the fork's causal depth — founder or not,
+member and admin rank alike, deny-wins over anything concurrent — and nothing they sign from there counts. What
+they signed before the fork stands: the people they admitted stay. If the removal empties the admin set, the
+caretaker rule hands over exactly as for a departure.
+
+**What it does not cover.** A thief who does NOT fork (signs only on a stolen device while the owner is silent) is
+not caught by this rule; revocation is the answer there, as it always was. Who is TOLD about a fork is a separate,
+open question (the person, the admins, the group).
+
+**Where.** `packages/core/src/security/rosterFold.js` (`equivocators` returns the fork siblings; `forkAt` / the
+removal in the depth loop); spec in `test/rosterFold.test.js`.

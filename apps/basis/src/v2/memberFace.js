@@ -42,6 +42,9 @@ const pictureOf = (row) => {
   const p = row?.personaProperties?.profilePicture
     ?? row?.said?.personaProperties?.profilePicture
     ?? row?.profilePicture
+    // A Contacten row / thread header: `contactsSource` lifts the pair circle's released picture onto the row
+    // under this name. Same ref, same seal check below.
+    ?? row?.face
     ?? null;
   return isSealedMediaRef(p) ? p : null;
 };

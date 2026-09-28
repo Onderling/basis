@@ -23,16 +23,12 @@ import { buildEmbed }        from '../embed.js';
 import { openExternalFlow }  from '../externalFlow.js';
 // Media Phase 1 (2026-07) — sealed media path for picked images (chat → blob-gateway).
 import { createMediaEmbed, hasMediaGateway, isImageMime } from './handlers/mediaEmbed.js';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
-
-// The door's own size question, declared rather than hardcoded (the parameters convention: a tunable
-// constant goes through the register). The VALUE is unchanged — this is the cap that has always applied
-// to /send-file. Its scope is deliberately still device+internal: whether a circle may set its own
-// ceiling, and whether full-size photos ride at all, is an open product decision, and widening the scope
-// here would pre-empt it.
-const SEND_FILE_MAX_BYTES = param({
-  key: 'sendFile.maxInlineBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 * 1024 * 1024,
-});
+// The door's own size question is the CIRCLE's (Frits, 2026-09-25, L78): only the encoder's output rides, a
+// direct message shares the circle's resize, and one param caps what rides — `attachment.maxNoticeboardBytesPerAtt`,
+// the same ceiling a circle photo is encoded under. The separate 8 MB door cap it replaces let a full-size photo
+// (or anything else up to 8 MB) ride a direct message while the same photo in a circle was resized. Full-size
+// waits for the media carrier.
+import { MAX_NOTICEBOARD_BYTES_PER_ATT } from '../v2/attachmentEncoder.js';
 
 
 // lazy chrono import for createTimeEmbed's
@@ -107,7 +103,7 @@ export function createLocalBuiltins({
     'lookup-peer':      async (args) => lookupPeer(args, { lookupPeerAddrByWebid, t }),
     'publish-peer':      async (args) => publishPeerAddrCmd(args, { publishPeerAddrToPod, t }),
     'send-file':        async (args) => sendFile(args, {
-      agent, t, openFilePicker, lookupPeerAddrByWebid,
+      agent, t, openFilePicker, lookupPeerAddrByWebid, encodeImage,
     }),
     mute:               async (args) => muteHandler(args, { agent, t }),
     unmute:             async (args) => unmuteHandler(args, { agent, t }),
@@ -364,7 +360,7 @@ async function meIdentity(_args, { agent, t }) {
  * an peer address ('app.<hex>') OR a webid (auto-resolved).
  */
 async function sendFile(args, {
-  agent, t, openFilePicker, lookupPeerAddrByWebid,
+  agent, t, openFilePicker, lookupPeerAddrByWebid, encodeImage = null,
 }) {
   const peerRaw = String(args?.peer ?? '').trim();
   if (!peerRaw) return { ok: false, error: t('sendFile.no_peer') };
@@ -405,13 +401,27 @@ async function sendFile(args, {
   // What remains HERE is the door's own question: is this a thing the peer wire should carry at all?
   // A phone photo (a few MB, ~a hundred control-sized chunks) — yes. A video — no: that is the blob
   // gate's job, and a cap is honest about it rather than letting a 500 MB send grind the wire.
-  const MAX_INLINE = SEND_FILE_MAX_BYTES;   // param() returns the resolved value itself
-  if (file.size > MAX_INLINE) {
-    return { ok: false, error: t('sendFile.too_large', { size: file.size, max: MAX_INLINE }) };
+  // A PHOTO leaves as the encoder's output — resized to the circle's longest edge and re-encoded under the
+  // attachment cap — when the shell injects the encoder (web: canvas). A shell whose picker already bounds the
+  // image (mobile's preset) injects none, and the picked bytes are what it chose.
+  let sent = { name: file.name, mime: file.type || 'application/octet-stream', size: file.size, dataB64: null };
+  if (typeof encodeImage === 'function' && isImageMime(file.type)) {
+    try {
+      const enc = await encodeImage(file);
+      if (enc?.dataB64) sent = { name: file.name, mime: enc.mime ?? sent.mime, size: Math.floor(enc.dataB64.length * 0.75), dataB64: enc.dataB64 };
+    } catch (err) {
+      return { ok: false, error: t('sendFile.read_failed', { error: err.message ?? String(err) }) };
+    }
+  }
+  const cap = MAX_NOTICEBOARD_BYTES_PER_ATT;   // param() returns the resolved value itself
+  if (sent.size > cap) {
+    return { ok: false, error: t('sendFile.too_large', { size: sent.size, max: cap }) };
   }
 
-  let dataB64;
-  if (typeof file?.dataB64 === 'string' && file.dataB64.length > 0) {
+  let dataB64 = sent.dataB64;       // set when the encoder ran
+  if (dataB64) {
+    /* the encoder's output is what rides */
+  } else if (typeof file?.dataB64 === 'string' && file.dataB64.length > 0) {
     // mobile pickers pre-encode the bytes
     // (substrate `packages/react-native/src/picker` returns
     // {dataB64, ...}).  Hermes has no FileReader, so the browser
@@ -441,9 +451,9 @@ async function sendFile(args, {
     const envelope = await buildFileShareEnvelope({
       file: {
         id:    `file-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-        name:  file.name,
-        mime:  file.type || 'application/octet-stream',
-        size:  file.size,
+        name:  sent.name,
+        mime:  sent.mime,
+        size:  sent.size,
         dataB64,
       },
       peerAddr,

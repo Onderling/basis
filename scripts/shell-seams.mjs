@@ -28,6 +28,12 @@ export const SEAMS = Object.freeze([
   // supplies only how its storage is reached.
   { id: 'enrol-forgets-the-throwaway-self', pattern: /runPendingForget\(/, why: 'a device that keeps a former self\'s content greets it in every circle and warns about rows it cannot open, for ever — read the ceremony\'s note as the FIRST awaited act of boot, before any store is touched' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
+  // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
+  // it on the governance change (live fan + catch-up), and serves its head at catch-up — the box above all, the
+  // always-on member a joiner catches up from after the lane's audit window has aged the statement out.
+  { id: 'circle-policy-lane',        pattern: /makeCirclePolicyLane\(/,         why: 'the circle policy as a signed admin statement on the governance lane — one composition, a shell injects its stores' },
+  { id: 'circle-policy-lane-folds',  pattern: /circlePolicyLane\??\.apply\(/,     why: 'the policy is applied where governance changes land — a shell that never folds it keeps the default posture' },
+  { id: 'circle-policy-lane-serves', pattern: /circlePolicyLane\??\.preserved\(/, why: 'the winning statement is served at catch-up after the audit window — a later joiner converges from any peer' },
   { id: 'contact-channel',       pattern: /createContactThreadChannel\(/,        why: 'direct messages: durable threads, the person seal, the own-devices carry' },
   // A ROW is a view: only the shells that paint Contacten compose it. The box stores the thread and carries it; the
   // row appears on each painting device when the carried turn lands there. Scoped on purpose, and said here so

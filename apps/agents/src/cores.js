@@ -563,7 +563,7 @@ export async function setProfileProperty(store, args = {}) {
 
 /**
  * setProfileDriver — set an OWN personal DRIVER property (drivers #3): an open { kind, text, tags[] } value,
- * not a coarse string, so it needs its own op (setProfileProperty's value is a plain string). Building +
+ * not a coarse string, so it needs its own op (setProfileProperty takes a string, or a media attribute's sealed ref). Building +
  * validating the driver lives in the `profiles` collaborator (dependency-free cores). `tags` accepts an array
  * (GUI) OR a comma-separated string (wire/slash). Degrades (ok:false) if unwired; ok:false on an empty driver.
  */

@@ -29,7 +29,7 @@ import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 import FaceView from './FaceView.js';
 
-export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack }) {
+export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, resolvePicture = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [members, setMembers] = useState([]);
@@ -123,7 +123,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
           <View key={m.webid || m.handle} style={styles.row} testID={`admin-member-${m.webid}`}>
             {/* The member's face — the persona picture they DISCLOSED to this circle, so its presence on the
                 row is already the permission. web parity: circleAdminPanel.js. */}
-            <FaceView row={m} size={28} />
+            <FaceView row={m} size={28} resolvePicture={resolvePicture} />
             <Text style={styles.name}>{m.displayName || m.handle || m.webid}</Text>
             {m.role && m.role !== 'member' && <Text style={styles.role}>{t(`circle.admin.role.${m.role}`)}</Text>}
             {/* …and HOW they came by it: they made the circle, an admin appointed them, or nobody

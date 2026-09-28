@@ -151,9 +151,11 @@ device-log lanes) are checked like the app manifests.
   applies to.
 - **`hosts: string[]` at the top level** — every network host the app's own code reaches (`[]` for none). An
   endpoint the person configures — their pod, their relay — is not a fixed host and is not listed. **A
-  declaration, not a check:** the guard verifies that the array is there, not that it is complete — a new
-  `fetch` to an undeclared host fails nothing. It binds where the realm host starts an extension with
-  `--allow-net` set from it; until then, and for code in the main bundle, it is a convention kept by review.
+  declaration, not a check:** `lint-manifest-scopes` verifies that the array is there, and
+  `lint-hosts-literals` that every host written into the app's source as a URL literal (`'https://api…'`)
+  is in it — but a host that is computed (`https://${host}/…`) or read from config passes both, so a `fetch`
+  to such a host fails nothing. It binds where the realm host starts an extension with `--allow-net` set from
+  it; until then, and for code in the main bundle, it is a convention kept by review and by the literal lint.
   `hosts` has **two** consumers in the runtime, not one: `--allow-net` (the enforcement), and certification
   and the consent card, which read the declaration itself (an extension that declares both a data-read grant
   and a network host is refused certification). So a false `[]` is not harmless until the realm arrives — it

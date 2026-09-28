@@ -3843,7 +3843,12 @@
     "more": {
       "text": "And what else?",
       "doc": "Assistant reply when a turn was cut short (too many acts at once, or a call the model left unfinished): the ones it could do are done, and it asks for the rest."
-    }
+    },
+    "memory_off": "I no longer keep this conversation: every message now stands on its own. What you put on a list stays.",
+    "memory_short": "I keep the last few messages of this conversation.",
+    "memory_long": "I keep the last messages of this conversation, and later also what I know about the household.",
+    "lang_set": "I will reply to you in: {{lang}}.",
+    "lang_auto": "I will reply in the language you write in again."
   },
   "op": {
     "not_in_this_circle": {

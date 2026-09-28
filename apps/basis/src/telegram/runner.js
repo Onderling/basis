@@ -101,8 +101,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     let reply;
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
-    const caller = turns.get(chatId)?.caller ?? null;
-    const call = caller ? (app, op, args) => callSkill(app, op, args, { caller }) : callSkill;
+    const rec = turns.get(chatId);
+    const caller = rec?.caller ?? null;
+    const threadId = rec?.thread ?? null;
+    const call = caller || threadId
+      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}) })
+      : callSkill;
     try { reply = await runDispatch(ready, call); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin }));
@@ -211,7 +215,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   // the turn before it; quick free-text lines are gathered into one turn by the engine's collect window.
   const engine = engineIn ?? createAssistantEngine({
     catalogue, lang, llm, interpret, loadItems, botName,
-    ...(threads ? { memory: threads.memory } : {}),
+    ...(threads ? { memory: threads.memory, threadLang: (id) => threads.langOf(id) } : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
@@ -243,7 +247,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const chatId = ctx.chatId;
     const text = lines.map((l) => String(l ?? '').trim()).join('\n');
     const started = Date.now();
-    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}) });
+    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}), thread: threadId });
     let r;
     try {
       r = await run();
@@ -258,7 +262,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       const voice = rec?.opId || rec?.route === 'help' ? 'system' : 'assistant';
       for (const reply of rec?.replies ?? []) engine.remember(threadId, voice, reply.text);
       // The log keeps the chat's last digits, never the person's id.
-      if (rec && typeof walkLog === 'function') { try { const { caller: _who, ...logged } = rec; walkLog({ ...logged, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
+      if (rec && typeof walkLog === 'function') { try { const { caller: _who, thread: _thread, ...logged } = rec; walkLog({ ...logged, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
     return r;
   }

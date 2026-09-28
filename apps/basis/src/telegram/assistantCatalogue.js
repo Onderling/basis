@@ -19,7 +19,7 @@
  */
 import { mergeManifests } from '../manifestMerge.js';
 import { scopeCatalogueToApps } from '../v2/circleCatalogueScope.js';
-import { catalogueManifests } from '../v2/manifestSources.js';
+import { catalogueManifests, DOOR_MANIFESTS } from '../v2/manifestSources.js';
 import { assistantAppsFrom } from '../v2/assistantApps.js';
 
 /**
@@ -32,8 +32,10 @@ export function composeAssistantCatalogue({ apps, householdManifest } = {}) {
   const list = assistantAppsFrom(apps);
   const all = catalogueManifests({ householdManifest });
   const ordered = [...all.filter((m) => m.app === 'household'), ...all.filter((m) => m.app !== 'household')];
-  const inScope = ordered.filter((m) => list.includes(m.app));
-  const catalogue = scopeCatalogueToApps(mergeManifests(inScope.map((manifest) => ({ manifest }))), list);
+  // The door's own ops (the person's memory mode, their language) come whatever the app list says: they are about
+  // the conversation, not an app.
+  const inScope = [...ordered.filter((m) => list.includes(m.app)), ...DOOR_MANIFESTS];
+  const catalogue = scopeCatalogueToApps(mergeManifests(inScope.map((manifest) => ({ manifest }))), [...list, ...DOOR_MANIFESTS.map((m) => m.app)]);
   const manifestsByOrigin = Object.fromEntries(inScope.map((m) => [m.app, m]));
   return { catalogue, manifestsByOrigin, apps: list };
 }

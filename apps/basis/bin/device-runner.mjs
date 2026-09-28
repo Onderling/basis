@@ -52,6 +52,7 @@ import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
+import { createBotThreads, dataSourceThreadStore, withAssistantOps, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
@@ -647,16 +648,25 @@ if (tgToken) {
   // Telegram that answers without a model, never a device that is not there.
   const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
+  // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
+  const threads = createBotThreads({
+    eventLog: deviceLog,
+    store: dataSourceThreadStore(await stores.botThreadsSource()),
+    memoryDefault: () => agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY),
+  });
+  await threads.load();
   tgRunner = createTelegramRunner({
     bridge: new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }),
     catalogue,
     manifestsByOrigin,
-    allowedChatIds, t, callSkill, lang: values.lang,
+    // The door's own ops (a person's memory mode and language) are answered by its threads; the rest go on.
+    allowedChatIds, t, callSkill: withAssistantOps({ callSkill, threads, t }), lang: values.lang,
     // Every person is a contact with a role, and their calls carry them to the host gate.
     admit: createDoorAdmit({
       users: createBotUsers({ store: contactBookStore(callSkill), adminUid: String(process.env.TG_ADMIN_UID ?? '').trim() || null }),
       setDoorCaller: agent.setDoorCaller,
     }),
+    threads,
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
     walkLog,

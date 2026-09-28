@@ -14,7 +14,8 @@ import { mergeManifests } from '../src/manifestMerge.js';
 import { createMockHouseholdAgent, mockHouseholdManifest } from '../src/core/agent/mockAgent.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { EventLog } from '../src/eventLog.js';
-import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
+import { createBotThreads, memoryThreadStore, withAssistantOps } from '../src/v2/botThreads.js';
+import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 
 const t = (k, p) => (p && typeof p === 'object' && Object.keys(p).length ? `${k}:${JSON.stringify(p)}` : k);
 
@@ -112,5 +113,43 @@ describe('the bot\'s threads', () => {
     d.threads.setMode('telegram:111', 'short');
     await d.say('111', '/help');
     expect(d.runner.recentTurns('telegram:111').some((l) => l === 'you: /help')).toBe(true);
+  });
+
+  it('/geheugen and /taal set the person\'s own thread, through the door\'s catalogue', async () => {
+    const eventLog = new EventLog({ initial: [], muted: [] });
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const agent = createMockHouseholdAgent();
+    const threads = createBotThreads({ eventLog, store: memoryThreadStore() });
+    const { catalogue, manifestsByOrigin } = composeAssistantCatalogue({ apps: ['household'], householdManifest: mockHouseholdManifest });
+    expect(catalogue.opsById.has('assistant-memory'), 'the door offers its own ops whatever the app list').toBe(true);
+    const runner = createTelegramRunner({
+      bridge, catalogue, manifestsByOrigin, t, allowedChatIds: '*', collectMs: 0,
+      callSkill: withAssistantOps({ callSkill: (app, op, args) => agent.callSkill(app, op, args), threads, t }),
+      admit: async (who) => `${who.channel}:${who.uid}`, threads,
+    });
+    await threads.load(); await runner.start();
+    const say = async (uid, text) => { bridge.clearOutbox(); await bridge.simulateIncoming({ chatId: uid, text, sender: { bridgeUid: uid } }); await runner.idle(); return bridge.outbox.map((m) => m.text).join('\n'); };
+
+    const off = await say('111', '/geheugen off');
+    expect(threads.modeOf('telegram:111')).toBe('off');
+    expect(threads.modeOf('telegram:222'), 'only the caller\'s own thread').toBe('short');
+    expect(off).toContain('circle.bot.memory_off');
+    await say('111', '/taal en');
+    expect(threads.langOf('telegram:111')).toBe('en');
+    await say('111', '/taal auto');
+    expect(threads.langOf('telegram:111')).toBeNull();
+  });
+
+  it('a thread fixed to a language tells the interpreter to reply in it, whatever the line is in', async () => {
+    const seen = [];
+    const d = door({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore(),
+      llm: { invoke: async () => ({ text: 'ok' }) }, interpret: async (text, o = {}) => { seen.push(o); return null; } });
+    await d.start();
+    d.threads.setLang('telegram:111', 'en');
+    await d.say('111', 'wat staat er nog op de lijst');
+    expect(JSON.stringify(seen.at(-1)?.hints)).toContain('Reply in English');
+    d.threads.setLang('telegram:111', 'auto');
+    await d.say('111', 'wat staat er nog op de lijst');
+    expect(JSON.stringify(seen.at(-1)?.hints)).toContain('The member wrote in: nl');
   });
 });

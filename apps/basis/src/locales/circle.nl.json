@@ -3843,7 +3843,12 @@
     "more": {
       "text": "En verder?",
       "doc": "Assistant reply when a turn was cut short (too many acts at once, or a call the model left unfinished): the ones it could do are done, and it asks for the rest."
-    }
+    },
+    "memory_off": "Ik onthoud dit gesprek niet meer: elk bericht staat nu op zichzelf. Wat je op een lijst zet, blijft staan.",
+    "memory_short": "Ik onthoud de laatste paar berichten van dit gesprek.",
+    "memory_long": "Ik onthoud de laatste berichten van dit gesprek, en later ook wat ik over het huishouden weet.",
+    "lang_set": "Ik antwoord je voortaan in: {{lang}}.",
+    "lang_auto": "Ik antwoord je weer in de taal waarin je schrijft."
   },
   "op": {
     "not_in_this_circle": {

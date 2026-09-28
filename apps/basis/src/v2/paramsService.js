@@ -21,6 +21,7 @@
  * Only kind:user params are declared into the register (a kind:internal param is immutable by construction —
  * decision E — so it has no settable value and is never here). `set-param` refuses everything else.
  */
+import { ASSISTANT_MEMORY_DEFAULT_KEY, DEFAULT_MEMORY_MODE } from './botThreads.js';
 import { createParamRegistry, setParam, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { createSettingsModule } from '@onderling/local-store';
 // The default VALUE is imported from the declaration site, so there is one source of truth for the number;
@@ -91,6 +92,9 @@ export const BASIS_USER_PARAMS = [
   // Which apps a door's assistant may act in when the door is not a circle (the box's Telegram chat). Set by the
   // owner, read at the door's boot; the model never sets it.
   { key: 'assistant.apps',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSISTANT_APPS },
+  // How much a door's assistant remembers of a person's conversation when they have not chosen (off · short · long);
+  // the person's own choice on their thread wins. Set by the bot's admin.
+  { key: ASSISTANT_MEMORY_DEFAULT_KEY,          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_MEMORY_MODE },
 ];
 
 /**

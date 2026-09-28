@@ -60,6 +60,8 @@ const DEFAULT_THREAD = '__default__';
  * @param {() => string[]} [a.recentTurns] the door's own memory getter (rows on screen); absent → `remember()` memory
  * @param {{remember:(threadId:string, who:string, text:string) => void, recent:(threadId:string) => string[]}} [a.memory]
  *        where `remember()` keeps turns and what a thread reads back (a door's durable threads); absent → this process
+ * @param {(threadId:string) => string|null} [a.threadLang]  the language a person fixed their thread to (`/taal`);
+ *        it replaces the detected one in the turn's hint
  * @param {string} [a.botName='assistant']
  * @param {number} [a.memoryTurns]
  * @param {Function} [a.postToCircle]      the chat sink for a line that is not for the bot (circle doors)
@@ -75,7 +77,7 @@ const DEFAULT_THREAD = '__default__';
 export function createAssistantEngine({
   catalogue, dispatch, lang = 'nl', llm = null, llmProviders = null, policy, userDefault, interpret = null,
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
-  recentTurns: recentTurnsIn = null, memory: memoryIn = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
+  recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
   collectMs = COLLECT_MS, claim = null, around = null,
 } = {}) {
@@ -91,6 +93,11 @@ export function createAssistantEngine({
   const interpretIn = typeof interpret === 'function'
     ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? interpretHintsFor(text) })
     : null;
+  // A thread fixed to a language (`/taal`) says so in its hint instead of what the line looks like.
+  const interpretFor = (threadId) => (text, o = {}) => {
+    const fixed = typeof threadLang === 'function' && threadId ? threadLang(threadId) : null;
+    return interpretIn(text, fixed ? { ...o, hints: o.hints ?? [replyInHint(fixed)] } : o);
+  };
   const retrieve = typeof loadItems === 'function'
     ? makeCircleRetriever({
       loadItems,
@@ -120,7 +127,7 @@ export function createAssistantEngine({
       policy: policy ?? { llmTool: smart ? 'local' : 'off' },
       ...(userDefault !== undefined ? { userDefault } : {}),
       llmProviders: smart ? providers : null,
-      interpret: smart ? interpretIn : async () => null,
+      interpret: smart ? interpretFor(threadId) : async () => null,
       gate,
       botName,
       recentTurns: typeof recentTurnsIn === 'function' ? recentTurnsIn : () => linesFor(threadId),
@@ -227,6 +234,11 @@ export function interpretSystemFor(lang = 'nl') {
     ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
   return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}`;
+}
+
+/** The hint for a thread the person fixed to a language. LLM-facing. */
+export function replyInHint(lang) {
+  return `Reply in ${LANG_NAMES[String(lang).slice(0, 2)] ?? lang}, whatever language the member writes in.`;
 }
 
 /** This turn's hints, below the prompt's turn marker: what the member's line was written in, when that is clear. */

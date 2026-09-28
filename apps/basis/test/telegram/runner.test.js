@@ -178,3 +178,56 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(agent.state().length).toBe(before);
   });
 });
+
+describe('a door dispatches only what it offers', () => {
+  // An op with no surface is not offered on any door — the owner's recovery phrase, device enrolment and the like
+  // sit on the manifest with `surfaces: {}` so the host can call them, never a chat. A button tap arrives as its
+  // callbackData `opId:itemId`, and anyone can TYPE that text: the tap path must accept only ops that are offered as
+  // a button, and a slash only ops offered as a command.
+  // the mock household manifest plus one op that no door offers (the shape of the owner-only ops)
+  const withHidden = { ...mockHouseholdManifest, operations: [...mockHouseholdManifest.operations, { id: 'revealSecret', verb: 'get', params: [], surfaces: {} }] };
+  async function bootWithHidden() {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const agent = createMockHouseholdAgent();
+    const calls = [];
+    const callSkill = async (app, op, args) => { calls.push({ app, op }); return op === 'revealSecret' ? { mnemonic: 'the root phrase' } : agent.callSkill(app, op, args); };
+    const catalogue = mergeManifests([{ manifest: withHidden }]);
+    const runner = createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin: { household: withHidden }, allowedChatIds: '*', t });
+    await runner.start();
+    const say = async (text) => { bridge.clearOutbox(); await bridge.simulateIncoming({ chatId: '9', text, sender: { bridgeUid: '9', displayName: 'X' } }); await runner.idle?.('9'); return bridge.outbox.map((m) => m.text).join('\n'); };
+    return { say, calls };
+  }
+
+  it('a typed tap for an op with no surface is not dispatched', async () => {
+    const { say, calls } = await bootWithHidden();
+    const reply = await say('revealSecret:');
+    expect(calls.map((c) => c.op)).not.toContain('revealSecret');
+    expect(reply).not.toContain('the root phrase');
+  });
+
+  it('a slash for an op with no slash surface is not dispatched', async () => {
+    const { say, calls } = await bootWithHidden();
+    const reply = await say('/revealSecret');
+    expect(calls.map((c) => c.op)).not.toContain('revealSecret');
+    expect(reply).not.toContain('the root phrase');
+  });
+});
+
+describe('the box\'s own catalogue: no op without a button can be tapped', () => {
+  it('every surface-less op the box composes (the owner-only ones among them) is refused as a typed tap', async () => {
+    const { composeAssistantCatalogue } = await import('../../src/telegram/assistantCatalogue.js');
+    const { householdManifest } = await import('../../../household/manifest.js');
+    const { catalogue, manifestsByOrigin } = composeAssistantCatalogue({ apps: ['household', 'lists'], householdManifest });
+    const hidden = [...catalogue.opsById.entries()].filter(([, e]) => !((e.op ?? e)?.surfaces?.ui?.control === 'button')).map(([id]) => id);
+    expect(hidden).toContain('revealOwnerPhrase');
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const calls = [];
+    const runner = createTelegramRunner({ bridge, callSkill: async (app, op) => { calls.push(op); return { ok: true }; }, catalogue, manifestsByOrigin, allowedChatIds: '*', t });
+    await runner.start();
+    for (const id of hidden) {
+      await bridge.simulateIncoming({ chatId: '9', text: `${id}:`, sender: { bridgeUid: '9', displayName: 'X' } });
+      await runner.idle?.('9');
+    }
+    expect(calls.filter((op) => hidden.includes(op))).toEqual([]);
+  });
+});

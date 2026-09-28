@@ -11,11 +11,14 @@
 
 export const basisManifest = {
   app:        'basis',
+  // The network hosts this app's code reaches: the sign-in issuers it offers as presets (reached when
+  // the person picks one). The person's own pod and relay are endpoints they configure, not fixed hosts.
+  hosts:      ['login.inrupt.com', 'solidcommunity.net', 'solidweb.org'],
   itemTypes:  ['chat-thread', 'chat-message'],
 
   // B · Layer 1 — domain (non-atom) verb: `help` (meta / shell command).
   // Every other op maps to an SDK atom.
-  domainVerbs: ['help'],
+  domainVerbs: { help: 'read' },
 
   // §1a (declared-authoritative capability surface): INTENTIONALLY no `nouns` block.
   // This is the shell/unifier manifest — every op is an app-level command (help/settings/
@@ -51,6 +54,7 @@ export const basisManifest = {
       id:    'help-with',
       group: 'help',
       verb:  'add',
+      writes: { scope: 'device' },   // a thread on this device; the post itself is not touched
       params: [
         { name: 'postId', kind: 'string', required: true },
       ],
@@ -114,6 +118,7 @@ export const basisManifest = {
     {
       id:    'embed',
       verb:  'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'itemId', kind: 'string',  required: true,
           // bare `/embed` → list household chores (default app);
@@ -164,6 +169,7 @@ export const basisManifest = {
     {
       id:    'embed-file',
       verb:  'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'path',  kind: 'string',  required: false },
         { name: 'pick',  kind: 'boolean', required: false },
@@ -199,6 +205,7 @@ export const basisManifest = {
     {
       id:    'embed-time',
       verb:  'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'title',    kind: 'string', required: true  },
         { name: 'when',     kind: 'date',   required: true  },
@@ -316,6 +323,7 @@ export const basisManifest = {
       id:    'signin',
       group: 'identity',
       verb:  'add',
+      writes: { scope: 'device' },
       params: [
         { name: 'issuer', kind: 'string', required: false },
       ],
@@ -404,6 +412,7 @@ export const basisManifest = {
       id:    'send-file',
       group: 'connectivity',
       verb:  'add',
+      writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
       params: [
         { name: 'peer', kind: 'string', required: true },
       ],
@@ -443,6 +452,7 @@ export const basisManifest = {
       id:    'publish-peer',
       group: 'connectivity',
       verb:  'add',
+      writes: { scope: 'person' },
       params: [],
       surfaces: {
         slash: { command: '/publish-peer' },
@@ -461,6 +471,7 @@ export const basisManifest = {
       id:    'rotate-identity',
       group: 'identity',
       verb:  'add',
+      writes: { scope: 'device' },   // this device's chat key; peers are told, nothing shared is written
       params: [],
       surfaces: {
         slash: { command: '/rotate-identity' },
@@ -499,6 +510,7 @@ export const basisManifest = {
       id:    'set-relay',
       group: 'device',
       verb:  'submit',
+      writes: { scope: 'device' },
       params: [
         { name: 'url',   kind: 'string',  required: false },
         { name: 'clear', kind: 'boolean', required: false },
@@ -523,6 +535,7 @@ export const basisManifest = {
       id:    'transport-mode',
       group: 'device',
       verb:  'submit',
+      writes: { scope: 'device' },
       params: [
         { name: 'mode', kind: 'enum', of: ['nkn', 'relay', 'both'], required: true },
       ],
@@ -665,6 +678,7 @@ export const basisManifest = {
       id:    'mute',
       group: 'people',
       verb:  'add',
+      writes: { scope: 'device' },
       params: [
         { name: 'peer', kind: 'string', required: true },
       ],
@@ -682,6 +696,7 @@ export const basisManifest = {
       id:    'unmute',
       group: 'people',
       verb:  'add',
+      writes: { scope: 'device' },
       params: [
         { name: 'peer', kind: 'string', required: true },
       ],
@@ -754,6 +769,7 @@ export const basisManifest = {
       id:    'peer-connect',
       group: 'connectivity',
       verb:  'add',
+      writes: { scope: 'device' },
       params: [],
       surfaces: {
         slash: { command: '/peer-connect' },
@@ -771,6 +787,7 @@ export const basisManifest = {
       id:    'test-peer',
       group: 'connectivity',
       verb:  'add',
+      writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
       params: [
         // 2026-05-27 slash audit close-out — param renamed
         // `address` → `addr` to match the user-facing locale
@@ -791,6 +808,7 @@ export const basisManifest = {
       id:    'signout',
       group: 'identity',
       verb:  'remove',
+      writes: { scope: 'device' },
       params: [],
       surfaces: {
         // No CHAT surface — see `signin`. Ending a session is the person's act.

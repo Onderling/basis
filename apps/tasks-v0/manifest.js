@@ -48,6 +48,9 @@ const STR_NONEMPTY = { schema: { minLength: 1 } };
 
 export const tasksManifest = {
   app:       'tasks',
+  // The network hosts this app's code reaches: the Telegram bot bridge of the tasks server, and Expo's
+  // push service when that server is started with push.
+  hosts:     ['api.telegram.org', 'exp.host'],
   /*
    * .3 (2026-05-20) — `'inbox-item'` joins as an app-local
    * (non-canonical, F-SP1-a) item type so the `inbox` view can declare
@@ -79,7 +82,7 @@ export const tasksManifest = {
 
   // B · Layer 1 — domain (non-atom) verb: `tree` (DAG traversal of the task
   // graph — structural, not a plain `list`).  All other ops map to SDK atoms.
-  domainVerbs: ['tree'],
+  domainVerbs: { tree: 'read' },
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set — a broad `appliesTo` can no
@@ -97,6 +100,7 @@ export const tasksManifest = {
     {
       id:        'addTask',
       verb:      'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'text',             kind: 'string', required: true, ...STR_NONEMPTY },
@@ -134,6 +138,7 @@ export const tasksManifest = {
     {
       id:        'claimTask',
       verb:      'claim',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['open'] },                      // F-SP3-a
       // DECLARATION LAYER (#34) — this op writes the task's `assignee` under the CLAIM policy (first-wins /
       // immutable-once-set): concurrent claims resolve to the first grab, not the latest write. Declared per-op,
@@ -177,6 +182,7 @@ export const tasksManifest = {
       // visibility live in the rolePolicy the projector reads.
       id:        'confirmClaim',
       verb:      'confirm',
+      writes: { scope: 'circle' },
       // Shows on a PENDING claim (explicit-confirm, not yet ratified) — the state `effectiveStatus` reports
       // as `pending-confirmation`. An auto-confirmed / already-confirmed claim is `claimed` and needs no button.
       appliesTo: { type: 'task', state: ['pending-confirmation'] },
@@ -198,6 +204,7 @@ export const tasksManifest = {
     {
       id:        'completeTask',
       verb:      'complete',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['claimed'] },                   // F-SP3-a
       params: [
         {
@@ -252,6 +259,7 @@ export const tasksManifest = {
     {
       id:        'removeTask', group: 'compose',
       verb:      'remove',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -282,6 +290,7 @@ export const tasksManifest = {
     {
       id:        'attachTaskGrant',
       verb:      'update',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'taskId', kind: 'string', required: true, ...ID_NONEMPTY  },
@@ -304,6 +313,7 @@ export const tasksManifest = {
     {
       id:        'reassignTask', group: 'admin',
       verb:      'reassign',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'id',          kind: 'string', required: true, ...ID_NONEMPTY  },
@@ -316,6 +326,7 @@ export const tasksManifest = {
     {
       id:        'submitTask',
       verb:      'submit',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['claimed', 'rejected'] },        // F-SP3-a
       params: [
         {
@@ -336,6 +347,7 @@ export const tasksManifest = {
     {
       id:        'approveTask',
       verb:      'approve',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['submitted'] },                  // F-SP3-a
       params: [
         {
@@ -356,6 +368,7 @@ export const tasksManifest = {
     {
       id:        'rejectTask',
       verb:      'reject',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['submitted'] },                  // F-SP3-a
       params: [
         {
@@ -381,6 +394,7 @@ export const tasksManifest = {
     {
       id:        'revokeTask',
       verb:      'revoke',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['claimed', 'submitted', 'rejected'] },  // F-SP3-a
       params: [
         { name: 'id',     kind: 'string', required: true, ...ID_NONEMPTY  },
@@ -473,6 +487,7 @@ export const tasksManifest = {
     {
       id:        'resolveClaim', group: 'admin',
       verb:      'reassign',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'taskId',   kind: 'string', required: true, ...ID_NONEMPTY },
@@ -574,6 +589,7 @@ export const tasksManifest = {
     {
       id:        'clearInboxItem',
       verb:      'remove',
+      writes: { scope: 'person' },   // the inbox is per person and cross-app, not the circle's
       appliesTo: { type: 'inbox-item' },
       params: [
         { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -608,6 +624,7 @@ export const tasksManifest = {
     {
       id:        'approveSubtaskRequest',
       verb:      'approve',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-request' },
       params: [
         { name: 'requestId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -622,6 +639,7 @@ export const tasksManifest = {
     {
       id:        'declineSubtaskRequest',
       verb:      'reject',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-request' },
       params: [
         { name: 'requestId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -637,6 +655,7 @@ export const tasksManifest = {
     {
       id:        'approveSubtaskProposal',
       verb:      'approve',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-proposal' },
       params: [
         { name: 'proposalId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -651,6 +670,7 @@ export const tasksManifest = {
     {
       id:        'declineSubtaskProposal',
       verb:      'reject',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-proposal' },
       params: [
         { name: 'proposalId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -666,6 +686,7 @@ export const tasksManifest = {
     {
       id:        'clearInbox',
       verb:      'remove',
+      writes: { scope: 'person' },   // the inbox is per person and cross-app, not the circle's
       appliesTo: { type: 'inbox-item' },          // matches every event in the section
       params: [
         { name: 'olderThanMs', kind: 'number' },  // optional age cutoff
@@ -734,6 +755,7 @@ export const tasksManifest = {
     {
       id:        'archiveCircle',
       verb:      'archive',
+      writes: { scope: 'circle' },
       // Part G (2026-06-17) — the mock declared a `confirm` flag; realAgent's
       // two-step gate reads `args.confirm`. Additive (real had no params).
       params:    [
@@ -761,6 +783,7 @@ export const tasksManifest = {
     {
       id:        'unarchiveCircle',
       verb:      'unarchive',
+      writes: { scope: 'circle' },
       params:    [],
       appliesTo: { type: 'circle' },
       surfaces: {
@@ -789,6 +812,7 @@ export const tasksManifest = {
      */
     {
       id:    'editTask', verb: 'edit',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['open', 'claimed'] },
       // DECLARATION LAYER (#34) — an edit to the task's `text` (body content) resolves under the CONTENT policy
       // (LWW-register): the latest edit survives. Same `task` type as claimTask, different field, different
@@ -819,6 +843,7 @@ export const tasksManifest = {
      */
     {
       id:    'provisionMyCircle', group: 'admin', verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'name', kind: 'string', required: true },
         { name: 'kind', kind: 'enum',
@@ -859,6 +884,7 @@ export const tasksManifest = {
     },
     {
       id:    'setMyAvailability', group: 'compose', verb: 'submit',
+      writes: { scope: 'circle' },
       params: [
         { name: 'cellKey', kind: 'string', required: true },
       ],
@@ -869,6 +895,7 @@ export const tasksManifest = {
     },
     {
       id:    'setAvailabilityOptIn', group: 'compose', verb: 'submit',
+      writes: { scope: 'circle' },
       params: [
         { name: 'on', kind: 'enum', of: ['on', 'off'], required: true },
       ],
@@ -896,6 +923,7 @@ export const tasksManifest = {
     },
     {
       id:    'acceptSchedule', verb: 'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'schedule-slot' },
       params: [
         { name: 'slotKey', kind: 'string', required: true },
@@ -965,6 +993,7 @@ export const tasksManifest = {
     },
     {
       id:    'pauseCircle', group: 'admin', verb: 'submit',
+      writes: { scope: 'circle' },
       params: [],
       surfaces: {
         slash: { command: '/pause-circle' },
@@ -973,6 +1002,7 @@ export const tasksManifest = {
     },
     {
       id:    'unpauseCircle', group: 'admin', verb: 'submit',
+      writes: { scope: 'circle' },
       params: [],
       surfaces: {
         slash: { command: '/unpause-circle' },
@@ -986,6 +1016,7 @@ export const tasksManifest = {
      */
     {
       id:    'issueInvite', group: 'admin', verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'role',      kind: 'enum',   of: ['member', 'admin'], required: false },
         { name: 'ttl-hours', kind: 'number', required: false },
@@ -997,6 +1028,7 @@ export const tasksManifest = {
     },
     {
       id:    'redeemInvite', group: 'admin', verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'invite',      kind: 'string', required: true },
         { name: 'displayName', kind: 'string', required: false },
@@ -1016,6 +1048,7 @@ export const tasksManifest = {
      */
     {
       id:    'addSubtask', verb: 'add',
+      writes: { scope: 'circle' },
       // Also on a PENDING claim: the claimant may decompose optimistically (a provisional subtree, §2.5).
       appliesTo: { type: 'task', state: ['open', 'claimed', 'pending-confirmation'] },
       params: [
@@ -1035,6 +1068,7 @@ export const tasksManifest = {
     },
     {
       id:    'proposeSubtask', verb: 'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['submitted'] },
       params: [
         { name: 'parentTaskId',     kind: 'string', required: true },
@@ -1052,6 +1086,7 @@ export const tasksManifest = {
     },
     {
       id:    'forceSpawnSubtask', group: 'compose', verb: 'add',
+      writes: { scope: 'circle' },
       // Admin-only escape hatch — no row button (admins use the slash).
       params: [
         { name: 'parentTaskId',     kind: 'string', required: true },

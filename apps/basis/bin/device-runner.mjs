@@ -66,6 +66,7 @@ import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
+import { shareDisclosureToCircle } from '../src/core/handlers/personaPropsUpdate.js';
 import { makeCircleAddressAnnouncePeerHandler, announceOwnCircleAddress, propagateCircleAddressesAfterJoin } from '../src/v2/circleAddressAnnounce.js';
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../src/core/handlers/groupRedeem.js';
 import { createPairRoster } from '../src/v2/pairRoster.js';

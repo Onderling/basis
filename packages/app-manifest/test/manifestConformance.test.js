@@ -68,7 +68,7 @@ describe('manifestConformance: the guard bites (negative cases)', () => {
     app: 'probe',
     itemTypes: ['thing'],
     operations: [{ id: 'help', verb: 'help' }],
-    domainVerbs: ['help'],
+    domainVerbs: { help: 'read' },
   });
 
   it('accepts a minimal conformant manifest', () => {

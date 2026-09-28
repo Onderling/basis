@@ -9,7 +9,7 @@ import { effectiveCapabilities, checkCapability, capabilityKey } from '../../src
 const household = {
   app: 'household',
   itemTypes: ['shopping', 'task', 'contact'],
-  domainVerbs: ['help', 'register'],
+  domainVerbs: { help: 'read', register: 'write' },
   nouns: {
     shopping: { atoms: ['add', 'list', 'complete', 'remove'] },
     task:     { atoms: ['add', 'complete', 'claim'] },

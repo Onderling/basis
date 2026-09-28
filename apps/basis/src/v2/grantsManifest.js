@@ -23,12 +23,13 @@ export const OWN_DEVICES_SCOPE = 'own-devices';
 
 export const grantsManifest = Object.freeze({
   app: 'grants',
+  hosts: [],
   itemTypes: [],
   nouns: {},
   operations: [
-    { id: 'grants.grant',  description: 'The owner pairs a view: a standing connection grant (metadata + the minted token ids — the token blobs go to the view, never the lane).', appends: [{ lane: GRANTS_LANE, kind: 'grant' }] },
-    { id: 'grants.revoke', description: 'The owner unpairs a view (deny-wins: a revoke defeats any grant that did not causally see it, on every device).',                          appends: [{ lane: GRANTS_LANE, kind: 'grant-revoke' }] },
-    { id: 'grants.revoke-tokens', description: 'The owner cancels named tokens by id, whatever minted them (a task grant today; any issuer-side source tomorrow) — deny-wins at every device\'s door once the statement lands.', appends: [{ lane: GRANTS_LANE, kind: 'token-revoke' }] },
+    { id: 'grants.grant',  description: 'The owner pairs a view: a standing connection grant (metadata + the minted token ids — the token blobs go to the view, never the lane).', writes: { scope: 'person' }, appends: [{ lane: GRANTS_LANE, kind: 'grant' }] },
+    { id: 'grants.revoke', description: 'The owner unpairs a view (deny-wins: a revoke defeats any grant that did not causally see it, on every device).',                          writes: { scope: 'person' }, appends: [{ lane: GRANTS_LANE, kind: 'grant-revoke' }] },
+    { id: 'grants.revoke-tokens', description: 'The owner cancels named tokens by id, whatever minted them (a task grant today; any issuer-side source tomorrow) — deny-wins at every device\'s door once the statement lands.', writes: { scope: 'person' }, appends: [{ lane: GRANTS_LANE, kind: 'token-revoke' }] },
   ],
 });
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# deploy/box/install.sh — one shot on a fresh Debian/Ubuntu VPS: Docker, the box user, the repos at
-# their release branch, the firewall (80 + 443 only), the systemd timer, and the profile questions.
+# deploy/box/install.sh — one shot on a fresh Debian/Ubuntu machine: Docker, the box user, the repos at
+# their release branch, the firewall (SSH, Tailscale when present, 80 + 443 only for a box that serves the web),
+# the systemd timer, and the profile questions.
 # Every step here is a step of deploy/DEPLOY-RUNBOOK.md Path B; the runbook stays the explanation.
 #
 #   curl -fsSL https://raw.githubusercontent.com/Onderling/basis/live/deploy/box/install.sh | sudo bash
@@ -17,6 +18,18 @@ BOX_REPO_URL="${BOX_REPO_URL:-https://github.com/Onderling/basis.git}"
 BOX_BRANCH="${BOX_BRANCH:-live}"
 FEEDBACK_REPO_URL="${FEEDBACK_REPO_URL:-https://github.com/Onderling/feedback.git}"
 SKIP_SYSTEM="${SKIP_SYSTEM:-0}"     # 1 = no apt/docker/user/firewall (tests, or a box you prepared yourself)
+
+# The firewall rules for a box's roles, one `ufw` argument list per line.
+#   firewall_rules "<roles>" <tailscale:0|1>
+# SSH by port number: the "OpenSSH" ufw profile exists only with the openssh-server package, and a machine reached
+# over Tailscale SSH may have none (the install stopped there on the household tablet, 2026-09-28). Tailscale's own
+# interface stays open, so enabling the firewall cannot cut the way in. 80 + 443 only where a web server runs.
+firewall_rules() {
+  echo "allow 22/tcp"
+  [ "${2:-0}" = 1 ] && echo "allow in on tailscale0"
+  case " $1 " in *" caddy@"*) echo "allow 80/tcp"; echo "allow 443/tcp" ;; esac
+  return 0
+}
 
 ask() {   # ask VAR "question" [default]
   local var="$1" q="$2" def="${3:-}"
@@ -36,7 +49,8 @@ ask PROFILE "Profile (relay | platform | feedback-project | personal)" relay
 case "$PROFILE" in
   relay)            ROLES="caddy@basis relay@basis"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH" ;;
   platform)         ROLES="caddy@basis relay@basis pod@basis companion@basis backup@basis"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH" ;;
-  personal)         ROLES="companion@basis assistant@basis"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH" ;;
+  # personal: the assistant only, for now — the companion's image cannot start (its core copy misses a dependency)
+  personal)         ROLES="assistant@basis"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH" ;;
   feedback-project) ROLES="caddy@basis relay@basis pod@basis backup@basis feedback-collect@feedback feedback-aggregate@feedback"; REPOS="basis=$BOX_REPO_URL#$BOX_BRANCH feedback=$FEEDBACK_REPO_URL#$BOX_BRANCH" ;;
   *) echo "profile '$PROFILE' is not built yet — only 'relay' is (plans/PLAN-vps-runner.md §6)"; exit 2 ;;
 esac
@@ -75,7 +89,11 @@ if [ "$SKIP_SYSTEM" != 1 ]; then
   fi
   id "$BOX_USER" >/dev/null 2>&1 || useradd -r -m -d "$BOX_DIR" -s /bin/bash -G docker "$BOX_USER"
   if command -v ufw >/dev/null; then
-    ufw allow OpenSSH >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443 >/dev/null
+    ts=0; ip link show tailscale0 >/dev/null 2>&1 && ts=1
+    while read -r rule; do
+      # shellcheck disable=SC2086
+      ufw $rule >/dev/null
+    done < <(firewall_rules "$ROLES" "$ts")
     ufw --force enable >/dev/null
   fi
 fi
@@ -166,7 +184,7 @@ fi
 echo
 echo "box: $BOX_DIR  profile: $PROFILE"
 [ -n "$RELAY_DOMAIN" ] && echo "relay: wss://$RELAY_DOMAIN   (media edge https://$RELAY_DOMAIN/blob-gate once R2_* is set)"
-[ "$PROFILE" = personal ] && echo "personal: companion dialing $COMPANION_RELAY_URL · assistant on Telegram (chats: ${TG_ALLOWED_CHAT_IDS:-open})"
+[ "$PROFILE" = personal ] && echo "personal: the assistant on Telegram (chats: ${TG_ALLOWED_CHAT_IDS:-open}), dialing $COMPANION_RELAY_URL"
 [ -n "$POD_DOMAIN" ] && echo "pod:   https://$POD_DOMAIN/"
 [ -n "$RELAY_DOMAIN" ] && echo "status page: https://$RELAY_DOMAIN/box/"
 [ -n "$PORTAL_HOST" ] && echo "portal: https://$PORTAL_HOST/   activation: https://$ACTIVATE_HOST/   new project: sudo -u $BOX_USER docker compose --project-name onderling exec feedback-bots node scripts/project.js new <id> --template or-feedback --css-url http://pod:3000"

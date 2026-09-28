@@ -133,3 +133,57 @@ export function classifyVerb(verb) {
 
 /** The Atom for a canonical verb (no alias resolution), or `undefined`. */
 export function atomFor(canonicalVerb) { return BY_CANONICAL.get(canonicalVerb); }
+
+/**
+ * The atoms that only READ. Every other atom changes something — creates, mutates, deletes, moves an
+ * item through its lifecycle, or shares it — so an op using one of them is a WRITING op.
+ * @type {ReadonlyArray<string>}
+ */
+export const READ_ATOMS = Object.freeze(['list', 'get']);
+
+/**
+ * True iff `verb` is an atom (canonical or alias) that writes: every atom except the read ones.
+ * A domain verb (not an atom) is neither here — the atom catalogue cannot say what it does; the
+ * manifest classifies it in its `domainVerbs` map (see `verbKind`).
+ * @param {string} verb
+ */
+export function isWritingVerb(verb) {
+  const canonical = canonicalAtom(verb);
+  return canonical !== null && !READ_ATOMS.includes(canonical);
+}
+
+/**
+ * How a manifest classifies each of its domain verbs: `domainVerbs` is a map `{ verb: 'read' | 'write' }`.
+ * @type {ReadonlyArray<'read'|'write'>}
+ */
+export const DOMAIN_VERB_KINDS = Object.freeze(['read', 'write']);
+
+/**
+ * Does an op's verb read or write, in this manifest?
+ *   • an atom — the catalogue says (`READ_ATOMS` read, every other atom writes);
+ *   • a domain verb — the manifest's `domainVerbs` map says;
+ *   • no verb at all — `'write'`: nothing says it only reads;
+ *   • `null` — a domain verb the manifest has not classified. Callers treat that as an error, never as a
+ *     read: the default is the safe one, so a new verb cannot slip past as a silent read.
+ * @param {object} manifest
+ * @param {string} [verb]
+ * @returns {'read'|'write'|null}
+ */
+export function verbKind(manifest, verb) {
+  if (typeof verb !== 'string' || verb === '') return 'write';
+  if (isAtom(verb)) return isWritingVerb(verb) ? 'write' : 'read';
+  const map = manifest?.domainVerbs;
+  if (!map || typeof map !== 'object' || Array.isArray(map) || !Object.hasOwn(map, verb)) return null;
+  return DOMAIN_VERB_KINDS.includes(map[verb]) ? map[verb] : null;
+}
+
+/**
+ * Where a writing op writes — the value set of an op's `writes: { scope }` declaration.
+ *   • `device` — only on this device (local settings, caches, this device's own registrations);
+ *   • `person` — the person's own data, which follows them across their devices (profile and persona
+ *                properties, the contacts book, personal settings);
+ *   • `circle` — the circle's shared store or log, which syncs to the circle's other members.
+ * Not the same axis as a setting's or a param's `scope` (who a SETTING applies to).
+ * @type {ReadonlyArray<'device'|'person'|'circle'>}
+ */
+export const WRITE_SCOPES = Object.freeze(['device', 'person', 'circle']);

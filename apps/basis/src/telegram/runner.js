@@ -38,6 +38,9 @@ const CONFIRM_NO  = '__confirm:no';
  *   open-door mode for a first try; a list pairs exactly those chats and tells any other chat its id
  * @param {(key:string, params?:object) => string} a.t
  * @param {(chatId:string) => string} [a.threadFor]  the thread id a chat maps to (default: the chat id)
+ * @param {(who:{channel:string, uid:string, displayName:string|null}) => Promise<string|null>} [a.admit]  the host's
+ *   door: admits the person behind a message and returns their caller id. Every call the turn makes then carries it
+ *   (`callSkill(app, op, args, {caller})`) and the host's gate checks it. A door without it calls as the host.
  * @param {{evaluate:Function}|null} [a.gate]        (tests) an engine override — see `engine` below
  * @param {Function|null} [a.interpret]              the NL→op interpreter (`interpretToCommand`) — only with an LLM route
  * @param {object|null} [a.llm]                      the LlmClient the interpreter runs on (the confidential route); null → basic mode
@@ -49,7 +52,7 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -94,7 +97,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   async function run(chatId, ready) {
     let reply;
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
-    try { reply = await runDispatch(ready, callSkill); }
+    // The person this turn is for: every call carries them, so the host's gate decides what they reach.
+    const caller = turns.get(chatId)?.caller ?? null;
+    const call = caller ? (app, op, args) => callSkill(app, op, args, { caller }) : callSkill;
+    try { reply = await runDispatch(ready, call); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin }));
   }
@@ -233,7 +239,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const chatId = ctx.chatId;
     const text = lines.map((l) => String(l ?? '').trim()).join('\n');
     const started = Date.now();
-    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}) });
+    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}) });
     let r;
     try {
       r = await run();
@@ -247,7 +253,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       // An op's result is the SYSTEM speaking; only a model reply is the assistant's own words.
       const voice = rec?.opId || rec?.route === 'help' ? 'system' : 'assistant';
       for (const reply of rec?.replies ?? []) engine.remember(threadId, voice, reply.text);
-      if (rec && typeof walkLog === 'function') { try { walkLog({ ...rec, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
+      // The log keeps the chat's last digits, never the person's id.
+      if (rec && typeof walkLog === 'function') { try { const { caller: _who, ...logged } = rec; walkLog({ ...logged, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
     return r;
   }
@@ -285,7 +292,15 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const text = String(msg?.text ?? '').trim();
     if (!chatId || !text) return;
     if (!open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
-    await engine.ask(threadFor(chatId), text, { chatId });
+    // Who is asking: the person, not the chat (a group chat holds several). No admission, no turn.
+    let caller = null;
+    if (typeof admit === 'function') {
+      try {
+        caller = await admit({ channel: 'telegram', uid: String(msg?.sender?.bridgeUid || chatId), displayName: msg?.sender?.displayName ?? null });
+      } catch { caller = null; }
+      if (!caller) { await say(chatId, t('circle.telegram.unknown')); return; }
+    }
+    await engine.ask(threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
   }
 
   // The bridge is let go as soon as the line is in its lane: a long-polling bridge fetches the next updates only when

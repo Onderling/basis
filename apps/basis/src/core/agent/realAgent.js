@@ -62,6 +62,9 @@ import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the govern
  *  (one replay serve is up to 1000 items against a burst-30 bucket). Replies only: requests and
  *  every other envelope stay bucketed, and each exempted reply still faces its rail's full
  *  verify-on-ingest gate. */
+// The tiers a door may give the people it admits, by role. Never `private`: that is the owner's own, self only.
+const DOOR_TIER_FOR_ROLE = Object.freeze({ member: 'authenticated', admin: 'trusted' });
+
 const CATCHUP_REPLY_SUBTYPES = new Set([
   GOV_CATCHUP_BATCH,
   MEMBERSHIP_CATCHUP_SUBTYPES.batch,
@@ -3021,6 +3024,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * 5 + the mobile pivot).
    */
 
+  // The host gate's trust registry — the door sets the tier of the people it admits here (setDoorCaller).
+  let hostTrustRegistry = null;
   /* Identity step 2.4a/2.4b — attach a PolicyEngine to hostAgent so scoped access is ENFORCED
    * (the gate was structurally absent: hostAgent.policyEngine was null, so taskExchange/A2ATransport
    * skipped it for host traffic). The owner-only CONTROL + secret-material skills (the phrase, the root,
@@ -3031,7 +3036,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
   try {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
-    const hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? makeBrowserVault('cc-host-trust:'));
+    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? makeBrowserVault('cc-host-trust:'));
     hostAgent.policyEngine = new PolicyEngine({
       trustRegistry: hostTrustRegistry,
       skillRegistry: hostAgent.skills,
@@ -3096,6 +3101,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   // by RolePolicy.
   const tasksCircle = await createBrowserMultiCircleTasksAgent({
     bus,
+    // the host that may vouch for a door's person (`actor`): its caller here is the owner's chat agent
+    hostKey: chatId.pubKey,
     identityVault: tasksIdentityVault,
     // THE ONE MEMBERSHIP ANSWER for the tasks app's authority gates: this circle's folded roster,
     // read through the waist. The tasks bundle composes its own member list locally (with this
@@ -3918,7 +3925,30 @@ export async function createRealHouseholdAgent(opts = {}) {
     agent: selfAgent,
   }));
 
-  const callSkill = async (appOrigin, opId, args) => {
+  /**
+   * A person at a door is a CALLER: before a door's call runs, the host gate checks their tier against the op's
+   * visibility — the same check a peer meets (`checkCaller`). A host skill is judged by its own visibility (the
+   * owner's own skills are `private`: self only, whatever tier anyone holds); any other op a door reaches is an
+   * ordinary one (`authenticated`: an admitted member). A stranger (no record) is `public`. Fails closed: no gate,
+   * no door call.
+   * @returns {Promise<string|null>} the refusal's code, or null when the caller may go on
+   */
+  const doorRefusal = async (opId, caller) => {
+    const engine = hostAgent.policyEngine;
+    if (!engine || typeof engine.checkCaller !== 'function') return 'no-gate';
+    try {
+      await engine.checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility: 'authenticated', enabled: true }, unknownAs: 'public' });
+      return null;
+    } catch (e) { return e?.code ?? 'refused'; }
+  };
+
+  const callSkill = async (appOrigin, opId, args, ctx = {}) => {
+    // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
+    if (typeof ctx?.caller === 'string' && ctx.caller) {
+      const refusal = await doorRefusal(opId, ctx.caller);
+      if (refusal) return { ok: false, error: refusal };
+      if (appOrigin === 'tasks') args = { ...(args ?? {}), actor: ctx.caller };
+    }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and
     // route to the app's capability entry ("declare a noun → get CRUD free"). ADDITIVE: a
@@ -4053,7 +4083,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Derived ops (not in the real circle agent): build the reply
       // from listMine + a small shape adapter.
       if (opId === 'briefSummary' || opId === 'tasks_briefSummary') {
-        const list = await callSkill('tasks', 'listMine', {});
+        const list = await callSkill('tasks', 'listMine', args?.actor ? { actor: args.actor } : {});
         const items = (list?.items ?? []).filter((t) => t.state === 'open');
         if (items.length === 0) return { ok: true };   // empty → /brief skips
         return {
@@ -4064,7 +4094,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (opId === 'searchTasks') {
         const q = String(args?.query ?? '').toLowerCase();
         if (!q) return { items: [] };
-        const list = await callSkill('tasks', 'listMine', {});
+        const list = await callSkill('tasks', 'listMine', args?.actor ? { actor: args.actor } : {});
         const hits = (list?.items ?? []).filter((t) =>
           String(t.text ?? t.title ?? '').toLowerCase().includes(q),
         );
@@ -6042,6 +6072,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Diagnostic (step 2.4a) — the enforcement gate on the host skills' agent. Non-null proves
     // the PolicyEngine attached (vs the try/catch having silently swallowed it).
     hostPolicyEngine: hostAgent.policyEngine ?? null,
+    /**
+     * A door admitted a person with a role: set their tier in the host gate. member → `authenticated`, admin →
+     * `trusted`. Nothing else: the owner's level (`private`) is self only and cannot be given from a door.
+     */
+    setDoorCaller: async (callerId, role) => {
+      const tier = DOOR_TIER_FOR_ROLE[role];
+      if (!tier) throw new Error(`setDoorCaller: a door gives only ${Object.keys(DOOR_TIER_FOR_ROLE).join(' or ')} (got "${role}")`);
+      if (!hostTrustRegistry) throw new Error('setDoorCaller: the host gate is not attached');
+      if (typeof callerId !== 'string' || !callerId) throw new Error('setDoorCaller: a caller id is required');
+      await hostTrustRegistry.setTier(callerId, tier);
+    },
     // Who may retire this device's addresses: the owner root, at a ceremony (core ceremonyCommitment.js).
     ceremonyCommitmentFor, signCeremonyCommitment,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)

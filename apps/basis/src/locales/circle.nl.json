@@ -3889,7 +3889,8 @@
     "cohort_closed": "De groep is gesloten: geen enkele code werkt nog.",
     "invite_code": "Code (één persoon, één keer): {{code}}\nDie persoon stuurt de bot: /start {{code}}",
     "revoke_unknown": "Ik ken niemand die \"{{who}}\" heet. /users laat zien wie er is.",
-    "revoked": "{{who}} is niet meer toegelaten. Met een nieuwe code kan die persoon terugkomen."
+    "revoked": "{{who}} is niet meer toegelaten. Met een nieuwe code kan die persoon terugkomen.",
+    "invite_link": "Of stuur deze link, die opent de bot en stuurt de code: {{link}}"
   },
   "op": {
     "not_in_this_circle": {

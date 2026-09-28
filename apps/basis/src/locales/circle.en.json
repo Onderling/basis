@@ -3889,7 +3889,8 @@
     "cohort_closed": "The group is closed: no code works any more.",
     "invite_code": "Code (one person, once): {{code}}\nThat person sends the bot: /start {{code}}",
     "revoke_unknown": "I know nobody called \"{{who}}\". /users shows who is here.",
-    "revoked": "{{who}} is no longer admitted. A new code brings them back."
+    "revoked": "{{who}} is no longer admitted. A new code brings them back.",
+    "invite_link": "Or send this link, which opens the bot and sends the code: {{link}}"
   },
   "op": {
     "not_in_this_circle": {

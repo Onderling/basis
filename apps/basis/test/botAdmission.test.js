@@ -39,7 +39,7 @@ async function door(state, { adminUid = '1', bootstrapUids = [] } = {}) {
     callSkill: withAssistantOps({
       callSkill: (app, op, args) => agent.callSkill(app, op, args), threads, t,
       refusal: async (_op, caller, visibility) => (visibility === 'trusted' && tiers.get(caller) !== 'admin' ? 'INSUFFICIENT_TIER' : null),
-      admin: { catalogue: doorCatalogue, users: () => users.list(), admission, revoke: (name) => users.revoke(name) },
+      admin: { catalogue: doorCatalogue, users: () => users.list(), admission, revoke: (name) => users.revoke(name), inviteLink: (code) => `https://t.me/huisbot?start=${code}` },
     }),
     admit: createDoorAdmit({
       users, admission, bootstrapUids: [adminUid, ...bootstrapUids],
@@ -69,8 +69,10 @@ describe('admission by code', () => {
   it('/cohort and /invite from the admin; /start <code> admits once; a second use is refused', async () => {
     const d = await door(boxState());
     await d.say('1', '/cohort 5 7');
-    const code = codeIn(await d.say('1', '/invite'));
+    const invite = await d.say('1', '/invite');
+    const code = codeIn(invite);
     expect(code, 'the admin got a code').toBeTruthy();
+    expect(invite, 'and the link that sends it').toContain(`https://t.me/huisbot?start=${code}`);
     const ann = await d.say('20', `/start ${code}`);
     expect(ann).toContain('circle.bot.welcome');
     expect((await d.users.list()).some((u) => u.id === 'telegram:20' && u.role === 'member')).toBe(true);

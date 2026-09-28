@@ -664,6 +664,7 @@ if (tgToken) {
   const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
+  const tgBridge = new TelegramBridge({ botToken: tgToken, mode: 'long-polling' });
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Every person is a contact with a role, and their calls carry them to the host gate.
   const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
@@ -674,9 +675,11 @@ if (tgToken) {
   });
   // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
   // console, never a chat or the walk log) — the first person admitted is the bot's admin.
+  let bootstrapCode = null;
   if (!bootstrapUids.length && !(await botUsers.list()).some((u) => u.role === 'admin')) {
     await admission.openCohort({ ceiling: 1, days: 1 });
-    console.log(`device-runner: this bot has no admin yet — send it, within a day:  /start ${await admission.code()}`);
+    bootstrapCode = await admission.code();
+    console.log(`device-runner: this bot has no admin yet — send it, within a day:  /start ${bootstrapCode}`);
   }
   // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
   const threads = createBotThreads({
@@ -686,7 +689,7 @@ if (tgToken) {
   });
   await threads.load();
   tgRunner = createTelegramRunner({
-    bridge: new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }),
+    bridge: tgBridge,
     catalogue: doorCatalogue.catalogue,
     manifestsByOrigin: doorCatalogue.manifestsByOrigin,
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are
@@ -699,6 +702,8 @@ if (tgToken) {
         users: () => botUsers.list(),
         admission,
         revoke: (who) => botUsers.revoke(who),
+        // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
+        inviteLink: (code) => (tgBridge.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
         status: async () => ({
           model: llm ? llmModel : null, door: 'codes', turns: turnLogMode ?? 'off',
           memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
@@ -714,6 +719,7 @@ if (tgToken) {
     turnLogMode,
   });
   await tgRunner.start();
+  if (bootstrapCode && tgBridge.botUsername) console.log(`device-runner: …or open  https://t.me/${tgBridge.botUsername}?start=${bootstrapCode}`);
   walkLog({ kind: 'telegram', door: 'codes', bootstrap: bootstrapUids.length, llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
 }
 

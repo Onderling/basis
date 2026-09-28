@@ -20,7 +20,8 @@ import { assistantManifest } from './assistantManifest.js';
  * @param {{catalogue?: ReturnType<import('../telegram/assistantCatalogue.js').createDoorCatalogue>,
  *          status?: () => object|Promise<object>, users?: () => Promise<object[]>,
  *          admission?: ReturnType<import('./botAdmission.js').createBotAdmission>,
- *          revoke?: (who: string) => Promise<object|null>}} [a.admin]  what the admin's ops read and change
+ *          revoke?: (who: string) => Promise<object|null>,
+ *          inviteLink?: (code: string) => string|null}} [a.admin]  what the admin's ops read and change
  */
 export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {} }) {
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
@@ -92,7 +93,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!admin.admission) return { ok: false, error: 'unwired' };
     const code = await admin.admission.code();
     if (!code) return { ok: false, error: { code: 'no-cohort', message: t('circle.bot.cohort_none') } };
-    return { ok: true, message: t('circle.bot.invite_code', { code }) };
+    // On a door with a link form (Telegram's `t.me/<bot>?start=<code>`), the link too: tapping it sends the code.
+    const link = typeof admin.inviteLink === 'function' ? admin.inviteLink(code) : null;
+    return { ok: true, message: [t('circle.bot.invite_code', { code }), ...(link ? [t('circle.bot.invite_link', { link })] : [])].join('\n') };
   }
 
   async function rotateOp() {

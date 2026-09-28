@@ -23,6 +23,11 @@ import { createMockHouseholdAgent, mockHouseholdManifest } from '../src/core/age
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
+import { followUpClaim } from '../src/v2/assistantFollowUp.js';
+import { resolveDispatch } from '../src/router.js';
+import { beginFollowUp } from '@onderling/kring-host/followUp';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 afterEach(() => { vi.useRealTimers(); });
 
@@ -238,5 +243,89 @@ describe('the collect window', () => {
     expect(log).toHaveLength(1);
     expect(log[0].text).toBe('melk\nbrood\neieren');
     expect(runner.recentTurns('tg:42')[0]).toBe('you: melk\nbrood\neieren');
+  });
+});
+
+describe('the circle doors: their pending ask is a claim on the lane', () => {
+  const t = (k) => k;
+  /** A circle door's composition: the ask a needsForm route makes, held by the door; the circle posts; no window. */
+  function circleDoor(model) {
+    let pending = null;
+    const ran = [];
+    const posted = [];
+    const engine = createAssistantEngine({
+      catalogue, lang: 'nl', llm: model.llm, interpret: interpretToCommand, collectMs: 0,
+      dispatch: (input) => {
+        const route = resolveDispatch({ kind: 'slash', opId: input.opId, args: input.args ?? {} }, catalogue);
+        if (route.kind === 'needsForm') { pending = beginFollowUp({ dispatch: route, t }); return; }
+        ran.push({ opId: input.opId, args: input.args });
+      },
+      postToCircle: (text) => { posted.push(text); },
+      onLlmUnavailable: () => {}, onNoMatch: () => {},
+      claim: followUpClaim({ pending: () => pending, clear: () => { pending = null; }, dispatchReady: (cmd) => { ran.push(cmd); }, catalogue }),
+    });
+    return { engine, ran, posted, pendingNow: () => pending };
+  }
+  /** The model picks addItem without a list, after 100 ms, so the turn ends by asking which list. */
+  const untypedAdd = () => {
+    const seen = [];
+    return { seen, llm: { invoke: async (req) => { seen.push(req); await sleep(100); return { toolCall: { id: 'addItem', args: { text: 'melk' } }, toolCalls: [{ id: 'addItem', args: { text: 'melk' } }] }; } } };
+  };
+
+  it('an answer typed while the turn that asks is still running answers the ask: not posted to the circle, not a new request', async () => {
+    vi.useFakeTimers();
+    const model = untypedAdd();
+    const { engine, ran, posted, pendingNow } = circleDoor(model);
+    const turn = engine.handle('@assistant ik heb melk nodig', { id: 'c1' });   // no rule takes it: the model, 100 ms
+    await vi.advanceTimersByTimeAsync(50);
+    const answer = engine.handle('boodschappen', { id: 'c1' });   // no tag: a line the circle would otherwise get
+    await vi.advanceTimersByTimeAsync(500);
+    await Promise.all([turn, answer]);
+
+    expect(posted).toEqual([]);
+    expect(model.seen).toHaveLength(1);
+    expect(ran).toEqual([{ opId: 'addItem', args: { text: 'melk', type: 'shopping' } }]);
+    expect(pendingNow()).toBeNull();
+  });
+
+  it('with nothing asked, a line for the circle still goes to the circle at once', async () => {
+    const { engine, posted } = circleDoor(untypedAdd());
+    await engine.handle('ik koop straks melk', { id: 'c1' });
+    expect(posted).toEqual(['ik koop straks melk']);
+  });
+
+  it('the claim: only with an ask pending, never a slash command; it completes the ask once, in the list\'s declared value', async () => {
+    let pending = beginFollowUp({ dispatch: resolveDispatch({ kind: 'slash', opId: 'addItem', args: { text: 'melk' } }, catalogue), t });
+    const ran = [];
+    const claim = followUpClaim({ pending: () => pending, clear: () => { pending = null; }, dispatchReady: (cmd) => { ran.push(cmd); }, catalogue });
+    expect(claim('/mine')).toBeNull();
+    const own = claim('boodschappen');
+    expect(typeof own).toBe('function');
+    expect(ran).toEqual([]);   // deciding does not act
+    await own();
+    expect(ran).toEqual([{ opId: 'addItem', args: { text: 'melk', type: 'shopping' } }]);
+    expect(pending).toBeNull();
+    expect(claim('brood')).toBeNull();
+  });
+});
+
+describe('which door collects', () => {
+  const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  /** The `createAssistantEngine({ … })` call in a shell, up to its closing `})`. */
+  const engineCall = (src) => { const i = src.indexOf('createAssistantEngine({'); return i < 0 ? '' : src.slice(i, src.indexOf('\n  }', i) + 4); };
+
+  it('the circle composers do not wait (a person types one line on purpose there) and hand their pending ask to the lane', () => {
+    for (const shell of ['../web/v2/circleApp.js']) {
+      const call = engineCall(read(shell));
+      expect(call, shell).toMatch(/collectMs:\s*0\b/);
+      expect(call, shell).toMatch(/claim:\s*followUpClaim\(/);
+    }
+  });
+
+  it('the box keeps the default window: quick lines arrive as separate messages on a chat app', () => {
+    const src = read('../bin/device-runner.mjs');
+    const i = src.indexOf('createTelegramRunner({');
+    expect(i).toBeGreaterThan(0);
+    expect(src.slice(i, src.indexOf('});', i))).not.toMatch(/collectMs/);
   });
 });

@@ -23,7 +23,7 @@ import { runDispatch }     from '../dispatch.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
-import { householdListType } from '../v2/circleGate.js';
+import { householdListType, coerceListArgs } from '../v2/circleGate.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -130,18 +130,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   /** An enum arg named the way people say it ("boodschappen") → the declared value ("shopping"). */
-  function coerceEnums(ready) {
-    const op = catalogue.opsById?.get?.(ready.opId)?.op;
-    const args = { ...(ready.args ?? {}) };
-    for (const p of (op?.params ?? [])) {
-      if (p?.kind !== 'enum' || !Array.isArray(p.of)) continue;
-      const v = args[p.name];
-      if (typeof v !== 'string' || p.of.includes(v)) continue;
-      const alt = householdListType(v);
-      if (alt && p.of.includes(alt)) args[p.name] = alt;
-    }
-    return { ...ready, args };
-  }
+  const coerceEnums = (ready) => coerceListArgs(ready, catalogue);
 
   /** A button tap arrives as its callbackData `opId:itemId` — dispatch it like `/command item`. */
   function tapToParse(text, threadId) {

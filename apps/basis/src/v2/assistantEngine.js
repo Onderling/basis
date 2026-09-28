@@ -21,9 +21,15 @@
  * A thread's lines are taken one turn at a time (its LANE), and lines that come in within a short window are one turn
  * (the COLLECT WINDOW, `assistant.collectMs`): "melk", "brood", "eieren" typed in a second reach the model as one
  * member message, "melk\nbrood\neieren", and come back as three adds. The gate still reads each line on its own (see
- * `createCircleDispatch`). A line for the circle, not the bot, is never held back. A door that handles some lines
- * itself (a form answer, a confirmation, a command) names them with `claim`, so they keep their place in the lane
- * without being gathered; `around` wraps every turn with the door's own bookkeeping, inside the lane.
+ * `createCircleDispatch`). A line for the circle, not the bot, is never gathered or held back by the window, but it
+ * does keep its place in the lane. A door that handles some lines itself (the answer to its pending ask, a
+ * confirmation, a command) names them with `claim`: the check runs when the line's turn comes, so a line typed while
+ * the turn that asks was running is the answer. `around` wraps every turn with the door's own bookkeeping.
+ *
+ * WHICH DOOR COLLECTS: a chat app (the box's Telegram door) keeps the default window — there, quick lines arrive as
+ * separate messages and belong together. The circle composers (web, mobile) pass `collectMs: 0`: a person types one
+ * line on purpose there, and a wait on every bot reply would read as a slow app. Their lane still serialises, and
+ * lines that queue up while a turn runs are still one turn.
  */
 import { createCircleDispatch, addressesBot, stripBotTag } from './circleDispatch.js';
 import { createThreadLanes, COLLECT_MS } from './assistantLane.js';
@@ -134,13 +140,14 @@ export function createAssistantEngine({
   const memoryCount = (threadId) => (typeof recentTurnsIn === 'function' ? (recentTurnsIn() || []) : linesFor(threadId)).length;
 
   // An entry is one line: `text` as the door gave it, `solo` what the dispatcher gets when the line is a turn on its
-  // own (unchanged from before the lane), `line` its words without the bot's tag (what a gathered turn joins).
+  // own (unchanged from before the lane), `line` its words without the bot's tag (what a gathered turn joins),
+  // `collect` whether it may be gathered with other lines (a line for the bot, not one for the circle).
   const lanes = createThreadLanes({
     collectMs,
     prepare: (entry) => {
       const own = typeof claim === 'function' ? claim(entry.text, entry.ctx) : null;
       if (typeof own === 'function') return { own };
-      return { collect: !entry.line.startsWith('/') };
+      return { collect: entry.collect && !entry.line.startsWith('/') };
     },
     runTurn: ({ entries }) => {
       const [first] = entries;
@@ -162,15 +169,16 @@ export function createAssistantEngine({
     /** A circle door: the raw line; the engine decides whether the bot was addressed (`ctx.id` = the thread). */
     handle: (text, ctx = {}) => {
       const raw = String(text ?? '').trim();
-      // A line for the circle, not the bot: straight to the circle, never behind a bot turn or a window.
-      if (!raw.startsWith('/') && !addressesBot(raw, botName)) return engineFor(ctx?.id).handle(text, { ...ctx, memoryTurns: memoryCount(ctx?.id) });
-      const line = raw.startsWith('/') ? raw : stripBotTag(raw, botName);
-      return lanes.push(ctx?.id ?? DEFAULT_THREAD, { threadId: ctx?.id, text, solo: text, line, ctx });
+      // A line for the circle, not the bot, is never gathered and never waits for a window — but it does take its
+      // place in the lane: typed while a bot turn runs, it may be the answer to what that turn asks (`claim`).
+      const forBot = raw.startsWith('/') || addressesBot(raw, botName);
+      const line = forBot && !raw.startsWith('/') ? stripBotTag(raw, botName) : raw;
+      return lanes.push(ctx?.id ?? DEFAULT_THREAD, { threadId: ctx?.id, text, solo: text, line, collect: forBot, ctx });
     },
     /** A private door (Telegram, a DM): every line is for the bot — tagged here so the engine treats it so. */
     ask: (threadId, text, ctx = {}) => {
       const line = String(text ?? '').trim();
-      return lanes.push(threadId ?? DEFAULT_THREAD, { threadId, text, solo: `@${botName} ${text}`, line, ctx: { id: threadId, ...ctx } });
+      return lanes.push(threadId ?? DEFAULT_THREAD, { threadId, text, solo: `@${botName} ${text}`, line, collect: true, ctx: { id: threadId, ...ctx } });
     },
     /** Resolves when the thread's lane (every lane, without a thread) has nothing queued or running. */
     idle: (threadId) => lanes.idle(threadId === undefined ? undefined : (threadId ?? DEFAULT_THREAD)),

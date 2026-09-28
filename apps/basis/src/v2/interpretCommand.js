@@ -5,6 +5,21 @@
 // exactly as it dispatches a button tap. Mirrors household's `classifyAndExtract` (LLM tool-call →
 // dispatch by id+args), generalized to basis's manifest-merged catalogue.
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+/**
+ * The retrieved items' share of the prompt, in characters. Past it the list is cut and the prompt says so ("some
+ * items were left out; ask to list them"), so a large circle neither floods the model nor silently hides items.
+ */
+export const CONTEXT_MAX_CHARS = param({ key: 'assistant.contextMaxChars', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2000 });
+
+/**
+ * The line between the prompt's STABLE part (the rules, the apps' backgrounds, the phrasing hints) and what changes
+ * every turn (the language line, the retrieved items, the date). Stable first so a provider's prefix cache can hit
+ * across turns; everything below this line may differ each time. LLM-facing.
+ */
+export const TURN_MARKER = '--- This turn ---';
+
 /** Default tool-selection prompt. Internal (LLM-facing), not a user-visible string. */
 export const DEFAULT_INTERPRET_SYSTEM =
   'You are the assistant in a shared circle. When a member\'s message is a clear request to DO or SEE '
@@ -85,15 +100,17 @@ export function buildToolDescriptors(catalogue) {
  * `null` (chat / no command). Signature matches what `createCircleDispatch` calls as `interpret`.
  *
  * @param {string} text
- * @param {{catalogue?: object, llm?: {invoke: Function}, system?: string, options?: object, context?: any[],
- *          history?: Array<{role:'user'|'assistant', content:string}>}} [opts]
+ * @param {{catalogue?: object, llm?: {invoke: Function}, system?: string, hints?: string[], options?: object,
+ *          context?: any[], history?: Array<{role:'user'|'assistant', content:string}>, now?: () => number}} [opts]
+ *        `system` = the STABLE instruction (rules + phrasing hints); `hints` = this turn's lines (the language),
+ *        placed below the turn marker with the retrieved items and the date.
  *        `context` = RAG items (e.g. from the token gate's `retrieve`) woven into the system prompt.
  *        `history` = prior conversation turns threaded as real messages — so a clarifying follow-up
  *        ("which list?" → "shopping") resolves against what the bot just asked, not a stateless guess.
  * @returns {Promise<{opId:string, args:object, more?:Array<{opId:string,args:object}>}|{reply:string}|null>}
  *   `more` carries the SECOND and later tool calls of the same turn (a member naming three items).
  */
-export async function interpretToCommand(text, { catalogue, llm, system, options, context, history } = {}) {
+export async function interpretToCommand(text, { catalogue, llm, system, hints, options, context, history, now } = {}) {
   const q = String(text ?? '').trim();
   if (!q || !llm || typeof llm.invoke !== 'function') return null;
   const tools = buildToolDescriptors(catalogue);
@@ -103,7 +120,7 @@ export async function interpretToCommand(text, { catalogue, llm, system, options
     ? history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content)
     : [];
   const result = await llm.invoke({
-    system: withContext(withAppBackgrounds(system || DEFAULT_INTERPRET_SYSTEM, catalogue), context),
+    system: assemblePrompt({ stable: withAppBackgrounds(system || DEFAULT_INTERPRET_SYSTEM, catalogue), hints, context, now }),
     messages: [...priorMsgs, { role: 'user', content: q }],
     tools,
     ...(options ? { options } : {}),
@@ -134,11 +151,34 @@ export function looksLikeConfirmation(text) {
   return /^[✓✔☑]/.test(t) || /^(added|toegevoegd|marked complete|afgevinkt|done|gedaan|removed|verwijderd)\b/i.test(t);
 }
 
-/** Append a compact RAG-context block to the (LLM-facing) system prompt. No-op without context. */
-function withContext(system, context) {
-  const lines = (Array.isArray(context) ? context : []).map(contextLine).filter(Boolean);
-  if (lines.length === 0) return system;
-  return `${system}\n\nRelevant items already in this circle (reference only — do NOT invent commands from them):\n${lines.map((l) => `- ${l}`).join('\n')}`;
+/**
+ * The system prompt: the STABLE part, the turn marker, then this turn's hints, the retrieved items (within the
+ * budget) and the date. LLM-facing.
+ */
+function assemblePrompt({ stable, hints, context, now }) {
+  const volatile = (Array.isArray(hints) ? hints : []).filter((h) => typeof h === 'string' && h.trim());
+  const items = contextBlock(context);
+  if (items) volatile.push(items);
+  const at = typeof now === 'function' ? now() : Date.now();
+  volatile.push(`Today is ${new Date(at).toISOString().slice(0, 10)}.`);
+  return `${stable}\n\n${TURN_MARKER}\n${volatile.join('\n\n')}`;
+}
+
+/** The retrieved items as a compact block, cut at `CONTEXT_MAX_CHARS` with a notice. Null without items. */
+function contextBlock(context) {
+  const lines = (Array.isArray(context) ? context : []).map(contextLine).filter(Boolean).map((l) => `- ${l}`);
+  if (lines.length === 0) return null;
+  const kept = [];
+  let size = 0;
+  for (const l of lines) {
+    const add = l.length + (kept.length ? 1 : 0);
+    if (size + add > CONTEXT_MAX_CHARS) break;
+    kept.push(l);
+    size += add;
+  }
+  const cut = kept.length < lines.length;
+  return `Relevant items already in this circle (reference only — do NOT invent commands from them):\n${kept.join('\n')}`
+    + (cut ? '\n(some items were left out; ask to list them)' : '');
 }
 
 /** A context item may be a raw index entry, a string, or a semanticQuery `{entry, score}` wrapper. */

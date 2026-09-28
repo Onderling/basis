@@ -3,7 +3,7 @@
  *
  * This is the `retrieve` hook the token gate (`tokenGate.js`) calls on the
  * `via:'llm'` path: given the user's message, return the few circle items most
- * relevant to it, which `interpretCommand.withContext` then weaves into the LLM
+ * relevant to it, which the interpreter (`interpretCommand.js`) then weaves into the LLM
  * prompt so the model answers grounded in THIS circle's actual tasks/posts —
  * with far fewer tokens than dumping the whole circle.  Retrieval only fires
  * when a turn is already headed to the model (rules/skip never call it).

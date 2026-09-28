@@ -59,3 +59,43 @@ describe('checkCaller', () => {
     expect(await trustRegistry.has('telegram:111')).toBe(true);
   });
 });
+
+describe('private is self only — never granted', () => {
+  function engineWith({ agentPubKey = 'hostKey', selfIds } = {}) {
+    const trustRegistry = new TrustRegistry(new VaultMemory());
+    const skills = new SkillRegistry();
+    skills.register(defineSkill('root', async () => 'ok', { visibility: 'private' }));
+    skills.register(defineSkill('admin', async () => 'ok', { visibility: 'trusted' }));
+    return { engine: new PolicyEngine({ trustRegistry, skillRegistry: skills, agentPubKey, ...(selfIds ? { selfIds } : {}) }), trustRegistry };
+  }
+
+  it('a caller registered private who is not the agent is refused on a private skill', async () => {
+    const { engine, trustRegistry } = engineWith();
+    await trustRegistry.setTier('telegram:111', 'private');
+    await expect(engine.checkCaller({ callerId: 'telegram:111', skillId: 'root' })).rejects.toMatchObject({ code: 'NOT_SELF' });
+    await expect(engine.checkInbound({ peerPubKey: 'telegram:111', skillId: 'root' })).rejects.toMatchObject({ code: 'NOT_SELF' });
+  });
+
+  it('the agent itself reaches its private skills', async () => {
+    const { engine, trustRegistry } = engineWith();
+    await trustRegistry.setTier('hostKey', 'private');
+    await expect(engine.checkCaller({ callerId: 'hostKey', skillId: 'root' })).resolves.toMatchObject({ tier: 'private' });
+  });
+
+  it('an owner key the host names as self at construction reaches them too (the in-process chat agent)', async () => {
+    const { engine, trustRegistry } = engineWith({ selfIds: ['ownerChatKey'] });
+    await trustRegistry.setTier('ownerChatKey', 'private');
+    await expect(engine.checkCaller({ callerId: 'ownerChatKey', skillId: 'root' })).resolves.toMatchObject({ tier: 'private' });
+  });
+
+  it('self is not a tier: a self id with no private record still needs its tier (no shortcut past the registry)', async () => {
+    const { engine } = engineWith({ selfIds: ['ownerChatKey'] });
+    await expect(engine.checkCaller({ callerId: 'ownerChatKey', skillId: 'root' })).rejects.toMatchObject({ code: 'INSUFFICIENT_TIER' });
+  });
+
+  it('a private-registered stranger still reaches what trusted reaches (the rule narrows private, nothing else)', async () => {
+    const { engine, trustRegistry } = engineWith();
+    await trustRegistry.setTier('telegram:111', 'private');
+    await expect(engine.checkCaller({ callerId: 'telegram:111', skillId: 'admin' })).resolves.toBeTruthy();
+  });
+});

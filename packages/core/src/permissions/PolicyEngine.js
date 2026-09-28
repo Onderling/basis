@@ -81,6 +81,7 @@ export class PolicyEngine {
   #groupManager;
   #isRevoked;
   #actorResolver;  // Phase 50.9.1 — optional ActorResolver (pubKey ↔ webid ↔ agentUri)
+  #selfIds;        // the identities that ARE this agent (its key + owner keys its host names) — fixed at construction
 
   /**
    * @param {object} opts
@@ -111,6 +112,9 @@ export class PolicyEngine {
    *   facade). When set, `resolveActor(identifier)` becomes available
    *   to callers + the token-verification path can accept URI-shaped
    *   agent IDs (Phase 50.10).
+   * @param {string[]} [opts.selfIds]
+   *   Owner identities that ARE this agent besides `agentPubKey` — only these (and `agentPubKey`) may reach a
+   *   `private` skill, whatever tier the registry holds for anyone else. Fixed at construction.
    */
   constructor({
     trustRegistry,
@@ -119,12 +123,17 @@ export class PolicyEngine {
     groupManager  = null,
     isRevoked     = null,
     actorResolver = null,
+    selfIds       = [],
   }) {
     this.#trustRegistry = trustRegistry;
     this.#skillRegistry = skillRegistry;
     this.#agentPubKey   = agentPubKey;
     this.#groupManager  = groupManager;
     this.#isRevoked     = typeof isRevoked === 'function' ? isRevoked : null;
+    // SELF, for `private` skills: this agent's own key plus the owner keys its host names here (an in-process host
+    // whose only caller is the owner's chat agent names that key). Fixed at construction, like `isRevoked`: there
+    // is no setter, so no door, peer or token can be added to self later.
+    this.#selfIds = new Set([agentPubKey, ...(Array.isArray(selfIds) ? selfIds : [])].filter((x) => typeof x === 'string' && x));
     this.#actorResolver = (actorResolver && typeof actorResolver.resolve === 'function')
       ? actorResolver
       : null;
@@ -196,6 +205,14 @@ export class PolicyEngine {
       throw new PolicyDeniedError(
         'INSUFFICIENT_TIER',
         `Skill "${skillId}" requires tier "${skill.visibility}" but caller has "${tier}"`,
+      );
+    }
+    // `private` is SELF only, never granted: the registry saying `private` for anyone who is not this agent is a
+    // bug the gate refuses, so no door, no peer and no token can be raised to self.
+    if (skill.visibility === 'private' && !this.#selfIds.has(callerId)) {
+      throw new PolicyDeniedError(
+        'NOT_SELF',
+        `Skill "${skillId}" is this agent's own (private); caller "${String(callerId).slice(0, 16)}…" is not self`,
       );
     }
     return { tier, skill };

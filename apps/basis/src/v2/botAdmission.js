@@ -59,6 +59,11 @@ export function createBotAdmission({ secretVault, store, now = Date.now } = {}) 
     return s;
   }
   const load = async () => (await store.get(STATE_ID)) ?? { id: STATE_ID, cohort: null, spent: [] };
+  // Every change of the state runs one at a time: the same message can arrive several times at once (the pair route and
+  // the profile address, retried), and two redemptions that both read the state before either wrote it would both
+  // pass — one code, or a one-person cohort, admitting several.
+  let chain = Promise.resolve();
+  const oneAtATime = (fn) => { const run = chain.then(fn, fn); chain = run.catch(() => {}); return run; };
   const save = (state) => store.put({ ...state, id: STATE_ID });
 
   async function check(code, state) {
@@ -79,13 +84,15 @@ export function createBotAdmission({ secretVault, store, now = Date.now } = {}) 
      * Open a cohort: up to `ceiling` people, until `days` from now. Replaces the one before — its codes stop working.
      * @param {{ceiling:number, days:number}} spec
      */
-    async openCohort({ ceiling, days } = {}) {
+    openCohort({ ceiling, days } = {}) {
       const c = Math.floor(Number(ceiling));
       const d = Number(days);
-      if (!Number.isFinite(c) || c < 1 || !Number.isFinite(d) || d <= 0) throw new TypeError('botAdmission: a cohort needs a ceiling ≥ 1 and a number of days > 0');
-      const cohort = { id: randomHex(8), ceiling: c, expiresAt: now() + d * 24 * 60 * 60 * 1000, count: 0 };
-      await save({ cohort, spent: [] });
-      return { ceiling: cohort.ceiling, expiresAt: cohort.expiresAt, count: 0 };
+      if (!Number.isFinite(c) || c < 1 || !Number.isFinite(d) || d <= 0) return Promise.reject(new TypeError('botAdmission: a cohort needs a ceiling ≥ 1 and a number of days > 0'));
+      return oneAtATime(async () => {
+        const cohort = { id: randomHex(8), ceiling: c, expiresAt: now() + d * 24 * 60 * 60 * 1000, count: 0 };
+        await save({ cohort, spent: [] });
+        return { ceiling: cohort.ceiling, expiresAt: cohort.expiresAt, count: 0 };
+      });
     },
     /** A fresh single-use code for the open cohort, or null when none is open. */
     async code() {
@@ -97,15 +104,17 @@ export function createBotAdmission({ secretVault, store, now = Date.now } = {}) 
     /** @returns {Promise<{ok:true}|{ok:false, reason:string}>} */
     async validate(code) { return check(code, await load()); },
     /** Spend a code: admitted once. @returns {Promise<{ok:true}|{ok:false, reason:string}>} */
-    async redeem(code) {
-      const state = await load();
-      const v = await check(code, state);
-      if (!v.ok) return v;
-      await save({ cohort: { ...state.cohort, count: state.cohort.count + 1 }, spent: [...state.spent, await sha256Hex(code)] });
-      return { ok: true };
+    redeem(code) {
+      return oneAtATime(async () => {
+        const state = await load();
+        const v = await check(code, state);
+        if (!v.ok) return v;
+        await save({ cohort: { ...state.cohort, count: state.cohort.count + 1 }, spent: [...state.spent, await sha256Hex(code)] });
+        return { ok: true };
+      });
     },
     /** Close the open cohort: no code of it works any more. */
-    async rotate() { await save({ cohort: null, spent: [] }); },
+    rotate() { return oneAtATime(() => save({ cohort: null, spent: [] })); },
     /** The open cohort as the admin sees it (never a code), or null. */
     async status() {
       const { cohort } = await load();

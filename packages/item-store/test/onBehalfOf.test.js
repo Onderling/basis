@@ -15,7 +15,7 @@ import { MemorySource } from '@onderling/core';
 
 import { CircleItemStore } from '../src/CircleItemStore.js';
 import { addTasks } from '../src/taskCrud.js';
-import { claim } from '../src/taskLifecycle.js';
+import { claim, markComplete, submit, approve, reject } from '../src/taskLifecycle.js';
 import { PermissionDeniedError } from '../src/errors.js';
 
 const ROOT = 'pod://circle/';
@@ -66,5 +66,50 @@ describe('claim — onBehalfOf: gate on the authority, record the person', () =>
     expect(again.error).toBe('already-claimed');
     const bo = await claim(store, t.id, { actor: HOST, onBehalfOf: BO, rolePolicy: hostOnly });
     expect(bo.assignees).toEqual([ANN, BO]);
+  });
+});
+
+describe('complete · submit · approve · reject — onBehalfOf: the item says who did it, the gate reads the key', () => {
+  const policy = { canAdd: (a) => a === HOST, canClaim: (a) => a === HOST, canComplete: (a) => a === HOST,
+    canSubmit: (a) => a === HOST, canApprove: (a) => a === HOST, canReject: (a) => a === HOST };
+  const claimed = async (store, extra = {}) => {
+    const [t] = await addTasks(store, [{ text: 'dishes', ...extra }], { actor: HOST });
+    await claim(store, t.id, { actor: HOST, onBehalfOf: ANN, rolePolicy: policy });
+    return t;
+  };
+
+  it('the host completes on Ann\'s word: completedBy is Ann, not the host (and not the host\'s display name)', async () => {
+    const store = mkCis();
+    const t = await claimed(store);
+    const [done] = await markComplete(store, [{ id: t.id }], { actor: HOST, actorDisplayName: 'Huisbot', onBehalfOf: ANN, rolePolicy: policy });
+    expect(done.completedBy).toBe(ANN);
+    expect(done.completedByDisplayName).toBeUndefined();
+  });
+
+  it('without onBehalfOf nothing changes: completedBy is the key', async () => {
+    const store = mkCis();
+    const t = await claimed(store);
+    const [done] = await markComplete(store, [{ id: t.id }], { actor: HOST, rolePolicy: policy });
+    expect(done.completedBy).toBe(HOST);
+  });
+
+  it('the review log names the person on submit, reject and approve; approve\'s completedBy too', async () => {
+    const store = mkCis();
+    const t = await claimed(store);
+    await submit(store, t.id, { note: 'gedaan' }, { actor: HOST, onBehalfOf: ANN, rolePolicy: policy });
+    await reject(store, t.id, { note: 'nog niet' }, { actor: HOST, onBehalfOf: BO, rolePolicy: policy });
+    await submit(store, t.id, {}, { actor: HOST, onBehalfOf: ANN, rolePolicy: policy });
+    const ok = await approve(store, t.id, {}, { actor: HOST, onBehalfOf: BO, rolePolicy: policy });
+    expect(ok.reviewLog.map((e) => [e.decision, e.by])).toEqual([
+      ['submit', ANN], ['reject', BO], ['submit', ANN], ['approve', BO],
+    ]);
+    expect(ok.completedBy).toBe(BO);
+  });
+
+  it('the gate still reads the key: a denied key completes nothing, whoever it names', async () => {
+    const store = mkCis();
+    const t = await claimed(store);
+    await expect(markComplete(store, [{ id: t.id }], { actor: 'https://id.example/stranger', onBehalfOf: ANN, rolePolicy: policy }))
+      .rejects.toBeInstanceOf(PermissionDeniedError);
   });
 });

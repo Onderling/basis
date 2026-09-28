@@ -114,6 +114,8 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
       action,
       actor: actor ?? ctx.actor ?? 'substrate',
       ...(dn ? { actorDisplayName: dn } : {}),
+      // the person the key acted for, when it vouched for one — the audit keeps both strings
+      ...(typeof ctx.onBehalfOf === 'string' && ctx.onBehalfOf ? { onBehalfOf: ctx.onBehalfOf } : {}),
       at: Date.now(),
       ...(details && typeof details === 'object' && Object.keys(details).length > 0 ? { details } : {}),
       ...(synced ? { synced: true } : {}),

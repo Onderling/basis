@@ -17,8 +17,9 @@
  *
  * What honours it (the task-store family in `./index.js`): `addTask` stamps `actor` on the item;
  * `claimTask` puts the actor into the co-owner set (the host's key passes the gate); `listMine` asks
- * "assigned to whom?" for the actor. Every other skill accepts it from the host and acts on the host's
- * authority alone.
+ * "assigned to whom?" for the actor; complete, submit, approve, reject and revoke record the actor as the
+ * one who did it (`completedBy`, the review log's `by`) while the gate reads the host's key, and the audit
+ * keeps both. Every other skill accepts it from the host and acts on the host's authority alone.
  */
 
 /** The refusal code — a peer that is not the host named an actor, or the actor is not a usable id. */

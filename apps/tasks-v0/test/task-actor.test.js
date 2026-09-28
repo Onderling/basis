@@ -12,6 +12,7 @@
  *   - `addTask` stamps it on the item (`task.actor`); the authority fields stay the host's key.
  *   - `claimTask` puts the actor into the co-owner set (the host's key passes the claim gate).
  *   - `listMine` asks "assigned to whom?" for the actor instead of the invoking key.
+ *   - complete / submit / approve / reject record the actor as the one who did it; the audit keeps the key.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -122,6 +123,31 @@ describe('actor from the host is accepted and lands on the item', () => {
     await call(bundle.agent, 'claimTask', { id: t.task.id, actor: ANN }, HOST);
     const c = await call(bundle.agent, 'claimTask', { id: t.task.id, actor: BO }, HOST);
     expect(c.result.error).toBe('already-claimed');
+  });
+
+  it('the host completes Ann\'s task on her word: the task says Ann completed it; the audit keeps the key', async () => {
+    const t = await call(bundle.agent, 'addTask', { text: 'dishes', actor: ANN }, HOST);
+    await call(bundle.agent, 'claimTask', { id: t.task.id, actor: ANN }, HOST);
+    const done = await call(bundle.agent, 'completeTask', { id: t.task.id, actor: ANN }, HOST);
+    expect(done.error).toBeUndefined();
+    expect(done.task.completedBy).toBe(ANN);
+    const log = await bundle._circleState.itemStore.auditLog(t.task.id);
+    const entry = (Array.isArray(log) ? log : log?.entries ?? []).find((e) => e.action === 'complete');
+    expect(entry).toMatchObject({ actor: HOST, onBehalfOf: ANN });
+  });
+
+  it('submit, reject and approve on someone\'s word: the review log names them', async () => {
+    const t = await call(bundle.agent, 'addTask', { text: 'report', approval: { required: true } }, HOST);
+    await call(bundle.agent, 'claimTask', { id: t.task.id, actor: ANN }, HOST);
+    await call(bundle.agent, 'submitTask', { id: t.task.id, note: 'klaar', actor: ANN }, HOST);
+    await call(bundle.agent, 'rejectTask', { id: t.task.id, note: 'nog niet', actor: BO }, HOST);
+    await call(bundle.agent, 'submitTask', { id: t.task.id, actor: ANN }, HOST);
+    const ok = await call(bundle.agent, 'approveTask', { id: t.task.id, actor: BO }, HOST);
+    expect(ok.error, JSON.stringify(ok)).toBeUndefined();
+    expect(ok.task.reviewLog.map((e) => [e.decision, e.by])).toEqual([
+      ['submit', ANN], ['reject', BO], ['submit', ANN], ['approve', BO],
+    ]);
+    expect(ok.task.completedBy).toBe(BO);
   });
 
   it('the local service route honours it the same way', async () => {

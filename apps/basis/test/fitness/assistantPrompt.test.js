@@ -49,14 +49,16 @@ describe('the assistant prompt — stable first, then what changes every turn', 
   };
 
   it('through the engine: rules, backgrounds and phrasing above the marker; the language and the date below it', async () => {
-    const system = await promptFor('goedemorgen');
+    const system = await promptFor('goedemorgen, hoe gaat het met je');   // a line the language counter can place
     expect(typeof TURN_MARKER).toBe('string');
     const base = at(system, 'You are the assistant in a shared circle');
     const background = at(system, 'How to choose the type for addItem');
     const phrasing = at(system, '"zet … op"');
     const marker = at(system, TURN_MARKER);
-    const language = at(system, 'Always reply in Dutch');
+    const rule = at(system, "Reply in the member's language");
+    const language = at(system, 'The member wrote in: nl');
     const date = at(system, /Today is \d{4}-\d{2}-\d{2}/);
+    expect(rule).toBeLessThan(marker);
     expect(base).toBeLessThan(background);
     expect(background).toBeLessThan(marker);
     expect(phrasing).toBeLessThan(marker);
@@ -68,12 +70,13 @@ describe('the assistant prompt — stable first, then what changes every turn', 
     let system = null;
     const llm = { invoke: async (req) => { system = req.system; return { toolCall: null, replyText: 'ok' }; } };
     await interpretToCommand('hoe zit het met de kaas', {
-      catalogue, llm, hints: ['Always reply in Dutch.'], context: ['oude kaas'], now: () => Date.UTC(2026, 8, 28),
+      catalogue, llm, hints: ['The member wrote in: nl.'], context: ['oude kaas'], now: () => Date.UTC(2026, 8, 28),
     });
     const marker = at(system, TURN_MARKER);
-    const language = at(system, 'Always reply in Dutch');
+    const language = at(system, 'The member wrote in: nl');
     const items = at(system, 'Relevant items already in this circle');
     const date = at(system, 'Today is 2026-09-28');
+    expect(system).toContain('You do not know the current time.');   // a date alone made the model invent a clock time
     expect(marker).toBeLessThan(language);
     expect(language).toBeLessThan(items);
     expect(items).toBeLessThan(date);

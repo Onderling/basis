@@ -167,7 +167,8 @@ function assemblePrompt({ stable, hints, context, now }) {
   const items = contextBlock(context);
   if (items) volatile.push(items);
   const at = typeof now === 'function' ? now() : Date.now();
-  volatile.push(`Today is ${new Date(at).toISOString().slice(0, 10)}.`);
+  // The date only: given a date, the model invented a clock time ("It's about 9:28 AM") — so it is told it has none.
+  volatile.push(`Today is ${new Date(at).toISOString().slice(0, 10)}. You do not know the current time.`);
   return `${stable}\n\n${TURN_MARKER}\n${volatile.join('\n\n')}`;
 }
 

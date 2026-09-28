@@ -537,7 +537,7 @@ export async function startCompanionNode(opts = {}) {
     // clear `checkInbound`'s issuer-trust floor (≥ 'trusted'). Unknown peers
     // default to 'authenticated', which is below the floor — so ONLY host-issued
     // (or host-trusted) tokens verify.
-    await trustRegistry.setTier(identity.pubKey, 'trusted');
+    await trustRegistry.setTier(identity.pubKey, 'private');   // self: 'private' is self only (it clears the issuer floor too)
 
     policyEngine = new PolicyEngine({
       trustRegistry,

@@ -114,7 +114,7 @@ export async function buildMeshAgent({
   // ── TrustRegistry + self-trust (— required by PolicyEngine for
   //    self-issued cap-tokens to validate). Idempotent.
   const trustRegistry = new TrustRegistry(vault);
-  await trustRegistry.setTier(id.pubKey, 'trusted');
+  await trustRegistry.setTier(id.pubKey, 'private');   // self: 'private' is self only (it clears the issuer floor too)
 
   // ── Agent ────────────────────────────────────────────────────────────────
   const agent = new Agent({

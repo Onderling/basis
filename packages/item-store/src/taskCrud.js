@@ -110,6 +110,9 @@ function materialise(partial, ctx) {
     addedBy: partial.addedBy ?? ctx.actor,
     ...(ctx.actorDisplayName ? { addedByDisplayName: ctx.actorDisplayName } : {}),
     addedAt: partial.addedAt ?? Date.now(),
+    // The person the task was added FOR, when the key with authority acts on someone's behalf (a host
+    // serving several people through one key). Attribution only: `addedBy` / `master` stay the authority.
+    ...(typeof partial.actor === 'string' && partial.actor ? { actor: partial.actor } : {}),
     ...(partial.dependencies ? { dependencies: [...partial.dependencies] } : {}),
     ...(partial.requiredSkills ? { requiredSkills: [...partial.requiredSkills] } : {}),
     ...(partial.dueAt !== undefined ? { dueAt: partial.dueAt } : {}),

@@ -53,10 +53,11 @@ import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
-import { createBotThreads, dataSourceThreadStore, withAssistantOps, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
+import { createBotThreads, dataSourceThreadStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
+import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 
 import { EventLog } from '../src/eventLog.js';
@@ -648,13 +649,21 @@ if (tgToken) {
 
   // Scope, then interpret: the apps this bot acts in are the owner's setting, read at boot, and the catalogue
   // every surface of the door projects — the model's tools included — holds only theirs.
-  const { catalogue, manifestsByOrigin, apps } = composeAssistantCatalogue({ apps: agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY), householdManifest: agent.manifest });
+  // The admin switches apps from the door (`/apps on tasks`): the parameter is written and the catalogue recomposed.
+  const doorCatalogue = createDoorCatalogue({
+    householdManifest: agent.manifest,
+    getApps: () => agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY),
+    setApps: (list) => callSkill('params', 'set-param', { key: ASSISTANT_APPS_PARAM_KEY, value: list }),
+  });
+  const apps = doorCatalogue.apps();
   // The model is the optional half of this optional half: a key without its SDK is a warning and a
   // Telegram that answers without a model, never a device that is not there.
   const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
+  // Every person is a contact with a role, and their calls carry them to the host gate.
+  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid: String(process.env.TG_ADMIN_UID ?? '').trim() || null });
   // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
   const threads = createBotThreads({
     eventLog: deviceLog,
@@ -664,15 +673,23 @@ if (tgToken) {
   await threads.load();
   tgRunner = createTelegramRunner({
     bridge: new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }),
-    catalogue,
-    manifestsByOrigin,
-    // The door's own ops (a person's memory mode and language) are answered by its threads; the rest go on.
-    allowedChatIds, t, callSkill: withAssistantOps({ callSkill, threads, t }), lang: values.lang,
-    // Every person is a contact with a role, and their calls carry them to the host gate.
-    admit: createDoorAdmit({
-      users: createBotUsers({ store: contactBookStore(callSkill), adminUid: String(process.env.TG_ADMIN_UID ?? '').trim() || null }),
-      setDoorCaller: agent.setDoorCaller,
+    catalogue: doorCatalogue.catalogue,
+    manifestsByOrigin: doorCatalogue.manifestsByOrigin,
+    // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are
+    // answered here, each after the host gate said yes at the op's level; the rest go on to the agent.
+    allowedChatIds, t, lang: values.lang,
+    callSkill: withAssistantOps({
+      callSkill, threads, t, refusal: agent.doorRefusal,
+      admin: {
+        catalogue: doorCatalogue,
+        users: () => botUsers.list(),
+        status: async () => ({
+          model: llm ? llmModel : null, door: allowedChatIds === '*' ? 'open' : 'allow-list', turns: turnLogMode ?? 'off',
+          memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
+        }),
+      },
     }),
+    admit: createDoorAdmit({ users: botUsers, setDoorCaller: agent.setDoorCaller }),
     threads,
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),

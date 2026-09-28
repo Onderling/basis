@@ -39,3 +39,30 @@ export function composeAssistantCatalogue({ apps, householdManifest } = {}) {
   const manifestsByOrigin = Object.fromEntries(inScope.map((m) => [m.app, m]));
   return { catalogue, manifestsByOrigin, apps: list };
 }
+
+/**
+ * The door's catalogue as it stands, recomposed when its admin switches an app on or off. The shells read it through
+ * getters (the runner, the engine, the model's tools), so a switch reaches every surface at once without a restart.
+ * @param {object} a
+ * @param {() => unknown} a.getApps              the `assistant.apps` parameter's value
+ * @param {(list: string[]) => Promise<unknown>} a.setApps  writes the parameter (never the model: slash only, admin only)
+ * @param {object} [a.householdManifest]
+ */
+export function createDoorCatalogue({ getApps, setApps, householdManifest } = {}) {
+  if (typeof getApps !== 'function' || typeof setApps !== 'function') throw new TypeError('createDoorCatalogue: getApps and setApps are required');
+  let current = composeAssistantCatalogue({ apps: getApps(), householdManifest });
+  // The apps a door can offer: every app manifest the shells compose, but the shell's own.
+  const available = catalogueManifests({ householdManifest }).map((m) => m.app).filter((a) => a && a !== 'basis');
+  return {
+    catalogue: () => current.catalogue,
+    manifestsByOrigin: () => current.manifestsByOrigin,
+    apps: () => [...current.apps],
+    available: () => [...available],
+    /** @param {string[]} list */
+    async setApps(list) {
+      await setApps(list);
+      current = composeAssistantCatalogue({ apps: list, householdManifest });
+      return current.apps;
+    },
+  };
+}

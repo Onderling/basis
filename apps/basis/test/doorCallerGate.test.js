@@ -86,6 +86,18 @@ describe('the door caller gate', () => {
     expect(refused(await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: 'telegram:999' }))).toBe(true);
   }, 90_000);
 
+  it('the door\'s own admin ops: the admin passes `trusted`, a member does not, a stranger nothing', async () => {
+    const node = await bootRealAgentNode('bot5');
+    nodes.push(node);
+    const { agent } = node;
+    await agent.setDoorCaller('telegram:111', 'member');
+    await agent.setDoorCaller('telegram:222', 'admin');
+    expect(await agent.doorRefusal('assistant-apps', 'telegram:222', 'trusted')).toBeNull();
+    expect(await agent.doorRefusal('assistant-apps', 'telegram:111', 'trusted')).toBeTruthy();
+    expect(await agent.doorRefusal('assistant-memory', 'telegram:111', 'authenticated')).toBeNull();
+    expect(await agent.doorRefusal('assistant-memory', 'telegram:999', 'authenticated')).toBeTruthy();
+  }, 90_000);
+
   it('a door can never raise anyone to the owner\'s level', async () => {
     const node = await bootRealAgentNode('bot2');
     nodes.push(node);

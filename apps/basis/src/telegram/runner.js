@@ -53,10 +53,13 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
-  if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
+  if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
+  // Static, or a getter: a door whose admin switches apps recomposes its catalogue, and every surface reads the new one.
+  const catalogueOf = () => (typeof catalogueIn === 'function' ? catalogueIn() : catalogueIn);
+  const manifestsOf = () => (typeof manifestsIn === 'function' ? manifestsIn() : manifestsIn);
   if (typeof t !== 'function') throw new TypeError('createTelegramRunner: t is required');
 
   const open = allowedChatIds === '*' || !Array.isArray(allowedChatIds) || allowedChatIds.length === 0;
@@ -110,13 +113,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       : callSkill;
     try { reply = await runDispatch(ready, call); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
-    await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin }));
+    await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
 
   /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue. */
   function helpText() {
-    const lines = (catalogue.commandMenu ?? []).map((e) => {
-      const op = catalogue.opsById?.get?.(e.opId)?.op;
+    const lines = (catalogueOf().commandMenu ?? []).map((e) => {
+      const op = catalogueOf().opsById?.get?.(e.opId)?.op;
       const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
       return hint ? `${e.command} — ${hint}` : e.command;
     });
@@ -133,7 +136,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   function splitTypedMatch(parse) {
     const m = parse?.args?._match;
     if (typeof m !== 'string' || !m.includes(' ')) return parse;
-    const op = catalogue.opsById?.get?.(parse.opId)?.op;
+    const op = catalogueOf().opsById?.get?.(parse.opId)?.op;
     const params = Array.isArray(op?.params) ? op.params : [];
     const enumP = params.find((p) => p?.required && p.kind === 'enum' && Array.isArray(p.of));
     const textP = params.find((p) => p !== enumP && p?.required && p.kind === 'string');
@@ -146,7 +149,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   /** An enum arg named the way people say it ("boodschappen") → the declared value ("shopping"). */
-  const coerceEnums = (ready) => coerceListArgs(ready, catalogue);
+  const coerceEnums = (ready) => coerceListArgs(ready, catalogueOf());
 
   /**
    * A button tap arrives as its callbackData `opId:itemId` — dispatch it like `/command item`. Only an op OFFERED as a
@@ -157,7 +160,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   function tapToParse(text, threadId) {
     const m = /^([A-Za-z][\w-]*):(.*)$/.exec(text);
     if (!m) return null;
-    const op = catalogue.opsById?.get?.(m[1]);
+    const op = catalogueOf().opsById?.get?.(m[1]);
     if (!op) return null;
     if ((op.op ?? op)?.surfaces?.ui?.control !== 'button') return null;
     return { kind: 'slash', opId: m[1], args: m[2] ? { _match: m[2] } : {}, threadId };
@@ -171,12 +174,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   async function route(chatId, threadId, text) {
     if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText()); }
     let parse = typeof text === 'string'
-      ? (tapToParse(text, threadId) ?? parseInput(text, catalogue, { threadId }))
+      ? (tapToParse(text, threadId) ?? parseInput(text, catalogueOf(), { threadId }))
       : opToParse(text, threadId);
     if (typeof text === 'string') note(chatId, { via: tapToParse(text, threadId) ? 'tap' : 'slash' });
     if (parse?.kind === 'slash') parse = splitTypedMatch(parse);
     if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText()); }
-    const r = resolveDispatch(parse, catalogue);
+    const r = resolveDispatch(parse, catalogueOf());
     note(chatId, { route: r?.kind });
     switch (r?.kind) {
       case 'ready':
@@ -189,7 +192,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
         pending.set(threadId, { kind: 'form', p });
         const fields = p.kind === 'single' ? p.missingParam : p.fields.map((f) => f.name).join(', ');
         // An enum field asks with BUTTONS: the declared values, named the way people say them.
-        const op = catalogue.opsById?.get?.(r.opId)?.op;
+        const op = catalogueOf().opsById?.get?.(r.opId)?.op;
         const askName = p.kind === 'single' ? p.missingParam : p.fields[0].name;
         const enumP = (op?.params ?? []).find((q) => q?.name === askName && q.kind === 'enum' && Array.isArray(q.of));
         const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: t(`circle.telegram.list_${v}`) })) : undefined;
@@ -217,7 +220,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   // answer to its ask, a confirmation, a command, a button tap) is CLAIMED, so it waits its turn instead of racing
   // the turn before it; quick free-text lines are gathered into one turn by the engine's collect window.
   const engine = engineIn ?? createAssistantEngine({
-    catalogue, lang, llm, interpret, loadItems, botName,
+    catalogue: catalogueOf, lang, llm, interpret, loadItems, botName,
     ...(threads ? { memory: threads.memory, threadLang: (id) => threads.langOf(id) } : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),

@@ -145,32 +145,3 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     },
   };
 }
-
-/**
- * The door's callSkill, with its own ops handled here: `assistant-memory` and `assistant-language` set the CALLING
- * thread's row (the thread id the door passes in `ctx`), and nothing else. Every other op goes on unchanged.
- * @param {object} a
- * @param {(app:string, op:string, args:object, ctx?:object) => Promise<any>} a.callSkill
- * @param {ReturnType<typeof createBotThreads>} a.threads
- * @param {(key:string, params?:object) => string} a.t
- */
-export function withAssistantOps({ callSkill, threads, t }) {
-  return async (app, op, args = {}, ctx = {}) => {
-    if (app !== 'assistant') return callSkill(app, op, args, ctx);
-    const threadId = typeof ctx?.threadId === 'string' && ctx.threadId ? ctx.threadId : null;
-    if (!threadId) return { ok: false, error: 'no-thread' };
-    try {
-      if (op === 'assistant-memory') {
-        threads.setMode(threadId, args?.mode);
-        return { ok: true, message: t(`circle.bot.memory_${args.mode}`) };
-      }
-      if (op === 'assistant-language') {
-        threads.setLang(threadId, args?.lang);
-        return { ok: true, message: args.lang === 'auto' ? t('circle.bot.lang_auto') : t('circle.bot.lang_set', { lang: args.lang }) };
-      }
-    } catch (err) {
-      return { ok: false, error: 'invalid-argument', message: err?.message ?? String(err) };
-    }
-    return { ok: false, error: 'unknown-op', app, op };
-  };
-}

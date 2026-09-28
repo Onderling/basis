@@ -7,7 +7,11 @@
  * other setting: the bot's app list and the admin's default memory mode are parameters, set by the admin, never
  * from a sentence.
  *
- * Handled by the door's composition (`withAssistantOps`), which knows the thread the call is for.
+ * The ADMIN's ops — the bot's app list, its status, who it serves — are `visibility: 'trusted'` (the host gate's level
+ * for the bot's admin) and have a slash surface only: the model is never offered them, so no sentence switches an app.
+ *
+ * Handled by the door's composition (`withAssistantOps`), which knows the thread the call is for and asks the host
+ * gate about the caller's level.
  */
 import { MEMORY_MODES, THREAD_LANGS } from './botThreads.js';
 
@@ -17,7 +21,7 @@ export const assistantManifest = {
   // Nothing it does reaches the network.
   hosts:     [],
   itemTypes: ['chat-thread'],
-  domainVerbs: { 'set-memory': 'write', 'set-language': 'write' },
+  domainVerbs: { 'set-memory': 'write', 'set-language': 'write', 'set-apps': 'write', status: 'read', 'list-users': 'read' },
   operations: [
     {
       id:     'assistant-memory',
@@ -39,6 +43,30 @@ export const assistantManifest = {
         slash: { command: '/taal', body: 'argline' },
         chat:  { reply: 'text', hint: 'The language the assistant replies in for this person; auto follows how they write.' },
       },
+    },
+    {
+      id:     'assistant-apps',
+      verb:   'set-apps',
+      visibility: 'trusted',
+      // The app list is a parameter of the door's own device.
+      writes: { scope: 'device' },
+      // `on <app>` · `off <app>` · nothing (the list as it stands)
+      params: [{ name: 'change', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/apps', body: 'argline' } },
+    },
+    {
+      id:     'assistant-status',
+      verb:   'status',
+      visibility: 'trusted',
+      params: [],
+      surfaces: { slash: { command: '/status', body: 'none' } },
+    },
+    {
+      id:     'assistant-users',
+      verb:   'list-users',
+      visibility: 'trusted',
+      params: [],
+      surfaces: { slash: { command: '/users', body: 'none' } },
     },
   ],
 };

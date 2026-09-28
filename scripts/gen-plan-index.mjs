@@ -16,6 +16,7 @@
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
+import { briefHeader } from './brief-header.mjs';
 
 const ROOT  = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const PLANS = path.join(ROOT, 'plans');
@@ -47,7 +48,13 @@ const cls = (f) => {
   if (OVERRIDE[name]) return OVERRIDE[name];
   if (f.startsWith('live/'))   return 'live';
   if (f.startsWith('notes/'))  return 'note';
-  if (f.startsWith('briefs/')) return 'brief';
+  // a brief says where it stands in its own header (brief-header.mjs); the index shows it, so an open question
+  // is visible from here and a finished brief is easy to spot
+  if (f.startsWith('briefs/')) {
+    let h = null;
+    try { h = briefHeader(readFileSync(path.join(PLANS, f), 'utf8')); } catch { /* unreadable → no status */ }
+    return h ? `brief · ${h.status}${h.asks && h.status === 'open' ? ` (asks ${h.asks.replace(/[`|]/g, '')})` : ''}` : 'brief · (no status)';
+  }
   return 'overview';
 };
 const h1 = (f) => {

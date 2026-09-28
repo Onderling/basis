@@ -133,3 +133,32 @@ export function classifyVerb(verb) {
 
 /** The Atom for a canonical verb (no alias resolution), or `undefined`. */
 export function atomFor(canonicalVerb) { return BY_CANONICAL.get(canonicalVerb); }
+
+/**
+ * The atoms that only READ. Every other atom changes something — creates, mutates, deletes, moves an
+ * item through its lifecycle, or shares it — so an op using one of them is a WRITING op.
+ * @type {ReadonlyArray<string>}
+ */
+export const READ_ATOMS = Object.freeze(['list', 'get']);
+
+/**
+ * True iff `verb` is an atom (canonical or alias) that writes: every atom except the read ones.
+ * A domain verb (not an atom) is neither — the atom catalogue cannot say what it does, so an op
+ * with a domain verb says it writes by declaring `appends` or `writes` itself.
+ * @param {string} verb
+ */
+export function isWritingVerb(verb) {
+  const canonical = canonicalAtom(verb);
+  return canonical !== null && !READ_ATOMS.includes(canonical);
+}
+
+/**
+ * Where a writing op writes — the value set of an op's `writes: { scope }` declaration.
+ *   • `device` — only on this device (local settings, caches, this device's own registrations);
+ *   • `person` — the person's own data, which follows them across their devices (profile and persona
+ *                properties, the contacts book, personal settings);
+ *   • `circle` — the circle's shared store or log, which syncs to the circle's other members.
+ * Not the same axis as a setting's or a param's `scope` (who a SETTING applies to).
+ * @type {ReadonlyArray<'device'|'person'|'circle'>}
+ */
+export const WRITE_SCOPES = Object.freeze(['device', 'person', 'circle']);

@@ -71,6 +71,9 @@
 /** @type {import('@onderling/app-manifest').__types__} */
 export const folioManifest = {
   app:       'folio',
+  // The network hosts this app's code reaches. None: whatever it syncs goes through the person's own
+  // pod and relay, which they configure — not a fixed host.
+  hosts:     [],
   itemTypes: [
     // Markdown notes + the files mirrored between local folder and Solid
     // pod.  The local rel-path is the item identity (e.g. 'notes/today.md').
@@ -97,6 +100,7 @@ export const folioManifest = {
     {
       id:        'deleteFromPod',
       verb:      'remove',
+      writes: { scope: 'person' },
       // (basis v0.4, 2026-05-22) — pod-side delete is HTTPS;
       // works in browser.  Per OQ-1.A: basis exposes this in
       // its browser bundle.
@@ -125,6 +129,7 @@ export const folioManifest = {
     {
       id:        'deleteLocally',
       verb:      'remove',
+      writes: { scope: 'device' },
       // local-fs delete needs Node; basis in browser
       // filters this out per OQ-1.A.
       runtime:   'node',
@@ -275,6 +280,7 @@ export const folioManifest = {
     },
     {
       id:    'shareFolder', group: 'compose', verb: 'add',
+      writes: { scope: 'person' },   // a share token over the person's own pod
       params: [
         { name: 'folder', kind: 'string', required: true },
         { name: 'with',   kind: 'webid',  required: true },
@@ -330,6 +336,7 @@ export const folioManifest = {
      */
     {
       id:    'saveToMyPod', verb: 'add',
+      writes: { scope: 'person' },
       appliesTo: { type: 'file' },
       params: [
         { name: 'path', kind: 'string', required: false,

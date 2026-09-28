@@ -39,6 +39,9 @@ const LIST_TYPES = ['shopping', 'errand', 'repair', 'schedule'];
 /** @type {import('@onderling/app-manifest').__types__} */
 export const householdManifest = {
   app:       'household',
+  // The network hosts this app's code reaches: the language-model providers the household web server
+  // can be started with (a local model needs no host). The person's pod is theirs to configure.
+  hosts:     ['api.anthropic.com', 'api.openai.com'],
   itemTypes: [...LIST_TYPES, 'task', 'contact', 'note'],
 
   // B · Layer 1 — domain (non-atom) verbs this manifest ships (F-SP1-e).
@@ -84,6 +87,7 @@ export const householdManifest = {
     {
       id:   'addItem', group: 'compose',
       verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'type', kind: 'enum',   of: LIST_TYPES, required: true },
         { name: 'text', kind: 'string', required: true, ...STR_NONEMPTY  },
@@ -129,6 +133,7 @@ export const householdManifest = {
     {
       id:        'markComplete',
       verb:      'complete',
+      writes: { scope: 'circle' },
       // surface as per-item button across all list-type
       // sections + tasks.  Multi-type via F-SP3-a; safe vs renderChat
       // byte-equivalence (toolCatalogue ignores appliesTo).
@@ -154,6 +159,7 @@ export const householdManifest = {
     {
       id:        'removeItem',
       verb:      'remove',
+      writes: { scope: 'circle' },
       appliesTo: { type: [...LIST_TYPES, 'task'] },   // same as markComplete
       params: [
         { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -197,6 +203,7 @@ export const householdManifest = {
     {
       id:        'addTask', group: 'compose',
       verb:      'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'text',     kind: 'string', required: true, ...STR_NONEMPTY },
@@ -232,6 +239,7 @@ export const householdManifest = {
     {
       id:        'claim',
       verb:      'claim',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/stoop)
       // DECLARATION LAYER (#34) — grabbing a household task writes `assignee` under the CLAIM policy
       // (first-wins). Same declared (task, assignee)→claim the receiver enforces for every app's task.
@@ -260,6 +268,7 @@ export const householdManifest = {
     {
       id:        'reassign', group: 'admin',
       verb:      'reassign',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       // DECLARATION LAYER (#34) — reassigning writes `assignee`, part of the CLAIM cluster (first-wins).
       resolves: [{ field: 'assignee', policy: 'claim' }],

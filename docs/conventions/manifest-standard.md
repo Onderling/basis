@@ -122,6 +122,30 @@ using the NOUN. The item-type is **deliberately not renamed** — its blast radi
 the two are disambiguated by documentation (this section + JSDoc on `packages/item-types/src/types/claim.js`)
 rather than a rename, per the repo's code-preservation ethos.
 
+## Declared reach: `writes` and `hosts`
+
+Two declarations say how far an app reaches. They are checked by the guard `scripts/lint-manifest-scopes.mjs`
+(in `npm run guards`), not by `manifestConformance`; the validator tolerates both keys like any other.
+
+- **`writes: { scope }` on an op row** — where the op writes. Required on every *writing* op: its verb is an
+  atom other than the read atoms `list` / `get` (`isWritingVerb` and `READ_ATOMS` in `atoms.js`; aliases count,
+  so `edit` writes and `read` does not), or the op declares `appends`. The three scopes (`WRITE_SCOPES`):
+  - `device` — only on this device: local settings, caches, this device's own registrations;
+  - `person` — the person's own data, which follows them across their devices: profile and persona
+    properties, the contacts book, the agent registry, their pod;
+  - `circle` — the circle's shared store or log, which syncs to the circle's members. An op that delivers to
+    another person outside any circle declares `circle` too: it leaves the person, so the widest reach is the
+    honest one.
+
+  A domain verb (in `domainVerbs`) is not classified by the atom catalogue, so the guard does not require
+  `writes` on it; when one does declare it, the value is checked. The key is `writes`, not `scope` — `scope`
+  already means who a setting or param applies to.
+- **`hosts: string[]` at the top level** — every network host the app's own code reaches (`[]` for none). An
+  endpoint the person configures — their pod, their relay — is not a fixed host and is not listed.
+
+Nothing at runtime reads either declaration yet; the extension contract (`docs/extending.md`) is where they
+will bind.
+
 ## What is not a conformance failure
 
 The registry (`@onderling/item-types`) is the source of truth for nouns, but app-local (non-registry) item types

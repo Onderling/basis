@@ -43,6 +43,10 @@ export {
   canonicalAtom,
   classifyVerb,
   atomFor,
+  // Which ops write, and the value set of their `writes: { scope }` declaration.
+  READ_ATOMS,
+  isWritingVerb,
+  WRITE_SCOPES,
 } from './atoms.js';
 
 // B · (ruling) — read helpers over manifest.settings (the wizard/form layer).

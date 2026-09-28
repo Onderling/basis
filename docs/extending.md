@@ -51,6 +51,7 @@ These exist and are the floor of the contract. Each is documented where it lives
 | **one table of entry kinds** | per kind: which lane (conversation or plumbing), may it wake a device, how long it is kept, is it immutable; an unregistered kind gets the conservative reading | `packages/item-store/src/entryKinds.js` |
 | **namespacing** | many apps compose at runtime as `appId.opId`, with collision detection | `packages/manifest-host` |
 | **an install door** | a consent card that refuses ops an app is not allowed to expose before any token is read (`NEVER_DELEGABLE`) | `apps/basis/src/v2/connections.js` |
+| **where each write lands, which hosts it reaches** | every op that writes declares `writes: { scope }` — `device` (only this device), `person` (the person's own data, on all their devices) or `circle` (the circle's shared store, synced to its members); every manifest declares `hosts`, the network hosts its code reaches (`[]` for none). Declared on every app today and checked by a guard; nothing at runtime reads them yet | `apps/*/manifest.js`; `scripts/lint-manifest-scopes.mjs`; [manifest standard](./conventions/manifest-standard.md) |
 | **the guard aggregate** | architecture kept by fitness functions, not review; a guard outside the aggregate does not exist | `npm run guards`; [`guards.md`](./guards.md) |
 | **conformance harnesses** | for every port: implement it and pass the harness = compatible | `@onderling/core/conformance`; [`ports.md`](./conventions/ports.md) |
 
@@ -72,8 +73,9 @@ These exist and are the floor of the contract. Each is documented where it lives
 |---|---|
 | `nouns` | item-type schemas; each registered kind is declared through a **preset** (below) |
 | `ops` | bespoke verbs: `{ opId, description, handler(args, invoke) }` — the description is read by people *and* by models |
+| `writes` (on an op) | where the op writes: `{ scope: 'device' \| 'person' \| 'circle' }`. Required on every op whose verb writes (every atom except `list`/`get`) or that declares `appends`. Real now: every app manifest carries it and `lint-manifest-scopes` fails an op without it |
 | `flows` | declared step graphs over ops; a flow-only extension contains no code |
-| `hosts` | every network host the extension may reach; an empty list means none |
+| `hosts` | every network host the extension may reach; an empty list means none. Real now: every app manifest declares it and `lint-manifest-scopes` fails one that does not — the declaration exists; the realm that makes it bind (§4) does not yet |
 | `hostRequirements` | what the running host must have — `ble`, `mdns`, `camera`, `location`, `always-on` |
 | `realm` | always `'required'`; an extension never runs in-process with Basis |
 | `lane` | the extension's own storage lane, removed on uninstall |
@@ -166,7 +168,9 @@ device; the recovery phrase is never typed for it.
 Three places a wrong declaration fails loudly, none of them in a person's circle:
 
 1. **Declare time** (designed) — a verifier beside `verifyFlows`: every kind an op appends is registered with
-   a preset; `hosts` and `realm` are present; no spine kind, no privileged acceptance.
+   a preset; `hosts` and `realm` are present; no spine kind, no privileged acceptance. (Already built for
+   the app manifests: `lint-manifest-scopes` fails a manifest with no `hosts` and a writing op with no
+   `writes` scope.)
 2. **The seam** (harness built, extension use designed) — the conformance harness runs the extension's ops
    against a *second* agent and asserts each appended statement folds there. A wrong declaration is refused
    at the far end, and the harness goes red.
@@ -197,7 +201,8 @@ with a named verifier; no lane signs with a static identity; every registered ki
 | the extension/app packaging split | designed |
 | kinds columns `signs · subject · accepts · syncPolicy` (every row bound; `UNKNOWN_KIND` refuses; two lints in the aggregate) | built |
 | presets `CONTENT · CLAIM · SPINE` as the manifest's way to declare a kind | designed |
-| `hosts`, `hostRequirements`, `realm`, `lane` in the manifest | designed |
+| `hosts` on every manifest, `writes: { scope }` on every writing op — declared and guarded; not yet read at runtime | built |
+| `hostRequirements`, `realm`, `lane` in the manifest | designed |
 | the realm transport + installer | designed |
 | the remit; template vs minted | designed |
 | edges on the card; scope diff on update; one-day default expiry | designed |

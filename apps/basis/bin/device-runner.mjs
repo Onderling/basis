@@ -47,13 +47,13 @@ import { VaultNodeFs } from '@onderling/vault';
 import { buildHouseholdDataSource } from '@onderling-app/household';
 
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
-import { mergeManifests } from '../src/manifestMerge.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
-import { listsManifest } from '../../lists/manifest.js';
+import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 
 import { EventLog } from '../src/eventLog.js';
 import { wireEventLogPersistence, fileSnapshotIo, fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
@@ -189,6 +189,9 @@ const agent = await createRealHouseholdAgent({
   settingsPersistDb:  { path: contentPaths.settings },
   outboxPersistDb:    { path: contentPaths.outbox },
   deviceLog,
+  // The lists' default table (and basis's) speak through this translator: a reply to Telegram is a sentence,
+  // not a locale key.
+  t,
   seedDemoData: false,
   seedHousehold: false,
   enrollOfferStorage: offerStash,
@@ -633,8 +636,9 @@ if (tgToken) {
   const allowedChatIds = raw && raw !== '*' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : '*';
   if (allowedChatIds === '*') console.warn('device-runner: OPEN TELEGRAM DOOR — no TG_ALLOWED_CHAT_IDS, every chat is admitted');
 
-  const sources = [{ manifest: agent.manifest }, { manifest: listsManifest }];
-  const catalogue = mergeManifests(sources);
+  // Scope, then interpret: the apps this bot acts in are the owner's setting, read at boot, and the catalogue
+  // every surface of the door projects — the model's tools included — holds only theirs.
+  const { catalogue, manifestsByOrigin, apps } = composeAssistantCatalogue({ apps: agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY), householdManifest: agent.manifest });
   // The model is the optional half of this optional half: a key without its SDK is a warning and a
   // Telegram that answers without a model, never a device that is not there.
   const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
@@ -642,14 +646,14 @@ if (tgToken) {
   tgRunner = createTelegramRunner({
     bridge: new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }),
     catalogue,
-    manifestsByOrigin: Object.fromEntries(sources.map((s) => [s.manifest.app, s.manifest])),
+    manifestsByOrigin,
     allowedChatIds, t, callSkill, lang: values.lang,
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
     walkLog,
   });
   await tgRunner.start();
-  walkLog({ kind: 'telegram', door: allowedChatIds === '*' ? 'open' : 'allow-list', llm: llm ? llmModel : null });
+  walkLog({ kind: 'telegram', door: allowedChatIds === '*' ? 'open' : 'allow-list', llm: llm ? llmModel : null, apps });
 }
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────

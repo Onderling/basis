@@ -50,6 +50,8 @@ import { buildDashboardSkills } from './skills/dashboard.js';
 import { buildForceCompleteSkill } from './skills/forceComplete.js';
 import { buildBotSkills } from './bot/skills.js';
 import { makeRoleOf } from './skills/roleOf.js';
+import { refusingForeignActor } from './skills/actor.js';
+import { argsFromParts } from './bundleResolver.js';
 
 /**
  * @param {object} args
@@ -130,10 +132,12 @@ export function wireSkills({
     buildBotSkills({ bundleResolver, roleOf }),
   ];
 
+  // Every skill registered here refuses an `actor` named by a peer that is not the host (see
+  // `skills/actor.js`) — including the skills that never read it, so the argument is never silently dropped.
   const registered = [];
   for (const defs of allBuilders) {
     for (const def of defs) {
-      meshAgent.skills.register(def);
+      meshAgent.skills.register(refusingForeignActor(def, bundleResolver, argsFromParts));
       registered.push(def.id);
     }
   }

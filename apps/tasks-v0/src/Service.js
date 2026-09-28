@@ -21,6 +21,7 @@
 import { DataPart } from '@onderling/core';
 import { dispatchCapability } from '@onderling/app-manifest';
 import { buildSkills, TASK_CORES } from './skills/index.js';
+import { vouchedActor } from './skills/actor.js';
 import { tasksManifest } from '../manifest.js';
 
 /**
@@ -71,6 +72,12 @@ export function createTasksService({ bundleResolver, circlesProvider, manifest =
       // Hand-written (non-core) op → the legacy DataPart handler path.
       const handler = byId.get(opId);
       if (!handler) throw new Error(`tasksService.callSkill: unknown op "${opId}"`);
+      // The host-only `actor` rule (skills/actor.js) — the cores apply it themselves; a hand-written
+      // handler does not read `actor`, so a non-host's is refused here rather than silently dropped.
+      if (Object.prototype.hasOwnProperty.call(callArgs, 'actor')) {
+        const v = vouchedActor(bundleResolver(null, { envelope, from, args: callArgs }), callArgs, from);
+        if (v.error) return v;
+      }
       return handler({ parts: [DataPart(callArgs)], from, envelope, agent: ctx.agent });
     },
 

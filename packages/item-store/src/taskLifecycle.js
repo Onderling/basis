@@ -218,6 +218,18 @@ async function assertDepsClosed(store, item) {
   }
 }
 
+/**
+ * The person a claim records: `ctx.onBehalfOf` when the authority acts for someone, else the authority
+ * itself. A present-but-empty or non-string `onBehalfOf` is a caller bug, refused rather than ignored.
+ */
+function claimantOf(ctx, actor) {
+  if (ctx.onBehalfOf === undefined || ctx.onBehalfOf === null) return actor;
+  if (typeof ctx.onBehalfOf !== 'string' || ctx.onBehalfOf.length === 0) {
+    throw new TypeError('claim: ctx.onBehalfOf must be a non-empty string when given');
+  }
+  return ctx.onBehalfOf;
+}
+
 // ── Lifecycle verbs ──────────────────────────────────────────────────────────
 
 /**
@@ -234,12 +246,18 @@ async function assertDepsClosed(store, item) {
  *
  * @param {import('./CircleItemStore.js').CircleItemStore} store
  * @param {string} id
- * @param {object} ctx  see module doc (`actor` required; `rolePolicy`,
+ * ON BEHALF OF someone: `ctx.onBehalfOf` names the person the claim is for when the key with authority
+ * (`ctx.actor`) acts for them — a host serving several people through one key. The GATE reads `ctx.actor`;
+ * the co-owner set, the "already a co-owner" test and the confirmed claimant read the person. Who may vouch
+ * is the caller's rule, not this layer's.
+ *
+ * @param {object} ctx  see module doc (`actor` required; `onBehalfOf`, `rolePolicy`,
  *   `expectedEtag`, `emit` optional).
  * @returns {Promise<object | {error:'already-claimed', current: object|null}>}
  */
 export async function claim(store, id, ctx = {}) {
   const actor = requireActor(ctx);
+  const claimant = claimantOf(ctx, actor);
   const current = await store.get(id);
   if (!current) throw new ItemNotFoundError(id);
   if (current.completedAt) {
@@ -251,13 +269,13 @@ export async function claim(store, id, ctx = {}) {
   const expired = isClaimExpired(current, at);
   // Already a co-owner, OR the set is full (default maxAssignees:1 ⇒ full after the first claim = today's
   // EXCLUSIVE first-come) → ItemStore's already-claimed — UNLESS the current claim has expired.
-  if (!expired && (roster.includes(actor) || roster.length >= maxAssigneesOf(current))) {
+  if (!expired && (roster.includes(claimant) || roster.length >= maxAssigneesOf(current))) {
     return { error: 'already-claimed', current };
   }
   gate(ctx.rolePolicy, 'canClaim', actor, current);
 
   // A fresh claim over an EXPIRED one drops the lapsed roster + its (now void) confirmation; otherwise CAS-ADD.
-  const assignees = expired ? [actor] : [...roster, actor];
+  const assignees = expired ? [claimant] : [...roster, claimant];
   const updated = {
     ...current, assignees, assignee: assignees[0], claimedAt: at,
     claimSeq: (current.claimSeq ?? 0) + 1,     // advance the claim's monotonic sequence (immutable-once-set)
@@ -274,12 +292,12 @@ export async function claim(store, id, ctx = {}) {
   // confirmation is void, so the superseding claim re-confirms per the mode.
   const autoConfirm = confirmationModeOf(current) !== 'explicit' && (expired || current.confirmedAssignee == null);
   if (autoConfirm) {
-    updated.confirmedAssignee = actor;
+    updated.confirmedAssignee = claimant;
     updated.confirmedAt = at;
     updated.confirmedBy = current.master ?? current.addedBy ?? actor;   // the pre-delegating authority
     if (typeof ctx.sign === 'function') {
       updated.confirmedSig = ctx.sign(claimConfirmationStatement({
-        taskId: id, confirmedAssignee: actor, confirmedAt: at, claimSeq: updated.claimSeq,
+        taskId: id, confirmedAssignee: claimant, confirmedAt: at, claimSeq: updated.claimSeq,
       }));
     }
   }

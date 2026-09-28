@@ -26,6 +26,7 @@ import { buildCircleInviteUri, joinCircleFromInvite } from './circleInvite.js';
 import { decodeInvite } from '../core/wizards/joinGroupState.js';
 import { personaOfContact } from './contactPersona.js';
 import { bookRowsOf } from './contactsSource.js';
+import { isKeylessContact, KEYLESS_REFUSAL } from '@onderling/item-types';
 
 export { PAIR_CIRCLE_PREFIX, pairCircleIdFor, isPairCircleId, pairFounderOf } from './pairCircleId.js';
 
@@ -104,6 +105,15 @@ export function createPairRoster({
       return (r?.members ?? []).some((m) => m?.webid === webid);
     } catch { return false; }
   };
+  /**
+   * A contact with no key cannot be in a pair circle: a person admitted through a keyless door (a Telegram user of a
+   * hosting bot — a door-shaped webid, no key on the row) has no device to redeem an invite or hold the circle's key.
+   */
+  const keyless = async (webid) => {
+    let row = null;
+    try { row = bookRowsOf(await callSkill('stoop', 'listContacts', {})).find((c) => c?.webid === webid) ?? null; } catch { row = null; }
+    return isKeylessContact(row ?? { webid });   // the book row decides; an id it does not hold, by its shape
+  };
   const recordOnContact = async (webid, circleId) => {
     try { await callSkill('stoop', 'addContact', { webid, pairCircleId: circleId }); } catch { /* the row is a convenience; the roster is the fact */ }
   };
@@ -149,10 +159,12 @@ export function createPairRoster({
     /**
      * What this side's next turn to `contactWebid` should carry: `{ pairInvite }` when this side founds and the
      * contact is not on the roster yet; `{ pairRequest: true }` when the other side founds and no roster exists here;
-     * `null` when the roster already has both (or the contact is already admitted).
+     * `null` when the roster already has both (or the contact is already admitted); `{ refused: 'keyless-contact' }`
+     * for a contact with no key, who cannot be in a circle.
      */
     async prepare(contactWebid, { name = null } = {}) {
       if (typeof contactWebid !== 'string' || !contactWebid || contactWebid === selfWebid) return null;
+      if (await keyless(contactWebid)) return { refused: KEYLESS_REFUSAL };
       const circleId = pairCircleIdFor(selfWebid, contactWebid);
       const mine = await myCircles();
       if (mine.has(circleId) && await memberOf(circleId, contactWebid)) return null;

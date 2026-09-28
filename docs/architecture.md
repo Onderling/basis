@@ -414,7 +414,11 @@ work, and a surface that conflates two gives the wrong reason for refusing.
 - **Authorisation — may this *caller* invoke it?** Answered by the **peer relationship**: `PolicyEngine`
   checks a skill's `visibility` (`public < authenticated < trusted < private`) against the caller's trust
   tier, plus the CapabilityToken an A2A op carries. Deliberately not folded into the layer above: *this
-  circle does not do that* and *you may not ask me that* are different refusals.
+  circle does not do that* and *you may not ask me that* are different refusals. **`private` is self only, never
+  granted:** a private skill (the recovery phrase, the owner root, enrolment, device retirement, surface grants)
+  is reached only by the identities the host names as self when it builds the gate, whatever tier the registry
+  holds for anyone else; `trusted` is someone who acts with standing but is not the owner (a hosting bot's admin,
+  a token holder).
 
 The order matters. A projector asks the manifest whether the op appears on its surface, then asks
 `opAvailability` whether it may happen; the authorisation layer applies at the door, to a caller, and

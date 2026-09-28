@@ -12,12 +12,10 @@
  * Pure over an injected store (`get`/`put`/`list` of rows by id): where the contacts are kept is the host's choice.
  */
 import { ROLES } from '@onderling/core';
+import { CHANNELS, isChannel } from '@onderling/item-types';
 
-/** The doors a person can be admitted by. */
-export const CHANNELS = Object.freeze(['telegram', 'web', 'whatsapp']);
-
-/** @param {unknown} v */
-export const isChannel = (v) => typeof v === 'string' && CHANNELS.includes(v);
+// The doors a person can be admitted by are the contact type's own closed set.
+export { CHANNELS, isChannel };
 
 /**
  * @param {object} a

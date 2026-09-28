@@ -19,6 +19,8 @@ import { decodeContactCard } from './contactCardLink.js';
 import { pairCircleIdFor } from './pairCircleId.js';
 import { DEFAULT_PERSONA, personaOfContact } from './contactPersona.js';
 import { personaPresetKeys } from './memberCards.js';
+import { bookRowsOf } from './contactsSource.js';
+import { isKeylessContact, KEYLESS_REFUSAL } from '@onderling/item-types';
 import {
   loadPersonas, loadPersonalRevealDefault, applyJoinRevealState, REVEAL_PRESETS,
 } from '../core/wizards/joinGroupState.js';
@@ -95,13 +97,14 @@ export async function addContactAs({ callSkill, payload, persona = DEFAULT_PERSO
 /**
  * What the thread header shows: the persona the row records (a row that records none shows the default — the
  * value the backfill writes where it can prove it) and the level that persona's disclosure for the pair circle
- * amounts to.
+ * amounts to. A contact with no key (a person a hosting bot admitted through a keyless door) has no pair circle and
+ * never will while it is keyless, so no pair circle's disclosure is read for it.
  */
 export async function contactLensModel({ callSkill, row, pairCircleIdOf = null } = {}) {
   const webid = row?.webid ?? row?.contactId ?? null;
   const persona = personaOfContact(row) ?? DEFAULT_PERSONA;
   const personas = await loadPersonas({ callSkill }).catch(() => []);
-  const pairId = await pairIdFor(webid, { pairCircleIdOf, callSkill });
+  const pairId = isKeylessContact(row ?? { webid }) ? null : await pairIdFor(webid, { pairCircleIdOf, callSkill });
   let revealPreset = REVEAL_PRESETS.includes(row?.revealPreset) ? row.revealPreset : null;
   if (!revealPreset && pairId) {
     try {
@@ -126,6 +129,10 @@ export async function changeContactLens({
   callSkill, contactId, persona, revealPreset = null, shareRelease = null, pairCircleExists = undefined, pairCircleIdOf = null,
 } = {}) {
   const chosen = typeof persona === 'string' && persona ? persona : DEFAULT_PERSONA;
+  // A contact with no key sees no persona of yours: there is no pair circle to say a release on. Refused, nothing written.
+  let held = null;
+  try { held = bookRowsOf(await callSkill('stoop', 'listContacts', {})).find((c) => c?.webid === contactId) ?? null; } catch { held = null; }
+  if (isKeylessContact(held ?? { webid: contactId })) return { error: KEYLESS_REFUSAL, releaseShared: false };
   const row = await callSkill('stoop', 'setContactPersona', { webid: contactId, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
   if (row?.error) return { error: row.error, releaseShared: false };
   const pairId = await pairIdFor(contactId, { pairCircleIdOf, callSkill });

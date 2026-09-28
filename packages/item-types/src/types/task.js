@@ -51,5 +51,8 @@ export const TASK_SCHEMA = {
     // rationale as the block above — the merge writes several of these as number-OR-null across call sites.
     claimConfirmation: {}, claimLease: {}, claimSeq: {}, confirmedAssignee: {}, confirmedAt: {},
     master: {}, provisional: {},
+    // The person the task was added FOR when the key with authority (`addedBy`) acts on someone's behalf —
+    // a contact id such as `telegram:123`. Attribution only; every authority gate keeps reading `addedBy`.
+    actor: { type: 'string' },
   },
 };

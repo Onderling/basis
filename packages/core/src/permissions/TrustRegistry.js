@@ -48,6 +48,15 @@ export class TrustRegistry {
     return rec.tier ?? 'authenticated';
   }
 
+  /**
+   * Whether this identity has a record at all — `getTier`/`getRecord` answer a default for an unknown one, so a
+   * caller that treats "unknown" differently (a door's stranger is `public`, not `authenticated`) asks this first.
+   * The key is any identity string: a pubKey for a peer, a contact id (`telegram:123`) for a person at a door.
+   */
+  async has(pubKey) {
+    return (await this.#vault.get(`trust:${pubKey}`)) != null;
+  }
+
   /** @returns {{ tier: Tier, groups: string[], tokenIds: string[] }} */
   async getRecord(pubKey) {
     return this.#load(pubKey);

@@ -46,6 +46,7 @@ export const NOT_A_NETWORK_CALL = Object.freeze({
   'https://onderling.org/ns#': "Onderling's own vocabulary namespace in the pod's Turtle — an identifier",
   'http://www.apple.com/DTDs/': "the property-list DOCTYPE in folio's launchd unit — a document-type identifier",
   'https://github.com/Onderling': "a project link for people: the geocoder's User-Agent contact and a systemd unit's Documentation= line",
+  'https://t.me/': "a Telegram invite link the bot hands its admin to pass on (opens the bot, sends the code) — shown, never fetched",
 });
 
 const SOURCE_DIRS = ['src', 'web', 'bin'];

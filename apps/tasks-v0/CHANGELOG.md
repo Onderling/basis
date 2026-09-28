@@ -3,6 +3,16 @@
 > Package renamed `@onderling-app/tasks-v0` → **`@onderling-app/tasks`** (2026-07-18); the directory
 > stays `apps/tasks-v0`.
 
+## [Unreleased] — 2026-09-28 — `actor`: the person a host's call is for
+
+- A host serving several people through one key may name the person a call is for in `args.actor` (a
+  contact id such as `telegram:123`). Honoured **only when the invoking peer is the engine's host** — the
+  `hostKey` the composer declares (`createTasksAgent` / `createCircleAgent` /
+  `createBrowserMultiCircleTasksAgent`), default the tasks agent's own key. From any other peer, an admin
+  included, every skill refuses it with `{ error: 'actor-refused', reason }`.
+- `addTask` stamps `actor` on the item (`addedBy` / `master` stay the host); `claimTask` puts the actor in
+  the co-owner set (the host's key passes the gate); `listMine` lists what is assigned to the actor.
+
 ## [Unreleased] — 2026-07-18/19 — shared tasks substrate + co-ownership + delegation
 
 The task engine moved onto the canonical **`CircleItemStore`** (`@onderling/item-store`) — a generic,

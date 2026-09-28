@@ -47,6 +47,7 @@ import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
 import { makeRoleOf } from './roleOf.js';
+import { honouringActor } from './actor.js';
 import { validateCanonical, LISTS_TYPES } from '@onderling/item-types';
 import { saveCircleConfig, loadCircleConfig, KIND_DEFAULTS } from '../Circle.js';
 import { tasksManifest } from '../../manifest.js';
@@ -162,6 +163,8 @@ async function addTaskCore(circle, a, ctx) {
     ...(a.estimateMinutes  !== undefined ? { estimateMinutes:  a.estimateMinutes } : {}),
     // Tasks V2 standardisation adoption — cross-pod refs.
     ...(embeds.length > 0  ? { embeds } : {}),
+    // The person the host added this FOR (see `./actor.js`); the authority stays `ctx.from`.
+    ...(ctx.onBehalfOf ? { actor: ctx.onBehalfOf } : {}),
   };
   // DAG cycle detection is now self-guarded inside the ported `addTasks`
   // (createTaskStore.addItems → detectCycle over the open set, throwing the
@@ -187,12 +190,19 @@ async function addTaskCore(circle, a, ctx) {
 }
 
 /**
- * claimTask({id})
+ * claimTask({id, actor?})
  * Compare-and-swap; loser gets `{error: 'already-claimed', current}`.
+ * With a host-vouched `actor` (see `./actor.js`) the claim is Ann's, not the host's: the host's key
+ * passes the claim gate and the actor joins the co-owner set, so `listMine` for Ann finds it and a
+ * second person through the same host is a second claimant.
  */
 async function claimTaskCore(circle, a, ctx) {
   if (!circle) return { error: 'circleId required' };
-  const result = await circle.itemStore.claim(a.id, { actor: ctx.from, actorDisplayName: ctx.actorDisplayName });
+  const result = await circle.itemStore.claim(a.id, {
+    actor: ctx.from,
+    actorDisplayName: ctx.actorDisplayName,
+    ...(ctx.onBehalfOf ? { onBehalfOf: ctx.onBehalfOf } : {}),
+  });
   // Phase 52.9.3 — publish the post-claim state. The
   // substrate is the source of authorisation truth on the
   // receiver side via applySync (gate-bypass); the receiver's
@@ -318,16 +328,19 @@ async function listOpenCore(circle, a, ctx) {
 }
 
 /**
- * listMine({})  — open tasks assigned to the calling actor.
+ * listMine({actor?})  — open tasks assigned to the calling actor.
+ * "The calling actor" is the host-vouched `actor` when one was named (see `./actor.js`), else the
+ * invoking key — so the people one host serves each get their own list, and the host its own.
  * Includes DAG `status` per item so 's open-deps gate
  * surfaces in the My-work UI (disabled "Mark complete" button).
  */
 async function listMineCore(circle, a, ctx) {
   if (!circle) return { error: 'circleId required' };
+  const me     = ctx.onBehalfOf ?? ctx.from;
   const open   = await circle.itemStore.listOpen();
   const closed = await circle.itemStore.listClosed();
   const items  = open
-    .filter((t) => assigneesOf(t).includes(ctx.from))   // co-owner membership (mirror-compatible)
+    .filter((t) => assigneesOf(t).includes(me))   // co-owner membership (mirror-compatible)
     .map((t) => ({
       ...t,
       status:   effectiveStatus(t, open, closed),
@@ -426,7 +439,10 @@ async function revokeTaskCore(circle, a, ctx) {
  * set stays in lock-step with the manifest ops + the wire registrations, so a
  * new op can never exist on one route but not the other (anti-drift invariant #3).
  */
-export const TASK_CORES = Object.freeze({
+//
+// Every core applies the host-only `actor` rule itself (`honouringActor`, see `./actor.js`), so the wire
+// and local routes cannot disagree on it: a non-host's `actor` is refused before the core runs.
+export const TASK_CORES = Object.freeze(Object.fromEntries(Object.entries({
   addTask:         addTaskCore,
   claimTask:       claimTaskCore,
   completeTask:    completeTaskCore,
@@ -439,7 +455,7 @@ export const TASK_CORES = Object.freeze({
   approveTask:     approveTaskCore,
   rejectTask:      rejectTaskCore,
   revokeTask:      revokeTaskCore,
-});
+}).map(([id, core]) => [id, honouringActor(core)])));
 
 /**
  * @param {object} args

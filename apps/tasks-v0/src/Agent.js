@@ -103,6 +103,9 @@ export async function createTasksAgent({
   // circle's other items live in ONE store, syncing over ONE mirror. Absent
   // ⇒ tasks-v0 constructs its own store (single-circle / standalone path).
   circleStore: injectedCircleStore,
+  // The HOST of this engine: the one invoking key allowed to name an `actor` (the person a call is for —
+  // see `skills/actor.js`). The composer declares it; absent ⇒ this agent's own key.
+  hostKey,
 }) {
   if (!roles || typeof roles !== 'object') {
     throw new TypeError('createTasksAgent: roles map required');
@@ -223,6 +226,8 @@ export async function createTasksAgent({
     },
     roles,
     itemStore,
+    // The one invoking key allowed to name an `actor` (skills/actor.js): declared by the composer, else ours.
+    hostKey: (typeof hostKey === 'string' && hostKey) ? hostKey : agent.pubKey,
     // The UNDERLYING CircleItemStore, alongside the task-store wrapper above. Exposed so a host can
     // attach a peer mirror to it (`wireStoreMirror`) — the wrapper has no `setSyncHook`, so without
     // this a circle's tasks can be written and read but never SYNCED, which is exactly what happened

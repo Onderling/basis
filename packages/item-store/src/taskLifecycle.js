@@ -157,7 +157,7 @@ export function claimState(item) {
  * @param {{taskId?:string, confirmedAssignee?:string, confirmedAt?:number, claimSeq?:number}} facts
  */
 export function claimConfirmationStatement({ taskId, confirmedAssignee, confirmedAt, claimSeq } = {}) {
-  return ['claim-confirmed', taskId ?? '', confirmedAssignee ?? '', confirmedAt ?? '', claimSeq ?? ''].join(' ');
+  return ['claim-confirmed', taskId ?? '', confirmedAssignee ?? '', confirmedAt ?? '', claimSeq ?? ''].join('\u0000');
 }
 
 /**

@@ -315,7 +315,7 @@ describe('which door collects', () => {
   const engineCall = (src) => { const i = src.indexOf('createAssistantEngine({'); return i < 0 ? '' : src.slice(i, src.indexOf('\n  }', i) + 4); };
 
   it('the circle composers do not wait (a person types one line on purpose there) and hand their pending ask to the lane', () => {
-    for (const shell of ['../web/v2/circleApp.js']) {
+    for (const shell of ['../web/v2/circleApp.js', '../../basis-mobile/src/screens/v2/CircleLauncherScreen.js']) {
       const call = engineCall(read(shell));
       expect(call, shell).toMatch(/collectMs:\s*0\b/);
       expect(call, shell).toMatch(/claim:\s*followUpClaim\(/);

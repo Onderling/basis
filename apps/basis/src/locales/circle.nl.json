@@ -3839,6 +3839,10 @@
     "unknown": {
       "text": "Ik kon daar geen actie van maken.",
       "doc": "Circle-bot reply when the input didn't resolve to a known command."
+    },
+    "more": {
+      "text": "En verder?",
+      "doc": "Assistant reply when a turn was cut short (too many acts at once, or a call the model left unfinished): the ones it could do are done, and it asks for the rest."
     }
   },
   "op": {

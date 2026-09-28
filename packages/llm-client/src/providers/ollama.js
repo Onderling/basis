@@ -190,7 +190,11 @@ export function parseOpenAIChatResponse(resp, options = {}) {
         args = typeof tc.function?.arguments === 'string'
           ? JSON.parse(tc.function.arguments)
           : (tc.function?.arguments ?? {});
-      } catch { args = {}; }
+      } catch {
+        // Arguments that do not parse were cut off (the output ran out mid-call). Say so rather than hand on an
+        // empty call: acting on `{}` would add a blank item.
+        return { id: tc.function?.name ?? '', args: {}, truncated: true };
+      }
       return { id: tc.function?.name ?? '', args };
     });
     return {

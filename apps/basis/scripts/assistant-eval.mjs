@@ -12,22 +12,23 @@
  *   node scripts/assistant-eval.mjs                 # real route (needs ~/.privatemode-apikey)
  *   node scripts/assistant-eval.mjs --model gpt-oss-120b
  *   node scripts/assistant-eval.mjs --only add        # fixtures whose id contains "add"
+ *   node scripts/assistant-eval.mjs --apps household,lists,tasks   # the bot's app list (default: the box's)
  *   node scripts/assistant-eval.mjs --from-log ~/.basis-telegram/walk-log-*.jsonl   # print fixture stubs from a walk
  *
  * Exit code 1 when the pass rate is under --min (default 0.85). Fixtures: scripts/assistant-eval.fixtures.mjs.
  */
 import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
-import { mergeManifests } from '../src/manifestMerge.js';
+import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
-import { householdManifest } from '../../household/manifest.js';
-import { listsManifest } from '../../lists/manifest.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
+import { detectLang } from '../src/v2/assistantLanguage.js';
 
 const { values } = parseArgs({ options: {
   model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.85' },
-  mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' },
+  mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' }, 'door-lang': { type: 'string' },
+  apps: { type: 'string' },
 } });
 
 if (values['from-log']) {
@@ -42,7 +43,8 @@ if (values['from-log']) {
   process.exit(0);
 }
 
-const catalogue = mergeManifests([{ manifest: householdManifest }, { manifest: listsManifest }]);
+// The catalogue the box's Telegram door hands its model: composed the same way, from the same app list.
+const { catalogue } = composeAssistantCatalogue({ apps: values.apps ? values.apps.split(',') : undefined });
 let llm = null;
 if (!values.mock) {
   const { privatemodeProvider, readPrivatemodeKey } = await import('@onderling/llm-client/providers/privatemode');
@@ -59,7 +61,8 @@ for (const f of fixtures) {
   const dispatched = [];
   const replies = [];
   const engine = createAssistantEngine({
-    catalogue, lang: f.lang ?? values.lang, llm, interpret: interpretToCommand,
+    // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
+    catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm, interpret: interpretToCommand,
     loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'shopping', text })),
     dispatch: (input) => { dispatched.push(input); },
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
@@ -102,7 +105,10 @@ function judge(expect, got, n) {
     if (got?.op) return { ok: false, why: 'called a tool' };
     const text = got?.reply ?? '';
     if (expect.reply === 'asks') return /\?/.test(text) ? { ok: true, why: '' } : { ok: false, why: 'no question' };
-    if (expect.reply === 'declines') return text && text !== '__unknown' ? { ok: true, why: '' } : { ok: false, why: 'silence' };
+    if (expect.reply === 'declines' && !(text && text !== '__unknown')) return { ok: false, why: 'silence' };
+    // `in`: the answer's language, read by the same counter the hint uses (undecided counts as a pass)
+    if (expect.in && detectLang(text) && detectLang(text) !== expect.in) return { ok: false, why: `answered in ${detectLang(text)}` };
+    if (expect.reply === 'declines') return { ok: true, why: '' };
     return { ok: true, why: '' };
   }
   return { ok: !got, why: got ? 'acted' : '' };

@@ -39,6 +39,9 @@ const LIST_TYPES = ['shopping', 'errand', 'repair', 'schedule'];
 /** @type {import('@onderling/app-manifest').__types__} */
 export const householdManifest = {
   app:       'household',
+  // The network hosts this app's code reaches: the language-model providers the household web server
+  // can be started with (a local model needs no host). The person's pod is theirs to configure.
+  hosts:     ['api.anthropic.com', 'api.openai.com'],
   itemTypes: [...LIST_TYPES, 'task', 'contact', 'note'],
 
   // B · Layer 1 — domain (non-atom) verbs this manifest ships (F-SP1-e).
@@ -49,12 +52,28 @@ export const householdManifest = {
   // atom without lying: revealing a recovery phrase is not a `list`, and granting a connection the right to
   // act as you is not an `add`. Declaring them here is what the atom-discipline guard asks for — it refuses
   // an undeclared verb rather than letting one drift in under a borrowed atom.
-  domainVerbs: [
-    'help', 'register',
-    'enroll-device', 'revoke-device', 'reveal-owner-phrase', 'restore-owner-phrase',
-    'replace-device', 'list-recovery-circles', 'export-recovery-file', 'import-recovery-file', 'restore-status', 'restore-source', 'restore-intent',
-    'grant-surface', 'revoke-surface', 'list-surface-grants',
-  ],
+  //
+  // Each domain verb says whether it reads or writes (the atom catalogue cannot say it for them); an op
+  // whose verb writes declares where (`writes: { scope }`). `restore-status` and `restore-source` write:
+  // the first clears the note the restore ceremony left on this device, the second lands a recovery file.
+  domainVerbs: {
+    help: 'read',
+    register: 'write',
+    'enroll-device': 'write',
+    'revoke-device': 'write',
+    'reveal-owner-phrase': 'write',
+    'restore-owner-phrase': 'write',
+    'replace-device': 'write',
+    'list-recovery-circles': 'read',
+    'export-recovery-file': 'write',
+    'import-recovery-file': 'write',
+    'restore-status': 'write',
+    'restore-source': 'write',
+    'restore-intent': 'write',
+    'grant-surface': 'write',
+    'revoke-surface': 'write',
+    'list-surface-grants': 'read',
+  },
 
   // B · Layer 1 — the (verb × noun) capability surface (PLAN-capability-arc.md).
   // Each key is one of `itemTypes`; each `atoms` entry is a CANONICAL SDK atom
@@ -84,6 +103,7 @@ export const householdManifest = {
     {
       id:   'addItem', group: 'compose',
       verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'type', kind: 'enum',   of: LIST_TYPES, required: true },
         { name: 'text', kind: 'string', required: true, ...STR_NONEMPTY  },
@@ -129,6 +149,7 @@ export const householdManifest = {
     {
       id:        'markComplete',
       verb:      'complete',
+      writes: { scope: 'circle' },
       // surface as per-item button across all list-type
       // sections + tasks.  Multi-type via F-SP3-a; safe vs renderChat
       // byte-equivalence (toolCatalogue ignores appliesTo).
@@ -154,6 +175,7 @@ export const householdManifest = {
     {
       id:        'removeItem',
       verb:      'remove',
+      writes: { scope: 'circle' },
       appliesTo: { type: [...LIST_TYPES, 'task'] },   // same as markComplete
       params: [
         { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -197,6 +219,7 @@ export const householdManifest = {
     {
       id:        'addTask', group: 'compose',
       verb:      'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       params: [
         { name: 'text',     kind: 'string', required: true, ...STR_NONEMPTY },
@@ -232,6 +255,7 @@ export const householdManifest = {
     {
       id:        'claim',
       verb:      'claim',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/stoop)
       // DECLARATION LAYER (#34) — grabbing a household task writes `assignee` under the CLAIM policy
       // (first-wins). Same declared (task, assignee)→claim the receiver enforces for every app's task.
@@ -260,6 +284,7 @@ export const householdManifest = {
     {
       id:        'reassign', group: 'admin',
       verb:      'reassign',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
       // DECLARATION LAYER (#34) — reassigning writes `assignee`, part of the CLAIM cluster (first-wins).
       resolves: [{ field: 'assignee', policy: 'claim' }],
@@ -276,6 +301,7 @@ export const householdManifest = {
     {
       id:        'registerName', group: 'compose',
       verb:      'register',                                   // F-SP1-e
+      writes: { scope: 'circle' },
       appliesTo: { type: 'contact' },
       params: [
         // `text` matches the F-SP2-a 'text-only' body shape; the contact
@@ -297,6 +323,7 @@ export const householdManifest = {
     {
       id:   'revokeDevice', group: 'device',
       verb: 'revoke-device',
+      writes: { scope: 'circle' },   // widest of what it writes: the registry tombstone, and an address-revoke statement in every circle
       // The device-revocation CEREMONY (the eviction machinery pointed inward): phrase-proven on a
       // SURVIVING device; tombstones the delegation and retires the device's per-circle addresses
       // from every roster set (fold-enforced at every member's end — the device becomes an island).
@@ -318,6 +345,7 @@ export const householdManifest = {
     {
       id:   'exportRecoveryFile', group: 'device',
       verb: 'export-recovery-file',
+      writes: { scope: 'device' },   // reads the registry into a file; nothing shared is written
       // THE RECOVERY FILE, out: the registry (circles, devices, wrapped-key refs) sealed exactly as the pod
       // mirror seals it — to the profile-derived key the phrase re-derives — so the phrase is the only
       // secret. Reached from My data → "Save a recovery file" (both shells); no chat/slash surface.
@@ -331,6 +359,7 @@ export const householdManifest = {
     {
       id:   'importRecoveryFile', group: 'device',
       verb: 'import-recovery-file',
+      writes: { scope: 'circle' },   // widest of what it writes: the registry on this device, and the rosters the file carries into each circle
       // THE RECOVERY FILE, in: opens the file with this device's key, upserts every entry through the
       // registry handle, and runs the boot re-open loop. Refuses `not-your-file` / `unreadable-file`.
       // Reached from My data → "Load a recovery file" after a phrase restore.
@@ -342,6 +371,7 @@ export const householdManifest = {
     {
       id:   'restoreStatus', group: 'device',
       verb: 'restore-status',
+      writes: { scope: 'device' },   // clears the note the restore ceremony left on this device
       // The restore-finish flow's first step: what came back after a phrase restore (circles from the
       // pod or a file, other devices on the registry) — and it clears the note the ceremony left.
       params: [],
@@ -350,6 +380,7 @@ export const householdManifest = {
     {
       id:   'restoreSource', group: 'device',
       verb: 'restore-source',
+      writes: { scope: 'circle' },   // a file source lands like importRecoveryFile
       // When nothing came back: load a recovery file now, or later (the honest "your circles are not
       // here" screen). Never "ask an admin" — that is the fallback of last resort, not an offered route.
       params: [
@@ -361,6 +392,7 @@ export const householdManifest = {
     {
       id:   'restoreIntent', group: 'device',
       verb: 'restore-intent',
+      writes: { scope: 'device' },
       // The question: could anyone else still use the old device? Broken and lost run the same ceremony
       // and differ in what the screen says; adding means the other devices keep working, nothing retires.
       params: [
@@ -371,6 +403,7 @@ export const householdManifest = {
     {
       id:   'replaceDevice', group: 'device',
       verb: 'replace-device',
+      writes: { scope: 'circle' },   // widest of what it writes: retires the other devices in every circle and rotates keys
       // THE REPLACE CEREMONY (one ceremony for both restore intents — a phone that broke, a phone that
       // walked away): on THIS, the restored device, phrase-proven; retires every other device the
       // registry lists (and the first device's profile-derived addresses) in every circle, absorbs the
@@ -384,6 +417,7 @@ export const householdManifest = {
     {
       id:   'enrollDevice', group: 'device',
       verb: 'enroll-device',
+      writes: { scope: 'person' },   // this install's delegation, sealed to the person's owner root
       // The add-a-device CEREMONY (a host identity act, like restoreOwnerPhrase): restores the
       // owner root from the phrase — typed on THIS, the NEW device — and writes this install's
       // delegation blob, so the next boot derives per-circle keys from the delegation seed and
@@ -413,6 +447,7 @@ export const householdManifest = {
     {
       id:   'revealOwnerPhrase', group: 'device',
       verb: 'reveal-owner-phrase',
+      writes: { scope: 'device' },   // shows the phrase; nothing is written
       // Shows the owner recovery phrase to the person already holding the device. Takes nothing:
       // possession of an unlocked device IS the authority, and asking for a secret to reveal a
       // secret would be theatre. Owner-only at the dispatch gate.
@@ -424,6 +459,7 @@ export const householdManifest = {
     {
       id:   'restoreOwnerPhrase', group: 'device',
       verb: 'restore-owner-phrase',
+      writes: { scope: 'circle' },   // widest of what it writes: the owner root on this device, and retiring this device's old row in the circle member map
       // The other direction: adopt an owner root from a phrase typed on THIS device. Distinct from
       // enrollDevice, which also writes a delegation blob for a device joining an existing account.
       params: [
@@ -434,6 +470,7 @@ export const householdManifest = {
     {
       id:   'grantSurface', group: 'admin',
       verb: 'grant-surface',
+      writes: { scope: 'person' },   // a connection is the person's: the grants lane travels between their own devices
       // CONNECTIONS — a thing that is not this device (a screen, a bot, an always-on companion)
       // acting as you within limits you ticked. `ops` is the boundary: the pick IS the grant, and
       // nothing outside it verifies at the door. `reads` names which sections its lane may carry.
@@ -455,6 +492,7 @@ export const householdManifest = {
     {
       id:   'revokeSurface', group: 'admin',
       verb: 'revoke-surface',
+      writes: { scope: 'person' },   // a connection is the person's: the grants lane travels between their own devices
       // Unpairing. Revoke-wins: the grant stops working regardless of what the other side still holds.
       params: [
         { name: 'viewPubKey', kind: 'string', required: true },

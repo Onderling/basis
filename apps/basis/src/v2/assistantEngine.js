@@ -23,6 +23,7 @@ import { createTokenGate } from './tokenGate.js';
 import { circleGateRules } from './circleGate.js';
 import { makeCircleRetriever } from './circleRetriever.js';
 import { DEFAULT_INTERPRET_SYSTEM } from './interpretCommand.js';
+import { detectLang } from './assistantLanguage.js';
 
 export const ASSISTANT_MEMORY_TURNS = 6;
 
@@ -61,9 +62,11 @@ export function createAssistantEngine({
   const smart = Boolean(providers && typeof interpret === 'function');
   // The interpreter speaks the member's language and knows the local phrasings for "add" — seen live:
   // an English greeting answered a Dutch "Maii", and "kun je … toevoegen?" was read as "show the list".
+  // The stable instruction (the rules and this language's phrasings) and this turn's hints (the language line), kept
+  // apart so the interpreter puts the stable part first and the hints below its turn marker.
   const system = interpretSystemFor(lang);
   const interpretIn = typeof interpret === 'function'
-    ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system })
+    ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? interpretHintsFor(text) })
     : null;
   const retrieve = typeof loadItems === 'function'
     ? makeCircleRetriever({
@@ -126,14 +129,37 @@ export function createAssistantEngine({
   };
 }
 
+/**
+ * The line a door speaks when the assistant did not act on a turn (or did not finish it): the model's own words when
+ * it spoke, "en verder?" when the turn was cut short (the per-turn cap, or a call the output cut off), else the
+ * door's own fallback. One answer for every door, so a cut turn is asked about the same way everywhere.
+ * @param {{reply?: string, partial?: boolean}|undefined} opts  what `onNoMatch` received
+ * @param {(key: string) => string} t
+ * @param {string} fallbackKey  the door's "could not make that into an action" key
+ */
+export function assistantReplyText(opts, t, fallbackKey) {
+  if (opts && typeof opts.reply === 'string' && opts.reply) return opts.reply;
+  if (opts && opts.partial === true) return t('circle.bot.more');
+  return t(fallbackKey);
+}
+
 const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
-/** The interpreter's system prompt for a language: the shared instruction plus the language and its add-phrasings. */
+/**
+ * The interpreter's STABLE system prompt for a door: the shared instruction, the reply-language rule (the member's
+ * language; the door's when that cannot be told), and the door language's add-phrasings.
+ */
 export function interpretSystemFor(lang = 'nl') {
   const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
   const add = lang === 'nl'
     ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
-  return `${DEFAULT_INTERPRET_SYSTEM}\nAlways reply in ${name}. ${add}`;
+  return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}`;
+}
+
+/** This turn's hints, below the prompt's turn marker: what the member's line was written in, when that is clear. */
+export function interpretHintsFor(text) {
+  const wrote = detectLang(text);
+  return wrote ? [`The member wrote in: ${wrote}.`] : [];
 }
 
 /**

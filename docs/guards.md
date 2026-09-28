@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 42
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 44
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -27,6 +27,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `duplicate-vocab` | — | a shared VOCABULARY is defined in exactly ONE place |
 | `entry-kinds-complete` | — | every entry kind declares all four BINDING cells from the vocabularies, the unknown |
 | `hardcoded-strings` | — | CLAIM: every word a person reads on a shipping surface comes from a locale |
+| `hosts-literals` | — | every host an app's code names in a URL literal is in that app's manifest `hosts` |
 | `image-entrypoints` | — | an image's entrypoint imports only Node builtins and relative paths |
 | `integration-index` | — | the integration index stays in sync with reality |
 | `journeys-reach-users` | — | a journey walks a corridor a PERSON can walk |
@@ -34,6 +35,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `lanes-sign-per-circle` | — | a lane module never names the profile identity — a statement on a lane signs with the |
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
+| `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
 | `plans-structure` | — | the private plans/ folder keeps the shape it was sorted into (2026-09-25) |
 | `rails-named-verifier` | — | every signed rail is constructed with a NAMED binding verifier, and the name agrees |

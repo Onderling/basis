@@ -34,6 +34,7 @@ export const SEAMS = Object.freeze([
   { id: 'circle-policy-lane',        pattern: /makeCirclePolicyLane\(/,         why: 'the circle policy as a signed admin statement on the governance lane — one composition, a shell injects its stores' },
   { id: 'circle-policy-lane-folds',  pattern: /circlePolicyLane\??\.apply\(/,     why: 'the policy is applied where governance changes land — a shell that never folds it keeps the default posture' },
   { id: 'circle-policy-lane-serves', pattern: /circlePolicyLane\??\.preserved\(/, why: 'the winning statement is served at catch-up after the audit window — a later joiner converges from any peer' },
+  { id: 'assistant-reply-line',  pattern: /assistantReplyText\(/,               why: 'the line a door speaks when the assistant did not act or was cut short ("en verder?") — one answer for every door' },
   { id: 'contact-channel',       pattern: /createContactThreadChannel\(/,        why: 'direct messages: durable threads, the person seal, the own-devices carry' },
   // A ROW is a view: only the shells that paint Contacten compose it. The box stores the thread and carries it; the
   // row appears on each painting device when the carried turn lands there. Scoped on purpose, and said here so
@@ -81,7 +82,7 @@ export const SEAMS = Object.freeze([
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
   { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/App.js'] },
-  { name: 'box',    files: ['apps/basis/bin/device-runner.mjs'] },
+  { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 
 /** Gaps a shell is known to have, each with what closes it. Remove the entry when the seam lands. */

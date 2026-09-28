@@ -17,7 +17,7 @@
  * has its own audit pipeline — this skill doesn't audit separately.
  */
 
-import { SYSTEM_PROMPT_CLASSIFY } from '../llm/prompts.js';
+import { SYSTEM_PROMPT_LEGACY } from '../llm/prompts.js';
 
 /**
  * Hand-built tool catalogue for v0.  The schemas are intentionally
@@ -108,7 +108,7 @@ export async function classifyAndExtract(args, ctx) {
   let result;
   try {
     result = await llm.invoke({
-      system:   SYSTEM_PROMPT_CLASSIFY,
+      system:   SYSTEM_PROMPT_LEGACY,
       messages: [{ role: 'user', content: text }],
       tools:    V0_TOOL_CATALOGUE,
     });

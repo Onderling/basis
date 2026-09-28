@@ -17,10 +17,13 @@
 
 export const calendarManifest = {
   app:        'calendar',
+  // The network hosts this app's code reaches. None: whatever it syncs goes through the person's own
+  // pod and relay, which they configure — not a fixed host.
+  hosts:      [],
   itemTypes:  ['calendar-event'],
 
   // B · Layer 1 — every op maps to an SDK atom (no domain-specific verbs).
-  domainVerbs: [],
+  domainVerbs: {},
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set. Equals the current derived
@@ -38,6 +41,7 @@ export const calendarManifest = {
     {
       id:    'addEvent', group: 'compose',
       verb:  'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event' },
       // v0.7.-followup 2026-05-23 (3rd pass): renamed startsAt →
       // 'when' for slash-arg ergonomics.  User-typed
@@ -98,6 +102,7 @@ export const calendarManifest = {
     {
       id:    'rsvpAccept',
       verb:  'claim',
+      writes: { scope: 'circle' },
       // Receiver-only: appears on open events the viewer is invited to.
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
@@ -118,6 +123,7 @@ export const calendarManifest = {
     {
       id:    'rsvpDecline',
       verb:  'reject',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id', kind: 'string', required: true,
@@ -136,6 +142,7 @@ export const calendarManifest = {
     {
       id:    'rsvpTentative',
       verb:  'submit',     // approximate; ItemStore.submit is the closest contract
+      writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id', kind: 'string', required: true,
@@ -154,6 +161,7 @@ export const calendarManifest = {
     {
       id:    'cancelEvent',
       verb:  'remove',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id', kind: 'string', required: true,

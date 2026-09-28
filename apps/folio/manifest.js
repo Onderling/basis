@@ -71,6 +71,9 @@
 /** @type {import('@onderling/app-manifest').__types__} */
 export const folioManifest = {
   app:       'folio',
+  // The network hosts this app's code reaches. None: whatever it syncs goes through the person's own
+  // pod and relay, which they configure — not a fixed host.
+  hosts:     [],
   itemTypes: [
     // Markdown notes + the files mirrored between local folder and Solid
     // pod.  The local rel-path is the item identity (e.g. 'notes/today.md').
@@ -82,7 +85,7 @@ export const folioManifest = {
 
   // B · Layer 1 — domain (non-atom) verbs: `sync`/`watch` (pod ↔ local file
   // reconciliation — genuinely orthogonal to CRUD).  Every other op is an atom.
-  domainVerbs: ['sync', 'watch'],
+  domainVerbs: { sync: 'write', watch: 'write' },
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set. Equals the current derived
@@ -97,6 +100,7 @@ export const folioManifest = {
     {
       id:        'deleteFromPod',
       verb:      'remove',
+      writes: { scope: 'person' },
       // (basis v0.4, 2026-05-22) — pod-side delete is HTTPS;
       // works in browser.  Per OQ-1.A: basis exposes this in
       // its browser bundle.
@@ -125,6 +129,7 @@ export const folioManifest = {
     {
       id:        'deleteLocally',
       verb:      'remove',
+      writes: { scope: 'device' },
       // local-fs delete needs Node; basis in browser
       // filters this out per OQ-1.A.
       runtime:   'node',
@@ -150,6 +155,7 @@ export const folioManifest = {
       verb:   'sync',  // F-SP1-e: app-local verb.  Distinct from runOnce
                        // (a normal bi-directional sync) — forceRepush
                        // overwrites pod versions wholesale.
+      writes: { scope: 'person' },
       // sync touches local fs (reads files to overwrite pod);
       // node-only.  Sidecar-mode basis re-includes.
       runtime: 'node',
@@ -178,6 +184,7 @@ export const folioManifest = {
     {
       id:        'syncOnce',
       verb:      'sync',
+      writes: { scope: 'person' },
       // bi-directional fs ↔ pod sync; needs Node.
       runtime:   'node',
       params:    [],
@@ -202,6 +209,7 @@ export const folioManifest = {
     {
       id:        'watchStart',
       verb:      'watch',
+      writes: { scope: 'device' },
       // local-fs watcher (chokidar); Node-only.
       runtime:   'node',
       params:    [],
@@ -223,6 +231,7 @@ export const folioManifest = {
       id:        'watchStop',
       verb:      'watch',  // F-SP1-e: same verb as watchStart, opposite
                            // semantics — distinguished by skill id.
+      writes: { scope: 'device' },
       // stops the local-fs watcher; Node-only.
       runtime:   'node',
       params:    [],
@@ -275,6 +284,7 @@ export const folioManifest = {
     },
     {
       id:    'shareFolder', group: 'compose', verb: 'add',
+      writes: { scope: 'person' },   // a share token over the person's own pod
       params: [
         { name: 'folder', kind: 'string', required: true },
         { name: 'with',   kind: 'webid',  required: true },
@@ -330,6 +340,7 @@ export const folioManifest = {
      */
     {
       id:    'saveToMyPod', verb: 'add',
+      writes: { scope: 'person' },
       appliesTo: { type: 'file' },
       params: [
         { name: 'path', kind: 'string', required: false,

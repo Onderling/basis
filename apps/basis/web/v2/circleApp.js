@@ -64,11 +64,9 @@ import * as podAuth from '../../src/web/podAuth.js';
 import { discoverPodRoot, createPodWriter } from '../../src/web/podStorage.js';
 // Phase 5 — the bot in the circle composer (mirrors mobile CircleLauncherScreen, on the shared
 // engine). The circle bot stack:
-import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
-import { calendarManifest } from '@onderling-app/calendar/manifest';
-// agents — the read-only "your agents" surface (2026-07-09). Real manifest,
-// like calendar; the skill handlers are composed in-process by realAgent.js.
-import { agentsManifest } from '@onderling-app/agents/manifest';
+// The catalogue manifests (basis, tasks, household, stoop, folio, calendar, lists, agents), in dispatch
+// order — one list, shared with the mobile shell.
+import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { buildCircleLlmProviders } from '../../src/v2/circleLlmProviders.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
@@ -93,7 +91,7 @@ import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
 import { createCircleCacheMedium } from '../../src/v2/circleCacheMedium.js';
 import { addressesBot } from '../../src/v2/circleDispatch.js';
-import { createAssistantEngine } from '../../src/v2/assistantEngine.js';
+import { createAssistantEngine, assistantReplyText } from '../../src/v2/assistantEngine.js';
 // Conversation memory — recent circle turns woven into the bot's interpret context.
 import { recentCircleTurns } from '../../src/v2/circleMemory.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
@@ -2115,27 +2113,9 @@ const circleSearchVectorStore = sealedLocalBackend(pickWebBackend('cc-circle-rag
 
 function buildCircleBot(agent) {
   // Merged catalogue (the LLM tool list + dispatch catalogue) — mirrors main.js.
-  const baseSources = [
-    { manifest: basisManifest },
-    // tasks BEFORE the household agent: a circle's items are TASKS, so colliding bare op-ids
-    // (notably `addTask`, declared by both) must resolve to tasks, not household chores — matching
-    // the circle GATE which already excludes household ("household shadowed by tasks", circleGate.js).
-    // Without this, "@assistant add X" landed in the household circle while the complete-resolver/lookup
-    // (tasks) found nothing → "couldn't find X in this circle" on `done X` (#49).
-    { manifest: mockTasksManifest },
-    { manifest: agent.manifest },
-    { manifest: mockStoopManifest },
-    { manifest: mockFolioManifest },
-    { manifest: calendarManifest },
-    // The composable LISTS feature's own contract. It has been running behind its panel since the
-    // container work; declaring it is what lets the "+", a slash command and a journey reach it.
-    { manifest: listsManifest },
-    // agents LAST (2026-07-09): no op-id collisions expected (listAgents/viewAgent
-    // are unique), and last-in-order means any future collision resolves to the
-    // earlier, established app.  Mirrors composeManifests.js on mobile — the two
-    // lists must stay in the same order (docs/manifest-pipeline.md dual-truth).
-    { manifest: agentsManifest },
-  ];
+  // The ONE catalogue list, in dispatch order (tasks before household, agents last — the reasons live
+  // with the list): `src/v2/manifestSources.js`, which the mobile shell reads too.
+  const baseSources = catalogueManifests({ householdManifest: agent.manifest }).map((manifest) => ({ manifest }));
   circleBaseSources = baseSources;   // expose to the module-level showSettings/showOverride
   let rawCatalogue = mergeManifests(baseSources, { runtime: 'browser' });
   // S6.A — manifests keyed by appOrigin, for computing inline embed buttons on
@@ -2766,7 +2746,7 @@ function buildCircleBot(agent) {
     // + passed its msgId in ctx) — same as mobile.
     postToCircle: (text, ctx) => { if (ctx?.msgId) _circleRender?.fanOut(ctx.msgId, text, ctx.ts); },
     // Addressed the bot, but the LLM mapped it to no tool → reply instead of going silent.
-    onNoMatch: (_text, _ctx, opts) => { _circleRender?.botBubble((opts && opts.reply) || t('circle.bot.unknown')); },
+    onNoMatch: (_text, _ctx, opts) => { _circleRender?.botBubble(assistantReplyText(opts, t, 'circle.bot.unknown')); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { _circleRender?.botBubble(t('circle.bot.basic_mode')); },
     botName: CIRCLE_BOT_NAME,

@@ -17,12 +17,14 @@ export const CHAT_LANE = 'chat-message';
 
 export const chatManifest = Object.freeze({
   app: 'chat-lane',
+  hosts: [],
   itemTypes: [],
   nouns: {},
   operations: [
     {
       id: 'chat.message',
       description: 'A chat message: the writer signs the wire payload (msgId, text, media pointer) with their per-circle key; receivers verify before it lands and renders.',
+      writes: { scope: 'circle' },
       appends: [{ lane: CHAT_LANE, kind: 'message' }],
     },
   ],

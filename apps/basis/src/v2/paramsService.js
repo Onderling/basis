@@ -32,6 +32,7 @@ import { SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM
 import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF } from './themePref.js';
+import { ASSISTANT_APPS } from './assistantApps.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -87,6 +88,9 @@ export const BASIS_USER_PARAMS = [
   { key: 'display.theme',                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_THEME_PREF },
   { key: 'app.lang',                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
   { key: 'relay.url',                           scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
+  // Which apps a door's assistant may act in when the door is not a circle (the box's Telegram chat). Set by the
+  // owner, read at the door's boot; the model never sets it.
+  { key: 'assistant.apps',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSISTANT_APPS },
 ];
 
 /**

@@ -14,18 +14,19 @@ export const MEMBERSHIP_LANE = 'membership';
 
 export const membershipManifest = Object.freeze({
   app: 'membership',
+  hosts: [],
   itemTypes: [],
   nouns: {},
   operations: [
-    { id: 'membership.create', description: "The circle's creation — the creator's self-signed first statement, and the root of its authority. Folds as founder only where the trail corroborates it (or where there is no trail yet, which is what a brand-new circle is).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'create' }] },
-    { id: 'membership.join',  description: 'A member joins (self-authored with redemption proof, or admin-authored).', appends: [{ lane: MEMBERSHIP_LANE, kind: 'join' }] },
-    { id: 'membership.leave', description: 'A member leaves (self-authored only — the fold enforces author == subject).', appends: [{ lane: MEMBERSHIP_LANE, kind: 'leave' }] },
-    { id: 'membership.evict', description: 'An admin removes a member (authority checked at the fold, deny-wins).',       appends: [{ lane: MEMBERSHIP_LANE, kind: 'evict' }] },
-    { id: 'membership.role',  description: 'A role change (promote/demote — folds via the causal authority rules).',      appends: [{ lane: MEMBERSHIP_LANE, kind: 'role' }] },
+    { id: 'membership.create', description: "The circle's creation — the creator's self-signed first statement, and the root of its authority. Folds as founder only where the trail corroborates it (or where there is no trail yet, which is what a brand-new circle is).", writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'create' }] },
+    { id: 'membership.join',  description: 'A member joins (self-authored with redemption proof, or admin-authored).', writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'join' }] },
+    { id: 'membership.leave', description: 'A member leaves (self-authored only — the fold enforces author == subject).', writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'leave' }] },
+    { id: 'membership.evict', description: 'An admin removes a member (authority checked at the fold, deny-wins).',       writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'evict' }] },
+    { id: 'membership.role',  description: 'A role change (promote/demote — folds via the causal authority rules).',      writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'role' }] },
     // Device revocation (the eviction machinery pointed INWARD): the member stays; ONE of their own
     // addresses is retired. Self-subject at the fold — the statement acts only on the author's own
     // row — and deny-wins: a revoked address never re-enters the set, whatever announces later.
-    { id: 'membership.addressRevoke', description: "A member revokes one of their OWN device addresses (self-subject; deny-wins — the revoked address never re-enters the row's set).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'address-revoke' }] },
+    { id: 'membership.addressRevoke', description: "A member revokes one of their OWN device addresses (self-subject; deny-wins — the revoked address never re-enters the row's set).", writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'address-revoke' }] },
     // Re-acceptance after a rules change: a member signs that they stand on the circle's CURRENT rules
     // version. Self-subject at the fold (nobody accepts on another's behalf); an older acceptance is
     // stale-but-valid, so this statement is always the member's own act, never an obligation the fold
@@ -34,12 +35,12 @@ export const membershipManifest = Object.freeze({
     // announces version n+1 to every circle the person is in; the statement binds by root reveal, and the
     // reveal covers the key, so a device that holds the current key can neither rotate nor substitute one.
     // Self-subject at the fold: the highest version is current (core personKeyFold.js).
-    { id: 'membership.personKey', description: "A member announces their CURRENT person key (version n+1) — a ceremony statement: binds by root reveal covering the key; self-subject; the highest version is current.", appends: [{ lane: MEMBERSHIP_LANE, kind: 'person-key' }] },
-    { id: 'membership.rulesAccept', description: "A member re-accepts the circle's current rules version (self-subject; supersedes the version on their signed join).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'rules-accept' }] },
+    { id: 'membership.personKey', description: "A member announces their CURRENT person key (version n+1) — a ceremony statement: binds by root reveal covering the key; self-subject; the highest version is current.", writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'person-key' }] },
+    { id: 'membership.rulesAccept', description: "A member re-accepts the circle's current rules version (self-subject; supersedes the version on their signed join).", writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'rules-accept' }] },
     // What a member says about THEMSELVES (2026-09-21): handle · displayName · avatarRef (by reference) — one generalized
     // self-subject kind, fields never new kinds; the handle unique in the circle at the fold; one statement per circle,
     // pair circles included, which is how a contact learns a name. Retires the persona-props side wire.
-    { id: 'membership.props', description: "A member changes the self-described fields of their own row — handle, display name, avatar (by reference). Self-subject; the fold refuses a handle another current member holds (deny-wins) and any admin-owned field.", appends: [{ lane: MEMBERSHIP_LANE, kind: 'member-props' }] },
+    { id: 'membership.props', description: "A member changes the self-described fields of their own row — handle, display name, avatar (by reference). Self-subject; the fold refuses a handle another current member holds (deny-wins) and any admin-owned field.", writes: { scope: 'circle' }, appends: [{ lane: MEMBERSHIP_LANE, kind: 'member-props' }] },
   ],
 });
 

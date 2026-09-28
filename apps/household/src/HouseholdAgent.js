@@ -26,6 +26,7 @@ import { ChatAgent }               from '@onderling/chat-agent';
 import { renderChat, renderSlash } from '@onderling/app-manifest';
 
 import { householdManifest }  from '../manifest.js';
+import { SYSTEM_PROMPT_LEGACY } from './llm/prompts.js';
 import {
   HOUSEHOLD_SKILL_REGISTRY as SKILL_REGISTRY,
   noopContextBuilder,
@@ -109,7 +110,7 @@ export class HouseholdAgent {
     // SYSTEM_PROMPT_CLASSIFY / buildHouseholdToolHandlers), proven by
     // `test/manifest-equivalence.test.js`.
     if (this.#llm) {
-      const { toolCatalogue, toolHandlers, systemPrompt } = renderChat(
+      const { toolCatalogue, toolHandlers } = renderChat(
         householdManifest,
         {
           skillRegistry: SKILL_REGISTRY,
@@ -138,7 +139,9 @@ export class HouseholdAgent {
         llm:            this.#llm,
         toolCatalogue,
         toolHandlers,
-        systemPrompt,
+        // The manifest's systemPrompt is the household's background for the shared engine; this standalone agent
+        // parses the "noise" protocol, so it keeps the prompt it was built against.
+        systemPrompt:   SYSTEM_PROMPT_LEGACY,
         contextBuilder: noopContextBuilder,
       });
     }

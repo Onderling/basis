@@ -256,12 +256,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}), thread: threadId });
     let r;
     try {
-      // A person's first turn with this door: who it is and what it keeps — once.
-      if (threads && threadId && !threads.greeted(threadId)) {
-        const disclosure = doorDisclosure(turnLogMode, t);
-        await say(chatId, [t('circle.bot.welcome'), ...(disclosure ? [disclosure] : [])].join('\n'));
-        threads.markGreeted(threadId);
-      }
+      await greetOnce(chatId, threadId);
       r = await run();
       if (!own) note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
@@ -277,6 +272,14 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       if (rec && typeof walkLog === 'function') { try { const { caller: _who, thread: _thread, ...logged } = rec; walkLog({ ...logged, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
     return r;
+  }
+
+  /** A person's first turn with this door: who it is and what it keeps — once. */
+  async function greetOnce(chatId, threadId) {
+    if (!threads || !threadId || threads.greeted(threadId)) return;
+    const disclosure = doorDisclosure(turnLogMode, t);
+    await say(chatId, [t('circle.bot.welcome'), ...(disclosure ? [disclosure] : [])].join('\n'));
+    threads.markGreeted(threadId);
   }
 
   /** Continue a pending follow-up or confirmation with this line; false when nothing was pending. */
@@ -311,14 +314,24 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const chatId = String(msg?.chatId ?? '');
     const text = String(msg?.text ?? '').trim();
     if (!chatId || !text) return;
-    if (!open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
+    // A door that admits people decides who may talk (a code, its bootstrap ids); without one, the chat allow-list.
+    if (typeof admit !== 'function' && !open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
     // Who is asking: the person, not the chat (a group chat holds several). No admission, no turn.
     let caller = null;
     if (typeof admit === 'function') {
+      let r = null;
       try {
-        caller = await admit({ channel: 'telegram', uid: String(msg?.sender?.bridgeUid || chatId), displayName: msg?.sender?.displayName ?? null });
-      } catch { caller = null; }
+        r = await admit({ channel: 'telegram', uid: String(msg?.sender?.bridgeUid || chatId), displayName: msg?.sender?.displayName ?? null, text });
+      } catch { r = null; }
+      // Refused: the reason, and nothing else — never the chat's id.
+      if (r && typeof r === 'object' && r.refused) { await say(chatId, t(`circle.bot.admission_${String(r.refused).replace(/-/g, "_")}`)); return; }
+      caller = typeof r === 'string' ? r : (r && typeof r === 'object' ? r.id : null);
       if (!caller) { await say(chatId, t('circle.telegram.unknown')); return; }
+      // The line was the code that admitted them: the welcome, and nothing to dispatch.
+      if (r && typeof r === 'object' && r.consumed) {
+        if (threads) await greetOnce(chatId, caller); else await say(chatId, t('circle.bot.welcome'));
+        return;
+      }
     }
     // The thread is the PERSON's when the door admits people (their contact id), so what one said is never another's
     // memory, in a group chat too; without admission, the chat's.
@@ -328,11 +341,21 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   // The bridge is let go as soon as the line is in its lane: a long-polling bridge fetches the next updates only when
   // the handler returns, so holding it for the whole turn would keep the chat's next quick line (and every other
   // chat) waiting, and the lane could never gather or run anything side by side. Replies go out through `say`.
-  bridge.onMessage((msg) => { handle(msg).catch(() => { /* a turn's error was already told to the chat */ }); });
+  // A line still being ADMITTED is not in a lane yet; `idle` waits for those too, or it would answer "nothing queued".
+  const admitting = new Set();
+  bridge.onMessage((msg) => {
+    const p = handle(msg).catch(() => { /* a turn's error was already told to the chat */ });
+    admitting.add(p);
+    p.finally(() => admitting.delete(p));
+  });
   return {
     handle,
-    /** Resolves when a chat's turns (every chat's, without an id) are all done. */
-    idle: (chatId) => (engine.idle ? engine.idle(chatId === undefined ? undefined : threadFor(String(chatId))) : Promise.resolve()),
+    /** Resolves when every turn under way is done. */
+    // Every lane, whatever the argument: a person's thread is keyed by who they are, not by the chat they wrote in.
+    idle: async () => {
+      while (admitting.size) await Promise.all([...admitting]);
+      return engine.idle ? engine.idle() : undefined;
+    },
     start: () => bridge.start(),
     stop:  () => bridge.stop(),
     /** test seam: the memory lines for a thread. */

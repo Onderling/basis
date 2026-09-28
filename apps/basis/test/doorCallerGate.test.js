@@ -98,6 +98,18 @@ describe('the door caller gate', () => {
     expect(await agent.doorRefusal('assistant-memory', 'telegram:999', 'authenticated')).toBeTruthy();
   }, 90_000);
 
+  it('a revoked person is a stranger to the gate again', async () => {
+    const node = await bootRealAgentNode('bot6');
+    nodes.push(node);
+    const { agent } = node;
+    await agent.setDoorCaller('telegram:111', 'member');
+    expect(await agent.doorRefusal('listOpen', 'telegram:111')).toBeNull();
+    await agent.clearDoorCaller('telegram:111');
+    expect(await agent.doorRefusal('listOpen', 'telegram:111')).toBeTruthy();
+    const r = await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: 'telegram:111' });
+    expect(r).toMatchObject({ ok: false });
+  }, 90_000);
+
   it('a door can never raise anyone to the owner\'s level', async () => {
     const node = await bootRealAgentNode('bot2');
     nodes.push(node);

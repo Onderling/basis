@@ -3858,7 +3858,38 @@
     "apps_unknown": "I don't know an app called \"{{app}}\". /apps shows which there are.",
     "apps_none_left": "At least one app has to stay on.",
     "status": "Apps: {{apps}}\nModel: {{model}}\nDoor: {{door}}\nConversations in the log: {{turns}}\nDefault memory: {{memory}}\nPeople admitted: {{users}}",
-    "users_none": "Nobody admitted yet."
+    "users_none": "Nobody admitted yet.",
+    "admission_needs_code": {
+      "text": "To talk to this assistant you need a code from its administrator. Then send: /start <code>",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_invalid_code": {
+      "text": "That code isn't right. Ask the administrator for a new one.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_code_used": {
+      "text": "That code has already been used. Ask the administrator for a new one.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_expired": {
+      "text": "That code has expired. Ask the administrator for a new one.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_full": {
+      "text": "No more people can join right now. Ask the administrator.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_no_cohort": {
+      "text": "Nobody is being admitted right now. Ask the administrator.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "cohort_usage": "Use: /cohort <number of people> <number of days>, for example /cohort 4 7.",
+    "cohort_open": "New group open: up to {{people}} people, until {{until}}. Earlier codes no longer work. Make a code with /invite.",
+    "cohort_none": "No group is open. Open one with /cohort <number of people> <number of days>.",
+    "cohort_closed": "The group is closed: no code works any more.",
+    "invite_code": "Code (one person, once): {{code}}\nThat person sends the bot: /start {{code}}",
+    "revoke_unknown": "I know nobody called \"{{who}}\". /users shows who is here.",
+    "revoked": "{{who}} is no longer admitted. A new code brings them back."
   },
   "op": {
     "not_in_this_circle": {

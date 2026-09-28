@@ -3858,7 +3858,38 @@
     "apps_unknown": "Een app met de naam \"{{app}}\" ken ik niet. /apps laat zien welke er zijn.",
     "apps_none_left": "Er moet minstens één app aan blijven.",
     "status": "Apps: {{apps}}\nModel: {{model}}\nDeur: {{door}}\nGesprekken in het logboek: {{turns}}\nStandaard geheugen: {{memory}}\nToegelaten mensen: {{users}}",
-    "users_none": "Nog niemand toegelaten."
+    "users_none": "Nog niemand toegelaten.",
+    "admission_needs_code": {
+      "text": "Om met deze assistent te praten heb je een code nodig van de beheerder. Stuur dan: /start <code>",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_invalid_code": {
+      "text": "Die code klopt niet. Vraag de beheerder om een nieuwe.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_code_used": {
+      "text": "Die code is al gebruikt. Vraag de beheerder om een nieuwe.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_expired": {
+      "text": "Die code is verlopen. Vraag de beheerder om een nieuwe.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_full": {
+      "text": "Er kunnen op dit moment niet meer mensen bij. Vraag de beheerder.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_no_cohort": {
+      "text": "Er worden op dit moment geen mensen toegelaten. Vraag de beheerder.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "cohort_usage": "Gebruik: /cohort <aantal mensen> <aantal dagen>, bijvoorbeeld /cohort 4 7.",
+    "cohort_open": "Nieuwe groep open: tot {{people}} mensen, tot {{until}}. Eerdere codes werken niet meer. Een code maak je met /invite.",
+    "cohort_none": "Er is geen open groep. Open er een met /cohort <aantal mensen> <aantal dagen>.",
+    "cohort_closed": "De groep is gesloten: geen enkele code werkt nog.",
+    "invite_code": "Code (één persoon, één keer): {{code}}\nDie persoon stuurt de bot: /start {{code}}",
+    "revoke_unknown": "Ik ken niemand die \"{{who}}\" heet. /users laat zien wie er is.",
+    "revoked": "{{who}} is niet meer toegelaten. Met een nieuwe code kan die persoon terugkomen."
   },
   "op": {
     "not_in_this_circle": {

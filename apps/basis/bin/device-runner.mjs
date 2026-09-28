@@ -21,7 +21,7 @@
  *   ONDERLING_RELAY_URL      the relay to dial. Absent → local-only (no wire; useful for a first boot)
  *   BASIS_VAULT_PASSPHRASE   the vault key; absent → one is generated once beside the vault
  *   TG_BOT_TOKEN             optional — also answer on Telegram (or ~/.canopy-tg-token)
- *   TG_ALLOWED_CHAT_IDS      which chats may use it; unset/'*' is an OPEN DOOR
+ *   TG_ALLOWED_CHAT_IDS      Telegram ids let in without a code (a bootstrap); everyone else needs an admin's code
  *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
  *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
@@ -53,8 +53,9 @@ import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
-import { createBotThreads, dataSourceThreadStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
+import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
+import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
 import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
@@ -643,9 +644,11 @@ const tgToken = (() => {
 let tgRunner = null;
 if (tgToken) {
   const { TelegramBridge } = await import('@onderling/chat-agent/bridges/telegram');
-  const raw = String(process.env.TG_ALLOWED_CHAT_IDS ?? '').trim();
-  const allowedChatIds = raw && raw !== '*' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : '*';
-  if (allowedChatIds === '*') console.warn('device-runner: OPEN TELEGRAM DOOR — no TG_ALLOWED_CHAT_IDS, every chat is admitted');
+  // Who gets in without a code: the admin named at start and a configured allow-list (the bootstrap). Everyone else
+  // needs a code the admin hands out (`/cohort`, `/invite`). There is no open door any more.
+  const adminUid = String(process.env.TG_ADMIN_UID ?? '').trim() || null;
+  const bootstrapUids = [adminUid, ...String(process.env.TG_ALLOWED_CHAT_IDS ?? '').split(',')]
+    .map((s) => String(s ?? '').trim()).filter((s) => s && s !== '*');
 
   // Scope, then interpret: the apps this bot acts in are the owner's setting, read at boot, and the catalogue
   // every surface of the door projects — the model's tools included — holds only theirs.
@@ -663,11 +666,22 @@ if (tgToken) {
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Every person is a contact with a role, and their calls carry them to the host gate.
-  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid: String(process.env.TG_ADMIN_UID ?? '').trim() || null });
+  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
+  // Admission by code: the signing secret in the bot's sealed vault, the cohort and spent codes in a sealed store.
+  const admission = createBotAdmission({
+    secretVault: chatVault,
+    store: dataSourceRowStore(await stores.botAdmissionSource(), 'mem://basis/bot-admission/'),
+  });
+  // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
+  // console, never a chat or the walk log) — the first person admitted is the bot's admin.
+  if (!bootstrapUids.length && !(await botUsers.list()).some((u) => u.role === 'admin')) {
+    await admission.openCohort({ ceiling: 1, days: 1 });
+    console.log(`device-runner: this bot has no admin yet — send it, within a day:  /start ${await admission.code()}`);
+  }
   // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
   const threads = createBotThreads({
     eventLog: deviceLog,
-    store: dataSourceThreadStore(await stores.botThreadsSource()),
+    store: dataSourceRowStore(await stores.botThreadsSource()),
     memoryDefault: () => agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY),
   });
   await threads.load();
@@ -677,19 +691,21 @@ if (tgToken) {
     manifestsByOrigin: doorCatalogue.manifestsByOrigin,
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are
     // answered here, each after the host gate said yes at the op's level; the rest go on to the agent.
-    allowedChatIds, t, lang: values.lang,
+    t, lang: values.lang,
     callSkill: withAssistantOps({
       callSkill, threads, t, refusal: agent.doorRefusal,
       admin: {
         catalogue: doorCatalogue,
         users: () => botUsers.list(),
+        admission,
+        revoke: (who) => botUsers.revoke(who),
         status: async () => ({
-          model: llm ? llmModel : null, door: allowedChatIds === '*' ? 'open' : 'allow-list', turns: turnLogMode ?? 'off',
+          model: llm ? llmModel : null, door: 'codes', turns: turnLogMode ?? 'off',
           memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
         }),
       },
     }),
-    admit: createDoorAdmit({ users: botUsers, setDoorCaller: agent.setDoorCaller }),
+    admit: createDoorAdmit({ users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller }),
     threads,
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
@@ -698,7 +714,7 @@ if (tgToken) {
     turnLogMode,
   });
   await tgRunner.start();
-  walkLog({ kind: 'telegram', door: allowedChatIds === '*' ? 'open' : 'allow-list', llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
+  walkLog({ kind: 'telegram', door: 'codes', bootstrap: bootstrapUids.length, llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
 }
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────

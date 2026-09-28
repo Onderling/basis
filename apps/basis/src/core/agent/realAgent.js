@@ -6081,6 +6081,12 @@ export async function createRealHouseholdAgent(opts = {}) {
      * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
      */
     doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /** A door dropped a person (revoked): the gate treats them as a stranger from now on. */
+    clearDoorCaller: async (callerId) => {
+      if (!hostTrustRegistry) throw new Error('clearDoorCaller: the host gate is not attached');
+      if (typeof callerId !== 'string' || !callerId) throw new Error('clearDoorCaller: a caller id is required');
+      await hostTrustRegistry.setTier(callerId, 'public');
+    },
     setDoorCaller: async (callerId, role) => {
       const tier = DOOR_TIER_FOR_ROLE[role];
       if (!tier) throw new Error(`setDoorCaller: a door gives only ${Object.keys(DOOR_TIER_FOR_ROLE).join(' or ')} (got "${role}")`);

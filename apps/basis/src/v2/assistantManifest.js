@@ -21,7 +21,10 @@ export const assistantManifest = {
   // Nothing it does reaches the network.
   hosts:     [],
   itemTypes: ['chat-thread'],
-  domainVerbs: { 'set-memory': 'write', 'set-language': 'write', 'set-apps': 'write', status: 'read', 'list-users': 'read' },
+  domainVerbs: {
+    'set-memory': 'write', 'set-language': 'write', 'set-apps': 'write', status: 'read', 'list-users': 'read',
+    'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write',
+  },
   operations: [
     {
       id:     'assistant-memory',
@@ -67,6 +70,42 @@ export const assistantManifest = {
       visibility: 'trusted',
       params: [],
       surfaces: { slash: { command: '/users', body: 'none' } },
+    },
+    // ── Admission: who may start talking to the bot (a code the admin hands out). ──
+    {
+      id:     'assistant-cohort',
+      verb:   'open-cohort',
+      visibility: 'trusted',
+      writes: { scope: 'device' },
+      // `<people> <days>` — a new cohort; the one before stops admitting
+      params: [{ name: 'spec', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/cohort', body: 'argline' } },
+    },
+    {
+      id:     'assistant-invite',
+      verb:   'invite',
+      visibility: 'trusted',
+      // a code is minted, not stored — but the cohort's state is this device's
+      writes: { scope: 'device' },
+      params: [],
+      surfaces: { slash: { command: '/invite', body: 'none' } },
+    },
+    {
+      id:     'assistant-rotate',
+      verb:   'rotate',
+      visibility: 'trusted',
+      writes: { scope: 'device' },
+      params: [],
+      surfaces: { slash: { command: '/rotate', body: 'none' } },
+    },
+    {
+      id:     'assistant-revoke',
+      verb:   'revoke-user',
+      visibility: 'trusted',
+      // the person's contact row is hidden, which the book carries to the person's other devices
+      writes: { scope: 'person' },
+      params: [{ name: 'who', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/revoke', body: 'argline' } },
     },
   ],
 };

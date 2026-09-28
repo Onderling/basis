@@ -42,7 +42,10 @@ export function createBotUsers({ store, adminUid = null } = {}) {
       const name = typeof displayName === 'string' && displayName.trim() ? displayName.trim() : null;
       const known = await store.get(id);
       if (known) {
-        if (name && name !== known.displayName) return store.put({ ...known, displayName: name });
+        // Admitted again after a revoke (a new code): the row comes back, with the role it had.
+        const back = known.hidden ? { ...known, hidden: false } : known;
+        if (known.hidden && typeof store.unhide === 'function') await store.unhide(id);
+        if ((name && name !== back.displayName) || back !== known) return store.put({ ...back, ...(name ? { displayName: name } : {}) });
         return known;
       }
       const named = adminUid != null && String(adminUid) === u;
@@ -50,8 +53,27 @@ export function createBotUsers({ store, adminUid = null } = {}) {
       const role = named || (adminUid == null && !anyAdmin) ? ROLES.ADMIN : ROLES.MEMBER;
       return store.put({ id, type: 'contact', channel, uid: u, role, ...(name ? { displayName: name } : {}) });
     },
-    /** Every admitted person, in the order they were admitted. */
-    async list() { return (await store.list()).filter((r) => r && isChannel(r.channel)); },
+    /** Every admitted person (a revoked one is not), in the order they were admitted. */
+    async list() { return (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden); },
+    /** The admitted person behind a door's uid, or null (never admitted, or revoked). */
+    async find(channel, uid) {
+      const row = await store.get(idOf(channel, String(uid ?? '').trim()));
+      return row && !row.hidden ? row : null;
+    },
+    /**
+     * Drop a person: they are no longer admitted and need a new code. Named by display name or contact id.
+     * @returns {Promise<object|null>} the row that was revoked, or null when nobody matched
+     */
+    async revoke(nameOrId) {
+      const want = String(nameOrId ?? '').trim();
+      if (!want) return null;
+      const rows = (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden);
+      const row = rows.find((r) => r.id === want) ?? rows.find((r) => (r.displayName ?? '').toLowerCase() === want.toLowerCase());
+      if (!row) return null;
+      if (typeof store.hide === 'function') await store.hide(row.id);
+      else await store.put({ ...row, hidden: true });
+      return row;
+    },
     /** @param {string} contactId */
     async roleOf(contactId) { return (await store.get(contactId))?.role ?? null; },
     /** @param {string} contactId */
@@ -73,9 +95,13 @@ export function contactBookStore(callSkill) {
   const toUser = (c) => ({
     id: c.webid, type: 'contact', channel: c.channel, uid: String(c.webid).slice(c.channel.length + 1), role: c.role ?? null,
     ...(c.displayName ? { displayName: c.displayName } : {}),
+    ...(c.hidden ? { hidden: true } : {}),
   });
   return {
     async get(id) { return (await rows()).find((u) => u.id === id) ?? null; },
+    // A revoked person's row is HIDDEN in the book (the book's own flag), not deleted: a new code brings it back.
+    async hide(id) { await callSkill('stoop', 'setContactHidden', { webid: id, hidden: true }); },
+    async unhide(id) { await callSkill('stoop', 'setContactHidden', { webid: id, hidden: false }); },
     async list() { return rows(); },
     async put(user) {
       const r = await callSkill('stoop', 'addContact', {
@@ -88,24 +114,48 @@ export function contactBookStore(callSkill) {
 }
 
 /**
- * A door's admission: the person is admitted (their contact, created on first sight) and their role becomes their
- * tier in the host's gate. Returns the caller id every call of their turn carries. The tier is set again only when
- * the role changed, so a demotion reaches the gate on the person's next message.
+ * A door's admission: who may talk to the bot, and their tier in the host's gate.
+ *
+ * With `admission` (the box): an admitted person goes on; a bootstrap uid (the admin named at start, a configured
+ * allow-list) is admitted without a code; anyone else must send `/start <code>` — a valid, unspent code of the open
+ * cohort admits them (the line is consumed), anything else is refused with the reason. A revoked person is not
+ * admitted and their tier is cleared from the gate. Without `admission`, everyone the door is handed is admitted.
+ * The role becomes the tier (set again only when it changed, so a demotion reaches the gate on the next message).
  * @param {object} a
  * @param {ReturnType<typeof createBotUsers>} a.users
  * @param {(callerId: string, role: string) => Promise<void>} a.setDoorCaller  the host agent's
- * @returns {(who: {channel: string, uid: string, displayName?: string|null}) => Promise<string>}
+ * @param {(callerId: string) => Promise<void>} [a.clearDoorCaller]  the host agent's: a revoked person's tier goes
+ * @param {ReturnType<import('./botAdmission.js').createBotAdmission>} [a.admission]
+ * @param {Array<string|number>} [a.bootstrapUids]
+ * @returns {(who: {channel: string, uid: string, displayName?: string|null, text?: string}) =>
+ *           Promise<string | {id: string, consumed: true} | {refused: string}>}
  */
-export function createDoorAdmit({ users, setDoorCaller }) {
+export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, admission = null, bootstrapUids = [] }) {
   if (!users || typeof users.admit !== 'function') throw new TypeError('createDoorAdmit: users are required');
   if (typeof setDoorCaller !== 'function') throw new TypeError('createDoorAdmit: setDoorCaller is required');
   const tiered = new Map();   // callerId → the role last set in the gate
-  return async (who) => {
-    const row = await users.admit(who);
+  const bootstrap = new Set(bootstrapUids.filter((u) => u != null && String(u).trim()).map((u) => String(u).trim()));
+  const tier = async (row) => {
     if (tiered.get(row.id) !== row.role) {
       await setDoorCaller(row.id, row.role);
       tiered.set(row.id, row.role);
     }
     return row.id;
+  };
+  return async (who) => {
+    // Without admission (a door that admits everyone it is handed), every person is admitted.
+    if (!admission) return tier(await users.admit(who));
+    const uid = String(who?.uid ?? '').trim();
+    const known = typeof users.find === 'function' ? await users.find(who.channel, uid) : null;
+    if (known) return tier(known.displayName || !who.displayName ? known : await users.admit(who));
+    // Not admitted (never, or revoked): the gate forgets any tier they had.
+    const id = `${who.channel}:${uid}`;
+    if (tiered.has(id)) { tiered.delete(id); if (typeof clearDoorCaller === 'function') await clearDoorCaller(id); }
+    if (bootstrap.has(uid)) return tier(await users.admit(who));
+    const m = /^\/start(?:@\S+)?\s+(\S+)/.exec(String(who?.text ?? '').trim());
+    if (!m) return { refused: 'needs-code' };
+    const r = await admission.redeem(m[1]);
+    if (!r.ok) return { refused: r.reason };
+    return { id: await tier(await users.admit(who)), consumed: true };
   };
 }

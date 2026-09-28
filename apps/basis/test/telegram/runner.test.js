@@ -22,11 +22,13 @@ async function boot({ allowedChatIds = ['42'], gate = null, interpret = null, wa
     bridge, callSkill, catalogue,
     manifestsByOrigin: { household: mockHouseholdManifest },
     allowedChatIds, t, gate, interpret, llm: interpret ? { invoke: async () => null } : null, walkLog,
+    collectMs: 0,   // one line at a time here; the collect window has its own test (assistantLane.test.js)
   });
   await runner.start();
   const say = async (text, chatId = '42') => {
     bridge.clearOutbox();
     await bridge.simulateIncoming({ chatId, text, sender: { bridgeUid: chatId, displayName: 'Frits' } });
+    await runner.idle(chatId);   // the bridge is let go at once; the turn runs in the chat's lane
     return bridge.outbox.map((m) => ({ text: m.text, buttons: m.buttons ?? [] }));
   };
   return { bridge, runner, agent, say, calls };

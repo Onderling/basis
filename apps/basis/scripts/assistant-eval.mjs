@@ -59,9 +59,13 @@ const results = [];
 for (const f of fixtures) {
   const dispatched = [];
   const replies = [];
+  let modelCalls = 0;
+  const counted = { invoke: (req) => { modelCalls += 1; return llm.invoke(req); } };
   const engine = createAssistantEngine({
     // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
-    catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm, interpret: interpretToCommand,
+    catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm: counted, interpret: interpretToCommand,
+    // A one-line fixture does not wait for the collect window (its time is the model's); lines sent at once do.
+    ...(f.lines ? {} : { collectMs: 0 }),
     loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'shopping', text })),
     dispatch: (input) => { dispatched.push(input); },
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
@@ -70,12 +74,17 @@ for (const f of fixtures) {
   for (const line of f.before ?? []) engine.remember('t', line.startsWith('assistant:') || line.startsWith('system:') ? line.split(':')[0] : 'you', line.replace(/^(you|assistant|system):\s*/, ''));
   const t0 = Date.now();
   let via = '?';
-  try { const r = await engine.ask('t', f.text); via = r?.via ?? '?'; } catch (e) { via = `error:${e.message.slice(0, 40)}`; }
+  const text = f.text ?? f.lines.join(' / ');
+  try {
+    const r = f.lines ? (await Promise.all(f.lines.map((l) => engine.ask('t', l))))[0] : await engine.ask('t', f.text);
+    via = r?.via ?? '?';
+  } catch (e) { via = `error:${e.message.slice(0, 40)}`; }
   const ms = Date.now() - t0;
   const got = dispatched[0] ? { op: dispatched[0].opId, args: dispatched[0].args ?? {} } : (replies[0] ? { reply: replies[0] } : null);
-  const verdict = judge(f.expect, got, dispatched.length);
-  results.push({ id: f.id, text: f.text, via, ms, got, ok: verdict.ok, why: verdict.why });
-  console.log(`${verdict.ok ? '✓' : '✗'} ${f.id.padEnd(22)} ${String(ms).padStart(5)}ms ${via.padEnd(15)} ${f.text.slice(0, 48).padEnd(48)} → ${verdict.ok ? describe(got) : `${describe(got)}  (wanted ${describe(f.expect)}) ${verdict.why}`}`);
+  let verdict = judge(f.expect, got, dispatched.length);
+  if (verdict.ok && f.lines && modelCalls > 1) verdict = { ok: false, why: `${modelCalls} model calls, wanted one turn` };
+  results.push({ id: f.id, text, via, ms, got, ok: verdict.ok, why: verdict.why });
+  console.log(`${verdict.ok ? '✓' : '✗'} ${f.id.padEnd(22)} ${String(ms).padStart(5)}ms ${via.padEnd(15)} ${text.slice(0, 48).padEnd(48)} → ${verdict.ok ? describe(got) : `${describe(got)}  (wanted ${describe(f.expect)}) ${verdict.why}`}`);
 }
 const pass = results.filter((r) => r.ok).length;
 const rate = results.length ? pass / results.length : 0;

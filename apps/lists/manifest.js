@@ -22,6 +22,9 @@
 /** @type {import('@onderling/app-manifest').__types__} */
 export const listsManifest = {
   app:       'lists',
+  // The network hosts this app's code reaches. None: whatever it syncs goes through the person's own
+  // pod and relay, which they configure — not a fixed host.
+  hosts:     [],
   itemTypes: ['list', 'list-item', 'board'],
 
   // The capability surface (`(atom × noun)` pairs the per-circle matrix gates at `callSkill`):
@@ -36,6 +39,7 @@ export const listsManifest = {
     {
       id:        'createList',
       verb:      'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'list' },
       requires:  ['lists'],
       // Two people naming a list at the same moment write the same field; last-writer-by-content is the
@@ -54,6 +58,7 @@ export const listsManifest = {
     {
       id:        'addToList',
       verb:      'add',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // The entry's own text merges by content. The CONTAINMENT edge it also writes is not a mergeable
@@ -100,6 +105,7 @@ export const listsManifest = {
     {
       id:        'markListItemDone',
       verb:      'complete',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       // Ticking off is a CLAIM in the same sense a task claim is: the first person to do it is the one

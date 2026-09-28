@@ -13,31 +13,13 @@
 
 import { renderCoverage, coverageGaps, formatCoverageMarkdown } from '@onderling/app-manifest';
 
-// Resilient: a manifest that fails to import is skipped, not fatal.
-// The circle catalogue set — exactly what composeManifests composes (the unified chat surface).
-const SPECS = [
-  { name: 'basis', path: '../manifest.js',                          pick: (m) => m.basisManifest },
-  { name: 'household',   path: '../../household/manifest.js',             pick: (m) => m.householdManifest },
-  { name: 'tasks',       path: '../src/core/manifests/mockManifests.js',  pick: (m) => m.mockTasksManifest },
-  { name: 'stoop',       path: '../src/core/manifests/mockManifests.js',  pick: (m) => m.mockStoopManifest },
-  { name: 'folio',       path: '../src/core/manifests/mockManifests.js',  pick: (m) => m.mockFolioManifest },
-  { name: 'calendar',    path: '../../calendar/manifest.js',              pick: (m) => m.calendarManifest },
-  { name: 'agents',      path: '../../agents/manifest.js',                pick: (m) => m.agentsManifest },
-  // params — the register's meta-ops + the restore-settings flow (flows ride the snapshot too)
-  { name: 'params',      path: '../src/v2/paramsManifest.js',             pick: (m) => m.paramsManifest },
-];
+// The circle catalogue set — read from the ONE list both shells compose (`src/v2/manifestSources.js`), plus
+// params (the register's meta-ops + the restore-settings flow; flows ride the snapshot too). The device-log
+// lane manifests declare appends, not surfaces, so they have no row here.
+import { catalogueManifests } from '../src/v2/manifestSources.js';
+import { paramsManifest } from '../src/v2/paramsManifest.js';
 
-const sources = [];
-for (const spec of SPECS) {
-  try {
-    const mod = await import(spec.path);
-    const m = spec.pick(mod);
-    if (m && Array.isArray(m.operations)) sources.push({ ...m, appId: m.appId ?? spec.name });
-    else console.error(`(skip ${spec.name}: no operations)`);
-  } catch (e) {
-    console.error(`(skip ${spec.name}: ${e.message})`);
-  }
-}
+const sources = [...catalogueManifests(), paramsManifest].map((m) => ({ ...m, appId: m.appId ?? m.app }));
 
 const cov = renderCoverage(sources);
 

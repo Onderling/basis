@@ -106,12 +106,15 @@ const NOTICEBOARD_INTENTS = ['ask', 'offer', 'lend'];
 /** @type {import('@onderling/app-manifest').__types__} */
 export const stoopManifest = {
   app:       'stoop',
+  // The network hosts this app's code reaches: place lookup for a typed location, and Expo's push service
+  // for waking a phone. Web-push endpoints come from each subscription, so they are not fixed hosts.
+  hosts:     ['nominatim.openstreetmap.org', 'exp.host'],
   itemTypes: ITEM_TYPES,
 
   // B · Layer 1 — domain (non-atom) verbs: moderation (`report`/`mute`),
   // profile/config (`set`), and circle-graph traversal (`tree`).
   // All other ops map to SDK atoms; the `{atoms:true}` validator enforces it.
-  domainVerbs: ['report', 'mute', 'set', 'tree'],
+  domainVerbs: { report: 'write', mute: 'write', set: 'write', tree: 'read' },
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set — a broad `appliesTo` can no
@@ -144,6 +147,7 @@ export const stoopManifest = {
       // everywhere (`circleStoopScope.js`); an op that acts on an item without saying so fails a guard.
       circleScoped: true,
       verb: 'add',
+      writes: { scope: 'circle' },
       // No `appliesTo.type` — postRequest dispatches across ask/offer/
       // lend based on the `intent` arg, so it spans three types.
       params: [
@@ -256,6 +260,7 @@ export const stoopManifest = {
       id:        'respondToItem',
       circleScoped: true,
       verb:      'claim',  // canonical — `respondToItem` soft-claims the post.
+      writes: { scope: 'circle' },
       // Part G dissolve (2026-06-17) — the former mock declared this op
       // WITHOUT a slash command but WITH a richer surface: an `appliesTo`
       // gate (so the [Help with] row button surfaces on open feed posts),
@@ -295,6 +300,7 @@ export const stoopManifest = {
       id:        'cancelRequest',
       circleScoped: true,
       verb:      'remove',  // canonical — cancelRequest removes the item.
+      writes: { scope: 'circle' },
       // (2026-05-21, narrowed 2026-07-02 for) — cancelRequest spans the
       // user's own POST types (ask/offer/lend + the generic request/post the `mine`
       // section renders as).  It surfaces as `itemActions[]` in each of those sections
@@ -338,6 +344,7 @@ export const stoopManifest = {
       id:        'assignLend', group: 'admin',
       circleScoped: true,
       verb:      'reassign',  // canonical — assigns the borrower.
+      writes: { scope: 'circle' },
       appliesTo: { type: 'offer', kind: 'lend' },
       params: [
         { name: 'itemId',        kind: 'string', required: true, ...ID_NONEMPTY  },
@@ -363,6 +370,7 @@ export const stoopManifest = {
       id:        'markReturned',
       circleScoped: true,
       verb:      'complete',  // canonical — marks the lend complete.
+      writes: { scope: 'circle' },
       appliesTo: { type: 'offer', kind: 'lend' },
       params: [
         // Part G dissolve (2026-06-17) — `/lend-return` was declared in
@@ -401,6 +409,7 @@ export const stoopManifest = {
                        // (owner): kept `report` (truer to intent).
                        // Squeezing into canonical `add` would obscure
                        // the action's nature.
+      writes: { scope: 'circle' },
       appliesTo: { type: 'report' },
       params: [
         // Part G dissolve (2026-06-17) — `/report` was in BOTH manifests;
@@ -436,6 +445,7 @@ export const stoopManifest = {
                     // Granular `addMyOffering`/`removeMyOffering` already
                     // exist as skills and can be added to a future LLM-
                     // only manifest layer (D.2) if needed.
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       params: [
         // Complex param — array of {categoryId, freeTags?,
         // availability?, radius?, status?}.  Slash surface can't
@@ -454,6 +464,7 @@ export const stoopManifest = {
     {
       id:   'setPeerReveal', group: 'compose',
       verb: 'set',  // F-SP1-e: non-canonical — local-only reveal flag.
+      writes: { scope: 'device' },   // a reveal flag kept on this device
       // Part G dissolve (2026-06-17) — `/reveal` was a COLLISION: the real
       // op is `setPeerReveal`; the former mock declared `revealPeer` (a
       // SEMANTIC alias of setPeerReveal via STOOP_OP_ALIAS) on the SAME
@@ -486,6 +497,7 @@ export const stoopManifest = {
       id:   'leaveGroup', group: 'admin',
       circleScoped: false,
       verb: 'remove',  // canonical — leaving is a removal of self.
+      writes: { scope: 'circle' },
       appliesTo: { type: 'group-leave' },
       params: [
         { name: 'groupId',     kind: 'string',  required: true, ...ID_NONEMPTY },
@@ -539,6 +551,7 @@ export const stoopManifest = {
     {
       id:   'signOutOfPod',
       verb: 'remove',  // canonical — signing out is removal of session.
+      writes: { scope: 'device' },
       params: [],
       surfaces: {
         chat:  { hint: 'Sign out of the current Solid pod session.  Mid-sync state may be dropped; the user can sign back in any time.' },
@@ -624,6 +637,7 @@ export const stoopManifest = {
      */
     {
       id:   'startDm', verb: 'add',
+      writes: { scope: 'device' },   // opens a DM thread on this device
       appliesTo: { type: ['contact', 'member'] },
       params: [{ name: 'webid', kind: 'string', required: true }],
       surfaces: {
@@ -637,6 +651,7 @@ export const stoopManifest = {
     // adapter translates the chat-shell {on:'on'|'off'} enum → boolean.
     {
       id:   'setHolidayMode', group: 'compose', verb: 'submit',
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       params: [
         { name: 'on', kind: 'enum', of: ['on', 'off'], required: true },
       ],
@@ -672,6 +687,7 @@ export const stoopManifest = {
     },
     {
       id:   'addContact', group: 'compose', verb: 'add',
+      writes: { scope: 'person' },
       params: [
         { name: 'webid', kind: 'webid',  required: true },
         { name: 'name',  kind: 'string', required: false },
@@ -683,6 +699,7 @@ export const stoopManifest = {
     },
     {
       id:   'setContactTrust', group: 'admin', verb: 'submit',
+      writes: { scope: 'person' },
       appliesTo: { type: 'contact' },
       params: [
         { name: 'webid', kind: 'webid', required: true },
@@ -698,6 +715,7 @@ export const stoopManifest = {
       // circles untouched — Contacten folds it away, and the contact's next message brings them back. On every
       // device of the person: the mark rides the own-devices carry, the newer change wins.
       id:   'setContactHidden', group: 'admin', verb: 'submit',
+      writes: { scope: 'person' },
       appliesTo: { type: 'contact' },
       resolves: [{ field: 'hidden', policy: 'content' }],   // a dropped hide heals on the next carry; the newer `hiddenAt` wins on landing
       params: [
@@ -726,6 +744,7 @@ export const stoopManifest = {
       // header; the row travels to the person's other devices and the newer `personaAt` wins, like `hiddenAt`. The
       // release itself is said on the pair circle by the device where the change was made (`contactLens.js`).
       id:   'setContactPersona', group: 'admin', verb: 'submit',
+      writes: { scope: 'person' },
       appliesTo: { type: 'contact' },
       resolves: [{ field: 'persona', policy: 'content' }],
       params: [
@@ -746,6 +765,7 @@ export const stoopManifest = {
       // A contact's CURRENT person key: taken on first sight (the card), else verified as a chain of links from the
       // version already on record. Reached by the card scan and by the person-key chain lane — no surface of its own.
       id:   'setContactPersonKey', group: 'data', verb: 'submit',
+      writes: { scope: 'person' },
       appliesTo: { type: 'contact' },
       // Versions are monotonic and chain-verified at the receiver — two of my devices converge on the highest version
       // the chain reaches; content, not a claim.
@@ -777,6 +797,7 @@ export const stoopManifest = {
     // ── Cluster C wizards — customRenderer ──
     {
       id:   'restoreFromMnemonicWizard', verb: 'submit',
+      writes: { scope: 'device' },   // restores the identity onto this device
       params: [],
       surfaces: {
         slash: { command: '/restore-from-mnemonic' },
@@ -787,6 +808,7 @@ export const stoopManifest = {
     {
       id:   'conflictDisputeWizard',
       circleScoped: false, verb: 'add',
+      writes: { scope: 'circle' },
       // per-bubble action on stoop posts. Slash kept for
       // general-dispute (no postId) + LLM tool-call surface.
       appliesTo: { type: 'post', state: ['open'] },
@@ -803,6 +825,7 @@ export const stoopManifest = {
     {
       id:   'postAudienceWizard',
       circleScoped: false, verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'text', kind: 'string', required: false },
       ],
@@ -823,6 +846,7 @@ export const stoopManifest = {
     },
     {
       id:   'createGroupWizard', verb: 'add',
+      writes: { scope: 'circle' },
       params: [],
       surfaces: {
         slash: { command: '/create-group' },
@@ -832,6 +856,7 @@ export const stoopManifest = {
     },
     {
       id:   'joinGroupWizard', verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'invite', kind: 'string', required: true },
       ],
@@ -881,6 +906,7 @@ export const stoopManifest = {
       // stale — the shells offer this from the stale-rules banner, so no slash surface is invented.
       id:   'acceptGroupRules',
       circleScoped: false, verb: 'add',
+      writes: { scope: 'circle' },
       // A member's acceptance is SELF-ONLY (the fold ignores anyone else's statement about them) and
       // versions are monotonic, so two of their own devices converge on the causally-later acceptance —
       // content, not a claim: nobody races for exclusive ownership of someone's own consent.
@@ -897,6 +923,7 @@ export const stoopManifest = {
     // with a screen does not need a slash command invented for it.
     {
       id:   'addMyOffering', verb: 'add',
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       // An offering set converges per CATEGORY: two devices adding different categories must both
       // survive, and the same category added twice is one entry. Last write wins WITHIN a category
       // (its free tags), which is content, not a claim — nobody is racing for exclusive ownership.
@@ -909,6 +936,7 @@ export const stoopManifest = {
     },
     {
       id:   'removeMyOffering', verb: 'remove',
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       params: [{ name: 'categoryId', kind: 'string', required: true }],
       surfaces: { chat: { hint: 'Stop offering a category you had listed.' } , ui: { control: 'button' } },
     },
@@ -929,6 +957,7 @@ export const stoopManifest = {
     // place into coordinates without storing anything — it is the lookup, not the setting.
     {
       id:   'setMyLocation', verb: 'add',
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       // One value, so the newest wins. A location is content, not a claim: two devices setting it
       // concurrently is a person moving, not a contest, and either answer is defensible.
       resolves: [{ field: 'location', policy: 'content' }],
@@ -941,6 +970,7 @@ export const stoopManifest = {
     },
     {
       id:   'clearMyLocation', verb: 'remove',
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       params: [],
       surfaces: { chat: { hint: "Remove this person's stored location entirely." } , ui: { control: 'button' } },
     },
@@ -967,6 +997,7 @@ export const stoopManifest = {
     // in another, and nothing links the two. That is why listMyHandles is plural.
     {
       id:   'setMyHandle', verb: 'set',
+      writes: { scope: 'circle' },
       params: [{ name: 'handle', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: "Set this person's handle in the current circle. Refuses if the handle is taken there." },
@@ -975,6 +1006,7 @@ export const stoopManifest = {
     },
     {
       id:   'setMyDisplayName', verb: 'set',
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       params: [{ name: 'displayName', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Set the display name others see for this person.' },
@@ -1013,6 +1045,7 @@ export const stoopManifest = {
     // enforced on the device and at the relay; holding a token buys no right to interrupt.
     {
       id:   'subscribeWebPush', verb: 'add',
+      writes: { scope: 'device' },
       params: [{ name: 'subscription', kind: 'object', required: true }],
       resolves: [{ field: 'subscription', policy: 'content' }],
       surfaces: {
@@ -1022,6 +1055,7 @@ export const stoopManifest = {
     },
     {
       id:   'unsubscribeWebPush', verb: 'remove',
+      writes: { scope: 'device' },
       params: [{ name: 'endpoint', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Remove a web-push subscription by endpoint.' },
@@ -1030,6 +1064,7 @@ export const stoopManifest = {
     },
     {
       id:   'subscribeExpoPush', verb: 'add',
+      writes: { scope: 'device' },
       params: [{ name: 'token', kind: 'string', required: true, ...ID_NONEMPTY }],
       resolves: [{ field: 'token', policy: 'content' }],
       surfaces: {
@@ -1039,6 +1074,7 @@ export const stoopManifest = {
     },
     {
       id:   'unsubscribeExpoPush', verb: 'remove',
+      writes: { scope: 'device' },
       params: [{ name: 'token', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: "Remove this device's Expo push token." },
@@ -1070,6 +1106,7 @@ export const stoopManifest = {
     {
       id:   'setCircleStoragePolicy',
       circleScoped: false, verb: 'set',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId',       kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'storagePolicy', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -1101,6 +1138,7 @@ export const stoopManifest = {
     },
     {
       id:   'restoreFromMnemonic', verb: 'set',
+      writes: { scope: 'device' },   // restores the identity onto this device
       // Destructive: adopts an identity from a phrase. `confirm` exists so a single stray call cannot
       // overwrite the identity in place.
       params: [
@@ -1191,6 +1229,7 @@ export const stoopManifest = {
     // params below are the SUBSTRATE's contract for those — read from circles, not guessed from the wrapper.
     {
       id:   'createGroupV2', verb: 'add',
+      writes: { scope: 'circle' },
       // Logic: @onderling/circles circleCreate.js
       params: [
         { name: 'groupId',               kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1211,6 +1250,7 @@ export const stoopManifest = {
     },
     {
       id:   'redeemMembershipCode', verb: 'submit',
+      writes: { scope: 'circle' },
       // Logic: @onderling/circles circleMembershipWriters.js. The joiner presents their own per-circle
       // address WITH its proof; an unproven address is dropped at the substrate, never recorded.
       params: [
@@ -1227,6 +1267,7 @@ export const stoopManifest = {
     },
     {
       id:   'verifyMembershipCodeForPeer', verb: 'confirm',
+      writes: { scope: 'circle' },
       // Logic: @onderling/circles. The ADMIN half of the peer-bridge join: when a joiner cannot redeem
       // locally, the admin verifies and answers with a statement the joiner mirrors.
       params: [
@@ -1244,6 +1285,7 @@ export const stoopManifest = {
     },
     {
       id:   'recordRemoteRedemption', verb: 'add',
+      writes: { scope: 'circle' },
       // The JOINER's local mirror of an admin-confirmed join. Carries both sides' per-circle addresses with
       // their proofs, so the joiner can reach the admin afterwards even with address-fallback off.
       params: [
@@ -1267,6 +1309,7 @@ export const stoopManifest = {
     },
     {
       id:   'acknowledgeCaretaker', verb: 'update',
+      writes: { scope: 'circle' },
       // The caretaker signs for the appointment nobody made. When the last admin leaves, the roster
       // fold appoints a successor — derived, so that every device reaches it alone and offline, and
       // therefore silently: nothing recorded that it happened. This is the record.
@@ -1297,6 +1340,7 @@ export const stoopManifest = {
     },
     {
       id:   'setMemberRole', verb: 'update',
+      writes: { scope: 'circle' },
       // Promote a member to admin, or demote an admin back to member. The producer for the
       // membership lane's `role` statement kind, which was declared with nothing writing it.
       //
@@ -1327,6 +1371,7 @@ export const stoopManifest = {
     },
     {
       id:   'removeMember', verb: 'remove',
+      writes: { scope: 'circle' },
       // Logic: @onderling/circles. Admin-only, and NOT just a roster edit — it forces a key rotation and
       // reseal, so a removed member cannot read what comes next. The island guarantee.
       params: [
@@ -1361,6 +1406,7 @@ export const stoopManifest = {
     },
     {
       id:   'rotateMyGroupCode', verb: 'revoke',
+      writes: { scope: 'circle' },
       // Rotating INVALIDATES the old code — that is the point, and why it is `revoke` rather than `update`.
       params: [
         { name: 'groupId',               kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1375,6 +1421,7 @@ export const stoopManifest = {
     },
     {
       id:   'editGroupRules', verb: 'update',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rules',   kind: 'object', required: true },
@@ -1389,6 +1436,7 @@ export const stoopManifest = {
       // The rules-update rider's RECEIVE half: land a peer-carried rules doc as the local mirror
       // head (idempotent by version; the statement's admin authority is verified at the caller).
       id:   'recordGroupRulesUpdate', verb: 'update',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId',   kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rules',     kind: 'object', required: true },
@@ -1406,6 +1454,7 @@ export const stoopManifest = {
       // id-preserved so the roster projection has a head on a trail-less device. Device-set
       // authority is verified at the receiving module; this op guards shape + idempotency.
       id:   'recordRosterSeed', verb: 'update',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rows',    kind: 'object', required: true },
@@ -1432,6 +1481,7 @@ export const stoopManifest = {
     {
       id:   'postAnnouncement',
       circleScoped: true, verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'text',    kind: 'string', required: true, ...STR_NONEMPTY },
@@ -1454,6 +1504,7 @@ export const stoopManifest = {
     // ── Reaching each other ─────────────────────────────────────────
     {
       id:   'recordPeerIntro', verb: 'add',
+      writes: { scope: 'circle' },
       // A peer announcing itself with an address. Recorded, not trusted: the address still has to prove
       // itself against the roster before anything is sent to it.
       params: [
@@ -1469,6 +1520,7 @@ export const stoopManifest = {
     },
     {
       id:   'addContactFromQr', verb: 'add',
+      writes: { scope: 'person' },
       params: [
         { name: 'payload', kind: 'object', required: true },
         // Which of your personas this contact is added through — what they see of you. Optional: absent
@@ -1486,6 +1538,7 @@ export const stoopManifest = {
     {
       id:   'acceptResponder',
       circleScoped: false, verb: 'confirm',
+      writes: { scope: 'circle' },
       params: [
         { name: 'requestId',       kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'responderWebid',  kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1504,6 +1557,7 @@ export const stoopManifest = {
     // The INGEST ops take `fromPeerAddr` + `fromPubKey` from the AUTHENTICATED envelope, never the payload.
     {
       id:   'broadcastCircleGovernance', verb: 'share',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1517,6 +1571,7 @@ export const stoopManifest = {
     },
     {
       id:   'broadcastCircleKeyStatement', verb: 'share',
+      writes: { scope: 'circle' },
       // The group-key lane's fan. Like the other lanes' broadcasts this goes through the circle
       // fan-out core, so the statement leaves under the sender's PER-CIRCLE address — a raw
       // sendPeerMessage signs with the canonical identity, which every receiver refuses inside a
@@ -1536,6 +1591,7 @@ export const stoopManifest = {
     },
     {
       id:   'broadcastCircleMembership', verb: 'share',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1549,6 +1605,7 @@ export const stoopManifest = {
     },
     {
       id:   'broadcastCircleChatStatement', verb: 'share',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1562,6 +1619,7 @@ export const stoopManifest = {
     },
     {
       id:   'broadcastCircleTask', verb: 'share',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'event',   kind: 'object', required: true },
@@ -1575,6 +1633,7 @@ export const stoopManifest = {
     },
     {
       id:   'broadcastCircleRules', verb: 'share',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'rulesDoc',   kind: 'object', required: true },
@@ -1589,6 +1648,7 @@ export const stoopManifest = {
     },
     {
       id:   'broadcastCircleRecipe', verb: 'share',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'recipe',     kind: 'object', required: true },
@@ -1603,6 +1663,7 @@ export const stoopManifest = {
     },
     {
       id:   'broadcastCircleAddresses', verb: 'share',
+      writes: { scope: 'circle' },
       // Logic: @onderling/circles fanCircleAddresses. The send half of address announcing — each
       // announcement carries its own proof, and the receiver verifies before recording.
       params: [
@@ -1619,6 +1680,7 @@ export const stoopManifest = {
     },
     {
       id:   'recordCircleAddressAnnouncement', verb: 'add',
+      writes: { scope: 'circle' },
       // Logic: @onderling/circles recordCircleAddress. The RECEIVE half — the proof is verified here and
       // an unproven address is dropped, which is what stops a peer claiming somebody else's address.
       params: [
@@ -1636,6 +1698,7 @@ export const stoopManifest = {
     },
     {
       id:   'ingestCircleMessage', verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1649,6 +1712,7 @@ export const stoopManifest = {
     },
     {
       id:   'ingestRemotePost', verb: 'add',
+      writes: { scope: 'circle' },
       params: [
         { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },

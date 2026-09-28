@@ -113,6 +113,68 @@ atomFor(canonicalVerb)
 
 The Atom for a canonical verb (no alias resolution), or `undefined`.
 
+### `READ_ATOMS`
+
+**Kind:** constant · **Import:** `READ_ATOMS` from `'@onderling/app-manifest'`
+
+The atoms that only READ. Every other atom changes something — creates, mutates, deletes, moves an
+item through its lifecycle, or shares it — so an op using one of them is a WRITING op.
+
+### `isWritingVerb`
+
+**Kind:** function · **Import:** `isWritingVerb` from `'@onderling/app-manifest'`
+
+```js
+isWritingVerb(verb)
+```
+
+True iff `verb` is an atom (canonical or alias) that writes: every atom except the read ones.
+A domain verb (not an atom) is neither here — the atom catalogue cannot say what it does; the
+manifest classifies it in its `domainVerbs` map (see `verbKind`).
+
+**Parameters**
+
+- `verb` `string`
+
+### `DOMAIN_VERB_KINDS`
+
+**Kind:** constant · **Import:** `DOMAIN_VERB_KINDS` from `'@onderling/app-manifest'`
+
+How a manifest classifies each of its domain verbs: `domainVerbs` is a map `{ verb: 'read' | 'write' }`.
+
+### `verbKind`
+
+**Kind:** function · **Import:** `verbKind` from `'@onderling/app-manifest'`
+
+```js
+verbKind(manifest, verb)
+```
+
+Does an op's verb read or write, in this manifest?
+  • an atom — the catalogue says (`READ_ATOMS` read, every other atom writes);
+  • a domain verb — the manifest's `domainVerbs` map says;
+  • no verb at all — `'write'`: nothing says it only reads;
+  • `null` — a domain verb the manifest has not classified. Callers treat that as an error, never as a
+    read: the default is the safe one, so a new verb cannot slip past as a silent read.
+
+**Parameters**
+
+- `manifest` `object`
+- `[verb]` `string`
+
+**Returns:** `'read'|'write'|null`
+
+### `WRITE_SCOPES`
+
+**Kind:** constant · **Import:** `WRITE_SCOPES` from `'@onderling/app-manifest'`
+
+Where a writing op writes — the value set of an op's `writes: { scope }` declaration.
+  • `device` — only on this device (local settings, caches, this device's own registrations);
+  • `person` — the person's own data, which follows them across their devices (profile and persona
+               properties, the contacts book, personal settings);
+  • `circle` — the circle's shared store or log, which syncs to the circle's other members.
+Not the same axis as a setting's or a param's `scope` (who a SETTING applies to).
+
 ## `src/capabilities.js`
 
 ### `opNouns`
@@ -948,7 +1010,7 @@ Validate a manifest.
 - `manifest` `import('./schema.js').Manifest`
 - `[opts]` `object`
 - `[opts.strict=false]` `boolean` — when `true`, every `view.dataSource.skillId` AND every `view.fields[].patch.opId` must be either declared in `manifest.operations[].id` OR in the new `manifest.externalSkills` allow-list. Catches typos (e.g. `'getMispelled'`) at manifest level. Default: non-strict (existing tolerant behaviour).
-- `[opts.atoms=false]` `boolean` — B · Layer 1 (2026-07-01) — ATOM DISCIPLINE. When `true`, every `op.verb` must be a known SDK atom (or alias — see `atoms.js`) OR be declared in `manifest.domainVerbs`. This is the fitness function against verb drift: a new noun-specific verb can't sneak in without either mapping to an atom or being explicitly named as domain-specific. Default off (F-SP1-e tolerant behaviour preserved for older callers).
+- `[opts.atoms=false]` `boolean` — B · Layer 1 (2026-07-01) — ATOM DISCIPLINE. When `true`, every `op.verb` must be a known SDK atom (or alias — see `atoms.js`) OR be a key of the `manifest.domainVerbs` map. This is the fitness function against verb drift: a new noun-specific verb can't sneak in without either mapping to an atom or being explicitly named as domain-specific. Default off (F-SP1-e tolerant behaviour preserved for older callers).
 - `[opts.strictNouns=false]` `boolean` — L4 ≡ B (2026-07-05) — REGISTRY-NOUN DISCIPLINE. The `@onderling/item-types` registry is the source of truth for nouns. By DEFAULT every declared `manifest.itemTypes` entry (and, transitively, every `manifest.nouns` key — nouns keys must be a subset of itemTypes) that the registry does not recognise is reported as a NON-BLOCKING WARNING (`result.warnings`, code `noncanonical-itemtype`) — F-SP1-a app-local types keep validating. When `true`, those same findings become hard ERRORS (default-deny toward `(verb × noun) = (atom × item-type)`): a manifest may only declare nouns the shared registry knows. Opt-in so existing apps that still carry app-local nouns don't hard-break.
 
 **Returns:** `{ ok: boolean, errors: Array<{path: string, message: string}>, warnings: Array<{path: string, message: string, code?: string}> }` — `ok` reflects `errors` only — warnings never flip `ok`. `warnings` is always present (empty array when clean); forward-additive for callers that only read `{ ok, errors }`.

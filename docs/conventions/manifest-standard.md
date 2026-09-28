@@ -28,8 +28,10 @@ every projector assumes. One conformance issue is raised per underlying validato
 
 ### 2. Atom discipline — `verb-not-atom`
 
-Every `op.verb` must be a known SDK atom (or a registered alias) **or** be declared in `manifest.domainVerbs`;
-and a `domainVerbs` entry must not itself be an atom. This is the drift guard against a new noun-specific verb
+Every `op.verb` must be a known SDK atom (or a registered alias) **or** be a key of the `manifest.domainVerbs`
+map; and a `domainVerbs` entry must not itself be an atom. The map classifies each domain verb — `{ register:
+'write', help: 'read' }` — because the atom catalogue cannot say whether a domain verb writes (see "Declared
+reach" below); a plain list is refused. This is the drift guard against a new noun-specific verb
 sneaking into an op without either mapping to an atom (`add` / `list` / `complete` / `claim` / …) or being
 named explicitly as domain-specific (folio `sync`, household `register`, stoop `report`). It is the packaged
 form of the existing atom-discipline guard (B · Layer 1).
@@ -92,7 +94,7 @@ nouns: {
 This declaration IS the capability surface (declared-authoritative, `docs/decisions.md` 2026-07-02): a broad
 `appliesTo` can no longer silently mint capabilities on internal item-types. Verbs that genuinely don't reduce
 to an atom (the ~20% domain tail — folio `sync`, household `register`, tasks-v0 `tree`, `help`) are declared
-in `manifest.domainVerbs` instead, never in `nouns[].atoms`.
+in the `manifest.domainVerbs` map instead (each classified `'read'` or `'write'`), never in `nouns[].atoms`.
 
 **Enforcement (the convention is now GUARDED, not just documented):**
 - **Op side** — the `verb-not-atom` conformance rule (Rule 2 above): every `op.verb` must be a canonical atom
@@ -121,6 +123,44 @@ using the NOUN. The item-type is **deliberately not renamed** — its blast radi
 `type: {const:'claim'}` discriminator, the registry's public API, and the `lend-request` legacy alias) — so
 the two are disambiguated by documentation (this section + JSDoc on `packages/item-types/src/types/claim.js`)
 rather than a rename, per the repo's code-preservation ethos.
+
+## Declared reach: `writes` and `hosts`
+
+Two declarations say how far an app reaches. They are checked by the guard `scripts/lint-manifest-scopes.mjs`
+(in `npm run guards`), not by `manifestConformance`; the validator tolerates both keys like any other. The guard
+reads every manifest the app runs — the list in `apps/basis/src/v2/manifestSources.js`, which both shells
+compose from — so the plumbing manifests declared outside `apps/<app>/manifest.js` (the parameter register, the
+device-log lanes) are checked like the app manifests.
+
+- **`writes: { scope }` on an op row** — where the op writes. Required on every op not known to only read: its
+  verb is an atom other than the read atoms `list` / `get` (aliases count, so `edit` writes and `read` does
+  not), a domain verb its manifest classifies `'write'`, or it has no verb; or the op declares `appends`
+  (`verbKind` in `atoms.js` is the one reading). A domain verb missing from the `domainVerbs` map is red —
+  "classify this verb: read or write" — never a silent read: the default is the safe one. There is no
+  `writes: null`. The three scopes (`WRITE_SCOPES`):
+  - `device` — only on this device: local settings, caches, this device's own registrations;
+  - `person` — the person's own data, which follows them across their devices: profile and persona
+    properties, the contacts book, the agent registry, their pod;
+  - `circle` — the circle's shared store or log, which syncs to the circle's members. An op that delivers to
+    another person outside any circle declares `circle` too: it leaves the person, so the widest reach is the
+    honest one.
+
+  **An op that writes in more than one place declares the WIDEST reach** — a share that writes the person's
+  store and a circle lane is `circle`. Widest, not most common, so the declaration can only over-state reach,
+  never under-state it. The key is `writes`, not `scope` — `scope` already means who a setting or param
+  applies to.
+- **`hosts: string[]` at the top level** — every network host the app's own code reaches (`[]` for none). An
+  endpoint the person configures — their pod, their relay — is not a fixed host and is not listed. **A
+  declaration, not a check:** the guard verifies that the array is there, not that it is complete — a new
+  `fetch` to an undeclared host fails nothing. It binds where the realm host starts an extension with
+  `--allow-net` set from it; until then, and for code in the main bundle, it is a convention kept by review.
+  `hosts` has **two** consumers in the runtime, not one: `--allow-net` (the enforcement), and certification
+  and the consent card, which read the declaration itself (an extension that declares both a data-read grant
+  and a network host is refused certification). So a false `[]` is not harmless until the realm arrives — it
+  is a future false claim on a card.
+
+Nothing at runtime reads either declaration yet; the extension contract (`docs/extending.md`) is where they
+will bind.
 
 ## What is not a conformance failure
 

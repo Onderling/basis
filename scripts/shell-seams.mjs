@@ -27,6 +27,10 @@ export const SEAMS = Object.freeze([
   // why this is a seam and not a convention. All three read ONE list now (`src/v2/enrolForgets.js`); a shell
   // supplies only how its storage is reached.
   { id: 'enrol-forgets-the-throwaway-self', pattern: /runPendingForget\(/, why: 'a device that keeps a former self\'s content greets it in every circle and warns about rows it cannot open, for ever — read the ceremony\'s note as the FIRST awaited act of boot, before any store is touched' },
+  // A FUNCTION profile's inbox is a door (the household bot on its own node): the shell that can run one reads the
+  // profile's kind and composes the door; a shell that ran one without it would leave the bot deaf on its inbox.
+  // Only the box runs a function profile today (web and mobile are a person's devices).
+  { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
   // it on the governance change (live fan + catch-up), and serves its head at catch-up — the box above all, the

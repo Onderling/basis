@@ -26,9 +26,12 @@ export function createBotUsers({ store, adminUid = null } = {}) {
   if (!store || typeof store.get !== 'function' || typeof store.put !== 'function' || typeof store.list !== 'function') {
     throw new TypeError('createBotUsers: a store with get/put/list is required');
   }
-  const idOf = (channel, uid) => `${channel}:${uid}`;
+  // A door-shaped id for a keyless person (`telegram:<uid>`); a web person's id IS their webid (the contact row the
+  // card made), so both doors reach the gate with the row's own id.
+  const idOf = (channel, uid) => (channel === 'web' ? uid : `${channel}:${uid}`);
 
   return {
+    idOf,
     /**
      * Admit a person on a door: their contact, created on first sight. Admitting again keeps the contact and its
      * role, and takes a new display name when one is given.
@@ -93,7 +96,7 @@ export function contactBookStore(callSkill) {
     return list.filter((c) => c && isChannel(c.channel)).map(toUser);
   };
   const toUser = (c) => ({
-    id: c.webid, type: 'contact', channel: c.channel, uid: String(c.webid).slice(c.channel.length + 1), role: c.role ?? null,
+    id: c.webid, type: 'contact', channel: c.channel, uid: c.channel === 'web' ? c.webid : String(c.webid).slice(c.channel.length + 1), role: c.role ?? null,
     ...(c.displayName ? { displayName: c.displayName } : {}),
     ...(c.hidden ? { hidden: true } : {}),
   });
@@ -149,13 +152,15 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     const known = typeof users.find === 'function' ? await users.find(who.channel, uid) : null;
     if (known) return tier(known.displayName || !who.displayName ? known : await users.admit(who));
     // Not admitted (never, or revoked): the gate forgets any tier they had.
-    const id = `${who.channel}:${uid}`;
+    const id = typeof users.idOf === 'function' ? users.idOf(who.channel, uid) : `${who.channel}:${uid}`;
     if (tiered.has(id)) { tiered.delete(id); if (typeof clearDoorCaller === 'function') await clearDoorCaller(id); }
     if (bootstrap.has(uid)) return tier(await users.admit(who));
+    // The code: a field on the message (the bot's inbox — from the card), or `/start <code>` (Telegram's link).
     const m = /^\/start(?:@\S+)?\s+(\S+)/.exec(String(who?.text ?? '').trim());
-    if (!m) return { refused: 'needs-code' };
-    const r = await admission.redeem(m[1]);
-    if (!r.ok) return { refused: r.reason };
+    const code = typeof who?.admission === 'string' && who.admission ? who.admission : m?.[1];
+    if (!code) return { refused: 'needs-code', id };
+    const r = await admission.redeem(code);
+    if (!r.ok) return { refused: r.reason, id };
     return { id: await tier(await users.admit(who)), consumed: true };
   };
 }

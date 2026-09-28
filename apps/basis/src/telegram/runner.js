@@ -321,10 +321,23 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     if (typeof admit === 'function') {
       let r = null;
       try {
-        r = await admit({ channel: 'telegram', uid: String(msg?.sender?.bridgeUid || chatId), displayName: msg?.sender?.displayName ?? null, text });
+        r = await admit({
+          channel: msg?.channel ?? 'telegram', uid: String(msg?.sender?.bridgeUid || chatId),
+          displayName: msg?.sender?.displayName ?? null, text,
+          ...(typeof msg?.admission === 'string' ? { admission: msg.admission } : {}),
+        });
       } catch { r = null; }
       // Refused: the reason, and nothing else — never the chat's id.
-      if (r && typeof r === 'object' && r.refused) { await say(chatId, t(`circle.bot.admission_${String(r.refused).replace(/-/g, "_")}`)); return; }
+      if (r && typeof r === 'object' && r.refused) {
+        // A door that tells a stranger once (the bot's inbox): "you need a code" the first time, kept on their row, then
+        // silence. A message that carried a code is told why it failed, every time: that is a new question.
+        if (msg?.refuseOnce && threads && r.id && r.refused === 'needs-code') {
+          if (threads.refused(r.id)) return;
+          threads.markRefused(r.id);
+        }
+        await say(chatId, t(`circle.bot.admission_${String(r.refused).replace(/-/g, "_")}`));
+        return;
+      }
       caller = typeof r === 'string' ? r : (r && typeof r === 'object' ? r.id : null);
       if (!caller) { await say(chatId, t('circle.telegram.unknown')); return; }
       // The line was the code that admitted them: the welcome, and nothing to dispatch.

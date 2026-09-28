@@ -112,6 +112,9 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     /** Has this thread been greeted (the door says who it is and what it keeps, once per person)? */
     greeted: (id) => rows.get(id)?.greeted === true,
     markGreeted(id) { return save({ ...rowOf(id), greeted: true }); },
+    /** Was this person, not admitted, already told they need a code (a door that says it once)? */
+    refused: (id) => rows.get(id)?.refused === true,
+    markRefused(id) { return save({ ...rowOf(id), refused: true }); },
     /** The ask this thread is waiting on (a form, a confirmation), or null. */
     pendingOf: (id) => rows.get(id)?.pending ?? null,
     setPending(id, pending) {

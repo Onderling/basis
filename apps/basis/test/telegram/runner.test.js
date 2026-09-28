@@ -224,7 +224,7 @@ describe('the box\'s own catalogue: no op without a button can be tapped', () =>
     expect(hidden).toContain('revealOwnerPhrase');
     const bridge = new InMemoryBridge({ id: 'telegram' });
     const calls = [];
-    const runner = createTelegramRunner({ bridge, callSkill: async (app, op) => { calls.push(op); return { ok: true }; }, catalogue, manifestsByOrigin, allowedChatIds: '*', t });
+    const runner = createTelegramRunner({ bridge, callSkill: async (app, op) => { calls.push(op); return { ok: true }; }, catalogue, manifestsByOrigin, allowedChatIds: '*', t, collectMs: 0 });
     await runner.start();
     for (const id of hidden) {
       await bridge.simulateIncoming({ chatId: '9', text: `${id}:`, sender: { bridgeUid: '9', displayName: 'X' } });

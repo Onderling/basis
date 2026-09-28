@@ -37,6 +37,7 @@ async function whatTheModelSees(apps) {
   });
   await runner.start();
   await bridge.simulateIncoming({ chatId: '42', text: 'wat staat er nog open?', sender: { bridgeUid: '42', displayName: 'Frits' } });
+  await runner.idle('42');   // the bridge is let go at once; the turn runs in the chat's lane
   expect(seen.length, 'the free-text turn reached the model').toBe(1);
   const originOf = (id) => catalogue.opsById.get(id)?.appOrigin;
   return { tools: seen[0].tools, system: seen[0].system, originOf, catalogue };

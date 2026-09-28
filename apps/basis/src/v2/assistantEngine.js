@@ -23,6 +23,7 @@ import { createTokenGate } from './tokenGate.js';
 import { circleGateRules } from './circleGate.js';
 import { makeCircleRetriever } from './circleRetriever.js';
 import { DEFAULT_INTERPRET_SYSTEM } from './interpretCommand.js';
+import { detectLang } from './assistantLanguage.js';
 
 export const ASSISTANT_MEMORY_TURNS = 6;
 
@@ -64,9 +65,8 @@ export function createAssistantEngine({
   // The stable instruction (the rules and this language's phrasings) and this turn's hints (the language line), kept
   // apart so the interpreter puts the stable part first and the hints below its turn marker.
   const system = interpretSystemFor(lang);
-  const hints = interpretHintsFor(lang);
   const interpretIn = typeof interpret === 'function'
-    ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? hints })
+    ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? interpretHintsFor(text) })
     : null;
   const retrieve = typeof loadItems === 'function'
     ? makeCircleRetriever({
@@ -144,18 +144,22 @@ export function assistantReplyText(opts, t, fallbackKey) {
 }
 
 const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
-/** The interpreter's STABLE system prompt for a language: the shared instruction plus its add-phrasings. */
+/**
+ * The interpreter's STABLE system prompt for a door: the shared instruction, the reply-language rule (the member's
+ * language; the door's when that cannot be told), and the door language's add-phrasings.
+ */
 export function interpretSystemFor(lang = 'nl') {
+  const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
   const add = lang === 'nl'
     ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
-  return `${DEFAULT_INTERPRET_SYSTEM}\n${add}`;
+  return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}`;
 }
 
-/** This turn's hints for a language: the reply language, which sits below the prompt's turn marker. */
-export function interpretHintsFor(lang = 'nl') {
-  const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
-  return [`Always reply in ${name}.`];
+/** This turn's hints, below the prompt's turn marker: what the member's line was written in, when that is clear. */
+export function interpretHintsFor(text) {
+  const wrote = detectLang(text);
+  return wrote ? [`The member wrote in: ${wrote}.`] : [];
 }
 
 /**

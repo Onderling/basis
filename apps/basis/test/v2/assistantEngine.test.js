@@ -91,10 +91,12 @@ describe('createAssistantEngine', () => {
     // prompt's turn marker, where the interpreter places it).
     const interpret = async (text, o) => { seen.push(o); return null; };
     const e = createAssistantEngine({ catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {} });
-    await e.ask('t', 'maii');
-    expect(seen[0].hints).toContain('Always reply in Dutch.');
+    await e.ask('t', 'kun je nog wat melk toevoegen');
+    expect(seen[0].system).toContain("Reply in the member's language; when you cannot tell, in Dutch.");
+    expect(seen[0].hints).toContain('The member wrote in: nl.');
     expect(seen[0].system).toContain('voeg … toe');
-    expect(interpretHintsFor('en')).toContain('Always reply in English.');
+    expect(interpretHintsFor('add some milk to the list please')).toContain('The member wrote in: en.');
+    expect(interpretHintsFor('maii')).toEqual([]);
   });
 
   it('three items named → three dispatches in one turn (the interpreter\'s `more`)', async () => {

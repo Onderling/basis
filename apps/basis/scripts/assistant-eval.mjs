@@ -24,10 +24,11 @@ import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { householdManifest } from '../../household/manifest.js';
 import { listsManifest } from '../../lists/manifest.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
+import { detectLang } from '../src/v2/assistantLanguage.js';
 
 const { values } = parseArgs({ options: {
   model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.85' },
-  mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' },
+  mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' }, 'door-lang': { type: 'string' },
 } });
 
 if (values['from-log']) {
@@ -59,7 +60,8 @@ for (const f of fixtures) {
   const dispatched = [];
   const replies = [];
   const engine = createAssistantEngine({
-    catalogue, lang: f.lang ?? values.lang, llm, interpret: interpretToCommand,
+    // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
+    catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm, interpret: interpretToCommand,
     loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'shopping', text })),
     dispatch: (input) => { dispatched.push(input); },
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
@@ -102,7 +104,10 @@ function judge(expect, got, n) {
     if (got?.op) return { ok: false, why: 'called a tool' };
     const text = got?.reply ?? '';
     if (expect.reply === 'asks') return /\?/.test(text) ? { ok: true, why: '' } : { ok: false, why: 'no question' };
-    if (expect.reply === 'declines') return text && text !== '__unknown' ? { ok: true, why: '' } : { ok: false, why: 'silence' };
+    if (expect.reply === 'declines' && !(text && text !== '__unknown')) return { ok: false, why: 'silence' };
+    // `in`: the answer's language, read by the same counter the hint uses (undecided counts as a pass)
+    if (expect.in && detectLang(text) && detectLang(text) !== expect.in) return { ok: false, why: `answered in ${detectLang(text)}` };
+    if (expect.reply === 'declines') return { ok: true, why: '' };
     return { ok: true, why: '' };
   }
   return { ok: !got, why: got ? 'acted' : '' };

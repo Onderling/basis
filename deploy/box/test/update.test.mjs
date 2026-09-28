@@ -259,7 +259,7 @@ test('install.sh feedback-project profile: two repos, five roles, the feedback r
   assert.match(r.stdout, /portal: https:\/\/portal\.example\.org\//);
 });
 
-test('install.sh personal profile: no hostnames, the companion dials the shared relay, the assistant gets its token', () => {
+test('install.sh personal profile: no hostnames, the assistant only (the companion image cannot start yet), the assistant gets its token', () => {
   const root = mkdtempSync(join(tmpdir(), 'box-personal-'));
   const remote = join(root, 'mono.git'); const work = join(root, 'work');
   sh('git', ['init', '-q', '--bare', '-b', 'live', remote]); sh('git', ['init', '-q', '-b', 'live', work]);
@@ -277,13 +277,14 @@ test('install.sh personal profile: no hostnames, the companion dials the shared 
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'personal', COMPANION_RELAY_URL: 'wss://relay.onderling.org', TG_BOT_TOKEN: '1:abc', TG_ALLOWED_CHAT_IDS: '42', PRIVATEMODE_API_KEY: 'pm', BOX_REPO_URL: remote, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' },
   });
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="companion@basis assistant@basis"/);
+  assert.match(readFileSync(join(box, 'box.conf'), 'utf8'), /ROLES="assistant@basis"/);
   const env = readFileSync(join(box, '.env'), 'utf8');
   assert.match(env, /COMPANION_RELAY_URL=wss:\/\/relay\.onderling\.org/); assert.match(env, /TG_BOT_TOKEN=1:abc/); assert.match(env, /TG_ALLOWED_CHAT_IDS=42/); assert.match(env, /RELAY_DOMAIN=$/m);
   const calls = readFileSync(join(root, 'calls.log'), 'utf8');
-  assert.match(calls, /build --pull companion assistant/);
+  assert.match(calls, /build --pull assistant/);
+  assert.doesNotMatch(calls, /companion/, 'no companion on a personal box until its image starts');
   assert.doesNotMatch(calls, /caddy\.yml/, 'no caddy on a personal box');
-  assert.match(r.stdout, /personal: companion dialing wss:\/\/relay\.onderling\.org · assistant on Telegram \(chats: 42\)/);
+  assert.match(r.stdout, /personal: the assistant on Telegram \(chats: 42\), dialing wss:\/\/relay\.onderling\.org/);
 });
 
 test('a release that touches nothing in a role\'s declared paths does not rebuild it — and one that does, does', () => {

@@ -17,6 +17,7 @@ export { QueueStore }           from './src/queueStores/QueueStore.js';
 export { MemoryQueueStore }     from './src/queueStores/MemoryQueueStore.js';
 export { SqliteQueueStore }     from './src/queueStores/SqliteQueueStore.js';
 export { SqliteForwardStore }   from './src/queueStores/SqliteForwardStore.js';
+export { loadSqlite }           from './src/loadSqlite.js';
 export { PushSender }           from './src/push/PushSender.js';
 export { ExpoPushSender, ReliableExpoPushSender } from './src/push/ExpoPushSender.js';
 export { PushTokenRegistry }    from './src/push/PushTokenRegistry.js';

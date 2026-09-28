@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 40
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 42
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -27,6 +27,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `duplicate-vocab` | — | a shared VOCABULARY is defined in exactly ONE place |
 | `entry-kinds-complete` | — | every entry kind declares all four BINDING cells from the vocabularies, the unknown |
 | `hardcoded-strings` | — | CLAIM: every word a person reads on a shipping surface comes from a locale |
+| `image-entrypoints` | — | an image's entrypoint imports only Node builtins and relative paths |
 | `integration-index` | — | the integration index stays in sync with reality |
 | `journeys-reach-users` | — | a journey walks a corridor a PERSON can walk |
 | `kind-appenders` | — | every declared entry kind must have a production APPENDER |
@@ -47,6 +48,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
 | `typed-commands-reachable` | — | a command a person can TYPE must have a door, in both shells |
+| `unbound-names` | — | a Node entry point uses no name that nothing defines |
 | `unconstructed-classes` | — | an exported class that nothing ever `new`s is a liability, not an asset |
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |
 | `unreached-exports` | — | a substrate symbol that nothing reaches is a LIABILITY, not an asset |

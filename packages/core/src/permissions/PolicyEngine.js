@@ -153,21 +153,24 @@ export class PolicyEngine {
   get actorResolver() { return this.#actorResolver; }
 
   /**
-   * Check whether a peer is allowed to call a skill.
+   * The tier-vs-visibility check alone, for one caller identity — the half of `checkInbound` a door's in-process call
+   * needs too. A peer over a transport and a person at a door are both callers; the one vocabulary (`visibility`,
+   * the tiers behind it) decides both, so there is one place that does it.
    *
-   * @param {object}  opts
-   * @param {string}  opts.peerPubKey   — caller's Ed25519 pubKey
-   * @param {string}  opts.skillId
-   * @param {string}  [opts.action='call']
-   * @param {object}  [opts.token]      — raw CapabilityToken JSON from the RQ payload
-   * @param {string}  [opts.agentPubKey] — this agent's pubKey (overrides constructor value)
-   * @returns {Promise<{ tier: string, allowed: true }>}
-   * @throws  {PolicyDeniedError}
+   * `unknownAs` is what a caller with NO record is: the registry's default (`authenticated`, a known key reached
+   * us) for a peer, which `checkInbound` keeps; `public` for a door, where a caller nobody admitted is a stranger.
+   *
+   * @param {object} opts
+   * @param {string} opts.callerId   an identity string: a peer's pubKey, or a door's contact id (`telegram:123`)
+   * @param {string} opts.skillId
+   * @param {'public'|'authenticated'|'trusted'|'private'} [opts.unknownAs]  the tier of a caller with no record
+   * @returns {Promise<{ tier: string, skill: object }>}
+   * @throws  {PolicyDeniedError} NOT_FOUND · DISABLED · INSUFFICIENT_TIER
    */
-  async checkInbound({ peerPubKey, skillId, action = 'call', token = null, agentPubKey = null }) {
-    const myPubKey = agentPubKey ?? this.#agentPubKey;
-    const tier     = await this.#trustRegistry.getTier(peerPubKey);
-    const skill    = this.#skillRegistry.get(skillId);
+  async checkCaller({ callerId, skillId, unknownAs = null }) {
+    const known = unknownAs == null ? true : await this.#trustRegistry.has(callerId);
+    const tier  = known ? await this.#trustRegistry.getTier(callerId) : unknownAs;
+    const skill = this.#skillRegistry.get(skillId);
 
     if (!skill) {
       throw new PolicyDeniedError('NOT_FOUND', `Unknown skill: "${skillId}"`);
@@ -195,6 +198,25 @@ export class PolicyEngine {
         `Skill "${skillId}" requires tier "${skill.visibility}" but caller has "${tier}"`,
       );
     }
+    return { tier, skill };
+  }
+
+  /**
+   * Check whether a peer is allowed to call a skill.
+   *
+   * @param {object}  opts
+   * @param {string}  opts.peerPubKey   — caller's Ed25519 pubKey
+   * @param {string}  opts.skillId
+   * @param {string}  [opts.action='call']
+   * @param {object}  [opts.token]      — raw CapabilityToken JSON from the RQ payload
+   * @param {string}  [opts.agentPubKey] — this agent's pubKey (overrides constructor value)
+   * @returns {Promise<{ tier: string, allowed: true }>}
+   * @throws  {PolicyDeniedError}
+   */
+  async checkInbound({ peerPubKey, skillId, action = 'call', token = null, agentPubKey = null }) {
+    const myPubKey = agentPubKey ?? this.#agentPubKey;
+    // the tier half, shared with a door's in-process caller (a peer with no record keeps the registry default)
+    const { tier, skill } = await this.checkCaller({ callerId: peerPubKey, skillId });
 
     // 'never' policy blocks all inbound callers unconditionally.
     if (skill.policy === 'never') {

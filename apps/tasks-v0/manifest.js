@@ -82,7 +82,7 @@ export const tasksManifest = {
 
   // B · Layer 1 — domain (non-atom) verb: `tree` (DAG traversal of the task
   // graph — structural, not a plain `list`).  All other ops map to SDK atoms.
-  domainVerbs: ['tree'],
+  domainVerbs: { tree: 'read' },
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set — a broad `appliesTo` can no

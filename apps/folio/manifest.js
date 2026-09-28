@@ -85,7 +85,7 @@ export const folioManifest = {
 
   // B · Layer 1 — domain (non-atom) verbs: `sync`/`watch` (pod ↔ local file
   // reconciliation — genuinely orthogonal to CRUD).  Every other op is an atom.
-  domainVerbs: ['sync', 'watch'],
+  domainVerbs: { sync: 'write', watch: 'write' },
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set. Equals the current derived
@@ -155,6 +155,7 @@ export const folioManifest = {
       verb:   'sync',  // F-SP1-e: app-local verb.  Distinct from runOnce
                        // (a normal bi-directional sync) — forceRepush
                        // overwrites pod versions wholesale.
+      writes: { scope: 'person' },
       // sync touches local fs (reads files to overwrite pod);
       // node-only.  Sidecar-mode basis re-includes.
       runtime: 'node',
@@ -183,6 +184,7 @@ export const folioManifest = {
     {
       id:        'syncOnce',
       verb:      'sync',
+      writes: { scope: 'person' },
       // bi-directional fs ↔ pod sync; needs Node.
       runtime:   'node',
       params:    [],
@@ -207,6 +209,7 @@ export const folioManifest = {
     {
       id:        'watchStart',
       verb:      'watch',
+      writes: { scope: 'device' },
       // local-fs watcher (chokidar); Node-only.
       runtime:   'node',
       params:    [],
@@ -228,6 +231,7 @@ export const folioManifest = {
       id:        'watchStop',
       verb:      'watch',  // F-SP1-e: same verb as watchStart, opposite
                            // semantics — distinguished by skill id.
+      writes: { scope: 'device' },
       // stops the local-fs watcher; Node-only.
       runtime:   'node',
       params:    [],

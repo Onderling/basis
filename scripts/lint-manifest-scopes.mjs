@@ -6,33 +6,34 @@
  * which is exactly why they need a guard: a declaration nobody checks drifts the first time someone adds
  * an op and forgets it.
  *
- *   • `writes: { scope: 'device' | 'person' | 'circle' }` on an op row. Required when the op writes:
- *     its verb is a writing atom (every atom except the read ones — `isWritingVerb` in
- *     `@onderling/app-manifest`), or it declares `appends`. A domain verb the atom catalogue cannot
- *     classify may declare `writes` too; when it does, the value is checked like any other.
+ *   • `writes: { scope: 'device' | 'person' | 'circle' }` on an op row. Required on every op that is not
+ *     known to only read: its verb is a writing atom (every atom except `list`/`get`), a domain verb its
+ *     manifest classifies `'write'`, or no verb at all; or it declares `appends`. The manifest classifies
+ *     each domain verb in its `domainVerbs` map (`{ verb: 'read' | 'write' }`); a domain verb missing from
+ *     the map — or a `domainVerbs` that is still a plain list — is red, "classify this verb: read or write".
+ *     The default is the safe one: a verb nobody classified never passes as a silent read. (`verbKind` in
+ *     `@onderling/app-manifest` is the one reading of this.)
  *       device — only on this device (local settings, caches, this device's registrations);
  *       person — the person's own data, following them across their devices;
  *       circle — the circle's shared store or log, which syncs to the circle's members.
- *     The key is `writes`, not `scope`: `scope` already means "who a setting applies to" on settings
- *     and param rows.
+ *     An op that writes in more than one place declares the WIDEST of them. The key is `writes`, not
+ *     `scope`: `scope` already means "who a setting applies to" on settings and param rows.
  *   • `hosts: string[]` at the manifest's top level — every host the app's code reaches over the
- *     network. Usually empty; an empty list is a claim ("none"), a missing one is no claim at all.
+ *     network. An empty list is a claim ("none"), a missing one is no claim at all.
  *
- * Pure core (`auditManifest`) + a thin CLI that loads every `apps/<app>/manifest.js`, so the self-test
- * can drive it with synthetic manifests.
+ * WHICH manifests: every manifest the app runs, read from the one list the shells compose from
+ * (`apps/basis/src/v2/manifestSources.js`) — the app manifests AND the plumbing ones declared elsewhere
+ * (the parameter register, the device-log lanes). Not a glob: a glob misses a manifest declared outside
+ * `apps/<app>/manifest.js`, and nobody would see the hole.
+ *
+ * Pure core (`auditManifest`) + a thin CLI, so the self-test can drive it with synthetic manifests.
  */
-import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isWritingVerb, WRITE_SCOPES } from '../packages/app-manifest/src/atoms.js';
+import { fileURLToPath } from 'node:url';
+import { verbKind, WRITE_SCOPES } from '../packages/app-manifest/src/atoms.js';
+import { allManifests } from '../apps/basis/src/v2/manifestSources.js';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.dirname(HERE);
-
-/** Does this op write? A writing atom, or an explicit `appends` declaration. */
-export function isWritingOp(op) {
-  return isWritingVerb(op?.verb) || op?.appends !== undefined;
-}
+const CLASSIFY = 'classify this verb: read or write';
 
 /**
  * Audit one manifest. Returns the list of problems (empty = green).
@@ -50,31 +51,32 @@ export function auditManifest(manifest) {
       }
     });
   }
+  if (Array.isArray(manifest?.domainVerbs)) {
+    problems.push({ opId: null, message: `\`domainVerbs\` is a list — make it a map and ${CLASSIFY} ({ verb: 'read' | 'write' })` });
+  }
   for (const op of manifest?.operations ?? []) {
     const id = op?.id ?? '(no id)';
+    const kind = verbKind(manifest, op?.verb);
+    if (kind === null) {
+      problems.push({ opId: id, message: `domain verb '${op.verb}' is not in the \`domainVerbs\` map — ${CLASSIFY}` });
+      continue;
+    }
     if (op?.writes !== undefined) {
       const scope = op.writes?.scope;
       if (!op.writes || typeof op.writes !== 'object' || !WRITE_SCOPES.includes(scope)) {
         problems.push({ opId: id, message: `writes.scope must be one of ${WRITE_SCOPES.join(' | ')} (got ${JSON.stringify(op.writes)})` });
       }
-    } else if (isWritingOp(op)) {
-      problems.push({ opId: id, message: `writing op (verb '${op.verb}'${op.appends !== undefined ? ', appends' : ''}) has no \`writes: { scope }\` declaration` });
+    } else if (kind === 'write' || op?.appends !== undefined) {
+      const why = op?.appends !== undefined ? 'appends' : (op?.verb ? `verb '${op.verb}'` : 'no verb');
+      problems.push({ opId: id, message: `writing op (${why}) has no \`writes: { scope }\` declaration` });
     }
   }
   return problems;
 }
 
-/** Every app manifest in the repo: `{ app, manifest }`. */
-export async function loadManifests(root = ROOT) {
-  const appsDir = path.join(root, 'apps');
-  const out = [];
-  for (const app of readdirSync(appsDir).sort()) {
-    const file = path.join(appsDir, app, 'manifest.js');
-    if (!existsSync(file)) continue;
-    const mod = await import(pathToFileURL(file).href);
-    out.push({ app, manifest: mod.default });
-  }
-  return out;
+/** Every manifest the app runs: `{ app, manifest }`. */
+export async function loadManifests() {
+  return allManifests().map((manifest) => ({ app: manifest.app, manifest }));
 }
 
 async function main() {

@@ -114,7 +114,7 @@ export const stoopManifest = {
   // B · Layer 1 — domain (non-atom) verbs: moderation (`report`/`mute`),
   // profile/config (`set`), and circle-graph traversal (`tree`).
   // All other ops map to SDK atoms; the `{atoms:true}` validator enforces it.
-  domainVerbs: ['report', 'mute', 'set', 'tree'],
+  domainVerbs: { report: 'write', mute: 'write', set: 'write', tree: 'read' },
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set — a broad `appliesTo` can no
@@ -409,6 +409,7 @@ export const stoopManifest = {
                        // (owner): kept `report` (truer to intent).
                        // Squeezing into canonical `add` would obscure
                        // the action's nature.
+      writes: { scope: 'circle' },
       appliesTo: { type: 'report' },
       params: [
         // Part G dissolve (2026-06-17) — `/report` was in BOTH manifests;
@@ -444,6 +445,7 @@ export const stoopManifest = {
                     // Granular `addMyOffering`/`removeMyOffering` already
                     // exist as skills and can be added to a future LLM-
                     // only manifest layer (D.2) if needed.
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       params: [
         // Complex param — array of {categoryId, freeTags?,
         // availability?, radius?, status?}.  Slash surface can't
@@ -462,6 +464,7 @@ export const stoopManifest = {
     {
       id:   'setPeerReveal', group: 'compose',
       verb: 'set',  // F-SP1-e: non-canonical — local-only reveal flag.
+      writes: { scope: 'device' },   // a reveal flag kept on this device
       // Part G dissolve (2026-06-17) — `/reveal` was a COLLISION: the real
       // op is `setPeerReveal`; the former mock declared `revealPeer` (a
       // SEMANTIC alias of setPeerReveal via STOOP_OP_ALIAS) on the SAME
@@ -994,6 +997,7 @@ export const stoopManifest = {
     // in another, and nothing links the two. That is why listMyHandles is plural.
     {
       id:   'setMyHandle', verb: 'set',
+      writes: { scope: 'circle' },
       params: [{ name: 'handle', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: "Set this person's handle in the current circle. Refuses if the handle is taken there." },
@@ -1002,6 +1006,7 @@ export const stoopManifest = {
     },
     {
       id:   'setMyDisplayName', verb: 'set',
+      writes: { scope: 'circle' },   // the person's row in this circle's member map
       params: [{ name: 'displayName', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Set the display name others see for this person.' },
@@ -1101,6 +1106,7 @@ export const stoopManifest = {
     {
       id:   'setCircleStoragePolicy',
       circleScoped: false, verb: 'set',
+      writes: { scope: 'circle' },
       params: [
         { name: 'groupId',       kind: 'string', required: true, ...ID_NONEMPTY },
         { name: 'storagePolicy', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -1132,6 +1138,7 @@ export const stoopManifest = {
     },
     {
       id:   'restoreFromMnemonic', verb: 'set',
+      writes: { scope: 'device' },   // restores the identity onto this device
       // Destructive: adopts an identity from a phrase. `confirm` exists so a single stray call cannot
       // overwrite the identity in place.
       params: [

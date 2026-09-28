@@ -73,9 +73,9 @@ These exist and are the floor of the contract. Each is documented where it lives
 |---|---|
 | `nouns` | item-type schemas; each registered kind is declared through a **preset** (below) |
 | `ops` | bespoke verbs: `{ opId, description, handler(args, invoke) }` — the description is read by people *and* by models |
-| `writes` (on an op) | where the op writes: `{ scope: 'device' \| 'person' \| 'circle' }`. Required on every op whose verb writes (every atom except `list`/`get`) or that declares `appends`. Real now: every app manifest carries it and `lint-manifest-scopes` fails an op without it |
+| `writes` (on an op) | where the op writes: `{ scope: 'device' \| 'person' \| 'circle' }`. Required on every op not known to only read — every atom except `list`/`get`, every domain verb the manifest's `domainVerbs` map classifies `'write'`, any op that declares `appends`; an op that writes in more than one place declares the widest. A domain verb nobody classified is refused, never taken as a read. Real now: every manifest the app runs carries it and `lint-manifest-scopes` fails an op without it |
 | `flows` | declared step graphs over ops; a flow-only extension contains no code |
-| `hosts` | every network host the extension may reach; an empty list means none. Real now: every app manifest declares it and `lint-manifest-scopes` fails one that does not — the declaration exists; the realm that makes it bind (§4) does not yet |
+| `hosts` | every network host the extension may reach; an empty list means none. Real now: every manifest the app runs declares it and `lint-manifest-scopes` fails one that does not — the declaration exists; the realm that makes it bind (§4) does not yet. Certification and the consent card read the declaration itself, so a false `[]` is a false claim on a card |
 | `hostRequirements` | what the running host must have — `ble`, `mdns`, `camera`, `location`, `always-on` |
 | `realm` | always `'required'`; an extension never runs in-process with Basis |
 | `lane` | the extension's own storage lane, removed on uninstall |

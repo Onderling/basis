@@ -18,7 +18,7 @@ export const basisManifest = {
 
   // B · Layer 1 — domain (non-atom) verb: `help` (meta / shell command).
   // Every other op maps to an SDK atom.
-  domainVerbs: ['help'],
+  domainVerbs: { help: 'read' },
 
   // §1a (declared-authoritative capability surface): INTENTIONALLY no `nouns` block.
   // This is the shell/unifier manifest — every op is an app-level command (help/settings/

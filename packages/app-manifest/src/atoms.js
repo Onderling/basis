@@ -143,13 +143,38 @@ export const READ_ATOMS = Object.freeze(['list', 'get']);
 
 /**
  * True iff `verb` is an atom (canonical or alias) that writes: every atom except the read ones.
- * A domain verb (not an atom) is neither — the atom catalogue cannot say what it does, so an op
- * with a domain verb says it writes by declaring `appends` or `writes` itself.
+ * A domain verb (not an atom) is neither here — the atom catalogue cannot say what it does; the
+ * manifest classifies it in its `domainVerbs` map (see `verbKind`).
  * @param {string} verb
  */
 export function isWritingVerb(verb) {
   const canonical = canonicalAtom(verb);
   return canonical !== null && !READ_ATOMS.includes(canonical);
+}
+
+/**
+ * How a manifest classifies each of its domain verbs: `domainVerbs` is a map `{ verb: 'read' | 'write' }`.
+ * @type {ReadonlyArray<'read'|'write'>}
+ */
+export const DOMAIN_VERB_KINDS = Object.freeze(['read', 'write']);
+
+/**
+ * Does an op's verb read or write, in this manifest?
+ *   • an atom — the catalogue says (`READ_ATOMS` read, every other atom writes);
+ *   • a domain verb — the manifest's `domainVerbs` map says;
+ *   • no verb at all — `'write'`: nothing says it only reads;
+ *   • `null` — a domain verb the manifest has not classified. Callers treat that as an error, never as a
+ *     read: the default is the safe one, so a new verb cannot slip past as a silent read.
+ * @param {object} manifest
+ * @param {string} [verb]
+ * @returns {'read'|'write'|null}
+ */
+export function verbKind(manifest, verb) {
+  if (typeof verb !== 'string' || verb === '') return 'write';
+  if (isAtom(verb)) return isWritingVerb(verb) ? 'write' : 'read';
+  const map = manifest?.domainVerbs;
+  if (!map || typeof map !== 'object' || Array.isArray(map) || !Object.hasOwn(map, verb)) return null;
+  return DOMAIN_VERB_KINDS.includes(map[verb]) ? map[verb] : null;
 }
 
 /**

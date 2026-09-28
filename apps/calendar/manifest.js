@@ -23,7 +23,7 @@ export const calendarManifest = {
   itemTypes:  ['calendar-event'],
 
   // B · Layer 1 — every op maps to an SDK atom (no domain-specific verbs).
-  domainVerbs: [],
+  domainVerbs: {},
 
   // B · Layer 1 — DECLARED-AUTHORITATIVE (verb × noun) capability surface (docs/decisions.md 2026-07-02;
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set. Equals the current derived

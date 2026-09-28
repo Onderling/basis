@@ -12,7 +12,7 @@
  */
 
 import { list as listCanonicalTypes, metadata as registryTypeMetadata } from '@onderling/item-types';
-import { isAtom, canonicalAtom } from './atoms.js';
+import { isAtom, canonicalAtom, DOMAIN_VERB_KINDS } from './atoms.js';
 
 /**
  * L4 ≡ B — registry recognition. True when the shared `@onderling/item-types`
@@ -139,7 +139,7 @@ export function isCanonicalVerb(verb) { return VERB_SET.has(verb); }
  * @param {boolean} [opts.atoms=false]
  *   B · Layer 1 (2026-07-01) — ATOM DISCIPLINE.  When `true`, every
  *   `op.verb` must be a known SDK atom (or alias — see `atoms.js`) OR be
- *   declared in `manifest.domainVerbs`.  This is the fitness function
+ *   a key of the `manifest.domainVerbs` map.  This is the fitness function
  *   against verb drift: a new noun-specific verb can't sneak in without
  *   either mapping to an atom or being explicitly named as domain-specific.
  *   Default off (F-SP1-e tolerant behaviour preserved for older callers).
@@ -214,27 +214,34 @@ export function validateManifest(manifest, opts = {}) {
     });
   }
 
-  // B · Layer 1 — `manifest.domainVerbs` is the explicit allow-list of
-  // NON-atom (domain-specific) verbs this manifest ships (folio `sync`,
-  // stoop `report`/`mute`, household `register`/`help`, …).  Validated as a
-  // string array whenever present; the atom-discipline cross-check
-  // (op.verb ∈ atoms ∪ domainVerbs) only fires under `opts.atoms`.
+  // B · Layer 1 — `manifest.domainVerbs` names the NON-atom (domain-specific) verbs this manifest ships
+  // (folio `sync`, stoop `report`, household `register`/`help`, …) and classifies each one: a map
+  // `{ verb: 'read' | 'write' }`. The atom catalogue knows whether an atom writes; a domain verb's own
+  // manifest is the only place that can say. Validated whenever present; the atom-discipline cross-check
+  // (op.verb ∈ atoms ∪ keys of domainVerbs) only fires under `opts.atoms`.
   if (manifest.domainVerbs !== undefined) {
-    if (!Array.isArray(manifest.domainVerbs)) {
-      errors.push({ path: '/domainVerbs', message: 'domainVerbs must be an array if present' });
+    const dv = manifest.domainVerbs;
+    if (!dv || typeof dv !== 'object' || Array.isArray(dv)) {
+      errors.push({ path: '/domainVerbs', message: "domainVerbs must be a map { verb: 'read' | 'write' } if present" });
     } else {
-      manifest.domainVerbs.forEach((v, i) => {
-        if (typeof v !== 'string' || v === '') {
-          errors.push({ path: `/domainVerbs/${i}`, message: 'domainVerbs entries must be non-empty strings' });
+      for (const [v, kind] of Object.entries(dv)) {
+        if (v === '') {
+          errors.push({ path: '/domainVerbs/', message: 'domainVerbs keys must be non-empty verbs' });
         } else if (isAtom(v)) {
           // A domain verb that IS an atom is a mistake — it should just be used as the atom.
           errors.push({
-            path:    `/domainVerbs/${i}`,
+            path:    `/domainVerbs/${v}`,
             message: `domainVerbs entry "${v}" is an SDK atom (or alias) — use it directly, don't declare it as a domain verb`,
             code:    'atom-in-domain-verbs',
           });
+        } else if (!DOMAIN_VERB_KINDS.includes(kind)) {
+          errors.push({
+            path:    `/domainVerbs/${v}`,
+            message: `domainVerbs "${v}" must be classified 'read' or 'write' (got ${JSON.stringify(kind)})`,
+            code:    'unclassified-domain-verb',
+          });
         }
-      });
+      }
     }
   }
 
@@ -408,8 +415,9 @@ function validateOperation(op, path, manifest, errors, idSet, opts = {}) {
     // SDK atom (or alias) OR explicitly declared as a domain verb.  Drift
     // guard: a new noun-specific verb fails here until it's mapped to an
     // atom or named in `manifest.domainVerbs`.
-    const domainVerbs = Array.isArray(manifest?.domainVerbs) ? manifest.domainVerbs : [];
-    if (!isAtom(op.verb) && !domainVerbs.includes(op.verb)) {
+    const dv = manifest?.domainVerbs;
+    const declared = dv && typeof dv === 'object' && !Array.isArray(dv) && Object.hasOwn(dv, op.verb);
+    if (!isAtom(op.verb) && !declared) {
       errors.push({
         path:    `${path}/verb`,
         message: `op.verb "${op.verb}" is not an SDK atom (see atoms.js) and is not in manifest.domainVerbs — map it to an atom (add/list/get/update/remove/complete/claim/reassign/…) or declare it as a domain verb`,

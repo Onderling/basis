@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 41
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 42
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|

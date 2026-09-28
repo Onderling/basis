@@ -3,7 +3,9 @@
  *
  * History: the remembered turns used to be woven into the system prompt as lines ("you: …", "assistant: …"), so the
  * model read its own earlier words as instructions rather than as what it had said. The member's and the assistant's
- * turns now go as real messages; an op's result (the "system" voice) stays context, since nobody said it.
+ * turns now go as real messages, and an op's result stays in the conversation at its place, as the app's note on the
+ * member's side: moved out into the prompt, the request it answered read as unanswered and the model did it again
+ * (measured: 21/27 against 27/27); in the assistant's voice, the model would imitate it instead of calling a tool.
  *
  * Many acts: a member naming many items gets one tool call each, capped per turn; a call the model's output cut off
  * (its arguments did not parse) is not dispatched as an empty act, and the member is asked for the rest.
@@ -34,7 +36,7 @@ function engineWith(llm, extra = {}) {
 }
 
 describe('the remembered turns go to the model as a conversation', () => {
-  it('the member and the assistant as messages; an op result stays context; no transcript in the system prompt', async () => {
+  it('the member and the assistant as messages; an op result as the app\'s note at its place; no transcript in the system prompt', async () => {
     let req = null;
     const { engine } = engineWith({ invoke: async (r) => { req = r; return { toolCall: null, replyText: 'Welke lijst?' }; } });
     engine.remember('t', 'you', 'zet kaas op de lijst');
@@ -46,11 +48,13 @@ describe('the remembered turns go to the model as a conversation', () => {
     expect(req.messages).toEqual([
       { role: 'user', content: 'zet kaas op de lijst' },
       { role: 'assistant', content: 'Welke lijst bedoel je?' },
+      { role: 'user', content: '(the app answered: toegevoegd aan boodschappen: kaas)' },
       { role: 'user', content: 'en broccoli ook' },
       { role: 'user', content: 'wat staat er nu op' },
     ]);
     expect(req.system).not.toMatch(/^- ?(you|assistant): /m);
-    expect(req.system).toContain('toegevoegd aan boodschappen: kaas');
+    expect(req.system).not.toContain('toegevoegd aan boodschappen: kaas');
+    expect(req.messages.filter((m) => m.role === 'assistant').map((m) => m.content)).not.toContain('toegevoegd aan boodschappen: kaas');
   });
 });
 

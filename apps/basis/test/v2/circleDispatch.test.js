@@ -83,7 +83,7 @@ describe('createCircleDispatch — routing', () => {
     expect(dispatched).toEqual([{ opId: 'addTask', args: { title: 'bread' } }]);
   });
 
-  it('a remembered op result goes IN FRONT of any gate context; the spoken turns go as history', async () => {
+  it('the gate context stays context; the remembered turns, op results included, go as history', async () => {
     const interpret = vi.fn(async () => null);
     const { cd } = harness({
       policy: { llmTool: 'local' }, providers: { local: { invoke: vi.fn() } }, interpret, botName: 'helper',
@@ -91,8 +91,10 @@ describe('createCircleDispatch — routing', () => {
       recentTurns: () => ['you: add milk', 'system: added to shopping: milk'],
     });
     await cd.handle('@helper and bread');
-    expect(interpret.mock.calls[0][1].context).toEqual(['added to shopping: milk', 'rag: list has eggs']);
-    expect(interpret.mock.calls[0][1].history).toEqual([{ role: 'user', content: 'add milk' }]);
+    expect(interpret.mock.calls[0][1].context).toEqual(['rag: list has eggs']);
+    expect(interpret.mock.calls[0][1].history).toEqual([
+      { role: 'user', content: 'add milk' }, { role: 'user', content: '(the app answered: added to shopping: milk)' },
+    ]);
   });
 
   it('falls back to a circle post when the interpreter returns null', async () => {

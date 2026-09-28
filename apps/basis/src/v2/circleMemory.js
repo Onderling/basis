@@ -26,13 +26,19 @@
  * @param {string[]} lines  `"<who>: <text>"`, oldest first (as `recentCircleTurns` and the engine's memory give them)
  * @returns {{history: Array<{role: 'user'|'assistant', content: string}>, context: string[]}}
  */
+/** How an op's result is marked in the conversation the model reads. LLM-facing. */
+export const RESULT_NOTE = 'the app answered:';
+
 export function splitRecentTurns(lines) {
   const history = [];
   const context = [];
   for (const line of Array.isArray(lines) ? lines : []) {
     const m = /^(you|assistant|system):\s*([\s\S]*)$/.exec(String(line ?? ''));
     if (!m || !m[2].trim()) { if (String(line ?? '').trim()) context.push(String(line)); continue; }
-    if (m[1] === 'system') context.push(m[2].trim());
+    // An op's result stays IN the conversation at its place, so the request it answered reads as answered (moved
+    // out, the model saw an unanswered request and did it again) — but never in the assistant's voice, which the
+    // model would imitate ("✓ added …") instead of calling the tool.
+    if (m[1] === 'system') history.push({ role: 'user', content: `(${RESULT_NOTE} ${m[2].trim()})` });
     else history.push({ role: m[1] === 'assistant' ? 'assistant' : 'user', content: m[2].trim() });
   }
   return { history, context };

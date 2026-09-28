@@ -31,8 +31,8 @@
  *                           underlying validator error (carrying its path).
  *
  *   2. verb-not-atom      — atom discipline (B · Layer 1). Every `op.verb` must
- *                           be a known SDK atom/alias OR be declared in
- *                           `manifest.domainVerbs` (and a domainVerb must not
+ *                           be a known SDK atom/alias OR be
+ *                           a key of `manifest.domainVerbs` (and a domainVerb must not
  *                           itself be an atom). This is the drift guard against
  *                           a new noun-specific verb sneaking in un-mapped.
  *

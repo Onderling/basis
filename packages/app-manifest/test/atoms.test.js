@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ATOMS, ATOM_VERBS, ATOM_VERBS_WITH_ALIASES,
   isAtom, canonicalAtom, classifyVerb, atomFor,
+  READ_ATOMS, isWritingVerb, WRITE_SCOPES, verbKind,
 } from '../src/atoms.js';
 import { VERBS } from '../src/validate.js';
 
@@ -74,5 +75,39 @@ describe('isAtom / canonicalAtom / classifyVerb', () => {
     expect(classifyVerb('grab')).toMatchObject({ canonical: 'claim', category: 'lifecycle', viaAlias: true });
     expect(classifyVerb('claim')).toMatchObject({ canonical: 'claim', viaAlias: false });
     expect(atomFor('share')).toMatchObject({ category: 'graph' });
+  });
+});
+
+describe('isWritingVerb / WRITE_SCOPES — which ops must say where they write', () => {
+  it('every atom writes except the read atoms, aliases included', () => {
+    for (const v of ATOM_VERBS) expect(isWritingVerb(v)).toBe(!READ_ATOMS.includes(v));
+    expect(isWritingVerb('edit')).toBe(true);
+    expect(isWritingVerb('create')).toBe(true);
+    expect(isWritingVerb('read')).toBe(false);
+  });
+  it('a domain verb is not classified as writing', () => {
+    expect(isWritingVerb('help')).toBe(false);
+    expect(isWritingVerb(undefined)).toBe(false);
+  });
+  it('the three scopes, frozen', () => {
+    expect(WRITE_SCOPES).toEqual(['device', 'person', 'circle']);
+    expect(Object.isFrozen(WRITE_SCOPES)).toBe(true);
+  });
+});
+
+describe('verbKind — an unclassified domain verb is never a silent read', () => {
+  const m = { domainVerbs: { register: 'write', help: 'read', odd: 'sometimes' } };
+  it('atoms answer from the catalogue; domain verbs from the manifest map', () => {
+    expect(verbKind(m, 'list')).toBe('read');
+    expect(verbKind(m, 'add')).toBe('write');
+    expect(verbKind(m, 'register')).toBe('write');
+    expect(verbKind(m, 'help')).toBe('read');
+  });
+  it('no verb writes; an unclassified or mis-classified domain verb is null', () => {
+    expect(verbKind(m, undefined)).toBe('write');
+    expect(verbKind(m, 'frobnicate')).toBe(null);
+    expect(verbKind(m, 'odd')).toBe(null);
+    expect(verbKind(m, 'constructor')).toBe(null);
+    expect(verbKind({ domainVerbs: ['help'] }, 'help')).toBe(null);
   });
 });

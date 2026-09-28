@@ -22,8 +22,9 @@ WORKDIR /app
 COPY . .
 
 # Focused install: relay + its workspace dependency subtree only.
+# A failed install fails the build (only the prune is best-effort): an image without its dependencies must not ship.
 RUN pnpm install --filter "@onderling/relay..." \
- && pnpm store prune || true
+ && (pnpm store prune || true)
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0

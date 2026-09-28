@@ -263,7 +263,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   name/location and drives git. **Tracked/public:** `docs/**`, `README.md`, `QUICKSTART.md`, `CLAUDE.md`/`AGENTS.md`,
   app-local `apps/*/docs/` + CHANGELOGs. **Private/local-only (gitignored, one Obsidian vault):** `plans/` (only the
   overviews at its top — TRIAGE, INDEX, DOC-STATUS, DECISIONS-FOR-REVIEW, BACKLOG-ideas, PLAN-homes; the design of
-  record for work not done in `live/`, settled reference in `notes/`, dated task-shaped docs in `briefs/`; an archived
+  record for work not done in `live/`, settled reference in `notes/`, dated task-shaped docs in `briefs/` — each brief opens
+  with a status header, `> **Status:** open · answered · building · done · **Asks:** … · **Retire when:** …`; an archived
   plan goes to `plans/archive/<YYYY-MM>/`, the month it was archived — `lint-plans-structure` holds the shape), `_archive/`
   (frozen NON-plan material only: old app folders, runbooks, legacy design), and root private-prefix docs (`PLAN-*`,
   `DESIGN-*`, `REMAINING-WORK.md`, …). Guard: `npm run lint:docs` — a tracked/public file must never link into `plans/`,

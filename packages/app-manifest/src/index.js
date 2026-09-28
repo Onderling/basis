@@ -43,6 +43,13 @@ export {
   canonicalAtom,
   classifyVerb,
   atomFor,
+  // Which ops write, and the value set of their `writes: { scope }` declaration.
+  READ_ATOMS,
+  isWritingVerb,
+  WRITE_SCOPES,
+  // A manifest's classification of its domain verbs (`domainVerbs: { verb: 'read' | 'write' }`).
+  DOMAIN_VERB_KINDS,
+  verbKind,
 } from './atoms.js';
 
 // B · (ruling) — read helpers over manifest.settings (the wizard/form layer).

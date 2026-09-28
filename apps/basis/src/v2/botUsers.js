@@ -58,3 +58,54 @@ export function createBotUsers({ store, adminUid = null } = {}) {
     async isAdmin(contactId) { return (await store.get(contactId))?.role === ROLES.ADMIN; },
   };
 }
+
+/**
+ * The bot's people kept where every contact is kept: the contact book, through the waist (`listContacts` /
+ * `addContact`). A person is one keyless row there — the door-shaped webid (`telegram:<uid>`), the door, the role.
+ * @param {(app: string, op: string, args: object) => Promise<any>} callSkill  the host's own (owner) callSkill
+ */
+export function contactBookStore(callSkill) {
+  const rows = async () => {
+    const r = await callSkill('stoop', 'listContacts', {});
+    const list = Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []);
+    return list.filter((c) => c && isChannel(c.channel)).map(toUser);
+  };
+  const toUser = (c) => ({
+    id: c.webid, type: 'contact', channel: c.channel, uid: String(c.webid).slice(c.channel.length + 1), role: c.role ?? null,
+    ...(c.displayName ? { displayName: c.displayName } : {}),
+  });
+  return {
+    async get(id) { return (await rows()).find((u) => u.id === id) ?? null; },
+    async list() { return rows(); },
+    async put(user) {
+      const r = await callSkill('stoop', 'addContact', {
+        webid: user.id, channel: user.channel, role: user.role, ...(user.displayName ? { displayName: user.displayName } : {}),
+      });
+      if (r?.ok === false || r?.error) throw new Error(`botUsers: the contact book refused ${user.id} (${r.error ?? 'refused'})`);
+      return user;
+    },
+  };
+}
+
+/**
+ * A door's admission: the person is admitted (their contact, created on first sight) and their role becomes their
+ * tier in the host's gate. Returns the caller id every call of their turn carries. The tier is set again only when
+ * the role changed, so a demotion reaches the gate on the person's next message.
+ * @param {object} a
+ * @param {ReturnType<typeof createBotUsers>} a.users
+ * @param {(callerId: string, role: string) => Promise<void>} a.setDoorCaller  the host agent's
+ * @returns {(who: {channel: string, uid: string, displayName?: string|null}) => Promise<string>}
+ */
+export function createDoorAdmit({ users, setDoorCaller }) {
+  if (!users || typeof users.admit !== 'function') throw new TypeError('createDoorAdmit: users are required');
+  if (typeof setDoorCaller !== 'function') throw new TypeError('createDoorAdmit: setDoorCaller is required');
+  const tiered = new Map();   // callerId → the role last set in the gate
+  return async (who) => {
+    const row = await users.admit(who);
+    if (tiered.get(row.id) !== row.role) {
+      await setDoorCaller(row.id, row.role);
+      tiered.set(row.id, row.role);
+    }
+    return row.id;
+  };
+}

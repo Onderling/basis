@@ -22,6 +22,7 @@
  *   BASIS_VAULT_PASSPHRASE   the vault key; absent → one is generated once beside the vault
  *   TG_BOT_TOKEN             optional — also answer on Telegram (or ~/.canopy-tg-token)
  *   TG_ALLOWED_CHAT_IDS      which chats may use it; unset/'*' is an OPEN DOOR
+ *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            optional — the web app, so a printed enrolment offer is also a link
  *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
@@ -51,6 +52,7 @@ import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
+import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
@@ -196,7 +198,8 @@ const agent = await createRealHouseholdAgent({
   seedHousehold: false,
   enrollOfferStorage: offerStash,
 });
-const callSkill = (app, op, args) => agent.callSkill(app, op, args);
+// `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
+const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
 
 // The walk log — one JSON line per event, so a run can be read afterwards rather than retold.
 // `--walk-log` names a FILE (stamped before its extension) or a DIRECTORY (a trailing slash, or one that
@@ -648,6 +651,11 @@ if (tgToken) {
     catalogue,
     manifestsByOrigin,
     allowedChatIds, t, callSkill, lang: values.lang,
+    // Every person is a contact with a role, and their calls carry them to the host gate.
+    admit: createDoorAdmit({
+      users: createBotUsers({ store: contactBookStore(callSkill), adminUid: String(process.env.TG_ADMIN_UID ?? '').trim() || null }),
+      setDoorCaller: agent.setDoorCaller,
+    }),
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
     walkLog,

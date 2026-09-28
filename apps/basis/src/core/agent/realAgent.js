@@ -235,6 +235,8 @@ import { householdManifest }               from '../../../../household/manifest.
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
 import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
+import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
+import { makeListsOps }                    from '../../v2/listsOps.js';                  // the lists handlers, once (a shell mounts the same ones with its own seams)
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3886,6 +3888,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (its store, its seal strategy) and so cannot be an agent's skills. `lists` is the first: the
   // composable-lists service lived behind its own panel because nothing declared it.
   const mountedLocalApps = new Map();   // appOrigin → { manifest, ops }
+  // …and the default for lists, on the same two levels as basis's: EVERY composition can run the lists ops its
+  // catalogue offers, and a painting shell upgrades the table with the circle it has open. Without it a composition
+  // that paints nothing — the box — offered `listLists` to its model and answered `unknown appOrigin "lists"`
+  // (seen on the tablet, 2026-09-28). The circle a call means when it names none is the one household ops mean
+  // here too (`resolveCircleId`), so a list and a shopping item made through the same door land in the same store.
+  let defaultLists = null;
+  const defaultLocalApp = (appOrigin) => {
+    if (appOrigin !== 'lists') return null;
+    return (defaultLists ??= {
+      manifest: listsManifest,
+      ops: makeListsOps({
+        storeFor: (circleId) => householdService.stores.getStore(circleId),
+        // No localisation on a bare agent: a key IS the message (the basis default table's rule).
+        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        activeCircle: () => resolveCircleId({}),
+        localActor: 'me',
+      }),
+    });
+  };
   const basisOps = () => mountedBasisOps ?? (defaultBasisOps ??= createLocalBuiltins({
     catalogue: mergeManifests([{ manifest: basisManifest }]),
     // No localisation on a bare agent: a key IS the message, and a key is at least true. A shell that
@@ -4537,9 +4558,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       return handler(args ?? {});
     }
-    // A local app a shell mounted (see `mountAppOps`). Same contract as the `basis` branch above: the
+    // A local app a shell mounted (see `mountAppOps`), else its default table (lists). Same contract as the `basis` branch above: the
     // app's own manifest gates which ops exist, an absent handler is a structured refusal, never a throw.
-    const local = mountedLocalApps.get(appOrigin);
+    const local = mountedLocalApps.get(appOrigin) ?? defaultLocalApp(appOrigin);
     if (local) {
       if (!local.manifest?.operations?.some((o) => o.id === opId)) {
         return { ok: false, error: 'unknown-op', app: appOrigin, op: opId };

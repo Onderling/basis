@@ -45,6 +45,14 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
         ? async (text, ctx) => { await postToCircle(text, ctx); return 'circle'; }
         : () => 'none');
   const sink = async (text, ctx) => (await unhandled(text, ctx)) ?? 'none';
+  // A gate rule's command, and the further items it names. Carries the rule's owning app so the resolver routes a
+  // colliding bare op-id to the gate's app, not the merge's first-declarer.
+  async function dispatchRule(command, ctx) {
+    await dispatch({ opId: command.opId, args: command.args || {}, appOrigin: command.appOrigin }, ctx);
+    for (const m of (Array.isArray(command.more) ? command.more : [])) {
+      if (m && m.opId) await dispatch({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? command.appOrigin }, ctx);
+    }
+  }
 
   return {
     /** Route one typed turn. Returns `{ via: 'slash'|'rule'|'llm'|'circle'|'defer'|'none', cmd? }`. */
@@ -68,15 +76,27 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
         // WITHOUT the LLM. It runs whether or not smart chat is configured, so commands keep working in
         // "basic mode". A rule routes a command directly; a skip treats the turn as normal chat (→ sink).
         let context;
-        if (gate && typeof gate.evaluate === 'function') {
+        // A gathered turn (several lines, see assistantLane): the gate reads each line on its own, as it would have
+        // read it alone. The lines a rule takes are dispatched by their rule; the others go to the model TOGETHER, as
+        // one member message — so "melk" / "brood" / "eieren" is one model call. Lines only a skip rule claims are
+        // left out of the model's message; when every line skips, the whole turn goes to the sink.
+        const lines = stripped.split('\n').map((l) => l.trim()).filter(Boolean);
+        let modelText = stripped;
+        if (lines.length > 1 && gate && typeof gate.evaluate === 'function') {
+          const verdicts = [];
+          for (const line of lines) verdicts.push(await gate.evaluate(line, ctx));
+          const ruled = verdicts.filter((g) => g.via === 'rule' && g.command?.opId).map((g) => g.command);
+          for (const c of ruled) await dispatchRule(c, ctx);
+          const rest = lines.filter((_l, i) => !(verdicts[i].via === 'rule' && verdicts[i].command?.opId) && verdicts[i].via !== 'skip');
+          if (!rest.length) return ruled.length ? { via: 'rule', cmd: ruled[0], cmds: ruled } : { via: await sink(trimmed, ctx) };
+          modelText = rest.join('\n');
+          const ctxItems = [];
+          for (const g of verdicts) for (const c of (Array.isArray(g.context) ? g.context : [])) if (!ctxItems.includes(c)) ctxItems.push(c);
+          context = ctxItems;
+        } else if (gate && typeof gate.evaluate === 'function') {
           const g = await gate.evaluate(stripped, ctx);
           if (g.via === 'rule' && g.command?.opId) {
-            // Carry the gate rule's owning app (K0 de-shadow) so the resolver routes a colliding bare
-            // op-id to the gate's app, not the merge's first-declarer.
-            await dispatch({ opId: g.command.opId, args: g.command.args || {}, appOrigin: g.command.appOrigin }, ctx);
-            for (const m of (Array.isArray(g.command.more) ? g.command.more : [])) {
-              if (m && m.opId) await dispatch({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? g.command.appOrigin }, ctx);
-            }
+            await dispatchRule(g.command, ctx);
             return { via: 'rule', cmd: g.command };
           }
           if (g.via === 'skip') return { via: await sink(trimmed, ctx) };
@@ -97,12 +117,12 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             // bare answer ("shopping") resolves against what was just asked. interpret threads it as messages.
             // A follow-up's own history (the bot's question + the ask) wins: it already carries those turns.
             const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
-            cmd = await interpret(stripped, { catalogue: scopedCatalogue, llm, context, history });   // → {opId,args,partial?}|{reply}|{partial}|null
+            cmd = await interpret(modelText, { catalogue: scopedCatalogue, llm, context, history });   // → {opId,args,partial?}|{reply}|{partial}|null
           } catch (err) {
             // Smart chat is configured but the endpoint is UNREACHABLE (server down). Reply in plain
             // words ("basic mode") rather than failing the turn — buttons + commands still work.
             if (typeof onLlmUnavailable === 'function') {
-              await onLlmUnavailable(stripped, ctx, { reason: 'unreachable', error: err });
+              await onLlmUnavailable(modelText, ctx, { reason: 'unreachable', error: err });
               return { via: 'llm-unavailable' };
             }
             throw err;   // no hook wired → preserve old behaviour
@@ -114,7 +134,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
               if (m && m.opId) await dispatch({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} }, ctx);
             }
             // The turn was cut (the per-turn cap, or a call the output cut off): ask the member for the rest.
-            if (cmd.partial && typeof onNoMatch === 'function') await onNoMatch(stripped, ctx, { partial: true });
+            if (cmd.partial && typeof onNoMatch === 'function') await onNoMatch(modelText, ctx, { partial: true });
             return { via: 'llm', cmd };
           }
           // The LLM ran but mapped the message to NO tool. If it spoke a conversational reply (a clarifying
@@ -122,13 +142,13 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
           // shell falls back to its generic "couldn't turn that into an action" via onNoMatch.
           const reply = cmd && typeof cmd.reply === 'string' && cmd.reply ? cmd.reply : null;
           const partial = !reply && cmd?.partial === true;   // every call was cut off: ask for it again
-          if (typeof onNoMatch === 'function') { await onNoMatch(stripped, ctx, reply ? { reply } : partial ? { partial: true } : undefined); return reply ? { via: 'llm-reply', reply } : { via: 'llm-nomatch' }; }
+          if (typeof onNoMatch === 'function') { await onNoMatch(modelText, ctx, reply ? { reply } : partial ? { partial: true } : undefined); return reply ? { via: 'llm-reply', reply } : { via: 'llm-nomatch' }; }
           // couldn't map it to a command → fall through to the sink.
         } else {
           // Smart chat is OFF (not configured / circle opted out). The bot was addressed with free text the
           // gate couldn't route. Reply in plain words ("basic mode") instead of silently posting it as chat.
           if (typeof onLlmUnavailable === 'function') {
-            await onLlmUnavailable(stripped, ctx, { reason: 'off' });
+            await onLlmUnavailable(modelText, ctx, { reason: 'off' });
             return { via: 'llm-unavailable' };
           }
           // no hook wired → fall through to the sink (back-compat: silent post).

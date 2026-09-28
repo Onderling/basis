@@ -25,7 +25,7 @@ const nl = (key) => key.split('.').slice(1).reduce((o, k) => o?.[k], sharedCircl
 function engineWith(llm, extra = {}) {
   const dispatched = [];
   const noMatch = [];
-  const engine = createAssistantEngine({
+  const engine = createAssistantEngine({ collectMs: 0,
     catalogue, lang: 'nl', llm, interpret: interpretToCommand,
     dispatch: (input) => { dispatched.push(input); },
     onUnhandled: async () => 'hint', onLlmUnavailable: () => {},

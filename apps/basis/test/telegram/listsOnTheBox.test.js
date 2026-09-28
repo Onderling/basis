@@ -32,6 +32,7 @@ async function boxWithModelPicking(pick) {
   const say = async (text) => {
     bridge.clearOutbox();
     await bridge.simulateIncoming({ chatId: '42', text, sender: { bridgeUid: '42', displayName: 'Frits' } });
+    await runner.idle('42');   // the bridge is let go at once; the turn runs in the chat's lane
     return bridge.outbox.map((m) => m.text).join('\n');
   };
   return { agent, say, log };

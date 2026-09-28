@@ -23,7 +23,7 @@ const catalogue = mergeManifests([{ manifest: householdManifest }, { manifest: l
 async function promptFor(text, items = []) {
   let system = null;
   const llm = { invoke: async (req) => { system = req.system; return { toolCall: null, replyText: 'Goedemorgen!' }; } };
-  const engine = createAssistantEngine({
+  const engine = createAssistantEngine({ collectMs: 0,
     catalogue, lang: 'nl', llm, interpret: interpretToCommand,
     loadItems: async () => items.map((t, i) => ({ id: `i${i}`, type: 'shopping', text: t })),
     dispatch: () => {}, onUnhandled: async () => 'hint', onLlmUnavailable: () => {}, onNoMatch: () => {},

@@ -20,7 +20,7 @@ const catalogue = mergeManifests([{ manifest: householdManifest }, { manifest: l
 async function promptFor(text, lang = 'nl') {
   let system = null;
   const llm = { invoke: async (req) => { system = req.system; return { toolCall: null, replyText: 'ok' }; } };
-  const engine = createAssistantEngine({
+  const engine = createAssistantEngine({ collectMs: 0,
     catalogue, lang, llm, interpret: interpretToCommand,
     dispatch: () => {}, onUnhandled: async () => 'hint', onLlmUnavailable: () => {}, onNoMatch: () => {},
   });

@@ -1798,7 +1798,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!ownerRoot) return [DataPart({ ok: false, error: 'phrase-not-stored' })];
     try { return [DataPart({ shown: false, mnemonic: ownerRoot.toMnemonic() })]; }
     catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'reveal-failed' })]; }
-  }, { visibility: 'trusted' });   // 2.4b — the master recovery phrase: owner-only
+  }, { visibility: 'private' });   // 2.4b — the master recovery phrase: owner-only
 
   /* ─── Remote surfaces: pair-a-view grants ─────────────────────────────────
    * A paired view (a browser tab, a companion node's client) holds a standing SURFACE role —
@@ -2367,17 +2367,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(delivery === null ? {} : { delivery, delivered: delivery === 'sent' }),
       })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'grant-failed' })]; }
-  }, { visibility: 'trusted' });   // hands out standing acting authority: owner-only
+  }, { visibility: 'private' });   // hands out standing acting authority: owner-only
 
   hostAgent.register('revokeSurface', async ({ parts }) => {
     const viewPubKey = String(parts?.[0]?.data?.viewPubKey ?? '').trim();
     if (!viewPubKey) return [DataPart({ ok: false, error: 'viewPubKey-required' })];
     return [DataPart({ ok: true, revoked: await surfaceGrants.revoke(viewPubKey) })];
-  }, { visibility: 'trusted' });
+  }, { visibility: 'private' });
 
   hostAgent.register('listSurfaceGrants', async () =>
     [DataPart({ ok: true, surfaces: surfaceGrants.list() })],
-  { visibility: 'trusted' });
+  { visibility: 'private' });
 
   hostAgent.register('buildEnrollOffer', async ({ parts }) => {
     // The add-a-device OFFER (`onderling-enroll://`) this EXISTING device shows: relay hint +
@@ -2391,7 +2391,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles });
       return [DataPart({ ok: true, uri, circles: circles.length })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'offer-failed' })]; }
-  }, { visibility: 'trusted' });   // enumerates the person's circles: owner-only
+  }, { visibility: 'private' });   // enumerates the person's circles: owner-only
 
   // A ceremony that hands this install a NEW identity (enrolling as someone's device, restoring a phrase)
   // leaves the identity it ran under behind at the reload — but that identity's own row in the member map
@@ -2446,7 +2446,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // caller that paints the flow — the walk, and any direct caller of this op, went straight past it.
       return [DataPart({ ok: true, reloadRequired: true, deviceId: r.deviceId })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'enroll-failed' })]; }
-  }, { visibility: 'trusted' });   // overwrites the owner root + enrolls: owner-only
+  }, { visibility: 'private' });   // overwrites the owner root + enrolls: owner-only
 
   /* ─── The ceremony primitives shared by revokeDevice and replaceDevice ───────────────────────
    * `verifyOwnerPhrase` — the typed phrase is THIS owner's (root custody compares fingerprints; delegation
@@ -2613,7 +2613,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         retiredIn: retiredAddresses, circles: retiredAddresses.length, historyKeys, rotated, known,
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'replace-failed' })]; }
-  }, { visibility: 'trusted' });   // retires every other device of this person: owner-only, phrase-proven
+  }, { visibility: 'private' });   // retires every other device of this person: owner-only, phrase-proven
 
   hostAgent.register('revokeDevice', async ({ parts }) => {
     // The DEVICE-REVOCATION CEREMONY ("evict my device" — the eviction machinery pointed inward):
@@ -2823,7 +2823,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
-  }, { visibility: 'trusted' });   // retires a device's keys everywhere: owner-only, phrase-proven
+  }, { visibility: 'private' });   // retires a device's keys everywhere: owner-only, phrase-proven
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),
@@ -2872,7 +2872,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const file = sealRecoveryFile({ strategy, body: bodyWithRosters({ body, rosters }) });
       return [DataPart({ ok: true, file, circles: circleIds.length, rosters: carried })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'export-failed' })]; }
-  }, { visibility: 'trusted' });   // the sealed circle list: owner-only
+  }, { visibility: 'private' });   // the sealed circle list: owner-only
 
   /** The circles a recovery file would carry — what the export door lists with its per-circle choice. */
   hostAgent.register('listRecoveryCircles', async () => {
@@ -2886,7 +2886,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         .map((id) => ({ id, name: nameOf.get(id) ?? null }));
       return [DataPart({ ok: true, circles })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
-  }, { visibility: 'trusted' });
+  }, { visibility: 'private' });
 
   const importRecoveryFileText = async (file) => {
     if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
@@ -2948,7 +2948,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return { ok: false, error: e?.message ?? 'import-failed' }; }
   };
   hostAgent.register('importRecoveryFile', async ({ parts }) => [DataPart(await importRecoveryFileText(parts?.[0]?.data?.file))],
-    { visibility: 'trusted' });   // writes the registry: owner-only
+    { visibility: 'private' });   // writes the registry: owner-only
 
   /* ─── The RESTORE-FINISH flow's ops: what came back, where from, and what the person wants ──────
    * Declared as the `restore-finish` flow on the household manifest; the shells paint its pauses. */
@@ -2972,7 +2972,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       circles: circles.length, circleIds: circles, otherDevices, otherDeviceCount: otherDevices.length,
       carrier: carrier?.mode === 'cache' ? 'pod' : 'local', probe: carrier?.probe ?? null,
     })];
-  }, { visibility: 'trusted' });
+  }, { visibility: 'private' });
 
   hostAgent.register('restoreSource', async ({ parts }) => {
     const source = String(parts?.[0]?.data?.source ?? '');
@@ -2981,7 +2981,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const r = await importRecoveryFileText(parts?.[0]?.data?.file);
     if (!r.ok) return [DataPart({ ok: false, outcome: r.error, error: r.error, source })];
     return [DataPart({ ok: true, outcome: 'ok', source, agents: r.agents, circles: r.circles.length, circleIds: r.circles })];
-  }, { visibility: 'trusted' });
+  }, { visibility: 'private' });
 
   hostAgent.register('restoreIntent', async ({ parts }) => {
     // The question: could anyone else still use the old device? Recorded on the plain marker vault so the
@@ -2990,7 +2990,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!['broken', 'lost', 'adding'].includes(intent)) return [DataPart({ ok: false, outcome: 'error', error: 'intent-required' })];
     try { await ownerRootVault.set('restore-intent', JSON.stringify({ intent, at: new Date().toISOString() })); } catch { /* best-effort */ }
     return [DataPart({ ok: true, outcome: intent, intent })];
-  }, { visibility: 'trusted' });
+  }, { visibility: 'private' });
 
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
@@ -3006,7 +3006,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       await retireCurrentSelfRow();
       return [DataPart({ ok: true, reloadRequired: true })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'restore-failed' })]; }
-  }, { visibility: 'trusted' });   // 2.4b — overwrites the owner root: owner-only
+  }, { visibility: 'private' });   // 2.4b — overwrites the owner root: owner-only
 
 
   /* folio's web-only handlers used to live here (~125 lines of mock-
@@ -3023,23 +3023,26 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   /* Identity step 2.4a/2.4b — attach a PolicyEngine to hostAgent so scoped access is ENFORCED
    * (the gate was structurally absent: hostAgent.policyEngine was null, so taskExchange/A2ATransport
-   * skipped it for host traffic). 2.4b raised the owner-only CONTROL + secret-material skills
-   * (grant/revoke/purge/install/restoreDataVersion/reveal/restoreOwnerPhrase) to 'trusted'. hostAgent
-   * is IN-PROCESS ONLY (InternalTransport; no external peer can reach it), so the sole caller is the
-   * chat agent — SEED its pubKey as 'trusted' below so those raised skills stay reachable in-process.
+   * skipped it for host traffic). The owner-only CONTROL + secret-material skills (the phrase, the root,
+   * enrolment, device retirement, recovery, surface grants) are 'private': SELF only, never granted — a
+   * household bot's admin at 'trusted' reaches none of them. hostAgent is IN-PROCESS ONLY (InternalTransport;
+   * no external peer can reach it), so the sole caller is the chat agent — the owner — named SELF below.
    * Reads stay 'authenticated'. Revocation feeds from the issuer-side agentsTokenRegistry. Best-effort:
    * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
   try {
-    // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the seeded chat identity → 'trusted'.
+    // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
     const hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? makeBrowserVault('cc-host-trust:'));
     hostAgent.policyEngine = new PolicyEngine({
       trustRegistry: hostTrustRegistry,
       skillRegistry: hostAgent.skills,
       agentPubKey:   hostId.pubKey,
+      // the owner's chat agent IS self here (two keys, one person): the only identity besides the host's own that
+      // may reach a 'private' skill. Fixed at construction — nothing can be added to self later.
+      selfIds:       [chatId.pubKey],
       isRevoked:     async (tokenId) => Boolean(await agentsTokenRegistry?.isRevoked(tokenId)),
     });
-    // The in-process chat caller is the owner's device — trust it so it clears the 'trusted' host ops.
-    await hostTrustRegistry.setTier(chatId.pubKey, 'trusted');
+    // The in-process chat caller is the owner's device — it is self, so it clears the 'private' host ops.
+    await hostTrustRegistry.setTier(chatId.pubKey, 'private');
   } catch (e) { console.warn('[realAgent] hostAgent PolicyEngine attach skipped:', e?.message ?? e); }
 
   await Promise.all([

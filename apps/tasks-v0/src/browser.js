@@ -174,6 +174,10 @@ export async function createBrowserMultiCircleTasksAgent({
   onTaskGrantsRevoked = null,
   onBotTokenRevoked = null,
   isRevokedAlso = null,
+  // The HOST of this engine — the one invoking key allowed to name an `actor` (the person a call is for;
+  // see `skills/actor.js`). A shell that invokes these skills from its own agent passes that agent's key.
+  // Absent ⇒ this tasks agent's own key, which no other peer can invoke as.
+  hostKey = null,
 }) {
   if (!bus) throw new TypeError('createBrowserMultiCircleTasksAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserMultiCircleTasksAgent: identityVault required');
@@ -219,6 +223,7 @@ export async function createBrowserMultiCircleTasksAgent({
     circleStoreFor,
     onTaskGrantsRevoked,
     onBotTokenRevoked,
+    hostKey,
   });
   const primaryCircleState = primaryBundle._circleState;
   const circlesMap = new Map([[primaryCircleState.circleId, primaryCircleState]]);
@@ -248,6 +253,7 @@ export async function createBrowserMultiCircleTasksAgent({
       circleStoreFor,
       onTaskGrantsRevoked,
       onBotTokenRevoked,
+      hostKey,
     });
     const cs = spawned._circleState;
     circlesMap.set(circleId, cs);

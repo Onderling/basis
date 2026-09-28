@@ -219,15 +219,26 @@ async function assertDepsClosed(store, item) {
 }
 
 /**
- * The person a claim records: `ctx.onBehalfOf` when the authority acts for someone, else the authority
+ * The person a verb records: `ctx.onBehalfOf` when the authority acts for someone, else the authority
  * itself. A present-but-empty or non-string `onBehalfOf` is a caller bug, refused rather than ignored.
+ * The gate and the write's `by` keep reading the authority; only what the item SAYS about who did it
+ * (the claimant, `completedBy`, a review entry's `by`) reads the person.
  */
-function claimantOf(ctx, actor) {
+function personOf(ctx, actor, verb) {
   if (ctx.onBehalfOf === undefined || ctx.onBehalfOf === null) return actor;
   if (typeof ctx.onBehalfOf !== 'string' || ctx.onBehalfOf.length === 0) {
-    throw new TypeError('claim: ctx.onBehalfOf must be a non-empty string when given');
+    throw new TypeError(`${verb}: ctx.onBehalfOf must be a non-empty string when given`);
   }
   return ctx.onBehalfOf;
+}
+
+/** Who completed it, as the item records it: the person, and the display name only when it is theirs. */
+function completedByOf(ctx, actor) {
+  const person = personOf(ctx, actor, 'complete');
+  return {
+    completedBy: person,
+    ...(ctx.actorDisplayName && person === actor ? { completedByDisplayName: ctx.actorDisplayName } : {}),
+  };
 }
 
 // ── Lifecycle verbs ──────────────────────────────────────────────────────────
@@ -257,7 +268,7 @@ function claimantOf(ctx, actor) {
  */
 export async function claim(store, id, ctx = {}) {
   const actor = requireActor(ctx);
-  const claimant = claimantOf(ctx, actor);
+  const claimant = personOf(ctx, actor, 'claim');
   const current = await store.get(id);
   if (!current) throw new ItemNotFoundError(id);
   if (current.completedAt) {
@@ -487,8 +498,7 @@ export async function markComplete(store, refs, ctx = {}) {
     const updated = {
       ...item,
       completedAt: at,
-      completedBy: actor,
-      ...(ctx.actorDisplayName ? { completedByDisplayName: ctx.actorDisplayName } : {}),
+      ...completedByOf(ctx, actor),
     };
     const res = await store.put(updated, { by: actor });
     completed.push(res);
@@ -517,7 +527,7 @@ export async function submit(store, id, args, ctx = {}) {
   gate(ctx.rolePolicy, 'canSubmit', actor, current);
 
   const at = Date.now();
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'submit', note: args?.note });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'submit'), decision: 'submit', note: args?.note });
   const deliverable = args?.deliverable ? { ...args.deliverable, submittedAt: at } : current.deliverable;
   const updated = {
     ...current,
@@ -555,13 +565,12 @@ export async function approve(store, id, args, ctx = {}) {
   }
 
   const at = Date.now();
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'approve', note: args?.note });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'approve'), decision: 'approve', note: args?.note });
   const updated = {
     ...current,
     reviewLog,
     completedAt: at,
-    completedBy: actor,
-    ...(ctx.actorDisplayName ? { completedByDisplayName: ctx.actorDisplayName } : {}),
+    ...completedByOf(ctx, actor),
   };
   const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
   if (res && res.error === 'conflict') return res;
@@ -592,7 +601,7 @@ export async function reject(store, id, args, ctx = {}) {
   gate(ctx.rolePolicy, 'canReject', actor, current);
 
   const at = Date.now();
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'reject', note: args.note });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'reject'), decision: 'reject', note: args.note });
   const res = await store.put({ ...current, reviewLog }, { by: actor });
   emit(ctx, 'item-rejected', res);
   return res;
@@ -629,7 +638,7 @@ export async function revoke(store, id, args, ctx = {}) {
   const at = Date.now();
   const roster = assigneesOf(current);
   const target = args?.assignee ?? args?.target ?? null;
-  const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'revoke', note: args.reason });
+  const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'revoke'), decision: 'revoke', note: args.reason });
   // Revoke is an AUTHORITATIVE transition — advance the claim sequence so it supersedes a stale claim on a peer.
   const updated = { ...current, reviewLog, claimSeq: (current.claimSeq ?? 0) + 1 };
   let previousAssignee;

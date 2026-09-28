@@ -99,3 +99,17 @@ describe('private is self only — never granted', () => {
     await expect(engine.checkCaller({ callerId: 'telegram:111', skillId: 'admin' })).resolves.toBeTruthy();
   });
 });
+
+describe('checkCaller with a skill the caller holds', () => {
+  it('judges a service op by the visibility it is given, and the registry\'s own record wins over it', async () => {
+    const trustRegistry = new TrustRegistry(new VaultMemory());
+    const skills = new SkillRegistry();
+    skills.register(defineSkill('root', async () => 'ok', { visibility: 'private' }));
+    const engine = new PolicyEngine({ trustRegistry, skillRegistry: skills, agentPubKey: 'host' });
+    await trustRegistry.setTier('telegram:1', 'authenticated');
+    await expect(engine.checkCaller({ callerId: 'telegram:1', skillId: 'listOpen', skill: { visibility: 'authenticated', enabled: true } })).resolves.toBeTruthy();
+    await expect(engine.checkCaller({ callerId: 'telegram:9', skillId: 'listOpen', skill: { visibility: 'authenticated', enabled: true }, unknownAs: 'public' })).rejects.toMatchObject({ code: 'INSUFFICIENT_TIER' });
+    // a caller cannot soften a registered skill by passing a looser record for it
+    await expect(engine.checkCaller({ callerId: 'telegram:1', skillId: 'root', skill: { visibility: 'public', enabled: true } })).rejects.toBeTruthy();
+  });
+});

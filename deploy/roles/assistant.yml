@@ -29,6 +29,8 @@ services:
       TG_ALLOWED_CHAT_IDS: "${TG_ALLOWED_CHAT_IDS:-}"
       # The Telegram user id of the bot's admin; unset → the first person the bot admits.
       TG_ADMIN_UID: "${TG_ADMIN_UID:-}"
+      # Conversation turns in the walk log: off (default) · redacted (a fixture-collecting week) · full (tests only).
+      ONDERLING_WALK_LOG_TURNS: "${ONDERLING_WALK_LOG_TURNS:-off}"
       PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"
     volumes:

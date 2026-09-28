@@ -84,7 +84,8 @@ import { runPendingForget } from '../src/v2/enrolForgets.js';
 
 const { values } = parseArgs({ options: {
   'data-dir':   { type: 'string',  default: path.join(homedir(), '.basis-device') },
-  lang:         { type: 'string',  default: 'nl' },
+  // The door's language; the box's .env sets it as ASSISTANT_LANG (roles/assistant.yml).
+  lang:         { type: 'string',  default: process.env.ASSISTANT_LANG || 'nl' },
   'walk-log':   { type: 'string' },
   // Whether conversation turns go into the walk log: off (default) · redacted · full.
   'walk-log-turns': { type: 'string' },

@@ -306,3 +306,30 @@ describe('Phase 6 — appealTask skill', () => {
     await lite.close?.();
   });
 });
+
+describe('a notice for a person admitted through a door (a contact id such as telegram:111)', () => {
+  // A host that serves people through a door (a household bot) claims for them: the assignee is then a contact
+  // id, and there is no route to it yet — nudges through the door that admitted them come later. Until then the
+  // notice is SKIPPED with a reason, not written into this device's own inbox as if it were for its owner.
+  const DOOR = 'telegram:111';
+  let lsBundle; let circle;
+  beforeEach(async () => {
+    lsBundle = buildBundle();
+    circle = await createCircleAgent({ circleConfig: CIRCLE, localStoreBundle: lsBundle, wireOnboardingSkills: false, hostKey: ANNE });
+  });
+  afterEach(async () => { await circle?.close?.(); });
+
+  it('rejected and revoked notices for a door contact are not written to this device\'s inbox', async () => {
+    const { task } = await callSkill(circle.agent, 'addTask', { text: 'Paint', approval: 'creator' }, ANNE);
+    await callSkill(circle.agent, 'claimTask', { id: task.id, actor: DOOR }, ANNE);
+    await callSkill(circle.agent, 'submitTask', { id: task.id, actor: DOOR }, ANNE);
+    const r = await callSkill(circle.agent, 'rejectTask', { id: task.id, note: 'again' }, ANNE);
+    expect(r.error, JSON.stringify(r)).toBeUndefined();
+    await callSkill(circle.agent, 'revokeTask', { id: task.id, reason: 'away' }, ANNE);
+    await new Promise((res) => setTimeout(res, 20));
+
+    const inbox = await listInbox(lsBundle.cache);
+    const forDoor = inbox.filter((e) => ['task-rejected', 'task-revoked'].includes(e.source.meta?.eventType));
+    expect(forDoor).toEqual([]);
+  });
+});

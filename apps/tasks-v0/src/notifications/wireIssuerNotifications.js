@@ -45,6 +45,7 @@
  * Returns `{detach}` so apps can shut down the wiring cleanly.
  */
 
+import { channelOfWebid } from '@onderling/item-types';
 import { InAppInboxBridge } from '../bridges/InAppInboxBridge.js';
 
 /**
@@ -66,6 +67,7 @@ import { InAppInboxBridge } from '../bridges/InAppInboxBridge.js';
  * @param {(webid: string) => string | null} [args.tokenFor]
  *   Optional resolver: webid → device push token. If it returns null
  *   /undefined for a recipient, push is silently skipped for that one.
+
  * @returns {{ detach: () => void }}
  */
 export function wireIssuerNotifications({
@@ -111,6 +113,10 @@ export function wireIssuerNotifications({
 
   async function notify(recipientWebid, payload) {
     if (typeof recipientWebid !== 'string' || !recipientWebid) return;
+    // A person admitted through a door (a contact id such as `telegram:123`, assigned by a host acting for
+    // them) has no route from here yet: reaching them goes through the door that admitted them. Their notice
+    // is skipped, not written into THIS device's inbox, where it would read as the owner's.
+    if (channelOfWebid(recipientWebid)) return;
     const bridge = ensureBridgeFor(recipientWebid);
     try {
       await bridge.sendReply({ chatId: recipientWebid, ...payload });

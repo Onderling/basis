@@ -3,6 +3,14 @@
 > Package renamed `@onderling-app/tasks-v0` → **`@onderling-app/tasks`** (2026-07-18); the directory
 > stays `apps/tasks-v0`.
 
+## [Unreleased] — 2026-09-29 — no notice yet for a person admitted through a door
+
+- When the assignee is a contact id (a person a host claimed for, such as `telegram:123`), the rejected and
+  revoked notices are **not delivered**: there is no route to that person from the tasks engine yet (it goes
+  through the door that admitted them, with the household nudges and digests). They are skipped, and no longer
+  written into the host device's own inbox, where they read as the owner's. Notices to keyed members are
+  unchanged.
+
 ## [Unreleased] — 2026-09-29 — `actor` on complete and review: who did it is the person
 
 - With a host-vouched `actor`, `completeTask` and `approveTask` record the actor as `completedBy` (the host's

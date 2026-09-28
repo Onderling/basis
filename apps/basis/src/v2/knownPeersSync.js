@@ -53,7 +53,10 @@ const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'ava
   'persona', 'revealPreset', 'personaAt',
   // …and WHEN the contact was deleted (L114): a delete is a hide that also left the pair circle, and its time rides
   // with the hidden mark so every device's marker can say "verwijderd"
-  'deletedAt'];
+  'deletedAt',
+  // …and, for a person a hosting bot admitted through a keyless door, the door and the role it gave them: without
+  // them the row lands on a sibling as a nameless keyless contact nobody can place
+  'channel', 'role'];
 
 function bindingToWire(b) {
   if (!b || typeof b !== 'object') return null;

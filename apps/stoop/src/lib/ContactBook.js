@@ -36,6 +36,8 @@
  */
 
 import { REVEAL_PRESETS } from '@onderling/agent-registry';
+import { isKnownRole } from '@onderling/core';
+import { isChannel, channelOfWebid } from '@onderling/item-types';
 
 const LISTS_PREFIX = 'mem://stoop/lists/';
 
@@ -86,9 +88,20 @@ export function createContactBook({ members, dataSource }) {
    * @param {boolean} [args.allowHopThrough]
    * @param {boolean} [args.allowAutomatching]
    * @param {string[]} [args.points]   where this person can be found (relay urls) — from their card
+   * @param {string} [args.channel]  the door a keyless person came in by — one of the contact type's `CHANNELS`
+   * @param {string} [args.role]     the role the host gave them — a role core knows (`ROLES`, or a registered one)
+   *
+   * A person admitted through a keyless door is ONE row, keyed by their door-shaped webid (`telegram:<uid>`): a second
+   * admit for the same webid lands on that row, and a re-add that does not name the door or the role keeps them.
    */
   async function addContact(args) {
     if (!args?.webid) throw new TypeError('addContact: webid required');
+    if (args.channel !== undefined && args.channel !== null && !isChannel(args.channel)) {
+      throw new TypeError(`addContact: unknown channel '${args.channel}'`);
+    }
+    if (args.role !== undefined && args.role !== null && !isKnownRole(args.role)) {
+      throw new TypeError(`addContact: unknown role '${args.role}'`);
+    }
     const existing = (await members.resolveByWebid(args.webid)) ?? {};
     const merged = {
       ...existing,
@@ -127,7 +140,8 @@ export function createContactBook({ members, dataSource }) {
    * Hide or show a contact in Contacten — a mark on the book row, never on the roster or the thread. A webid the book
    * does not hold yet (someone who wrote to me and was never added) gets a placeholder row `{ webid, pubKey: webid }`
    * (in this binding a sender's webid IS its chat key), so the mark has a row to sit on; when they write again the
-   * shell shows the row, named by the ladder (what they said on the pair roster → the card → the key).
+   * shell shows the row, named by the ladder (what they said on the pair roster → the card → the key). A DOOR-shaped
+   * webid (`telegram:<uid>`) is not a key: its placeholder names the door instead, and stays keyless.
    *
    * `hiddenAt` orders the marks between a person's devices (newest wins on landing) and is each device's own clock —
    * a wall-clock race, stated in the manifest row and accepted until the book is an item type on the log (L97).
@@ -136,7 +150,8 @@ export function createContactBook({ members, dataSource }) {
     if (!webid) throw new TypeError('setHidden: webid required');
     if (typeof hidden !== 'boolean') throw new TypeError('setHidden: hidden must be boolean');
     if (!Number.isFinite(hiddenAt)) throw new TypeError('setHidden: hiddenAt must be a time');
-    const existing = (await members.resolveByWebid(webid)) ?? { webid, pubKey: webid };
+    const door = channelOfWebid(webid);
+    const existing = (await members.resolveByWebid(webid)) ?? (door ? { webid, channel: door } : { webid, pubKey: webid });
     // A DELETE is a hide that also left the pair circle (L114): `deletedAt` stays on the row after a return, so the
     // returning turn can say "you had deleted this contact". A landing carries the sibling's time.
     const del = Number.isFinite(deletedAt) ? { deletedAt } : (deleted === true && hidden ? { deletedAt: hiddenAt } : {});

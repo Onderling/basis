@@ -55,6 +55,16 @@ export function deviceDelegationsOf(entry) {
   return (map && typeof map === 'object' && !Array.isArray(map)) ? map : {};
 }
 
+/**
+ * Does this profile have a live device other than `deviceId`? A profile with a phone and a laptop behind it is a
+ * person's — the rule that keeps a person's profile from ever being named a function's (a bot's).
+ * @param {object} entry  the profile's registry entry
+ * @param {string|null} deviceId  this node's own device id
+ */
+export function profileHasOtherDevices(entry, deviceId) {
+  return Object.entries(deviceDelegationsOf(entry)).some(([id, rec]) => id !== deviceId && !rec?.revoked);
+}
+
 /** One device's record off an entry, or null. */
 export function deviceDelegationOf(entry, deviceId) {
   return deviceDelegationsOf(entry)[deviceId] ?? null;

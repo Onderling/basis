@@ -13,15 +13,19 @@ const llm = { invoke: async () => null };
 describe('createAssistantEngine', () => {
   it('re-sends the thread\'s recent turns to the interpreter, per thread', async () => {
     const seen = [];
-    const interpret = async (text, { context }) => { seen.push({ text, context }); return { opId: 'listOpen', args: {} }; };
+    const interpret = async (text, { history }) => { seen.push({ text, history }); return { opId: 'listOpen', args: {} }; };
     const dispatched = [];
     const e = createAssistantEngine({ catalogue, dispatch: (i) => dispatched.push(i), llm, interpret });
     e.remember('a', 'you', 'welke lijst?');
     e.remember('a', 'assistant', 'Welke lijst bedoel je — boodschappen of klusjes?');
     await e.ask('a', 'boodschappen');
     await e.ask('b', 'boodschappen');
-    expect(seen[0].context).toEqual(['you: welke lijst?', 'assistant: Welke lijst bedoel je — boodschappen of klusjes?']);
-    expect(seen[1].context).toEqual([]);
+    // The thread's turns reach the interpreter as a conversation (messages), per thread.
+    expect(seen[0].history).toEqual([
+      { role: 'user', content: 'welke lijst?' },
+      { role: 'assistant', content: 'Welke lijst bedoel je — boodschappen of klusjes?' },
+    ]);
+    expect(seen[1].history).toBeUndefined();
     expect(dispatched).toHaveLength(2);
   });
   it('three voices: you, assistant, system — an op result is never the assistant speaking', () => {
@@ -70,7 +74,7 @@ describe('createAssistantEngine', () => {
   });
   it('the circle composers\' form: a policy getter, a user default and two providers, plus their own recentTurns', async () => {
     const seen = [];
-    const interpret = async (text, { context }) => { seen.push(context); return null; };
+    const interpret = async (text, { history }) => { seen.push(history); return null; };
     const e = createAssistantEngine({
       catalogue, dispatch: () => {}, interpret, onNoMatch: () => {},
       policy: async () => ({ llmTool: 'user' }), userDefault: () => ({ mode: 'cloud' }),
@@ -79,7 +83,7 @@ describe('createAssistantEngine', () => {
     });
     expect(e.smart).toBe(true);
     await e.ask('c', 'iets');
-    expect(seen[0]).toEqual(['you: hoi', 'assistant: hallo']);
+    expect(seen[0]).toEqual([{ role: 'user', content: 'hoi' }, { role: 'assistant', content: 'hallo' }]);
   });
   it('the interpreter is told the language and the local add-phrasings (walk 2: an English greeting, "kun je … toevoegen" read as show)', async () => {
     const seen = [];

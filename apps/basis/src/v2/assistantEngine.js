@@ -129,6 +129,20 @@ export function createAssistantEngine({
   };
 }
 
+/**
+ * The line a door speaks when the assistant did not act on a turn (or did not finish it): the model's own words when
+ * it spoke, "en verder?" when the turn was cut short (the per-turn cap, or a call the output cut off), else the
+ * door's own fallback. One answer for every door, so a cut turn is asked about the same way everywhere.
+ * @param {{reply?: string, partial?: boolean}|undefined} opts  what `onNoMatch` received
+ * @param {(key: string) => string} t
+ * @param {string} fallbackKey  the door's "could not make that into an action" key
+ */
+export function assistantReplyText(opts, t, fallbackKey) {
+  if (opts && typeof opts.reply === 'string' && opts.reply) return opts.reply;
+  if (opts && opts.partial === true) return t('circle.bot.more');
+  return t(fallbackKey);
+}
+
 const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
 /** The interpreter's STABLE system prompt for a language: the shared instruction plus its add-phrasings. */
 export function interpretSystemFor(lang = 'nl') {

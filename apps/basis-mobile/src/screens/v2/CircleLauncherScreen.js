@@ -129,7 +129,7 @@ import { resolveChatAi } from '../../../../basis/src/v2/chatAi.js';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import MultiFieldFormBubble from '../../rn/MultiFieldFormBubble.js';   // 2+-field inline form (parity with web)
 import { addressesBot, stripBotTag } from '../../../../basis/src/v2/circleDispatch.js';
-import { createAssistantEngine } from '../../../../basis/src/v2/assistantEngine.js';
+import { createAssistantEngine, assistantReplyText } from '../../../../basis/src/v2/assistantEngine.js';
 import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
@@ -3617,7 +3617,7 @@ function CircleDetail({
     },
     postToCircle: (text, ctx) => { if (ctx?.msgId) broadcastFanOut({ msgId: ctx.msgId, text, ts: ctx.ts ?? Date.now() }); },
     // Addressed the bot, but the LLM mapped it to no tool → reply instead of going silent.
-    onNoMatch: (_text, _ctx, opts) => { appendCircleMessage({ actor: 'bot', text: (opts && opts.reply) || t('circle.bot.unknown') }); },
+    onNoMatch: (_text, _ctx, opts) => { appendCircleMessage({ actor: 'bot', text: assistantReplyText(opts, t, 'circle.bot.unknown') }); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { appendCircleMessage({ actor: 'bot', text: t('circle.bot.basic_mode') }); },
   }), [catalogue, clarify, circle?.id, resolveSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk]);

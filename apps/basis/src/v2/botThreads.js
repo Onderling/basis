@@ -108,6 +108,9 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       if (!THREAD_LANGS.includes(lang)) throw new TypeError(`botThreads: unknown language "${lang}"`);
       return save({ ...rowOf(id), lang });
     },
+    /** Has this thread been greeted (the door says who it is and what it keeps, once per person)? */
+    greeted: (id) => rows.get(id)?.greeted === true,
+    markGreeted(id) { return save({ ...rowOf(id), greeted: true }); },
     /** The ask this thread is waiting on (a form, a confirmation), or null. */
     pendingOf: (id) => rows.get(id)?.pending ?? null,
     setPending(id, pending) {

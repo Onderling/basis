@@ -20,6 +20,7 @@
 import { parseInput }      from '../parser.js';
 import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
+import { doorDisclosure } from '../v2/turnLog.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
@@ -52,7 +53,7 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -119,7 +120,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
       return hint ? `${e.command} — ${hint}` : e.command;
     });
-    return lines.join('\n');
+    // How to turn memory off, always; and, when turns are logged, that they are.
+    const disclosure = doorDisclosure(turnLogMode, t);
+    return [...lines, '', t('circle.bot.help_memory'), ...(disclosure ? [disclosure] : [])].join('\n');
   }
 
   /**
@@ -250,6 +253,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}), thread: threadId });
     let r;
     try {
+      // A person's first turn with this door: who it is and what it keeps — once.
+      if (threads && threadId && !threads.greeted(threadId)) {
+        const disclosure = doorDisclosure(turnLogMode, t);
+        await say(chatId, [t('circle.bot.welcome'), ...(disclosure ? [disclosure] : [])].join('\n'));
+        threads.markGreeted(threadId);
+      }
       r = await run();
       if (!own) note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {

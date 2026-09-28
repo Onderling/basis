@@ -23,6 +23,7 @@
  *   TG_BOT_TOKEN             optional — also answer on Telegram (or ~/.canopy-tg-token)
  *   TG_ALLOWED_CHAT_IDS      which chats may use it; unset/'*' is an OPEN DOOR
  *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
+ *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            optional — the web app, so a printed enrolment offer is also a link
  *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
@@ -31,7 +32,7 @@
  *                            lands HERE and not on the phone. The headless form of the tap on Mij / My data;
  *                            enrolling alone never makes a box primary. Claimed once per start, carried to the siblings.
  *
- * Flags: --data-dir · --lang · --walk-log · --show-offer (print an add-a-device offer and exit) ·
+ * Flags: --data-dir · --lang · --walk-log · --walk-log-turns off|redacted|full (default off) · --show-offer (print an add-a-device offer and exit) ·
  *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual)
  *
  * The recovery phrase is NEVER read from the environment or a file here. A device is enrolled by a
@@ -53,6 +54,7 @@ import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
 import { createBotThreads, dataSourceThreadStore, withAssistantOps, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
+import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
@@ -84,6 +86,8 @@ const { values } = parseArgs({ options: {
   'data-dir':   { type: 'string',  default: path.join(homedir(), '.basis-device') },
   lang:         { type: 'string',  default: 'nl' },
   'walk-log':   { type: 'string' },
+  // Whether conversation turns go into the walk log: off (default) · redacted · full.
+  'walk-log-turns': { type: 'string' },
   'show-offer': { type: 'boolean', default: false },
   enrol:        { type: 'boolean', default: false },
 } });
@@ -648,6 +652,8 @@ if (tgToken) {
   // Telegram that answers without a model, never a device that is not there.
   const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
+  // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
+  const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
   const threads = createBotThreads({
     eventLog: deviceLog,
@@ -669,10 +675,12 @@ if (tgToken) {
     threads,
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
-    walkLog,
+    // Turns go into the walk log only when the operator asks, and then the people in the house are told.
+    walkLog: turnLogFor(turnLogMode, walkLog),
+    turnLogMode,
   });
   await tgRunner.start();
-  walkLog({ kind: 'telegram', door: allowedChatIds === '*' ? 'open' : 'allow-list', llm: llm ? llmModel : null, apps });
+  walkLog({ kind: 'telegram', door: allowedChatIds === '*' ? 'open' : 'allow-list', llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
 }
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────

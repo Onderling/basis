@@ -3848,7 +3848,10 @@
     "memory_short": "I keep the last few messages of this conversation.",
     "memory_long": "I keep the last messages of this conversation, and later also what I know about the household.",
     "lang_set": "I will reply to you in: {{lang}}.",
-    "lang_auto": "I will reply in the language you write in again."
+    "lang_auto": "I will reply in the language you write in again.",
+    "welcome": "Hi! I'm this household's assistant. Type /help to see what I can do.",
+    "help_memory": "I keep the last few messages of our conversation. With /geheugen off I keep nothing; /taal nl or /taal en picks the language I reply in.",
+    "log_disclosure": "Conversations are kept in redacted form and can be read by the administrator to improve the assistant."
   },
   "op": {
     "not_in_this_circle": {

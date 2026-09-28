@@ -33,31 +33,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `peer-connect` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `test-peer` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `signout` | remove | · | ✅ | · | · | · | · |  |
-| **household** | `addItem` | add | ✅ | ✅ | ✅ | · | ✅ | · | add, toevoegen, noteer, voeg toe |
-|  | `listOpen` | list | ✅ | ✅ | ✅ | · | · | · | list, show, lijst, toon |
-|  | `markComplete` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | done, complete, bought, did, finished, klaar, gedaan, gekocht |
-|  | `removeItem` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | remove, delete, cancel, nope, verwijder, weg |
-|  | `help` | help | ✅ | ✅ | ✅ | · | · | · | help, hulp |
-|  | `addTask` | add | ✅ | ✅ | ✅ | · | ✅ | · | task, taak |
-|  | `listTasks` | list | ✅ | ✅ | ✅ | · | · | · | tasks, tasks |
-|  | `claim` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | grab, oppakken |
-|  | `reassign` | reassign | ✅ | · | · | · | · | · |  |
-|  | `registerName` | register | ✅ | ✅ | ✅ | · | ✅ | · | register, registreer, naam |
-|  | `revokeDevice` | revoke-device | · | · | · | · | · | · |  |
-|  | `listRecoveryCircles` | list-recovery-circles | · | · | · | · | · | · |  |
-|  | `exportRecoveryFile` | export-recovery-file | · | · | · | · | · | · |  |
-|  | `importRecoveryFile` | import-recovery-file | · | · | · | · | · | · |  |
-|  | `restoreStatus` | restore-status | · | · | · | · | · | · |  |
-|  | `restoreSource` | restore-source | · | · | · | · | · | · |  |
-|  | `restoreIntent` | restore-intent | · | · | · | · | · | · |  |
-|  | `replaceDevice` | replace-device | · | · | · | · | · | · |  |
-|  | `enrollDevice` | enroll-device | · | · | · | · | · | · |  |
-|  | `buildEnrollOffer` | get | · | · | · | · | · | · |  |
-|  | `revealOwnerPhrase` | reveal-owner-phrase | · | · | · | · | · | · |  |
-|  | `restoreOwnerPhrase` | restore-owner-phrase | · | · | · | · | · | · |  |
-|  | `grantSurface` | grant-surface | · | · | · | · | · | · |  |
-|  | `revokeSurface` | revoke-surface | · | · | · | · | · | · |  |
-|  | `listSurfaceGrants` | list-surface-grants | · | · | · | · | · | · |  |
 | **tasks** | `addTask` | add | ✅ | ✅ | ✅ | ✅ | ✅ | · | add, todo, new task, voeg, zet, maak taak, nieuwe taak |
 |  | `claimTask` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | claim, pak, neem, i'll take, i'll do, ik pak, ik doe, ik neem |
 |  | `confirmClaim` | confirm | ✅ | ✅ | ✅ | · | ✅ | ✅ | confirm, bevestig, keur, keur goed, ken toe |
@@ -106,6 +81,31 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `addSubtask` | add | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `proposeSubtask` | add | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `forceSpawnSubtask` | add | ✅ | ✅ | · | · | ✅ | · |  |
+| **household** | `addItem` | add | ✅ | ✅ | ✅ | · | ✅ | · | add, toevoegen, noteer, voeg toe |
+|  | `listOpen` | list | ✅ | ✅ | ✅ | · | · | · | list, show, lijst, toon |
+|  | `markComplete` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | done, complete, bought, did, finished, klaar, gedaan, gekocht |
+|  | `removeItem` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | remove, delete, cancel, nope, verwijder, weg |
+|  | `help` | help | ✅ | ✅ | ✅ | · | · | · | help, hulp |
+|  | `addTask` | add | ✅ | ✅ | ✅ | · | ✅ | · | task, taak |
+|  | `listTasks` | list | ✅ | ✅ | ✅ | · | · | · | tasks, tasks |
+|  | `claim` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | grab, oppakken |
+|  | `reassign` | reassign | ✅ | · | · | · | · | · |  |
+|  | `registerName` | register | ✅ | ✅ | ✅ | · | ✅ | · | register, registreer, naam |
+|  | `revokeDevice` | revoke-device | · | · | · | · | · | · |  |
+|  | `listRecoveryCircles` | list-recovery-circles | · | · | · | · | · | · |  |
+|  | `exportRecoveryFile` | export-recovery-file | · | · | · | · | · | · |  |
+|  | `importRecoveryFile` | import-recovery-file | · | · | · | · | · | · |  |
+|  | `restoreStatus` | restore-status | · | · | · | · | · | · |  |
+|  | `restoreSource` | restore-source | · | · | · | · | · | · |  |
+|  | `restoreIntent` | restore-intent | · | · | · | · | · | · |  |
+|  | `replaceDevice` | replace-device | · | · | · | · | · | · |  |
+|  | `enrollDevice` | enroll-device | · | · | · | · | · | · |  |
+|  | `buildEnrollOffer` | get | · | · | · | · | · | · |  |
+|  | `revealOwnerPhrase` | reveal-owner-phrase | · | · | · | · | · | · |  |
+|  | `restoreOwnerPhrase` | restore-owner-phrase | · | · | · | · | · | · |  |
+|  | `grantSurface` | grant-surface | · | · | · | · | · | · |  |
+|  | `revokeSurface` | revoke-surface | · | · | · | · | · | · |  |
+|  | `listSurfaceGrants` | list-surface-grants | · | · | · | · | · | · |  |
 | **stoop** | `postRequest` | add | ✅ | ✅ | ✅ | · | ✅ | · | post, ask, borrow, vraag, plaats, leen, bied aan |
 |  | `listOpen` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `listMyRequests` | list | ✅ | ✅ | ✅ | · | · | · | mine, mijn |
@@ -226,6 +226,10 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `searchEvents` | list | ✅ | · | · | · | · | · |  |
 |  | `podStatus` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `getIcsFeed` | list | ✅ | ✅ | · | · | · | · |  |
+| **lists** | `createList` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
+|  | `addToList` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
+|  | `listLists` | list | ✅ | ✅ | · | · | · | · |  |
+|  | `markListItemDone` | complete | ✅ | ✅ | · | · | ✅ | ✅ |  |
 | **agents** | `listAgents` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `viewAgent` | list | ✅ | · | · | · | · | · |  |
 |  | `setAgentSkillExposure` | update | ✅ | ✅ | · | · | · | · |  |
@@ -257,7 +261,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 252 ops | | 226 | 121 | 33 | 3 | 146 | 71 | |
+| **totals** | 256 ops | | 230 | 125 | 33 | 5 | 149 | 72 | |
 
 ### Flows
 
@@ -272,6 +276,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (219/252): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:reassign, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer …
-- **missing inline** (181/252): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, household:addItem, household:listOpen, household:help, household:addTask, household:listTasks, household:reassign, household:registerName, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus …
-- **missing chat** (26/252): basis:signin, basis:signout, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch
+- **missing gate** (223/256): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:revokeTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks …
+- **missing inline** (184/256): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:addTask, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks, tasks:listMyPendingClaims …
+- **missing chat** (26/256): basis:signin, basis:signout, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch

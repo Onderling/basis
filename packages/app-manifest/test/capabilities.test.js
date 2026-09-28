@@ -13,7 +13,7 @@ import { validateManifest } from '../src/validate.js';
 const M = {
   app: 'demo',
   itemTypes: ['shopping', 'task'],
-  domainVerbs: ['help'],
+  domainVerbs: { help: 'read' },
   nouns: {
     shopping: { atoms: ['add', 'list', 'complete', 'remove'] },
     task:     { atoms: ['add', 'complete', 'claim', 'update'] },   // `update` declared but no op implements it

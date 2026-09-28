@@ -1010,7 +1010,7 @@ describe('L4 ≡ B — nouns converge with the @onderling/item-types registry', 
   });
 });
 
-describe('B · Layer 1 — domainVerbs allow-list shape (#65)', () => {
+describe('B · Layer 1 — domainVerbs map shape: each domain verb classified read or write', () => {
   const M = (domainVerbs) => ({
     app: 'a',
     itemTypes: ['task'],
@@ -1018,30 +1018,35 @@ describe('B · Layer 1 — domainVerbs allow-list shape (#65)', () => {
     domainVerbs,
   });
 
-  it('accepts a well-formed array of non-atom domain verbs', () => {
+  it('accepts a map of non-atom domain verbs, each read or write', () => {
     // `help`/`register` don't reduce to an atom — the legitimate ~20% domain tail.
-    expect(validateManifest(M(['help', 'register'])).ok).toBe(true);
+    expect(validateManifest(M({ help: 'read', register: 'write' })).ok).toBe(true);
+    expect(validateManifest(M({})).ok).toBe(true);
   });
 
   it('absent domainVerbs is fine (forward-additive)', () => {
-    const { domainVerbs, ...rest } = M(['help']);   // eslint-disable-line no-unused-vars
+    const { domainVerbs, ...rest } = M({ help: 'read' });   // eslint-disable-line no-unused-vars
     expect(validateManifest(rest).ok).toBe(true);
   });
 
-  it('rejects a non-array domainVerbs', () => {
-    const { errors, ok } = validateManifest(M('help'));
-    expect(ok).toBe(false);
-    expect(errors.some((e) => e.path === '/domainVerbs')).toBe(true);
+  it('rejects a list or a string — a list says nothing about reading or writing', () => {
+    for (const bad of [['help'], 'help']) {
+      const { errors, ok } = validateManifest(M(bad));
+      expect(ok).toBe(false);
+      expect(errors.some((e) => e.path === '/domainVerbs')).toBe(true);
+    }
   });
 
-  it('rejects an empty / non-string entry', () => {
-    expect(validateManifest(M(['ok', ''])).errors.some((e) => e.path === '/domainVerbs/1')).toBe(true);
-    expect(validateManifest(M([42])).errors.some((e) => e.path === '/domainVerbs/0')).toBe(true);
+  it('rejects a verb that is not classified read or write', () => {
+    for (const bad of [true, 'writes', null]) {
+      const r = validateManifest(M({ register: bad }));
+      expect(r.errors.some((e) => e.path === '/domainVerbs/register' && e.code === 'unclassified-domain-verb')).toBe(true);
+    }
   });
 
   it('rejects an SDK atom (or alias) declared as a domain verb — use the atom directly', () => {
     // Fitness guard: `remove` is a canonical atom; `create` is an alias of `add`.
-    expect(validateManifest(M(['remove'])).errors.some((e) => e.code === 'atom-in-domain-verbs')).toBe(true);
-    expect(validateManifest(M(['create'])).errors.some((e) => e.code === 'atom-in-domain-verbs')).toBe(true);
+    expect(validateManifest(M({ remove: 'write' })).errors.some((e) => e.code === 'atom-in-domain-verbs')).toBe(true);
+    expect(validateManifest(M({ create: 'write' })).errors.some((e) => e.code === 'atom-in-domain-verbs')).toBe(true);
   });
 });

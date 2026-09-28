@@ -29,17 +29,20 @@ export const TASK_LANE = 'task-statement';
 
 export const taskManifest = Object.freeze({
   app: 'task-lane',
+  hosts: [],
   itemTypes: [],
   nouns: {},
   operations: [
     {
       id: 'task.snapshot',
       description: 'Any task write (add / claim / reassign / complete / update) fans the writer\'s full item snapshot; receivers causally merge it into their head.',
+      writes: { scope: 'circle' },
       appends: [{ lane: TASK_LANE, kind: 'snapshot' }],
     },
     {
       id: 'task.remove',
       description: 'A task hard-delete; receivers delete their head row by id.',
+      writes: { scope: 'circle' },
       appends: [{ lane: TASK_LANE, kind: 'remove' }],
     },
   ],

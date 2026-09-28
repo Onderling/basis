@@ -18,11 +18,12 @@ export const KEY_LANE = 'key-event';
 
 export const keyManifest = Object.freeze({
   app: 'keys',
+  hosts: [],
   itemTypes: [],
   nouns: {},
   operations: [
-    { id: 'keys.establish', description: 'The circle\'s FIRST group key (version 1), sealed to the founding recipients — authored by the creator when the circle seals.', appends: [{ lane: KEY_LANE, kind: 'key-establish' }] },
-    { id: 'keys.rotate',    description: 'A group-key ROTATION (version n+1, sealed to the remaining recipients — backward secrecy). A governed action: the circle policy\'s rotateKey decision-class says who may (default any-admin).', appends: [{ lane: KEY_LANE, kind: 'key-rotate' }] },
+    { id: 'keys.establish', description: 'The circle\'s FIRST group key (version 1), sealed to the founding recipients — authored by the creator when the circle seals.', writes: { scope: 'circle' }, appends: [{ lane: KEY_LANE, kind: 'key-establish' }] },
+    { id: 'keys.rotate',    description: 'A group-key ROTATION (version n+1, sealed to the remaining recipients — backward secrecy). A governed action: the circle policy\'s rotateKey decision-class says who may (default any-admin).', writes: { scope: 'circle' }, appends: [{ lane: KEY_LANE, kind: 'key-rotate' }] },
   ],
 });
 

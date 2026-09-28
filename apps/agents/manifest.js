@@ -41,6 +41,9 @@
  */
 export const agentsManifest = {
   app:       'agents',
+  // The network hosts this app's code reaches. None: whatever it syncs goes through the person's own
+  // pod and relay, which they configure — not a fixed host.
+  hosts:     [],
   itemTypes: ['agent', 'data-version', 'catalogue-entry'],
 
   // Layer-1 capability surface — (verb × noun) atoms this app ships.
@@ -105,6 +108,7 @@ export const agentsManifest = {
     {
       id:        'setAgentSkillExposure', group: 'admin',
       verb:      'update',
+      writes: { scope: 'person' },   // the exposure lives on the agent's registry entry, the owner's own; a circle admin's narrowing is stored there too
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId',  kind: 'string',  required: true, schema: { minLength: 1 } },
@@ -150,6 +154,7 @@ export const agentsManifest = {
     {
       id:        'createProfile',
       verb:      'add',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         // Stable profile id — also the registry agentId + the HKDF label. Never rename.
@@ -181,6 +186,7 @@ export const agentsManifest = {
     {
       id:        'setProfileProperty', group: 'compose',
       verb:      'update',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',    kind: 'string', required: true, schema: { minLength: 1 } },
@@ -207,6 +213,7 @@ export const agentsManifest = {
     {
       id:        'setProfileDriver', group: 'compose',
       verb:      'update',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',   kind: 'string', required: true, schema: { minLength: 1 } },
@@ -232,6 +239,7 @@ export const agentsManifest = {
     {
       id:        'setProfileCircleMembership', group: 'compose',
       verb:      'update',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',       kind: 'string', required: true, schema: { minLength: 1 } },
@@ -248,6 +256,7 @@ export const agentsManifest = {
     {
       id:        'removeProfileCircleMembership', group: 'compose',
       verb:      'update',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       // The record is a device's own restore-data (never merged with anyone's): the last write to the profile wins,
       // and a leave is a write like the join that made the record.
@@ -264,6 +273,7 @@ export const agentsManifest = {
     {
       id:        'setProfileDisclosure', group: 'compose',
       verb:      'update',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'id',        kind: 'string',  required: true, schema: { minLength: 1 } },
@@ -312,6 +322,7 @@ export const agentsManifest = {
     {
       id:        'revokeAgent',
       verb:      'revoke',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -339,6 +350,7 @@ export const agentsManifest = {
     {
       id:        'grantAgent', group: 'admin',
       verb:      'update',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId',       kind: 'string', required: true, schema: { minLength: 1 } },
@@ -380,6 +392,7 @@ export const agentsManifest = {
     {
       id:        'grantRole', group: 'admin',
       verb:      'update',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'agent' },
       params: [
         // The circle/group the role is held IN.
@@ -407,6 +420,7 @@ export const agentsManifest = {
     {
       id:        'revokeGrant', group: 'admin',
       verb:      'revoke',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -425,6 +439,7 @@ export const agentsManifest = {
     {
       id:        'purgeAgent',
       verb:      'remove',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         { name: 'agentId', kind: 'string', required: true, schema: { minLength: 1 } },
@@ -476,6 +491,7 @@ export const agentsManifest = {
     {
       id:        'installAgent',
       verb:      'add',
+      writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
         // CURATED path — the id of a catalogue entry (from listCatalogue).
@@ -543,6 +559,7 @@ export const agentsManifest = {
     {
       id:        'restoreDataVersion',
       verb:      'update',
+      writes: { scope: 'circle' },
       appliesTo: { type: 'data-version' },
       params: [
         { name: 'circleId', kind: 'string', required: true, schema: { minLength: 1 } },

@@ -54,7 +54,7 @@ describe('atom discipline (B · Layer 1 fitness function)', () => {
 
   it('declaring the verb in domainVerbs lets it through', () => {
     const good = {
-      app: 'x', itemTypes: ['thing'], domainVerbs: ['frobnicate'],
+      app: 'x', itemTypes: ['thing'], domainVerbs: { frobnicate: 'write' },
       operations: [{ id: 'frobnicateThing', verb: 'frobnicate' }],
     };
     expect(validateManifest(good, { atoms: true }).ok).toBe(true);
@@ -62,7 +62,7 @@ describe('atom discipline (B · Layer 1 fitness function)', () => {
 
   it('an atom (or alias) in domainVerbs is itself an error', () => {
     const wrong = {
-      app: 'x', itemTypes: ['thing'], domainVerbs: ['create'],
+      app: 'x', itemTypes: ['thing'], domainVerbs: { create: 'write' },
       operations: [{ id: 'addThing', verb: 'add' }],
     };
     const { errors } = validateManifest(wrong, { atoms: true });

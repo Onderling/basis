@@ -68,7 +68,7 @@ describe('createCircleDispatch — routing', () => {
     expect(posted).toEqual([]);
   });
 
-  it('threads recentTurns into the interpret context (conversation memory)', async () => {
+  it('threads recentTurns to the interpreter as conversation history (conversation memory)', async () => {
     const interpret = vi.fn(async () => ({ opId: 'addTask', args: { title: 'bread' } }));
     const { cd, dispatched } = harness({
       policy: { llmTool: 'local' }, providers: { local: { invoke: vi.fn() } }, interpret, botName: 'helper',
@@ -76,19 +76,23 @@ describe('createCircleDispatch — routing', () => {
     });
     await cd.handle('@helper and bread too');
     expect(interpret).toHaveBeenCalledTimes(1);
-    expect(interpret.mock.calls[0][1].context).toEqual(['you: add milk', 'assistant: Added milk to the list']);
+    expect(interpret.mock.calls[0][1].history).toEqual([
+      { role: 'user', content: 'add milk' }, { role: 'assistant', content: 'Added milk to the list' },
+    ]);
+    expect(interpret.mock.calls[0][1].context ?? []).toEqual([]);
     expect(dispatched).toEqual([{ opId: 'addTask', args: { title: 'bread' } }]);
   });
 
-  it('prepends recentTurns IN FRONT of any gate context', async () => {
+  it('a remembered op result goes IN FRONT of any gate context; the spoken turns go as history', async () => {
     const interpret = vi.fn(async () => null);
     const { cd } = harness({
       policy: { llmTool: 'local' }, providers: { local: { invoke: vi.fn() } }, interpret, botName: 'helper',
       gate: { evaluate: async () => ({ via: 'context', context: ['rag: list has eggs'] }) },
-      recentTurns: () => ['you: add milk'],
+      recentTurns: () => ['you: add milk', 'system: added to shopping: milk'],
     });
     await cd.handle('@helper and bread');
-    expect(interpret.mock.calls[0][1].context).toEqual(['you: add milk', 'rag: list has eggs']);
+    expect(interpret.mock.calls[0][1].context).toEqual(['added to shopping: milk', 'rag: list has eggs']);
+    expect(interpret.mock.calls[0][1].history).toEqual([{ role: 'user', content: 'add milk' }]);
   });
 
   it('falls back to a circle post when the interpreter returns null', async () => {

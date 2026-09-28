@@ -38,5 +38,6 @@ export const FIXTURES = [
   // ── not our business: a spoken decline in the member's language, never a tool ──
   { id: 'decline-time-nl',    text: 'Hoe laat is het', expect: { reply: 'declines' } },
   { id: 'decline-socks-nl',   text: 'Kun je ook sokken stoppen', expect: { reply: 'declines' } },
+  { id: 'greet-nl',           text: 'goedemorgen', expect: { reply: 'declines' } },   // a greeting gets a spoken greeting, never silence
   { id: 'greeting-nl',        text: 'Maii', expect: { reply: 'declines' } },   // walk 2: answered in English
 ];

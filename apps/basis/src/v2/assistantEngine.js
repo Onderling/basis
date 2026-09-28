@@ -61,9 +61,12 @@ export function createAssistantEngine({
   const smart = Boolean(providers && typeof interpret === 'function');
   // The interpreter speaks the member's language and knows the local phrasings for "add" — seen live:
   // an English greeting answered a Dutch "Maii", and "kun je … toevoegen?" was read as "show the list".
+  // The stable instruction (the rules and this language's phrasings) and this turn's hints (the language line), kept
+  // apart so the interpreter puts the stable part first and the hints below its turn marker.
   const system = interpretSystemFor(lang);
+  const hints = interpretHintsFor(lang);
   const interpretIn = typeof interpret === 'function'
-    ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system })
+    ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? hints })
     : null;
   const retrieve = typeof loadItems === 'function'
     ? makeCircleRetriever({
@@ -127,13 +130,18 @@ export function createAssistantEngine({
 }
 
 const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
-/** The interpreter's system prompt for a language: the shared instruction plus the language and its add-phrasings. */
+/** The interpreter's STABLE system prompt for a language: the shared instruction plus its add-phrasings. */
 export function interpretSystemFor(lang = 'nl') {
-  const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
   const add = lang === 'nl'
     ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
-  return `${DEFAULT_INTERPRET_SYSTEM}\nAlways reply in ${name}. ${add}`;
+  return `${DEFAULT_INTERPRET_SYSTEM}\n${add}`;
+}
+
+/** This turn's hints for a language: the reply language, which sits below the prompt's turn marker. */
+export function interpretHintsFor(lang = 'nl') {
+  const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
+  return [`Always reply in ${name}.`];
 }
 
 /**

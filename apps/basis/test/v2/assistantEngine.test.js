@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { mergeManifests } from '../../src/manifestMerge.js';
 import { mockHouseholdManifest } from '../../src/core/agent/mockAgent.js';
-import { createAssistantEngine, loadAssistantItems, interpretSystemFor } from '../../src/v2/assistantEngine.js';
+import { createAssistantEngine, loadAssistantItems, interpretSystemFor, interpretHintsFor } from '../../src/v2/assistantEngine.js';
 
 const catalogue = mergeManifests([{ manifest: mockHouseholdManifest }]);
 const llm = { invoke: async () => null };
@@ -83,12 +83,14 @@ describe('createAssistantEngine', () => {
   });
   it('the interpreter is told the language and the local add-phrasings (walk 2: an English greeting, "kun je … toevoegen" read as show)', async () => {
     const seen = [];
-    const interpret = async (text, o) => { seen.push(o.system); return null; };
+    // The phrasings are part of the stable instruction; the reply language rides as this turn's hint (below the
+    // prompt's turn marker, where the interpreter places it).
+    const interpret = async (text, o) => { seen.push(o); return null; };
     const e = createAssistantEngine({ catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {} });
     await e.ask('t', 'maii');
-    expect(seen[0]).toContain('Always reply in Dutch');
-    expect(seen[0]).toContain('voeg … toe');
-    expect(interpretSystemFor('en')).toContain('Always reply in English');
+    expect(seen[0].hints).toContain('Always reply in Dutch.');
+    expect(seen[0].system).toContain('voeg … toe');
+    expect(interpretHintsFor('en')).toContain('Always reply in English.');
   });
 
   it('three items named → three dispatches in one turn (the interpreter\'s `more`)', async () => {

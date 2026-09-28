@@ -46,7 +46,7 @@
 // root node_modules linking @onderling/relay. The package's OWN @onderling/* deps still
 // resolve from packages/relay/node_modules — only this outer hop must be relative.
 import { readFileSync } from 'node:fs';
-import { startRelay, getLanIp, ExpoPushSender, PushTokenRegistry, SqlitePushTokenStore, SqliteForwardStore } from '../../packages/relay/index.js';
+import { startRelay, getLanIp, ExpoPushSender, PushTokenRegistry, SqlitePushTokenStore, SqliteForwardStore, loadSqlite } from '../../packages/relay/index.js';
 
 const port = parseInt(process.env.PORT ?? '8787', 10);
 const host = process.env.HOST ?? '0.0.0.0';
@@ -100,7 +100,7 @@ if ((process.env.PUSH_PROVIDER ?? '').toLowerCase() === 'expo') {
   // device — asleep means it never reconnects to re-register. Opt-in via PUSH_TOKENS_DB
   // (point it at the PaaS volume); a missing better-sqlite3 refuses boot loudly.
   if (process.env.PUSH_TOKENS_DB) {
-    const { default: Database } = await import('better-sqlite3');
+    const Database = await loadSqlite();   // from the relay package, where the image installs it
     pushTokenRegistry = new PushTokenRegistry({
       store: new SqlitePushTokenStore({ path: process.env.PUSH_TOKENS_DB, Database }),
     });
@@ -128,7 +128,7 @@ let acceptedGroups;
 // Memory only when unset — a restart (a redeploy, a crash, an update) then drops every waiting message.
 let forwardStore = null;
 if (process.env.QUEUE_DB) {
-  const { default: Database } = await import('better-sqlite3');   // throws loudly when not installed
+  const Database = await loadSqlite();   // from the relay package, where the image installs it; throws when absent
   forwardStore = new SqliteForwardStore({ path: process.env.QUEUE_DB, Database });
 }
 

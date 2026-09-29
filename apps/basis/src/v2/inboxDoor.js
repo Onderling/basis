@@ -64,6 +64,7 @@ export function createContactDoorBridge({ sendTurn }) {
         bridgeId: 'web', channel: 'web', chatId: contactId, messageId, text,
         ...(typeof admission === 'string' && admission ? { admission } : {}),
         refuseOnce: true,
+        slash: false,   // a contact turn is words: this door has no commands to point at
         sender: { bridgeUid: contactId, displayName },
       });
       return true;

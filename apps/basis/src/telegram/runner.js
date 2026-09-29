@@ -79,8 +79,23 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   };
 
   /** Paint a RenderedReply as bridge messages. */
+  /**
+   * The ops this chat's person may be OFFERED: their role's map (the same scoping their tools get), or null — no map,
+   * everything the catalogue holds. A button for an op off the map would be refused on tap; it is never shown.
+   */
+  function offeredOps(chatId) {
+    if (typeof roleFor !== 'function' || typeof scopeToRole !== 'function') return null;
+    const rec = turns.get(chatId);
+    const scoped = scopeToRole(catalogueOf(), roleFor(rec?.caller ?? rec?.thread ?? threadFor(chatId)));
+    const ops = new Set();
+    for (const [key, entry] of scoped?.opsById ?? []) ops.add(entry?.op?.id ?? key);
+    return ops;
+  }
+
   async function paint(chatId, rendered) {
     if (!rendered) return;
+    const offered = offeredOps(chatId);
+    const onMap = (b) => !offered || offered.has(String(b?.callbackData ?? '').split(':')[0]);
     if (rendered.kind === 'list') {
       const items = Array.isArray(rendered.items) ? rendered.items : [];
       if (!items.length) { await say(chatId, rendered.text ?? t('circle.telegram.empty_list')); return; }
@@ -91,7 +106,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       items.forEach((it, i) => {
         const name = String(it.label ?? '').trim();
         const short = name.length > 18 ? `${name.slice(0, 17)}…` : name;
-        for (const b of (it.buttons ?? [])) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
+        for (const b of (it.buttons ?? []).filter(onMap)) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
       });
       await say(chatId, lines.join('\n'), buttons);
       return;
@@ -247,7 +262,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
     peek: (cmd, ctx) => peekOp(ctx.chatId, ctx.id, cmd),
     onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
-    onLlmUnavailable: (_text, ctx) => say(ctx.chatId, t('circle.telegram.unknown')),
+    // A model that is slow is SAID: "even geduld" while it retries, and when it does not come back, that it is not
+    // reachable now — never "I did not understand" for a model that did not answer.
+    onSlow: (ctx) => say(ctx.chatId, t('circle.bot.slow')),
+    onLlmUnavailable: (_text, ctx, info) => say(ctx.chatId, t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown')),
     onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),
     claim: (text, ctx) => (claims(ctx.chatId, ctx.id, text) ? () => doorLine(ctx.chatId, ctx.id, text) : null),
     around: (turn, run) => aroundTurn(turn, run),
@@ -296,10 +314,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   }
 
   /** A person's first turn with this door: who it is and what it keeps — once. */
+  // The chats that came in on a door without commands (the bot's contact inbox): their welcome does not say "typ /help".
+  const slashless = new Set();
   async function greetOnce(chatId, threadId) {
     if (!threads || !threadId || threads.greeted(threadId)) return;
     const disclosure = doorDisclosure(turnLogMode, t);
-    await say(chatId, [t('circle.bot.welcome'), ...(disclosure ? [disclosure] : [])].join('\n'));
+    const welcome = slashless.has(String(chatId)) ? t('circle.bot.welcome_talk') : t('circle.bot.welcome');
+    await say(chatId, [welcome, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);
   }
 
@@ -378,6 +399,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   // A line still being ADMITTED is not in a lane yet; `idle` waits for those too, or it would answer "nothing queued".
   const admitting = new Set();
   bridge.onMessage((msg) => {
+    if (msg?.slash === false && msg?.chatId) slashless.add(String(msg.chatId));
     const p = handle(msg).catch(() => { /* a turn's error was already told to the chat */ });
     admitting.add(p);
     p.finally(() => admitting.delete(p));

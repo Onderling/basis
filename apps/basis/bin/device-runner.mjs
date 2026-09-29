@@ -766,7 +766,7 @@ if (tgToken || inboxDoor.bridge) {
       promptLines: HOUSEHOLD_TEMPLATE.promptLines,
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
       scopeToRole: scopeCatalogueToRole,
-      hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId)),
+      hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds(),
       gateRules: listsGateRules(values.lang, templateListNameOf(t)),

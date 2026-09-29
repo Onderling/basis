@@ -19,7 +19,8 @@ const isTimeout = (err) => err?.name === 'AbortError' || /\babort|timed? ?out\b/
 
 /**
  * A provider that retries a turn ONCE on another model when the first times out — any other error goes on as it
- * is. The second provider is made on first need. `onFallback` hears of it (the box writes it to its walk log).
+ * is. The second provider is made on first need. `onFallback` hears of it (the box writes it to its walk log), and so
+ * does the turn: a request's own `onSlow` (the door tells the person to wait).
  */
 function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback }) {
   let second = null;
@@ -31,6 +32,8 @@ function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback 
         if (!isTimeout(err) || !fallbackModel || fallbackModel === primary.model) throw err;
         second ??= await makeFallback();
         try { onFallback?.({ from: primary.model ?? null, to: fallbackModel, reason: 'timeout' }); } catch { /* a listener never breaks a turn */ }
+        // …and the turn itself hears it is slow, so the person is told before the second wait (`req.onSlow`, per turn)
+        try { req?.onSlow?.(); } catch { /* a listener never breaks a turn */ }
         return second.invoke(req);
       }
     },

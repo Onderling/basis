@@ -67,6 +67,9 @@ describe('the bot\'s slim map', () => {
     const [line] = roleHintsFor('member');
     for (const op of BOT_OP_MAP.admin) expect(line).toContain(op);
     expect(roleHintsFor('admin')).toEqual([]);
+    // with the door's translator, the model is handed the refusal sentence itself — the locale's words, not its own
+    const [said] = roleHintsFor('member', (k) => (k === 'circle.bot.admin_only' ? 'Dat kan alleen de beheerder van deze bot.' : k));
+    expect(said).toContain('Dat kan alleen de beheerder van deze bot.');
     expect(roleHintsFor(null)).toEqual([]);
   });
 });

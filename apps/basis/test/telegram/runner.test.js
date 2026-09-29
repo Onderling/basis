@@ -12,7 +12,7 @@ import { createTelegramRunner } from '../../src/telegram/runner.js';
 
 const t = (k, p) => (p && typeof p === 'object' && Object.keys(p).length ? `${k}:${JSON.stringify(p)}` : k);
 
-async function boot({ allowedChatIds = ['42'], gate = null, interpret = null, walkLog = null, admit = null } = {}) {
+async function boot({ allowedChatIds = ['42'], gate = null, interpret = null, walkLog = null, admit = null, ...extra } = {}) {
   const bridge = new InMemoryBridge({ id: 'telegram' });
   const agent = createMockHouseholdAgent();
   const calls = [];
@@ -23,6 +23,7 @@ async function boot({ allowedChatIds = ['42'], gate = null, interpret = null, wa
     manifestsByOrigin: { household: mockHouseholdManifest },
     allowedChatIds, t, gate, interpret, llm: interpret ? { invoke: async () => null } : null, walkLog, admit,
     collectMs: 0,   // one line at a time here; the collect window has its own test (assistantLane.test.js)
+    ...extra,
   });
   await runner.start();
   const say = async (text, chatId = '42') => {
@@ -49,6 +50,30 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     // the dispatch reached the waist with both fields bound (the mock agent has no addItem handler; the
     // real one does — what matters here is that the shell compiled the turn to the right {opId, args})
     expect(calls.at(-1)).toMatchObject({ app: 'household', op: 'addItem', args: { type: 'shopping', text: 'bread' } });
+  });
+
+  it('a slow model is said honestly: "even geduld", and when it does not come back, not "ik begreep je niet"', async () => {
+    const abort = () => Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    const interpret = async (_text, o) => { o.onSlow?.(); throw abort(); };
+    const { say } = await boot({ interpret });
+    const out = (await say('hoe gaat het eigenlijk met de planten')).map((m) => m.text);   // past the gate: the model's
+    expect(out).toContain('circle.bot.slow');
+    expect(out).toContain('circle.bot.model_down');
+    expect(out).not.toContain('circle.telegram.unknown');
+  });
+
+  it('a reply\'s buttons obey the person\'s map: an op their role does not reach is never offered', async () => {
+    // a member's map without the complete op (the household bot's slim map scopes per role the same way)
+    const scopeToRole = (cat, role) => (role === 'member'
+      ? { ...cat, opsById: new Map([...cat.opsById].filter(([, e]) => (e?.op?.id ?? '') !== 'markComplete')) }
+      : cat);
+    const { say } = await boot({ roleFor: () => 'member', scopeToRole });
+    const out = await say('/mine');
+    const ids = out.flatMap((m) => m.buttons.map((b) => b.id.split(':')[0]));
+    expect(ids).not.toContain('markComplete');
+    const admin = await boot({ roleFor: () => 'admin', scopeToRole });
+    const theirs = (await admin.say('/mine')).flatMap((m) => m.buttons.map((b) => b.id.split(':')[0]));
+    expect(theirs).toContain('markComplete');
   });
 
   it('a list reply paints its items with their per-item buttons; a tap dispatches the item op', async () => {

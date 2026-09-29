@@ -3685,6 +3685,10 @@
     "mean_this": {
       "text": "Do you mean '{{item}}'?",
       "doc": "A household bot's question when a person's words are only part of one entry (it does not tick or change more than was said)."
+    },
+    "already_there": {
+      "text": "'{{item}}' is already on {{list}}.",
+      "doc": "An add whose words are already open on that list: said, and no second entry is made."
     }
   },
   "share": {
@@ -3968,6 +3972,18 @@
     "not_done": {
       "text": "I did not do that — tell me which list and what to change.",
       "doc": "The assistant's line when the model twice described a result without doing anything (nothing changed)."
+    },
+    "welcome_talk": {
+      "text": "Hi! I'm this household's assistant. Tell me what you want to add or see.",
+      "doc": "The household bot's first words on a door without commands (its contact inbox)."
+    },
+    "slow": {
+      "text": "One moment — the assistant is slow, I am trying once more.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "model_down": {
+      "text": "The assistant is not answering right now. Please try again in a moment.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     }
   },
   "op": {

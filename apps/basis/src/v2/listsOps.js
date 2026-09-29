@@ -107,6 +107,9 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       // An appointment needs a time: a bare add to a list whose entries are events (the Agenda) goes through the
       // calendar's own add, which asks when — never as an event with no date.
       if ((kind ?? target.defaultChild) === 'calendar-event') return { ok: false, error: t('circle.calendar.say_when', { name: target.text ?? ref }) };
+      // The same words already open on this list: not a second entry (the walk: "lamp vervangen" twice on Klusjes).
+      const same = (await entriesOf(circleId, target.id)).find((c) => String(c.text ?? '').trim().toLowerCase() === text.toLowerCase());
+      if (same) return { ok: true, itemId: same.id, duplicate: true, message: t('circle.lists.already_there', { item: same.text ?? text, list: target.text ?? ref }) };
       const made = await svc.addItem(circleId, target.id, text, localActor, kind ? { hint: kind } : undefined);
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {

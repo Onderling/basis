@@ -49,16 +49,26 @@ describe('the household bot, as a walk found it', () => {
     // the title twice
     expect(added.message).toContain(`"when":"${day} 10:00"`);
 
-    // "wat moet ik nog doen": the chores, not the shopping or the Agenda
-    const mine = await call('tasks', 'listMine', {});
-    const labels = (mine.items ?? []).map((i) => i.text ?? i.label);
+    // the general task listing: the chores, not the shopping or the Agenda
+    const open = await call('tasks', 'listOpen', {});
+    const labels = (open.items ?? []).map((i) => i.text ?? i.label);
     expect(labels).toContain('vuilnis buiten zetten');
     expect(labels).not.toContain('tandarts');
     expect(labels).not.toContain('melk');
+    // "wat moet ik nog doen" on the bot: MINE — the chores this person claimed and has not done (nothing yet)
+    const mineBefore = await call('tasks', 'listMine', { actor: 'telegram:111' });
+    expect((mineBefore.items ?? []).map((i) => i.text ?? i.label)).toEqual([]);
+    // an add whose words are already open on that list is not a second entry
+    const dup = await call('lists', 'addToList', { list: 'Klusjes', text: 'Vuilnis buiten zetten' });
+    expect(String(dup.message ?? dup.error)).toContain('circle.lists.already_there');
+    expect(((await call('lists', 'listEntries', { list: 'Klusjes' })).items ?? []).filter((i) => /vuilnis/i.test(i.label)).length).toBe(1);
 
     // a chore by its words
     const claimed = await call('tasks', 'claimTask', { id: 'vuilnis', actor: 'telegram:111' });
     expect(claimed?.result?.error, JSON.stringify(claimed)).toBeUndefined();
+    const mineAfter = await call('tasks', 'listMine', { actor: 'telegram:111' });
+    expect((mineAfter.items ?? []).map((i) => i.text ?? i.label)).toEqual(['vuilnis buiten zetten']);
+    expect(((await call('tasks', 'listMine', { actor: 'telegram:222' })).items ?? [])).toEqual([]);
     // …confirmed in the household's words (the box hands the agent its translator), not a line of English
     expect(claimed?.message).toContain('circle.tasks.reply.claimed');
     // …naming the chore that was FOUND, not the words it was asked by (the walk: "✓ Opgepakt: " with nothing after it)

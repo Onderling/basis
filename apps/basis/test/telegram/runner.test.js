@@ -12,16 +12,16 @@ import { createTelegramRunner } from '../../src/telegram/runner.js';
 
 const t = (k, p) => (p && typeof p === 'object' && Object.keys(p).length ? `${k}:${JSON.stringify(p)}` : k);
 
-async function boot({ allowedChatIds = ['42'], gate = null, interpret = null, walkLog = null } = {}) {
+async function boot({ allowedChatIds = ['42'], gate = null, interpret = null, walkLog = null, admit = null } = {}) {
   const bridge = new InMemoryBridge({ id: 'telegram' });
   const agent = createMockHouseholdAgent();
   const calls = [];
-  const callSkill = async (app, op, args) => { calls.push({ app, op, args }); return agent.callSkill(app, op, args); };
+  const callSkill = async (app, op, args, ctx) => { calls.push({ app, op, args, ...(ctx ? { ctx } : {}) }); return agent.callSkill(app, op, args); };
   const catalogue = mergeManifests([{ manifest: mockHouseholdManifest }]);
   const runner = createTelegramRunner({
     bridge, callSkill, catalogue,
     manifestsByOrigin: { household: mockHouseholdManifest },
-    allowedChatIds, t, gate, interpret, llm: interpret ? { invoke: async () => null } : null, walkLog,
+    allowedChatIds, t, gate, interpret, llm: interpret ? { invoke: async () => null } : null, walkLog, admit,
     collectMs: 0,   // one line at a time here; the collect window has its own test (assistantLane.test.js)
   });
   await runner.start();
@@ -81,6 +81,30 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     const { say: say2, calls: calls2 } = await boot({ allowedChatIds: [] });
     await say2('/mine', '778');
     expect(calls2.at(-1)).toMatchObject({ op: 'listOpen' });
+  });
+
+  it('a door that admits people: every call of the turn carries the person, and the log does not', async () => {
+    const admitted = [];
+    const records = [];
+    const admit = async (who) => { admitted.push(who); return `${who.channel}:${who.uid}`; };
+    const { say, calls, bridge, runner } = await boot({ admit, walkLog: (r) => records.push(r) });
+    await say('/mine');
+    expect(admitted[0]).toMatchObject({ channel: 'telegram', uid: '42', displayName: 'Frits' });
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) expect(c.ctx).toEqual({ caller: 'telegram:42' });
+    expect(JSON.stringify(records)).not.toContain('telegram:42');
+    // the PERSON, not the chat: in a group chat the sender is who asks
+    calls.length = 0;
+    await bridge.simulateIncoming({ chatId: '42', text: '/mine', sender: { bridgeUid: '7', displayName: 'Ann' } });
+    await runner.idle('42');
+    expect(calls.at(-1).ctx).toEqual({ caller: 'telegram:7' });
+  });
+
+  it('a door whose admission fails runs nothing', async () => {
+    const { say, calls } = await boot({ admit: async () => null });
+    const out = await say('/mine');
+    expect(calls).toHaveLength(0);
+    expect(out[0].text).toBe('circle.telegram.unknown');
   });
 
   it('free text (no LLM wired) answers with the help hint, not silence', async () => {

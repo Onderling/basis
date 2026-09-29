@@ -27,6 +27,8 @@ services:
       # Telegram is OPTIONAL now: no token simply means this box is a device and not also a bot.
       TG_BOT_TOKEN: "${TG_BOT_TOKEN:-}"
       TG_ALLOWED_CHAT_IDS: "${TG_ALLOWED_CHAT_IDS:-}"
+      # The Telegram user id of the bot's admin; unset → the first person the bot admits.
+      TG_ADMIN_UID: "${TG_ADMIN_UID:-}"
       PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"
     volumes:

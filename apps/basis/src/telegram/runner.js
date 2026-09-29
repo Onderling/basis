@@ -79,8 +79,23 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   };
 
   /** Paint a RenderedReply as bridge messages. */
+  /**
+   * The ops this chat's person may be OFFERED: their role's map (the same scoping their tools get), or null — no map,
+   * everything the catalogue holds. A button for an op off the map would be refused on tap; it is never shown.
+   */
+  function offeredOps(chatId) {
+    if (typeof roleFor !== 'function' || typeof scopeToRole !== 'function') return null;
+    const rec = turns.get(chatId);
+    const scoped = scopeToRole(catalogueOf(), roleFor(rec?.caller ?? rec?.thread ?? threadFor(chatId)));
+    const ops = new Set();
+    for (const [key, entry] of scoped?.opsById ?? []) ops.add(entry?.op?.id ?? key);
+    return ops;
+  }
+
   async function paint(chatId, rendered) {
     if (!rendered) return;
+    const offered = offeredOps(chatId);
+    const onMap = (b) => !offered || offered.has(String(b?.callbackData ?? '').split(':')[0]);
     if (rendered.kind === 'list') {
       const items = Array.isArray(rendered.items) ? rendered.items : [];
       if (!items.length) { await say(chatId, rendered.text ?? t('circle.telegram.empty_list')); return; }
@@ -91,7 +106,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       items.forEach((it, i) => {
         const name = String(it.label ?? '').trim();
         const short = name.length > 18 ? `${name.slice(0, 17)}…` : name;
-        for (const b of (it.buttons ?? [])) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
+        for (const b of (it.buttons ?? []).filter(onMap)) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
       });
       await say(chatId, lines.join('\n'), buttons);
       return;

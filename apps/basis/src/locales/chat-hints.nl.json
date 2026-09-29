@@ -57,6 +57,18 @@
     "markListItemDone": {
       "text": "Vink iets af op een lijst.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "listEntries": {
+      "text": "Wat er op één lijst staat (de open regels).",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "removeFromList": {
+      "text": "Haal een regel van een lijst (een vergissing, of niet meer nodig).",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "editEntry": {
+      "text": "Pas de woorden van een regel op een lijst aan.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "assistant": {

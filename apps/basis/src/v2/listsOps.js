@@ -35,6 +35,29 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       ?? null;
   };
 
+  /** A list's open entries (its direct children), oldest first. */
+  const entriesOf = async (circleId, listId) => {
+    const tree = await svc.tree(circleId, listId);
+    return (Array.isArray(tree?.children) ? tree.children : []).filter((c) => c && !c.completedAt);
+  };
+  /** An entry on a list, by its id or its words (case aside) — the first open match. */
+  const findEntry = async (circleId, listId, ref) => {
+    const want = String(ref ?? '').trim();
+    const open = await entriesOf(circleId, listId);
+    return open.find((c) => c.id === want) ?? open.find((c) => String(c.text ?? '').toLowerCase() === want.toLowerCase()) ?? null;
+  };
+  /** The list and the entry a call names, or the refusal. */
+  const locate = async (args) => {
+    const circleId = circleOf(args);
+    if (!circleId) return { error: t('circle.lists.no_circle') };
+    const ref = String(args?.list ?? '').trim();
+    const target = ref ? await findList(circleId, ref) : null;
+    if (!target) return { error: t('circle.lists.no_such_list', { name: ref }) };
+    const entry = await findEntry(circleId, target.id, args?.item);
+    if (!entry) return { error: t('circle.lists.no_such_entry', { item: String(args?.item ?? ''), name: target.text ?? ref }) };
+    return { circleId, target, entry };
+  };
+
   return {
     createList: async (args) => {
       const circleId = circleOf(args);
@@ -80,6 +103,32 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       if (!itemId) return { ok: false, error: t('circle.lists.need_item') };
       await svc.markDone(circleId, itemId, localActor);
       return { ok: true, message: t('circle.lists.done') };
+    },
+
+    listEntries: async (args) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
+      const ref = String(args?.list ?? '').trim();
+      const target = ref ? await findList(circleId, ref) : null;
+      if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
+      const open = await entriesOf(circleId, target.id);
+      return { ok: true, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
+    },
+
+    removeFromList: async (args) => {
+      const at = await locate(args);
+      if (at.error) return { ok: false, error: at.error };
+      await svc.remove(at.circleId, at.entry.id);
+      return { ok: true, message: t('circle.lists.removed', { text: at.entry.text ?? '', name: at.target.text ?? '' }) };
+    },
+
+    editEntry: async (args) => {
+      const text = String(args?.text ?? '').trim();
+      if (!text) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      const at = await locate(args);
+      if (at.error) return { ok: false, error: at.error };
+      await svc.storeFor(at.circleId).put({ ...at.entry, text }, { by: localActor });
+      return { ok: true, message: t('circle.lists.edited', { text, name: at.target.text ?? '' }) };
     },
 
     /** The service itself, for a screen that projects containers (a read, not a second write path). */

@@ -70,11 +70,15 @@ export function scopeCatalogueToRole(catalogue, role) {
  * What a person's model is told about the tools they do NOT have: a member asking to make a list gets "the admin does
  * that" rather than their words squeezed into another op. LLM-facing.
  * @param {'member'|'admin'|null} role
+ * @param {(key: string) => string} [t]  the door's translator
  * @returns {string[]}
  */
-export function roleHintsFor(role) {
+export function roleHintsFor(role, t = null) {
   if (role !== 'member') return [];
-  return [`These are the household admin's, not this member's: ${BOT_OP_MAP.admin.join(', ')}. When the member asks for one of them, `
-    + 'do not use another tool instead: reply that only the household\'s admin can do that.'];
+  // With the door's translator the model is handed the refusal itself, so the words are the locale's, not its own.
+  const say = typeof t === 'function'
+    ? `call no tool and reply with exactly this sentence, nothing more: "${t('circle.bot.admin_only')}"`
+    : 'do not use another tool instead: reply that only the household\'s admin can do that, and stop there';
+  return [`These are the household admin's, not this member's: ${BOT_OP_MAP.admin.join(', ')}. When the member asks for one of them, ${say}.`];
 }
 

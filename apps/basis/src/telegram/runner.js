@@ -311,10 +311,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   }
 
   /** A person's first turn with this door: who it is and what it keeps — once. */
+  // The chats that came in on a door without commands (the bot's contact inbox): their welcome does not say "typ /help".
+  const slashless = new Set();
   async function greetOnce(chatId, threadId) {
     if (!threads || !threadId || threads.greeted(threadId)) return;
     const disclosure = doorDisclosure(turnLogMode, t);
-    await say(chatId, [t('circle.bot.welcome'), ...(disclosure ? [disclosure] : [])].join('\n'));
+    const welcome = slashless.has(String(chatId)) ? t('circle.bot.welcome_talk') : t('circle.bot.welcome');
+    await say(chatId, [welcome, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);
   }
 
@@ -393,6 +396,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   // A line still being ADMITTED is not in a lane yet; `idle` waits for those too, or it would answer "nothing queued".
   const admitting = new Set();
   bridge.onMessage((msg) => {
+    if (msg?.slash === false && msg?.chatId) slashless.add(String(msg.chatId));
     const p = handle(msg).catch(() => { /* a turn's error was already told to the chat */ });
     admitting.add(p);
     p.finally(() => admitting.delete(p));

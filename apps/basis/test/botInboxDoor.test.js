@@ -70,7 +70,8 @@ describe('the bot\'s inbox door', () => {
     await d.admission.openCohort({ ceiling: 3, days: 1 });
     const code = await d.admission.code();
     const first = await d.write(ANN, 'hallo', { admission: code });
-    expect(first.replies.join('\n')).toContain('circle.bot.welcome');
+    // the inbox has no slash commands: its welcome says what to do, not "typ /help"
+    expect(first.replies.join('\n')).toContain('circle.bot.welcome_talk');
     // the reply goes to the PERSON (their id), whatever address the message came from
     expect(first.to).toEqual([ANN]);
     expect((await d.users.list()).some((u) => u.id === ANN && u.channel === 'web')).toBe(true);

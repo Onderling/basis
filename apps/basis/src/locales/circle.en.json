@@ -3972,6 +3972,10 @@
     "not_done": {
       "text": "I did not do that — tell me which list and what to change.",
       "doc": "The assistant's line when the model twice described a result without doing anything (nothing changed)."
+    },
+    "welcome_talk": {
+      "text": "Hi! I'm this household's assistant. Tell me what you want to add or see.",
+      "doc": "The household bot's first words on a door without commands (its contact inbox)."
     }
   },
   "op": {

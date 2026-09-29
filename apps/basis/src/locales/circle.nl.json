@@ -3960,7 +3960,11 @@
     "invite_code": "Code (één persoon, één keer): {{code}}\nDie persoon stuurt de bot: /start {{code}}",
     "revoke_unknown": "Ik ken niemand die \"{{who}}\" heet. /users laat zien wie er is.",
     "revoked": "{{who}} is niet meer toegelaten. Met een nieuwe code kan die persoon terugkomen.",
-    "invite_link": "Of stuur deze link, die opent de bot en stuurt de code: {{link}}"
+    "invite_link": "Of stuur deze link, die opent de bot en stuurt de code: {{link}}",
+    "not_done": {
+      "text": "Dat heb ik niet gedaan — zeg me welke lijst en wat er moet veranderen.",
+      "doc": "The assistant's line when the model twice described a result without doing anything (nothing changed)."
+    }
   },
   "op": {
     "not_in_this_circle": {

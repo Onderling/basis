@@ -247,6 +247,8 @@ function processMemory(memoryTurns) {
 export function assistantReplyText(opts, t, fallbackKey) {
   if (opts && typeof opts.reply === 'string' && opts.reply) return opts.reply;
   if (opts && opts.partial === true) return t('circle.bot.more');
+  // a reply that claimed a result twice, with nothing done: said plainly instead
+  if (opts && opts.notDone === true) return t('circle.bot.not_done');
   return t(fallbackKey);
 }
 

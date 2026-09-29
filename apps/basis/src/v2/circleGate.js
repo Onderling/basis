@@ -69,6 +69,33 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
 }
 
 // alias → canonical household list type (the addItem `type` enum: shopping·errand·repair·schedule).
+/**
+ * The deterministic gate for a household BOT, whose household lives on LISTS: the same phrasings the household rules
+ * read ("zet melk op de boodschappen", "wat staat er op de klusjes"), pointed at the lists — `addToList` and
+ * `listEntries` on the list the template names for that kind — and "wat moet ik nog doen" at `listMine`.
+ * @param {string} [_locale]
+ * @param {(kind: 'shopping'|'errand'|'repair'|'schedule') => string|null} listNameOf  the template's list for a kind
+ */
+export function listsGateRules(_locale, listNameOf) {
+  const nameOf = (kind) => (typeof listNameOf === 'function' ? listNameOf(kind) : null);
+  return [
+    { name: 'lists:addToList(named-list)', test: HH_ADD_TYPED, command: (text) => {
+      const m = HH_ADD_TYPED.exec(String(text || '').trim());
+      if (!m) return null;
+      const list = nameOf(HH_LIST_ALIASES[m[2].toLowerCase()]);
+      const items = splitItems(m[1].trim());
+      if (!list || !items.length) return null;
+      return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addToList', args: { list, text: t } })) } : {}) };
+    } },
+    { name: 'lists:listEntries(named-list-read)', test: HH_LIST_READ, command: (text) => {
+      const m = HH_LIST_READ.exec(String(text || '').trim());
+      const list = m ? nameOf(HH_LIST_ALIASES[m[1].toLowerCase()]) : null;
+      return list ? { opId: 'listEntries', args: { list } } : null;
+    } },
+    { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
+  ];
+}
+
 const HH_LIST_ALIASES = {
   shopping: 'shopping', groceries: 'shopping', grocery: 'shopping',
   boodschappen: 'shopping', boodschappenlijst: 'shopping', boodschappenlijstje: 'shopping',

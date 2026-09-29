@@ -3937,9 +3937,14 @@ export async function createRealHouseholdAgent(opts = {}) {
    * no door call.
    * @returns {Promise<string|null>} the refusal's code, or null when the caller may go on
    */
-  const doorRefusal = async (opId, caller, visibility = 'authenticated') => {
+  const doorRefusal = async (opId, caller, visibility) => {
     const engine = hostAgent.policyEngine;
     if (!engine || typeof engine.checkCaller !== 'function') return 'no-gate';
+    // A door that declares its op map (a household bot, `opts.doorOpLevel`): an op off the map is refused however
+    // it is asked for, and an op on it is judged at the map's level. Without a map, an ordinary op is a member's.
+    const mapped = typeof opts.doorOpLevel === 'function' ? opts.doorOpLevel(opId) : undefined;
+    if (mapped === null && visibility === undefined) return 'not-on-this-door';
+    visibility = visibility ?? mapped ?? 'authenticated';
     try {
       await engine.checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility, enabled: true }, unknownAs: 'public' });
       return null;

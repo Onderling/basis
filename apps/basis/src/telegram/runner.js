@@ -53,7 +53,7 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -223,6 +223,11 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     catalogue: catalogueOf, lang, llm, interpret, loadItems, botName,
     ...(threads ? { memory: threads.memory, threadLang: (id) => threads.langOf(id) } : {}),
     ...(promptLines ? { promptLines } : {}),
+    ...(Array.isArray(gateRules) ? { gateRules } : {}),
+    // Each person sees their own tools (a household bot: a member's, or an admin's): the thread is the person.
+    ...(typeof roleFor === 'function' && typeof scopeToRole === 'function'
+      ? { catalogueFor: (threadId) => scopeToRole(catalogueOf(), roleFor(threadId)) }
+      : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),

@@ -11,7 +11,8 @@
  * The household TEMPLATE, as data: a composition of the plugins that exist (lists · tasks · calendar), not an app.
  * "Household" is the bot's name and this start — a "Tennisclub" template composes the same plugins with other lists
  * and other words.
- *   - `lists`   — the lists made on the first start: the locale key of each name, and what a bare add to it makes
+ *   - `lists`   — the lists made on the first start: the locale key of each name, the KIND of list it is (the words
+ *                 people use for it — "boodschappen", "klusjes" — which the deterministic gate reads), and what a bare add to it makes
  *                 (`defaultChild`, honoured only when the list type accepts that kind in this composition — the
  *                 Agenda's `calendar-event` once calendar is composed on the box);
  *   - `required` — the fields a new child of a kind must carry before it is added, per kind: none (Frits,
@@ -21,11 +22,13 @@
 export const HOUSEHOLD_TEMPLATE = Object.freeze({
   id: 'household',
   lists: Object.freeze([
-    { key: 'circle.lists.template.shopping' },
-    { key: 'circle.lists.template.chores', defaultChild: 'task' },
-    { key: 'circle.lists.template.repairs' },
-    { key: 'circle.lists.template.schedule', defaultChild: 'calendar-event' },
+    { key: 'circle.lists.template.shopping', kind: 'shopping' },
+    { key: 'circle.lists.template.chores', kind: 'errand', defaultChild: 'task' },
+    { key: 'circle.lists.template.repairs', kind: 'repair' },
+    { key: 'circle.lists.template.schedule', kind: 'schedule', defaultChild: 'calendar-event' },
   ]),
+  // The plugins this template composes on the bot (its app list on the first start): lists hold, tasks move.
+  apps: Object.freeze(['lists', 'tasks']),
   required: Object.freeze({}),
   promptLines: Object.freeze([
     'This household keeps its things on LISTS. Add anything with addToList (the list by its name); a bare add makes what that list holds.',
@@ -55,4 +58,16 @@ export async function ensureHouseholdLists({ callSkill, t, template = HOUSEHOLD_
     if (res?.ok !== false) made.push(name);
   }
   return made;
+}
+
+/**
+ * The template's list for a kind of list ("boodschappen" → the shopping list's name), for the deterministic gate.
+ * @param {(key: string) => string} t
+ * @param {object} [template]
+ */
+export function templateListNameOf(t, template = HOUSEHOLD_TEMPLATE) {
+  return (kind) => {
+    const entry = template.lists.find((l) => l.kind === kind);
+    return entry ? t(entry.key) : null;
+  };
 }

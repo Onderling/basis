@@ -58,7 +58,9 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, templateListNameOf } from '../src/v2/householdTemplate.js';
+import { botOpLevel, scopeCatalogueToRole } from '../src/v2/botOpMap.js';
+import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
@@ -198,7 +200,8 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
-  ...(botInstall ? { tasksCircleId: 'household' } : {}),
+  // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
+  ...(botInstall ? { tasksCircleId: 'household', doorOpLevel: botOpLevel } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -683,8 +686,11 @@ if (tgToken || inboxDoor.bridge) {
   // Scope, then interpret: the apps this bot acts in are the owner's setting, read at boot, and the catalogue
   // every surface of the door projects — the model's tools included — holds only theirs.
   // The admin switches apps from the door (`/apps on tasks`): the parameter is written and the catalogue recomposed.
+  const isFunctionProfile = (await agent.profileKind?.()) === 'function';
   const doorCatalogue = createDoorCatalogue({
     householdManifest: agent.manifest,
+    // A household bot composes exactly its map (`botOpMap.js`); a person's box its app list, as before.
+    slim: isFunctionProfile,
     getApps: () => agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY),
     setApps: (list) => callSkill('params', 'set-param', { key: ASSISTANT_APPS_PARAM_KEY, value: list }),
   });
@@ -700,7 +706,6 @@ if (tgToken || inboxDoor.bridge) {
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
   const tgBridge = tgToken ? new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }) : null;
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
-  const isFunctionProfile = (await agent.profileKind?.()) === 'function';
   // Every person is a contact with a role, and their calls carry them to the host gate.
   const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
   // Admission by code: the signing secret in the bot's sealed vault, the cohort and spent codes in a sealed store.
@@ -708,6 +713,8 @@ if (tgToken || inboxDoor.bridge) {
     secretVault: chatVault,
     store: dataSourceRowStore(await stores.botAdmissionSource(), 'mem://basis/bot-admission/'),
   });
+  // The door's admission, once: who is let in, their tier in the gate, and the role their thread's tools follow.
+  const doorAdmit = createDoorAdmit({ users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller });
   // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
   // console, never a chat or the walk log) — the first person admitted is the bot's admin.
   let bootstrapCode = null;
@@ -745,22 +752,33 @@ if (tgToken || inboxDoor.bridge) {
         }),
       },
     }),
-    admit: createDoorAdmit({ users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller }),
+    admit: doorAdmit,
     threads,
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
     // Turns go into the walk log only when the operator asks, and then the people in the house are told.
     walkLog: turnLogFor(turnLogMode, walkLog),
     turnLogMode,
-    // A household bot's model is told about its household's lists (the template's words).
-    ...(isFunctionProfile ? { promptLines: HOUSEHOLD_TEMPLATE.promptLines } : {}),
+    // A household bot: its model is told about its household's lists (the template's words), each person sees their
+    // own tools (a member's or the admin's), and the deterministic gate speaks the lists.
+    ...(isFunctionProfile ? {
+      promptLines: HOUSEHOLD_TEMPLATE.promptLines,
+      roleFor: (threadId) => doorAdmit.roleOf(threadId),
+      scopeToRole: scopeCatalogueToRole,
+      gateRules: listsGateRules(values.lang, templateListNameOf(t)),
+    } : {}),
   });
   await tgRunner.start();
   // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a
   // person's node: their circle is theirs, and four lists would appear on every device of theirs.
   if (isFunctionProfile) {
     ensureHouseholdLists({ callSkill, t })
-      .then((made) => { if (made.length) walkLog({ kind: 'household-template', lists: made.length }); })
+      .then(async (made) => {
+        if (!made.length) return;
+        // The first start: the template's plugins become the bot's app list (lists hold, tasks move).
+        await doorCatalogue.setApps([...HOUSEHOLD_TEMPLATE.apps]).catch(() => {});
+        walkLog({ kind: 'household-template', lists: made.length, apps: HOUSEHOLD_TEMPLATE.apps });
+      })
       .catch((err) => console.warn(`device-runner: the household lists were not made (${err?.message ?? err})`));
   }
   if (bootstrapCode && tgBridge?.botUsername) console.log(`device-runner: …or open  https://t.me/${tgBridge.botUsername}?start=${bootstrapCode}`);

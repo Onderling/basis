@@ -10,7 +10,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { buildToolDescriptors } from '../src/v2/interpretCommand.js';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
-import { BOT_OP_MAP, botOpLevel, scopeCatalogueToRole } from '../src/v2/botOpMap.js';
+import { BOT_OP_MAP, botOpLevel, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
 import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
@@ -61,5 +61,12 @@ describe('the bot\'s slim map', () => {
     expect(run('add task call the plumber')).toMatchObject({ opId: 'addToList', args: { list: 'Klusjes', text: 'call the plumber' } });
     expect(run('nieuwe taak: lamp vervangen')).toMatchObject({ opId: 'addToList', args: { list: 'Klusjes', text: 'lamp vervangen' } });
     expect(HOUSEHOLD_TEMPLATE.lists.map((l) => l.kind)).toEqual(['shopping', 'errand', 'repair', 'schedule']);
+  });
+
+  it('a member\'s model is told which tools are the admin\'s, so "maak een lijst" gets "the admin does that"', () => {
+    const [line] = roleHintsFor('member');
+    for (const op of BOT_OP_MAP.admin) expect(line).toContain(op);
+    expect(roleHintsFor('admin')).toEqual([]);
+    expect(roleHintsFor(null)).toEqual([]);
   });
 });

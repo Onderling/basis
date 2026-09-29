@@ -98,6 +98,17 @@ describe('createAssistantEngine', () => {
     expect(interpretHintsFor('add some milk to the list please')).toContain('The member wrote in: en.');
     expect(interpretHintsFor('maii')).toEqual([]);
   });
+  it('a thread\'s own hints reach the model below the language line; and it acts on the newest message only', async () => {
+    const seen = [];
+    const interpret = async (text, o) => { seen.push(o); return null; };
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {},
+      threadHints: (id) => (id === 'member-thread' ? ['only the admin makes lists'] : []) });
+    await e.ask('member-thread', 'maak een nieuwe lijst: cadeaus');
+    expect(seen[0].hints).toEqual(['The member wrote in: nl.', 'only the admin makes lists']);
+    expect(seen[0].system).toContain("NEWEST message only");
+    await e.ask('other', 'maak een nieuwe lijst: cadeaus');
+    expect(seen[1].hints).toEqual(['The member wrote in: nl.']);
+  });
 
   it('three items named → three dispatches in one turn (the interpreter\'s `more`)', async () => {
     const dispatched = [];

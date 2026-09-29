@@ -59,7 +59,7 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateListNameOf, loadListItems } from '../src/v2/householdTemplate.js';
-import { botOpLevel, scopeCatalogueToRole } from '../src/v2/botOpMap.js';
+import { botOpLevel, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
@@ -766,6 +766,7 @@ if (tgToken || inboxDoor.bridge) {
       promptLines: HOUSEHOLD_TEMPLATE.promptLines,
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
       scopeToRole: scopeCatalogueToRole,
+      hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId)),
       gateRules: listsGateRules(values.lang, templateListNameOf(t)),
     } : {}),
   });

@@ -1,3 +1,4 @@
+import { isKeylessContact } from '@onderling/item-types';
 /**
  * `createCircleFanOut(deps)` — the ONE circle-broadcast fan the whole
  * `broadcastCircle*` family rides. Lifted verbatim out of stoop's `buildSkills`
@@ -107,7 +108,12 @@ export function createCircleFanOut({
     // The no-trail fallback fans over the global MemberMap, so it must drop this circle's
     // exits itself; otherwise a removed member keeps receiving the circle's traffic.
     const fanExits = roster ? null : await readCircleExits({ store, groupId: circleId });
-    const fanMembers = roster
+    // A person admitted at a bot's DOOR (a keyless contact row: `telegram:<uid>`, a channel, no key) is in the
+    // MemberMap as a contact, never a peer: there is no address to reach them on. Found on the tablet (2026-09-29):
+    // a circle with no trail fell back to the MemberMap below, and every write was "fanned" to a Telegram id over
+    // the relay. Dropped from every branch.
+    const peersOnly = (rows) => (Array.isArray(rows) ? rows : []).filter((m) => !isKeylessContact(typeof m === 'string' ? { webid: m } : m));
+    const fanMembersAll = roster
       ? { list: async () => roster, resolveByWebid: (w) => members.resolveByWebid(w) }
       : (fanExits && fanExits.size > 0
         ? {
@@ -115,6 +121,7 @@ export function createCircleFanOut({
           resolveByWebid: (w) => members.resolveByWebid(w),
         }
         : members);
+    const fanMembers = { list: async () => peersOnly(await fanMembersAll.list()), resolveByWebid: (w) => fanMembersAll.resolveByWebid(w) };
 
     // ── ONE RECIPIENT WHO IS DELIBERATELY NOT ON THE ROSTER ────────────────
     // `only` narrows the fan; this widens it, by exactly the addresses the caller names. The case

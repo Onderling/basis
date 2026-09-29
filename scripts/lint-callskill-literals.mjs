@@ -39,6 +39,7 @@ const SPECS = [
   { name: 'folio',     path: 'apps/folio/manifest.js',                            pick: (m) => m.folioManifest },
   { name: 'calendar',  path: 'apps/calendar/manifest.js',                         pick: (m) => m.calendarManifest },
   { name: 'agents',    path: 'apps/agents/manifest.js',                           pick: (m) => m.agentsManifest },
+  { name: 'lists',     path: 'apps/lists/manifest.js',                            pick: (m) => m.listsManifest },
   { name: 'params',    path: 'apps/basis/src/v2/paramsManifest.js',               pick: (m) => m.paramsManifest },
   // the composed chat stand-ins — tasks has no app manifest of its own today
   { name: 'tasks',     path: 'apps/basis/src/core/manifests/mockManifests.js',    pick: (m) => m.mockTasksManifest },

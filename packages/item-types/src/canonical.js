@@ -37,7 +37,13 @@ import { INBOX_ITEM_SCHEMA }        from './types/inbox-item.js';
 /** A list: a named container of entries. */
 const LIST_SCHEMA = Object.freeze({
   iri: `${NAMESPACE}List`,
-  type: 'object', properties: { type: { const: 'list' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
+  type: 'object',
+  properties: {
+    type: { const: 'list' }, text: { type: 'string', minLength: 1 },
+    // What a bare add to THIS list makes (one of the kinds a list accepts): a chores list's is `task`.
+    defaultChild: { type: 'string', minLength: 1 },
+  },
+  required: ['type', 'text'],
 });
 /** An entry in a container — and itself a container, which is what makes the nesting composable. */
 const LIST_ITEM_SCHEMA = Object.freeze({

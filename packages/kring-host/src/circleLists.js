@@ -98,7 +98,14 @@ export function makeCircleLists({ storeFor, dataSource, manifests, rootPrefix } 
     stores: own,
     /** The circle's store, however this service was composed. One place that answers "which store". */
     storeFor: s,
-    createList:  (circleId, text, by) => s(circleId).put({ type: 'list', text }, { by }),
+    /**
+     * A new list. `opts.defaultChild` — one of the kinds a list accepts — is what a bare add to THIS list makes (a
+     * chores list: `task`); one the list type does not accept is not stored, so the type's default applies.
+     */
+    createList: (circleId, text, by, { defaultChild } = {}) => {
+      const ok = typeof defaultChild === 'string' && policy.acceptsFor('list').some((a) => a.type === defaultChild);
+      return s(circleId).put({ type: 'list', text, ...(ok ? { defaultChild } : {}) }, { by });
+    },
     createBoard: (circleId, text, by) => s(circleId).put({ type: 'board', text }, { by }),   // multi-type container
     /**
      * Add a child to a container — the child TYPE is resolved from the container type's `accepts` (not fixed).

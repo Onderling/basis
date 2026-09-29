@@ -58,6 +58,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
@@ -747,6 +748,13 @@ if (tgToken || inboxDoor.bridge) {
     turnLogMode,
   });
   await tgRunner.start();
+  // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a
+  // person's node: their circle is theirs, and four lists would appear on every device of theirs.
+  if ((await agent.profileKind?.()) === 'function') {
+    ensureHouseholdLists({ callSkill, t })
+      .then((made) => { if (made.length) walkLog({ kind: 'household-template', lists: made.length }); })
+      .catch((err) => console.warn(`device-runner: the household lists were not made (${err?.message ?? err})`));
+  }
   if (bootstrapCode && tgBridge?.botUsername) console.log(`device-runner: …or open  https://t.me/${tgBridge.botUsername}?start=${bootstrapCode}`);
   walkLog({ kind: 'assistant', doors: [tgBridge ? 'telegram' : null, inboxDoor.bridge ? 'inbox' : null].filter(Boolean), admission: 'codes', bootstrap: bootstrapUids.length, llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
 }

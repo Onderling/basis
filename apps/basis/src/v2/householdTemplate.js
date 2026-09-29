@@ -28,12 +28,18 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     { key: 'circle.lists.template.schedule', kind: 'schedule', defaultChild: 'calendar-event' },
   ]),
   // The plugins this template composes on the bot (its app list on the first start): lists hold, tasks move.
-  apps: Object.freeze(['lists', 'tasks']),
+  apps: Object.freeze(['lists', 'tasks', 'calendar']),
   required: Object.freeze({}),
   promptLines: Object.freeze([
     'This household keeps its things on LISTS. Add anything with addToList (the list by its name); a bare add makes what that list holds.',
     'Klusjes (chores) holds TASKS: a person claims one ("ik doe de lamp" → claimTask) and completes it; listMine shows theirs.',
-    'Boodschappen (shopping) and Reparaties (repairs) hold plain entries; Agenda holds appointments.',
+    'Boodschappen (shopping) and Reparaties (repairs) hold plain entries.',
+    'Agenda holds APPOINTMENTS: add one with addEvent (a title and `when` as the household\'s local time without a zone, e.g. 2026-09-30T10:00); listEvents shows the coming days; a person answers an invitation with rsvpAccept / rsvpDecline / rsvpTentative (the appointment by its words or id).',
+    'Each thing is its own entry: "melk en brood" is two adds (melk, brood), not one entry.',
+    'A chore or an entry can be named by its words: claimTask / completeTask with the chore\'s words as `id` ("vuilnis") when you have no id.',
+    'Food, drinks and household goods named without a list go on Boodschappen — do not ask which list for groceries.',
+    'The task list (takenlijst, chores, to-dos) is Klusjes: "wat staat er op de takenlijst" is listEntries on Klusjes.',
+    'When a person says an entry is done, bought or fixed, tick it off with markListItemDone and the entry\'s id from the items you were given.',
   ]),
 });
 
@@ -61,6 +67,19 @@ export async function ensureHouseholdLists({ callSkill, t, template = HOUSEHOLD_
 }
 
 /**
+ * The bot's app list with the template's apps in it: what a start writes when the template has grown since the list
+ * was set (a bot made before tasks or calendar were in it), or null when nothing is missing. The owner's own apps
+ * stay; only the template's missing ones are added.
+ * @param {string[]|null|undefined} current
+ * @returns {string[]|null}
+ */
+export function withTemplateApps(current, template = HOUSEHOLD_TEMPLATE) {
+  const have = Array.isArray(current) ? current : [];
+  const missing = template.apps.filter((a) => !have.includes(a));
+  return missing.length ? [...have, ...missing] : null;
+}
+
+/**
  * The template's list for a kind of list ("boodschappen" → the shopping list's name), for the deterministic gate.
  * @param {(key: string) => string} t
  * @param {object} [template]
@@ -69,5 +88,24 @@ export function templateListNameOf(t, template = HOUSEHOLD_TEMPLATE) {
   return (kind) => {
     const entry = template.lists.find((l) => l.kind === kind);
     return entry ? t(entry.key) : null;
+  };
+}
+
+/**
+ * What a household bot's model may draw on: every open entry of every list, with its list — the retrieval a bare
+ * "kaas is gekocht" needs to find the entry's id. (A person's node reads its household items instead.)
+ * @param {{ callSkill: Function }} a
+ */
+export function loadListItems({ callSkill }) {
+  return async () => {
+    try {
+      const lists = (await callSkill('lists', 'listLists', {}))?.items ?? [];
+      const out = [];
+      for (const l of lists) {
+        const entries = (await callSkill('lists', 'listEntries', { list: l.id }))?.items ?? [];
+        for (const e of entries) out.push({ id: String(e.id ?? ''), type: e.type ?? 'list-item', text: `${e.label ?? ''} (${l.label ?? ''})` });
+      }
+      return out.filter((it) => it.id && it.text);
+    } catch { return []; }
   };
 }

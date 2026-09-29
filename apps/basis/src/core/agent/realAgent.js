@@ -239,7 +239,9 @@ import { basisManifest }                   from '../../../manifest.js';         
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
 import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
-import { makeListsOps }                    from '../../v2/listsOps.js';                  // the lists handlers, once (a shell mounts the same ones with its own seams)
+import { makeListsOps }                    from '../../v2/listsOps.js';
+import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
+import { pickEntry }                       from '../../v2/entryRef.js';                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3951,12 +3953,26 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return e?.code ?? 'refused'; }
   };
 
+  let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       const refusal = await doorRefusal(opId, ctx.caller);
       if (refusal) return { ok: false, error: refusal };
-      if (appOrigin === 'tasks') args = { ...(args ?? {}), actor: ctx.caller };
+      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
+    }
+    // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
+    // for its id — the task by id, else by its words (`pickEntry`) among the circle's open tasks; words that name no
+    // task are said so in the household's words, not the store's.
+    if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {
+      const store = householdService?.stores?.getStore?.(resolveCircleId(args ?? {}));
+      if (store && typeof store.listByType === 'function') {
+        const open = ((await store.listByType('task')) ?? []).filter((it) => !it?.completedAt);
+        const task = pickEntry(open, args.id, (it) => it?.text ?? it?.title);
+        if (!task) return { ok: false, error: (typeof opts.t === 'function' ? opts.t : (k) => k)('circle.tasks.no_such_task', { item: args.id }) };
+        args = { ...args, id: task.id };
+      }
     }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and
@@ -4537,6 +4553,18 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first  = Array.isArray(result) ? result[0] : null;
       return first?.data ?? null;
     }
+    // A household bot (`opts.calendarInCircle`): the calendar's verbs over the circle's ONE store — events are the
+    // Agenda's children — not the per-agent in-memory CalendarStore below, which a person's node keeps.
+    if (appOrigin === 'calendar' && opts.calendarInCircle) {
+      const ops = (circleCalendar ??= makeCircleCalendarOps({
+        storeFor: (circleId) => householdService.stores.getStore(circleId),
+        activeCircle: () => resolveCircleId({}),
+        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        localActor: 'me',
+      }));
+      const handler = ops[opId];
+      return handler ? handler(args ?? {}) : { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
+    }
     if (appOrigin === 'calendar') {
       // Calendar skills are registered on the household host agent with the
       // 'calendar_' prefix (v0.7.10 multi-app collision-avoidance).  Routing
@@ -4794,9 +4822,14 @@ export async function createRealHouseholdAgent(opts = {}) {
             }));
         }
       }
+      // In the household's words where the shell hands the agent its translator (the box does); web and mobile
+      // hand none yet, and keep the English line.
+      const message = typeof opts.t === 'function'
+        ? opts.t(`circle.tasks.reply.${verbMap[opId].toLowerCase()}`, { title, note: noteSuffix })
+        : `✓ ${verbMap[opId]}: ${title}${noteSuffix}`;
       return {
         ok:      true,
-        message: `✓ ${verbMap[opId]}: ${title}${noteSuffix}`,
+        message,
         itemId:  task.id,
         // S6.A — enrich with mock-era state/type so the post-action reply also
         // carries the right inline buttons (e.g. a claimed task → Mark complete).

@@ -623,6 +623,38 @@
     "invited": {
       "text": "📅 Je bent uitgenodigd: {{title}} — het staat in je agenda.",
       "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
+    },
+    "no_agenda": {
+      "text": "Er is geen agenda om een afspraak op te zetten.",
+      "doc": "A household bot's calendar reply."
+    },
+    "added": {
+      "text": "Afspraak gezet: {{title}} ({{when}}).",
+      "doc": "A household bot's calendar reply."
+    },
+    "no_event": {
+      "text": "Die afspraak ken ik niet.",
+      "doc": "A household bot's calendar reply."
+    },
+    "cancelled": {
+      "text": "Afspraak geschrapt: {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_accepted": {
+      "text": "Je komt naar {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_declined": {
+      "text": "Je komt niet naar {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_tentative": {
+      "text": "Misschien kom je naar {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "say_when": {
+      "text": "Een afspraak op {{name}} heeft een tijd nodig: zeg wanneer.",
+      "doc": "A household bot's calendar reply."
     }
   },
   "embed": {
@@ -3641,6 +3673,10 @@
     "edited": {
       "text": "Aangepast op {{name}}: \"{{text}}\".",
       "doc": "A lists reply in the chat."
+    },
+    "not_there": {
+      "text": "\"{{item}}\" staat op geen lijst.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
     }
   },
   "share": {
@@ -6755,6 +6791,38 @@
     "share": {
       "text": "Delen…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    }
+  },
+  "tasks": {
+    "no_such_task": {
+      "text": "Geen klus \"{{item}}\" hier.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "reply": {
+      "claimed": {
+        "text": "✓ Opgepakt: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "completed": {
+        "text": "✓ Klaar: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "submitted": {
+        "text": "✓ Ingeleverd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "approved": {
+        "text": "✓ Goedgekeurd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "rejected": {
+        "text": "✓ Afgekeurd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "edited": {
+        "text": "✓ Aangepast: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      }
     }
   }
 }

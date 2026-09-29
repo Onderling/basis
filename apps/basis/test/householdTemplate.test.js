@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, loadListItems, withTemplateApps } from '../src/v2/householdTemplate.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { mergeManifests } from '../src/manifestMerge.js';
 import { listsManifest } from '../../lists/manifest.js';
@@ -55,5 +55,24 @@ describe('the household template', () => {
     await engine.ask('t1', 'hoe is het nu met de lijst van ons');
     await engine.idle();
     expect(seen[0]).toContain(HOUSEHOLD_TEMPLATE.promptLines[0]);
+  });
+
+  it('a household bot\'s model draws on its list entries: id, words and the list', async () => {
+    const node = await bootRealAgentNode('tpl2');
+    nodes.push(node);
+    const call = (a, o, x) => node.agent.callSkill(a, o, x);
+    const t = (k) => ({ 'circle.lists.template.shopping': 'Boodschappen' }[k] ?? k.split('.').pop());
+    await ensureHouseholdLists({ callSkill: call, t });
+    await call('lists', 'addToList', { list: 'Boodschappen', text: 'kaas' });
+    const items = await loadListItems({ callSkill: call })();
+    expect(items.find((i) => i.text === 'kaas (Boodschappen)')?.id).toBeTruthy();
+  }, 90_000);
+
+  it('a bot made before the template grew still gets its apps: the template\'s are added at every start, the owner\'s kept', () => {
+    // a bot whose app list was set before tasks and calendar were in the template (the list a restart restores)
+    expect(withTemplateApps(['household', 'lists'])).toEqual(['household', 'lists', 'tasks', 'calendar']);
+    expect(withTemplateApps(null)).toEqual([...HOUSEHOLD_TEMPLATE.apps]);
+    // already complete: the same list back (nothing to write)
+    expect(withTemplateApps(['lists', 'tasks', 'calendar'])).toBeNull();
   });
 });

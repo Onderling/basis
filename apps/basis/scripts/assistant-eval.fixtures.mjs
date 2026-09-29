@@ -7,37 +7,37 @@
  */
 export const FIXTURES = [
   // ── the deterministic gate (no model should be needed; via=rule) ──
-  { id: 'gate-add-typed-nl',  text: 'zet kaas op het boodschappenlijstje', expect: { op: 'addItem', args: { type: 'shopping', text: 'kaas' } } },
-  { id: 'gate-list-nl',       text: 'wat staat er op de boodschappenlijst?', expect: { op: 'listOpen', args: { type: 'shopping' } } },
-  { id: 'gate-add-typed-en',  text: 'add bread to the shopping list', lang: 'en', expect: { op: 'addItem', args: { type: 'shopping', text: 'bread' } } },
+  { id: 'gate-add-typed-nl',  text: 'zet kaas op het boodschappenlijstje', expect: { op: 'addToList', args: { list: /boodschappen/, text: 'kaas' } } },
+  { id: 'gate-list-nl',       text: 'wat staat er op de boodschappenlijst?', expect: { op: 'listEntries', args: { list: /boodschappen/ } } },
+  { id: 'gate-add-typed-en',  text: 'add bread to the shopping list', lang: 'en', expect: { op: 'addToList', args: { list: /boodschappen/, text: 'bread' } } },
   // ── the model: single adds (walk 1 + 2) ──
-  { id: 'add-plain-nl',       text: 'Anyway, zet zout maar op de boodschappenlijst', expect: { op: 'addItem', args: { type: 'shopping', text: /zout/ } } },
-  { id: 'add-erbij-nl',       text: 'Doe broccoli erbij', before: ['you: wat staat er op de boodschappenlijst', 'system: 1. stokbrood 2. brood'], expect: { op: 'addItem', args: { type: 'shopping', text: /broccoli/ } } },
-  { id: 'add-kunje-nl',       text: 'Kun je brood en eieren toevoegen?', before: ['you: wat staat er nu op de lijst', 'system: 1. stokbrood 2. broccoli 3. zout'], expect: { op: 'addItem', args: { type: 'shopping', text: /brood/ } } },   // walk 2: picked listOpen
-  { id: 'add-want-nl',        text: 'Ehm ja, ik wil graag braadlappen kopen', before: ['you: ik wil vandaag stokbrood halen', 'system: ✓ added to shopping: stokbrood'], expect: { op: 'addItem', args: { type: 'shopping', text: /braadlappen/ } } },   // walk 1: fabricated ✓
-  { id: 'add-followup-nl',    text: 'En geurkazen', before: ['you: ik wil graag braadlappen kopen', 'system: ✓ added to shopping: braadlappen'], expect: { op: 'addItem', args: { type: 'shopping', text: /^geurkazen$/i } } },   // walk 1: "En geurkazen" as text
+  { id: 'add-plain-nl',       text: 'Anyway, zet zout maar op de boodschappenlijst', expect: { op: 'addToList', args: { list: /boodschappen/, text: /zout/ } } },
+  { id: 'add-erbij-nl',       text: 'Doe broccoli erbij', before: ['you: wat staat er op de boodschappenlijst', 'system: 1. stokbrood 2. brood'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /broccoli/ } } },
+  { id: 'add-kunje-nl',       text: 'Kun je brood en eieren toevoegen?', before: ['you: wat staat er nu op de lijst', 'system: 1. stokbrood 2. broccoli 3. zout'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /brood/ } } },   // walk 2: picked listOpen
+  { id: 'add-want-nl',        text: 'Ehm ja, ik wil graag braadlappen kopen', before: ['you: ik wil vandaag stokbrood halen', 'system: ✓ added to shopping: stokbrood'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /braadlappen/ } } },   // walk 1: fabricated ✓
+  { id: 'add-followup-nl',    text: 'En geurkazen', before: ['you: ik wil graag braadlappen kopen', 'system: ✓ added to shopping: braadlappen'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /^geurkazen$/i } } },   // walk 1: "En geurkazen" as text
   // ── multi-item (walk 1: only the first landed) ──
-  { id: 'add-multi-nl',       text: 'Hoi, ik wil vandaag het volgende halen bij de winkel: stokbrood, braadlappen en geurkazen', expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
-  { id: 'add-two-nl',         text: 'zet brood en eieren op de boodschappen', expect: { op: 'addItem', args: { type: 'shopping' } } },
+  { id: 'add-multi-nl',       text: 'Hoi, ik wil vandaag het volgende halen bij de winkel: stokbrood, braadlappen en geurkazen', expect: { op: 'addToList', args: { list: /boodschappen/ }, count: 3 } },
+  { id: 'add-two-nl',         text: 'zet brood en eieren op de boodschappen', expect: { op: 'addToList', args: { list: /boodschappen/ } } },
   // three quick lines, one turn (the collect window): one model call, three adds
-  { id: 'collect-three-lines-nl', lines: ['melk', 'brood', 'eieren'], expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
-  { id: 'add-three-plain-nl', text: 'zet stokbrood, melk en eieren op de boodschappenlijst', expect: { op: 'addItem', args: { type: 'shopping' }, count: 3 } },
+  { id: 'collect-three-lines-nl', lines: ['melk', 'brood', 'eieren'], expect: { op: 'addToList', args: { list: /boodschappen/ }, count: 3 } },
+  { id: 'add-three-plain-nl', text: 'zet stokbrood, melk en eieren op de boodschappenlijst', expect: { op: 'addToList', args: { list: /boodschappen/ }, count: 3 } },
   // ── an untyped add ASKS which list (L90): the gate hands addItem without a type; the shell asks ──
-  { id: 'gate-add-untyped-nl', text: 'voeg ook de braadlappen en geurkazen toe', expect: { op: 'addItem', args: { text: /braadlappen/ } } },
-  { id: 'gate-add-untyped-en', text: 'add milk to the list', lang: 'en', expect: { op: 'addItem', args: { text: 'milk' } } },
-  { id: 'gate-add-task-en',    text: 'add task call the plumber', lang: 'en', expect: { op: 'addTask' } },
-  { id: 'gate-add-colon-nl',   text: 'Voeg toe: spruiten kopen', expect: { op: 'addItem', args: { text: 'spruiten kopen' } } },   // walk 3: became a task "toe: spruiten kopen"
-  { id: 'add-typed-colon-nl',  text: 'Kun je er opzetten: kraan aandraaien', before: ['you: wat staat er op de reparatieslijst', 'system: Nog niets.'], expect: { op: 'addItem', args: { type: 'repair', text: /kraan/ } } },
-  { id: 'add-three-repair-nl', text: 'Ook graag op reparaties: wasmachine reinigen, vloer ontkleven en kopjes afbreien', expect: { op: 'addItem', args: { type: 'repair' }, count: 3 } },
-  { id: 'list-tasks-nl',       text: 'Wat staat er op de takenlijst', expect: { op: 'listTasks' } },
-  { id: 'list-now-vague-nl',   text: 'Wat staat op de lijst nu?', expect: { anyOf: [{ reply: 'asks' }, { op: 'listLists' }, { op: 'listOpen' }] } },
+  { id: 'gate-add-untyped-nl', text: 'voeg ook de braadlappen en geurkazen toe', expect: { anyOf: [{ reply: 'asks' }, { op: 'addToList', args: { text: /braadlappen/ } }] } },
+  { id: 'gate-add-untyped-en', text: 'add milk to the list', lang: 'en', expect: { anyOf: [{ reply: 'asks' }, { op: 'addToList', args: { text: 'milk' } }] } },
+  { id: 'gate-add-task-en',    text: 'add task call the plumber', lang: 'en', expect: { op: 'addToList', args: { list: /klusjes/ } } },
+  { id: 'gate-add-colon-nl',   text: 'Voeg toe: spruiten kopen', expect: { anyOf: [{ reply: 'asks' }, { op: 'addToList', args: { text: /spruiten/ } }] } },   // walk 3: became a task "toe: spruiten kopen"
+  { id: 'add-typed-colon-nl',  text: 'Kun je er opzetten: kraan aandraaien', before: ['you: wat staat er op de reparatieslijst', 'system: Nog niets.'], expect: { op: 'addToList', args: { list: /reparaties/, text: /kraan/ } } },
+  { id: 'add-three-repair-nl', text: 'Ook graag op reparaties: wasmachine reinigen, vloer ontkleven en kopjes afbreien', expect: { op: 'addToList', args: { list: /reparaties/ }, count: 3 } },
+  { id: 'list-tasks-nl',       text: 'Wat staat er op de takenlijst', expect: { anyOf: [{ op: 'listMine' }, { op: 'listEntries', args: { list: /klusjes/ } }] } },
+  { id: 'list-now-vague-nl',   text: 'Wat staat op de lijst nu?', expect: { anyOf: [{ reply: 'asks' }, { op: 'listLists' }, { op: 'listEntries' }] } },
   // ── complete / remove ──
-  { id: 'done-bought-nl',     text: 'Kaas is gekocht', items: ['kaas', 'melk'], expect: { op: 'markComplete', args: { match: /kaas/ } } },
+  { id: 'done-bought-nl',     text: 'Kaas is gekocht', items: ['kaas', 'melk'], expect: { anyOf: [{ reply: 'asks' }, { op: 'markListItemDone' }, { op: 'removeFromList', args: { item: /kaas/ } }] } },
   // ── memory: a bare answer to the bot's question ──
-  { id: 'memory-which-list',  text: 'De boodschappenlijst', before: ['you: wat staat er op de lijst', 'assistant: Welke lijst bedoel je — boodschappen of klusjes?'], expect: { op: 'listOpen', args: { type: 'shopping' } } },
-  { id: 'memory-show-first',  text: 'Laat eerst maar zien', before: ['you: ik wil boodschappen doen!', 'assistant: prima, wil je de boodschappenlijst zien, of iets toevoegen?'], expect: { op: 'listOpen', args: { type: 'shopping' } } },
+  { id: 'memory-which-list',  text: 'De boodschappenlijst', before: ['you: wat staat er op de lijst', 'assistant: Welke lijst bedoel je — boodschappen of klusjes?'], expect: { op: 'listEntries', args: { list: /boodschappen/ } } },
+  { id: 'memory-show-first',  text: 'Laat eerst maar zien', before: ['you: ik wil boodschappen doen!', 'assistant: prima, wil je de boodschappenlijst zien, of iets toevoegen?'], expect: { op: 'listEntries', args: { list: /boodschappen/ } } },
   // ── ambiguity: the model should ASK, not guess ──
-  { id: 'ask-which-list',     text: 'Wat staat er op de lijst', expect: { anyOf: [{ reply: 'asks' }, { op: 'listLists' }, { op: 'listOpen' }] } },   // asking, or showing what lists there are, both fine
+  { id: 'ask-which-list',     text: 'Wat staat er op de lijst', expect: { anyOf: [{ reply: 'asks' }, { op: 'listLists' }, { op: 'listEntries' }] } },   // asking, or showing what lists there are, both fine
   // ── not our business: a spoken decline in the member's language, never a tool ──
   { id: 'decline-time-nl',    text: 'Hoe laat is het', expect: { reply: 'declines' } },
   { id: 'decline-socks-nl',   text: 'Kun je ook sokken stoppen', expect: { reply: 'declines' } },

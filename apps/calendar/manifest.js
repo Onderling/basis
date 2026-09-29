@@ -22,6 +22,10 @@ export const calendarManifest = {
   hosts:      [],
   itemTypes:  ['calendar-event'],
 
+  // A list may hold appointments: a household's Agenda is a list of `calendar-event` children, added through this
+  // app's own add (its validation of when and how long) — "declare a noun, and a container can hold it".
+  accepts: { list: [{ type: 'calendar-event', op: 'addEvent' }] },
+
   // B · Layer 1 — every op maps to an SDK atom (no domain-specific verbs).
   domainVerbs: {},
 

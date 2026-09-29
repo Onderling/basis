@@ -58,7 +58,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, templateListNameOf } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateListNameOf, loadListItems } from '../src/v2/householdTemplate.js';
 import { botOpLevel, scopeCatalogueToRole } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -201,7 +201,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  ...(botInstall ? { tasksCircleId: 'household', doorOpLevel: botOpLevel } : {}),
+  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -754,7 +754,8 @@ if (tgToken || inboxDoor.bridge) {
     }),
     admit: doorAdmit,
     threads,
-    loadItems: loadAssistantItems({ callSkill }),
+    // What the model may draw on: a household bot's list entries, a person's household items.
+    loadItems: isFunctionProfile ? loadListItems({ callSkill }) : loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
     // Turns go into the walk log only when the operator asks, and then the people in the house are told.
     walkLog: turnLogFor(turnLogMode, walkLog),
@@ -774,10 +775,11 @@ if (tgToken || inboxDoor.bridge) {
   if (isFunctionProfile) {
     ensureHouseholdLists({ callSkill, t })
       .then(async (made) => {
-        if (!made.length) return;
-        // The first start: the template's plugins become the bot's app list (lists hold, tasks move).
-        await doorCatalogue.setApps([...HOUSEHOLD_TEMPLATE.apps]).catch(() => {});
-        walkLog({ kind: 'household-template', lists: made.length, apps: HOUSEHOLD_TEMPLATE.apps });
+        // Every start: the template's plugins are in the bot's app list (lists hold, tasks move, the calendar keeps the
+        // Agenda) — also on a bot whose list was set before the template grew; the owner's own apps stay.
+        const next = withTemplateApps(doorCatalogue.apps());
+        if (next) await doorCatalogue.setApps(next).catch(() => {});
+        if (made.length || next) walkLog({ kind: 'household-template', lists: made.length, apps: next ?? doorCatalogue.apps() });
       })
       .catch((err) => console.warn(`device-runner: the household lists were not made (${err?.message ?? err})`));
   }
@@ -787,7 +789,8 @@ if (tgToken || inboxDoor.bridge) {
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────
 const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null);
-walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken });
+// `clock`: the zone the household's times are read and shown in (the role's TZ; a bare container is UTC).
+walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

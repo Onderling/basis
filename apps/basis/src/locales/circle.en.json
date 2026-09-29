@@ -623,6 +623,38 @@
     "invited": {
       "text": "📅 You're invited: {{title}} — it's on your calendar.",
       "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
+    },
+    "no_agenda": {
+      "text": "There is no agenda to put an appointment on.",
+      "doc": "A household bot's calendar reply."
+    },
+    "added": {
+      "text": "Appointment set: {{title}} ({{when}}).",
+      "doc": "A household bot's calendar reply."
+    },
+    "no_event": {
+      "text": "I do not know that appointment.",
+      "doc": "A household bot's calendar reply."
+    },
+    "cancelled": {
+      "text": "Appointment cancelled: {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_accepted": {
+      "text": "You are coming to {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_declined": {
+      "text": "You are not coming to {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_tentative": {
+      "text": "You might come to {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "say_when": {
+      "text": "An appointment on {{name}} needs a time: say when.",
+      "doc": "A household bot's calendar reply."
     }
   },
   "embed": {
@@ -3641,6 +3673,10 @@
     "edited": {
       "text": "Changed on {{name}}: \"{{text}}\".",
       "doc": "A lists reply in the chat."
+    },
+    "not_there": {
+      "text": "\"{{item}}\" is on no list.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
     }
   },
   "share": {
@@ -6755,6 +6791,38 @@
     "share": {
       "text": "Share…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    }
+  },
+  "tasks": {
+    "no_such_task": {
+      "text": "No chore \"{{item}}\" here.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "reply": {
+      "claimed": {
+        "text": "✓ Claimed: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "completed": {
+        "text": "✓ Completed: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "submitted": {
+        "text": "✓ Submitted: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "approved": {
+        "text": "✓ Approved: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "rejected": {
+        "text": "✓ Rejected: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "edited": {
+        "text": "✓ Edited: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      }
     }
   }
 }

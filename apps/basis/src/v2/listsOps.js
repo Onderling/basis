@@ -12,6 +12,8 @@
  * obeys the circle's data-move branch. Nothing here knows about sharing; that is the point.
  */
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
+import { calendarManifest } from '../../../calendar/manifest.js';
+import { pickEntry } from './entryRef.js';
 
 /**
  * @param {object} a
@@ -22,7 +24,8 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';
  * @returns {Record<string, (args: object) => Promise<object>>} opId → handler
  */
 export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = {}) {
-  const svc = makeCircleLists({ storeFor });
+  // What a list may hold beyond its own entries and tasks: appointments (the calendar's `accepts` line).
+  const svc = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   // A call names its circle, or means the one the person is looking at. Named wins: an agent or a
   // journey acts on a circle it is not "in", and must be able to say which.
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
@@ -40,11 +43,13 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
     const tree = await svc.tree(circleId, listId);
     return (Array.isArray(tree?.children) ? tree.children : []).filter((c) => c && !c.completedAt);
   };
-  /** An entry on a list, by its id or its words (case aside) — the first open match. */
-  const findEntry = async (circleId, listId, ref) => {
-    const want = String(ref ?? '').trim();
-    const open = await entriesOf(circleId, listId);
-    return open.find((c) => c.id === want) ?? open.find((c) => String(c.text ?? '').toLowerCase() === want.toLowerCase()) ?? null;
+  /** An entry on a list, by its id or its words (`pickEntry`: exact words, else the one entry that contains them). */
+  const findEntry = async (circleId, listId, ref) => pickEntry(await entriesOf(circleId, listId), ref, (c) => c.text);
+  /** An open entry on ANY of the circle's lists, by its id or its words — a tick names the entry, not its list. */
+  const findAnyEntry = async (circleId, ref) => {
+    const all = [];
+    for (const c of await svc.listContainers(circleId)) all.push(...await entriesOf(circleId, c.id));
+    return pickEntry(all, ref, (c) => c.text);
   };
   /** The list and the entry a call names, or the refusal. */
   const locate = async (args) => {
@@ -81,6 +86,9 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       // WHICH KIND of child is the container's `accepts` policy's decision, not this handler's: `hint`
       // names one of the kinds that container accepts, and absent it the policy's default child wins.
       const kind = String(args?.kind ?? '').trim() || undefined;
+      // An appointment needs a time: a bare add to a list whose entries are events (the Agenda) goes through the
+      // calendar's own add, which asks when — never as an event with no date.
+      if ((kind ?? target.defaultChild) === 'calendar-event') return { ok: false, error: t('circle.calendar.say_when', { name: target.text ?? ref }) };
       const made = await svc.addItem(circleId, target.id, text, localActor, kind ? { hint: kind } : undefined);
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {
@@ -101,7 +109,10 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       const itemId = String(args?.itemId ?? '').trim();
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       if (!itemId) return { ok: false, error: t('circle.lists.need_item') };
-      await svc.markDone(circleId, itemId, localActor);
+      // Never "done" for an entry that is not there: nothing would have been ticked.
+      const entry = await findAnyEntry(circleId, itemId);
+      if (!entry) return { ok: false, error: t('circle.lists.not_there', { item: itemId }) };
+      await svc.markDone(circleId, entry.id, localActor);
       return { ok: true, message: t('circle.lists.done') };
     },
 

@@ -67,8 +67,16 @@ describe('the household bot, as a walk found it', () => {
     const none = await call('tasks', 'claimTask', { id: 'stofzuigen', actor: 'telegram:111' });
     expect(String(none?.error ?? '')).toContain('circle.tasks.no_such_task');
 
+    // two chores that both contain the words: the bot asks which, naming both — never "no such chore", never a guess
+    await call('lists', 'addToList', { list: 'Klusjes', text: 'ramen lappen boven' });
+    await call('lists', 'addToList', { list: 'Klusjes', text: 'ramen lappen beneden' });
+    const which = await call('tasks', 'claimTask', { id: 'ramen', actor: 'telegram:111' });
+    expect(String(which?.error ?? '')).toContain('circle.lists.which_one');
+    expect(String(which?.error ?? '')).toContain('ramen lappen boven');
+    expect(String(which?.error ?? '')).toContain('ramen lappen beneden');
+
     // a tick of an entry that is not there says so
-    const miss = await call('lists', 'markListItemDone', { itemId: '1' });
+    const miss = await call('lists', 'markListItemDone', { item: '1' });
     expect(miss.ok).toBe(false);
 
     // an appointment by its words: rsvp, then a soft cancel — the child stays (cancelled), the listing drops it

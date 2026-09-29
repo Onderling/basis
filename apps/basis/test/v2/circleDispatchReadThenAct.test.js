@@ -26,7 +26,7 @@ function harness({ interpret, peek }) {
 }
 
 const LIST = { opId: 'listEntries', args: { list: 'Boodschappen' } };
-const TICK = { opId: 'markListItemDone', args: { itemId: 'e1' } };
+const TICK = { opId: 'markListItemDone', args: { item: 'e1' } };
 const peek = vi.fn(async () => ({ payload: { items: [{ id: 'e1', label: 'melk' }] } }));
 
 describe('a turn that reads, then acts', () => {

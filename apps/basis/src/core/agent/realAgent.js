@@ -241,7 +241,7 @@ import { mergeManifests }                  from '../../manifestMerge.js';       
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
-import { pickEntry }                       from '../../v2/entryRef.js';                           // an entry by its id or a person's words
+import { matchEntry, choicesOf }           from '../../v2/entryRef.js';                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3963,14 +3963,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
     }
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
-    // for its id — the task by id, else by its words (`pickEntry`) among the circle's open tasks; words that name no
+    // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no
     // task are said so in the household's words, not the store's.
     if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {
       const store = householdService?.stores?.getStore?.(resolveCircleId(args ?? {}));
       if (store && typeof store.listByType === 'function') {
         const open = ((await store.listByType('task')) ?? []).filter((it) => !it?.completedAt);
-        const task = pickEntry(open, args.id, (it) => it?.text ?? it?.title);
-        if (!task) return { ok: false, error: (typeof opts.t === 'function' ? opts.t : (k) => k)('circle.tasks.no_such_task', { item: args.id }) };
+        const words = (it) => it?.text ?? it?.title;
+        const { entry: task, among } = matchEntry(open, args.id, words);
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        if (!task) return { ok: false, error: among.length ? tr('circle.lists.which_one', { options: choicesOf(among, words) }) : tr('circle.tasks.no_such_task', { item: args.id }) };
         args = { ...args, id: task.id };
       }
     }

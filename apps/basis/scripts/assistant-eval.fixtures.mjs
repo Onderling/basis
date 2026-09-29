@@ -2,7 +2,7 @@
  * The assistant's golden set — utterances with what we accept as right. Lifted from the 2026-09-05
  * walks where marked. `expect`: `{ op, args?, count? }` (args match case-insensitively; a RegExp
  * matches), `{ reply: 'asks' | 'declines' }`, or null (must do nothing). `before`: memory lines.
- * `items`: what retrieval may see. `lines` (instead of `text`): lines sent at once, which the collect window makes one
+ * `items`: what retrieval may see (and what a read shows, with ids `i0`, `i1`, …). `exact`: exactly `count` calls (1 by default). `lines` (instead of `text`): lines sent at once, which the collect window makes one
  * turn — one model call.
  */
 export const FIXTURES = [
@@ -33,6 +33,10 @@ export const FIXTURES = [
   { id: 'list-now-vague-nl',   text: 'Wat staat op de lijst nu?', expect: { anyOf: [{ reply: 'asks' }, { op: 'listLists' }, { op: 'listEntries' }] } },
   // ── complete / remove ──
   { id: 'done-bought-nl',     text: 'Kaas is gekocht', items: ['kaas', 'melk'], expect: { anyOf: [{ reply: 'asks' }, { op: 'markListItemDone' }, { op: 'removeFromList', args: { item: /kaas/ } }] } },
+  // ── the newest message only (walk 2026-09-29: an unanswered earlier request was redone beside the new one) ──
+  { id: 'newest-only-nl',     text: 'Wat staat er op de takenlijst?', before: ['you: maak een nieuwe lijst: cadeaus', 'system: Geen lijst "cadeaus" hier.'], expect: { anyOf: [{ op: 'listMine', count: 1, exact: true }, { op: 'listEntries', args: { list: /klusjes/ }, count: 1, exact: true }] } },   // a newest message that cannot refer back
+  // ── a member asks for the admin's tool: told so, not squeezed into another op (walk 2026-09-29) ──
+  { id: 'member-admin-op-nl', text: 'maak een nieuwe lijst: cadeaus', expect: { reply: 'declines' } },
   // ── memory: a bare answer to the bot's question ──
   { id: 'memory-which-list',  text: 'De boodschappenlijst', before: ['you: wat staat er op de lijst', 'assistant: Welke lijst bedoel je — boodschappen of klusjes?'], expect: { op: 'listEntries', args: { list: /boodschappen/ } } },
   { id: 'memory-show-first',  text: 'Laat eerst maar zien', before: ['you: ik wil boodschappen doen!', 'assistant: prima, wil je de boodschappenlijst zien, of iets toevoegen?'], expect: { op: 'listEntries', args: { list: /boodschappen/ } } },

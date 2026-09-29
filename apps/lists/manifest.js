@@ -116,7 +116,9 @@ export const listsManifest = {
       // the claim cluster's no-downgrade rule applies to `task`, not here, but the shape is the same.)
       resolves:  [{ field: 'state', policy: 'claim' }],
       params: [
-        { name: 'itemId', kind: 'string', required: true, schema: { minLength: 1 } },
+        // the entry: its id, or its words as they stand on the list; the list only to tell two apart
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
       ],
       surfaces: {
         slash: { command: '/list-done', body: 'argline' },
@@ -143,9 +145,9 @@ export const listsManifest = {
       appliesTo: { type: 'list-item' },
       requires:  ['lists'],
       params: [
-        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
-        // the entry: its id, or its words as they stand on the list
+        // the entry: its id, or its words as they stand on the list; the list only to tell two apart
         { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
       ],
       surfaces: {
         slash: { command: '/list-remove', body: 'flags' },
@@ -161,9 +163,9 @@ export const listsManifest = {
       // Two people fixing the same entry write the same field; the text merges by content.
       resolves:  [{ field: 'text', policy: 'content' }],
       params: [
-        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
         { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
         { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
       ],
       surfaces: {
         slash: { command: '/list-edit', body: 'flags' },

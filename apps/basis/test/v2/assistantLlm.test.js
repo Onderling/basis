@@ -46,4 +46,17 @@ describe('buildAssistantLlm — the confidential route is optional at every step
     expect(seen?.model).toBe('some-model');
     expect(seen?.timeoutMs).toBeGreaterThan(0);
   });
+
+  it('a timeout on the primary: the turn hears it is slow (its request\'s onSlow), then the fallback answers', async () => {
+    const abort = () => Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    const makeProvider = async ({ model }) => (model === 'second'
+      ? { id: 'pm', model, invoke: async () => ({ replyText: 'ok' }) }
+      : { id: 'pm', model: 'first', invoke: async () => { throw abort(); } });
+    const r = await buildAssistantLlm({ hasKey: () => true, makeProvider, fallbackModel: 'second', warn: () => {} });
+    let slow = 0;
+    const out = await r.llm.invoke({ messages: [{ role: 'user', content: 'hoi' }], onSlow: () => { slow += 1; } });
+    expect(slow).toBe(1);
+    expect(out?.replyText ?? out?.text).toBe('ok');
+  });
 });
+

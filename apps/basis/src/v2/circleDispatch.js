@@ -33,8 +33,9 @@ import { splitRecentTurns } from './circleMemory.js';
  *        gated call): a read the model picks is looked at and handed back to it once, so the turn can act on it
  * @param {(cmd:{opId:string,args:object,appOrigin?:string}) => object[]} [a.expand]  a door's rewrite of a chosen op
  *        into the ops it stands for (a household bot: one add per thing named) — the gate's and the model's alike
+ * @param {(ctx:object) => any} [a.onSlow]  the model route is slow and retrying: tell the person to wait (their turn's ctx)
  */
-export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns, peek = null, expand = null }) {
+export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns, peek = null, expand = null, onSlow = null }) {
   if (typeof dispatch !== 'function') {
     throw new Error('createCircleDispatch: dispatch is required');
   }
@@ -52,6 +53,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
   // A gate rule's command, and the further items it names. Carries the rule's owning app so the resolver routes a
   // colliding bare op-id to the gate's app, not the merge's first-declarer.
   const expanded = (c) => (typeof expand === 'function' ? expand(c) : [c]);
+  const slowFor = (ctx) => (typeof onSlow === 'function' ? { onSlow: () => onSlow(ctx) } : {});
   async function dispatchRule(command, ctx) {
     for (const c of expanded({ opId: command.opId, args: command.args || {}, appOrigin: command.appOrigin })) await dispatch(c, ctx);
     for (const m of (Array.isArray(command.more) ? command.more : [])) {
@@ -124,7 +126,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             // bare answer ("shopping") resolves against what was just asked. interpret threads it as messages.
             // A follow-up's own history (the bot's question + the ask) wins: it already carries those turns.
             const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
-            cmd = await interpret(modelText, { catalogue: scopedCatalogue, llm, context, history });   // → {opId,args,partial?}|{reply}|{partial}|null
+            cmd = await interpret(modelText, { ...slowFor(ctx), catalogue: scopedCatalogue, llm, context, history });   // → {opId,args,partial?}|{reply}|{partial}|null
           } catch (err) {
             // Smart chat is configured but the endpoint is UNREACHABLE (server down). Reply in plain
             // words ("basic mode") rather than failing the turn — buttons + commands still work.
@@ -140,7 +142,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
           // not do that" (walk 2026-09-30: three "→ halfvolle melk ✓" lines, and nothing had changed).
           if (cmd && !cmd.opId && typeof cmd.reply === 'string' && !ranByRule && claimsResult(cmd.reply)) {
             const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
-            const again = await interpret(modelText, { catalogue: scopedCatalogue, llm, context: [...(Array.isArray(context) ? context : []), NO_CLAIM_RETRY], history }).catch(() => null);
+            const again = await interpret(modelText, { ...slowFor(ctx), catalogue: scopedCatalogue, llm, context: [...(Array.isArray(context) ? context : []), NO_CLAIM_RETRY], history }).catch(() => null);
             if (again && (again.opId || (typeof again.reply === 'string' && again.reply && !claimsResult(again.reply)))) cmd = again;
             else {
               if (typeof onNoMatch === 'function') await onNoMatch(modelText, ctx, { notDone: true });
@@ -152,7 +154,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             const line = readLine(cmd, seen);
             if (line) {
               const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
-              const again = await interpret(modelText, { catalogue: scopedCatalogue, llm, context: [...(Array.isArray(context) ? context : []), line, READ_THEN_ACT], history }).catch(() => null);
+              const again = await interpret(modelText, { ...slowFor(ctx), catalogue: scopedCatalogue, llm, context: [...(Array.isArray(context) ? context : []), line, READ_THEN_ACT], history }).catch(() => null);
               if (again && again.opId && !isRead(scopedCatalogue, again.opId)) cmd = again;
             }
           }

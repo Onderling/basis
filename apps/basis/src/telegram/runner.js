@@ -262,7 +262,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
     peek: (cmd, ctx) => peekOp(ctx.chatId, ctx.id, cmd),
     onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
-    onLlmUnavailable: (_text, ctx) => say(ctx.chatId, t('circle.telegram.unknown')),
+    // A model that is slow is SAID: "even geduld" while it retries, and when it does not come back, that it is not
+    // reachable now — never "I did not understand" for a model that did not answer.
+    onSlow: (ctx) => say(ctx.chatId, t('circle.bot.slow')),
+    onLlmUnavailable: (_text, ctx, info) => say(ctx.chatId, t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown')),
     onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),
     claim: (text, ctx) => (claims(ctx.chatId, ctx.id, text) ? () => doorLine(ctx.chatId, ctx.id, text) : null),
     around: (turn, run) => aroundTurn(turn, run),

@@ -81,6 +81,7 @@ const DEFAULT_THREAD = '__default__';
  * @param {number} [a.collectMs]           the collect window (default `assistant.collectMs`)
  * @param {(text:string, ctx:object) => (null|(() => Promise<any>))} [a.claim]  a line the door handles itself: return
  *        the handling (it must not act yet — it runs when the line's turn comes), or null to leave the line to the engine
+ * @param {(ctx: object) => any} [a.onSlow]  the model route is slow and retrying (the door tells the person to wait)
  * @param {(cmd: object) => object[]} [a.expand]  a door's rewrite of a chosen op into the ops it stands for (see `createCircleDispatch`)
  * @param {(threadId: string) => string[]} [a.threadHints]  a thread's own lines for the model (its role's)
  * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op without showing it (a read the
@@ -93,7 +94,7 @@ export function createAssistantEngine({
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
   recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, promptLines = null, catalogueFor = null, gateRules = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
-  collectMs = COLLECT_MS, claim = null, around = null, peek = null, threadHints = null, expand = null,
+  collectMs = COLLECT_MS, claim = null, around = null, peek = null, threadHints = null, expand = null, onSlow = null,
 } = {}) {
   if (!catalogue) throw new TypeError('createAssistantEngine: catalogue required');
   if (typeof dispatch !== 'function') throw new TypeError('createAssistantEngine: dispatch required');
@@ -164,6 +165,7 @@ export function createAssistantEngine({
       onUnhandled, onLlmUnavailable, onNoMatch,
       ...(typeof peek === 'function' ? { peek } : {}),
       ...(typeof expand === 'function' ? { expand } : {}),
+      ...(typeof onSlow === 'function' ? { onSlow } : {}),
     });
     engines.set(key, e);
     return e;

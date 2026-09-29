@@ -52,6 +52,16 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(calls.at(-1)).toMatchObject({ app: 'household', op: 'addItem', args: { type: 'shopping', text: 'bread' } });
   });
 
+  it('a slow model is said honestly: "even geduld", and when it does not come back, not "ik begreep je niet"', async () => {
+    const abort = () => Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    const interpret = async (_text, o) => { o.onSlow?.(); throw abort(); };
+    const { say } = await boot({ interpret });
+    const out = (await say('hoe gaat het eigenlijk met de planten')).map((m) => m.text);   // past the gate: the model's
+    expect(out).toContain('circle.bot.slow');
+    expect(out).toContain('circle.bot.model_down');
+    expect(out).not.toContain('circle.telegram.unknown');
+  });
+
   it('a reply\'s buttons obey the person\'s map: an op their role does not reach is never offered', async () => {
     // a member's map without the complete op (the household bot's slim map scopes per role the same way)
     const scopeToRole = (cat, role) => (role === 'member'

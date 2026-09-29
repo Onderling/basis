@@ -3976,6 +3976,14 @@
     "welcome_talk": {
       "text": "Hi! I'm this household's assistant. Tell me what you want to add or see.",
       "doc": "The household bot's first words on a door without commands (its contact inbox)."
+    },
+    "slow": {
+      "text": "One moment — the assistant is slow, I am trying once more.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "model_down": {
+      "text": "The assistant is not answering right now. Please try again in a moment.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     }
   },
   "op": {

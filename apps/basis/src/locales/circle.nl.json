@@ -3976,6 +3976,14 @@
     "welcome_talk": {
       "text": "Hoi! Ik ben de assistent van dit huishouden. Zeg me wat je wilt toevoegen of zien.",
       "doc": "The household bot's first words on a door without commands (its contact inbox)."
+    },
+    "slow": {
+      "text": "Even geduld — de assistent is traag, ik probeer het nog één keer.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "model_down": {
+      "text": "De assistent reageert nu niet. Probeer het zo nog eens.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     }
   },
   "op": {

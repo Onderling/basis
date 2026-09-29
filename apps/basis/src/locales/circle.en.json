@@ -3685,6 +3685,10 @@
     "mean_this": {
       "text": "Do you mean '{{item}}'?",
       "doc": "A household bot's question when a person's words are only part of one entry (it does not tick or change more than was said)."
+    },
+    "already_there": {
+      "text": "'{{item}}' is already on {{list}}.",
+      "doc": "An add whose words are already open on that list: said, and no second entry is made."
     }
   },
   "share": {

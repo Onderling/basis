@@ -4275,7 +4275,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first = Array.isArray(result) ? result[0] : null;
       const data  = first?.data ?? null;
       if (data && noteHint) data.noteHint = noteHint;
-      return adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask });
+      const adapted = adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask });
+      // On a household bot "wat moet ik nog doen" is MINE: the open chores this person claimed (the chat-shell reading of
+      // `listMine` — everything open — stays for the painting shells, which show every chore on their own screen).
+      const mineOf = opts.tasksCircleId && opId === 'listMine' ? (args?.actor ?? null) : null;
+      if (mineOf && Array.isArray(adapted?.items)) {
+        const holds = (it) => [...(Array.isArray(it?.assignees) ? it.assignees : []), it?.assignee].filter(Boolean).includes(mineOf);
+        return { ...adapted, items: adapted.items.filter(holds) };
+      }
+      return adapted;
     }
     if (appOrigin === 'stoop') {
       // Derived: briefSummary builds a summary from listOpen since

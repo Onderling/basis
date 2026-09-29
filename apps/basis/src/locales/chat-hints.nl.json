@@ -55,7 +55,7 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "markListItemDone": {
-      "text": "Vink een lijstregel af: item = de woorden of het id. Voor 'is gekocht / gedaan / gemaakt'.",
+      "text": "Vink een lijstregel af: item = de woorden of het id. Voor 'is gekocht / gedaan / gemaakt'. De lijst is niet nodig.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "listEntries": {
@@ -63,11 +63,11 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "removeFromList": {
-      "text": "Haal een regel van een lijst: item = de woorden of het id.",
+      "text": "Haal een regel van een lijst: item = de woorden of het id. De lijst is niet nodig.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "editEntry": {
-      "text": "Verander de woorden van een regel: item = de oude woorden of het id, text = de nieuwe woorden.",
+      "text": "Verander de woorden van een regel: item = de oude woorden of het id, text = de nieuwe woorden. De lijst is niet nodig.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },

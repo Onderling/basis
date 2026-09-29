@@ -53,6 +53,13 @@ describe('a reply that claims a result', () => {
     expect(assistantReplyText(noMatch[0], (k) => k, 'circle.bot.unknown')).toBe('circle.bot.not_done');
   });
 
+  it('a question that uses a done-word claims nothing; a claim followed by a question still does', () => {
+    expect(claimsResult('Aan welke lijst moet het worden toegevoegd?')).toBe(false);
+    expect(claimsResult('Which list should it be added to?')).toBe(false);
+    expect(claimsResult('Melk is toegevoegd. Nog iets?')).toBe(true);
+    expect(claimsResult('kaas → halfvolle melk ✓\nWil je nog iets?')).toBe(true);
+  });
+
   it('a question is shown as it is, asked once', async () => {
     const interpret = vi.fn().mockResolvedValue({ reply: 'Welke lijst bedoel je?' });
     const { cd, noMatch } = harness(interpret);

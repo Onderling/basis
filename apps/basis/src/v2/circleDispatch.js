@@ -199,7 +199,10 @@ const NO_CLAIM_RETRY = 'Your last answer described a result without calling a to
 const CLAIM_WORDS = /\b(toegevoegd|afgevinkt|verwijderd|gewijzigd|aangepast|gezet op|added|removed|ticked|changed|done)\b/i;
 export function claimsResult(text) {
   const s = String(text ?? '');
-  return s.includes('✓') || CLAIM_WORDS.test(s);
+  if (s.includes('✓')) return true;
+  // A QUESTION may use a done-word without claiming anything ("Aan welke lijst moet het worden toegevoegd?"): only a
+  // sentence that is not a question claims.
+  return s.split(/(?<=[.!?])\s+|\n+/).some((part) => part.trim() && !/\?\s*$/.test(part.trim()) && CLAIM_WORDS.test(part));
 }
 
 /** What the model is told after a read it asked for. LLM-facing. */

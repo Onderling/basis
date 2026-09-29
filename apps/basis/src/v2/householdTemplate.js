@@ -38,8 +38,8 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
   promptLines: Object.freeze([
     "Dit huishouden houdt alles op LIJSTEN: Boodschappen, Klusjes, Reparaties, Agenda.",
     "addToList(list, text) voegt iets toe; eten, drinken en huishoudspullen zonder lijstnaam gaan op Boodschappen, zonder vraag.",
-    "Klusjes zijn TAKEN: \"ik doe de lamp\" → claimTask(id: de woorden van het klusje); \"de lamp is gemaakt\" → completeTask(id: de woorden). \"wat moet ik nog doen\" → listMine. \"wat staat er op de klusjes\" → listEntries(list: Klusjes).",
-    "\"… is gekocht / gedaan / gemaakt\" over een lijstregel → markListItemDone(item: de woorden). \"haal … van de lijst\" → removeFromList(item). \"verander … in …\" → editEntry(item, text). Je hoeft de lijst niet te weten: de woorden zijn genoeg.",
+    "Klusjes zijn TAKEN: \"ik doe de lamp\" → claimTask(id: de woorden van het klusje); \"de lamp is gemaakt\" → completeTask(id: de woorden). \"wat moet ik nog doen\" → listMine. \"wat staat er op de klusjes / de takenlijst / de to-do's\" → listEntries(list: Klusjes): de takenlijst IS Klusjes.",
+    "\"… is gekocht / gedaan / gemaakt\" over een lijstregel → markListItemDone(item: de woorden). \"haal … van de lijst\" → removeFromList(item). \"verander … in …\" → editEntry(item, text). Geef alleen item (en text); laat list weg. Vraag NOOIT op welke lijst iets staat: het systeem zoekt de regel zelf.",
     "Agenda zijn AFSPRAKEN: \"tandarts morgen om 10 uur\" → addEvent(title, when als lokale tijd zonder zone, bv. 2026-09-30T10:00). \"wat staat er in de agenda\" → listEvents. \"ik kom (naar de tandarts)\" / \"ik ben erbij\" → rsvpAccept(id: de woorden); \"ik kan niet\" → rsvpDecline; \"misschien\" → rsvpTentative.",
     "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
     "Alleen de beheerder maakt of verwijdert lijsten en wijst klusjes toe. Vraagt een lid daarom: zeg dat alleen de beheerder dat kan, en stop daar.",

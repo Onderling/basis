@@ -3965,6 +3965,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
     // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no
     // task are said so in the household's words, not the store's.
+    let namedTask = null;   // the task's words, when the door named it by them
     if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {
       const store = householdService?.stores?.getStore?.(resolveCircleId(args ?? {}));
       if (store && typeof store.listByType === 'function') {
@@ -3974,6 +3975,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
         if (!task) return { ok: false, error: among.length ? tr('circle.lists.which_one', { options: choicesOf(among, words) }) : tr('circle.tasks.no_such_task', { item: args.id }) };
         args = { ...args, id: task.id };
+        namedTask = words(task) || null;
       }
     }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
@@ -4273,7 +4275,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first = Array.isArray(result) ? result[0] : null;
       const data  = first?.data ?? null;
       if (data && noteHint) data.noteHint = noteHint;
-      return adaptTasksReply(opId, data);
+      return adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask });
     }
     if (appOrigin === 'stoop') {
       // Derived: briefSummary builds a summary from listOpen since
@@ -4755,7 +4757,13 @@ export async function createRealHouseholdAgent(opts = {}) {
    * tasks-v0 underneath.  Eventually the chat-shell renderer
    * absorbs the richer shape natively + these adapters fall away.
    */
-  function adaptTasksReply(opId, data) {
+  /**
+   * @param {string} opId
+   * @param {object|null} data  the tasks skill's answer
+   * @param {{actor?: string|null, named?: string|null}} [who]  the person the call was for, and the task's words when
+   *        the door named it by its words (the reply names the task FOUND, never the words it was asked by)
+   */
+  function adaptTasksReply(opId, data, { actor = null, named = null } = {}) {
     if (data == null) return null;
     // (B8) — DAG hard-dep blocking surface. Real skill returns
     // {error: 'has-open-dependencies', openDeps: [...]} when the user
@@ -4778,6 +4786,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     // submitTask) OR {result: ...} (claimTask / completeTask) — the
     // field name differs by skill.  Normalise to a task variable.
     const task = data.task ?? data.result ?? null;
+    // A claim that LOST comes back as its result (`{error: 'already-claimed', current}`) — never a "✓": someone else has
+    // the task, or this person had it already.
+    if (task && typeof task.error === 'string' && task.error) {
+      const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+      const cur = task.current ?? {};
+      const title = cur.text || cur.title || named || '';
+      if (task.error === 'already-claimed') {
+        const holders = [...(Array.isArray(cur.assignees) ? cur.assignees : []), cur.assignee].filter(Boolean);
+        const yours = Boolean(actor && holders.includes(actor));
+        // In the household's words where the shell hands the agent its translator; web and mobile hand none yet.
+        if (typeof opts.t !== 'function') return { ok: false, error: yours ? `You had already claimed: ${title}` : `Already claimed: ${title}` };
+        return { ok: false, error: tr(yours ? 'circle.tasks.already_yours' : 'circle.tasks.already_claimed', { title }) };
+      }
+      return { ok: false, error: task.error };
+    }
 
     // addTask: {task} → {ok, message, itemId, _sync}
     if (opId === 'addTask' && task) {
@@ -4804,7 +4827,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       editTask:    'Edited',
     };
     if (verbMap[opId] && task) {
-      const title = task.text ?? task.title ?? task.id;
+      const title = task.text || task.title || named || task.id;
       // Reject path: surface the audit-log note in the message so
       // the chat-shell + user see WHY the task was rejected.
       const noteSuffix = (opId === 'rejectTask' && data.noteHint)

@@ -58,7 +58,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateListNameOf, loadListItems } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateListNameOf, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -767,6 +767,8 @@ if (tgToken || inboxDoor.bridge) {
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
       scopeToRole: scopeCatalogueToRole,
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId)),
+      // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
+      expand: expandAdds(),
       gateRules: listsGateRules(values.lang, templateListNameOf(t)),
     } : {}),
   });

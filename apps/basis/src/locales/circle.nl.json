@@ -3681,6 +3681,10 @@
     "which_one": {
       "text": "Welke bedoel je: {{options}}?",
       "doc": "A household bot's question when a person's words fit several entries, chores or appointments (the choices, quoted)."
+    },
+    "mean_this": {
+      "text": "Bedoel je '{{item}}'?",
+      "doc": "A household bot's question when a person's words are only part of one entry (it does not tick or change more than was said)."
     }
   },
   "share": {
@@ -3960,7 +3964,11 @@
     "invite_code": "Code (één persoon, één keer): {{code}}\nDie persoon stuurt de bot: /start {{code}}",
     "revoke_unknown": "Ik ken niemand die \"{{who}}\" heet. /users laat zien wie er is.",
     "revoked": "{{who}} is niet meer toegelaten. Met een nieuwe code kan die persoon terugkomen.",
-    "invite_link": "Of stuur deze link, die opent de bot en stuurt de code: {{link}}"
+    "invite_link": "Of stuur deze link, die opent de bot en stuurt de code: {{link}}",
+    "not_done": {
+      "text": "Dat heb ik niet gedaan — zeg me welke lijst en wat er moet veranderen.",
+      "doc": "The assistant's line when the model twice described a result without doing anything (nothing changed)."
+    }
   },
   "op": {
     "not_in_this_circle": {
@@ -6827,6 +6835,14 @@
         "text": "✓ Aangepast: {{title}}{{note}}",
         "doc": "A task op's confirmation line (the note: why a task was rejected)."
       }
+    },
+    "already_claimed": {
+      "text": "'{{title}}' is al opgepakt.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "already_yours": {
+      "text": "Je had '{{title}}' al opgepakt.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
     }
   }
 }

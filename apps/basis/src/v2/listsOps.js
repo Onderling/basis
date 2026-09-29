@@ -44,7 +44,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
     return (Array.isArray(tree?.children) ? tree.children : []).filter((c) => c && !c.completedAt);
   };
   /** An entry on a list, by its id or its words (`matchEntry`: exact words, else the one entry that contains them; several → which). */
-  const findEntry = async (circleId, listId, ref) => matchEntry(await entriesOf(circleId, listId), ref, (c) => c.text);
+  const findEntry = async (circleId, listId, ref) => matchEntry(await entriesOf(circleId, listId), ref, (c) => c.text, undefined, { partialAsks: true });
   /** An open entry on ANY of the circle's lists, by its id or its words — with the list that holds it. */
   const findAnyEntry = async (circleId, ref) => {
     const all = [];
@@ -52,11 +52,13 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
     for (const c of await svc.listContainers(circleId)) {
       for (const e of await entriesOf(circleId, c.id)) { all.push(e); listOf.set(e.id, c); }
     }
-    const m = matchEntry(all, ref, (c) => c.text);
+    const m = matchEntry(all, ref, (c) => c.text, undefined, { partialAsks: true });
     return { ...m, target: m.entry ? listOf.get(m.entry.id) ?? null : null };
   };
-  /** Words that fit several entries ask which, with the choices. */
-  const which = (among) => t('circle.lists.which_one', { options: choicesOf(among, (c) => c.text) });
+  /** Words that are part of one entry ask about it ("Bedoel je 'melk en kaas'?"); words that fit several ask which. */
+  const which = (among) => (among.length === 1
+    ? t('circle.lists.mean_this', { item: among[0].text ?? '' })
+    : t('circle.lists.which_one', { options: choicesOf(among, (c) => c.text) }));
   /**
    * The entry a call names, and the list that holds it — or the refusal. A person names the ENTRY ("verander melk in
    * halfvolle melk"); a list, when given, only tells two entries on different lists apart.

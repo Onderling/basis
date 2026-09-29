@@ -29,6 +29,9 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
   ]),
   // The plugins this template composes on the bot (its app list on the first start): lists hold, tasks move.
   apps: Object.freeze(['lists', 'tasks', 'calendar']),
+  // Fixed pairs that are ONE entry, though they read as two ("peper en zout"): an add does not split them. Short on
+  // purpose; the admin may grow it later.
+  compoundEntries: Object.freeze(['peper en zout', 'zout en peper', 'brood en spelen']),
   required: Object.freeze({}),
   promptLines: Object.freeze([
     'This household keeps its things on LISTS. Add anything with addToList (the list by its name); a bare add makes what that list holds.',
@@ -109,3 +112,38 @@ export function loadListItems({ callSkill }) {
     } catch { return []; }
   };
 }
+
+/**
+ * One add per thing: "melk en kaas" → melk, kaas; "stokbrood, melk en eieren" → three. Commas split first, then " en " /
+ * " and " — except a part that is a known pair ("peper en zout"), which stays one entry.
+ * @param {string} text
+ * @param {readonly string[]} [compounds]
+ * @returns {string[]}
+ */
+export function splitEntryText(text, compounds = HOUSEHOLD_TEMPLATE.compoundEntries) {
+  const whole = String(text ?? '').trim();
+  const known = new Set((compounds ?? []).map((c) => String(c).toLowerCase()));
+  if (!whole || known.has(whole.toLowerCase())) return whole ? [whole] : [];
+  const parts = [];
+  for (const piece of whole.split(/\s*,\s*/)) {
+    const p = piece.trim();
+    if (!p) continue;
+    if (known.has(p.toLowerCase())) { parts.push(p); continue; }
+    parts.push(...p.split(/\s+(?:en|and)\s+/i).map((x) => x.trim()).filter(Boolean));
+  }
+  return parts.length ? parts : [whole];
+}
+
+/**
+ * The dispatcher's `expand` for a household bot: an addToList whose text names several things becomes one add per
+ * thing, on the gate's route and the model's alike; every other op passes as it is.
+ * @returns {(cmd: {opId: string, args?: object, appOrigin?: string}) => object[]}
+ */
+export function expandAdds(template = HOUSEHOLD_TEMPLATE) {
+  return (cmd) => {
+    if (cmd?.opId !== 'addToList' || typeof cmd.args?.text !== 'string') return [cmd];
+    const parts = splitEntryText(cmd.args.text, template.compoundEntries);
+    return parts.length > 1 ? parts.map((text) => ({ ...cmd, args: { ...cmd.args, text } })) : [cmd];
+  };
+}
+

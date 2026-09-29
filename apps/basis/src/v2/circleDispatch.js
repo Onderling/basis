@@ -31,8 +31,10 @@ import { splitRecentTurns } from './circleMemory.js';
  * @param {string} [a.botName='assistant']
  * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op WITHOUT showing it (the door's
  *        gated call): a read the model picks is looked at and handed back to it once, so the turn can act on it
+ * @param {(cmd:{opId:string,args:object,appOrigin?:string}) => object[]} [a.expand]  a door's rewrite of a chosen op
+ *        into the ops it stands for (a household bot: one add per thing named) — the gate's and the model's alike
  */
-export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns, peek = null }) {
+export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns, peek = null, expand = null }) {
   if (typeof dispatch !== 'function') {
     throw new Error('createCircleDispatch: dispatch is required');
   }
@@ -49,10 +51,11 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
   const sink = async (text, ctx) => (await unhandled(text, ctx)) ?? 'none';
   // A gate rule's command, and the further items it names. Carries the rule's owning app so the resolver routes a
   // colliding bare op-id to the gate's app, not the merge's first-declarer.
+  const expanded = (c) => (typeof expand === 'function' ? expand(c) : [c]);
   async function dispatchRule(command, ctx) {
-    await dispatch({ opId: command.opId, args: command.args || {}, appOrigin: command.appOrigin }, ctx);
+    for (const c of expanded({ opId: command.opId, args: command.args || {}, appOrigin: command.appOrigin })) await dispatch(c, ctx);
     for (const m of (Array.isArray(command.more) ? command.more : [])) {
-      if (m && m.opId) await dispatch({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? command.appOrigin }, ctx);
+      if (m && m.opId) for (const c of expanded({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? command.appOrigin })) await dispatch(c, ctx);
     }
   }
 
@@ -78,6 +81,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
         // WITHOUT the LLM. It runs whether or not smart chat is configured, so commands keep working in
         // "basic mode". A rule routes a command directly; a skip treats the turn as normal chat (→ sink).
         let context;
+        let ranByRule = 0;   // ops a gate rule ran in this turn (a gathered turn's other lines)
         // A gathered turn (several lines, see assistantLane): the gate reads each line on its own, as it would have
         // read it alone. The lines a rule takes are dispatched by their rule; the others go to the model TOGETHER, as
         // one member message — so "melk" / "brood" / "eieren" is one model call. Lines only a skip rule claims are
@@ -89,6 +93,7 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
           for (const line of lines) verdicts.push(await gate.evaluate(line, ctx));
           const ruled = verdicts.filter((g) => g.via === 'rule' && g.command?.opId).map((g) => g.command);
           for (const c of ruled) await dispatchRule(c, ctx);
+          ranByRule = ruled.length;
           const rest = lines.filter((_l, i) => !(verdicts[i].via === 'rule' && verdicts[i].command?.opId) && verdicts[i].via !== 'skip');
           if (!rest.length) return ruled.length ? { via: 'rule', cmd: ruled[0], cmds: ruled } : { via: await sink(trimmed, ctx) };
           modelText = rest.join('\n');
@@ -131,6 +136,17 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
           }
           // A READ before the act ("melk is gekocht" → first the list): look at it, hand it back once, and do what the
           // model then picks. Asked only to see it, the model reads again and the read is shown — once, as before.
+          // A REPLY that says something happened, when nothing ran: never shown. Asked once more; a second claim is "I did
+          // not do that" (walk 2026-09-30: three "→ halfvolle melk ✓" lines, and nothing had changed).
+          if (cmd && !cmd.opId && typeof cmd.reply === 'string' && !ranByRule && claimsResult(cmd.reply)) {
+            const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
+            const again = await interpret(modelText, { catalogue: scopedCatalogue, llm, context: [...(Array.isArray(context) ? context : []), NO_CLAIM_RETRY], history }).catch(() => null);
+            if (again && (again.opId || (typeof again.reply === 'string' && again.reply && !claimsResult(again.reply)))) cmd = again;
+            else {
+              if (typeof onNoMatch === 'function') await onNoMatch(modelText, ctx, { notDone: true });
+              return { via: 'llm-not-done' };
+            }
+          }
           if (cmd && cmd.opId && typeof peek === 'function' && !(Array.isArray(cmd.more) && cmd.more.length) && isRead(scopedCatalogue, cmd.opId)) {
             const seen = await Promise.resolve(peek({ opId: cmd.opId, args: cmd.args ?? {} }, ctx)).catch(() => null);
             const line = readLine(cmd, seen);
@@ -141,10 +157,10 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             }
           }
           if (cmd && cmd.opId) {
-            await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
+            for (const c of expanded({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} })) await dispatch(c, ctx);
             // A member who names three items gets three acts in one turn — the further calls, in order.
             for (const m of (Array.isArray(cmd.more) ? cmd.more : [])) {
-              if (m && m.opId) await dispatch({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} }, ctx);
+              if (m && m.opId) for (const c of expanded({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} })) await dispatch(c, ctx);
             }
             // The turn was cut (the per-turn cap, or a call the output cut off): ask the member for the rest.
             if (cmd.partial && typeof onNoMatch === 'function') await onNoMatch(modelText, ctx, { partial: true });
@@ -172,6 +188,16 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
       return { via: await sink(trimmed, ctx) };
     },
   };
+}
+
+/** The one-shot retry after a reply that claimed a result. LLM-facing (Fable's text, verbatim). */
+const NO_CLAIM_RETRY = 'Your last answer described a result without calling a tool. That is not allowed. Either call the tool now, or ask the member one short question. Do not describe results.';
+
+/** Does a model REPLY say something happened (a ✓, or a done-word)? Only a tool call does anything. */
+const CLAIM_WORDS = /\b(toegevoegd|afgevinkt|verwijderd|gewijzigd|aangepast|gezet op|added|removed|ticked|changed|done)\b/i;
+export function claimsResult(text) {
+  const s = String(text ?? '');
+  return s.includes('✓') || CLAIM_WORDS.test(s);
 }
 
 /** What the model is told after a read it asked for. LLM-facing. */

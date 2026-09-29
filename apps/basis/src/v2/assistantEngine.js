@@ -81,6 +81,7 @@ const DEFAULT_THREAD = '__default__';
  * @param {number} [a.collectMs]           the collect window (default `assistant.collectMs`)
  * @param {(text:string, ctx:object) => (null|(() => Promise<any>))} [a.claim]  a line the door handles itself: return
  *        the handling (it must not act yet — it runs when the line's turn comes), or null to leave the line to the engine
+ * @param {(cmd: object) => object[]} [a.expand]  a door's rewrite of a chosen op into the ops it stands for (see `createCircleDispatch`)
  * @param {(threadId: string) => string[]} [a.threadHints]  a thread's own lines for the model (its role's)
  * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op without showing it (a read the
  *        model picks is handed back to it once, so the turn acts — see `createCircleDispatch`)
@@ -92,7 +93,7 @@ export function createAssistantEngine({
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
   recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, promptLines = null, catalogueFor = null, gateRules = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
-  collectMs = COLLECT_MS, claim = null, around = null, peek = null, threadHints = null,
+  collectMs = COLLECT_MS, claim = null, around = null, peek = null, threadHints = null, expand = null,
 } = {}) {
   if (!catalogue) throw new TypeError('createAssistantEngine: catalogue required');
   if (typeof dispatch !== 'function') throw new TypeError('createAssistantEngine: dispatch required');
@@ -162,6 +163,7 @@ export function createAssistantEngine({
       ...(dispatchSlash !== undefined ? { dispatchSlash } : {}),
       onUnhandled, onLlmUnavailable, onNoMatch,
       ...(typeof peek === 'function' ? { peek } : {}),
+      ...(typeof expand === 'function' ? { expand } : {}),
     });
     engines.set(key, e);
     return e;
@@ -247,6 +249,8 @@ function processMemory(memoryTurns) {
 export function assistantReplyText(opts, t, fallbackKey) {
   if (opts && typeof opts.reply === 'string' && opts.reply) return opts.reply;
   if (opts && opts.partial === true) return t('circle.bot.more');
+  // a reply that claimed a result twice, with nothing done: said plainly instead
+  if (opts && opts.notDone === true) return t('circle.bot.not_done');
   return t(fallbackKey);
 }
 

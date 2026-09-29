@@ -3673,6 +3673,10 @@
     "edited": {
       "text": "Changed on {{name}}: \"{{text}}\".",
       "doc": "A lists reply in the chat."
+    },
+    "not_there": {
+      "text": "\"{{item}}\" is on no list.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
     }
   },
   "share": {
@@ -6787,6 +6791,12 @@
     "share": {
       "text": "Share…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    }
+  },
+  "tasks": {
+    "no_such_task": {
+      "text": "No chore \"{{item}}\" here.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
     }
   }
 }

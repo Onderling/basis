@@ -13,6 +13,7 @@
  */
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
+import { pickEntry } from './entryRef.js';
 
 /**
  * @param {object} a
@@ -42,11 +43,13 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
     const tree = await svc.tree(circleId, listId);
     return (Array.isArray(tree?.children) ? tree.children : []).filter((c) => c && !c.completedAt);
   };
-  /** An entry on a list, by its id or its words (case aside) — the first open match. */
-  const findEntry = async (circleId, listId, ref) => {
-    const want = String(ref ?? '').trim();
-    const open = await entriesOf(circleId, listId);
-    return open.find((c) => c.id === want) ?? open.find((c) => String(c.text ?? '').toLowerCase() === want.toLowerCase()) ?? null;
+  /** An entry on a list, by its id or its words (`pickEntry`: exact words, else the one entry that contains them). */
+  const findEntry = async (circleId, listId, ref) => pickEntry(await entriesOf(circleId, listId), ref, (c) => c.text);
+  /** An open entry on ANY of the circle's lists, by its id or its words — a tick names the entry, not its list. */
+  const findAnyEntry = async (circleId, ref) => {
+    const all = [];
+    for (const c of await svc.listContainers(circleId)) all.push(...await entriesOf(circleId, c.id));
+    return pickEntry(all, ref, (c) => c.text);
   };
   /** The list and the entry a call names, or the refusal. */
   const locate = async (args) => {
@@ -106,7 +109,10 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       const itemId = String(args?.itemId ?? '').trim();
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       if (!itemId) return { ok: false, error: t('circle.lists.need_item') };
-      await svc.markDone(circleId, itemId, localActor);
+      // Never "done" for an entry that is not there: nothing would have been ticked.
+      const entry = await findAnyEntry(circleId, itemId);
+      if (!entry) return { ok: false, error: t('circle.lists.not_there', { item: itemId }) };
+      await svc.markDone(circleId, entry.id, localActor);
       return { ok: true, message: t('circle.lists.done') };
     },
 

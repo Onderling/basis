@@ -789,7 +789,8 @@ if (tgToken || inboxDoor.bridge) {
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────
 const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null);
-walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken });
+// `clock`: the zone the household's times are read and shown in (the role's TZ; a bare container is UTC).
+walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

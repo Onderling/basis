@@ -48,7 +48,7 @@ import { argsFromParts } from '../bundleResolver.js';
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
 import { makeRoleOf } from './roleOf.js';
 import { honouringActor } from './actor.js';
-import { validateCanonical, LISTS_TYPES } from '@onderling/item-types';
+import { validateCanonical } from '@onderling/item-types';
 import { saveCircleConfig, loadCircleConfig, KIND_DEFAULTS } from '../Circle.js';
 import { tasksManifest } from '../../manifest.js';
 import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
@@ -317,10 +317,11 @@ async function listOpenCore(circle, a, ctx) {
   if ('assignee' in a) filter.assignee      = a.assignee;
   const all    = await circle.itemStore.listOpen(filter);
   // An unfiltered read returns everything the circle's one store holds, which is RIGHT — a task, a
-  // message and a list entry are siblings there. What is wrong is showing them all as tasks: a shopping
-  // list and its entries are not chores, and they have a surface of their own. Only an explicit `type`
-  // asks for them; the general listing skips the lists vocabulary.
-  const open   = a.type ? all : all.filter((it) => !LISTS_TYPES.includes(it?.type));
+  // message, a list entry and an appointment are siblings there. What is wrong is showing them all as
+  // tasks: a shopping list, its entries and the Agenda's appointments are not chores, and they have a
+  // surface of their own. Only an explicit `type` asks for them; the general listing is the tasks (an
+  // item with no type is one, as it always was).
+  const open   = a.type ? all : all.filter((it) => !it?.type || it.type === 'task');
   const closed = await circle.itemStore.listClosed();
   // 41.18 follow-up — every item carries:
   //   status   — lifecycle ∪ DAG (effectiveStatus)

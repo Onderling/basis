@@ -8,14 +8,18 @@
  *                      the Agenda (the list whose default child is an event, else the one by the template's name);
  *   - `listEvents`   — a read over the store with a window (`days`, default 7), soonest first;
  *   - `rsvpAccept` · `rsvpDecline` · `rsvpTentative` — the child's rsvp for the person who asks;
- *   - `cancelEvent`  — the child removed;
+ *   - `cancelEvent`  — the child kept as cancelled (the calendar's own soft cancel: the Agenda's edge stays whole and
+ *                      the record stays; the window no longer lists it);
  *   - `getEventSnapshot` — one event.
+ * An event is named by its id or by its words ("de tandarts"), and a time is the household's clock: a time without a
+ * zone is read as local, and shown as local.
  * The `.ics` feed is a projection for later (a read, never a second store). A person's node composes none of this.
  */
 import { addChildTo } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { buildEvent, rsvpEvent, eventsInWindow } from '@onderling-app/calendar';
 import { calendarManifest } from '../../../calendar/manifest.js';
+import { pickEntry } from './entryRef.js';
 
 const RSVP = { rsvpAccept: 'accepted', rsvpDecline: 'declined', rsvpTentative: 'tentative' };
 
@@ -41,7 +45,20 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       ?? null;
   }
   const eventsOf = async (circleId) => (await storeFor(circleId).listByType('calendar-event')) ?? [];
-  const label = (e) => `${String(e.startsAt).slice(0, 16).replace('T', ' ')} · ${e.title}`;
+  const pad = (n) => String(n).padStart(2, '0');
+  /** When, on the household's clock: `YYYY-MM-DD HH:MM` in local time. */
+  const stamp = (e) => {
+    const d = new Date(e.startsAt);
+    return Number.isNaN(d.getTime()) ? String(e.startsAt ?? '')
+      : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const label = (e) => `${stamp(e)} · ${e.title}`;
+  /** The event a call names — its id, or its words among the open ones. */
+  const eventOf = async (circleId, ref) => {
+    if (!circleId || !ref) return null;
+    const open = (await eventsOf(circleId)).filter((e) => e.state !== 'cancelled');
+    return pickEntry(open, ref, (e) => e.title ?? e.text) ?? (await storeFor(circleId).get(String(ref))) ?? null;
+  };
 
   return {
     addEvent: async (args) => {
@@ -54,7 +71,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
       // The Agenda's child, with the event's own id; `text` so the list shows it as an entry too.
       const made = await addChildTo(storeFor(circleId), agenda.id, { ...event, text: event.title, completedAt: null, createdBy: who(args) });
-      return { ok: true, itemId: made?.id ?? event.id, message: t('circle.calendar.added', { title: event.title, when: label(event) }) };
+      return { ok: true, itemId: made?.id ?? event.id, message: t('circle.calendar.added', { title: event.title, when: stamp(event) }) };
     },
 
     listEvents: async (args) => {
@@ -68,25 +85,23 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
 
     getEventSnapshot: async (args) => {
       const circleId = circleOf(args);
-      const event = circleId && args?.id ? await storeFor(circleId).get(String(args.id)) : null;
+      const event = await eventOf(circleId, args?.id);
       return event ? { ok: true, event } : { ok: false, error: t('circle.calendar.no_event') };
     },
 
     cancelEvent: async (args) => {
       const circleId = circleOf(args);
-      const store = circleId ? storeFor(circleId) : null;
-      const event = store && args?.id ? await store.get(String(args.id)) : null;
+      const event = await eventOf(circleId, args?.id);
       if (!event) return { ok: false, error: t('circle.calendar.no_event') };
-      await store.delete(event.id);
+      await storeFor(circleId).put({ ...event, state: 'cancelled' }, { by: who(args) });
       return { ok: true, message: t('circle.calendar.cancelled', { title: event.title }) };
     },
 
     ...Object.fromEntries(Object.entries(RSVP).map(([op, response]) => [op, async (args) => {
       const circleId = circleOf(args);
-      const store = circleId ? storeFor(circleId) : null;
-      const event = store && args?.id ? await store.get(String(args.id)) : null;
+      const event = await eventOf(circleId, args?.id);
       if (!event) return { ok: false, error: t('circle.calendar.no_event') };
-      await store.put(rsvpEvent(event, who(args), response), { by: who(args) });
+      await storeFor(circleId).put(rsvpEvent(event, who(args), response), { by: who(args) });
       return { ok: true, message: t(`circle.calendar.rsvp_${response}`, { title: event.title }) };
     }])),
   };

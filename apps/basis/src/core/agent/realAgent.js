@@ -240,7 +240,8 @@ import { createLocalBuiltins }             from '../localBuiltins.js';          
 import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
-import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // the lists handlers, once (a shell mounts the same ones with its own seams)
+import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
+import { pickEntry }                       from '../../v2/entryRef.js';                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3953,12 +3954,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
 
   let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       const refusal = await doorRefusal(opId, ctx.caller);
       if (refusal) return { ok: false, error: refusal };
       if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
+    }
+    // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
+    // for its id — the task by id, else by its words (`pickEntry`) among the circle's open tasks; words that name no
+    // task are said so in the household's words, not the store's.
+    if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {
+      const store = householdService?.stores?.getStore?.(resolveCircleId(args ?? {}));
+      if (store && typeof store.listByType === 'function') {
+        const open = ((await store.listByType('task')) ?? []).filter((it) => !it?.completedAt);
+        const task = pickEntry(open, args.id, (it) => it?.text ?? it?.title);
+        if (!task) return { ok: false, error: (typeof opts.t === 'function' ? opts.t : (k) => k)('circle.tasks.no_such_task', { item: args.id }) };
+        args = { ...args, id: task.id };
+      }
     }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and

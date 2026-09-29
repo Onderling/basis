@@ -90,7 +90,7 @@ export default function CircleListsScreen({ circleId, storeFor, callSkill, onBac
 
   const onRowAction = useCallback(async (op, node) => {
     if (!svcRef.current || !openList) return;
-    if (op === 'markComplete') await callSkill?.('lists', 'markListItemDone', { circleId, itemId: node.id });
+    if (op === 'markComplete') await callSkill?.('lists', 'markListItemDone', { circleId, item: node.id });
     else if (op === 'removeItem') await svcRef.current.remove(circleId, node.id);
     reloadTree(openList.id);
   }, [circleId, openList, reloadTree]);

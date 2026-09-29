@@ -23,9 +23,9 @@ export const SCOPE = Object.freeze(['household', 'lists', 'tasks', 'assistant'])
 
 // Not translated yet. Shrinks only.
 export const ALLOW = new Set([
-  'tasks:addTask', 'tasks:claimTask', 'tasks:confirmClaim', 'tasks:completeTask', 'tasks:removeTask', 'tasks:attachTaskGrant',
+  'tasks:addTask', 'tasks:confirmClaim', 'tasks:removeTask', 'tasks:attachTaskGrant',
   'tasks:reassignTask', 'tasks:submitTask', 'tasks:approveTask', 'tasks:rejectTask', 'tasks:revokeTask', 'tasks:listOpen',
-  'tasks:listMine', 'tasks:listClaimable', 'tasks:listClaimConflicts', 'tasks:resolveClaim', 'tasks:listAwaitingApproval',
+  'tasks:listClaimable', 'tasks:listClaimConflicts', 'tasks:resolveClaim', 'tasks:listAwaitingApproval',
   'tasks:listMyMasteredTasks', 'tasks:listMyPendingClaims', 'tasks:listMyInbox', 'tasks:clearInboxItem',
   'tasks:approveSubtaskRequest', 'tasks:declineSubtaskRequest', 'tasks:approveSubtaskProposal', 'tasks:declineSubtaskProposal',
   'tasks:clearInbox', 'tasks:getDagTree', 'tasks:archiveCircle', 'tasks:unarchiveCircle', 'tasks:editTask', 'tasks:provisionMyCircle',

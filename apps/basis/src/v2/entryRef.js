@@ -15,9 +15,10 @@
  * @param {string} ref   an id, or the person's words
  * @param {(e: T) => string} textOf  an entry's words
  * @param {(e: T) => string} [idOf]
- * @returns {{ entry: T|null, among: T[] }}  `among`: the entries the words fit when they fit several (else empty)
+ * @param {{ partialAsks?: boolean }} [opts]  words that are only part of the one entry they fit ask, not act
+ * @returns {{ entry: T|null, among: T[] }}  `among`: the entries the words fit when they do not name one (else empty)
  */
-export function matchEntry(entries, ref, textOf, idOf = (e) => e?.id) {
+export function matchEntry(entries, ref, textOf, idOf = (e) => e?.id, { partialAsks = false } = {}) {
   const want = String(ref ?? '').trim();
   if (!want || !Array.isArray(entries)) return { entry: null, among: [] };
   const byId = entries.find((e) => idOf(e) === want);
@@ -27,7 +28,10 @@ export function matchEntry(entries, ref, textOf, idOf = (e) => e?.id) {
   const exact = entries.filter((e) => words(e) === low);
   if (exact.length) return { entry: exact[0], among: [] };
   const within = entries.filter((e) => words(e).includes(low));
-  return within.length === 1 ? { entry: within[0], among: [] } : { entry: null, among: within };
+  // One entry the words are only a PART of ("kaas" in "melk en kaas"): where acting on it would tick or change more than
+  // was said, ask about that one entry instead (`among` of one); otherwise it is the entry meant.
+  if (within.length === 1) return partialAsks ? { entry: null, among: within } : { entry: within[0], among: [] };
+  return { entry: null, among: within };
 }
 
 /** The "which one?" line's choices: the entries' words, quoted, in the order they came. */

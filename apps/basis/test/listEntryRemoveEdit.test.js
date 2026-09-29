@@ -60,4 +60,20 @@ describe('removing and editing a list entry', () => {
       expect(Boolean(op.params.find((p) => p.name === 'list')?.required), id).toBe(false);
     }
   }, 90_000);
+
+  it('words that are only a PART of the one entry ask "Bedoel je …?" — nothing is ticked; the whole words act', async () => {
+    const node = await bootRealAgentNode('lists-part');
+    nodes.push(node);
+    const call = (a, o, x) => node.agent.callSkill(a, o, x);
+    await call('lists', 'createList', { text: 'Boodschappen' });
+    await call('lists', 'addToList', { list: 'Boodschappen', text: 'melk en kaas' });
+    const part = await call('lists', 'markListItemDone', { item: 'kaas' });
+    expect(part.ok).toBe(false);
+    expect(String(part.error)).toContain('circle.lists.mean_this');
+    expect(await entries(call, 'Boodschappen')).toEqual(['melk en kaas']);
+    const whole = await call('lists', 'markListItemDone', { item: 'melk en kaas' });
+    expect(whole.ok, JSON.stringify(whole)).toBe(true);
+    expect(await entries(call, 'Boodschappen')).toEqual([]);
+  }, 90_000);
 });
+

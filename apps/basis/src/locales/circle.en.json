@@ -3681,6 +3681,10 @@
     "which_one": {
       "text": "Which one do you mean: {{options}}?",
       "doc": "A household bot's question when a person's words fit several entries, chores or appointments (the choices, quoted)."
+    },
+    "mean_this": {
+      "text": "Do you mean '{{item}}'?",
+      "doc": "A household bot's question when a person's words are only part of one entry (it does not tick or change more than was said)."
     }
   },
   "share": {

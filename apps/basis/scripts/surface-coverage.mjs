@@ -14,12 +14,12 @@
 import { renderCoverage, coverageGaps, formatCoverageMarkdown } from '@onderling/app-manifest';
 
 // The circle catalogue set — read from the ONE list both shells compose (`src/v2/manifestSources.js`), plus
-// params (the register's meta-ops + the restore-settings flow; flows ride the snapshot too). The device-log
+// params (the register's meta-ops + the restore-settings flow; flows ride the snapshot too), plus the door's own ops. The device-log
 // lane manifests declare appends, not surfaces, so they have no row here.
-import { catalogueManifests } from '../src/v2/manifestSources.js';
+import { catalogueManifests, DOOR_MANIFESTS } from '../src/v2/manifestSources.js';
 import { paramsManifest } from '../src/v2/paramsManifest.js';
 
-const sources = [...catalogueManifests(), paramsManifest].map((m) => ({ ...m, appId: m.appId ?? m.app }));
+const sources = [...catalogueManifests(), paramsManifest, ...DOOR_MANIFESTS].map((m) => ({ ...m, appId: m.appId ?? m.app }));
 
 const cov = renderCoverage(sources);
 

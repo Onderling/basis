@@ -3933,11 +3933,11 @@ export async function createRealHouseholdAgent(opts = {}) {
    * no door call.
    * @returns {Promise<string|null>} the refusal's code, or null when the caller may go on
    */
-  const doorRefusal = async (opId, caller) => {
+  const doorRefusal = async (opId, caller, visibility = 'authenticated') => {
     const engine = hostAgent.policyEngine;
     if (!engine || typeof engine.checkCaller !== 'function') return 'no-gate';
     try {
-      await engine.checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility: 'authenticated', enabled: true }, unknownAs: 'public' });
+      await engine.checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility, enabled: true }, unknownAs: 'public' });
       return null;
     } catch (e) { return e?.code ?? 'refused'; }
   };
@@ -6076,6 +6076,11 @@ export async function createRealHouseholdAgent(opts = {}) {
      * A door admitted a person with a role: set their tier in the host gate. member → `authenticated`, admin →
      * `trusted`. Nothing else: the owner's level (`private`) is self only and cannot be given from a door.
      */
+    /**
+     * The host gate's answer for a door's person on an op the door answers itself (its own ops: a person's thread
+     * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
+     */
+    doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
     setDoorCaller: async (callerId, role) => {
       const tier = DOOR_TIER_FOR_ROLE[role];
       if (!tier) throw new Error(`setDoorCaller: a door gives only ${Object.keys(DOOR_TIER_FOR_ROLE).join(' or ')} (got "${role}")`);

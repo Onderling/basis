@@ -1,7 +1,7 @@
 /**
  * manifestSources — the ONE list of manifests the app runs.
  *
- * Two sets, both declared here and nowhere else:
+ * Three sets, all declared here and nowhere else:
  *
  *   • the CATALOGUE — the app manifests both shells merge into their dispatch catalogue and key by origin
  *     (`manifestsByOrigin`). ORDER MATTERS: an op id two apps both declare resolves to the earlier one, so
@@ -9,6 +9,7 @@
  *     chore, which is how "@assistant add X" once went to the wrong place), and agents comes last (any future
  *     collision resolves to the established app). The web and mobile shells each held their own copy of
  *     this list with a comment asking them to stay in the same order; they read this one now.
+ *   • the DOOR manifests — the ops a door that is not a circle offers about the person's own thread with it.
  *   • the PLUMBING — cross-cutting manifests that are composed elsewhere than the catalogue: the parameter
  *     register's ops (routed on the waist's `params` branch, offered to connections) and the device-log
  *     lanes, whose declared `appends` are what each lane's rail derives its allowed kinds from.
@@ -30,6 +31,7 @@ import { keyManifest } from './keyManifest.js';
 import { grantsManifest } from './grantsManifest.js';
 import { taskManifest } from './taskManifest.js';
 import { chatManifest } from './chatManifest.js';
+import { assistantManifest } from './assistantManifest.js';
 
 /**
  * The catalogue manifests, in dispatch order.
@@ -62,7 +64,10 @@ export const PLUMBING_MANIFESTS = Object.freeze([
   chatManifest,
 ]);
 
+/** The manifests a door that is not a circle adds to its catalogue (the box's Telegram chat): its own ops. */
+export const DOOR_MANIFESTS = Object.freeze([assistantManifest]);
+
 /** Every manifest the app runs — the set the manifest guards read. */
 export function allManifests() {
-  return [...catalogueManifests(), ...PLUMBING_MANIFESTS];
+  return [...catalogueManifests(), ...PLUMBING_MANIFESTS, ...DOOR_MANIFESTS];
 }

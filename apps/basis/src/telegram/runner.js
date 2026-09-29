@@ -20,6 +20,7 @@
 import { parseInput }      from '../parser.js';
 import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
+import { doorDisclosure } from '../v2/turnLog.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
@@ -52,16 +53,22 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
-  if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
+  if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
+  // Static, or a getter: a door whose admin switches apps recomposes its catalogue, and every surface reads the new one.
+  const catalogueOf = () => (typeof catalogueIn === 'function' ? catalogueIn() : catalogueIn);
+  const manifestsOf = () => (typeof manifestsIn === 'function' ? manifestsIn() : manifestsIn);
   if (typeof t !== 'function') throw new TypeError('createTelegramRunner: t is required');
 
   const open = allowedChatIds === '*' || !Array.isArray(allowedChatIds) || allowedChatIds.length === 0;
   const allowed = new Set(open ? [] : allowedChatIds.map(String));
-  /** chatId → a pending follow-up (single/multi field) or a pending confirmation. */
-  const pending = new Map();
+  /** threadId → a pending follow-up (single/multi field) or a pending confirmation — on the thread's row when the
+   *  door keeps its threads (it survives a restart), else for this process. */
+  const pending = threads
+    ? { get: (id) => threads.pendingOf(id), set: (id, v) => threads.setPending(id, v), delete: (id) => threads.setPending(id, null) }
+    : new Map();
 
   /** The turn under way (one per chat at a time) — the walk log's record in the making. */
   const turns = new Map();
@@ -98,21 +105,27 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     let reply;
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
-    const caller = turns.get(chatId)?.caller ?? null;
-    const call = caller ? (app, op, args) => callSkill(app, op, args, { caller }) : callSkill;
+    const rec = turns.get(chatId);
+    const caller = rec?.caller ?? null;
+    const threadId = rec?.thread ?? null;
+    const call = caller || threadId
+      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}) })
+      : callSkill;
     try { reply = await runDispatch(ready, call); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
-    await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin }));
+    await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
 
   /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue. */
   function helpText() {
-    const lines = (catalogue.commandMenu ?? []).map((e) => {
-      const op = catalogue.opsById?.get?.(e.opId)?.op;
+    const lines = (catalogueOf().commandMenu ?? []).map((e) => {
+      const op = catalogueOf().opsById?.get?.(e.opId)?.op;
       const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
       return hint ? `${e.command} — ${hint}` : e.command;
     });
-    return lines.join('\n');
+    // How to turn memory off, always; and, when turns are logged, that they are.
+    const disclosure = doorDisclosure(turnLogMode, t);
+    return [...lines, '', t('circle.bot.help_memory'), ...(disclosure ? [disclosure] : [])].join('\n');
   }
 
   /**
@@ -123,7 +136,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   function splitTypedMatch(parse) {
     const m = parse?.args?._match;
     if (typeof m !== 'string' || !m.includes(' ')) return parse;
-    const op = catalogue.opsById?.get?.(parse.opId)?.op;
+    const op = catalogueOf().opsById?.get?.(parse.opId)?.op;
     const params = Array.isArray(op?.params) ? op.params : [];
     const enumP = params.find((p) => p?.required && p.kind === 'enum' && Array.isArray(p.of));
     const textP = params.find((p) => p !== enumP && p?.required && p.kind === 'string');
@@ -136,7 +149,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   /** An enum arg named the way people say it ("boodschappen") → the declared value ("shopping"). */
-  const coerceEnums = (ready) => coerceListArgs(ready, catalogue);
+  const coerceEnums = (ready) => coerceListArgs(ready, catalogueOf());
 
   /**
    * A button tap arrives as its callbackData `opId:itemId` — dispatch it like `/command item`. Only an op OFFERED as a
@@ -147,7 +160,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   function tapToParse(text, threadId) {
     const m = /^([A-Za-z][\w-]*):(.*)$/.exec(text);
     if (!m) return null;
-    const op = catalogue.opsById?.get?.(m[1]);
+    const op = catalogueOf().opsById?.get?.(m[1]);
     if (!op) return null;
     if ((op.op ?? op)?.surfaces?.ui?.control !== 'button') return null;
     return { kind: 'slash', opId: m[1], args: m[2] ? { _match: m[2] } : {}, threadId };
@@ -161,12 +174,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   async function route(chatId, threadId, text) {
     if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText()); }
     let parse = typeof text === 'string'
-      ? (tapToParse(text, threadId) ?? parseInput(text, catalogue, { threadId }))
+      ? (tapToParse(text, threadId) ?? parseInput(text, catalogueOf(), { threadId }))
       : opToParse(text, threadId);
     if (typeof text === 'string') note(chatId, { via: tapToParse(text, threadId) ? 'tap' : 'slash' });
     if (parse?.kind === 'slash') parse = splitTypedMatch(parse);
     if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText()); }
-    const r = resolveDispatch(parse, catalogue);
+    const r = resolveDispatch(parse, catalogueOf());
     note(chatId, { route: r?.kind });
     switch (r?.kind) {
       case 'ready':
@@ -176,17 +189,17 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
         const p = single ?? beginFormFollowUp({ dispatch: r, t });
         if (!p) return say(chatId, t('circle.telegram.unknown'));
         if (p.kind === 'multi') p.values = {};
-        pending.set(chatId, { kind: 'form', p });
+        pending.set(threadId, { kind: 'form', p });
         const fields = p.kind === 'single' ? p.missingParam : p.fields.map((f) => f.name).join(', ');
         // An enum field asks with BUTTONS: the declared values, named the way people say them.
-        const op = catalogue.opsById?.get?.(r.opId)?.op;
+        const op = catalogueOf().opsById?.get?.(r.opId)?.op;
         const askName = p.kind === 'single' ? p.missingParam : p.fields[0].name;
         const enumP = (op?.params ?? []).find((q) => q?.name === askName && q.kind === 'enum' && Array.isArray(q.of));
         const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: t(`circle.telegram.list_${v}`) })) : undefined;
         return say(chatId, `${t('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`, buttons);
       }
       case 'needsConfirm': {
-        pending.set(chatId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
+        pending.set(threadId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
         return say(chatId, t('circle.telegram.confirm', { message: r.message ?? '' }), [
           { id: CONFIRM_YES, label: t('circle.telegram.confirm_yes') },
           { id: CONFIRM_NO,  label: t('circle.telegram.confirm_no') },
@@ -207,7 +220,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   // answer to its ask, a confirmation, a command, a button tap) is CLAIMED, so it waits its turn instead of racing
   // the turn before it; quick free-text lines are gathered into one turn by the engine's collect window.
   const engine = engineIn ?? createAssistantEngine({
-    catalogue, lang, llm, interpret, loadItems, botName,
+    catalogue: catalogueOf, lang, llm, interpret, loadItems, botName,
+    ...(threads ? { memory: threads.memory, threadLang: (id) => threads.langOf(id) } : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
@@ -220,13 +234,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
 
   /** Does this shell take the line itself? Asked when the line's turn comes, so an ask the turn before made counts. */
   function claims(chatId, threadId, text) {
-    const pend = pending.get(chatId);
+    const pend = pending.get(threadId);
     if (pend && (pend.kind === 'form' || text === CONFIRM_YES || text === CONFIRM_NO)) return true;
     return text.startsWith('/') || Boolean(tapToParse(text, threadId));
   }
   /** A line this shell takes: the answer to its pending ask, else a command or a tap. */
   async function doorLine(chatId, threadId, text) {
-    if (await continuePending(chatId, text)) return { via: 'door' };
+    if (await continuePending(chatId, threadId, text)) return { via: 'door' };
     await route(chatId, threadId, text);
     return { via: 'door' };
   }
@@ -239,9 +253,15 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const chatId = ctx.chatId;
     const text = lines.map((l) => String(l ?? '').trim()).join('\n');
     const started = Date.now();
-    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}) });
+    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}), thread: threadId });
     let r;
     try {
+      // A person's first turn with this door: who it is and what it keeps — once.
+      if (threads && threadId && !threads.greeted(threadId)) {
+        const disclosure = doorDisclosure(turnLogMode, t);
+        await say(chatId, [t('circle.bot.welcome'), ...(disclosure ? [disclosure] : [])].join('\n'));
+        threads.markGreeted(threadId);
+      }
       r = await run();
       if (!own) note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
@@ -254,23 +274,23 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       const voice = rec?.opId || rec?.route === 'help' ? 'system' : 'assistant';
       for (const reply of rec?.replies ?? []) engine.remember(threadId, voice, reply.text);
       // The log keeps the chat's last digits, never the person's id.
-      if (rec && typeof walkLog === 'function') { try { const { caller: _who, ...logged } = rec; walkLog({ ...logged, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
+      if (rec && typeof walkLog === 'function') { try { const { caller: _who, thread: _thread, ...logged } = rec; walkLog({ ...logged, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
     return r;
   }
 
   /** Continue a pending follow-up or confirmation with this line; false when nothing was pending. */
-  async function continuePending(chatId, text) {
-    const pend = pending.get(chatId);
+  async function continuePending(chatId, threadId, text) {
+    const pend = pending.get(threadId);
     if (!pend) return false;
     if (pend.kind === 'confirm') {
       if (text !== CONFIRM_YES && text !== CONFIRM_NO) return false;   // something else — leave the confirm standing
-      pending.delete(chatId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
+      pending.delete(threadId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
       if (text === CONFIRM_YES) await run(chatId, pend.ready);
       return true;
     }
-    if (text.startsWith('/')) { pending.delete(chatId); return false; }   // a new command cancels the ask
-    pending.delete(chatId); note(chatId, { via: 'form' });
+    if (text.startsWith('/')) { pending.delete(threadId); return false; }   // a new command cancels the ask
+    pending.delete(threadId); note(chatId, { via: 'form' });
     // The answer is typed the way people say it ("boodschappen"): an enum field takes its declared value.
     if (pend.p.kind === 'single') { await run(chatId, coerceEnums(completeFollowUp({ pending: pend.p, text }))); return true; }
     // multi: one field per line, in order
@@ -278,7 +298,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const next = p.fields[Object.keys(p.values).length];
     p.values[next.name] = text;
     if (Object.keys(p.values).length < p.fields.length) {
-      pending.set(chatId, pend);
+      pending.set(threadId, pend);
       await say(chatId, p.fields[Object.keys(p.values).length].label);
       return true;
     }
@@ -300,7 +320,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       } catch { caller = null; }
       if (!caller) { await say(chatId, t('circle.telegram.unknown')); return; }
     }
-    await engine.ask(threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
+    // The thread is the PERSON's when the door admits people (their contact id), so what one said is never another's
+    // memory, in a group chat too; without admission, the chat's.
+    await engine.ask(caller ?? threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
   }
 
   // The bridge is let go as soon as the line is in its lane: a long-polling bridge fetches the next updates only when
@@ -316,6 +338,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     /** test seam: the memory lines for a thread. */
     recentTurns: (threadId) => engine.recentTurns(threadId),
     /** test seam: is a follow-up or confirmation pending for this chat? */
-    pendingFor: (chatId) => pending.get(String(chatId))?.kind ?? null,
+    /** test seam: is a follow-up or confirmation pending — for a thread id, or a chat's own thread? */
+    pendingFor: (id) => (pending.get(String(id)) ?? pending.get(threadFor(String(id))))?.kind ?? null,
   };
 }

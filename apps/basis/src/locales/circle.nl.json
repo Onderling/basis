@@ -3843,7 +3843,22 @@
     "more": {
       "text": "En verder?",
       "doc": "Assistant reply when a turn was cut short (too many acts at once, or a call the model left unfinished): the ones it could do are done, and it asks for the rest."
-    }
+    },
+    "memory_off": "Ik onthoud dit gesprek niet meer: elk bericht staat nu op zichzelf. Wat je op een lijst zet, blijft staan.",
+    "memory_short": "Ik onthoud de laatste paar berichten van dit gesprek.",
+    "memory_long": "Ik onthoud de laatste berichten van dit gesprek, en later ook wat ik over het huishouden weet.",
+    "lang_set": "Ik antwoord je voortaan in: {{lang}}.",
+    "lang_auto": "Ik antwoord je weer in de taal waarin je schrijft.",
+    "welcome": "Hoi! Ik ben de assistent van dit huishouden. Typ /help om te zien wat ik kan.",
+    "help_memory": "Ik onthoud de laatste paar berichten van ons gesprek. Met /geheugen off onthoud ik niets meer; /taal nl of /taal en kiest de taal waarin ik antwoord.",
+    "log_disclosure": "Gesprekken worden geredigeerd bewaard en kunnen door de beheerder worden nagelezen om de assistent te verbeteren.",
+    "admin_only": "Dat kan alleen de beheerder van deze bot.",
+    "apps_list": "Aan: {{on}}\nBeschikbaar: {{available}}\nZet er een aan of uit met /apps on <naam> of /apps off <naam>.",
+    "apps_usage": "Gebruik: /apps, /apps on <naam> of /apps off <naam>.",
+    "apps_unknown": "Een app met de naam \"{{app}}\" ken ik niet. /apps laat zien welke er zijn.",
+    "apps_none_left": "Er moet minstens één app aan blijven.",
+    "status": "Apps: {{apps}}\nModel: {{model}}\nDeur: {{door}}\nGesprekken in het logboek: {{turns}}\nStandaard geheugen: {{memory}}\nToegelaten mensen: {{users}}",
+    "users_none": "Nog niemand toegelaten."
   },
   "op": {
     "not_in_this_circle": {

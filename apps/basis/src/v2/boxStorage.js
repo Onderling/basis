@@ -115,6 +115,7 @@ export function boxStores(dataDir) {
     deviceLog:    path.join(dataDir, 'device-log'),          // a directory: the manifest and its segments
     contactDm:    path.join(dataDir, 'contact-dm.json'),
     circlePolicy: path.join(dataDir, 'circle-policy.json'),
+    botThreads:   path.join(dataDir, 'bot-threads.json'),
   };
   return {
     paths,
@@ -123,5 +124,7 @@ export function boxStores(dataDir) {
     circlePolicyKv: sealedFileKeyValue(paths.circlePolicy),
     // Built after the agent booted (the key exists), like every other content store.
     contactDmSource: () => buildHouseholdDataSource({ path: paths.contactDm }, { strategy: shellContentSeal() }),
+    // The door's thread rows (memory mode, language, a pending ask) — the turns themselves are on the device log.
+    botThreadsSource: () => buildHouseholdDataSource({ path: paths.botThreads }, { strategy: shellContentSeal() }),
   };
 }

@@ -3843,7 +3843,22 @@
     "more": {
       "text": "And what else?",
       "doc": "Assistant reply when a turn was cut short (too many acts at once, or a call the model left unfinished): the ones it could do are done, and it asks for the rest."
-    }
+    },
+    "memory_off": "I no longer keep this conversation: every message now stands on its own. What you put on a list stays.",
+    "memory_short": "I keep the last few messages of this conversation.",
+    "memory_long": "I keep the last messages of this conversation, and later also what I know about the household.",
+    "lang_set": "I will reply to you in: {{lang}}.",
+    "lang_auto": "I will reply in the language you write in again.",
+    "welcome": "Hi! I'm this household's assistant. Type /help to see what I can do.",
+    "help_memory": "I keep the last few messages of our conversation. With /geheugen off I keep nothing; /taal nl or /taal en picks the language I reply in.",
+    "log_disclosure": "Conversations are kept in redacted form and can be read by the administrator to improve the assistant.",
+    "admin_only": "Only this bot's administrator can do that.",
+    "apps_list": "On: {{on}}\nAvailable: {{available}}\nSwitch one with /apps on <name> or /apps off <name>.",
+    "apps_usage": "Use: /apps, /apps on <name> or /apps off <name>.",
+    "apps_unknown": "I don't know an app called \"{{app}}\". /apps shows which there are.",
+    "apps_none_left": "At least one app has to stay on.",
+    "status": "Apps: {{apps}}\nModel: {{model}}\nDoor: {{door}}\nConversations in the log: {{turns}}\nDefault memory: {{memory}}\nPeople admitted: {{users}}",
+    "users_none": "Nobody admitted yet."
   },
   "op": {
     "not_in_this_circle": {

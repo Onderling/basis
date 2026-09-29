@@ -91,13 +91,14 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     await say('/mine');
     expect(admitted[0]).toMatchObject({ channel: 'telegram', uid: '42', displayName: 'Frits' });
     expect(calls.length).toBeGreaterThan(0);
-    for (const c of calls) expect(c.ctx).toEqual({ caller: 'telegram:42' });
+    // the person, and the thread that is theirs
+    for (const c of calls) expect(c.ctx).toEqual({ caller: 'telegram:42', threadId: 'telegram:42' });
     expect(JSON.stringify(records)).not.toContain('telegram:42');
     // the PERSON, not the chat: in a group chat the sender is who asks
     calls.length = 0;
     await bridge.simulateIncoming({ chatId: '42', text: '/mine', sender: { bridgeUid: '7', displayName: 'Ann' } });
     await runner.idle('42');
-    expect(calls.at(-1).ctx).toEqual({ caller: 'telegram:7' });
+    expect(calls.at(-1).ctx).toEqual({ caller: 'telegram:7', threadId: 'telegram:7' });
   });
 
   it('a door whose admission fails runs nothing', async () => {

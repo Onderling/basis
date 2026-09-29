@@ -4949,7 +4949,7 @@ function openListsPanel(circleId) {
             // THROUGH THE WAIST — the same op the "+" and a typed command dispatch. The panel used to
             // call the service directly, so "screen ≡ chat ≡ +" was a claim rather than a fact: three
             // doors into one feature, only two of which went through the contract.
-            if (op === 'markComplete') await rawCallSkill('lists', 'markListItemDone', { circleId, itemId: node.id });
+            if (op === 'markComplete') await rawCallSkill('lists', 'markListItemDone', { circleId, item: node.id });
             else if (op === 'removeItem') await svc.remove(circleId, node.id);
             draw();
           },

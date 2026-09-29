@@ -51,4 +51,30 @@ export const FIXTURES = [
   { id: 'decline-socks-en',   text: 'can you also darn my socks', lang: 'en', expect: { reply: 'declines', in: 'en' } },
   { id: 'greet-nl',           text: 'goedemorgen', expect: { reply: 'declines' } },   // a greeting gets a spoken greeting, never silence
   { id: 'greeting-nl',        text: 'Maii', expect: { reply: 'declines' } },   // walk 2: answered in English
+  // ── Fable's probe set (2026-09-30): the cases the set above does not cover — splits, chores and appointments by
+  //    their words, two tools in one message, back-references, the admin's op asked by a member ──
+  { id: 'p-split-en',        text: 'kaas en eieren', expect: { op: 'addToList', args: { list: /boodschappen/ }, count: 2 } },
+  { id: 'p-split-comma',     text: 'zet melk, boter en jam op de lijst', expect: { op: 'addToList', args: { list: /boodschappen/ }, count: 3 } },
+  { id: 'p-pair-unit',       text: 'peper en zout op de boodschappen', expect: { anyOf: [{ op: 'addToList', args: { list: /boodschappen/ }, count: 2 }, { op: 'addToList', args: { list: /boodschappen/, text: /peper en zout/ } }] } },
+  { id: 'p-implicit-add',    text: 'we hebben geen brood meer', expect: { anyOf: [{ op: 'addToList', args: { text: /brood/ } }, { reply: 'asks' }] } },
+  { id: 'p-claim-words',     text: 'ik doe de lamp', items: ['lamp vervangen (Klusjes)', 'vuilnis buiten zetten (Klusjes)'], expect: { op: 'claimTask', args: { id: /lamp|i0/ } } },
+  { id: 'p-complete-words',  text: 'de lamp is gemaakt', items: ['lamp vervangen (Klusjes)'], expect: { anyOf: [{ op: 'completeTask' }, { op: 'markListItemDone' }] } },
+  { id: 'p-mine',            text: 'heb ik nog klusjes?', expect: { op: 'listMine' } },
+  { id: 'p-event-add',       text: 'tandarts morgen om 10 uur', expect: { op: 'addEvent', args: { title: /tandarts/, when: /T10:00/ } } },
+  { id: 'p-event-relative',  text: 'volgende week dinsdag om 9 uur huisarts', expect: { op: 'addEvent', args: { title: /huisarts/, when: /T09:00/ } } },
+  { id: 'p-event-list',      text: 'wat staat er deze week in de agenda?', expect: { anyOf: [{ op: 'listEvents' }, { op: 'listEntries', args: { list: /agenda/ } }] } },
+  { id: 'p-rsvp-words',      text: 'ik kom naar de tandarts', items: ['2026-10-01 10:00 · tandarts (Agenda)'], expect: { op: 'rsvpAccept', args: { id: /tandarts|i0/ } } },
+  { id: 'p-two-tools',       text: 'zet melk op de lijst en maak een klusje: lamp vervangen', expect: { op: 'addToList', count: 2 } },
+  { id: 'p-flow-dinner',     text: 'plan een etentje zaterdag om 19 uur en zet wijn en kaas op de boodschappen', expect: { anyOf: [{ op: 'addEvent', count: 3 }, { op: 'addToList', count: 3 }] } },
+  { id: 'p-chain-done-add',  text: 'ik heb de lamp gedaan, zet een nieuwe lamp op de boodschappen', items: ['lamp vervangen (Klusjes)'], expect: { anyOf: [{ op: 'completeTask', count: 2 }, { op: 'addToList', count: 2 }, { op: 'markListItemDone', count: 2 }] } },
+  { id: 'p-backref',         text: 'doe er ook melk bij', before: ['you: zet brood op de boodschappen', 'system: ✓ Toegevoegd aan Boodschappen: brood'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /melk/ } } },
+  { id: 'p-remove',          text: 'haal melk van de boodschappenlijst', items: ['melk (Boodschappen)'], expect: { op: 'removeFromList', args: { item: /melk|i0/ } } },
+  { id: 'p-edit',            text: 'verander melk in halfvolle melk', items: ['melk (Boodschappen)'], expect: { op: 'editEntry' } },
+  { id: 'p-repairs-colon',   text: 'en op reparaties: de kraan lekt', expect: { op: 'addToList', args: { list: /reparaties/, text: /kraan/ } } },
+  { id: 'p-admin-op-member', text: 'gooi de klusjeslijst weg', expect: { reply: 'declines' } },
+  { id: 'p-thanks',          text: 'dankjewel!', expect: { reply: 'declines' } },
+  { id: 'p-mixed-en',        text: 'add dentist to the agenda tomorrow at 10', lang: 'en', expect: { op: 'addEvent', args: { title: /dentist/ } } },
+  { id: 'p-question-count',  text: 'hoeveel dingen staan er op de boodschappenlijst?', expect: { anyOf: [{ op: 'listEntries', args: { list: /boodschappen/ } }, { reply: 'asks' }] } },
+  { id: 'p-who-does',        text: 'wie doet de lamp?', items: ['lamp vervangen (Klusjes)'], expect: { anyOf: [{ op: 'listEntries', args: { list: /klusjes/ } }, { op: 'listMine' }, { reply: 'asks' }, { reply: 'declines' }] } },
+  { id: 'p-tick-partial',    text: 'kaas is gekocht', items: ['kaas en eieren (Boodschappen)', 'melk (Boodschappen)'], expect: { anyOf: [{ reply: 'asks' }, { op: 'markListItemDone' }] } },
 ];

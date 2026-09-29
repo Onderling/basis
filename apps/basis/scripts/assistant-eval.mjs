@@ -78,7 +78,8 @@ for (const f of fixtures) {
     // A one-line fixture does not wait for the collect window (its time is the model's); lines sent at once do.
     ...(f.lines ? {} : { collectMs: 0 }),
     // the bot's retrieval shape (`loadListItems`): an entry, with its list
-    loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'list-item', text: `${text} (Boodschappen)` })),
+    // (an item that names its list — "lamp vervangen (Klusjes)" — keeps it; one that does not is a Boodschappen entry)
+    loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'list-item', text: /\([^)]+\)\s*$/.test(text) ? text : `${text} (Boodschappen)` })),
     dispatch: (input) => { dispatched.push(input); },
     // As the box: a read the model picks first is looked at (here: the fixture's entries, with their ids) and handed
     // back once; the member's thread names the admin's tools.

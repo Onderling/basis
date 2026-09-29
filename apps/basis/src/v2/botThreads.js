@@ -30,11 +30,12 @@ export const THREAD_LANGS = Object.freeze(['nl', 'en']);
 const isMode = (m) => MEMORY_MODES.includes(m);
 
 /**
- * Thread rows kept in a DataSource (a sealed one on the box), one path per thread.
+ * Rows by id kept in a DataSource (a sealed one on the box), one path per row — the door's thread rows, its
+ * admission state.
  * @param {{read:Function, write:Function, list:Function}} ds
  * @param {string} [prefix]
  */
-export function dataSourceThreadStore(ds, prefix = 'mem://basis/bot-threads/') {
+export function dataSourceRowStore(ds, prefix = 'mem://basis/bot-threads/') {
   const pathOf = (id) => `${prefix}${encodeURIComponent(id)}`;
   const parse = (v) => { if (v == null) return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } };
   return {
@@ -111,6 +112,9 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     /** Has this thread been greeted (the door says who it is and what it keeps, once per person)? */
     greeted: (id) => rows.get(id)?.greeted === true,
     markGreeted(id) { return save({ ...rowOf(id), greeted: true }); },
+    /** Was this person, not admitted, already told they need a code (a door that says it once)? */
+    refused: (id) => rows.get(id)?.refused === true,
+    markRefused(id) { return save({ ...rowOf(id), refused: true }); },
     /** The ask this thread is waiting on (a form, a confirmation), or null. */
     pendingOf: (id) => rows.get(id)?.pending ?? null,
     setPending(id, pending) {

@@ -191,6 +191,7 @@ export function createContactThreadChannel({
     if (typeof env.extras?.pairInvite === 'string' && !env.extras?.sealed) payload.pairInvite = env.extras.pairInvite;
     if (env.extras?.pairRequest === true && !env.extras?.sealed) payload.pairRequest = true;
     if (typeof env.extras?.card === 'string' && !env.extras?.sealed) payload.card = env.extras.card;
+    if (typeof env.extras?.admission === 'string' && !env.extras?.sealed) payload.admission = env.extras.admission;
     // Sealed to the PERSON: the wire carries the box and no text — a device that holds the profile key but not the
     // person key (a revoked one) receives an envelope it cannot read.
     if (env.extras?.sealed) { payload.sealed = env.extras.sealed; payload.text = ''; }
@@ -214,7 +215,7 @@ export function createContactThreadChannel({
    *   (not the reply, which arrives asynchronously through `replyHandler`), plus the text that
    *   actually left the device (redacted when a floor applied) and how many items the floor took.
    */
-  function sendTurn({ peerAddr, threadId, text, messageId, replyTo, sender, floor } = {}) {
+  function sendTurn({ peerAddr, threadId, text, messageId, replyTo, sender, floor, admission } = {}) {
     if (!peerAddr) throw new Error('contactThreadChannel.sendTurn: peerAddr is required');
     if (typeof sendToPeer !== 'function') throw new Error('contactThreadChannel: sendToPeer is required');
     const id = messageId ?? mkId();
@@ -235,6 +236,8 @@ export function createContactThreadChannel({
         replyTo,
         ...(sender?.displayName ? { displayName: sender.displayName } : {}),
         ...(sender?.webid       ? { webid: sender.webid }             : {}),
+        // A code for a bot's door (from its card), on the first message to it.
+        ...(typeof admission === 'string' && admission ? { admission } : {}),
       },
     };
     // The fan rides the SEND's promise, after the turn has actually gone out and been stored — so a
@@ -265,8 +268,10 @@ export function createContactThreadChannel({
       // pair roster's material with it: an invite is a join secret).
       if (typeof sealFor === 'function') {
         try {
-          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}) };
-          const s = await sealFor(peerAddr, content); if (s) envelope.extras.sealed = s;
+          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}) };
+          const s = await sealFor(peerAddr, content);
+          // Sealed: the code travels inside the box only (it admits whoever holds it).
+          if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; }
         } catch { /* unsealed, as before */ }
       }
       const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
@@ -497,6 +502,8 @@ export function createContactThreadChannel({
       let pairInvite = typeof payload.pairInvite === 'string' ? payload.pairInvite : null;
       let pairRequest = payload.pairRequest === true;
       let card = typeof payload.card === 'string' ? payload.card : null;
+      // A code for a bot's door (from its card), riding the first message beside the text.
+      let admission = typeof payload.admission === 'string' ? payload.admission : null;
       if (payload.sealed && typeof payload.sealed === 'object') {
         // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
         const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
@@ -505,6 +512,7 @@ export function createContactThreadChannel({
         if (typeof content.pairInvite === 'string') pairInvite = content.pairInvite;
         if (content.pairRequest === true) pairRequest = true;
         if (typeof content.card === 'string') card = content.card;
+        if (typeof content.admission === 'string') admission = content.admission;
       }
       // The sender's card — taken only when it names the person this message is from (the shell's read of the
       // address); the shell adds it to the book. Never on the thread; the words go on regardless.
@@ -530,6 +538,7 @@ export function createContactThreadChannel({
         buttons:   Array.isArray(payload.buttons) ? payload.buttons : undefined,
         replyTo:   payload.replyTo,
         messageId: payload.messageId,
+        ...(admission ? { admission } : {}),
       });
     };
   }

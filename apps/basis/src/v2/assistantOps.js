@@ -18,7 +18,10 @@ import { assistantManifest } from './assistantManifest.js';
  * @param {(opId:string, caller:string, visibility:string) => Promise<string|null>} [a.refusal]  the host gate: a
  *        refusal code, or null. Absent → no caller is checked (a door without admitted people).
  * @param {{catalogue?: ReturnType<import('../telegram/assistantCatalogue.js').createDoorCatalogue>,
- *          status?: () => object|Promise<object>, users?: () => Promise<object[]>}} [a.admin]  what the admin's ops read and change
+ *          status?: () => object|Promise<object>, users?: () => Promise<object[]>,
+ *          admission?: ReturnType<import('./botAdmission.js').createBotAdmission>,
+ *          revoke?: (who: string) => Promise<object|null>,
+ *          inviteLink?: (code: string) => string|null}} [a.admin]  what the admin's ops read and change
  */
 export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {} }) {
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
@@ -34,6 +37,10 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-apps') return appsOp(args?.change ?? args?._match);
       if (op === 'assistant-status') return { ok: true, message: await statusText() };
       if (op === 'assistant-users') return { ok: true, message: await usersText() };
+      if (op === 'assistant-cohort') return cohortOp(args?.spec ?? args?._match);
+      if (op === 'assistant-invite') return inviteOp();
+      if (op === 'assistant-rotate') return rotateOp();
+      if (op === 'assistant-revoke') return revokeOp(args?.who);
       const threadId = typeof ctx?.threadId === 'string' && ctx.threadId ? ctx.threadId : null;
       if (!threadId) return { ok: false, error: 'no-thread' };
       if (op === 'assistant-memory') {
@@ -72,6 +79,36 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       apps, model: s.model ?? '—', door: s.door ?? '—', turns: s.turns ?? 'off',
       memory: s.memory ?? '—', users: s.users ?? '—',
     });
+  }
+
+  async function cohortOp(spec) {
+    if (!admin.admission) return { ok: false, error: 'unwired' };
+    const [people, days] = String(spec ?? '').trim().split(/\s+/).map(Number);
+    if (!(people >= 1) || !(days > 0)) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.cohort_usage') } };
+    const c = await admin.admission.openCohort({ ceiling: people, days });
+    return { ok: true, message: t('circle.bot.cohort_open', { people: c.ceiling, until: new Date(c.expiresAt).toISOString().slice(0, 10) }) };
+  }
+
+  async function inviteOp() {
+    if (!admin.admission) return { ok: false, error: 'unwired' };
+    const code = await admin.admission.code();
+    if (!code) return { ok: false, error: { code: 'no-cohort', message: t('circle.bot.cohort_none') } };
+    // On a door with a link form (Telegram's `t.me/<bot>?start=<code>`), the link too: tapping it sends the code.
+    const link = typeof admin.inviteLink === 'function' ? admin.inviteLink(code) : null;
+    return { ok: true, message: [t('circle.bot.invite_code', { code }), ...(link ? [t('circle.bot.invite_link', { link })] : [])].join('\n') };
+  }
+
+  async function rotateOp() {
+    if (!admin.admission) return { ok: false, error: 'unwired' };
+    await admin.admission.rotate();
+    return { ok: true, message: t('circle.bot.cohort_closed') };
+  }
+
+  async function revokeOp(who) {
+    if (typeof admin.revoke !== 'function') return { ok: false, error: 'unwired' };
+    const row = await admin.revoke(who);
+    if (!row) return { ok: false, error: { code: 'unknown-user', message: t('circle.bot.revoke_unknown', { who: String(who ?? '') }) } };
+    return { ok: true, message: t('circle.bot.revoked', { who: row.displayName ?? row.id }) };
   }
 
   async function usersText() {

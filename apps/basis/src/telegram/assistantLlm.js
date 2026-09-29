@@ -10,6 +10,32 @@
  */
 import { LlmClient } from '@onderling/llm-client';
 import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/providers/privatemode';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+/** The model a turn is retried on ONCE when the primary times out. */
+export const ASSISTANT_FALLBACK_MODEL = param({ key: 'assistant.fallbackModel', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 'gpt-oss-120b' });
+
+const isTimeout = (err) => err?.name === 'AbortError' || /\babort|timed? ?out\b/i.test(String(err?.message ?? ''));
+
+/**
+ * A provider that retries a turn ONCE on another model when the first times out — any other error goes on as it
+ * is. The second provider is made on first need. `onFallback` hears of it (the box writes it to its walk log).
+ */
+function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback }) {
+  let second = null;
+  return {
+    id: primary.id, endpoint: primary.endpoint, model: primary.model,
+    async invoke(req) {
+      try { return await primary.invoke(req); }
+      catch (err) {
+        if (!isTimeout(err) || !fallbackModel || fallbackModel === primary.model) throw err;
+        second ??= await makeFallback();
+        try { onFallback?.({ from: primary.model ?? null, to: fallbackModel, reason: 'timeout' }); } catch { /* a listener never breaks a turn */ }
+        return second.invoke(req);
+      }
+    },
+  };
+}
 
 /**
  * @param {object} [a]
@@ -18,6 +44,8 @@ import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/p
  * @param {string} [a.model]                               the model name, when the operator chose one
  * @param {number} [a.timeoutMs]
  * @param {(msg: string) => void} [a.warn]
+ * @param {string} [a.fallbackModel]    retried once on a timeout (`assistant.fallbackModel`)
+ * @param {(e: {from: string|null, to: string, reason: string}) => void} [a.onFallback]
  * @returns {Promise<{ llm: LlmClient, model: string|null } | null>}
  */
 export async function buildAssistantLlm({
@@ -26,11 +54,16 @@ export async function buildAssistantLlm({
   model = undefined,
   timeoutMs = 60_000,
   warn = (m) => console.warn(m),
+  fallbackModel = ASSISTANT_FALLBACK_MODEL,
+  onFallback = null,
 } = {}) {
   if (!hasKey()) return null;
   try {
-    const provider = await makeProvider({ model: model || undefined, timeoutMs });
-    return { llm: new LlmClient({ provider }), model: provider?.model ?? null };
+    const primary = await makeProvider({ model: model || undefined, timeoutMs });
+    const provider = withTimeoutFallback(primary, {
+      fallbackModel, onFallback, makeFallback: () => makeProvider({ model: fallbackModel, timeoutMs }),
+    });
+    return { llm: new LlmClient({ provider }), model: primary?.model ?? null };
   } catch (err) {
     warn(`device-runner: the confidential LLM route did not load (${err?.message ?? err}) — Telegram answers without a model; the device runs on.`);
     return null;

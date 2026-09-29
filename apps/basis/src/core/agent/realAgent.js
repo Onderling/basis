@@ -157,7 +157,7 @@ import {
   setCircleMembership as registrySetCircleMembership,
   removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
-  deviceDelegationOf, deviceDelegationsOf, setDeviceDelegation as registrySetDeviceDelegation,
+  deviceDelegationOf, deviceDelegationsOf, profileHasOtherDevices, setDeviceDelegation as registrySetDeviceDelegation,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -6081,6 +6081,29 @@ export async function createRealHouseholdAgent(opts = {}) {
      * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
      */
     doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /**
+     * Whose profile this node runs: a PERSON's (their devices keep their inbox; nothing answers it) or a FUNCTION's
+     * (a household bot on its own node — its inbox is the bot's, and the assistant answers it). Read from the
+     * profile record, never from a flag or from "not enrolled".
+     */
+    profileKind: async () => ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function' ? 'function' : 'person'),
+    /**
+     * Name this node's profile a function's (once, at the bot's install: the bot IS its own profile, this node its
+     * device). Refused when the profile has another device: a profile with a phone and a laptop behind it is a
+     * person's, and their inbox must never start answering (the VPS box, enrolled as Frits' device).
+     */
+    markFunctionProfile: async () => {
+      if (!agentsRegistryRef || typeof agentsRegistryRef.updateKind !== 'function') throw new Error('markFunctionProfile: no profile registry');
+      const cur = await agentsRegistryRef.lookup('default');
+      if (profileHasOtherDevices(cur ?? {}, enrolledDevice?.deviceId ?? null)) throw new Error('markFunctionProfile: this profile has other devices — it is a person\'s, not a function\'s');
+      await agentsRegistryRef.updateKind('default', 'function');
+    },
+    /** A door dropped a person (revoked): the gate treats them as a stranger from now on. */
+    clearDoorCaller: async (callerId) => {
+      if (!hostTrustRegistry) throw new Error('clearDoorCaller: the host gate is not attached');
+      if (typeof callerId !== 'string' || !callerId) throw new Error('clearDoorCaller: a caller id is required');
+      await hostTrustRegistry.setTier(callerId, 'public');
+    },
     setDoorCaller: async (callerId, role) => {
       const tier = DOOR_TIER_FOR_ROLE[role];
       if (!tier) throw new Error(`setDoorCaller: a door gives only ${Object.keys(DOOR_TIER_FOR_ROLE).join(' or ')} (got "${role}")`);

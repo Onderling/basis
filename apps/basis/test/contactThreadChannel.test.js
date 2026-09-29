@@ -129,6 +129,29 @@ describe('createContactThreadChannel — subtype injection (repo-boundary decoup
 });
 
 describe('createContactThreadChannel — messageHandler (S1 #3 peer DM)', () => {
+  it('a code for a bot\'s door rides the message as a field and reaches the handler; none, nothing', async () => {
+    const onMessage = vi.fn();
+    const ch = createContactThreadChannel({ sendToPeer: () => {} });
+    const router = makePeerRouter({ handlers: { [ch.subtypes.out]: ch.messageHandler(onMessage) } });
+    await router({ from: 'ann', payload: { subtype: 'contact-msg', text: 'hallo', messageId: 'a-1', admission: 'abc-123' } });
+    expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({ fromAddr: 'ann', text: 'hallo', admission: 'abc-123' }));
+    onMessage.mockClear();
+    await router({ from: 'ann', payload: { subtype: 'contact-msg', text: 'weer', messageId: 'a-2' } });
+    expect(onMessage.mock.calls[0][0].admission).toBeUndefined();
+  });
+
+  it('sendTurn carries a code on the wire beside the text (inside the seal when there is one)', async () => {
+    const sent = [];
+    const ch = createContactThreadChannel({ sendToPeer: (a, p) => { sent.push(p); } });
+    await ch.sendTurn({ peerAddr: 'bot', threadId: 'bot', text: 'hallo', admission: 'abc-123' }).sent;
+    expect(sent.at(-1)).toMatchObject({ text: 'hallo', admission: 'abc-123' });
+    const sealed = [];
+    const ch2 = createContactThreadChannel({ sendToPeer: (a, p) => { sealed.push(p); }, sealFor: async (_a, content) => ({ box: JSON.stringify(content) }) });
+    await ch2.sendTurn({ peerAddr: 'bot', threadId: 'bot', text: 'hallo', admission: 'abc-123' }).sent;
+    expect(sealed.at(-1).admission, 'not in the clear when sealed').toBeUndefined();
+    expect(sealed.at(-1).sealed.box).toContain('abc-123');
+  });
+
   it('routes an inbound contact-msg (a peer DMing you) to onMessage', () => {
     const onMessage = vi.fn();
     const ch = createContactThreadChannel({ sendToPeer: () => {} });

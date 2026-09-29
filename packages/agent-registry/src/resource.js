@@ -114,6 +114,9 @@ function _normaliseAgent(a) {
     // Per-skill EXPOSURE (which skills this agent ADVERTISES, per circle). Additive; absent → nothing
     // hidden. A discovery filter only — the dispatch grant is the enforcement. → src/skillExposure.js.
     exposure:         normalizeExposure(a.exposure),
+    // Whose the profile is — a person's (absent) or a function's (a bot on its own node). A closed set: anything else
+    // reads as absent, so a stray value can never switch the bot's inbox door on.
+    ...((a.kind === 'person' || a.kind === 'function') ? { kind: a.kind } : {}),
   });
 }
 

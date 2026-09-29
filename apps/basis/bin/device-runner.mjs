@@ -21,7 +21,8 @@
  *   ONDERLING_RELAY_URL      the relay to dial. Absent → local-only (no wire; useful for a first boot)
  *   BASIS_VAULT_PASSPHRASE   the vault key; absent → one is generated once beside the vault
  *   TG_BOT_TOKEN             optional — also answer on Telegram (or ~/.canopy-tg-token)
- *   TG_ALLOWED_CHAT_IDS      which chats may use it; unset/'*' is an OPEN DOOR
+ *   TG_ALLOWED_CHAT_IDS      Telegram ids let in without a code (a bootstrap); everyone else needs an admin's code
+ *   ONDERLING_PROFILE_KIND   `function` on a household bot's own node: its profile is the bot's, its inbox a door
  *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
  *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
@@ -53,8 +54,11 @@ import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
-import { createBotThreads, dataSourceThreadStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
+import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
+import { createBotAdmission } from '../src/v2/botAdmission.js';
+import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
 import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
@@ -313,6 +317,8 @@ if (values.enrol) { process.exit(await enrolOnce()); }
 
 // ── The wire ────────────────────────────────────────────────────────────────────────────────────
 let contactChannel = null;
+// The bot's inbox door (a function profile only), late-bound: the contact channel is composed below, the door after it.
+let inboxDoor = { bridge: null, feed: () => false };
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
@@ -455,9 +461,18 @@ if (relayUrl) {
   // on the maker's web app under a key its Contacten row never opened).
   const landTurn = ({ fromAddr, text, buttons, messageId, replyTo, ts }) => {
     const contactId = agent.identityOfAddress?.(fromAddr) ?? fromAddr;
-    contactChannel.persistInbound({ contactId, fromAddr, text, buttons, messageId, replyTo, ts })
-      ?.then((r) => { if (!r?.deduped) walkLog({ kind: 'contact-turn', from: String(fromAddr).slice(0, 12), text }); })
+    return contactChannel.persistInbound({ contactId, fromAddr, text, buttons, messageId, replyTo, ts })
+      ?.then((r) => { if (!r?.deduped) walkLog({ kind: 'contact-turn', from: String(fromAddr).slice(0, 12), text }); return r; })
       ?.catch(() => { /* durability is best-effort, as in the shells */ });
+  };
+  // A person's MESSAGE (never a bot's reply: two bots must not answer each other) lands in the inbox like any other,
+  // and on a function profile's node it then goes to the assistant.
+  const landMessage = (m) => {
+    const landed = landTurn(m);
+    Promise.resolve(landed).then((r) => {
+      if (r?.deduped) return;
+      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId });
+    }).catch(() => {});
   };
 
   // The redeem pair (the join's wire), as both shells wire it — here for the pair roster: the box founds or joins
@@ -484,7 +499,7 @@ if (relayUrl) {
     handlers: {
       ...lanes.handlers,
       [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
-      [contactChannel.subtypes.out]: contactChannel.messageHandler(landTurn),
+      [contactChannel.subtypes.out]: contactChannel.messageHandler(landMessage),
       // A join request — for the box, a contact joining the pair circle it founded: admit, promote to co-admin
       // (the pair roster's rule), return the box's proven per-circle address, hand the circle the newcomer's.
       'group-redeem-request': makeHandleGroupRedeemRequest({
@@ -640,12 +655,24 @@ const tgToken = (() => {
   if (process.env.TG_BOT_TOKEN) return process.env.TG_BOT_TOKEN.trim();
   try { return readFileSync(path.join(homedir(), '.canopy-tg-token'), 'utf8').trim(); } catch { return null; }
 })();
+// ── Whose node this is: a bot's install names its profile a function's, once (refused on a person's profile) ────
+if (String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function') {
+  try { await agent.markFunctionProfile(); } catch (err) { console.warn(`device-runner: ${err?.message ?? err}`); }
+}
+// The bot's inbox door follows the profile: a person's node never answers its inbox.
+if (contactChannel) {
+  inboxDoor = await createInboxDoor({ profileKind: () => agent.profileKind(), sendTurn: (turn) => contactChannel.sendTurn(turn) });
+}
+
+// ── The assistant: its doors (Telegram, the bot's inbox), ONE engine behind them ─────────────────────────────
 let tgRunner = null;
-if (tgToken) {
-  const { TelegramBridge } = await import('@onderling/chat-agent/bridges/telegram');
-  const raw = String(process.env.TG_ALLOWED_CHAT_IDS ?? '').trim();
-  const allowedChatIds = raw && raw !== '*' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : '*';
-  if (allowedChatIds === '*') console.warn('device-runner: OPEN TELEGRAM DOOR — no TG_ALLOWED_CHAT_IDS, every chat is admitted');
+if (tgToken || inboxDoor.bridge) {
+  const { TelegramBridge } = tgToken ? await import('@onderling/chat-agent/bridges/telegram') : {};
+  // Who gets in without a code: the admin named at start and a configured allow-list (the bootstrap). Everyone else
+  // needs a code the admin hands out (`/cohort`, `/invite`). There is no open door any more.
+  const adminUid = String(process.env.TG_ADMIN_UID ?? '').trim() || null;
+  const bootstrapUids = [adminUid, ...String(process.env.TG_ALLOWED_CHAT_IDS ?? '').split(',')]
+    .map((s) => String(s ?? '').trim()).filter((s) => s && s !== '*');
 
   // Scope, then interpret: the apps this bot acts in are the owner's setting, read at boot, and the catalogue
   // every surface of the door projects — the model's tools included — holds only theirs.
@@ -658,38 +685,60 @@ if (tgToken) {
   const apps = doorCatalogue.apps();
   // The model is the optional half of this optional half: a key without its SDK is a warning and a
   // Telegram that answers without a model, never a device that is not there.
-  const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
+  const built = await buildAssistantLlm({
+    model: process.env.PRIVATEMODE_MODEL,
+    // One retry on the fallback model after a timeout — said in the walk log, so a slow route is visible.
+    onFallback: (e) => walkLog({ kind: 'llm-fallback', ...e }),
+  });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
+  const tgBridge = tgToken ? new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }) : null;
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Every person is a contact with a role, and their calls carry them to the host gate.
-  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid: String(process.env.TG_ADMIN_UID ?? '').trim() || null });
+  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
+  // Admission by code: the signing secret in the bot's sealed vault, the cohort and spent codes in a sealed store.
+  const admission = createBotAdmission({
+    secretVault: chatVault,
+    store: dataSourceRowStore(await stores.botAdmissionSource(), 'mem://basis/bot-admission/'),
+  });
+  // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
+  // console, never a chat or the walk log) — the first person admitted is the bot's admin.
+  let bootstrapCode = null;
+  if (!bootstrapUids.length && !(await botUsers.list()).some((u) => u.role === 'admin')) {
+    await admission.openCohort({ ceiling: 1, days: 1 });
+    bootstrapCode = await admission.code();
+    console.log(`device-runner: this bot has no admin yet — send it, within a day:  /start ${bootstrapCode}`);
+  }
   // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
   const threads = createBotThreads({
     eventLog: deviceLog,
-    store: dataSourceThreadStore(await stores.botThreadsSource()),
+    store: dataSourceRowStore(await stores.botThreadsSource()),
     memoryDefault: () => agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY),
   });
   await threads.load();
   tgRunner = createTelegramRunner({
-    bridge: new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }),
+    bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
     catalogue: doorCatalogue.catalogue,
     manifestsByOrigin: doorCatalogue.manifestsByOrigin,
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are
     // answered here, each after the host gate said yes at the op's level; the rest go on to the agent.
-    allowedChatIds, t, lang: values.lang,
+    t, lang: values.lang,
     callSkill: withAssistantOps({
       callSkill, threads, t, refusal: agent.doorRefusal,
       admin: {
         catalogue: doorCatalogue,
         users: () => botUsers.list(),
+        admission,
+        revoke: (who) => botUsers.revoke(who),
+        // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
+        inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
         status: async () => ({
-          model: llm ? llmModel : null, door: allowedChatIds === '*' ? 'open' : 'allow-list', turns: turnLogMode ?? 'off',
+          model: llm ? llmModel : null, door: 'codes', turns: turnLogMode ?? 'off',
           memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
         }),
       },
     }),
-    admit: createDoorAdmit({ users: botUsers, setDoorCaller: agent.setDoorCaller }),
+    admit: createDoorAdmit({ users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller }),
     threads,
     loadItems: loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
@@ -698,7 +747,8 @@ if (tgToken) {
     turnLogMode,
   });
   await tgRunner.start();
-  walkLog({ kind: 'telegram', door: allowedChatIds === '*' ? 'open' : 'allow-list', llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
+  if (bootstrapCode && tgBridge?.botUsername) console.log(`device-runner: …or open  https://t.me/${tgBridge.botUsername}?start=${bootstrapCode}`);
+  walkLog({ kind: 'assistant', doors: [tgBridge ? 'telegram' : null, inboxDoor.bridge ? 'inbox' : null].filter(Boolean), admission: 'codes', bootstrap: bootstrapUids.length, llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
 }
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────

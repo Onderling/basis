@@ -1,0 +1,72 @@
+{
+  "household": {
+    "addItem": {
+      "text": "Zet iets op een lijst van het huishouden — type is shopping (boodschappen), errand (klusjes), repair (reparaties) of schedule (agenda). Gebruik dit voor \"zet X op de boodschappen\".",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "listOpen": {
+      "text": "Laat de open items van een lijst zien.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "markComplete": {
+      "text": "Vink een open item af. match = id, begin van de id, of een woord eruit.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "removeItem": {
+      "text": "Haal een item helemaal weg.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "help": {
+      "text": "Laat zien welke opdrachten er zijn.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "addTask": {
+      "text": "Voeg een KLUS/TAAK toe (toe te wijzen, met een datum) — GEEN item op een boodschappen-, klusjes-, reparatie- of agendalijst (daarvoor is addItem).",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "listTasks": {
+      "text": "Laat de open taken zien.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "claim": {
+      "text": "Neem een open taak op je. match = id, begin van de id, of een woord eruit.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "reassign": {
+      "text": "Geef een taak aan iemand anders. match = id of woord; assignee = de webid.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "registerName": {
+      "text": "Zet je naam in het huishouden.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    }
+  },
+  "lists": {
+    "createList": {
+      "text": "Begin een nieuwe lijst in deze kring.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "addToList": {
+      "text": "Zet iets op een lijst — een gewone regel, of iets anders dat die lijst aanneemt.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "listLists": {
+      "text": "De lijsten in deze kring.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "markListItemDone": {
+      "text": "Vink iets af op een lijst.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    }
+  },
+  "assistant": {
+    "assistant-memory": {
+      "text": "Hoeveel de assistent van dit gesprek onthoudt: off (niets), short (de laatste berichten), long.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "assistant-language": {
+      "text": "De taal waarin de assistent deze persoon antwoordt; auto volgt de taal waarin iemand schrijft.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    }
+  }
+}

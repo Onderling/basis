@@ -38,8 +38,12 @@ import { circleGateRules } from './circleGate.js';
 import { makeCircleRetriever } from './circleRetriever.js';
 import { DEFAULT_INTERPRET_SYSTEM } from './interpretCommand.js';
 import { detectLang } from './assistantLanguage.js';
+import { chatHintFor } from './chatHints.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 export const ASSISTANT_MEMORY_TURNS = 6;
+/** How much the model may vary: low and fixed, so the same line picks the same tool. No `tool_choice`. */
+export const ASSISTANT_TEMPERATURE = param({ key: 'assistant.temperature', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 0.2 });
 const DEFAULT_THREAD = '__default__';
 
 /**
@@ -93,10 +97,19 @@ export function createAssistantEngine({
   const interpretIn = typeof interpret === 'function'
     ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? interpretHintsFor(text) })
     : null;
-  // A thread fixed to a language (`/taal`) says so in its hint instead of what the line looks like.
+  // A thread fixed to a language (`/taal`) says so in its hint instead of what the line looks like. The tools are
+  // described in the thread's language first (its own, what the line is written in, else the door's), and the model
+  // is called at the pinned temperature.
   const interpretFor = (threadId) => (text, o = {}) => {
     const fixed = typeof threadLang === 'function' && threadId ? threadLang(threadId) : null;
-    return interpretIn(text, fixed ? { ...o, hints: o.hints ?? [replyInHint(fixed)] } : o);
+    const toolLang = fixed ?? detectLang(text) ?? String(lang).slice(0, 2);
+    return interpretIn(text, {
+      ...o,
+      ...(fixed ? { hints: o.hints ?? [replyInHint(fixed)] } : {}),
+      options: o.options ?? { temperature: ASSISTANT_TEMPERATURE },
+      toolLang: o.toolLang ?? toolLang,
+      hintFor: o.hintFor ?? chatHintFor,
+    });
   };
   const retrieve = typeof loadItems === 'function'
     ? makeCircleRetriever({

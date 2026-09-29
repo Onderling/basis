@@ -39,6 +39,12 @@ import { normalizeExposure } from './skillExposure.js';
  *                                          every write snapshots the resource (best-effort).
  * @param {() => string} [opts.now]
  */
+/**
+ * Whose a profile is: a PERSON's, or a FUNCTION's (a household bot on its own node — "a hosted function is a profile
+ * whose runners are its devices"). The bot's inbox door follows it; absent means a person.
+ */
+export const PROFILE_KINDS = Object.freeze(['person', 'function']);
+
 export function createAgentRegistry({
   pseudoPod,
   anchorPodUri,
@@ -128,6 +134,8 @@ export function createAgentRegistry({
       onPersistentConflict,
       mutate(body /*, etag */) {
         const without = body.agents.filter(a => a.agentId !== entry.agentId);
+        // A record written again for another reason keeps its kind (set only through `updateKind`).
+        const prevKind = body.agents.find(a => a.agentId === entry.agentId)?.kind;
         const next = {
           v:         RESOURCE_VERSION,
           agents:    [...without, {
@@ -147,6 +155,7 @@ export function createAgentRegistry({
             ownerFingerprint: entry.ownerFingerprint ?? null,
             // property layer (personas) — persisted per-context disclosure policy
             disclosure:       entry.disclosure ?? { perContext: {} },
+            ...(PROFILE_KINDS.includes(prevKind) ? { kind: prevKind } : {}),
           }],
           updatedAt: now(),
         };
@@ -246,6 +255,31 @@ export function createAgentRegistry({
           agents:    body.agents.map(a =>
             _agentMatches(a, identifier) ? { ...a, exposure: normalizeExposure(exposure) } : a,
           ),
+          updatedAt: now(),
+        };
+      },
+    });
+  }
+
+  /**
+   * Set whose a profile is (`PROFILE_KINDS`). The authority check is the caller's (a node enrolled as a person's
+   * device must not turn their profile into a function's); this is the persistence half.
+   * @param {string} identifier  agentId or pubKey
+   * @param {'person'|'function'} kind
+   */
+  async function updateKind(identifier, kind) {
+    if (!PROFILE_KINDS.includes(kind)) {
+      throw Object.assign(new Error(`updateKind: kind must be one of ${PROFILE_KINDS.join(', ')}`), { code: 'INVALID_ARGUMENT' });
+    }
+    return withCAS({
+      readCurrent: _readCurrent,
+      writeNext:   _writeNext,
+      maxRetries:  maxRetries ?? 3,
+      onPersistentConflict,
+      mutate(body) {
+        return {
+          v:         RESOURCE_VERSION,
+          agents:    body.agents.map(a => (_agentMatches(a, identifier) ? { ...a, kind } : a)),
           updatedAt: now(),
         };
       },
@@ -368,6 +402,7 @@ export function createAgentRegistry({
     purge,
     updateCapabilities,
     updateExposure,
+    updateKind,
     applyGrant,
     revokeGrant,
     list,

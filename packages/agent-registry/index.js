@@ -5,7 +5,7 @@
  * `Project Files/Substrates/substrates-v2-coding-plan-2026-05-11.md`.
  */
 
-export { createAgentRegistry }  from './src/AgentRegistry.js';
+export { createAgentRegistry, PROFILE_KINDS }  from './src/AgentRegistry.js';
 export { makeActorResolver }    from './src/makeActorResolver.js';
 export {
   registryResourceUri,
@@ -43,7 +43,7 @@ export {
 // auditable device list + the revocation tombstone's home. Same construction as circleMembership.
 export {
   DEVICE_DELEGATIONS_KEY, isDeviceDelegationRecord, normaliseDeviceDelegation,
-  deviceDelegationsOf, deviceDelegationOf, setDeviceDelegation,
+  deviceDelegationsOf, deviceDelegationOf, profileHasOtherDevices, setDeviceDelegation,
   } from './src/deviceDelegations.js';
 // identity step 5A — encrypted-file/DB export of the profile set
 export { exportProfileRegistry, importProfileRegistry, restoreProfilesInto } from './src/exportRegistry.js';

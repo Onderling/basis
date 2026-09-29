@@ -300,6 +300,11 @@ export class TelegramBridge {
    *
    * @returns {string}
    */
+  /** The bot's own @-name (known after `start()`), or null — what a `t.me/<name>` link needs. */
+  get botUsername() {
+    return this.#botUsername;
+  }
+
   get id() {
     return 'telegram';
   }

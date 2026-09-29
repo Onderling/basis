@@ -116,6 +116,7 @@ export function boxStores(dataDir) {
     contactDm:    path.join(dataDir, 'contact-dm.json'),
     circlePolicy: path.join(dataDir, 'circle-policy.json'),
     botThreads:   path.join(dataDir, 'bot-threads.json'),
+    botAdmission: path.join(dataDir, 'bot-admission.json'),
   };
   return {
     paths,
@@ -126,5 +127,7 @@ export function boxStores(dataDir) {
     contactDmSource: () => buildHouseholdDataSource({ path: paths.contactDm }, { strategy: shellContentSeal() }),
     // The door's thread rows (memory mode, language, a pending ask) — the turns themselves are on the device log.
     botThreadsSource: () => buildHouseholdDataSource({ path: paths.botThreads }, { strategy: shellContentSeal() }),
+    // Who may start talking to the door: the open cohort and the hashes of spent codes (never a code).
+    botAdmissionSource: () => buildHouseholdDataSource({ path: paths.botAdmission }, { strategy: shellContentSeal() }),
   };
 }

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 44
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 45
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -17,6 +17,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `box-runner` | — | the box runner (deploy/box) stays a working thing, not a script that rotted |
 | `branch-hygiene` | — | the trunk and the release branch move by MERGE, not by commits typed on them |
 | `callskill-literals` | — | a literal `callSkill('group', 'op')` must name an op some manifest declares |
+| `chat-hints-localised` | — | every op the household assistant can be asked for has a Dutch hint |
 | `ci-runs-guards` | — | the mechanism that runs the checks is itself checked |
 | `circle-store-door` | G-C1 | one store per circle |
 | `codenames` | — | no internal PLANNING CODENAMES in public code comments or docs |

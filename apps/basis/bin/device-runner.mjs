@@ -193,7 +193,12 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // device is in, which devices the person has), the item store (rosters, contacts, the trail) and the
 // settings were memory, and a restart — every deploy of a box — came back to no circles at all. The
 // same descriptors the web app passes, with a file where it has an IndexedDB store.
+// A household bot's install (a function profile) runs its tasks engine in its household circle, so a task on one of its
+// lists is the engine's — one store per circle. A person's node keeps its tasks where they are. (The profile record is
+// only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
+const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
+  ...(botInstall ? { tasksCircleId: 'household' } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),

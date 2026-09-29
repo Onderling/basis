@@ -3099,6 +3099,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // role; without the chatAgent's pubKey in the member list, every
   // call from basis would be treated as a stranger + denied
   // by RolePolicy.
+  // WHICH CIRCLE the tasks engine runs in when the shell names none. An engine is verbs over the circle's ONE store,
+  // not a store of its own: on the bot (`tasksCircleId`, the box) its tasks are the household circle's, so a task
+  // on a list (Klusjes) is the engine's to list, claim and complete. The painting shells keep their own default.
+  const tasksDefaultCircleId = (typeof opts.tasksCircleId === 'string' && opts.tasksCircleId) ? opts.tasksCircleId : 'cc-default';
   const tasksCircle = await createBrowserMultiCircleTasksAgent({
     bus,
     // the host that may vouch for a door's person (`actor`): its caller here is the owner's chat agent
@@ -3118,7 +3122,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch { return null; }
     },
     primaryCircleConfig: opts.tasksCircleConfig ?? {
-      circleId:  'cc-default',
+      circleId:  tasksDefaultCircleId,
       name:    'Onderling tasks',
       kind:    'household',
       members: [
@@ -3175,7 +3179,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The primary tasks circle's single store needs its store<->mirror sync wired
   // so unscoped task ops (which don't carry a circleId, so the per-op wiring at
   // dispatch is skipped) still fan out. Idempotent with the dispatch-time wire.
-  const tasksPrimaryCircleId = opts.tasksCircleConfig?.circleId ?? 'cc-default';
+  const tasksPrimaryCircleId = opts.tasksCircleConfig?.circleId ?? tasksDefaultCircleId;
   await ensureCircleSync(tasksPrimaryCircleId);
 
   // Registry restore-and-open — the READ side of the circle-membership registry, the consumer that
@@ -4145,7 +4149,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         return adaptTasksReply('listCircleMembers', first?.data ?? null);
       }
       if (CIRCLE_AUTO_INJECT.has(realOpId) && !realArgs.circleId) {
-        const circleId = opts.tasksCircleConfig?.circleId ?? 'cc-default';
+        const circleId = opts.tasksCircleConfig?.circleId ?? tasksDefaultCircleId;
         realArgs = { ...realArgs, circleId };
       }
       if (realOpId === 'archiveCircle' && realArgs.confirm !== true) {

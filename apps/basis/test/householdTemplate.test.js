@@ -8,7 +8,10 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
-import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
+import { createAssistantEngine } from '../src/v2/assistantEngine.js';
+import { mergeManifests } from '../src/manifestMerge.js';
+import { listsManifest } from '../../lists/manifest.js';
 
 const nodes = [];
 afterAll(() => teardown(nodes));
@@ -34,4 +37,23 @@ describe('the household template', () => {
     expect(shop.kind ?? shop.type).toBe('list-item');
     expect(await ensureHouseholdLists({ callSkill: call, t }), 'a second start adds nothing').toEqual([]);
   }, 90_000);
+
+  it('the template is data: its lists, no required fields for a chore, and what the model is told', () => {
+    expect(HOUSEHOLD_TEMPLATE.lists.map((l) => l.defaultChild ?? null)).toEqual([null, 'task', null, 'calendar-event']);
+    expect(HOUSEHOLD_TEMPLATE.required).toEqual({});
+    expect(HOUSEHOLD_TEMPLATE.promptLines.join(' ')).toMatch(/addToList/);
+    expect(HOUSEHOLD_TEMPLATE.promptLines.join(' ')).not.toMatch(/addItem|addTask/);
+  });
+
+  it('what the template tells the model reaches the model: the engine\'s stable prompt carries its lines', async () => {
+    const seen = [];
+    const engine = createAssistantEngine({
+      catalogue: mergeManifests([{ manifest: listsManifest }]), dispatch: async () => ({}), lang: 'nl', collectMs: 0,
+      llm: { invoke: async () => ({ text: 'ok' }) }, interpret: async (text, o = {}) => { seen.push(o.system); return null; },
+      promptLines: HOUSEHOLD_TEMPLATE.promptLines,
+    });
+    await engine.ask('t1', 'hoe is het nu met de lijst van ons');
+    await engine.idle();
+    expect(seen[0]).toContain(HOUSEHOLD_TEMPLATE.promptLines[0]);
+  });
 });

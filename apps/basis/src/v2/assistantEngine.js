@@ -64,6 +64,8 @@ const DEFAULT_THREAD = '__default__';
  * @param {() => string[]} [a.recentTurns] the door's own memory getter (rows on screen); absent → `remember()` memory
  * @param {{remember:(threadId:string, who:string, text:string) => void, recent:(threadId:string) => string[]}} [a.memory]
  *        where `remember()` keeps turns and what a thread reads back (a door's durable threads); absent → this process
+ * @param {string[]} [a.promptLines]  what a door's template tells the model about its household (added to the stable
+ *        instruction: the same every turn, so it stays above the turn marker)
  * @param {(threadId:string) => string|null} [a.threadLang]  the language a person fixed their thread to (`/taal`);
  *        it replaces the detected one in the turn's hint
  * @param {string} [a.botName='assistant']
@@ -81,7 +83,7 @@ const DEFAULT_THREAD = '__default__';
 export function createAssistantEngine({
   catalogue, dispatch, lang = 'nl', llm = null, llmProviders = null, policy, userDefault, interpret = null,
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
-  recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
+  recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, promptLines = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
   collectMs = COLLECT_MS, claim = null, around = null,
 } = {}) {
@@ -93,7 +95,8 @@ export function createAssistantEngine({
   // an English greeting answered a Dutch "Maii", and "kun je … toevoegen?" was read as "show the list".
   // The stable instruction (the rules and this language's phrasings) and this turn's hints (the language line), kept
   // apart so the interpreter puts the stable part first and the hints below its turn marker.
-  const system = interpretSystemFor(lang);
+  const extra = Array.isArray(promptLines) ? promptLines.filter((l) => typeof l === 'string' && l.trim()) : [];
+  const system = extra.length ? `${interpretSystemFor(lang)}\n${extra.join('\n')}` : interpretSystemFor(lang);
   const interpretIn = typeof interpret === 'function'
     ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? interpretHintsFor(text) })
     : null;

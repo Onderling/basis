@@ -58,7 +58,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
-import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
@@ -700,6 +700,7 @@ if (tgToken || inboxDoor.bridge) {
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
   const tgBridge = tgToken ? new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }) : null;
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
+  const isFunctionProfile = (await agent.profileKind?.()) === 'function';
   // Every person is a contact with a role, and their calls carry them to the host gate.
   const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
   // Admission by code: the signing secret in the bot's sealed vault, the cohort and spent codes in a sealed store.
@@ -751,11 +752,13 @@ if (tgToken || inboxDoor.bridge) {
     // Turns go into the walk log only when the operator asks, and then the people in the house are told.
     walkLog: turnLogFor(turnLogMode, walkLog),
     turnLogMode,
+    // A household bot's model is told about its household's lists (the template's words).
+    ...(isFunctionProfile ? { promptLines: HOUSEHOLD_TEMPLATE.promptLines } : {}),
   });
   await tgRunner.start();
   // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a
   // person's node: their circle is theirs, and four lists would appear on every device of theirs.
-  if ((await agent.profileKind?.()) === 'function') {
+  if (isFunctionProfile) {
     ensureHouseholdLists({ callSkill, t })
       .then((made) => { if (made.length) walkLog({ kind: 'household-template', lists: made.length }); })
       .catch((err) => console.warn(`device-runner: the household lists were not made (${err?.message ?? err})`));

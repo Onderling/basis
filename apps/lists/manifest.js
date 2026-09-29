@@ -132,7 +132,7 @@ export const listsManifest = {
         { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
       ],
       surfaces: {
-        slash: { command: '/list', body: 'argline' },
+        slash: { command: '/list-entries', body: 'argline' },
         chat:  { reply: 'list', hint: 'What is on one list (the open entries).' },
       },
     },

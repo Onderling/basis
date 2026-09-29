@@ -41,7 +41,9 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       const text = String(args?.text ?? '').trim();
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       if (!text) return { ok: false, error: t('circle.lists.need_name') };
-      const made = await svc.createList(circleId, text, localActor);
+      // What a bare add to it makes (a chores list: `task`) — one of the kinds a list accepts, else ignored.
+      const defaultChild = typeof args?.defaultChild === 'string' && args.defaultChild.trim() ? args.defaultChild.trim() : undefined;
+      const made = await svc.createList(circleId, text, localActor, defaultChild ? { defaultChild } : undefined);
       return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.made', { name: text }) };
     },
 
@@ -59,7 +61,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       const made = await svc.addItem(circleId, target.id, text, localActor, kind ? { hint: kind } : undefined);
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {
-        ok: true, itemId: made.id ?? null,
+        ok: true, itemId: made.id ?? null, kind: made.type ?? null,
         message: t('circle.lists.added', { text, name: target.text ?? ref }),
       };
     },

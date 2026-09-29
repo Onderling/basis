@@ -3611,6 +3611,24 @@
     "not_accepted": {
       "text": "That list does not take that kind of thing.",
       "doc": "Refusal when a container's accepts policy has no place for the requested kind of child."
+    },
+    "template": {
+      "shopping": {
+        "text": "Shopping",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "chores": {
+        "text": "Chores",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "repairs": {
+        "text": "Repairs",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "schedule": {
+        "text": "Schedule",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      }
     }
   },
   "share": {

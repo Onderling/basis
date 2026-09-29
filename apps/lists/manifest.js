@@ -47,6 +47,9 @@ export const listsManifest = {
       resolves:  [{ field: 'text', policy: 'content' }],
       params: [
         { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
+        // What a bare add to this list makes — one of the kinds a list accepts (a chores list: `task`); absent → the
+        // list type's own default.
+        { name: 'defaultChild', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/new-list', body: 'argline' },

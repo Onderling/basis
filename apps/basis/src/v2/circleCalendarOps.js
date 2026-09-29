@@ -19,7 +19,7 @@ import { addChildTo } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { buildEvent, rsvpEvent, eventsInWindow } from '@onderling-app/calendar';
 import { calendarManifest } from '../../../calendar/manifest.js';
-import { pickEntry } from './entryRef.js';
+import { matchEntry, choicesOf } from './entryRef.js';
 
 const RSVP = { rsvpAccept: 'accepted', rsvpDecline: 'declined', rsvpTentative: 'tentative' };
 
@@ -54,11 +54,16 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
   };
   const label = (e) => `${stamp(e)} · ${e.title}`;
   /** The event a call names — its id, or its words among the open ones. */
+  const titleOf = (e) => e.title ?? e.text;
   const eventOf = async (circleId, ref) => {
-    if (!circleId || !ref) return null;
+    if (!circleId || !ref) return { event: null, among: [] };
     const open = (await eventsOf(circleId)).filter((e) => e.state !== 'cancelled');
-    return pickEntry(open, ref, (e) => e.title ?? e.text) ?? (await storeFor(circleId).get(String(ref))) ?? null;
+    const m = matchEntry(open, ref, titleOf);
+    if (m.entry || m.among.length) return { event: m.entry, among: m.among };
+    return { event: (await storeFor(circleId).get(String(ref))) ?? null, among: [] };
   };
+  /** Words that fit several appointments ask which; words that fit none say so. */
+  const missing = (among) => ({ ok: false, error: among.length ? t('circle.lists.which_one', { options: choicesOf(among, titleOf) }) : t('circle.calendar.no_event') });
 
   return {
     addEvent: async (args) => {
@@ -85,22 +90,22 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
 
     getEventSnapshot: async (args) => {
       const circleId = circleOf(args);
-      const event = await eventOf(circleId, args?.id);
-      return event ? { ok: true, event } : { ok: false, error: t('circle.calendar.no_event') };
+      const { event, among } = await eventOf(circleId, args?.id);
+      return event ? { ok: true, event } : missing(among);
     },
 
     cancelEvent: async (args) => {
       const circleId = circleOf(args);
-      const event = await eventOf(circleId, args?.id);
-      if (!event) return { ok: false, error: t('circle.calendar.no_event') };
+      const { event, among } = await eventOf(circleId, args?.id);
+      if (!event) return missing(among);
       await storeFor(circleId).put({ ...event, state: 'cancelled' }, { by: who(args) });
       return { ok: true, message: t('circle.calendar.cancelled', { title: event.title }) };
     },
 
     ...Object.fromEntries(Object.entries(RSVP).map(([op, response]) => [op, async (args) => {
       const circleId = circleOf(args);
-      const event = await eventOf(circleId, args?.id);
-      if (!event) return { ok: false, error: t('circle.calendar.no_event') };
+      const { event, among } = await eventOf(circleId, args?.id);
+      if (!event) return missing(among);
       await storeFor(circleId).put(rsvpEvent(event, who(args), response), { by: who(args) });
       return { ok: true, message: t(`circle.calendar.rsvp_${response}`, { title: event.title }) };
     }])),

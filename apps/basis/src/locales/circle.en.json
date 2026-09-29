@@ -3677,6 +3677,10 @@
     "not_there": {
       "text": "\"{{item}}\" is on no list.",
       "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "which_one": {
+      "text": "Which one do you mean: {{options}}?",
+      "doc": "A household bot's question when a person's words fit several entries, chores or appointments (the choices, quoted)."
     }
   },
   "share": {

@@ -106,7 +106,7 @@ function parseTypeHint(body, accepts) {
  *   - `null`                      → the container accepts nothing (not composable here → normal add)
  *
  * @param {object} args
- * @param {{type:string}} args.container         the active container item
+ * @param {{type:string, defaultChild?:string}} args.container  the active container item (its own default child, if any)
  * @param {(containerType:string)=>Array} args.acceptsFor  from `buildAcceptsPolicy`
  * @param {string} [args.body]                   the "add X" text
  */
@@ -115,7 +115,9 @@ export function resolveAddInContainer({ container, acceptsFor, body = '' } = {})
   const accepts = (typeof acceptsFor === 'function' ? acceptsFor(container.type) : acceptsFor) || [];
   if (!accepts.length) return null;
   const { hint, rest } = parseTypeHint(body, accepts);
-  const r = resolveContainerAdd({ accepts, hint });
+  // No kind named: the container's OWN default child (a chores list makes tasks), else its type's default. A
+  // `defaultChild` the type does not accept matches nothing in `accepts`, so it cannot widen what is allowed.
+  const r = resolveContainerAdd({ accepts, hint: hint ?? (typeof container.defaultChild === 'string' ? container.defaultChild : undefined) });
   if (!r) return null;
   if (r.ambiguous) return r;
   return { op: r.op, type: r.type, body: rest };

@@ -81,6 +81,9 @@ const DEFAULT_THREAD = '__default__';
  * @param {number} [a.collectMs]           the collect window (default `assistant.collectMs`)
  * @param {(text:string, ctx:object) => (null|(() => Promise<any>))} [a.claim]  a line the door handles itself: return
  *        the handling (it must not act yet — it runs when the line's turn comes), or null to leave the line to the engine
+ * @param {(threadId: string) => string[]} [a.threadHints]  a thread's own lines for the model (its role's)
+ * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op without showing it (a read the
+ *        model picks is handed back to it once, so the turn acts — see `createCircleDispatch`)
  * @param {(turn:{threadId:string, lines:string[], ctx:object, own:boolean}, run:() => Promise<any>) => Promise<any>} [a.around]
  *        the door's bookkeeping around every turn (its record of the turn, what it remembers afterwards)
  */
@@ -89,7 +92,7 @@ export function createAssistantEngine({
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
   recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, promptLines = null, catalogueFor = null, gateRules = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
-  collectMs = COLLECT_MS, claim = null, around = null,
+  collectMs = COLLECT_MS, claim = null, around = null, peek = null, threadHints = null,
 } = {}) {
   if (!catalogue) throw new TypeError('createAssistantEngine: catalogue required');
   if (typeof dispatch !== 'function') throw new TypeError('createAssistantEngine: dispatch required');
@@ -110,9 +113,12 @@ export function createAssistantEngine({
   const interpretFor = (threadId) => (text, o = {}) => {
     const fixed = typeof threadLang === 'function' && threadId ? threadLang(threadId) : null;
     const toolLang = fixed ?? detectLang(text) ?? String(lang).slice(0, 2);
+    // The thread's own hints (a member told which tools are the admin's), below the language line.
+    const own = typeof threadHints === 'function' && threadId ? (threadHints(threadId) ?? []) : [];
+    const langHints = fixed ? [replyInHint(fixed)] : interpretHintsFor(text);
     return interpretIn(text, {
       ...o,
-      ...(fixed ? { hints: o.hints ?? [replyInHint(fixed)] } : {}),
+      ...(fixed || own.length ? { hints: o.hints ?? [...langHints, ...own] } : {}),
       options: o.options ?? { temperature: ASSISTANT_TEMPERATURE },
       toolLang: o.toolLang ?? toolLang,
       hintFor: o.hintFor ?? chatHintFor,
@@ -155,6 +161,7 @@ export function createAssistantEngine({
       ...(typeof postToCircle === 'function' ? { postToCircle } : {}),
       ...(dispatchSlash !== undefined ? { dispatchSlash } : {}),
       onUnhandled, onLlmUnavailable, onNoMatch,
+      ...(typeof peek === 'function' ? { peek } : {}),
     });
     engines.set(key, e);
     return e;
@@ -253,7 +260,9 @@ export function interpretSystemFor(lang = 'nl') {
   const add = lang === 'nl'
     ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
-  return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}`;
+  // Seen live: an earlier request that got no action was done again, beside the new one.
+  const newest = 'Earlier turns are context: act on the member\'s NEWEST message only, never redo or finish a request from an earlier turn.';
+  return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}\n${newest}`;
 }
 
 /** The hint for a thread the person fixed to a language. LLM-facing. */

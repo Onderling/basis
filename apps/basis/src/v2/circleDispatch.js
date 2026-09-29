@@ -29,8 +29,10 @@ import { splitRecentTurns } from './circleMemory.js';
  * @param {boolean} [a.dispatchSlash=true]  when false, a /command is NOT dispatched here (left to onUnhandled — the web shell routes slash itself)
  * @param {object} [a.gate]   optional token gate ({ evaluate })
  * @param {string} [a.botName='assistant']
+ * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op WITHOUT showing it (the door's
+ *        gated call): a read the model picks is looked at and handed back to it once, so the turn can act on it
  */
-export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns }) {
+export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns, peek = null }) {
   if (typeof dispatch !== 'function') {
     throw new Error('createCircleDispatch: dispatch is required');
   }
@@ -127,6 +129,17 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             }
             throw err;   // no hook wired → preserve old behaviour
           }
+          // A READ before the act ("melk is gekocht" → first the list): look at it, hand it back once, and do what the
+          // model then picks. Asked only to see it, the model reads again and the read is shown — once, as before.
+          if (cmd && cmd.opId && typeof peek === 'function' && !(Array.isArray(cmd.more) && cmd.more.length) && isRead(scopedCatalogue, cmd.opId)) {
+            const seen = await Promise.resolve(peek({ opId: cmd.opId, args: cmd.args ?? {} }, ctx)).catch(() => null);
+            const line = readLine(cmd, seen);
+            if (line) {
+              const history = Array.isArray(ctx?.history) ? ctx.history : (remembered.history.length ? remembered.history : undefined);
+              const again = await interpret(modelText, { catalogue: scopedCatalogue, llm, context: [...(Array.isArray(context) ? context : []), line, READ_THEN_ACT], history }).catch(() => null);
+              if (again && again.opId && !isRead(scopedCatalogue, again.opId)) cmd = again;
+            }
+          }
           if (cmd && cmd.opId) {
             await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
             // A member who names three items gets three acts in one turn — the further calls, in order.
@@ -159,6 +172,28 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
       return { via: await sink(trimmed, ctx) };
     },
   };
+}
+
+/** What the model is told after a read it asked for. LLM-facing. */
+const READ_THEN_ACT = 'Above is what you read for this message. If the member asked to CHANGE something (add, tick off, '
+  + 'claim, complete, remove, edit), call that tool now, with the ids above. If they only asked to see it, call the same read again.';
+
+/** Is this op a read (its verb lists or gets)? Unknown ops are not. */
+function isRead(catalogue, opId) {
+  const entry = catalogue?.opsById?.get?.(opId);
+  const verb = entry?.op?.verb ?? entry?.verb;
+  return verb === 'list' || verb === 'get' || verb === 'view';
+}
+
+/** A read's result as one context line for the model: its entries by id and words, or the result itself, short. */
+function readLine(cmd, reply) {
+  const p = reply && typeof reply === 'object' && 'payload' in reply ? reply.payload : reply;
+  if (p == null) return null;
+  const items = Array.isArray(p?.items) ? p.items : null;
+  const body = items
+    ? (items.length ? items.slice(0, 40).map((it) => `[${it?.id ?? '?'}] ${it?.label ?? it?.text ?? it?.title ?? ''}`).join('; ') : '(nothing)')
+    : JSON.stringify(p).slice(0, 600);
+  return `You read ${cmd.opId} ${JSON.stringify(cmd.args ?? {})}: ${body}`;
 }
 
 /** The bot is "addressed" when the turn @-tags it or opens with its name (phase-1: tag the bot). */

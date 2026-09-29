@@ -109,10 +109,13 @@ describe('the per-thread lane', () => {
     await Promise.all(sent);
     await runner.idle?.('42');
 
-    expect(seen.map((s) => s.text)).toEqual(['wat staat er open', 'en nu?']);
+    // A read is looked at and handed back once (the turn may act on it), so each turn asks the model twice — the
+    // first turn's both calls before the second turn's.
+    expect(seen.map((s) => s.text)).toEqual(['wat staat er open', 'wat staat er open', 'en nu?', 'en nu?']);
     expect(maxRunning).toBe(1);
     // the first turn's op result reached the second turn as the app's note
-    expect(seen[1].history.some((m) => m.role === 'user' && m.content.startsWith('(the app answered:'))).toBe(true);
+    const second = seen.find((s) => s.text === 'en nu?');
+    expect(second.history.some((m) => m.role === 'user' && m.content.startsWith('(the app answered:'))).toBe(true);
   });
 
   it('a form answer arriving while a run is in flight is queued behind it and answers the form, not lost', async () => {

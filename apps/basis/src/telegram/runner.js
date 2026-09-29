@@ -53,7 +53,7 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -101,17 +101,29 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   }
 
   /** Run a ready route and paint its reply. */
+  /** The call for this chat's turn: it carries the person, so the host's gate decides what they reach. */
+  function callFor(chatId) {
+    const rec = turns.get(chatId);
+    const caller = rec?.caller ?? null;
+    const threadId = rec?.thread ?? null;
+    return caller || threadId
+      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}) })
+      : callSkill;
+  }
+
+  /** A read the model asked for, run through the same gated call as any op but not shown (the turn acts on it). */
+  async function peekOp(chatId, threadId, cmd) {
+    const r = resolveDispatch(splitTypedMatch(opToParse(cmd, threadId)), catalogueOf());
+    if (r?.kind !== 'ready') return null;
+    note(chatId, { peeked: r.opId });
+    return runDispatch(coerceEnums(r), callFor(chatId));
+  }
+
   async function run(chatId, ready) {
     let reply;
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
-    const rec = turns.get(chatId);
-    const caller = rec?.caller ?? null;
-    const threadId = rec?.thread ?? null;
-    const call = caller || threadId
-      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}) })
-      : callSkill;
-    try { reply = await runDispatch(ready, call); }
+    try { reply = await runDispatch(ready, callFor(chatId)); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
@@ -224,6 +236,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     ...(threads ? { memory: threads.memory, threadLang: (id) => threads.langOf(id) } : {}),
     ...(promptLines ? { promptLines } : {}),
     ...(Array.isArray(gateRules) ? { gateRules } : {}),
+    ...(typeof hintsFor === 'function' ? { threadHints: hintsFor } : {}),
     // Each person sees their own tools (a household bot: a member's, or an admin's): the thread is the person.
     ...(typeof roleFor === 'function' && typeof scopeToRole === 'function'
       ? { catalogueFor: (threadId) => scopeToRole(catalogueOf(), roleFor(threadId)) }
@@ -231,6 +244,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
+    peek: (cmd, ctx) => peekOp(ctx.chatId, ctx.id, cmd),
     onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
     onLlmUnavailable: (_text, ctx) => say(ctx.chatId, t('circle.telegram.unknown')),
     onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),

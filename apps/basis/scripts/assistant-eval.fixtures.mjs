@@ -34,7 +34,7 @@ export const FIXTURES = [
   // ── complete / remove ──
   { id: 'done-bought-nl',     text: 'Kaas is gekocht', items: ['kaas', 'melk'], expect: { anyOf: [{ reply: 'asks' }, { op: 'markListItemDone' }, { op: 'removeFromList', args: { item: /kaas/ } }] } },
   // ── the newest message only (walk 2026-09-29: an unanswered earlier request was redone beside the new one) ──
-  { id: 'newest-only-nl',     text: 'zet melk op de boodschappen', before: ['you: maak een nieuwe lijst: cadeaus', 'system: Geen lijst "cadeaus" hier.'], expect: { op: 'addToList', args: { text: /^melk$/ }, count: 1, exact: true } },
+  { id: 'newest-only-nl',     text: 'Doe er ook melk bij',   // past the gate, so the model decides before: ['you: maak een nieuwe lijst: cadeaus', 'system: Geen lijst "cadeaus" hier.'], expect: { op: 'addToList', args: { text: /^melk$/ }, count: 1, exact: true } },
   // ── a member asks for the admin's tool: told so, not squeezed into another op (walk 2026-09-29) ──
   { id: 'member-admin-op-nl', text: 'maak een nieuwe lijst: cadeaus', expect: { reply: 'declines' } },
   // ── memory: a bare answer to the bot's question ──

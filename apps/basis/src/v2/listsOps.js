@@ -45,23 +45,37 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
   };
   /** An entry on a list, by its id or its words (`matchEntry`: exact words, else the one entry that contains them; several → which). */
   const findEntry = async (circleId, listId, ref) => matchEntry(await entriesOf(circleId, listId), ref, (c) => c.text);
-  /** An open entry on ANY of the circle's lists, by its id or its words — a tick names the entry, not its list. */
+  /** An open entry on ANY of the circle's lists, by its id or its words — with the list that holds it. */
   const findAnyEntry = async (circleId, ref) => {
     const all = [];
-    for (const c of await svc.listContainers(circleId)) all.push(...await entriesOf(circleId, c.id));
-    return matchEntry(all, ref, (c) => c.text);
+    const listOf = new Map();
+    for (const c of await svc.listContainers(circleId)) {
+      for (const e of await entriesOf(circleId, c.id)) { all.push(e); listOf.set(e.id, c); }
+    }
+    const m = matchEntry(all, ref, (c) => c.text);
+    return { ...m, target: m.entry ? listOf.get(m.entry.id) ?? null : null };
   };
   /** Words that fit several entries ask which, with the choices. */
   const which = (among) => t('circle.lists.which_one', { options: choicesOf(among, (c) => c.text) });
-  /** The list and the entry a call names, or the refusal. */
+  /**
+   * The entry a call names, and the list that holds it — or the refusal. A person names the ENTRY ("verander melk in
+   * halfvolle melk"); a list, when given, only tells two entries on different lists apart.
+   */
   const locate = async (args) => {
     const circleId = circleOf(args);
     if (!circleId) return { error: t('circle.lists.no_circle') };
+    const item = String(args?.item ?? '').trim();
+    if (!item) return { error: t('circle.lists.need_item') };
     const ref = String(args?.list ?? '').trim();
-    const target = ref ? await findList(circleId, ref) : null;
+    if (!ref) {
+      const { entry, among, target } = await findAnyEntry(circleId, item);
+      if (!entry) return { error: among.length ? which(among) : t('circle.lists.not_there', { item }) };
+      return { circleId, target, entry };
+    }
+    const target = await findList(circleId, ref);
     if (!target) return { error: t('circle.lists.no_such_list', { name: ref }) };
-    const { entry, among } = await findEntry(circleId, target.id, args?.item);
-    if (!entry) return { error: among.length ? which(among) : t('circle.lists.no_such_entry', { item: String(args?.item ?? ''), name: target.text ?? ref }) };
+    const { entry, among } = await findEntry(circleId, target.id, item);
+    if (!entry) return { error: among.length ? which(among) : t('circle.lists.no_such_entry', { item, name: target.text ?? ref }) };
     return { circleId, target, entry };
   };
 
@@ -107,14 +121,10 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
     },
 
     markListItemDone: async (args) => {
-      const circleId = circleOf(args);
-      const itemId = String(args?.itemId ?? '').trim();
-      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
-      if (!itemId) return { ok: false, error: t('circle.lists.need_item') };
       // Never "done" for an entry that is not there: nothing would have been ticked.
-      const { entry, among } = await findAnyEntry(circleId, itemId);
-      if (!entry) return { ok: false, error: among.length ? which(among) : t('circle.lists.not_there', { item: itemId }) };
-      await svc.markDone(circleId, entry.id, localActor);
+      const at = await locate(args);
+      if (at.error) return { ok: false, error: at.error };
+      await svc.markDone(at.circleId, at.entry.id, localActor);
       return { ok: true, message: t('circle.lists.done') };
     },
 

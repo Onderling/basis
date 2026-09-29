@@ -76,7 +76,7 @@ describe('the household bot, as a walk found it', () => {
     expect(String(which?.error ?? '')).toContain('ramen lappen beneden');
 
     // a tick of an entry that is not there says so
-    const miss = await call('lists', 'markListItemDone', { itemId: '1' });
+    const miss = await call('lists', 'markListItemDone', { item: '1' });
     expect(miss.ok).toBe(false);
 
     // an appointment by its words: rsvp, then a soft cancel — the child stays (cancelled), the listing drops it

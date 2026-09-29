@@ -65,6 +65,19 @@ export async function ensureHouseholdLists({ callSkill, t, template = HOUSEHOLD_
 }
 
 /**
+ * The bot's app list with the template's apps in it: what a start writes when the template has grown since the list
+ * was set (a bot made before tasks or calendar were in it), or null when nothing is missing. The owner's own apps
+ * stay; only the template's missing ones are added.
+ * @param {string[]|null|undefined} current
+ * @returns {string[]|null}
+ */
+export function withTemplateApps(current, template = HOUSEHOLD_TEMPLATE) {
+  const have = Array.isArray(current) ? current : [];
+  const missing = template.apps.filter((a) => !have.includes(a));
+  return missing.length ? [...have, ...missing] : null;
+}
+
+/**
  * The template's list for a kind of list ("boodschappen" → the shopping list's name), for the deterministic gate.
  * @param {(key: string) => string} t
  * @param {object} [template]

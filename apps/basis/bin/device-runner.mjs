@@ -58,7 +58,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, templateListNameOf, loadListItems } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateListNameOf, loadListItems } from '../src/v2/householdTemplate.js';
 import { botOpLevel, scopeCatalogueToRole } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -775,10 +775,11 @@ if (tgToken || inboxDoor.bridge) {
   if (isFunctionProfile) {
     ensureHouseholdLists({ callSkill, t })
       .then(async (made) => {
-        if (!made.length) return;
-        // The first start: the template's plugins become the bot's app list (lists hold, tasks move).
-        await doorCatalogue.setApps([...HOUSEHOLD_TEMPLATE.apps]).catch(() => {});
-        walkLog({ kind: 'household-template', lists: made.length, apps: HOUSEHOLD_TEMPLATE.apps });
+        // Every start: the template's plugins are in the bot's app list (lists hold, tasks move, the calendar keeps the
+        // Agenda) — also on a bot whose list was set before the template grew; the owner's own apps stay.
+        const next = withTemplateApps(doorCatalogue.apps());
+        if (next) await doorCatalogue.setApps(next).catch(() => {});
+        if (made.length || next) walkLog({ kind: 'household-template', lists: made.length, apps: next ?? doorCatalogue.apps() });
       })
       .catch((err) => console.warn(`device-runner: the household lists were not made (${err?.message ?? err})`));
   }

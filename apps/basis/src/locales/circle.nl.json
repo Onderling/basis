@@ -623,6 +623,38 @@
     "invited": {
       "text": "📅 Je bent uitgenodigd: {{title}} — het staat in je agenda.",
       "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
+    },
+    "no_agenda": {
+      "text": "Er is geen agenda om een afspraak op te zetten.",
+      "doc": "A household bot's calendar reply."
+    },
+    "added": {
+      "text": "Afspraak gezet: {{title}} ({{when}}).",
+      "doc": "A household bot's calendar reply."
+    },
+    "no_event": {
+      "text": "Die afspraak ken ik niet.",
+      "doc": "A household bot's calendar reply."
+    },
+    "cancelled": {
+      "text": "Afspraak geschrapt: {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_accepted": {
+      "text": "Je komt naar {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_declined": {
+      "text": "Je komt niet naar {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_tentative": {
+      "text": "Misschien kom je naar {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "say_when": {
+      "text": "Een afspraak op {{name}} heeft een tijd nodig: zeg wanneer.",
+      "doc": "A household bot's calendar reply."
     }
   },
   "embed": {

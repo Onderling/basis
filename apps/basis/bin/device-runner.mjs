@@ -201,7 +201,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  ...(botInstall ? { tasksCircleId: 'household', doorOpLevel: botOpLevel } : {}),
+  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),

@@ -28,12 +28,13 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     { key: 'circle.lists.template.schedule', kind: 'schedule', defaultChild: 'calendar-event' },
   ]),
   // The plugins this template composes on the bot (its app list on the first start): lists hold, tasks move.
-  apps: Object.freeze(['lists', 'tasks']),
+  apps: Object.freeze(['lists', 'tasks', 'calendar']),
   required: Object.freeze({}),
   promptLines: Object.freeze([
     'This household keeps its things on LISTS. Add anything with addToList (the list by its name); a bare add makes what that list holds.',
     'Klusjes (chores) holds TASKS: a person claims one ("ik doe de lamp" → claimTask) and completes it; listMine shows theirs.',
-    'Boodschappen (shopping) and Reparaties (repairs) hold plain entries; Agenda holds appointments.',
+    'Boodschappen (shopping) and Reparaties (repairs) hold plain entries.',
+    'Agenda holds APPOINTMENTS: add one with addEvent (a title and when); listEvents shows the coming days; a person answers an invitation with rsvpAccept / rsvpDecline / rsvpTentative.',
     'Food, drinks and household goods named without a list go on Boodschappen — do not ask which list for groceries.',
     'The task list (takenlijst, chores, to-dos) is Klusjes: "wat staat er op de takenlijst" is listEntries on Klusjes.',
     'When a person says an entry is done, bought or fixed, tick it off with markListItemDone and the entry\'s id from the items you were given.',

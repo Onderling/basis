@@ -623,6 +623,38 @@
     "invited": {
       "text": "📅 You're invited: {{title}} — it's on your calendar.",
       "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
+    },
+    "no_agenda": {
+      "text": "There is no agenda to put an appointment on.",
+      "doc": "A household bot's calendar reply."
+    },
+    "added": {
+      "text": "Appointment set: {{title}} ({{when}}).",
+      "doc": "A household bot's calendar reply."
+    },
+    "no_event": {
+      "text": "I do not know that appointment.",
+      "doc": "A household bot's calendar reply."
+    },
+    "cancelled": {
+      "text": "Appointment cancelled: {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_accepted": {
+      "text": "You are coming to {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_declined": {
+      "text": "You are not coming to {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_tentative": {
+      "text": "You might come to {{title}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "say_when": {
+      "text": "An appointment on {{name}} needs a time: say when.",
+      "doc": "A household bot's calendar reply."
     }
   },
   "embed": {

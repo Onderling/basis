@@ -3,7 +3,8 @@
  *
  * Three plugins, three concerns, no overlap, and the model never needs an app name: lists HOLD (make one, list them,
  * add to one, and an entry's done · remove · edit), tasks MOVE (a task's claim · complete · reassign · edit · remove,
- * and "mine"), and the assistant's own ops set a person's thread. "Zet melk op de lijst" is one op whatever the list;
+ * and "mine"), the calendar keeps the Agenda's appointments (add · the coming days · rsvp; the admin cancels), and the
+ * assistant's own ops set a person's thread. "Zet melk op de lijst" is one op whatever the list;
  * "ik doe de lamp" is claimTask on a Klusjes child; "wat moet ik nog doen" is listMine.
  *
  * The map is the ONE declaration three things read: the box's catalogue (nothing else is composed), each thread's
@@ -17,9 +18,10 @@ export const BOT_OP_MAP = Object.freeze({
   member: Object.freeze([
     'listLists', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
     'listMine', 'claimTask', 'completeTask',
+    'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative',
     'assistant-memory', 'assistant-language',
   ]),
-  admin: Object.freeze(['createList', 'reassignTask', 'removeTask', 'editTask']),
+  admin: Object.freeze(['createList', 'reassignTask', 'removeTask', 'editTask', 'cancelEvent']),
 });
 
 const MEMBER = new Set(BOT_OP_MAP.member);

@@ -239,7 +239,8 @@ import { basisManifest }                   from '../../../manifest.js';         
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
 import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
-import { makeListsOps }                    from '../../v2/listsOps.js';                  // the lists handlers, once (a shell mounts the same ones with its own seams)
+import { makeListsOps }                    from '../../v2/listsOps.js';
+import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // the lists handlers, once (a shell mounts the same ones with its own seams)
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3951,12 +3952,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (e) { return e?.code ?? 'refused'; }
   };
 
+  let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       const refusal = await doorRefusal(opId, ctx.caller);
       if (refusal) return { ok: false, error: refusal };
-      if (appOrigin === 'tasks') args = { ...(args ?? {}), actor: ctx.caller };
+      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
     }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and
@@ -4536,6 +4538,18 @@ export async function createRealHouseholdAgent(opts = {}) {
       const result = await chatAgent.invoke(folioAgent.address, realOpId, parts);
       const first  = Array.isArray(result) ? result[0] : null;
       return first?.data ?? null;
+    }
+    // A household bot (`opts.calendarInCircle`): the calendar's verbs over the circle's ONE store — events are the
+    // Agenda's children — not the per-agent in-memory CalendarStore below, which a person's node keeps.
+    if (appOrigin === 'calendar' && opts.calendarInCircle) {
+      const ops = (circleCalendar ??= makeCircleCalendarOps({
+        storeFor: (circleId) => householdService.stores.getStore(circleId),
+        activeCircle: () => resolveCircleId({}),
+        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        localActor: 'me',
+      }));
+      const handler = ops[opId];
+      return handler ? handler(args ?? {}) : { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
     }
     if (appOrigin === 'calendar') {
       // Calendar skills are registered on the household host agent with the

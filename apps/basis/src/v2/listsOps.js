@@ -12,6 +12,7 @@
  * obeys the circle's data-move branch. Nothing here knows about sharing; that is the point.
  */
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
+import { calendarManifest } from '../../../calendar/manifest.js';
 
 /**
  * @param {object} a
@@ -22,7 +23,8 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';
  * @returns {Record<string, (args: object) => Promise<object>>} opId → handler
  */
 export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = {}) {
-  const svc = makeCircleLists({ storeFor });
+  // What a list may hold beyond its own entries and tasks: appointments (the calendar's `accepts` line).
+  const svc = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   // A call names its circle, or means the one the person is looking at. Named wins: an agent or a
   // journey acts on a circle it is not "in", and must be able to say which.
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
@@ -81,6 +83,9 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       // WHICH KIND of child is the container's `accepts` policy's decision, not this handler's: `hint`
       // names one of the kinds that container accepts, and absent it the policy's default child wins.
       const kind = String(args?.kind ?? '').trim() || undefined;
+      // An appointment needs a time: a bare add to a list whose entries are events (the Agenda) goes through the
+      // calendar's own add, which asks when — never as an event with no date.
+      if ((kind ?? target.defaultChild) === 'calendar-event') return { ok: false, error: t('circle.calendar.say_when', { name: target.text ?? ref }) };
       const made = await svc.addItem(circleId, target.id, text, localActor, kind ? { hint: kind } : undefined);
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {

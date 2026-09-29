@@ -58,6 +58,8 @@ describe('the bot\'s slim map', () => {
     const run = (text) => { for (const r of rules) { const ok = typeof r.test === 'function' ? r.test(text) : r.test.test(text); if (ok) { const c = r.command(text, {}); if (c) return c; } } return null; };
     expect(run('zet melk op de boodschappen')).toMatchObject({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk' } });
     expect(run('wat staat er op de boodschappen')).toMatchObject({ opId: 'listEntries', args: { list: 'Boodschappen' } });
+    expect(run('add task call the plumber')).toMatchObject({ opId: 'addToList', args: { list: 'Klusjes', text: 'call the plumber' } });
+    expect(run('nieuwe taak: lamp vervangen')).toMatchObject({ opId: 'addToList', args: { list: 'Klusjes', text: 'lamp vervangen' } });
     expect(HOUSEHOLD_TEMPLATE.lists.map((l) => l.kind)).toEqual(['shopping', 'errand', 'repair', 'schedule']);
   });
 });

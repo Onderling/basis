@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, loadListItems } from '../src/v2/householdTemplate.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { mergeManifests } from '../src/manifestMerge.js';
 import { listsManifest } from '../../lists/manifest.js';
@@ -56,4 +56,15 @@ describe('the household template', () => {
     await engine.idle();
     expect(seen[0]).toContain(HOUSEHOLD_TEMPLATE.promptLines[0]);
   });
+
+  it('a household bot\'s model draws on its list entries: id, words and the list', async () => {
+    const node = await bootRealAgentNode('tpl2');
+    nodes.push(node);
+    const call = (a, o, x) => node.agent.callSkill(a, o, x);
+    const t = (k) => ({ 'circle.lists.template.shopping': 'Boodschappen' }[k] ?? k.split('.').pop());
+    await ensureHouseholdLists({ callSkill: call, t });
+    await call('lists', 'addToList', { list: 'Boodschappen', text: 'kaas' });
+    const items = await loadListItems({ callSkill: call })();
+    expect(items.find((i) => i.text === 'kaas (Boodschappen)')?.id).toBeTruthy();
+  }, 90_000);
 });

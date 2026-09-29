@@ -93,8 +93,17 @@ export function listsGateRules(_locale, listNameOf) {
       return list ? { opId: 'listEntries', args: { list } } : null;
     } },
     { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
+    // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
+    // of the chores list (it defaults to a task there).
+    { name: 'lists:addToList(task-on-chores)', test: LISTS_ADD_TASK, command: (text) => {
+      const m = LISTS_ADD_TASK.exec(String(text || '').trim());
+      const list = nameOf('errand');
+      const what = m ? m[1].trim() : '';
+      return list && what ? { opId: 'addToList', args: { list, text: what } } : null;
+    } },
   ];
 }
+const LISTS_ADD_TASK = /^(?:add|new|voeg|zet|nieuwe?|maak)?\s*(?:a|an|een)?\s*(?:task|taak|chore|klus|klusje)\s*:?\s+(.+?)\s*$/i;
 
 const HH_LIST_ALIASES = {
   shopping: 'shopping', groceries: 'shopping', grocery: 'shopping',

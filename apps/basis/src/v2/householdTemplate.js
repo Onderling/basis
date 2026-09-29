@@ -34,6 +34,9 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     'This household keeps its things on LISTS. Add anything with addToList (the list by its name); a bare add makes what that list holds.',
     'Klusjes (chores) holds TASKS: a person claims one ("ik doe de lamp" → claimTask) and completes it; listMine shows theirs.',
     'Boodschappen (shopping) and Reparaties (repairs) hold plain entries; Agenda holds appointments.',
+    'Food, drinks and household goods named without a list go on Boodschappen — do not ask which list for groceries.',
+    'The task list (takenlijst, chores, to-dos) is Klusjes: "wat staat er op de takenlijst" is listEntries on Klusjes.',
+    'When a person says an entry is done, bought or fixed, tick it off with markListItemDone and the entry\'s id from the items you were given.',
   ]),
 });
 
@@ -69,5 +72,24 @@ export function templateListNameOf(t, template = HOUSEHOLD_TEMPLATE) {
   return (kind) => {
     const entry = template.lists.find((l) => l.kind === kind);
     return entry ? t(entry.key) : null;
+  };
+}
+
+/**
+ * What a household bot's model may draw on: every open entry of every list, with its list — the retrieval a bare
+ * "kaas is gekocht" needs to find the entry's id. (A person's node reads its household items instead.)
+ * @param {{ callSkill: Function }} a
+ */
+export function loadListItems({ callSkill }) {
+  return async () => {
+    try {
+      const lists = (await callSkill('lists', 'listLists', {}))?.items ?? [];
+      const out = [];
+      for (const l of lists) {
+        const entries = (await callSkill('lists', 'listEntries', { list: l.id }))?.items ?? [];
+        for (const e of entries) out.push({ id: String(e.id ?? ''), type: e.type ?? 'list-item', text: `${e.label ?? ''} (${l.label ?? ''})` });
+      }
+      return out.filter((it) => it.id && it.text);
+    } catch { return []; }
   };
 }

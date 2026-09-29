@@ -12,7 +12,7 @@
  *   node scripts/assistant-eval.mjs                 # real route (needs ~/.privatemode-apikey)
  *   node scripts/assistant-eval.mjs --model gpt-oss-120b
  *   node scripts/assistant-eval.mjs --only add        # fixtures whose id contains "add"
- *   node scripts/assistant-eval.mjs --apps household,lists,tasks   # the bot's app list (default: the box's)
+ *   node scripts/assistant-eval.mjs --apps lists   # the bot's app list (default: the household template's — lists, tasks)
  *   node scripts/assistant-eval.mjs --from-log ~/.basis-telegram/walk-log-*.jsonl   # print fixture stubs from a walk
  *
  * Exit code 1 when the pass rate is under --min (default 0.85). Fixtures: scripts/assistant-eval.fixtures.mjs.
@@ -21,6 +21,9 @@ import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
+import { scopeCatalogueToRole } from '../src/v2/botOpMap.js';
+import { listsGateRules } from '../src/v2/circleGate.js';
+import { HOUSEHOLD_TEMPLATE, templateListNameOf } from '../src/v2/householdTemplate.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';
@@ -43,8 +46,13 @@ if (values['from-log']) {
   process.exit(0);
 }
 
-// The catalogue the box's Telegram door hands its model: composed the same way, from the same app list.
-const { catalogue } = composeAssistantCatalogue({ apps: values.apps ? values.apps.split(',') : undefined });
+// What the household bot's door hands a MEMBER's model: the bot's slim map over its plugins (lists, tasks — the
+// template's), the template's words about its lists, and the deterministic gate that speaks the lists. Composed the
+// way the box composes a function profile (`bin/device-runner.mjs`).
+const TEMPLATE_NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
+const { catalogue: botCatalogue } = composeAssistantCatalogue({ apps: values.apps ? values.apps.split(',') : [...HOUSEHOLD_TEMPLATE.apps], slim: true });
+const catalogue = scopeCatalogueToRole(botCatalogue, 'member');
+const gateRulesFor = (lang) => listsGateRules(lang, templateListNameOf((k) => TEMPLATE_NAMES[k] ?? k));
 let llm = null;
 if (!values.mock) {
   const { privatemodeProvider, readPrivatemodeKey } = await import('@onderling/llm-client/providers/privatemode');
@@ -65,9 +73,11 @@ for (const f of fixtures) {
   const engine = createAssistantEngine({
     // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
     catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm: counted, interpret: interpretToCommand,
+    promptLines: HOUSEHOLD_TEMPLATE.promptLines, gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
     // A one-line fixture does not wait for the collect window (its time is the model's); lines sent at once do.
     ...(f.lines ? {} : { collectMs: 0 }),
-    loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'shopping', text })),
+    // the bot's retrieval shape (`loadListItems`): an entry, with its list
+    loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'list-item', text: `${text} (Boodschappen)` })),
     dispatch: (input) => { dispatched.push(input); },
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
     onNoMatch: (_t, _c, extra) => replies.push(extra?.reply || '__unknown'),

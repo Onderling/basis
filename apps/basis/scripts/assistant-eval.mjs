@@ -23,7 +23,7 @@ import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { HOUSEHOLD_TEMPLATE, templateListNameOf } from '../src/v2/householdTemplate.js';
+import { HOUSEHOLD_TEMPLATE, templateListNameOf, expandAdds } from '../src/v2/householdTemplate.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';
@@ -84,6 +84,7 @@ for (const f of fixtures) {
     // back once; the member's thread names the admin's tools.
     peek: async (cmd) => { peeked = cmd.opId; return { payload: { items: (f.items ?? []).map((text, i) => ({ id: `i${i}`, label: text })) } }; },
     threadHints: () => roleHintsFor('member'),
+    expand: expandAdds(),
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
     onNoMatch: (_t, _c, extra) => replies.push(extra?.reply || '__unknown'),
   });

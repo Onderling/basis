@@ -31,8 +31,10 @@ import { splitRecentTurns } from './circleMemory.js';
  * @param {string} [a.botName='assistant']
  * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op WITHOUT showing it (the door's
  *        gated call): a read the model picks is looked at and handed back to it once, so the turn can act on it
+ * @param {(cmd:{opId:string,args:object,appOrigin?:string}) => object[]} [a.expand]  a door's rewrite of a chosen op
+ *        into the ops it stands for (a household bot: one add per thing named) — the gate's and the model's alike
  */
-export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns, peek = null }) {
+export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns, peek = null, expand = null }) {
   if (typeof dispatch !== 'function') {
     throw new Error('createCircleDispatch: dispatch is required');
   }
@@ -49,10 +51,11 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
   const sink = async (text, ctx) => (await unhandled(text, ctx)) ?? 'none';
   // A gate rule's command, and the further items it names. Carries the rule's owning app so the resolver routes a
   // colliding bare op-id to the gate's app, not the merge's first-declarer.
+  const expanded = (c) => (typeof expand === 'function' ? expand(c) : [c]);
   async function dispatchRule(command, ctx) {
-    await dispatch({ opId: command.opId, args: command.args || {}, appOrigin: command.appOrigin }, ctx);
+    for (const c of expanded({ opId: command.opId, args: command.args || {}, appOrigin: command.appOrigin })) await dispatch(c, ctx);
     for (const m of (Array.isArray(command.more) ? command.more : [])) {
-      if (m && m.opId) await dispatch({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? command.appOrigin }, ctx);
+      if (m && m.opId) for (const c of expanded({ opId: m.opId, args: m.args || {}, appOrigin: m.appOrigin ?? command.appOrigin })) await dispatch(c, ctx);
     }
   }
 
@@ -154,10 +157,10 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
             }
           }
           if (cmd && cmd.opId) {
-            await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
+            for (const c of expanded({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} })) await dispatch(c, ctx);
             // A member who names three items gets three acts in one turn — the further calls, in order.
             for (const m of (Array.isArray(cmd.more) ? cmd.more : [])) {
-              if (m && m.opId) await dispatch({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} }, ctx);
+              if (m && m.opId) for (const c of expanded({ opId: m.opId, args: m.args && typeof m.args === 'object' ? m.args : {} })) await dispatch(c, ctx);
             }
             // The turn was cut (the per-turn cap, or a call the output cut off): ask the member for the rest.
             if (cmd.partial && typeof onNoMatch === 'function') await onNoMatch(modelText, ctx, { partial: true });

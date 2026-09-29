@@ -109,6 +109,14 @@ describe('createAssistantEngine', () => {
     await e.ask('other', 'maak een nieuwe lijst: cadeaus');
     expect(seen[1].hints).toEqual(['The member wrote in: nl.']);
   });
+  it('a door\'s expand reaches the dispatcher: one chosen add becomes the adds it stands for', async () => {
+    const dispatched = [];
+    const interpret = async () => ({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk en kaas' } });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: (i) => { dispatched.push(i.args.text); }, llm, interpret, onNoMatch: () => {},
+      expand: (c) => c.args.text.split(' en ').map((text) => ({ ...c, args: { ...c.args, text } })) });
+    await e.ask('t', 'melk en kaas graag');
+    expect(dispatched).toEqual(['melk', 'kaas']);
+  });
 
   it('three items named → three dispatches in one turn (the interpreter\'s `more`)', async () => {
     const dispatched = [];

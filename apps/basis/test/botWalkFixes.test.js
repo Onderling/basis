@@ -59,6 +59,8 @@ describe('the household bot, as a walk found it', () => {
     // a chore by its words
     const claimed = await call('tasks', 'claimTask', { id: 'vuilnis', actor: 'telegram:111' });
     expect(claimed?.result?.error, JSON.stringify(claimed)).toBeUndefined();
+    // …confirmed in the household's words (the box hands the agent its translator), not a line of English
+    expect(claimed?.message).toContain('circle.tasks.reply.claimed');
     const done = await call('tasks', 'completeTask', { id: 'vuilnis', actor: 'telegram:111' });
     expect(done?.task?.id, JSON.stringify(done)).toBeTruthy();
     // words that name no chore: said in the household's words, never the store's own error

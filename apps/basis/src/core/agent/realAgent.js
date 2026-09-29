@@ -4822,9 +4822,14 @@ export async function createRealHouseholdAgent(opts = {}) {
             }));
         }
       }
+      // In the household's words where the shell hands the agent its translator (the box does); web and mobile
+      // hand none yet, and keep the English line.
+      const message = typeof opts.t === 'function'
+        ? opts.t(`circle.tasks.reply.${verbMap[opId].toLowerCase()}`, { title, note: noteSuffix })
+        : `✓ ${verbMap[opId]}: ${title}${noteSuffix}`;
       return {
         ok:      true,
-        message: `✓ ${verbMap[opId]}: ${title}${noteSuffix}`,
+        message,
         itemId:  task.id,
         // S6.A — enrich with mock-era state/type so the post-action reply also
         // carries the right inline buttons (e.g. a claimed task → Mark complete).

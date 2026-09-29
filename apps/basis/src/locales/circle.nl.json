@@ -6797,6 +6797,32 @@
     "no_such_task": {
       "text": "Geen klus \"{{item}}\" hier.",
       "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "reply": {
+      "claimed": {
+        "text": "✓ Opgepakt: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "completed": {
+        "text": "✓ Klaar: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "submitted": {
+        "text": "✓ Ingeleverd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "approved": {
+        "text": "✓ Goedgekeurd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "rejected": {
+        "text": "✓ Afgekeurd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "edited": {
+        "text": "✓ Aangepast: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      }
     }
   }
 }

@@ -3629,6 +3629,18 @@
         "text": "Schedule",
         "doc": "The name of a list a household bot starts with (made once, on its first start)."
       }
+    },
+    "no_such_entry": {
+      "text": "\"{{item}}\" is not on {{name}}.",
+      "doc": "A lists reply in the chat."
+    },
+    "removed": {
+      "text": "Took \"{{text}}\" off {{name}}.",
+      "doc": "A lists reply in the chat."
+    },
+    "edited": {
+      "text": "Changed on {{name}}: \"{{text}}\".",
+      "doc": "A lists reply in the chat."
     }
   },
   "share": {

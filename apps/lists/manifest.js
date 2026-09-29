@@ -32,7 +32,7 @@ export const listsManifest = {
   // ops manage — no op names it directly, so it carries no atoms yet.
   nouns: {
     list:        { atoms: ['add', 'list'] },
-    'list-item': { atoms: ['add', 'complete'] },
+    'list-item': { atoms: ['add', 'complete', 'remove', 'update'] },
   },
   verbs:     [],
   operations: [
@@ -122,6 +122,52 @@ export const listsManifest = {
         slash: { command: '/list-done', body: 'argline' },
         chat:  { reply: 'text', hint: 'Tick something off a list.' },
         ui:    { control: 'button', labelKey: 'circle.list.done' },
+      },
+    },
+    {
+      id:        'listEntries', group: 'data',
+      verb:      'list',
+      requires:  ['lists'],
+      params: [
+        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-entries', body: 'argline' },
+        chat:  { reply: 'list', hint: 'What is on one list (the open entries).' },
+      },
+    },
+    {
+      id:        'removeFromList', group: 'compose',
+      verb:      'remove',
+      writes:    { scope: 'circle' },
+      appliesTo: { type: 'list-item' },
+      requires:  ['lists'],
+      params: [
+        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+        // the entry: its id, or its words as they stand on the list
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+      ],
+      surfaces: {
+        slash: { command: '/list-remove', body: 'flags' },
+        chat:  { reply: 'text', hint: 'Take an entry off a list (a mistake, or no longer needed).' },
+      },
+    },
+    {
+      id:        'editEntry', group: 'compose',
+      verb:      'edit',
+      writes:    { scope: 'circle' },
+      appliesTo: { type: 'list-item' },
+      requires:  ['lists'],
+      // Two people fixing the same entry write the same field; the text merges by content.
+      resolves:  [{ field: 'text', policy: 'content' }],
+      params: [
+        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
+      ],
+      surfaces: {
+        slash: { command: '/list-edit', body: 'flags' },
+        chat:  { reply: 'text', hint: 'Change the words of an entry on a list.' },
       },
     },
   ],

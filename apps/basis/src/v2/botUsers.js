@@ -145,7 +145,7 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     }
     return row.id;
   };
-  return async (who) => {
+  const admit = async (who) => {
     // Without admission (a door that admits everyone it is handed), every person is admitted.
     if (!admission) return tier(await users.admit(who));
     const uid = String(who?.uid ?? '').trim();
@@ -163,4 +163,7 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     if (!r.ok) return { refused: r.reason, id };
     return { id: await tier(await users.admit(who)), consumed: true };
   };
+  /** The role this door last gave a person (their thread's tools follow it), or null (not admitted here). */
+  admit.roleOf = (id) => tiered.get(id) ?? null;
+  return admit;
 }

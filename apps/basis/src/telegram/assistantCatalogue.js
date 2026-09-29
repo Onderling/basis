@@ -21,21 +21,25 @@ import { mergeManifests } from '../manifestMerge.js';
 import { scopeCatalogueToApps } from '../v2/circleCatalogueScope.js';
 import { catalogueManifests, DOOR_MANIFESTS } from '../v2/manifestSources.js';
 import { assistantAppsFrom } from '../v2/assistantApps.js';
+import { scopeCatalogueToRole } from '../v2/botOpMap.js';
 
 /**
  * @param {object} [a]
  * @param {unknown} [a.apps]               the app list (the parameter's value); unset or empty → the default
  * @param {object}  [a.householdManifest]  the household manifest the door's agent carries (`agent.manifest`)
+ * @param {boolean} [a.slim]               a household bot: only the ops on the bot's map (`botOpMap.js`)
  * @returns {{catalogue: object, manifestsByOrigin: Object<string, object>, apps: string[]}}
  */
-export function composeAssistantCatalogue({ apps, householdManifest } = {}) {
+export function composeAssistantCatalogue({ apps, householdManifest, slim = false } = {}) {
   const list = assistantAppsFrom(apps);
   const all = catalogueManifests({ householdManifest });
   const ordered = [...all.filter((m) => m.app === 'household'), ...all.filter((m) => m.app !== 'household')];
   // The door's own ops (the person's memory mode, their language) come whatever the app list says: they are about
   // the conversation, not an app.
   const inScope = [...ordered.filter((m) => list.includes(m.app)), ...DOOR_MANIFESTS];
-  const catalogue = scopeCatalogueToApps(mergeManifests(inScope.map((manifest) => ({ manifest }))), [...list, ...DOOR_MANIFESTS.map((m) => m.app)]);
+  const scoped = scopeCatalogueToApps(mergeManifests(inScope.map((manifest) => ({ manifest }))), [...list, ...DOOR_MANIFESTS.map((m) => m.app)]);
+  // A household bot (`slim`): exactly the bot's map (`botOpMap.js`) — nothing else of the apps is composed.
+  const catalogue = slim ? scopeCatalogueToRole(scoped, null) : scoped;
   const manifestsByOrigin = Object.fromEntries(inScope.map((m) => [m.app, m]));
   return { catalogue, manifestsByOrigin, apps: list };
 }
@@ -48,9 +52,9 @@ export function composeAssistantCatalogue({ apps, householdManifest } = {}) {
  * @param {(list: string[]) => Promise<unknown>} a.setApps  writes the parameter (never the model: slash only, admin only)
  * @param {object} [a.householdManifest]
  */
-export function createDoorCatalogue({ getApps, setApps, householdManifest } = {}) {
+export function createDoorCatalogue({ getApps, setApps, householdManifest, slim = false } = {}) {
   if (typeof getApps !== 'function' || typeof setApps !== 'function') throw new TypeError('createDoorCatalogue: getApps and setApps are required');
-  let current = composeAssistantCatalogue({ apps: getApps(), householdManifest });
+  let current = composeAssistantCatalogue({ apps: getApps(), householdManifest, slim });
   // The apps a door can offer: every app manifest the shells compose, but the shell's own.
   const available = catalogueManifests({ householdManifest }).map((m) => m.app).filter((a) => a && a !== 'basis');
   return {
@@ -61,7 +65,7 @@ export function createDoorCatalogue({ getApps, setApps, householdManifest } = {}
     /** @param {string[]} list */
     async setApps(list) {
       await setApps(list);
-      current = composeAssistantCatalogue({ apps: list, householdManifest });
+      current = composeAssistantCatalogue({ apps: list, householdManifest, slim });
       return current.apps;
     },
   };

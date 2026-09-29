@@ -3629,6 +3629,18 @@
         "text": "Agenda",
         "doc": "The name of a list a household bot starts with (made once, on its first start)."
       }
+    },
+    "no_such_entry": {
+      "text": "\"{{item}}\" staat niet op {{name}}.",
+      "doc": "A lists reply in the chat."
+    },
+    "removed": {
+      "text": "\"{{text}}\" is van {{name}} gehaald.",
+      "doc": "A lists reply in the chat."
+    },
+    "edited": {
+      "text": "Aangepast op {{name}}: \"{{text}}\".",
+      "doc": "A lists reply in the chat."
     }
   },
   "share": {

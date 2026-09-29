@@ -61,8 +61,20 @@ describe('the household bot, as a walk found it', () => {
     expect(claimed?.result?.error, JSON.stringify(claimed)).toBeUndefined();
     // …confirmed in the household's words (the box hands the agent its translator), not a line of English
     expect(claimed?.message).toContain('circle.tasks.reply.claimed');
+    // …naming the chore that was FOUND, not the words it was asked by (the walk: "✓ Opgepakt: " with nothing after it)
+    expect(claimed?.message).toContain('"title":"vuilnis buiten zetten"');
+    // a claim that loses is never a "✓": someone else has it, or you had it already (the walk: "✓ Opgepakt: " with
+    // nothing after it was a lost claim reported as a win)
+    const theirs = await call('tasks', 'claimTask', { id: 'vuilnis', actor: 'telegram:222' });
+    expect(theirs.ok).toBe(false);
+    expect(String(theirs.error)).toContain('circle.tasks.already_claimed');
+    expect(String(theirs.error)).toContain('vuilnis buiten zetten');
+    const again = await call('tasks', 'claimTask', { id: 'vuilnis', actor: 'telegram:111' });
+    expect(again.ok).toBe(false);
+    expect(String(again.error)).toContain('circle.tasks.already_yours');
     const done = await call('tasks', 'completeTask', { id: 'vuilnis', actor: 'telegram:111' });
     expect(done?.task?.id, JSON.stringify(done)).toBeTruthy();
+    expect(done?.message).toContain('"title":"vuilnis buiten zetten"');
     // words that name no chore: said in the household's words, never the store's own error
     const none = await call('tasks', 'claimTask', { id: 'stofzuigen', actor: 'telegram:111' });
     expect(String(none?.error ?? '')).toContain('circle.tasks.no_such_task');

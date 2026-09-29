@@ -6835,6 +6835,14 @@
         "text": "✓ Edited: {{title}}{{note}}",
         "doc": "A task op's confirmation line (the note: why a task was rejected)."
       }
+    },
+    "already_claimed": {
+      "text": "'{{title}}' has already been claimed.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "already_yours": {
+      "text": "You had already claimed '{{title}}'.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
     }
   }
 }

@@ -137,7 +137,7 @@ export const listsManifest = {
       },
     },
     {
-      id:        'removeFromList',
+      id:        'removeFromList', group: 'compose',
       verb:      'remove',
       writes:    { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -153,7 +153,7 @@ export const listsManifest = {
       },
     },
     {
-      id:        'editEntry',
+      id:        'editEntry', group: 'compose',
       verb:      'edit',
       writes:    { scope: 'circle' },
       appliesTo: { type: 'list-item' },

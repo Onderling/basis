@@ -4359,7 +4359,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first = Array.isArray(result) ? result[0] : null;
       const data  = first?.data ?? null;
       if (data && noteHint) data.noteHint = noteHint;
-      const adapted = adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask });
+      const adapted = adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask, args: realArgs ?? args ?? {} });
       // On a household bot "wat moet ik nog doen" is MINE: the open chores this person claimed (the chat-shell reading of
       // `listMine` — everything open — stays for the painting shells, which show every chore on their own screen).
       const mineOf = opts.tasksCircleId && opId === 'listMine' ? (args?.actor ?? null) : null;
@@ -4868,7 +4868,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * @param {{actor?: string|null, named?: string|null}} [who]  the person the call was for, and the task's words when
    *        the door named it by its words (the reply names the task FOUND, never the words it was asked by)
    */
-  function adaptTasksReply(opId, data, { actor = null, named = null } = {}) {
+  function adaptTasksReply(opId, data, { actor = null, named = null, args = {} } = {}) {
     if (data == null) return null;
     // (B8) — DAG hard-dep blocking surface. Real skill returns
     // {error: 'has-open-dependencies', openDeps: [...]} when the user
@@ -4943,7 +4943,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the chat-shell envelope returns immediately.  Default hook is a
       // no-op so existing tests keep their behaviour.
       if (opId === 'claimTask' && typeof claimRouterRef.hook === 'function') {
-        const circleId = args?.circleId ?? args?.circleId ?? args?.groupId ?? null;
+        // the call's own args (handed in: this adapter is not inside the call's scope)
+        const circleId = args?.circleId ?? args?.groupId ?? null;
         if (circleId) {
           Promise.resolve(claimRouterRef.hook({ task, circleId, args }))
             .catch((err) => publishEvent?.({

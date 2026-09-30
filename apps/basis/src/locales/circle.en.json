@@ -637,19 +637,19 @@
       "doc": "A household bot's calendar reply."
     },
     "cancelled": {
-      "text": "Appointment cancelled: {{title}}.",
+      "text": "Appointment cancelled: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "rsvp_accepted": {
-      "text": "You are coming to {{title}}.",
+      "text": "You are coming: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "rsvp_declined": {
-      "text": "You are not coming to {{title}}.",
+      "text": "You are not coming: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "rsvp_tentative": {
-      "text": "You might come to {{title}}.",
+      "text": "Maybe: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "say_when": {
@@ -3697,6 +3697,10 @@
     "event_passed": {
       "text": "{{text}} — passed",
       "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "done_named": {
+      "text": "Ticked off: {{text}}.",
+      "doc": "A household bot's reply naming the entry it ticked off."
     }
   },
   "share": {

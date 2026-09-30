@@ -132,7 +132,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error };
       await svc.markDone(at.circleId, at.entry.id, localActor);
-      return { ok: true, message: t('circle.lists.done') };
+      // the reply names what was ticked — the entry found, not the words it was asked by
+      return { ok: true, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
     },
 
     listEntries: async (args) => {

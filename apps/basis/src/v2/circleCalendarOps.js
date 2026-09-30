@@ -99,7 +99,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
       await storeFor(circleId).put({ ...event, state: 'cancelled' }, { by: who(args) });
-      return { ok: true, message: t('circle.calendar.cancelled', { title: event.title }) };
+      return { ok: true, message: t('circle.calendar.cancelled', { title: event.title, when: stamp(event) }) };
     },
 
     ...Object.fromEntries(Object.entries(RSVP).map(([op, response]) => [op, async (args) => {
@@ -107,7 +107,8 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
       await storeFor(circleId).put(rsvpEvent(event, who(args), response), { by: who(args) });
-      return { ok: true, message: t(`circle.calendar.rsvp_${response}`, { title: event.title }) };
+      // the reply names the appointment answered, and when
+      return { ok: true, message: t(`circle.calendar.rsvp_${response}`, { title: event.title, when: stamp(event) }) };
     }])),
   };
 }

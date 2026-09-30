@@ -41,6 +41,10 @@ describe('calendar on the household bot', () => {
     await ensureHouseholdLists({ callSkill: call, t });
     const added = await call('calendar', 'addEvent', { title: 'tandarts', when: `${tomorrow}T10:00:00.000Z`, duration: '30m' });
     expect(added.ok, JSON.stringify(added)).toBe(true);
+    // the same appointment again (the title, case aside, at the same start): "staat er al", not a second one
+    const again = await call('calendar', 'addEvent', { title: 'Tandarts', when: `${tomorrow}T10:00:00.000Z` });
+    expect(again.duplicate).toBe(true);
+    expect(String(again.message)).toContain('circle.calendar.already_there');
     // a bare add to the Agenda asks for a time instead of making an event with none
     const bare = await call('lists', 'addToList', { list: 'Agenda', text: 'tandarts' });
     expect(bare.ok).toBe(false);
@@ -52,6 +56,8 @@ describe('calendar on the household bot', () => {
     const second = await boot();
     const call2 = (a, o, x) => second.callSkill(a, o, x);
     const listed = await call2('calendar', 'listEvents', { days: 7 });
+    // the coming days say which list they are — the Agenda's own name, as any list read does
+    expect(listed.title).toBe('Agenda');
     const ev = (listed.items ?? []).find((i) => /tandarts/.test(i.label));
     expect(ev, `listed after the restart: ${JSON.stringify(listed)}`).toBeTruthy();
     const rsvp = await call2('calendar', 'rsvpAccept', { id: ev.id, actor: 'telegram:111' });

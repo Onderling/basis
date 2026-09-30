@@ -58,5 +58,11 @@ describe('buildAssistantLlm — the confidential route is optional at every step
     expect(slow).toBe(1);
     expect(out?.replyText ?? out?.text).toBe('ok');
   });
+
+  it('the model has 20 s before the turn is told it is slow and the fallback is tried — not a minute', async () => {
+    let seen = null;
+    await buildAssistantLlm({ hasKey: () => true, makeProvider: async (o) => { seen = o; return { id: 'pm', model: 'm', invoke: async () => ({}) }; }, warn: () => {} });
+    expect(seen.timeoutMs).toBe(20_000);
+  });
 });
 

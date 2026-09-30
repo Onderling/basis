@@ -14,6 +14,11 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** The model a turn is retried on ONCE when the primary times out. */
 export const ASSISTANT_FALLBACK_MODEL = param({ key: 'assistant.fallbackModel', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 'gpt-oss-120b' });
+/**
+ * How long the model may take before the turn says it is slow and tries the fallback once. Well under a minute: a
+ * person waiting 60 s for "even geduld" has given up (measured 2026-09-30: a normal model turn is about 2 s).
+ */
+export const ASSISTANT_MODEL_TIMEOUT_MS = param({ key: 'assistant.modelTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20_000 });
 
 const isTimeout = (err) => err?.name === 'AbortError' || /\babort|timed? ?out\b/i.test(String(err?.message ?? ''));
 
@@ -55,7 +60,7 @@ export async function buildAssistantLlm({
   hasKey = readPrivatemodeKey,
   makeProvider = privatemodeProvider,
   model = undefined,
-  timeoutMs = 60_000,
+  timeoutMs = ASSISTANT_MODEL_TIMEOUT_MS,
   warn = (m) => console.warn(m),
   fallbackModel = ASSISTANT_FALLBACK_MODEL,
   onFallback = null,

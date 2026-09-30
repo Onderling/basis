@@ -28,6 +28,9 @@ describe('the bot\'s slim map', () => {
   it('a member\'s thread offers exactly the member ops; an admin\'s adds the admin ops', () => {
     expect(tools('member')).toEqual([...MEMBER].sort());
     expect(tools('admin')).toEqual([...MEMBER, ...ADMIN_EXTRA].sort());
+    // a coordinator's or an observer's thread is a member's: the admin's column is the admin's alone
+    expect(tools('coordinator')).toEqual([...MEMBER].sort());
+    expect(tools('observer')).toEqual([...MEMBER].sort());
     expect(BOT_OP_MAP.member).toEqual(MEMBER);
   });
 
@@ -67,6 +70,9 @@ describe('the bot\'s slim map', () => {
     const [line] = roleHintsFor('member');
     for (const op of BOT_OP_MAP.admin) expect(line).toContain(op);
     expect(roleHintsFor('admin')).toEqual([]);
+    // a coordinator or an observer is not the admin: told which tools are the admin's too
+    expect(roleHintsFor('coordinator').length).toBe(1);
+    expect(roleHintsFor('observer').length).toBe(1);
     // with the door's translator, the model is handed the refusal sentence itself — the locale's words, not its own
     const [said] = roleHintsFor('member', (k) => (k === 'circle.bot.admin_only' ? 'Dat kan alleen de beheerder van deze bot.' : k));
     expect(said).toContain('Dat kan alleen de beheerder van deze bot.');

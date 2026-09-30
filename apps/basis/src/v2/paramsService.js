@@ -34,6 +34,7 @@ import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
+import { ASSIGN_POLICY, ASSIGN_POLICY_KEY } from './botSettings.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -95,6 +96,9 @@ export const BASIS_USER_PARAMS = [
   // How much a door's assistant remembers of a person's conversation when they have not chosen (off · short · long);
   // the person's own choice on their thread wins. Set by the bot's admin.
   { key: ASSISTANT_MEMORY_DEFAULT_KEY,          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_MEMORY_MODE },
+  // Whether a household bot's roles decide who may give a chore to someone else (roles · anyone · self). Set by the
+  // bot's admin; enforced at the waist, never by the model.
+  { key: ASSIGN_POLICY_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSIGN_POLICY },
 ];
 
 /**

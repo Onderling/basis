@@ -22,7 +22,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'set-language': 'write', 'set-apps': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write',
   },
   operations: [
@@ -56,6 +56,26 @@ export const assistantManifest = {
       // `on <app>` · `off <app>` · nothing (the list as it stands)
       params: [{ name: 'change', kind: 'string', required: false }],
       surfaces: { slash: { command: '/apps', body: 'argline' } },
+    },
+    {
+      id:     'assistant-settings',
+      verb:   'set-settings',
+      visibility: 'trusted',
+      // The bot's own settings are parameters of the door's device (who may give a chore to whom).
+      writes: { scope: 'device' },
+      // `assign self|anyone|role` · `roles admin,member` · nothing (the settings as they stand)
+      params: [{ name: 'change', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/instellingen', body: 'argline' } },
+    },
+    {
+      id:     'assistant-role',
+      verb:   'set-role',
+      visibility: 'trusted',
+      // A person's role on the bot is on their contact row (the bot's people), the same words as a circle's roster.
+      writes: { scope: 'device' },
+      // `<naam> coordinator|member|observer`
+      params: [{ name: 'spec', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/role', body: 'argline' } },
     },
     {
       id:     'assistant-status',

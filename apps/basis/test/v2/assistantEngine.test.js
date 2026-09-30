@@ -105,7 +105,7 @@ describe('createAssistantEngine', () => {
       threadHints: (id) => (id === 'member-thread' ? ['only the admin makes lists'] : []) });
     await e.ask('member-thread', 'maak een nieuwe lijst: cadeaus');
     expect(seen[0].hints).toEqual(['The member wrote in: nl.', 'only the admin makes lists']);
-    expect(seen[0].system).toContain("NEWEST message only");
+    expect(seen[0].system).toContain("act on the NEWEST message");
     await e.ask('other', 'maak een nieuwe lijst: cadeaus');
     expect(seen[1].hints).toEqual(['The member wrote in: nl.']);
   });

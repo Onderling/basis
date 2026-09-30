@@ -264,11 +264,10 @@ const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
 export function interpretSystemFor(lang = 'nl') {
   const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
   const add = lang === 'nl'
-    ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
+    ? "Nederlands: \"zet … op\", \"voeg … toe\", \"doe … erbij\", \"kun je … toevoegen\", \"… moet nog gehaald worden\", \"we hebben geen … meer\" betekenen allemaal TOEVOEGEN → addToList, één aanroep per ding. Noem lijsten bij hun naam: boodschappen, klusjes, reparaties, agenda."
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
-  // Seen live: an earlier request that got no action was done again, beside the new one.
-  const newest = 'Earlier turns are context: act on the member\'s NEWEST message only, never redo or finish a request from an earlier turn.';
-  return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}\n${newest}`;
+  // (the newest-message rule is rule 8 of the shared instruction — said once)
+  return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}`;
 }
 
 /** The hint for a thread the person fixed to a language. LLM-facing. */

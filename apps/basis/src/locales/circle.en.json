@@ -3984,6 +3984,26 @@
     "model_down": {
       "text": "The assistant is not answering right now. Please try again in a moment.",
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "settings_list": {
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides, coordinator or above may · anyone: everyone may · self: nobody).",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "settings_usage": {
+      "text": "Use: /instellingen assign roles|anyone|self",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "role_usage": {
+      "text": "Use: /role <name> coordinator|member|observer",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_nobody": {
+      "text": "I do not know anyone here called \"{{name}}\" (or it is the admin).",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_set": {
+      "text": "{{name}} is now {{role}}.",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
     }
   },
   "op": {
@@ -6859,6 +6879,14 @@
     "already_yours": {
       "text": "You had already claimed '{{title}}'.",
       "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "assign_refused": {
+      "text": "You can only give a chore to yourself.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "no_such_person": {
+      "text": "I do not know anyone called \"{{name}}\".",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
     }
   }
 }

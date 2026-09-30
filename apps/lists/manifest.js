@@ -88,6 +88,10 @@ export const listsManifest = {
         // shells' own type picker (the Lists panel's, already built) is what asks it today; extending
         // the form contract to a dependent picker is the honest next step and is on the work list.
         { name: 'kind', kind: 'string', required: false },
+        // A chore's person and day, on a list whose entries are chores: `assignee` is "mij" or a name the bot knows,
+        // `due` a local date without a zone. Who may be named is the bot's setting, decided at the waist.
+        { name: 'assignee', kind: 'string', required: false },
+        { name: 'due', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/add-to-list', body: 'flags' },

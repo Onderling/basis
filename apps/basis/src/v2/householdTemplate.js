@@ -27,22 +27,22 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     { key: 'circle.lists.template.repairs', kind: 'repair' },
     { key: 'circle.lists.template.schedule', kind: 'schedule', defaultChild: 'calendar-event' },
   ]),
-  // The plugins this template composes on the bot (its app list on the first start): lists hold, tasks move.
+  // The plugins this template composes on the bot (added to its app list at every start): lists hold, tasks move, the
+  // calendar keeps the Agenda.
   apps: Object.freeze(['lists', 'tasks', 'calendar']),
   // Fixed pairs that are ONE entry, though they read as two ("peper en zout"): an add does not split them. Short on
   // purpose; the admin may grow it later.
   compoundEntries: Object.freeze(['peper en zout', 'zout en peper', 'brood en spelen']),
   required: Object.freeze({}),
+  // The model's household words (Fable's text, verbatim): the tool name beside the phrase it answers, in Dutch.
   promptLines: Object.freeze([
-    'This household keeps its things on LISTS. Add anything with addToList (the list by its name); a bare add makes what that list holds.',
-    'Klusjes (chores) holds TASKS: a person claims one ("ik doe de lamp" → claimTask) and completes it; listMine shows theirs.',
-    'Boodschappen (shopping) and Reparaties (repairs) hold plain entries.',
-    'Agenda holds APPOINTMENTS: add one with addEvent (a title and `when` as the household\'s local time without a zone, e.g. 2026-09-30T10:00); listEvents shows the coming days; a person answers an invitation with rsvpAccept / rsvpDecline / rsvpTentative (the appointment by its words or id).',
-    'Each thing is its own entry: "melk en brood" is two adds (melk, brood), not one entry.',
-    'A chore or an entry can be named by its words: claimTask / completeTask with the chore\'s words as `id` ("vuilnis") when you have no id.',
-    'Food, drinks and household goods named without a list go on Boodschappen — do not ask which list for groceries.',
-    'The task list (takenlijst, chores, to-dos) is Klusjes: "wat staat er op de takenlijst" is listEntries on Klusjes.',
-    'When a person says an entry is done, bought or fixed, tick it off with markListItemDone and the entry\'s id from the items you were given.',
+    "Dit huishouden houdt alles op LIJSTEN: Boodschappen, Klusjes, Reparaties, Agenda.",
+    "addToList(list, text) voegt iets toe; eten, drinken en huishoudspullen zonder lijstnaam gaan op Boodschappen, zonder vraag.",
+    "Klusjes zijn TAKEN: \"nieuwe taak voor mij/voor Bert: X (maandag)\" → addToList(list: Klusjes, text: X, assignee: mij/Bert, due: de dag als datum). \"ik doe de lamp\" → claimTask(id: de woorden); \"de lamp is gemaakt\" → completeTask(id: de woorden). \"wat moet ik nog doen\" → listMine. \"wat staat er op de klusjes / de takenlijst\" → listEntries(list: Klusjes).",
+    "\"… is gekocht / gedaan / gemaakt\" over een lijstregel → markListItemDone(item: de woorden). \"haal … van de lijst\" → removeFromList(item). \"verander … in …\" → editEntry(item, text). Geef alleen item (en text); laat list weg. Vraag NOOIT op welke lijst iets staat: het systeem zoekt de regel zelf.",
+    "Agenda zijn AFSPRAKEN: \"tandarts morgen om 10 uur\" → addEvent(title, when als lokale tijd zonder zone, bv. 2026-09-30T10:00). \"wat staat er in de agenda\" → listEvents. \"ik kom (naar de tandarts)\" / \"ik ben erbij\" → rsvpAccept(id: de woorden); \"ik kan niet\" → rsvpDecline; \"misschien\" → rsvpTentative.",
+    "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
+    "Alleen de beheerder maakt of verwijdert lijsten en wijst klusjes toe. Vraagt een lid daarom: zeg dat alleen de beheerder dat kan, en stop daar.",
   ]),
 });
 

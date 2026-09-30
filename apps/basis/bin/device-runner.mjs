@@ -744,6 +744,7 @@ if (tgToken || inboxDoor.bridge) {
         users: () => botUsers.list(),
         admission,
         revoke: (who) => botUsers.revoke(who),
+        setRole: (who, role) => botUsers.setRole(who, role),
         // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
         inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
         status: async () => ({

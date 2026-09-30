@@ -41,6 +41,8 @@ export function welcomeLines({ ops, lists = [], role = null, settings = {}, t })
       const [from, to] = String(settings.quiet || QUIET_HOURS).split('-');
       lines.push(t('circle.bot.welcome_reminders_on', { from, to }));
     }
+    // the weekly overview is off until the person switches it on: its own line, after either reminders line
+    if (has('assistant-overview')) lines.push(t('circle.bot.welcome_overview'));
   }
   if (role === 'admin') lines.push(t('circle.bot.welcome_admin'));
   return lines;

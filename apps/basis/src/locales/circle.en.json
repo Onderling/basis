@@ -4138,15 +4138,19 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "I send you a reminder: the evening before an appointment (19:00) and the morning your chore is due (08:00), never between {{from}} and {{to}}. To stop them: /herinneringen off. A weekly overview every Sunday at 18:00: /overzicht on.",
+      "text": "When something has a date I remind you: the evening before an appointment (19:00) and on the morning of a chore (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
-      "text": "Reminders are off for this household. A weekly overview every Sunday at 18:00: /overzicht on.",
+      "text": "Reminders are off for this household.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_overview": {
+      "text": "Want a weekly overview, Sundays at 18:00? Switch it on with /overzicht aan.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_admin": {
-      "text": "You are the admin: /instellingen changes the settings for the whole household (who assigns chores, names, reminders, quiet hours).",
+      "text": "You are the admin. With /instellingen you set, for the whole household, who may give chores, who sees names, the reminders and the quiet hours.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "reminder_done": {

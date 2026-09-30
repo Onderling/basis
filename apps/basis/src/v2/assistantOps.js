@@ -2,6 +2,7 @@
  * assistantOps — the door's own ops (`assistantManifest`), answered by the door: a person's thread settings, and the
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
+import { checkExport, countExport } from './householdExport.js';
 import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 
@@ -50,6 +51,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-invite') return inviteOp();
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
+      if (op === 'assistant-exports') return exportsOp();
+      if (op === 'assistant-import') return importOp(args?.file ?? args?._match, { preview: args?.preview === true });
       const threadId = typeof ctx?.threadId === 'string' && ctx.threadId ? ctx.threadId : null;
       if (!threadId) return { ok: false, error: 'no-thread' };
       if (op === 'assistant-memory') {
@@ -90,6 +93,30 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
   /** The bot's settings (parameters of its device): who may give a chore to whom. The admin's; never the model's. */
+  /** The export files on the box, newest first. */
+  async function exportsOp() {
+    if (!admin.exports) return { ok: false, error: 'unwired' };
+    const names = await admin.exports.names();
+    return { ok: true, message: names.length ? t('circle.bot.exports_list', { names: names.join('\n') }) : t('circle.bot.exports_none') };
+  }
+
+  /** Read an export back (the admin's; asked first — `preview` answers the question with what the file holds). */
+  async function importOp(name, { preview = false } = {}) {
+    if (!admin.exports || typeof admin.importFile !== 'function') return { ok: false, error: 'unwired' };
+    const file = String(name ?? '').trim();
+    let data;
+    try { data = await admin.exports.read(file); }
+    catch { return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_no_file', { name: file }) } }; }
+    const checked = checkExport(data);
+    if (!checked.ok) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_unreadable', { name: file }) } };
+    const c = countExport(data);
+    if (preview) return { ok: true, vars: c, message: t('circle.bot.import_confirm_counts', { name: file, ...c }) };
+    const r = await admin.importFile(data);
+    if (!r?.ok) return { ok: false, error: t('circle.bot.import_unreadable', { name: file }) };
+    const missed = (r.notRestored ?? []).length;
+    return { ok: true, message: t('circle.bot.import_done', { ...r.done }) + (missed ? `\n${t('circle.bot.import_missed', { count: missed })}` : '') };
+  }
+
   async function settingsOp(change) {
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);

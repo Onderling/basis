@@ -720,3 +720,9 @@ Use the Detox suite (`apps/basis-mobile/e2e/`) first. When you must hand-drive:
   phone's inbound path, independent of any companion.
 - **The routing log line names transports that exist, not ones that worked.** Say which transport carried
   each step from the transport's own log, never from the router's summary.
+
+## `npm run coverage` prints the snapshot; it does not write it (2026-09-30)
+`apps/basis`'s `npm run coverage` runs `scripts/surface-coverage.mjs`, which prints the matrix to stdout. The committed
+snapshot is refreshed with `node scripts/surface-coverage.mjs > docs/surface-coverage.md` (from `apps/basis`). Running
+only `npm run coverage` after a manifest change leaves the snapshot stale, and `test/fitness/surfaceCoverageFresh.test.js`
+goes red.

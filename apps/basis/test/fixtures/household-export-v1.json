@@ -1,0 +1,27 @@
+{
+  "format": "onderling-household-export",
+  "v": 1,
+  "exportedAt": "2026-09-30T20:00:00.000Z",
+  "lists": [
+    { "n": 1, "name": "Boodschappen", "entries": [
+      { "n": 2, "type": "list-item", "text": "melk", "createdBy": "telegram:111" }
+    ] },
+    { "n": 3, "name": "Klusjes", "defaultChild": "task", "entries": [
+      { "n": 4, "type": "task", "text": "kleurenwiezen", "holders": ["telegram:111"], "dueAt": "2026-10-04T22:00:00.000Z" },
+      { "n": 5, "type": "task", "text": "vuilnis", "holders": ["telegram:222"], "dueAt": "2026-10-05T22:00:00.000Z" }
+    ] },
+    { "n": 6, "name": "Reparaties", "entries": [] },
+    { "n": 7, "name": "Agenda", "defaultChild": "calendar-event", "entries": [
+      { "n": 8, "type": "calendar-event", "title": "tandarts", "startsAt": "2026-10-07T08:00:00.000Z", "endsAt": "2026-10-07T09:00:00.000Z",
+        "createdBy": "telegram:999", "rsvp": { "telegram:222": "accepted" } }
+    ] }
+  ],
+  "loose": [],
+  "people": [
+    { "id": "telegram:111", "channel": "telegram", "uid": "111", "role": "member", "displayName": "Frits" },
+    { "id": "telegram:222", "channel": "telegram", "uid": "222", "role": "member", "displayName": "Bert" },
+    { "id": "telegram:999", "channel": "telegram", "uid": "999", "role": "admin", "displayName": "Anne" }
+  ],
+  "settings": { "assistant.reminders": "on" },
+  "knowledge": []
+}

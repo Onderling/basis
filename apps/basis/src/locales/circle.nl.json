@@ -4149,6 +4149,38 @@
       "text": "Wil je elke zondag om 18:00 een weekoverzicht? Zet het aan met /overzicht aan.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
+    "exports_list": {
+      "text": "Exportbestanden op deze box, nieuwste eerst:\n{{names}}\nTerugzetten: /import <naam>.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "exports_none": {
+      "text": "Er staan nog geen exportbestanden op deze box.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm": {
+      "text": "Dit exportbestand terugzetten in het huishouden?",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm_counts": {
+      "text": "\"{{name}}\" terugzetten? Het bevat {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken en {{people}} mensen. Wat er al staat, blijft staan.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_no_file": {
+      "text": "Een exportbestand \"{{name}}\" ken ik niet. /exports laat zien welke er zijn.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_unreadable": {
+      "text": "\"{{name}}\" kan ik niet lezen als exportbestand.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_done": {
+      "text": "Teruggezet: {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken, {{people}} mensen.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_missed": {
+      "text": "{{count}} dingen kon ik niet terugzetten.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
     "welcome_admin": {
       "text": "Je bent beheerder. Met /instellingen regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."

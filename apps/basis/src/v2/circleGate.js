@@ -109,6 +109,10 @@ export function listsGateRules(_locale, lists = []) {
     // "wat staat er deze week" / "wat moet er nog gebeuren": the person's week overview — by rule, so the model does not
     // summarise the week itself from what it happens to have in view
     { name: 'assistant:weekOverview(read)', test: WEEK_READ, command: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
+    // A person's own switch for what the bot writes first: "stop writing to me" must work every time, model or no
+    // model — so it is a rule, never the model's reading.
+    { name: 'assistant:reminders(off)', test: REMINDERS_OFF, command: () => ({ opId: 'assistant-reminders', args: { mode: 'off' }, appOrigin: 'assistant' }) },
+    { name: 'assistant:reminders(on)', test: REMINDERS_ON, command: () => ({ opId: 'assistant-reminders', args: { mode: 'on' }, appOrigin: 'assistant' }) },
     // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
     // of the list whose entries are chores (it defaults to a task there).
     { name: 'lists:addToList(task-on-chores)', test: (text) => LISTS_ADD_TASK.test(text), command: (text) => {
@@ -119,6 +123,8 @@ export function listsGateRules(_locale, lists = []) {
   ];
 }
 
+const REMINDERS_OFF = /^(?:(?:(?:stuur|geef)\s+(?:me|mij)\s+)?geen\s+herinneringen(?:\s+meer)?(?:\s+(?:sturen|graag|aub|alsjeblieft))?|(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+uit|stop\s+(?:met\s+)?(?:de\s+)?herinneringen|no\s+more\s+reminders|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+off|stop\s+(?:the\s+)?reminders)\s*[.!]*$/i;
+const REMINDERS_ON = /^(?:(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+(?:weer\s+)?aan|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+(?:back\s+)?on)\s*[.!]*$/i;
 const WEEK_READ = /^(?:wat\s+staat\s+er\s+(?:voor\s+)?deze\s+week|wat\s+moet\s+er\s+(?:nog|deze\s+week)?\s*gebeuren|what(?:'s|\s+is)\s+on\s+this\s+week)\s*[?.!]*$/i;
 // A chore that says WHO ("voor mij", "voor Bert", "for me") or WHEN (a day word) is the model's: it has the assignee and
 // the due date to fill, which this typed rule cannot.

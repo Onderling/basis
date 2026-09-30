@@ -47,7 +47,8 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     "\"ik ben bij … geweest\" / \"de afspraak is geweest\" is GEEN rsvp: → markListItemDone(item: de woorden van de afspraak).",
     "\"wat staat er deze week\" / \"wat moet er nog gebeuren\" → weekOverview. \"geen herinneringen meer\" → assistant-reminders(mode: off).",
     "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
-    "Alleen de beheerder maakt of verwijdert lijsten en wijst klusjes toe. Vraagt een lid daarom: zeg dat alleen de beheerder dat kan, en stop daar.",
+    "Een klusje voor jezelf (\"nieuwe taak voor mij: X\") mag ieder lid: roep addToList aan met assignee: mij. Een klusje voor een ander: roep addToList ook aan; het systeem zegt zelf of het mag. Zeg NOOIT zelf dat iets niet mag als er een tool voor is.",
+    "Alleen de beheerder maakt of verwijdert lijsten. Vraagt een lid daarom: zeg dat alleen de beheerder dat kan, en stop daar.",
   ]),
 });
 

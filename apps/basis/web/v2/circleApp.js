@@ -8128,6 +8128,8 @@ async function boot() {
 
   try {
     const agent = await createRealHouseholdAgent({
+      // the agent's own lines (list and calendar defaults, task confirmations, a paused circle) in the person's language
+      t,
       publishEvent: publishEventToLog,
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.

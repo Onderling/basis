@@ -128,6 +128,8 @@ export function renderReply(reply, opts = {}) {
       messageId, threadId,
       lifecycleState: 'live',     // A2 hybrid — flips 'disabled' on next user msg
       items,
+      // the list's own name, when the op gives one (a lists read): the surface shows it above the entries
+      ...(typeof reply.payload?.title === 'string' && reply.payload.title ? { title: reply.payload.title } : {}),
       // v0.6 — list-level _sync from the reply itself (vs per-row
       // _lastSync extracted inside renderListItems).
       syncHint: formatSyncHints(reply.payload?._sync, t),

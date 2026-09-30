@@ -140,7 +140,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       const target = ref ? await findList(circleId, ref) : null;
       if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
       const open = await entriesOf(circleId, target.id);
-      return { ok: true, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
+      // the list's own name goes with its entries: a read of five lists says which is which
+      return { ok: true, title: target.text ?? ref, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
     },
 
     removeFromList: async (args) => {

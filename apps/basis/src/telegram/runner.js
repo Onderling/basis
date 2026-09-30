@@ -98,8 +98,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const onMap = (b) => !offered || offered.has(String(b?.callbackData ?? '').split(':')[0]);
     if (rendered.kind === 'list') {
       const items = Array.isArray(rendered.items) ? rendered.items : [];
-      if (!items.length) { await say(chatId, rendered.text ?? t('circle.telegram.empty_list')); return; }
-      const lines = items.map((it, i) => `${i + 1}. ${it.label}`);
+      // A read of a named list says which list, always — one list or five in a turn.
+      const head = rendered.title ? [`${rendered.title}:`] : [];
+      if (!items.length) { await say(chatId, [...head, rendered.text ?? t('circle.telegram.empty_list')].join('\n')); return; }
+      const lines = [...head, ...items.map((it, i) => `${i + 1}. ${it.label}`)];
       const buttons = [];
       // A button names the ITEM, not its row number ("Done: melk", not "Done 1") — read from a phone, the
       // number was a puzzle (walk 2). Long labels are cut; the row number stays as a tiebreaker.

@@ -424,6 +424,28 @@ The order matters. A projector asks the manifest whether the op appears on its s
 `opAvailability` whether it may happen; the authorisation layer applies at the door, to a caller, and
 never to the local person's own affordances.
 
+A door that acts for people (a household bot) adds checks of its own, and so will grants and the realm's
+remit. Each stays where it binds — folding them into one function would move enforcement away from the place a
+different client cannot skip — but the ORDER and the REASON are one thing, written here once:
+
+**The order, written once:** `admission` · `tier` · `door-map` · `door-role` · `availability` · `op-rule` · `door-settings` · `grant` · `remit`.
+
+- `admission` — the door lets the person in (a code, its bootstrap list); nothing reaches the waist before it.
+- `tier` — the host gate: the op's visibility against the caller's tier (`private` is self only).
+- `door-map` — is the op on this door at all (a bot's slim map); `door-role` — does the door narrow this role
+  (an observer reads).
+- `availability` — `opAvailability`: the circle composes the app, the feature is on, the capability allows.
+- `op-rule` — the op's own rule (the tasks app's `rolePolicy`: who may claim, reassign, complete).
+- `door-settings` — the door's household settings loosen or tighten that (who may give chores, whose names show).
+- `grant` · `remit` — later: a grant carried on the lane, the realm's remit.
+
+Every check answers "go on" or one refusal shape, `{layer, code, message?}` (`apps/basis/src/v2/refusal.js`);
+a composition declares the checks it asks as an ordered list of these layers (a bot's door: `botRungs.js`) and asks
+them deny-wins — the first no is the answer, and a later check never re-allows what an earlier one refused. The
+layers a surface asks before the model sees any tool (tier, map, availability) are folded once per turn into what
+the model is SHOWN; the rest run at the waist on the one call. A fitness test pins the code's layer list to the
+line above, so the two cannot drift.
+
 *Found the hard way (2026-08-28): the composer's attach menu did the structural layer and skipped the
 contextual one entirely — projected once at module load, offered whole, while dispatch resolved through
 a per-circle catalogue. Tapping an entry threw, and the shell answered "I couldn't turn that into an

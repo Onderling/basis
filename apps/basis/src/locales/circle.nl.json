@@ -6920,5 +6920,59 @@
       "text": "Toegewezen.",
       "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
     }
+  },
+  "refusal": {
+    "role": {
+      "text": "Dat kan jouw rol hier niet: je kunt alleen kijken.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "not-on-this-door": {
+      "text": "Dat doet deze bot niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "no-gate": {
+      "text": "De bot kan nu niet nagaan wie je bent; probeer het zo nog eens.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "DISABLED": {
+      "text": "Dat staat hier uit.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_FOUND": {
+      "text": "Dat ken ik niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INVALID_TOKEN": {
+      "text": "Dat mag je hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "refused": {
+      "text": "Dat mag je hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_TIER": {
+      "text": "Dat mag alleen de beheerder van deze bot.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_SELF": {
+      "text": "Dat mag alleen de eigenaar zelf.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NO_TOKEN": {
+      "text": "Dat mag je hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_ROLE": {
+      "text": "Dat kan jouw rol hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_A_MEMBER": {
+      "text": "Je hoort hier (nog) niet bij.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "POLICY_NEVER": {
+      "text": "Dat kan hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    }
   }
 }

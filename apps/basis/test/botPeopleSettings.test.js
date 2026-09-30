@@ -5,7 +5,6 @@
  * - a bare due date is the household's local day, as an appointment's time is local;
  * - who may see names is the household's ceiling (`assistant.names`: members · assigners · admin · none): a member
  *   under `admin` cannot give a chore by name, and a reply names the assignee only where the asker may see names;
- * - `assignPolicy: bots` — chores go only to the bot contacts (function profiles).
  * One boot composed as the box composes a household bot, the calls carrying the door's person.
  */
 import { describe, it, expect, afterAll } from 'vitest';
@@ -24,7 +23,6 @@ const FRITS = 'telegram:111';
 const BERT = 'telegram:222';
 const OLGA = 'telegram:333';
 const ADMIN = 'telegram:999';
-const ROBOT = 'bot:vacuum';
 
 describe('the bot\'s people', () => {
   let dir;
@@ -34,7 +32,7 @@ describe('the bot\'s people', () => {
     if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
   });
 
-  it('observers read; assignees claim by their own role; due is a local day; names follow the ceiling; bots', async () => {
+  it('observers read; assignees claim by their own role; due is a local day; names follow the ceiling', async () => {
     dir = await mkdtemp(path.join(tmpdir(), 'bot-people-'));
     const pass = randomBytes(32).toString('base64url');
     await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });
@@ -47,7 +45,7 @@ describe('the bot\'s people', () => {
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
-    for (const [webid, role, displayName, extra] of [[FRITS, 'member', 'Frits'], [BERT, 'coordinator', 'Bert'], [OLGA, 'observer', 'Olga'], [ADMIN, 'admin', 'Anne'], [ROBOT, 'member', 'Robotstofzuiger', { profileKind: 'function' }]]) {
+    for (const [webid, role, displayName, extra] of [[FRITS, 'member', 'Frits'], [BERT, 'coordinator', 'Bert'], [OLGA, 'observer', 'Olga'], [ADMIN, 'admin', 'Anne']]) {
       await own('stoop', 'addContact', { webid, channel: webid.startsWith('bot:') ? 'web' : 'telegram', role, displayName, ...(extra ?? {}) });
       if (!webid.startsWith('bot:')) await agent.setDoorCaller(webid, role);
     }
@@ -83,11 +81,5 @@ describe('the bot\'s people', () => {
     expect((await as(ADMIN)('lists', 'addToList', { list: 'Klusjes', text: 'gras', assignee: 'Frits' })).ok).toBe(true);
     await set('assistant.names', 'members');
 
-    // assignPolicy `bots`: chores go only to the bot contacts
-    await set('assistant.assignPolicy', 'bots');
-    expect((await as(ADMIN)('lists', 'addToList', { list: 'Klusjes', text: 'zuigen', assignee: 'Frits' })).ok).toBe(false);
-    const toRobot = await as(ADMIN)('lists', 'addToList', { list: 'Klusjes', text: 'zuigen', assignee: 'Robotstofzuiger' });
-    expect(toRobot.ok, JSON.stringify(toRobot)).toBe(true);
-    await set('assistant.assignPolicy', 'roles');
   }, 180_000);
 });

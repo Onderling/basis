@@ -318,9 +318,6 @@ export class MemberMap extends Emitter {
       // pairCircleId: the contact's PAIR ROSTER (the hidden two-member circle made on the first exchange — the roster
       // a contact lacks), once it exists. Same whitelist lesson: named here or dropped.
       pairCircleId: (typeof m.pairCircleId === 'string' && m.pairCircleId) ? m.pairCircleId : null,
-      // profileKind: `function` when this contact is a BOT (a function profile's node — a household bot), else absent.
-      // What a household's "chores only to bots" setting reads. Same whitelist lesson: named here or dropped.
-      ...(m.profileKind === 'function' ? { profileKind: 'function' } : {}),
       personKey:   (m.personKey && Number.isInteger(m.personKey.version) && typeof m.personKey.pubKey === 'string')
         ? { version: m.personKey.version, pubKey: m.personKey.pubKey, ...((typeof m.personKey.linkKeyPub === 'string' && m.personKey.linkKeyPub) ? { linkKeyPub: m.personKey.linkKeyPub } : {}) }
         : null,

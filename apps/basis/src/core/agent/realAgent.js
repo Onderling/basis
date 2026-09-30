@@ -3988,11 +3988,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         who = hit[0].webid;
         whoName = hit[0].displayName ?? null;
       }
-      const assigneeRow = known.find((c) => c.webid === who) ?? null;
       const allowed = assignAllowed({
         policy: paramsService.register.valueOf(ASSIGN_POLICY_KEY),
         roleMayAssign, callerId: caller, assigneeId: who,
-        assigneeIsBot: assigneeRow?.profileKind === 'function',
       });
       if (!allowed) return { ok: false, error: tr('circle.tasks.assign_refused') };
       // …and the one who gets it must be someone their OWN role lets claim (an observer looks, and holds no chore).

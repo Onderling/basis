@@ -6,15 +6,14 @@
  * The household's setting `assistant.assignPolicy` only loosens or tightens that:
  *   - `roles`  (default): the role decides;
  *   - `anyone`: every admitted person may give a chore to anyone;
- *   - `self`:   nobody gives chores to others, not even a coordinator;
- *   - `bots`:   chores go to others only when they are bots (function-profile contacts).
+ *   - `self`:   nobody gives chores to others, not even a coordinator.
  * Enforced at the waist when an add names an assignee — the model only passes the words on.
  *
  * Device scope, `kind: user`: settable by the bot's admin (`/instellingen`), never synced to anyone's other devices.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-export const ASSIGN_POLICIES = Object.freeze(['roles', 'anyone', 'self', 'bots']);
+export const ASSIGN_POLICIES = Object.freeze(['roles', 'anyone', 'self']);
 export const ASSIGN_POLICY_KEY = 'assistant.assignPolicy';
 export const ASSIGN_POLICY = param({ key: ASSIGN_POLICY_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'roles' });
 
@@ -26,12 +25,11 @@ export const assignPolicyFrom = (v) => (ASSIGN_POLICIES.includes(v) ? v : ASSIGN
  * @param {{policy?: string, roleMayAssign: boolean, callerId: string|null, assigneeId: string}} a
  *        `roleMayAssign`: the role's answer (`rolePolicy.canReassign`); no caller (the bot's owner) may always
  */
-export function assignAllowed({ policy, roleMayAssign, callerId, assigneeId, assigneeIsBot = false }) {
+export function assignAllowed({ policy, roleMayAssign, callerId, assigneeId }) {
   if (!callerId || assigneeId === callerId) return true;
   const p = assignPolicyFrom(policy);
   if (p === 'anyone') return true;
   if (p === 'self') return false;
-  if (p === 'bots') return Boolean(assigneeIsBot);
   return Boolean(roleMayAssign);
 }
 

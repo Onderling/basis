@@ -129,6 +129,7 @@ import { resolveChatAi } from '../../../../basis/src/v2/chatAi.js';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import MultiFieldFormBubble from '../../rn/MultiFieldFormBubble.js';   // 2+-field inline form (parity with web)
 import { addressesBot, stripBotTag } from '../../../../basis/src/v2/circleDispatch.js';
+import { createPeek } from '../../../../basis/src/v2/circlePeek.js';
 import { createAssistantEngine, assistantReplyText } from '../../../../basis/src/v2/assistantEngine.js';
 import { followUpClaim } from '../../../../basis/src/v2/assistantFollowUp.js';
 import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
@@ -3144,6 +3145,18 @@ function CircleDetail({
   // B (circle bot) — run a FULLY-RESOLVED command ({opId, args}) against the circle's catalogue, scoped
   // to THIS circle, and post a one-line bot reply. Local-only (the command's substrate effect reaches
   // members on its own). Target resolution / ambiguity is handled upstream by the clarifying dispatch.
+  // The capability gate every dispatch here passes (and the bot's read-then-act look too): the refusal code, or null.
+  const capabilityDenyFor = useCallback((dispatch) => {
+    if (!circle?.id) return null;
+    const gateEntry = catalogue?.opsById?.get(dispatch.opId);
+    const gOrigin = dispatch.appOrigin || gateEntry?.appOrigin;
+    if (!gOrigin) return null;
+    const enabled = isAppSurfaceEnabled(gOrigin, policy, isFeatureEnabled);
+    const eff = effectiveCapabilities(capabilitySources, { apps: enabled ? [gOrigin] : [] });
+    const verdict = checkCapability({ op: gateEntry?.op, appOrigin: gOrigin, args: dispatch.args }, eff);
+    return verdict.allow ? null : (verdict.code || 'capability-denied');
+  }, [catalogue, circle?.id, policy, capabilitySources]);
+
   const runCircleCommandResolved = useCallback(async ({ opId, args, appOrigin }) => {
     if (!catalogue) { appendCircleMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     let dispatch;
@@ -3184,18 +3197,10 @@ function CircleDetail({
       // user-initiated dispatch (slash/LLM/gate/button/follow-up) converges on runCircleCommandResolved.
       // Enablement comes from the SAME per-circle source the UI uses (isAppSurfaceEnabled → policy.features,
       // already consulted for the screen button below); the pure (verb×noun) gate evaluates the capability.
-      if (circle?.id) {
-        const gateEntry = catalogue?.opsById?.get(dispatch.opId);
-        const gOrigin = dispatch.appOrigin || gateEntry?.appOrigin;
-        if (gOrigin) {
-          const enabled = isAppSurfaceEnabled(gOrigin, policy, isFeatureEnabled);
-          const eff = effectiveCapabilities(capabilitySources, { apps: enabled ? [gOrigin] : [] });
-          const verdict = checkCapability({ op: gateEntry?.op, appOrigin: gOrigin, args: dispatch.args }, eff);
-          if (!verdict.allow) {
-            appendCircleMessage({ actor: 'bot', text: t(verdict.code === 'app-disabled' ? 'circle.gate.appDisabled' : 'circle.gate.capabilityDenied') });
-            return;
-          }
-        }
+      const denied = capabilityDenyFor(dispatch);
+      if (denied) {
+        appendCircleMessage({ actor: 'bot', text: t(denied === 'app-disabled' ? 'circle.gate.appDisabled' : 'circle.gate.capabilityDenied') });
+        return;
       }
       // scopeReadyDispatch takes the active-circle id STRING (it writes it into the scope arg keys);
       // an {id} object would land as the literal scope value (device-verify 2026-06-11).
@@ -3248,7 +3253,7 @@ function CircleDetail({
         if (hopCard) appendCircleMessage({ actor: 'bot', text: `${hopCard.title}\n${hopCard.body}` });
       } catch { /* enrichment is non-essential */ }
     }
-  }, [catalogue, circle?.id, rawCallSkill, appendCircleMessage, manifestsByOrigin, policy, capabilitySources, overrideStore]);
+  }, [catalogue, circle?.id, rawCallSkill, appendCircleMessage, manifestsByOrigin, policy, capabilitySources, overrideStore, capabilityDenyFor]);
 
   // Entrust (mandate) — open the task-scoped grant picker. Gathers WHO (the circle
   // roster), WHAT (MY offerings, kind 'offering'), my WebID (the granter), and any
@@ -3622,6 +3627,13 @@ function CircleDetail({
     onNoMatch: (_text, _ctx, opts) => { appendCircleMessage({ actor: 'bot', text: assistantReplyText(opts, t, 'circle.bot.unknown') }); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { appendCircleMessage({ actor: 'bot', text: t('circle.bot.basic_mode') }); },
+    // Read-then-act (web parity): a read the model picks is looked at — the same gate as every dispatch here, painted
+    // nowhere — and handed back to it once, so "haal de melk eraf" acts instead of showing the list.
+    peek: createPeek({
+      catalogue: () => catalogue,
+      deny: async (ready) => capabilityDenyFor(ready),
+      run: (ready) => runDispatch(scopeReadyDispatch(ready, circle?.id), rawCallSkill),
+    }),
     // No collect window here (web parity): in a circle composer a person types one line on purpose, and a wait on
     // every bot reply would read as a slow app. The lane still takes the circle's lines one turn at a time.
     collectMs: 0,
@@ -3633,7 +3645,7 @@ function CircleDetail({
       dispatchReady: (cmd) => runCircleCommandResolved(cmd),
       catalogue,
     }),
-  }), [catalogue, clarify, circle?.id, resolveSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk, runCircleCommandResolved]);
+  }), [catalogue, clarify, circle?.id, resolveSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk, runCircleCommandResolved, rawCallSkill, capabilityDenyFor]);
 
   // ── Task #13 — onboarding-as-bot-chat + standing help Q&A (thin twin of web circleApp.js) ──────────
   // The confidential-route-aware help LLM binding (parity with web's circleHelpLlm): ready() reflects

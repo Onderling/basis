@@ -4900,7 +4900,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (task.error === 'already-claimed') {
         const holders = [...(Array.isArray(cur.assignees) ? cur.assignees : []), cur.assignee].filter(Boolean);
         const yours = Boolean(actor && holders.includes(actor));
-        // In the household's words where the shell hands the agent its translator; web and mobile hand none yet.
+        // In the person's words: every shell hands the agent its translator; a bare agent (a test) keeps the English.
         if (typeof opts.t !== 'function') return { ok: false, error: yours ? `You had already claimed: ${title}` : `Already claimed: ${title}` };
         return { ok: false, error: tr(yours ? 'circle.tasks.already_yours' : 'circle.tasks.already_claimed', { title }) };
       }
@@ -4953,8 +4953,7 @@ export async function createRealHouseholdAgent(opts = {}) {
             }));
         }
       }
-      // In the household's words where the shell hands the agent its translator (the box does); web and mobile
-      // hand none yet, and keep the English line.
+      // In the person's words: every shell hands the agent its translator; a bare agent (a test) keeps the English.
       const message = typeof opts.t === 'function'
         ? opts.t(`circle.tasks.reply.${verbMap[opId].toLowerCase()}`, { title, note: noteSuffix })
         : `✓ ${verbMap[opId]}: ${title}${noteSuffix}`;

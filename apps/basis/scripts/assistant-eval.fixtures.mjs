@@ -89,4 +89,9 @@ export const FIXTURES = [
   // ── the week overview, on request (the reminders brief) ──
   { id: 'week-overview',      text: 'wat staat er deze week', expect: { anyOf: [{ op: 'weekOverview' }, { op: 'listEvents' }] } },
   { id: 'reminders-off',      text: 'stuur me geen herinneringen meer', expect: { op: 'assistant-reminders', args: { mode: 'off' } } },
+  // ── an old refusal in the thread is not an answer to a new request (the test bot, 2026-09-30) ──
+  { id: 'chore-for-me-after-refusal', text: 'nieuwe taak voor mij: ramen lappen, morgen', before: ['you: maak een lijst cadeaus', 'assistant: Dat kan alleen de beheerder van deze bot.', 'you: geef de afwas aan Bert', 'assistant: Dat kan alleen de beheerder van deze bot.'], expect: { op: 'addToList', args: { list: /klusjes/, text: /^ramen lappen$/, assignee: /^(mij|me|ik)$/ } } },
+  { id: 'chore-for-me-after-same-refusal', text: 'nieuwe taak voor mij: ramen lappen, morgen', before: ['you: nieuwe taak voor mij: ramen lappen, morgen', 'assistant: Dat kan alleen de beheerder van deze bot.'], expect: { op: 'addToList', args: { list: /klusjes/, text: /^ramen lappen$/, assignee: /^(mij|me|ik)$/ } } },
+  { id: 'reminders-off-plain', text: 'geen herinneringen meer graag', expect: { op: 'assistant-reminders', args: { mode: 'off' } } },
+  { id: 'reminders-on',       text: 'zet de herinneringen weer aan', expect: { op: 'assistant-reminders', args: { mode: 'on' } } },
 ];

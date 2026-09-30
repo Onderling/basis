@@ -30,6 +30,13 @@ export const SEAMS = Object.freeze([
   // A FUNCTION profile's inbox is a door (the household bot on its own node): the shell that can run one reads the
   // profile's kind and composes the door; a shell that ran one without it would leave the bot deaf on its inbox.
   // Only the box runs a function profile today (web and mobile are a person's devices).
+  // The agent speaks in the person's language only when the shell hands it its translator: without one, its own lines
+  // (list and calendar defaults, task confirmations, a paused circle) come out as keys or English. The box passed it;
+  // web and mobile did not (found 2026-09-29).
+  { id: 'agent-translator', pattern: /createRealHouseholdAgent\(\{(?:(?!\n\s*\}\);)[\s\S])*?\n\s+t(?::\s*[\w.]+)?,/, why: 'the agent\'s own lines follow the person\'s language' },
+  // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
+  // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).
+  { id: 'circle-peek', pattern: /createPeek\(/, shells: ['web', 'mobile'], why: 'a circle bot acts on "haal de melk eraf" instead of showing the list' },
   { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
   // A household bot WRITES FIRST (reminders of what people dated): only a shell that hosts a bot runs the tick. Web and
   // mobile are a person's devices and write first to nobody.

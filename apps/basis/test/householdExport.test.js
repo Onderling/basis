@@ -166,3 +166,19 @@ describe('the admin\'s /exports and /import', () => {
     expect(r.kind).toBe('needsConfirm');
   });
 });
+
+describe('the export shelf, with its defaults', () => {
+  it('at most once a day by default (never a tight loop), and it keeps a week — found on the test bot, 2026-09-30', async () => {
+    const { createExportShelf } = await import('../src/v2/householdExportShelf.js');
+    const disk = new Map();
+    const files = { list: async () => [...disk.keys()], write: async (n, t) => { disk.set(n, t); }, read: async (n) => disk.get(n), remove: async (n) => { disk.delete(n); } };
+    const intervals = [];
+    const timers = { setInterval: (_fn, ms) => { intervals.push(ms); return 1; }, clearInterval: () => {} };
+    let at = new Date('2026-10-01T02:00:00').getTime();
+    const shelf = createExportShelf({ files, exportNow: async () => ({ v: 1 }), now: () => at, timers });
+    await shelf.start();
+    expect(intervals).toEqual([24 * 3_600_000]);
+    for (let d = 1; d < 10; d++) { at += 86_400_000; await shelf.writeNow(); }
+    expect((await shelf.names()).length).toBe(7);
+  });
+});

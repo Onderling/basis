@@ -28,15 +28,19 @@ export const isExportName = (name) => NAME.test(String(name ?? ''));
  * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
  * @param {(e: {name?: string, ok: boolean, error?: string}) => void} [a.onWritten]
  */
-export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP.default, every = EXPORT_EVERY_MS.default, now = () => Date.now(), timers = globalThis, onWritten = null }) {
+export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP, every = EXPORT_EVERY_MS, now = () => Date.now(), timers = globalThis, onWritten = null }) {
   let handle = null;
+  // (`param()` hands the value itself.) Never more often than hourly, never fewer than one kept: a bad number must not
+  // make the box write in a loop or delete its only copy.
+  const period = Math.max(3_600_000, Number(every) || EXPORT_EVERY_MS);
+  const kept = Math.max(1, Math.floor(Number(keep)) || EXPORT_KEEP);
   /** The shelf's files, newest first. */
   const names = async () => (await files.list()).filter(isExportName).sort().reverse();
   const writeNow = async () => {
     try {
       const name = exportNameFor(now());
       await files.write(name, JSON.stringify(await exportNow(), null, 1));
-      for (const old of (await names()).slice(Math.max(1, keep))) await files.remove(old);
+      for (const old of (await names()).slice(kept)) await files.remove(old);
       onWritten?.({ name, ok: true });
       return name;
     } catch (e) {
@@ -52,7 +56,7 @@ export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP.default
       if (!isExportName(name)) throw new Error('not-an-export-name');
       return JSON.parse(await files.read(name));
     },
-    start() { if (!handle) { handle = timers.setInterval(() => { writeNow(); }, every); handle?.unref?.(); } return writeNow(); },
+    start() { if (!handle) { handle = timers.setInterval(() => { writeNow(); }, period); handle?.unref?.(); } return writeNow(); },
     stop() { if (handle) { timers.clearInterval(handle); handle = null; } },
   };
 }

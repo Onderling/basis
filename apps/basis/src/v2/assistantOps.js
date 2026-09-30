@@ -2,7 +2,7 @@
  * assistantOps — the door's own ops (`assistantManifest`), answered by the door: a person's thread settings, and the
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
-import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom } from './botSettings.js';
+import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 
 /**
@@ -82,7 +82,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)) });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)) });
     };
     const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
@@ -93,7 +93,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       await callSkill('params', 'set-param', { key: PASSED_DAYS_KEY, value: n });
       return { ok: true, message: await current() };
     }
-    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES] }[what];
+    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES] }[what];
     if (!setting || !setting[1].includes(value)) return usage;
     await callSkill('params', 'set-param', { key: setting[0], value });
     return { ok: true, message: await current() };

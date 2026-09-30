@@ -69,6 +69,10 @@
     "editEntry": {
       "text": "Verander de woorden van een regel: item = de oude woorden of het id, text = de nieuwe woorden. De lijst is niet nodig.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "removeList": {
+      "text": "Verwijder een hele lijst en alles wat erop staat (list = de naam). Alleen voor een lijst die weg moet.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "assistant": {

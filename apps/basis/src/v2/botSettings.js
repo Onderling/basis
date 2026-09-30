@@ -77,3 +77,13 @@ export const PASSED_KEEP_DAYS = param({ key: PASSED_DAYS_KEY, scope: PARAM_SCOPE
 export const passedPolicyFrom = (v) => (PASSED_POLICIES.includes(v) ? v : PASSED_POLICY);
 export const passedDaysFrom = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : PASSED_KEEP_DAYS);
 
+/**
+ * Who may cancel an appointment (Frits, 2026-09-30: a member may cancel their own; the admin may switch it off):
+ *   - `own`   (default): the one who added it, and the admin;
+ *   - `admin`: only the admin.
+ */
+export const CANCEL_POLICIES = Object.freeze(['own', 'admin']);
+export const CANCEL_KEY = 'assistant.cancelPolicy';
+export const CANCEL_POLICY = param({ key: CANCEL_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'own' });
+export const cancelPolicyFrom = (v) => (CANCEL_POLICIES.includes(v) ? v : CANCEL_POLICY);
+

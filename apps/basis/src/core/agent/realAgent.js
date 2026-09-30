@@ -246,7 +246,7 @@ import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
 import { botDoorChecks } from '../../v2/botRungs.js';                                            // the bot door's checks, declared once
-import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
+import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
@@ -4651,6 +4651,19 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     // A household bot (`opts.calendarInCircle`): the calendar's verbs over the circle's ONE store — events are the
     // Agenda's children — not the per-agent in-memory CalendarStore below, which a person's node keeps.
+    // A household bot's appointment is cancelled by the one who added it, or the admin — unless the admin keeps that
+    // to themselves (`assistant.cancelPolicy`). The op's rule and the door's setting refuse in the one shape.
+    if (appOrigin === 'calendar' && opId === 'cancelEvent' && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
+        && doorRoles.get(ctx.caller) !== 'admin') {
+      const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+      if (cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {
+        return { ok: false, error: tr('circle.calendar.cancel_admin_only'), refusal: refuse('door-settings', 'setting:cancel') };
+      }
+      const snap = await callSkill('calendar', 'getEventSnapshot', { id: args?.id });
+      if (snap?.ok && snap.event && snap.event.createdBy !== ctx.caller) {
+        return { ok: false, error: tr('circle.calendar.not_yours', { title: snap.event.title ?? '' }), refusal: refuse('op-rule', 'not-yours') };
+      }
+    }
     if (appOrigin === 'calendar' && opts.calendarInCircle) {
       const ops = (circleCalendar ??= makeCircleCalendarOps({
         storeFor: (circleId) => householdService.stores.getStore(circleId),

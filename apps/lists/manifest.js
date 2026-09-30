@@ -159,6 +159,21 @@ export const listsManifest = {
       },
     },
     {
+      id:        'removeList', group: 'compose',
+      verb:      'remove',
+      writes:    { scope: 'circle' },
+      requires:  ['lists'],
+      params: [
+        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-delete', body: 'argline' },
+        chat:  { reply: 'text', hint: 'Remove a whole list and everything on it (a list made by mistake).' },
+        // the list and its entries go at once: asked first, in the household's words
+        ui:    { confirm: { severity: 'danger', messageKey: 'circle.lists.remove_list_confirm', message: 'Remove this list and everything on it?' } },
+      },
+    },
+    {
       id:        'editEntry', group: 'compose',
       verb:      'edit',
       writes:    { scope: 'circle' },

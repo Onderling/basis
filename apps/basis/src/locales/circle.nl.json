@@ -659,6 +659,14 @@
     "already_there": {
       "text": "{{title}} staat al in de agenda ({{when}}).",
       "doc": "A household bot's reply when the same appointment (title, at the same start) is added again: said, and no second one is made."
+    },
+    "not_yours": {
+      "text": "\"{{title}}\" heeft iemand anders gezet: die kan alleen diegene (of de beheerder) schrappen.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
+    },
+    "cancel_admin_only": {
+      "text": "Afspraken schrappen doet hier alleen de beheerder.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
     }
   },
   "embed": {
@@ -3705,6 +3713,14 @@
     "done_named": {
       "text": "Afgevinkt: {{text}}.",
       "doc": "A household bot's reply naming the entry it ticked off."
+    },
+    "remove_list_confirm": {
+      "text": "De lijst \"{{list}}\" en alles wat erop staat verwijderen?",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "list_removed": {
+      "text": "De lijst \"{{name}}\" is weg.",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     }
   },
   "share": {
@@ -4002,11 +4018,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder).",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <aantal>",
+      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <aantal> · /instellingen cancel own|admin",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {

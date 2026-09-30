@@ -167,12 +167,23 @@ export function splitEntryText(text, compounds = HOUSEHOLD_TEMPLATE.compoundEntr
 
 /**
  * The dispatcher's `expand` for a household bot: an addToList whose text names several things becomes one add per
- * thing, on the gate's route and the model's alike; every other op passes as it is.
+ * thing, on the gate's route and the model's alike — but only on a list of PLAIN entries. A chore or an appointment is
+ * one thing however it is worded ("lamp vervangen en ophangen", "tandarts en huisarts"): the target list is found by its
+ * name or its words in the template, and a list whose entries are tasks or appointments is never split. A list the
+ * template does not know (one the admin made) holds plain entries.
+ * @param {{template?: object, t?: (key: string) => string}} [a]
  * @returns {(cmd: {opId: string, args?: object, appOrigin?: string}) => object[]}
  */
-export function expandAdds(template = HOUSEHOLD_TEMPLATE) {
+export function expandAdds({ template = HOUSEHOLD_TEMPLATE, t = (k) => k } = {}) {
+  const byWord = new Map();
+  for (const l of templateLists(t, template)) for (const w of [l.name, ...l.aliases]) if (w) byWord.set(String(w).toLowerCase(), l);
+  const holdsThings = (listRef) => {
+    const l = byWord.get(String(listRef ?? '').trim().toLowerCase());
+    return !l || !l.defaultChild;   // unknown, or plain entries
+  };
   return (cmd) => {
     if (cmd?.opId !== 'addToList' || typeof cmd.args?.text !== 'string') return [cmd];
+    if (!holdsThings(cmd.args.list)) return [cmd];
     const parts = splitEntryText(cmd.args.text, template.compoundEntries);
     return parts.length > 1 ? parts.map((text) => ({ ...cmd, args: { ...cmd.args, text } })) : [cmd];
   };

@@ -34,7 +34,7 @@ import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
-import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS } from './botSettings.js';
+import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY } from './botSettings.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -104,6 +104,8 @@ export const BASIS_USER_PARAMS = [
   // What happens to what is done or has passed on a household bot (keep · hide · delete), and how long `hide` shows it.
   { key: PASSED_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_POLICY },
   { key: PASSED_DAYS_KEY,                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_KEEP_DAYS },
+  // Who may cancel an appointment on a household bot (own · admin).
+  { key: CANCEL_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: CANCEL_POLICY },
 ];
 
 /**

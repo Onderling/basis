@@ -18,6 +18,16 @@ describe('splitting an add', () => {
     expect(splitEntryText('lamp vervangen', pairs)).toEqual(['lamp vervangen']);
   });
 
+  it('only a list of plain entries splits: a chore or an appointment is one thing ("lamp vervangen en ophangen")', () => {
+    const names = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
+    const expand = expandAdds({ t: (k) => names[k] ?? k });
+    expect(expand({ opId: 'addToList', args: { list: 'Klusjes', text: 'lamp vervangen en ophangen' } })).toHaveLength(1);
+    expect(expand({ opId: 'addToList', args: { list: 'takenlijst', text: 'ramen en deuren' } })).toHaveLength(1);   // by its words too
+    expect(expand({ opId: 'addToList', args: { list: 'Agenda', text: 'tandarts en huisarts' } })).toHaveLength(1);
+    expect(expand({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk en kaas' } })).toHaveLength(2);
+    expect(expand({ opId: 'addToList', args: { list: 'werktaken', text: 'a en b' } })).toHaveLength(2);        // a list of the admin's own: plain
+  });
+
   it('an addToList becomes one add per part; other ops pass as they are', () => {
     const expand = expandAdds();
     expect(expand({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk en kaas' } }))
@@ -37,6 +47,7 @@ describe('splitting an add', () => {
     });
     await cd.handle('@bot zet appels en peren op de boodschappen');
     await cd.handle('@bot ramen en deuren lappen');
-    expect(dispatched).toEqual(['appels', 'peren', 'ramen', 'deuren']);
+    // a chore on Klusjes is one thing: "ramen en deuren" stays whole
+    expect(dispatched).toEqual(['appels', 'peren', 'ramen en deuren']);
   });
 });

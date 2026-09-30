@@ -659,6 +659,14 @@
     "already_there": {
       "text": "{{title}} is already on the agenda ({{when}}).",
       "doc": "A household bot's reply when the same appointment (title, at the same start) is added again: said, and no second one is made."
+    },
+    "not_yours": {
+      "text": "Someone else set \"{{title}}\": only they (or the admin) can cancel it.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
+    },
+    "cancel_admin_only": {
+      "text": "Here only the admin cancels appointments.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
     }
   },
   "embed": {
@@ -3705,6 +3713,14 @@
     "done_named": {
       "text": "Ticked off: {{text}}.",
       "doc": "A household bot's reply naming the entry it ticked off."
+    },
+    "remove_list_confirm": {
+      "text": "Remove the list \"{{list}}\" and everything on it?",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "list_removed": {
+      "text": "The list \"{{name}}\" is gone.",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     }
   },
   "share": {
@@ -4002,11 +4018,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed).",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin).",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <number>",
+      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <number> · /instellingen cancel own|admin",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {

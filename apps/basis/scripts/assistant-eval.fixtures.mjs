@@ -83,4 +83,6 @@ export const FIXTURES = [
   // ── a short answer answers the bot's own last question (rule 8, Frits' session) ──
   { id: 'short-answer-ja',    text: 'ja', before: ['you: we hebben geen melk meer', 'assistant: Zal ik melk op de boodschappen zetten?'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /melk/ } } },
   { id: 'short-answer-list',  text: 'boodschappen', before: ['you: zet kaas erop', 'assistant: Op welke lijst — boodschappen of klusjes?'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /kaas/ } } },
+  // ── a report about the past is a tick, not an rsvp (Frits' session) ──
+  { id: 'past-is-tick',       text: 'ik ben bij de tandarts geweest', items: ['2026-09-29 10:00 · tandarts (Agenda)'], expect: { op: 'markListItemDone', args: { item: /tandarts|i0/ } } },
 ];

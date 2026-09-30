@@ -402,7 +402,7 @@ export function eventsInWindow(events, { since, until } = {}) {
   const from = toEpoch(since) ?? Date.now();
   const to = toEpoch(until) ?? (from + 7 * 86_400_000);
   return (Array.isArray(events) ? events : [])
-    .filter((e) => e && e.state !== 'cancelled' && e.state !== 'removed')
+    .filter((e) => e && e.state !== 'cancelled' && e.state !== 'removed' && !e.completedAt)   // a ticked appointment has been
     .filter((e) => { const t0 = new Date(e.startsAt).getTime(); return t0 >= from && t0 < to; })
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }

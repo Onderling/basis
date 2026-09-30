@@ -44,6 +44,7 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     "{errand} zijn TAKEN: \"nieuwe taak voor mij/voor Bert: X (maandag)\" → addToList(list: {errand}, text: X, assignee: mij/Bert, due: de dag als datum). \"ik doe de lamp\" → claimTask(id: de woorden); \"de lamp is gemaakt\" → completeTask(id: de woorden). \"wat moet ik nog doen\" → listMine. \"wat staat er op de klusjes / de takenlijst\" → listEntries(list: {errand}).",
     "\"… is gekocht / gedaan / gemaakt\" over een lijstregel → markListItemDone(item: de woorden). \"haal … van de lijst\" → removeFromList(item). \"verander … in …\" → editEntry(item, text). Geef alleen item (en text); laat list weg. Vraag NOOIT op welke lijst iets staat: het systeem zoekt de regel zelf.",
     "{schedule} zijn AFSPRAKEN: \"tandarts morgen om 10 uur\" → addEvent(title, when als lokale tijd zonder zone, bv. 2026-09-30T10:00). \"wat staat er in de agenda\" → listEvents. \"ik kom (naar de tandarts)\" / \"ik ben erbij\" → rsvpAccept(id: de woorden); \"ik kan niet\" → rsvpDecline; \"misschien\" → rsvpTentative.",
+    "\"ik ben bij … geweest\" / \"de afspraak is geweest\" is GEEN rsvp: → markListItemDone(item: de woorden van de afspraak).",
     "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
     "Alleen de beheerder maakt of verwijdert lijsten en wijst klusjes toe. Vraagt een lid daarom: zeg dat alleen de beheerder dat kan, en stop daar.",
   ]),

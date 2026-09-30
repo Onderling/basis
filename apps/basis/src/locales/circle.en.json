@@ -3689,6 +3689,14 @@
     "already_there": {
       "text": "'{{item}}' is already on {{list}}.",
       "doc": "An add whose words are already open on that list: said, and no second entry is made."
+    },
+    "entry_done": {
+      "text": "{{text}} — done",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "event_passed": {
+      "text": "{{text}} — passed",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
     }
   },
   "share": {
@@ -3986,11 +3994,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody).",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed).",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none",
+      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <number>",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {

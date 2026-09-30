@@ -118,6 +118,9 @@ describe('a chore that says who and when', () => {
     expect(shown.message).toContain('"assign":"roles"');
     expect(shown.message).toContain('"names":"members"');
     expect((await call('assistant', 'assistant-settings', { change: 'names none' })).message).toContain('"names":"none"');
+    expect((await call('assistant', 'assistant-settings', { change: 'passed keep' })).message).toContain('"passed":"keep"');
+    expect((await call('assistant', 'assistant-settings', { change: 'days 3' })).message).toContain('"days":3');
+    expect((await call('assistant', 'assistant-settings', { change: 'days soon' })).ok).toBe(false);
     const set = await call('assistant', 'assistant-settings', { change: 'assign anyone' });
     expect(set.message).toContain('"assign":"anyone"');
     expect((await call('assistant', 'assistant-settings', { change: 'assign everybody' })).ok).toBe(false);

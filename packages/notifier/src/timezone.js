@@ -58,7 +58,7 @@ function parseHHMM(s) {
   return [hh, mm];
 }
 
-function wallClockInTz(instantMs, tz) {
+export function wallClockInTz(instantMs, tz) {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     year:    'numeric',
@@ -83,7 +83,7 @@ function wallClockInTz(instantMs, tz) {
   return out;
 }
 
-function utcInstantForWallClock({ year, month, day, hour, minute, tz }) {
+export function utcInstantForWallClock({ year, month, day, hour, minute, tz }) {
   const naiveUtcMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
   const wall       = wallClockInTz(naiveUtcMs, tz);
   const wallAsUtcMs = Date.UTC(

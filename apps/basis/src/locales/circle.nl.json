@@ -3986,12 +3986,24 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven: {{assign}} (self: alleen jezelf, de beheerder iedereen · anyone: iedereen · role: de rollen {{roles}} iedereen).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist, coördinator of hoger mag · anyone: iedereen mag · self: niemand).",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /instellingen assign self|anyone|role · /instellingen roles admin,member",
+      "text": "Gebruik: /instellingen assign roles|anyone|self",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "role_usage": {
+      "text": "Gebruik: /role <naam> coordinator|member|observer",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_nobody": {
+      "text": "Ik ken hier niemand die \"{{name}}\" heet (of het is de beheerder).",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_set": {
+      "text": "{{name}} is nu {{role}}.",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
     }
   },
   "op": {
@@ -6873,7 +6885,7 @@
       "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
     },
     "no_such_person": {
-      "text": "Ik ken niemand die \"{{name}}\" heet. Ik ken: {{known}}.",
+      "text": "Ik ken niemand die \"{{name}}\" heet.",
       "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
     }
   }

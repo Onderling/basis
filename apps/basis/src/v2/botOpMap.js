@@ -56,7 +56,8 @@ export function scopeCatalogueToRole(catalogue, role) {
     if (entry?.appOrigin === 'assistant') return true;
     const level = botOpLevel(id);
     if (!level) return false;
-    return level === 'authenticated' || role !== 'member';
+    // the admin's column is the ADMIN's (and the owner's, no door caller) — never a coordinator's or an observer's
+    return level === 'authenticated' || role == null || role === 'admin';
   };
   const opsById = new Map();
   for (const [k, entry] of catalogue.opsById) if (allowed(k, entry)) opsById.set(k, entry);
@@ -74,7 +75,7 @@ export function scopeCatalogueToRole(catalogue, role) {
  * @returns {string[]}
  */
 export function roleHintsFor(role, t = null) {
-  if (role !== 'member') return [];
+  if (role == null || role === 'admin') return [];
   // With the door's translator the model is handed the refusal itself, so the words are the locale's, not its own.
   const say = typeof t === 'function'
     ? `call no tool and reply with exactly this sentence, nothing more: "${t('circle.bot.admin_only')}"`

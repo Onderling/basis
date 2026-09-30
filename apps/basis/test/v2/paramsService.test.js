@@ -53,9 +53,9 @@ describe('the set-param op — the kind gate (decision D)', () => {
     // recency window joined with the personal history store — all flipped through this same gate).
     // `assistant.apps`: which apps a non-circle door's assistant (the box's Telegram chat) may act in;
     // `assistant.memoryDefault`: how much of a person's thread the household bot keeps, until they choose;
-    // `assistant.assignPolicy` / `assistant.assignRoles`: who may give a chore to whom on a household bot.
+    // `assistant.assignPolicy`: whether a household bot's roles decide who may give a chore to someone else.
     expect(params.map((p) => p.key).sort()).toEqual([
-      'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.assignRoles', 'assistant.memoryDefault', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
+      'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.memoryDefault', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
       'history.restore.maxPerCircle', 'history.restore.recencyDays',
       'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
       'privacy.shareNknAddress', 'relay.url', 'surface.pref',

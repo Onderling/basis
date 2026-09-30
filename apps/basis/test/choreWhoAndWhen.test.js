@@ -75,13 +75,23 @@ describe('a chore that says who and when', () => {
     await own('params', 'set-param', { key: 'assistant.assignPolicy', value: 'anyone' });
     const byMember = await as(FRITS)('lists', 'addToList', { list: 'Klusjes', text: 'ramen lappen', assignee: 'Bert' });
     expect(byMember.ok, JSON.stringify(byMember)).toBe(true);
-    await own('params', 'set-param', { key: 'assistant.assignPolicy', value: 'self' });
+    await own('params', 'set-param', { key: 'assistant.assignPolicy', value: 'roles' });
 
-    // a name the bot does not know: said, with who IS known
+    // a coordinator (the same role word as a circle's roster) may give chores to others — the tasks app's rule
+    await own('stoop', 'addContact', { webid: BERT, channel: 'telegram', role: 'coordinator', displayName: 'Bert' });
+    const byCoordinator = await as(BERT)('lists', 'addToList', { list: 'Klusjes', text: 'bladeren harken', assignee: 'Frits' });
+    expect(byCoordinator.ok, JSON.stringify(byCoordinator)).toBe(true);
+    // …unless the household's setting says nobody gives chores to others
+    await own('params', 'set-param', { key: 'assistant.assignPolicy', value: 'self' });
+    const tightened = await as(BERT)('lists', 'addToList', { list: 'Klusjes', text: 'gras maaien', assignee: 'Frits' });
+    expect(String(tightened.error)).toContain('circle.tasks.assign_refused');
+    await own('params', 'set-param', { key: 'assistant.assignPolicy', value: 'roles' });
+
+    // a name the bot does not know: said — and who IS known is not (whether names are shared is the household's choice)
     const who = await as(ADMIN)('lists', 'addToList', { list: 'Klusjes', text: 'stofzuigen', assignee: 'Karel' });
     expect(who.ok).toBe(false);
     expect(String(who.error)).toContain('circle.tasks.no_such_person');
-    expect(String(who.error)).toContain('Bert');
+    expect(String(who.error)).not.toContain('Bert');
   }, 180_000);
 
   it('the gate\'s typed rule takes "nieuwe taak: X" only; a person or a day goes to the model', () => {
@@ -105,12 +115,16 @@ describe('a chore that says who and when', () => {
     };
     const call = withAssistantOps({ callSkill: inner, threads: null, t, admin: {} });
     const shown = await call('assistant', 'assistant-settings', {});
-    expect(shown.message).toContain('"assign":"self"');
-    const set = await call('assistant', 'assistant-settings', { change: 'assign role' });
-    expect(set.message).toContain('"assign":"role"');
-    await call('assistant', 'assistant-settings', { change: 'roles admin,member' });
-    expect(stored.get('assistant.assignRoles')).toEqual(['admin', 'member']);
+    expect(shown.message).toContain('"assign":"roles"');
+    const set = await call('assistant', 'assistant-settings', { change: 'assign anyone' });
+    expect(set.message).toContain('"assign":"anyone"');
     expect((await call('assistant', 'assistant-settings', { change: 'assign everybody' })).ok).toBe(false);
+    // /role <naam> coordinator|member|observer — the admin gives a role; never admin, never an unknown word
+    const given = [];
+    const withRole = withAssistantOps({ callSkill: inner, threads: null, t, admin: { setRole: async (who, role) => { given.push([who, role]); return { displayName: who, role }; } } });
+    expect((await withRole('assistant', 'assistant-role', { spec: 'Bert coordinator' })).message).toContain('circle.bot.role_set');
+    expect(given).toEqual([['Bert', 'coordinator']]);
+    expect((await withRole('assistant', 'assistant-role', { spec: 'Bert admin' })).ok).toBe(false);
   });
 });
 

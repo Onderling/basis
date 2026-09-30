@@ -67,6 +67,18 @@ export function createBotUsers({ store, adminUid = null } = {}) {
      * Drop a person: they are no longer admitted and need a new code. Named by display name or contact id.
      * @returns {Promise<object|null>} the row that was revoked, or null when nobody matched
      */
+    /**
+     * Give an admitted person a role (below admin: coordinator · member · observer). Named by display name or id.
+     * @returns {Promise<object|null>} the row as it is now, or null when nobody matched
+     */
+    async setRole(nameOrId, role) {
+      const want = String(nameOrId ?? '').trim();
+      if (!want || !['coordinator', 'member', 'observer'].includes(role)) return null;
+      const rows = (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden);
+      const row = rows.find((r) => r.id === want) ?? rows.find((r) => (r.displayName ?? '').toLowerCase() === want.toLowerCase());
+      if (!row || row.role === ROLES.ADMIN) return null;
+      return store.put({ ...row, role });
+    },
     async revoke(nameOrId) {
       const want = String(nameOrId ?? '').trim();
       if (!want) return null;

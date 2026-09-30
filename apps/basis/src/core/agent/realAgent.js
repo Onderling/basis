@@ -63,7 +63,9 @@ import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the govern
  *  every other envelope stay bucketed, and each exempted reply still faces its rail's full
  *  verify-on-ingest gate. */
 // The tiers a door may give the people it admits, by role. Never `private`: that is the owner's own, self only.
-const DOOR_TIER_FOR_ROLE = Object.freeze({ member: 'authenticated', admin: 'trusted' });
+// A door's person reaches the member's ops at every role below admin (what a coordinator or an observer may do with
+// a chore is the tasks app's role rule, read at the op); the admin reaches the admin's.
+const DOOR_TIER_FOR_ROLE = Object.freeze({ coordinator: 'authenticated', member: 'authenticated', observer: 'authenticated', admin: 'trusted' });
 
 const CATCHUP_REPLY_SUBTYPES = new Set([
   GOV_CATCHUP_BATCH,
@@ -242,7 +244,8 @@ import { listsManifest }                   from '../../../../lists/manifest.js';
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
-import { assignAllowed, isSelfWord, ASSIGN_POLICY_KEY, ASSIGN_ROLES_KEY } from '../../v2/botSettings.js';   // who may give a chore to whom                           // an entry by its id or a person's words
+import { assignAllowed, isSelfWord, ASSIGN_POLICY_KEY } from '../../v2/botSettings.js';   // who may give a chore to whom
+import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3968,17 +3971,18 @@ export async function createRealHouseholdAgent(opts = {}) {
       else {
         const name = assignee.trim().toLowerCase();
         const hit = known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
-        if (hit.length !== 1) {
-          const names = known.map((c) => c.displayName).filter(Boolean).join(', ');
-          return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim(), known: names }) };
-        }
+        // Who the bot knows is not said here: whether names are shared, and with whom, is a household's choice still to
+        // be made — until then the bot says only that it does not know this one.
+        if (hit.length !== 1) return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim() }) };
         who = hit[0].webid;
       }
-      const callerRole = caller ? (known.find((c) => c.webid === caller)?.role ?? null) : null;
+      // The role decides first — the tasks app's own rule (coordinator-or-above may reassign), over the bot's people and
+      // the roles they hold; the household's setting loosens or tightens it.
+      const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
       const allowed = assignAllowed({
         policy: paramsService.register.valueOf(ASSIGN_POLICY_KEY),
-        roles: paramsService.register.valueOf(ASSIGN_ROLES_KEY),
-        callerId: caller, callerRole, assigneeId: who,
+        roleMayAssign: caller ? buildStandardRolePolicy(roles).canReassign(caller) : true,
+        callerId: caller, assigneeId: who,
       });
       if (!allowed) return { ok: false, error: tr('circle.tasks.assign_refused') };
     }

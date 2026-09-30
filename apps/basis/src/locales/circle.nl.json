@@ -4077,6 +4077,42 @@
       "text": "Het weekoverzicht staat uit.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "switch_usage": {
+      "text": "Gebruik: {{command}} aan of {{command}} uit.",
+      "doc": "Reply when a person's switch (reminders, weekly overview) gets a word it does not know."
+    },
+    "welcome_lists": {
+      "text": "Lijsten: {{lists}}. Zeg bijvoorbeeld \"melk op de boodschappen\" of \"wat staat er op de boodschappen\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_chores": {
+      "text": "{{list}}: \"nieuwe taak voor mij: ramen lappen, morgen\", \"ik doe de ramen\", \"de ramen zijn klaar\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_agenda": {
+      "text": "{{list}}: \"tandarts morgen om 10 uur\" zet een afspraak; \"wat staat er in de agenda\" laat ze zien.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_week": {
+      "text": "\"Wat staat er deze week?\" of /week: jouw klusjes en de afspraken van de komende zeven dagen.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reader": {
+      "text": "Je leest mee: vraag wat er op een lijst of in de agenda staat.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_on": {
+      "text": "Ik stuur je een herinnering: de avond voor een afspraak (19:00) en de ochtend dat je klusje moet (08:00), nooit tussen {{from}} en {{to}}. Uitzetten: /herinneringen uit. Elke zondag om 18:00 een weekoverzicht: /overzicht aan.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_off": {
+      "text": "Herinneringen staan voor dit huishouden uit. Elke zondag om 18:00 een weekoverzicht: /overzicht aan.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_admin": {
+      "text": "Je bent de beheerder: /instellingen verandert de instellingen voor het hele huishouden (wie klusjes toewijst, namen, herinneringen, stille uren).",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
     "reminder_done": {
       "text": "Klaar",
       "doc": "The button under a chore's reminder: it is done."

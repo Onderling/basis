@@ -25,6 +25,10 @@ import { assistantManifest } from './assistantManifest.js';
  *          revoke?: (who: string) => Promise<object|null>,
  *          inviteLink?: (code: string) => string|null}} [a.admin]  what the admin's ops read and change
  */
+/** A switch in the door's words: "uit" is off (never "not off, so on"); a word it does not know is null. */
+const SWITCH_WORDS = Object.freeze({ on: 'on', aan: 'on', ja: 'on', yes: 'on', off: 'off', uit: 'off', nee: 'off', no: 'off' });
+const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()] ?? null;
+
 export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {} }) {
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
   return async (app, op, args = {}, ctx = {}) => {
@@ -53,13 +57,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         return { ok: true, message: t(`circle.bot.memory_${args.mode}`) };
       }
       if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx) };
-      if (op === 'assistant-reminders') {
-        threads.setReminders(threadId, args?.mode !== 'off');
-        return { ok: true, message: t(args?.mode === 'off' ? 'circle.bot.reminders_off' : 'circle.bot.reminders_on') };
-      }
-      if (op === 'assistant-overview') {
-        threads.setOverview(threadId, args?.mode === 'on');
-        return { ok: true, message: t(args?.mode === 'on' ? 'circle.bot.overview_on' : 'circle.bot.overview_off') };
+      if (op === 'assistant-reminders' || op === 'assistant-overview') {
+        const mode = switchOf(args?.mode);
+        if (!mode) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
+        const which = op === 'assistant-reminders' ? 'reminders' : 'overview';
+        if (which === 'reminders') threads.setReminders(threadId, mode === 'on'); else threads.setOverview(threadId, mode === 'on');
+        return { ok: true, message: t(`circle.bot.${which}_${mode}`) };
       }
       if (op === 'assistant-language') {
         threads.setLang(threadId, args?.lang);

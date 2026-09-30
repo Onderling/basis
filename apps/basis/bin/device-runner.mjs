@@ -60,6 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
+import { welcomeLines } from '../src/v2/botWelcome.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom } from '../src/v2/botSettings.js';
 import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
@@ -708,6 +709,8 @@ if (tgToken || inboxDoor.bridge) {
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
   const tgBridge = tgToken ? new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }) : null;
+  // the household's reminder settings as the admin set them (the welcome says them; the tick obeys them)
+  const reminderSettings = () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)) });
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Every person is a contact with a role, and their calls carry them to the host gate.
   const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
@@ -779,6 +782,8 @@ if (tgToken || inboxDoor.bridge) {
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds({ t }),
       gateRules: listsGateRules(values.lang, templateLists(t)),
+      // the first message says what this bot does for this person, and how the reminders stand and change
+      welcomeFor: ({ role, ops }) => welcomeLines({ ops, role, lists: templateLists(t), t, settings: reminderSettings() }),
     } : {}),
   });
   await tgRunner.start();
@@ -789,7 +794,7 @@ if (tgToken || inboxDoor.bridge) {
     const reminderTick = createReminderTick({
       sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
       tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
-      settings: () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)) }),
+      settings: reminderSettings,
       // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
       onSent: (e) => walkLog({ kind: 'reminder', to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}) }),
       // the Sunday overview is the weekOverview op asked AS the person — the gate, the role and the names apply

@@ -49,11 +49,12 @@ const CONFIRM_NO  = '__confirm:no';
  * @param {object} [a.engine]                        (tests) a pre-built assistant engine
  * @param {number} [a.collectMs]                     the engine's collect window (default `assistant.collectMs`)
  * @param {string} [a.botName]
+ * @param {(a: {threadId: string, role: string|null, ops: Set<string>}) => Promise<string[]>|string[]} [a.welcomeFor]  the lines a new person's welcome adds: what this door does for them
  * @param {(entry: object) => void} [a.walkLog]  a sink for one record per turn — what came in, which path
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -322,7 +323,15 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     if (!threads || !threadId || threads.greeted(threadId)) return;
     const disclosure = doorDisclosure(turnLogMode, t);
     const welcome = slashless.has(String(chatId)) ? t('circle.bot.welcome_talk') : t('circle.bot.welcome');
-    await say(chatId, [welcome, ...(disclosure ? [disclosure] : [])].join('\n'));
+    // what this bot does for THIS person (their role's tools, the household's settings), when the door derives it
+    let derived = [];
+    if (typeof welcomeFor === 'function') {
+      const role = typeof roleFor === 'function' ? roleFor(threadId) : null;
+      const scoped = typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), role) : catalogueOf();
+      const ops = new Set([...(scoped?.opsById ?? [])].map(([key, entry]) => entry?.op?.id ?? key));
+      try { derived = (await welcomeFor({ threadId, role, ops })) ?? []; } catch { derived = []; }
+    }
+    await say(chatId, [welcome, ...derived, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);
   }
 

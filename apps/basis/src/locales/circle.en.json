@@ -4077,6 +4077,42 @@
       "text": "The weekly overview is off.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "switch_usage": {
+      "text": "Use: {{command}} on or {{command}} off.",
+      "doc": "Reply when a person's switch (reminders, weekly overview) gets a word it does not know."
+    },
+    "welcome_lists": {
+      "text": "Lists: {{lists}}. Say for example \"milk on the shopping list\" or \"what's on the shopping list\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_chores": {
+      "text": "{{list}}: \"new chore for me: clean the windows, tomorrow\", \"I'll do the windows\", \"the windows are done\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_agenda": {
+      "text": "{{list}}: \"dentist tomorrow at 10\" adds an appointment; \"what's in the agenda\" shows them.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_week": {
+      "text": "\"What's on this week?\" or /week: your chores and the appointments of the coming seven days.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reader": {
+      "text": "You read along: ask what is on a list or in the agenda.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_on": {
+      "text": "I send you a reminder: the evening before an appointment (19:00) and the morning your chore is due (08:00), never between {{from}} and {{to}}. To stop them: /herinneringen off. A weekly overview every Sunday at 18:00: /overzicht on.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_off": {
+      "text": "Reminders are off for this household. A weekly overview every Sunday at 18:00: /overzicht on.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_admin": {
+      "text": "You are the admin: /instellingen changes the settings for the whole household (who assigns chores, names, reminders, quiet hours).",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
     "reminder_done": {
       "text": "Done",
       "doc": "The button under a chore's reminder: it is done."

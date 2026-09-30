@@ -19,6 +19,19 @@
 export function createTokenGate({ rules = [], retrieve, maxContext = 5 } = {}) {
   const ruleList = Array.isArray(rules) ? rules : [];
   return {
+    /** Does a rule take this line (a command, or a skip) — sync, no retrieval: what the lane asks before it waits. */
+    takes(text, ctx = {}) {
+      const trimmed = String(text ?? '').trim();
+      if (!trimmed) return false;
+      for (const rule of ruleList) {
+        try {
+          if (!ruleMatches(rule, trimmed, ctx)) continue;
+          if (typeof rule.command !== 'function') return true;           // a skip rule: the line is not the model's
+          if (rule.command(trimmed, ctx)?.opId) return true;             // a command rule that builds one
+        } catch { /* a rule that throws takes nothing */ }
+      }
+      return false;
+    },
     /** @returns {Promise<{via:'skip'|'rule'|'llm', command?, context?, reason?, rule?}>} */
     async evaluate(text, ctx = {}) {
       const trimmed = String(text ?? '').trim();

@@ -181,7 +181,10 @@ export function createAssistantEngine({
     prepare: (entry) => {
       const own = typeof claim === 'function' ? claim(entry.text, entry.ctx) : null;
       if (typeof own === 'function') return { own };
-      return { collect: entry.collect && !entry.line.startsWith('/') };
+      // a line a gate rule takes needs no model and waits for no window (the lane runs it at once, after any lines
+      // already waiting)
+      const ruled = typeof gate?.takes === 'function' && gate.takes(entry.line, entry.ctx);
+      return { collect: entry.collect && !entry.line.startsWith('/') && !ruled };
     },
     runTurn: ({ entries }) => {
       const [first] = entries;

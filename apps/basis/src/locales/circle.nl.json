@@ -4018,11 +4018,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}}.",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <aantal> · /instellingen cancel own|admin",
+      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <aantal> · /instellingen cancel own|admin · /instellingen reminders on|off · /instellingen quiet 21:00-08:00",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
@@ -4036,6 +4036,46 @@
     "role_set": {
       "text": "{{name}} is nu {{role}}.",
       "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "reminder_event": {
+      "text": "Morgen: {{title}}, {{time}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_chore": {
+      "text": "Vandaag: {{text}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_first": {
+      "text": "Je krijgt dit omdat er een datum bij staat. Uitzetten: /herinneringen uit",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_head": {
+      "text": "Deze week",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_none": {
+      "text": "Niets open deze week.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "unreachable": {
+      "text": "{{count}} mensen zijn niet bereikbaar voor herinneringen (geen privéchat).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_on": {
+      "text": "Herinneringen staan aan.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_off": {
+      "text": "Herinneringen staan uit.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_on": {
+      "text": "Het weekoverzicht staat aan (zondag 18:00).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_off": {
+      "text": "Het weekoverzicht staat uit.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     }
   },
   "op": {

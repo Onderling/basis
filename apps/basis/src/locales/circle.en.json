@@ -4018,11 +4018,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin).",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}}.",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <number> · /instellingen cancel own|admin",
+      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <number> · /instellingen cancel own|admin · /instellingen reminders on|off · /instellingen quiet 21:00-08:00",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
@@ -4036,6 +4036,46 @@
     "role_set": {
       "text": "{{name}} is now {{role}}.",
       "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "reminder_event": {
+      "text": "Tomorrow: {{title}}, {{time}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_chore": {
+      "text": "Today: {{text}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_first": {
+      "text": "You get this because it has a date. To stop: /herinneringen uit",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_head": {
+      "text": "This week",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_none": {
+      "text": "Nothing open this week.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "unreachable": {
+      "text": "{{count}} people cannot be reached for reminders (no private chat).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_on": {
+      "text": "Reminders are on.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_off": {
+      "text": "Reminders are off.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_on": {
+      "text": "The weekly overview is on (Sunday 18:00).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_off": {
+      "text": "The weekly overview is off.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     }
   },
   "op": {

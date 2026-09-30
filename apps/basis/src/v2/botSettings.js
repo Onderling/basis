@@ -87,3 +87,17 @@ export const CANCEL_KEY = 'assistant.cancelPolicy';
 export const CANCEL_POLICY = param({ key: CANCEL_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'own' });
 export const cancelPolicyFrom = (v) => (CANCEL_POLICIES.includes(v) ? v : CANCEL_POLICY);
 
+/**
+ * Reminders for the household (the admin's switch; each person also switches their own): only things someone put a
+ * date on — an appointment the evening before, a chore the morning it is due. And the hours nothing is sent.
+ */
+export const REMINDERS_KEY = 'assistant.reminders';
+export const REMINDERS_MODES = Object.freeze(['on', 'off']);
+export const REMINDERS_DEFAULT = param({ key: REMINDERS_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'on' });
+export const remindersModeFrom = (v) => (REMINDERS_MODES.includes(v) ? v : REMINDERS_DEFAULT);
+export const QUIET_KEY = 'assistant.quietHours';
+export const QUIET_DEFAULT = param({ key: QUIET_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '21:00-08:00' });
+const QUIET_SHAPE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
+export const isQuietHours = (v) => QUIET_SHAPE.test(String(v ?? ''));
+export const quietHoursFrom = (v) => (isQuietHours(v) ? v : QUIET_DEFAULT);
+

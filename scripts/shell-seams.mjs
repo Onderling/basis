@@ -34,6 +34,9 @@ export const SEAMS = Object.freeze([
   // (list and calendar defaults, task confirmations, a paused circle) come out as keys or English. The box passed it;
   // web and mobile did not (found 2026-09-29).
   { id: 'agent-translator', pattern: /createRealHouseholdAgent\(\{(?:(?!\n\s*\}\);)[\s\S])*?\n\s+t(?::\s*[\w.]+)?,/, why: 'the agent\'s own lines follow the person\'s language' },
+  // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
+  // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).
+  { id: 'circle-peek', pattern: /createPeek\(/, shells: ['web', 'mobile'], why: 'a circle bot acts on "haal de melk eraf" instead of showing the list' },
   { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
   // A household bot WRITES FIRST (reminders of what people dated): only a shell that hosts a bot runs the tick. Web and
   // mobile are a person's devices and write first to nobody.
@@ -105,7 +108,9 @@ export const SHELLS = Object.freeze([
 ]);
 
 /** Gaps a shell is known to have, each with what closes it. Remove the entry when the seam lands. */
-export const BASELINE = Object.freeze([]);
+export const BASELINE = Object.freeze([
+  { seam: 'circle-peek', shell: 'mobile', closes: 'plans/briefs/BRIEF-assistant-language-pipeline-2026-09-28.md (ledger L159: the mobile commit after the web one)' },
+]);
 
 /** Source with comments removed — a comment that EXPLAINS a seam is not the seam. */
 export const code = (src) => String(src).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

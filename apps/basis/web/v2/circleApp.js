@@ -25,6 +25,7 @@ import '../../src/web/shims/bufferPolyfill.js';
 import { configureLog, consoleSink } from '@onderling/logger';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
+import { createPeek } from '../../src/v2/circlePeek.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
   scopeStoopCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
@@ -2751,6 +2752,13 @@ function buildCircleBot(agent) {
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { _circleRender?.botBubble(t('circle.bot.basic_mode')); },
     botName: CIRCLE_BOT_NAME,
+    // Read-then-act: a read the model picks is looked at (gated as every dispatch here, painted nowhere) and handed
+    // back to it once, so "haal de melk eraf" acts instead of showing the list.
+    peek: createPeek({
+      catalogue: () => catalogue,
+      deny: (ready) => circleCapabilityDeny(ready.appOrigin, ready.opId, ready.args),
+      run: (ready) => runDispatch(scopeReadyDispatch(ready, getActiveCircle()), rawCallSkill),
+    }),
     // No collect window here: in a circle composer a person types one line on purpose, and a wait on every bot reply
     // would read as a slow app. The lane still takes the circle's lines one turn at a time.
     collectMs: 0,

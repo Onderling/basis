@@ -92,6 +92,7 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
+    "@onderling/notifier": "workspace:*",
     "@onderling/pseudo-pod": "workspace:*",
     "@onderling/versioning": "workspace:*",
     "@onderling/relay": "workspace:*",

@@ -104,4 +104,13 @@ describe('MemberMap — skill status enum (V2.5 migration)', () => {
     const found = await m.resolveByWebid(BOB);
     expect(found.offerings[0].categoryId).toBe('vervoer');
   });
+
+  it('keeps a contact\'s profileKind when it is a bot (function), and nothing else under that name', async () => {
+    const m = new MemberMap();
+    await m.addMember({ webid: 'bot:vacuum', role: 'member', profileKind: 'function' });
+    await m.addMember({ webid: 'telegram:1', role: 'member', profileKind: 'person' });
+    expect((await m.resolveByWebid('bot:vacuum'))?.profileKind).toBe('function');
+    expect((await m.resolveByWebid('telegram:1'))?.profileKind).toBeUndefined();
+  });
 });
+

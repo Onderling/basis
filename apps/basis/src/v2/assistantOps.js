@@ -2,7 +2,7 @@
  * assistantOps — the door's own ops (`assistantManifest`), answered by the door: a person's thread settings, and the
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
-import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, assignPolicyFrom } from './botSettings.js';
+import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, assignPolicyFrom, namesPolicyFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 
 /**
@@ -81,14 +81,16 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)) });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)) });
     };
     const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
-    if (what !== 'assign' || !ASSIGN_POLICIES.includes(value)) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.settings_usage') } };
-    await callSkill('params', 'set-param', { key: ASSIGN_POLICY_KEY, value });
+    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES] }[what];
+    if (!setting || !setting[1].includes(value)) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.settings_usage') } };
+    await callSkill('params', 'set-param', { key: setting[0], value });
     return { ok: true, message: await current() };
   }
+
 
   /** `/role <naam> coordinator|member|observer`: a person's role on the bot — the same words a circle's roster uses. */
   async function roleOp(spec) {
@@ -145,6 +147,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function usersText() {
     const rows = typeof admin.users === 'function' ? await admin.users() : [];
     if (!rows.length) return t('circle.bot.users_none');
-    return rows.map((u) => `${u.displayName ?? u.id} — ${u.role ?? '?'}`).join('\n');
+    // Under `assistant.names: none` no name leaves the bot — not even to the admin's door: the rows by their id.
+    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+    const hideNames = namesPolicyFrom((r?.params ?? []).find((p) => p.key === NAMES_KEY)?.value) === 'none';
+    return rows.map((u) => `${hideNames ? u.id : (u.displayName ?? u.id)} — ${u.role ?? '?'}`).join('\n');
   }
 }

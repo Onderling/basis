@@ -28,9 +28,9 @@ describe('the bot\'s slim map', () => {
   it('a member\'s thread offers exactly the member ops; an admin\'s adds the admin ops', () => {
     expect(tools('member')).toEqual([...MEMBER].sort());
     expect(tools('admin')).toEqual([...MEMBER, ...ADMIN_EXTRA].sort());
-    // a coordinator's or an observer's thread is a member's: the admin's column is the admin's alone
+    // a coordinator's thread is a member's (the admin's column is the admin's alone); an observer's is the reads
     expect(tools('coordinator')).toEqual([...MEMBER].sort());
-    expect(tools('observer')).toEqual([...MEMBER].sort());
+    expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].sort());
     expect(BOT_OP_MAP.member).toEqual(MEMBER);
   });
 

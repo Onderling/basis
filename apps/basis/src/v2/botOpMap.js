@@ -22,6 +22,8 @@ export const BOT_OP_MAP = Object.freeze({
     'assistant-memory', 'assistant-language',
   ]),
   admin: Object.freeze(['createList', 'reassignTask', 'removeTask', 'editTask', 'cancelEvent']),
+  // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
+  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language']),
 });
 
 const MEMBER = new Set(BOT_OP_MAP.member);
@@ -40,6 +42,19 @@ export function botOpLevel(opId) {
   return null;
 }
 
+const OBSERVER = new Set(BOT_OP_MAP.observer);
+
+/**
+ * Does this role reach this op, beyond its tier? Only an observer is narrowed (to the reads); the host gate asks it at
+ * the waist, so an observer is refused an add however it is asked for — not only never shown the tool.
+ * @param {string|null} role
+ * @param {string} opId
+ */
+export function botRoleAllows(role, opId) {
+  if (role !== 'observer') return true;
+  return OBSERVER.has(String(opId ?? '').replace(/^[a-z-]+\//, ''));
+}
+
 /** Is this catalogue entry on the map at all (any role)? */
 export const onBotMap = (opId) => botOpLevel(opId) !== null;
 
@@ -56,6 +71,7 @@ export function scopeCatalogueToRole(catalogue, role) {
     if (entry?.appOrigin === 'assistant') return true;
     const level = botOpLevel(id);
     if (!level) return false;
+    if (!botRoleAllows(role, id)) return false;
     // the admin's column is the ADMIN's (and the owner's, no door caller) — never a coordinator's or an observer's
     return level === 'authenticated' || role == null || role === 'admin';
   };

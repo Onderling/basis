@@ -116,6 +116,8 @@ describe('a chore that says who and when', () => {
     const call = withAssistantOps({ callSkill: inner, threads: null, t, admin: {} });
     const shown = await call('assistant', 'assistant-settings', {});
     expect(shown.message).toContain('"assign":"roles"');
+    expect(shown.message).toContain('"names":"members"');
+    expect((await call('assistant', 'assistant-settings', { change: 'names none' })).message).toContain('"names":"none"');
     const set = await call('assistant', 'assistant-settings', { change: 'assign anyone' });
     expect(set.message).toContain('"assign":"anyone"');
     expect((await call('assistant', 'assistant-settings', { change: 'assign everybody' })).ok).toBe(false);

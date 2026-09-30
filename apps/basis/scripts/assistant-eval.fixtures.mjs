@@ -80,4 +80,7 @@ export const FIXTURES = [
   // ── a chore that says who and when (Frits' session, 2026-09-30) ──
   { id: 'chore-for-me-day',   text: 'nieuwe taak voor mij: kleurenwiezen, maandag', expect: { op: 'addToList', args: { list: /klusjes/, text: /^kleurenwiezen$/, assignee: /^(mij|me|ik)$/, due: /^\d{4}-\d{2}-\d{2}/ } } },
   { id: 'chore-same-for-bert', text: 'voor Bert hetzelfde, dinsdag', before: ['you: nieuwe taak voor mij: kleurenwiezen, maandag', "system: 'kleurenwiezen' toegevoegd aan Klusjes."], expect: { anyOf: [{ reply: 'asks' }, { op: 'addToList', args: { text: /^kleurenwiezen$/, assignee: /bert/ } }] } },   // never "hetzelfde" as the chore
+  // ── a short answer answers the bot's own last question (rule 8, Frits' session) ──
+  { id: 'short-answer-ja',    text: 'ja', before: ['you: we hebben geen melk meer', 'assistant: Zal ik melk op de boodschappen zetten?'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /melk/ } } },
+  { id: 'short-answer-list',  text: 'boodschappen', before: ['you: zet kaas erop', 'assistant: Op welke lijst — boodschappen of klusjes?'], expect: { op: 'addToList', args: { list: /boodschappen/, text: /kaas/ } } },
 ];

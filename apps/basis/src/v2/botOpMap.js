@@ -19,11 +19,11 @@ export const BOT_OP_MAP = Object.freeze({
     'listLists', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
     'listMine', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
-    'assistant-memory', 'assistant-language',
+    'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview',
   ]),
   admin: Object.freeze(['createList', 'removeList', 'reassignTask', 'removeTask', 'editTask']),
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language']),
+  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview']),
 });
 
 const MEMBER = new Set(BOT_OP_MAP.member);
@@ -68,7 +68,8 @@ export function scopeCatalogueToRole(catalogue, role) {
   if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function') return catalogue;
   const allowed = (key, entry) => {
     const id = entry?.op?.id ?? key;
-    if (entry?.appOrigin === 'assistant') return true;
+    // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too
+    if (entry?.appOrigin === 'assistant') return role !== 'observer' || botRoleAllows(role, id);
     const level = botOpLevel(id);
     if (!level) return false;
     if (!botRoleAllows(role, id)) return false;

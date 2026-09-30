@@ -115,6 +115,26 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     /** Was this person, not admitted, already told they need a code (a door that says it once)? */
     refused: (id) => rows.get(id)?.refused === true,
     markRefused(id) { return save({ ...rowOf(id), refused: true }); },
+    /** Reminders for this person: on unless they switched them off (`/herinneringen uit`). */
+    remindersOn: (id) => rows.get(id)?.reminders !== 'off',
+    setReminders(id, on) { return save({ ...rowOf(id), reminders: on ? 'on' : 'off' }); },
+    /** The weekly overview: off until the person switches it on (`/overzicht aan`). */
+    overviewOn: (id) => rows.get(id)?.overview === 'on',
+    setOverview(id, on) { return save({ ...rowOf(id), overview: on ? 'on' : 'off' }); },
+    /** Why the bot cannot write first to this person (a Telegram refusal), or null — kept until they next write. */
+    unreachableOf: (id) => rows.get(id)?.unreachable ?? null,
+    markUnreachable(id, reason) { return save({ ...rowOf(id), unreachable: reason }); },
+    clearUnreachable(id) {
+      if (!rows.get(id)?.unreachable) return rows.get(id) ?? null;
+      const { unreachable: _u, ...rest } = rowOf(id);
+      return save(rest);
+    },
+    /** Has this person had a reminder before (the first one says how to stop)? */
+    remindedOnce: (id) => rows.get(id)?.reminded === true,
+    markReminded(id) { return save({ ...rowOf(id), reminded: true }); },
+    /** What was already said to this person: item id → the slot it was said for (the reminders' only state). */
+    saidOf: (id) => ({ ...(rows.get(id)?.said ?? {}) }),
+    setSaid(id, said) { return save({ ...rowOf(id), said: { ...said } }); },
     /** The ask this thread is waiting on (a form, a confirmation), or null. */
     pendingOf: (id) => rows.get(id)?.pending ?? null,
     setPending(id, pending) {

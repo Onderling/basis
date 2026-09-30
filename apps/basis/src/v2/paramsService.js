@@ -34,7 +34,7 @@ import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
-import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY } from './botSettings.js';
+import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, QUIET_KEY, QUIET_DEFAULT } from './botSettings.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -106,6 +106,9 @@ export const BASIS_USER_PARAMS = [
   { key: PASSED_DAYS_KEY,                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_KEEP_DAYS },
   // Who may cancel an appointment on a household bot (own · admin).
   { key: CANCEL_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: CANCEL_POLICY },
+  // Reminders on a household bot (on · off) and the hours nothing is sent ("21:00-08:00").
+  { key: REMINDERS_KEY,                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDERS_DEFAULT },
+  { key: QUIET_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: QUIET_DEFAULT },
 ];
 
 /**

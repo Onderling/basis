@@ -53,7 +53,7 @@ async function boot(state, kind) {
     return { fed, replies: sent.map((s) => s.text), to: sent.map((s) => s.peerAddr) };
   };
   const tg = async (uid, text) => { telegram.clearOutbox(); await telegram.simulateIncoming({ chatId: uid, text, sender: { bridgeUid: uid } }); await runner.idle(); return telegram.outbox.map((m) => m.text).join('\n'); };
-  return { write, tg, admission, users };
+  return { write, tg, admission, users, threads };
 }
 
 describe('the bot\'s inbox door', () => {
@@ -72,6 +72,10 @@ describe('the bot\'s inbox door', () => {
     const first = await d.write(ANN, 'hallo', { admission: code });
     // the inbox has no slash commands: its welcome says what to do, not "typ /help"
     expect(first.replies.join('\n')).toContain('circle.bot.welcome_talk');
+    // a person who writes can be written to again: a kept "cannot reach" is cleared
+    d.threads.markUnreachable(ANN, 'no-private-chat');
+    await d.write(ANN, 'nog iets');
+    expect(d.threads.unreachableOf(ANN)).toBeNull();
     // the reply goes to the PERSON (their id), whatever address the message came from
     expect(first.to).toEqual([ANN]);
     expect((await d.users.list()).some((u) => u.id === ANN && u.channel === 'web')).toBe(true);

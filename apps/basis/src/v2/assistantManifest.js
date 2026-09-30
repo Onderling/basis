@@ -22,7 +22,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write',
   },
   operations: [
@@ -36,7 +36,29 @@ export const assistantManifest = {
         slash: { command: '/geheugen', body: 'argline' },
         chat:  { reply: 'text', hint: 'How much of this conversation the assistant keeps: off (nothing), short (the last few turns), long.' },
       },
+    },    {
+      id:     'assistant-reminders',
+      verb:   'set-reminders',
+      // a person's own switch for the reminders the bot writes first (only things they dated); on the thread row
+      writes: { scope: 'device' },
+      params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: true }],
+      surfaces: {
+        slash: { command: '/herinneringen', body: 'argline' },
+        chat:  { reply: 'text', hint: 'Reminders on or off for this person (mode = on or off).' },
+      },
     },
+    {
+      id:     'assistant-overview',
+      verb:   'set-overview',
+      // a person's own switch for the weekly overview (off until they switch it on); on the thread row
+      writes: { scope: 'device' },
+      params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: true }],
+      surfaces: {
+        slash: { command: '/overzicht', body: 'argline' },
+        chat:  { reply: 'text', hint: 'The weekly overview on or off for this person (mode = on or off).' },
+      },
+    },
+
     {
       id:     'assistant-language',
       verb:   'set-language',

@@ -83,6 +83,14 @@
     "assistant-language": {
       "text": "De taal waarin de assistent deze persoon antwoordt; auto volgt de taal waarin iemand schrijft.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "assistant-reminders": {
+      "text": "Herinneringen aan of uit voor dit lid (mode = on of off). Voor 'stuur me geen herinneringen meer'.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "assistant-overview": {
+      "text": "Het wekelijkse overzicht aan of uit voor dit lid (mode = on of off).",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "tasks": {

@@ -390,6 +390,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         return;
       }
     }
+    // A person who writes can be written to again: a kept refusal (the bot could not start a chat with them) is cleared.
+    if (caller && threads && typeof threads.clearUnreachable === 'function') threads.clearUnreachable(caller);
     // The thread is the PERSON's when the door admits people (their contact id), so what one said is never another's
     // memory, in a group chat too; without admission, the chat's.
     await engine.ask(caller ?? threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });

@@ -31,6 +31,9 @@ export const SEAMS = Object.freeze([
   // profile's kind and composes the door; a shell that ran one without it would leave the bot deaf on its inbox.
   // Only the box runs a function profile today (web and mobile are a person's devices).
   { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
+  // A household bot WRITES FIRST (reminders of what people dated): only a shell that hosts a bot runs the tick. Web and
+  // mobile are a person's devices and write first to nobody.
+  { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
   // it on the governance change (live fan + catch-up), and serves its head at catch-up — the box above all, the

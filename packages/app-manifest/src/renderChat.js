@@ -140,8 +140,10 @@ export function renderChat(manifest, args, opts = {}) {
   // per-item buttons.  callbackData carries `<opId>:<itemId>` (the
   // triple-in-text-form: a tap → callback_query → IncomingMessage →
   // ChatAgent's existing dispatch path).
+  // The label KEY goes with the button, so the surface can put it in the person's words (`label` is the literal
+  // fallback — the key itself when the op declares only a key, which is what showed "circle.list.done" to people).
   const inlineKeyboardFor = (item) => itemRowButtons(manifest, item)
-    .map(({ label, callbackData }) => ({ label, callbackData }));
+    .map(({ label, labelKey, callbackData }) => ({ label, ...(labelKey ? { labelKey } : {}), callbackData }));
 
   // (e) reply-shape lookup (basis v0.1, 2026-05-21). The
   // chat shell calls `replyShapeFor(opId)` to pick a renderer (text,

@@ -34,6 +34,15 @@ describe('the bot\'s slim map', () => {
     expect(BOT_OP_MAP.member).toEqual(MEMBER);
   });
 
+  it('a member\'s command menu (their /help) holds no admin command; the admin\'s does', () => {
+    const menu = (role) => (scopeCatalogueToRole(catalogue, role).commandMenu ?? []).map((e) => e.opId);
+    for (const op of ['assistant-apps', 'assistant-cohort', 'assistant-revoke', 'assistant-role', 'assistant-settings']) {
+      expect(menu('member'), op).not.toContain(op);
+      expect(menu('admin'), op).toContain(op);
+    }
+    expect(menu('member')).toContain('assistant-reminders');
+  });
+
   it('each op has its level; an op off the map has none', () => {
     expect(botOpLevel('addToList')).toBe('authenticated');
     expect(botOpLevel('reassignTask')).toBe('trusted');

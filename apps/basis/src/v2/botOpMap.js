@@ -68,8 +68,12 @@ export function scopeCatalogueToRole(catalogue, role) {
   if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function') return catalogue;
   const allowed = (key, entry) => {
     const id = entry?.op?.id ?? key;
-    // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too
-    if (entry?.appOrigin === 'assistant') return role !== 'observer' || botRoleAllows(role, id);
+    // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too, and
+    // the admin's own (`trusted`) are not offered to anyone else — their /help does not list what they cannot do
+    if (entry?.appOrigin === 'assistant') {
+      if (role === 'observer') return botRoleAllows(role, id);
+      return entry?.op?.visibility !== 'trusted' || role == null || role === 'admin';
+    }
     const level = botOpLevel(id);
     if (!level) return false;
     if (!botRoleAllows(role, id)) return false;

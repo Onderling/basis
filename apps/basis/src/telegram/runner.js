@@ -146,9 +146,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
 
-  /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue. */
-  function helpText() {
-    const lines = (catalogueOf().commandMenu ?? []).map((e) => {
+  /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to
+   *  this person's role (a member is not shown the admin's commands). */
+  function helpText(chatId, threadId) {
+    const who = turns.get(chatId)?.caller ?? threadId;
+    const scoped = typeof roleFor === 'function' && typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), roleFor(who)) : catalogueOf();
+    const lines = (scoped?.commandMenu ?? []).map((e) => {
       const op = catalogueOf().opsById?.get?.(e.opId)?.op;
       const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
       return hint ? `${e.command} — ${hint}` : e.command;
@@ -202,13 +205,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   }
 
   async function route(chatId, threadId, text) {
-    if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText()); }
+    if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
     let parse = typeof text === 'string'
       ? (tapToParse(text, threadId) ?? parseInput(text, catalogueOf(), { threadId }))
       : opToParse(text, threadId);
     if (typeof text === 'string') note(chatId, { via: tapToParse(text, threadId) ? 'tap' : 'slash' });
     if (parse?.kind === 'slash') parse = splitTypedMatch(parse);
-    if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText()); }
+    if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
     const r = resolveDispatch(parse, catalogueOf());
     note(chatId, { route: r?.kind });
     switch (r?.kind) {

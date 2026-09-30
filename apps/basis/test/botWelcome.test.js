@@ -67,4 +67,23 @@ describe('the welcome, derived', () => {
     await runner.idle();
     expect(bridge.outbox.map((m) => m.text).join('\n')).not.toContain('derived for');
   });
+
+  it('/help lists the commands this person reaches — the menu as scoped to their role', async () => {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const catalogue = {
+      opsById: new Map([['a', { op: { id: 'a', description: 'for all' } }], ['b', { op: { id: 'b', description: 'admin only' } }]]),
+      commandMenu: [{ command: '/a', opId: 'a' }, { command: '/b', opId: 'b' }],
+    };
+    const runner = createTelegramRunner({
+      bridge, t, collectMs: 0, catalogue, callSkill: async () => ({ ok: true }),
+      roleFor: () => 'member',
+      scopeToRole: (c, role) => ({ ...c, commandMenu: c.commandMenu.filter((e) => role === 'admin' || e.opId !== 'b') }),
+    });
+    await runner.start();
+    await bridge.simulateIncoming({ chatId: '8', text: '/help', sender: { bridgeUid: '8' } });
+    await runner.idle();
+    const help = bridge.outbox.map((m) => m.text).join('\n');
+    expect(help).toContain('/a');
+    expect(help).not.toContain('/b');
+  });
 });

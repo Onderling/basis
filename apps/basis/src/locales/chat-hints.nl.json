@@ -91,6 +91,10 @@
     "assistant-overview": {
       "text": "Het wekelijkse overzicht aan of uit voor dit lid (mode = on of off).",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "weekOverview": {
+      "text": "Het overzicht van deze week voor dit lid: eigen klusjes, afspraken, open boodschappen. Voor 'wat staat er deze week', 'wat moet er nog gebeuren'.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "tasks": {

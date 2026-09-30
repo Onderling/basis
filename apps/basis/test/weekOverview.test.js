@@ -1,0 +1,72 @@
+/**
+ * The week overview: per person, what is theirs this week — their open chores (with a date), the appointments of the
+ * next seven days, how many entries are open on the shopping list, and how many chores nobody holds. It is an op called
+ * AS the person (the gate, the role and the names ceiling apply as to anything they type), asked for any time ("wat staat
+ * er deze week"), and sent on Sunday at 18:00 to those who switched it on.
+ */
+import { describe, it, expect, afterAll } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { VaultNodeFs } from '@onderling/vault';
+import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
+import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
+import { botOpLevel, botRoleAllows, BOT_OP_MAP } from '../src/v2/botOpMap.js';
+import { withAssistantOps } from '../src/v2/assistantOps.js';
+import { EventLog } from '../src/eventLog.js';
+import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
+
+const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
+const t = (k, vars) => NAMES[k] ?? (vars ? `${k} ${JSON.stringify(vars)}` : k);
+const local = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+describe('the week overview', () => {
+  let dir;
+  let agent;
+  afterAll(async () => {
+    await agent?.stop?.().catch(() => {});
+    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  it('my chores, the coming appointments, the shopping count, the unheld chores — asked as me', async () => {
+    expect(BOT_OP_MAP.member).toContain('weekOverview');
+    expect(BOT_OP_MAP.observer).toContain('weekOverview');
+    dir = await mkdtemp(path.join(tmpdir(), 'bot-overview-'));
+    const pass = randomBytes(32).toString('base64url');
+    await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });
+    agent = await createRealHouseholdAgent({
+      ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass),
+      chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
+      householdPersistDb: { path: path.join(dir, 'household-items.json') },
+      seedDemoData: false, seedHousehold: false,
+      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, t,
+    });
+    const own = (a, o, x) => agent.callSkill(a, o, x);
+    await ensureHouseholdLists({ callSkill: own, t });
+    for (const [webid, role, displayName] of [['telegram:1', 'member', 'Frits'], ['telegram:2', 'member', 'Bert']]) {
+      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName });
+      await agent.setDoorCaller(webid, role);
+    }
+    const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });
+    const tomorrow = local(new Date(Date.now() + 86_400_000));
+    await as('telegram:1')('lists', 'addToList', { list: 'Klusjes', text: 'kleurenwiezen', assignee: 'mij', due: tomorrow });
+    await as('telegram:2')('lists', 'addToList', { list: 'Klusjes', text: 'bladeren', assignee: 'mij' });
+    await own('lists', 'addToList', { list: 'Klusjes', text: 'ramen lappen' });                 // nobody holds it
+    await own('lists', 'addToList', { list: 'Boodschappen', text: 'melk' });
+    await own('lists', 'addToList', { list: 'Boodschappen', text: 'kaas' });
+    await as('telegram:1')('calendar', 'addEvent', { title: 'tandarts', when: `${tomorrow}T10:00` });
+
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    await threads.load();
+    const door = withAssistantOps({ callSkill: (a, o, x, c) => agent.callSkill(a, o, x, c), threads, t, refusal: agent.doorRefusal, admin: {} });
+    const r = await door('assistant', 'weekOverview', {}, { caller: 'telegram:1', threadId: 'telegram:1' });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(r.message).toContain('circle.bot.overview_head');
+    expect(r.message).toContain('kleurenwiezen');
+    expect(r.message).not.toContain('bladeren');                 // Bert's, not mine
+    expect(r.message).toContain('tandarts');
+    expect(r.message).toContain('"n":2');                        // two open on the shopping list
+    expect(r.message).toMatch(/overview_unheld[^\n]*"n":1/);     // one chore nobody holds
+  }, 180_000);
+});

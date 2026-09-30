@@ -733,6 +733,25 @@ if (tgToken || inboxDoor.bridge) {
     memoryDefault: () => agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY),
   });
   await threads.load();
+  // The door's call: the assistant's own ops answered here (each after the host gate), the rest on to the agent — the
+  // same call a typed line and a scheduled overview take.
+  const doorCall = withAssistantOps({
+    callSkill, threads, t, refusal: agent.doorRefusal,
+    admin: {
+      catalogue: doorCatalogue,
+      users: () => botUsers.list(),
+      admission,
+      revoke: (who) => botUsers.revoke(who),
+      setRole: (who, role) => botUsers.setRole(who, role),
+      // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
+      inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
+      status: async () => ({
+        model: llm ? llmModel : null, door: 'codes', turns: turnLogMode ?? 'off',
+        memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
+        unreachable: (await botUsers.list()).filter((u) => threads.unreachableOf(u.id)).length,
+      }),
+    },
+  });
   tgRunner = createTelegramRunner({
     bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
     catalogue: doorCatalogue.catalogue,
@@ -740,23 +759,7 @@ if (tgToken || inboxDoor.bridge) {
     // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are
     // answered here, each after the host gate said yes at the op's level; the rest go on to the agent.
     t, lang: values.lang,
-    callSkill: withAssistantOps({
-      callSkill, threads, t, refusal: agent.doorRefusal,
-      admin: {
-        catalogue: doorCatalogue,
-        users: () => botUsers.list(),
-        admission,
-        revoke: (who) => botUsers.revoke(who),
-        setRole: (who, role) => botUsers.setRole(who, role),
-        // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
-        inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
-        status: async () => ({
-          model: llm ? llmModel : null, door: 'codes', turns: turnLogMode ?? 'off',
-          memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
-          unreachable: (await botUsers.list()).filter((u) => threads.unreachableOf(u.id)).length,
-        }),
-      },
-    }),
+    callSkill: doorCall,
     admit: doorAdmit,
     threads,
     // What the model may draw on: a household bot's list entries, a person's household items.
@@ -789,6 +792,8 @@ if (tgToken || inboxDoor.bridge) {
       settings: () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)) }),
       // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
       onSent: (e) => walkLog({ kind: 'reminder', to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}) }),
+      // the Sunday overview is the weekOverview op asked AS the person — the gate, the role and the names apply
+      overviewFor: async (id) => (await doorCall('assistant', 'weekOverview', {}, { caller: id, threadId: id }))?.message ?? null,
     });
     reminderTick.start();
     walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });

@@ -52,6 +52,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         threads.setMode(threadId, args?.mode);
         return { ok: true, message: t(`circle.bot.memory_${args.mode}`) };
       }
+      if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx) };
       if (op === 'assistant-reminders') {
         threads.setReminders(threadId, args?.mode !== 'off');
         return { ok: true, message: t(args?.mode === 'off' ? 'circle.bot.reminders_off' : 'circle.bot.reminders_on') };
@@ -125,6 +126,32 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: t('circle.bot.role_set', { name: row.displayName ?? name, role }) };
   }
 
+
+  /**
+   * A person's week, asked AS them: their open chores (with a date) and the coming appointments go through the gate as
+   * that person; the two counts (open on the shopping list, chores nobody holds) are the household's, and name nobody.
+   */
+  async function weekOverviewText(ctx) {
+    const asThem = (a, o, x) => callSkill(a, o, x, ctx);
+    const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
+    const mine = itemsOf(await asThem('tasks', 'listMine', {}).catch(() => null));
+    const events = itemsOf(await asThem('calendar', 'listEvents', { days: 7 }).catch(() => null));
+    const shopping = itemsOf(await callSkill('lists', 'listEntries', { list: t('circle.lists.template.shopping') }).catch(() => null));
+    const open = itemsOf(await callSkill('tasks', 'listOpen', {}).catch(() => null));
+    const unheld = open.filter((it) => ![...(Array.isArray(it.assignees) ? it.assignees : []), it.assignee].some(Boolean)).length;
+    const lines = [];
+    if (mine.length) {
+      lines.push(t('circle.bot.overview_mine'));
+      for (const c of mine) lines.push(`• ${c.text ?? c.title ?? c.label ?? ''}${c.dueAt ? ` (${String(c.dueAt).slice(0, 10)})` : ''}`);
+    }
+    if (events.length) {
+      lines.push(t('circle.bot.overview_events'));
+      for (const e of events) lines.push(`• ${e.label ?? e.title ?? ''}`);
+    }
+    if (shopping.length) lines.push(t('circle.bot.overview_shopping', { n: shopping.length, list: t('circle.lists.template.shopping') }));
+    if (unheld) lines.push(t('circle.bot.overview_unheld', { n: unheld }));
+    return [t('circle.bot.overview_head'), ...(lines.length ? lines : [t('circle.bot.overview_none')])].join('\n');
+  }
 
   async function statusText() {
     const s = typeof admin.status === 'function' ? ((await admin.status()) ?? {}) : {};

@@ -9,7 +9,7 @@
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { wallClockInTz } from '@onderling/notifier';
-import { dueReminders } from './botReminders.js';
+import { dueReminders, inQuiet, QUIET_HOURS } from './botReminders.js';
 
 /** How often the box asks what is due. Reminders are for the evening and the morning; minutes are close enough. */
 export const REMINDER_TICK_MS = param({ key: 'assistant.reminderTickMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60_000 });
@@ -29,8 +29,9 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {number} [a.every]
  * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
  * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null}) => void} [a.onSent]  each send, for the walk log
+ * @param {(personId: string) => Promise<string|null>} [a.overviewFor]  a person's week overview, asked AS them (Sunday 18:00)
  */
-export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, timers = globalThis, onSent = null }) {
+export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, timers = globalThis, onSent = null, overviewFor = null }) {
   let handle = null;
   let running = null;
   const timeOf = (iso) => { const w = wallClockInTz(new Date(iso).getTime(), tz); return `${pad(w.hour)}:${pad(w.minute)}`; };
@@ -40,12 +41,13 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
 
   async function passOnce() {
     const s = typeof settings === 'function' ? (settings() ?? {}) : {};
-    if (s.reminders === 'off') return { sent: 0 };
-    const { chores = [], events = [] } = (await sources()) ?? {};
     const rows = (await users.list()) ?? [];
+    const at = now();
+    const sentOverviews = await sendOverviews(rows, at, s);
+    if (s.reminders === 'off') return { sent: sentOverviews };
+    const { chores = [], events = [] } = (await sources()) ?? {};
     const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id) }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
-    const at = now();
     const due = dueReminders({ chores, events, people, said, now: at, tz, ...(s.quiet ? { quiet: s.quiet } : {}) });
     let sent = 0;
     for (const { personId, items } of due) {
@@ -62,7 +64,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       if (first) threads.markReminded(personId);
     }
     // marks for what is done or past are dropped: only what can still be due keeps its mark
-    const open = new Set([
+    const open = new Set(['overview',
       ...chores.filter((c) => c && !c.completedAt).map((c) => c.id),
       ...events.filter((e) => e && e.state !== 'cancelled' && !e.completedAt && new Date(e.startsAt).getTime() > at).map((e) => e.id),
     ]);
@@ -72,6 +74,32 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       if (Object.keys(kept).length !== Object.keys(mine).length) threads.setSaid(r.id, kept);
     }
     return { sent };
+  }
+
+  /**
+   * Sunday from 18:00 (outside quiet hours): the week overview to each person who switched it on, once that week — the
+   * overview is the person's own ask, so it goes whether or not the household's reminders are on.
+   */
+  async function sendOverviews(rows, at, s) {
+    if (typeof overviewFor !== 'function') return 0;
+    const w = wallClockInTz(at, tz);
+    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(new Date(at));
+    if (weekday !== 'Sun' || w.hour < 18 || inQuiet(w, s.quiet || QUIET_HOURS)) return 0;
+    const week = `${w.year}-${pad(w.month)}-${pad(w.day)}:overview`;
+    let sent = 0;
+    for (const r of rows) {
+      if (!r?.id || r.hidden || !threads.overviewOn(r.id)) continue;
+      const mine = threads.saidOf(r.id);
+      if (mine.overview === week) continue;
+      const text = await overviewFor(r.id).catch(() => null);
+      if (!text) continue;
+      const res = await reach.sendToPerson(r.id, { text });
+      try { onSent?.({ personId: r.id, items: 0, ok: Boolean(res?.ok), reason: res?.reason ?? null }); } catch { /* never stops the tick */ }
+      if (!res?.ok) continue;
+      threads.setSaid(r.id, { ...mine, overview: week });
+      sent += 1;
+    }
+    return sent;
   }
 
   return {

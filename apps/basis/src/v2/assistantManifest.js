@@ -22,7 +22,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write',
   },
   operations: [
@@ -37,6 +37,17 @@ export const assistantManifest = {
         chat:  { reply: 'text', hint: 'How much of this conversation the assistant keeps: off (nothing), short (the last few turns), long.' },
       },
     },    {
+      id:     'weekOverview',
+      verb:   'week-overview',
+      // a person's week, asked as that person (the gate, the role and the names ceiling apply): their open chores, the
+      // coming appointments, how many open on the shopping list, how many chores nobody holds
+      params: [],
+      surfaces: {
+        slash: { command: '/week', body: 'none' },
+        chat:  { reply: 'text', hint: "This member's week: their own chores, the appointments, what is open on the shopping list." },
+      },
+    },
+    {
       id:     'assistant-reminders',
       verb:   'set-reminders',
       // a person's own switch for the reminders the bot writes first (only things they dated); on the thread row

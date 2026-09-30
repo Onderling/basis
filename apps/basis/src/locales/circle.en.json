@@ -3718,6 +3718,42 @@
       "text": "Remove the list \"{{list}}\" and everything on it?",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     },
+    "remove_list_confirm_counts": {
+      "text": "Remove the list \"{{list}}\", with {{what}}?",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_one": {
+      "text": "{{count}} entry",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_other": {
+      "text": "{{count}} entries",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries": {
+      "text": "{{count}} entries",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_one": {
+      "text": "{{count}} chore",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_other": {
+      "text": "{{count}} chores",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores": {
+      "text": "{{count}} chores",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_held": {
+      "text": "{{count}} taken by someone",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_kept": {
+      "text": "{{count}} stays on another list.",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
     "list_removed": {
       "text": "The list \"{{name}}\" is gone.",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
@@ -4077,9 +4113,65 @@
       "text": "The weekly overview is off.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "switch_usage": {
+      "text": "Use: {{command}} on or {{command}} off.",
+      "doc": "Reply when a person's switch (reminders, weekly overview) gets a word it does not know."
+    },
+    "welcome_lists": {
+      "text": "Lists: {{lists}}. Say for example \"milk on the shopping list\" or \"what's on the shopping list\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_chores": {
+      "text": "{{list}}: \"new chore for me: clean the windows, tomorrow\", \"I'll do the windows\", \"the windows are done\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_agenda": {
+      "text": "{{list}}: \"dentist tomorrow at 10\" adds an appointment; \"what's in the agenda\" shows them.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_week": {
+      "text": "\"What's on this week?\" or /week: your chores and the appointments of the coming seven days.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reader": {
+      "text": "You read along: ask what is on a list or in the agenda.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_on": {
+      "text": "When something has a date I remind you: the evening before an appointment (19:00) and on the morning of a chore (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_off": {
+      "text": "Reminders are off for this household.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_overview": {
+      "text": "Want a weekly overview, Sundays at 18:00? Switch it on with /overzicht aan.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_admin": {
+      "text": "You are the admin. With /instellingen you set, for the whole household, who may give chores, who sees names, the reminders and the quiet hours.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
     "reminder_done": {
       "text": "Done",
       "doc": "The button under a chore's reminder: it is done."
+    },
+    "overview_mine": {
+      "text": "Your chores:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_events": {
+      "text": "Appointments:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_shopping": {
+      "text": "{{n}} open on {{list}}.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_unheld": {
+      "text": "{{n}} chores nobody has taken yet.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
     }
   },
   "op": {

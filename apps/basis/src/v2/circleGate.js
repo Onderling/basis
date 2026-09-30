@@ -106,6 +106,9 @@ export function listsGateRules(_locale, lists = []) {
       return holdsEvents.has(list) ? { opId: 'listEvents', args: {}, appOrigin: 'calendar' } : { opId: 'listEntries', args: { list } };
     } },
     { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
+    // "wat staat er deze week" / "wat moet er nog gebeuren": the person's week overview — by rule, so the model does not
+    // summarise the week itself from what it happens to have in view
+    { name: 'assistant:weekOverview(read)', test: WEEK_READ, command: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
     // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
     // of the list whose entries are chores (it defaults to a task there).
     { name: 'lists:addToList(task-on-chores)', test: (text) => LISTS_ADD_TASK.test(text), command: (text) => {
@@ -116,6 +119,7 @@ export function listsGateRules(_locale, lists = []) {
   ];
 }
 
+const WEEK_READ = /^(?:wat\s+staat\s+er\s+(?:voor\s+)?deze\s+week|wat\s+moet\s+er\s+(?:nog|deze\s+week)?\s*gebeuren|what(?:'s|\s+is)\s+on\s+this\s+week)\s*[?.!]*$/i;
 // A chore that says WHO ("voor mij", "voor Bert", "for me") or WHEN (a day word) is the model's: it has the assignee and
 // the due date to fill, which this typed rule cannot.
 const CHORE_WHO_OR_WHEN = /\b(?:voor\s+\S+|for\s+\S+|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|morgen|vandaag|overmorgen|volgende\s+week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next\s+week)\b/i;

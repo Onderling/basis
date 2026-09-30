@@ -21,6 +21,7 @@ import { parseInput }      from '../parser.js';
 import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
 import { doorDisclosure } from '../v2/turnLog.js';
+import { confirmPreviewMessage } from '../v2/confirmGate.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
@@ -49,11 +50,12 @@ const CONFIRM_NO  = '__confirm:no';
  * @param {object} [a.engine]                        (tests) a pre-built assistant engine
  * @param {number} [a.collectMs]                     the engine's collect window (default `assistant.collectMs`)
  * @param {string} [a.botName]
+ * @param {(a: {threadId: string, role: string|null, ops: Set<string>}) => Promise<string[]>|string[]} [a.welcomeFor]  the lines a new person's welcome adds: what this door does for them
  * @param {(entry: object) => void} [a.walkLog]  a sink for one record per turn — what came in, which path
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -145,9 +147,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
 
-  /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue. */
-  function helpText() {
-    const lines = (catalogueOf().commandMenu ?? []).map((e) => {
+  /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to
+   *  this person's role (a member is not shown the admin's commands). */
+  function helpText(chatId, threadId) {
+    const who = turns.get(chatId)?.caller ?? threadId;
+    const scoped = typeof roleFor === 'function' && typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), roleFor(who)) : catalogueOf();
+    const lines = (scoped?.commandMenu ?? []).map((e) => {
       const op = catalogueOf().opsById?.get?.(e.opId)?.op;
       const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
       return hint ? `${e.command} — ${hint}` : e.command;
@@ -201,13 +206,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   }
 
   async function route(chatId, threadId, text) {
-    if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText()); }
+    if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
     let parse = typeof text === 'string'
       ? (tapToParse(text, threadId) ?? parseInput(text, catalogueOf(), { threadId }))
       : opToParse(text, threadId);
     if (typeof text === 'string') note(chatId, { via: tapToParse(text, threadId) ? 'tap' : 'slash' });
     if (parse?.kind === 'slash') parse = splitTypedMatch(parse);
-    if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText()); }
+    if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
     const r = resolveDispatch(parse, catalogueOf());
     note(chatId, { route: r?.kind });
     switch (r?.kind) {
@@ -229,7 +234,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       }
       case 'needsConfirm': {
         pending.set(threadId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
-        return say(chatId, t('circle.telegram.confirm', { message: r.messageKey ? t(r.messageKey, r.args ?? {}) : (r.message ?? '') }), [
+        // a confirm that declares a preview asks with what is there (asked as this person, through the same gate)
+        const previewed = await confirmPreviewMessage({ route: r, catalogue: catalogueOf(), call: callFor(chatId) });
+        return say(chatId, t('circle.telegram.confirm', { message: previewed ?? (r.messageKey ? t(r.messageKey, r.args ?? {}) : (r.message ?? '')) }), [
           { id: CONFIRM_YES, label: t('circle.telegram.confirm_yes') },
           { id: CONFIRM_NO,  label: t('circle.telegram.confirm_no') },
         ]);
@@ -322,7 +329,15 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     if (!threads || !threadId || threads.greeted(threadId)) return;
     const disclosure = doorDisclosure(turnLogMode, t);
     const welcome = slashless.has(String(chatId)) ? t('circle.bot.welcome_talk') : t('circle.bot.welcome');
-    await say(chatId, [welcome, ...(disclosure ? [disclosure] : [])].join('\n'));
+    // what this bot does for THIS person (their role's tools, the household's settings), when the door derives it
+    let derived = [];
+    if (typeof welcomeFor === 'function') {
+      const role = typeof roleFor === 'function' ? roleFor(threadId) : null;
+      const scoped = typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), role) : catalogueOf();
+      const ops = new Set([...(scoped?.opsById ?? [])].map(([key, entry]) => entry?.op?.id ?? key));
+      try { derived = (await welcomeFor({ threadId, role, ops })) ?? []; } catch { derived = []; }
+    }
+    await say(chatId, [welcome, ...derived, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);
   }
 

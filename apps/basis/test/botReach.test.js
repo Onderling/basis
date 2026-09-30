@@ -79,6 +79,14 @@ describe('reaching a person first', () => {
     expect(threads.remindersOn('telegram:111')).toBe(false);
     expect(threads.remindersOn('webid:bert')).toBe(true);      // theirs only
     expect(threads.overviewOn('telegram:111')).toBe(true);
+    // the door's own words switch too — "uit" is off, never "not off, so on"; a word it does not know changes nothing
+    await call('assistant', 'assistant-reminders', { mode: 'aan' }, { threadId: 'webid:bert' });
+    await call('assistant', 'assistant-reminders', { mode: 'uit' }, { threadId: 'webid:bert' });
+    expect(threads.remindersOn('webid:bert')).toBe(false);
+    expect((await call('assistant', 'assistant-reminders', { mode: 'misschien' }, { threadId: 'webid:bert' })).ok).toBe(false);
+    expect(threads.remindersOn('webid:bert')).toBe(false);
+    await call('assistant', 'assistant-overview', { mode: 'uit' }, { threadId: 'telegram:111' });
+    expect(threads.overviewOn('telegram:111')).toBe(false);
     const off = await call('assistant', 'assistant-settings', { change: 'reminders off' });
     expect(off.message).toContain('"reminders":"off"');
     await call('assistant', 'assistant-settings', { change: 'quiet 22:00-07:30' });

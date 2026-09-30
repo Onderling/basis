@@ -25,7 +25,7 @@ const ymd = (w) => `${w.year}-${pad(w.month)}-${pad(w.day)}`;
 const minutesOf = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + m; };
 
 /** Is this wall-clock time inside the quiet hours ("21:00-08:00" wraps midnight)? */
-function inQuiet(w, quiet) {
+export function inQuiet(w, quiet) {
   const [from, to] = String(quiet || '').split('-');
   if (!from || !to) return false;
   const now = w.hour * 60 + w.minute;

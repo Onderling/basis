@@ -68,4 +68,26 @@ describe('the reminder tick', () => {
     await w.tick.pass();
     expect(w.sent).toEqual([]);
   });
+
+  it('Sunday 18:00: the week overview, as the person, only to those who switched it on — once a week', async () => {
+    const sunday = new Date('2026-10-04T16:05:00.000Z').getTime();   // Sun 4 Oct, 18:05 local
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    await threads.load();
+    threads.setOverview('telegram:2', true);
+    const sent = [];
+    const asked = [];
+    const tick = createReminderTick({
+      sources: async () => ({ chores: [], events: [] }),
+      users: { list: async () => people }, threads, t, tz: TZ,
+      reach: { sendToPerson: async (id, m) => { sent.push({ id, ...m }); return { ok: true }; } },
+      settings: () => ({ reminders: 'on', quiet: '21:00-08:00' }), now: () => sunday,
+      overviewFor: async (id) => { asked.push(id); return `Deze week voor ${id}`; },
+    });
+    await tick.pass();
+    expect(asked).toEqual(['telegram:2']);
+    expect(sent).toEqual([expect.objectContaining({ id: 'telegram:2', text: 'Deze week voor telegram:2' })]);
+    await tick.pass();
+    expect(sent).toHaveLength(1);
+  });
 });
+

@@ -135,6 +135,27 @@ describe('parseSlash — body: flags', () => {
   });
 });
 
+describe('parseSlash — body: flags, a value after a space', () => {
+  // `/list-remove --item brood` reached the op as `item: true`: a flag the op declares as a value takes the next word
+  const withParams = {
+    commandMenu: [{ command: '/list-remove', opId: 'removeFromList', body: 'flags' }],
+    opsById: new Map([['removeFromList', { op: { id: 'removeFromList', params: [{ name: 'item', kind: 'string' }, { name: 'confirm', kind: 'boolean' }] } }]]),
+  };
+  it('--item brood → item: "brood"', () => {
+    expect(parseInput('/list-remove --item brood', withParams).args).toEqual({ item: 'brood' });
+  });
+  it('a quoted value after the space stays whole; the words after it are positional', () => {
+    expect(parseInput('/list-remove --item "oude kaas" extra', withParams).args).toEqual({ item: 'oude kaas', _match: 'extra' });
+  });
+  it('a boolean flag does not take the next word; an undeclared one keeps the old reading', () => {
+    expect(parseInput('/list-remove --confirm brood', withParams).args).toEqual({ confirm: true, _match: 'brood' });
+    expect(parseInput('/list-remove --later brood', withParams).args).toEqual({ later: true, _match: 'brood' });
+  });
+  it('a value flag followed by another flag has no value: true, as before', () => {
+    expect(parseInput('/list-remove --item --confirm', withParams).args).toEqual({ item: true, confirm: true });
+  });
+});
+
 describe('parseSlash — edge cases', () => {
   it("returns null when called directly on a non-slash input", () => {
     expect(parseSlash('hello', catalogue)).toBeNull();

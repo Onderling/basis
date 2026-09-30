@@ -25,6 +25,10 @@ import { assistantManifest } from './assistantManifest.js';
  *          revoke?: (who: string) => Promise<object|null>,
  *          inviteLink?: (code: string) => string|null}} [a.admin]  what the admin's ops read and change
  */
+/** A switch in the door's words: "uit" is off (never "not off, so on"); a word it does not know is null. */
+const SWITCH_WORDS = Object.freeze({ on: 'on', aan: 'on', ja: 'on', yes: 'on', off: 'off', uit: 'off', nee: 'off', no: 'off' });
+const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()] ?? null;
+
 export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {} }) {
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
   return async (app, op, args = {}, ctx = {}) => {
@@ -52,13 +56,13 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         threads.setMode(threadId, args?.mode);
         return { ok: true, message: t(`circle.bot.memory_${args.mode}`) };
       }
-      if (op === 'assistant-reminders') {
-        threads.setReminders(threadId, args?.mode !== 'off');
-        return { ok: true, message: t(args?.mode === 'off' ? 'circle.bot.reminders_off' : 'circle.bot.reminders_on') };
-      }
-      if (op === 'assistant-overview') {
-        threads.setOverview(threadId, args?.mode === 'on');
-        return { ok: true, message: t(args?.mode === 'on' ? 'circle.bot.overview_on' : 'circle.bot.overview_off') };
+      if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx) };
+      if (op === 'assistant-reminders' || op === 'assistant-overview') {
+        const mode = switchOf(args?.mode);
+        if (!mode) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
+        const which = op === 'assistant-reminders' ? 'reminders' : 'overview';
+        if (which === 'reminders') threads.setReminders(threadId, mode === 'on'); else threads.setOverview(threadId, mode === 'on');
+        return { ok: true, message: t(`circle.bot.${which}_${mode}`) };
       }
       if (op === 'assistant-language') {
         threads.setLang(threadId, args?.lang);
@@ -125,6 +129,35 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: t('circle.bot.role_set', { name: row.displayName ?? name, role }) };
   }
 
+
+  /**
+   * A person's week, asked AS them: their open chores (with a date) and the coming appointments go through the gate as
+   * that person; the two counts (open on the shopping list, chores nobody holds) are the household's, and name nobody.
+   */
+  async function weekOverviewText(ctx) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const localDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso).slice(0, 10) : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const asThem = (a, o, x) => callSkill(a, o, x, ctx);
+    const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
+    const mine = itemsOf(await asThem('tasks', 'listMine', {}).catch(() => null));
+    const events = itemsOf(await asThem('calendar', 'listEvents', { days: 7 }).catch(() => null));
+    const shopping = itemsOf(await callSkill('lists', 'listEntries', { list: t('circle.lists.template.shopping') }).catch(() => null));
+    const open = itemsOf(await callSkill('tasks', 'listOpen', {}).catch(() => null));
+    const unheld = open.filter((it) => ![...(Array.isArray(it.assignees) ? it.assignees : []), it.assignee].some(Boolean)).length;
+    const lines = [];
+    if (mine.length) {
+      lines.push(t('circle.bot.overview_mine'));
+      // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
+      for (const c of mine) lines.push(`• ${c.text ?? c.title ?? c.label ?? ''}${c.dueAt ? ` (${localDay(c.dueAt)})` : ''}`);
+    }
+    if (events.length) {
+      lines.push(t('circle.bot.overview_events'));
+      for (const e of events) lines.push(`• ${e.label ?? e.title ?? ''}`);
+    }
+    if (shopping.length) lines.push(t('circle.bot.overview_shopping', { n: shopping.length, list: t('circle.lists.template.shopping') }));
+    if (unheld) lines.push(t('circle.bot.overview_unheld', { n: unheld }));
+    return [t('circle.bot.overview_head'), ...(lines.length ? lines : [t('circle.bot.overview_none')])].join('\n');
+  }
 
   async function statusText() {
     const s = typeof admin.status === 'function' ? ((await admin.status()) ?? {}) : {};

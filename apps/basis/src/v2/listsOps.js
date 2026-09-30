@@ -14,6 +14,7 @@
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
+import { childIdsOf, deleteContainer } from '@onderling/item-store';
 
 /**
  * @param {object} a
@@ -173,11 +174,36 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const ref = String(args?.list ?? '').trim();
       const target = ref ? await findList(circleId, ref) : null;
       if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
-      // the list and everything on it (done or not): nothing is left pointing at a list that is gone
-      const tree = await svc.tree(circleId, target.id);
-      for (const c of (Array.isArray(tree?.children) ? tree.children : [])) if (c?.id) await svc.remove(circleId, c.id);
-      await svc.remove(circleId, target.id);
-      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref }) };
+      // What goes: the list, and every item under it that has no parent left once it is gone (children of children
+      // too). An item on another list as well is detached from this one and stays there.
+      const store = svc.storeFor(circleId);
+      const removing = [target.id];
+      const gone = new Set(removing);
+      const kept = new Set();
+      for (let i = 0; i < removing.length; i++) {
+        const parent = await store.get(removing[i]);
+        for (const id of childIdsOf(parent)) {
+          const child = await store.get(id);
+          if (!child || gone.has(id)) continue;
+          if ((Array.isArray(child.containedBy) ? child.containedBy : []).some((p) => !gone.has(p))) { kept.add(id); continue; }
+          kept.delete(id); gone.add(id); removing.push(id);
+        }
+      }
+      const items = (await Promise.all(removing.slice(1).map((id) => store.get(id)))).filter(Boolean);
+      const chores = items.filter((i) => i.type === 'task');
+      const held = chores.filter((c) => (Array.isArray(c.assignees) && c.assignees.length) || c.assignee).length;
+      const vars = { list: target.text ?? ref, entries: items.length - chores.length, chores: chores.length, held, kept: kept.size };
+      // the confirm asks with the counts: a read, through the same gate as the removal
+      if (args?.preview) {
+        const what = [
+          ...(vars.entries ? [t('circle.lists.remove_count_entries', { count: vars.entries })] : []),
+          ...(vars.chores ? [`${t('circle.lists.remove_count_chores', { count: vars.chores })}${held ? ` (${t('circle.lists.remove_count_held', { count: held })})` : ''}`] : []),
+        ];
+        const ask = what.length ? t('circle.lists.remove_list_confirm_counts', { list: vars.list, what: what.join(', ') }) : t('circle.lists.remove_list_confirm', { list: vars.list });
+        return { ok: true, vars, message: vars.kept ? `${ask} ${t('circle.lists.remove_count_kept', { count: vars.kept })}` : ask };
+      }
+      for (const id of removing) await deleteContainer(store, id);
+      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref }), vars };
     },
 
     removeFromList: async (args) => {

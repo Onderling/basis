@@ -18,7 +18,7 @@ import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 const nodes = [];
 afterAll(() => teardown(nodes));
 
-const MEMBER = ['listLists', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'listMine', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview'];
+const MEMBER = ['listLists', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'listMine', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview'];
 const ADMIN_EXTRA = ['createList', 'removeList', 'reassignTask', 'removeTask', 'editTask'];
 
 describe('the bot\'s slim map', () => {
@@ -32,6 +32,15 @@ describe('the bot\'s slim map', () => {
     expect(tools('coordinator')).toEqual([...MEMBER].sort());
     expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].sort());
     expect(BOT_OP_MAP.member).toEqual(MEMBER);
+  });
+
+  it('a member\'s command menu (their /help) holds no admin command; the admin\'s does', () => {
+    const menu = (role) => (scopeCatalogueToRole(catalogue, role).commandMenu ?? []).map((e) => e.opId);
+    for (const op of ['assistant-apps', 'assistant-cohort', 'assistant-revoke', 'assistant-role', 'assistant-settings']) {
+      expect(menu('member'), op).not.toContain(op);
+      expect(menu('admin'), op).toContain(op);
+    }
+    expect(menu('member')).toContain('assistant-reminders');
   });
 
   it('each op has its level; an op off the map has none', () => {

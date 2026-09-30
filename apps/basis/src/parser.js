@@ -124,7 +124,9 @@ export function parseSlash(trimmed, catalogue, ctx = {}) {
   }
 
   const bodyRule = entry.body ?? 'match';
-  const args     = parseBody(body, bodyRule);
+  // the op's declared params: a flag it declares as a value takes the next word (`--item brood`)
+  const params   = catalogue.opsById?.get?.(entry.opId)?.op?.params ?? [];
+  const args     = parseBody(body, bodyRule, params);
 
   return {
     kind: 'slash',
@@ -149,7 +151,7 @@ export function parseSlash(trimmed, catalogue, ctx = {}) {
  * @param {'match' | 'reject' | 'flags'}    rule
  * @returns {object}
  */
-function parseBody(body, rule) {
+function parseBody(body, rule, params = []) {
   const trimmed = body.trim();
 
   if (rule === 'reject') {
@@ -160,7 +162,7 @@ function parseBody(body, rule) {
   }
 
   if (rule === 'flags') {
-    return parseFlags(trimmed);
+    return parseFlags(trimmed, params);
   }
 
   // rule === 'match' (default).  Body is a single positional value
@@ -177,17 +179,22 @@ function parseBody(body, rule) {
  * @param {string} body
  * @returns {object}
  */
-function parseFlags(body) {
+function parseFlags(body, params = []) {
   const out = {};
   const positional = [];
+  // A flag the op declares as a VALUE (not a boolean) takes the next word when written `--key value`; a boolean, or a
+  // flag the op does not declare, stays `true` without one.
+  const takesValue = new Set((Array.isArray(params) ? params : []).filter((p) => p?.name && p.kind && p.kind !== 'boolean').map((p) => p.name));
 
   // Tokenize on whitespace BUT respect simple double-quoted spans.
   const tokens = tokenize(body);
-  for (const tok of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
     if (tok.startsWith('--')) {
       const eq    = tok.indexOf('=');
       const key   = eq === -1 ? tok.slice(2) : tok.slice(2, eq);
-      const value = eq === -1 ? true         : tok.slice(eq + 1);
+      let value   = eq === -1 ? true         : tok.slice(eq + 1);
+      if (eq === -1 && takesValue.has(key) && i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) value = tokens[++i];
       out[key] = value;
     } else {
       positional.push(tok);

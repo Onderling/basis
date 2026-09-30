@@ -3718,6 +3718,42 @@
       "text": "De lijst \"{{list}}\" en alles wat erop staat verwijderen?",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     },
+    "remove_list_confirm_counts": {
+      "text": "De lijst \"{{list}}\" verwijderen, met {{what}}?",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_one": {
+      "text": "{{count}} regel",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_other": {
+      "text": "{{count}} regels",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries": {
+      "text": "{{count}} regels",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_one": {
+      "text": "{{count}} klusje",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_other": {
+      "text": "{{count}} klusjes",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores": {
+      "text": "{{count}} klusjes",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_held": {
+      "text": "{{count}} opgepakt",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_kept": {
+      "text": "{{count}} blijft op een andere lijst staan.",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
     "list_removed": {
       "text": "De lijst \"{{name}}\" is weg.",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
@@ -4077,9 +4113,65 @@
       "text": "Het weekoverzicht staat uit.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "switch_usage": {
+      "text": "Gebruik: {{command}} aan of {{command}} uit.",
+      "doc": "Reply when a person's switch (reminders, weekly overview) gets a word it does not know."
+    },
+    "welcome_lists": {
+      "text": "Lijsten: {{lists}}. Zeg bijvoorbeeld \"melk op de boodschappen\" of \"wat staat er op de boodschappen\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_chores": {
+      "text": "{{list}}: \"nieuwe taak voor mij: ramen lappen, morgen\", \"ik doe de ramen\", \"de ramen zijn klaar\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_agenda": {
+      "text": "{{list}}: \"tandarts morgen om 10 uur\" zet een afspraak; \"wat staat er in de agenda\" laat ze zien.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_week": {
+      "text": "\"Wat staat er deze week?\" of /week: jouw klusjes en de afspraken van de komende zeven dagen.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reader": {
+      "text": "Je leest mee: vraag wat er op een lijst of in de agenda staat.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_on": {
+      "text": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00) en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_off": {
+      "text": "Herinneringen staan voor dit huishouden uit.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_overview": {
+      "text": "Wil je elke zondag om 18:00 een weekoverzicht? Zet het aan met /overzicht aan.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_admin": {
+      "text": "Je bent beheerder. Met /instellingen regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
     "reminder_done": {
       "text": "Klaar",
       "doc": "The button under a chore's reminder: it is done."
+    },
+    "overview_mine": {
+      "text": "Jouw klusjes:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_events": {
+      "text": "Afspraken:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_shopping": {
+      "text": "{{n}} open op {{list}}.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_unheld": {
+      "text": "{{n}} klusjes waar nog niemand voor staat.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
     }
   },
   "op": {

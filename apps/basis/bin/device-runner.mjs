@@ -770,7 +770,7 @@ if (tgToken || inboxDoor.bridge) {
       scopeToRole: scopeCatalogueToRole,
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
-      expand: expandAdds(),
+      expand: expandAdds({ t }),
       gateRules: listsGateRules(values.lang, templateLists(t)),
     } : {}),
   });

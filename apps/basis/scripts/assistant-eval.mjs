@@ -90,7 +90,7 @@ for (const f of fixtures) {
     // back once; the member's thread names the admin's tools.
     peek: async (cmd) => { peeked = cmd.opId; return { payload: { items: (f.items ?? []).map((text, i) => ({ id: `i${i}`, label: text })) } }; },
     threadHints: () => roleHintsFor('member'),
-    expand: expandAdds(),
+    expand: expandAdds({ t: tNl }),
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
     onNoMatch: (_t, _c, extra) => replies.push(extra?.reply || '__unknown'),
   });

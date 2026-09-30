@@ -787,6 +787,8 @@ if (tgToken || inboxDoor.bridge) {
       sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
       tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
       settings: () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)) }),
+      // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
+      onSent: (e) => walkLog({ kind: 'reminder', to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}) }),
     });
     reminderTick.start();
     walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });

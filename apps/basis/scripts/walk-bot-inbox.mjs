@@ -42,7 +42,7 @@ const node = await bootRealAgentNode('walker', {
 const replies = [];
 const channel = createContactThreadChannel({ sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload), sealFor: node.agent.contactSeal?.sealFor ?? null, openFor: node.agent.contactSeal?.openFor ?? null });
 // The bot answers as a person does (`contact-msg`); a bot-style `contact-reply` is taken too.
-const take = (r) => replies.push({ at: Date.now(), text: r.text });
+const take = (r) => { replies.push({ at: Date.now(), text: r.text }); console.log(`< ${String(r.text).replace(/\n/g, '\n  ')}`); };
 const onReply = channel.replyHandler(take);
 const onMessage = channel.messageHandler(take);
 await node.agent.connectPeerTransport({
@@ -64,7 +64,8 @@ for (const text of lines) {
   while (replies.length === from && Date.now() - started < firstMs) await wait(250);
   if (replies.length === from) { console.log('  (no reply)'); continue; }
   while (Date.now() - replies[replies.length - 1].at < settleMs) await wait(250);
-  for (const r of replies.slice(from)) console.log(`< ${String(r.text).replace(/\n/g, '\n  ')}   [${((r.at - started) / 1000).toFixed(1)}s]`);
+  // the replies were printed as they came; here, how long each took
+  for (const r of replies.slice(from)) console.log(`  [${((r.at - started) / 1000).toFixed(1)}s]`);
 }
 await teardown(node);
 process.exit(0);

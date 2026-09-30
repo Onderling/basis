@@ -28,8 +28,9 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {() => number} [a.now]
  * @param {number} [a.every]
  * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
+ * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null}) => void} [a.onSent]  each send, for the walk log
  */
-export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, timers = globalThis }) {
+export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, timers = globalThis, onSent = null }) {
   let handle = null;
   let running = null;
   const timeOf = (iso) => { const w = wallClockInTz(new Date(iso).getTime(), tz); return `${pad(w.hour)}:${pad(w.minute)}`; };
@@ -52,6 +53,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       const text = [...items.map(lineOf), ...(first ? [t('circle.bot.reminder_first')] : [])].join('\n');
       const buttons = items.filter((i) => i.kind === 'chore').map((i) => ({ id: `completeTask:${i.id}`, label: t('circle.bot.reminder_done') }));
       const r = await reach.sendToPerson(personId, { text, buttons });
+      try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null }); } catch { /* a listener never stops the tick */ }
       if (!r?.ok) continue;
       sent += 1;
       const mine = threads.saidOf(personId);

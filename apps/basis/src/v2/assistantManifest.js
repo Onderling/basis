@@ -23,7 +23,7 @@ export const assistantManifest = {
   itemTypes: ['chat-thread'],
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
-    'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write',
+    'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'import-household': 'write',
   },
   operations: [
     {
@@ -159,6 +159,28 @@ export const assistantManifest = {
       writes: { scope: 'person' },
       params: [{ name: 'who', kind: 'string', required: true }],
       surfaces: { slash: { command: '/revoke', body: 'argline' } },
+    },
+    {
+      id:     'assistant-exports',
+      verb:   'list-exports',
+      visibility: 'trusted',
+      // the household's export files on the box (one a night, the last few kept)
+      params: [],
+      // slash only, like the admin's other ops: never a tool the model is handed
+      surfaces: { slash: { command: '/exports', body: 'none' } },
+    },
+    {
+      id:     'assistant-import',
+      verb:   'import-household',
+      visibility: 'trusted',
+      // the household's lists, chores, appointments and people, written back through their own ops
+      writes: { scope: 'circle' },
+      params: [{ name: 'file', kind: 'string', required: true }],
+      surfaces: {
+        slash: { command: '/import', body: 'argline' },
+        // asked first, with what the file holds (the op answers the question with `preview: true`)
+        ui:    { confirm: { severity: 'danger', messageKey: 'circle.bot.import_confirm', message: 'Read this export back into the household?', preview: true } },
+      },
     },
   ],
 };

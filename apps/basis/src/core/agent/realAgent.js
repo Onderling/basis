@@ -6253,6 +6253,8 @@ export async function createRealHouseholdAgent(opts = {}) {
      * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
      */
     doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /** Every item of the household's circle store, as stored (the export writes its public fields from these). */
+    householdItems: async () => (await householdService.stores.getStore(resolveCircleId({})).list()) ?? [],
     /** A household bot's reminders read the household circle's chores and appointments, whole (dates, who comes). */
     reminderSources: async () => {
       const store = householdService.stores.getStore(resolveCircleId({}));

@@ -40,7 +40,7 @@
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
  * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -61,6 +61,8 @@ import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { welcomeLines } from '../src/v2/botWelcome.js';
+import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
+import { createExportShelf } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom } from '../src/v2/botSettings.js';
 import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
@@ -743,6 +745,29 @@ if (tgToken || inboxDoor.bridge) {
   await threads.load();
   // The door's call: the assistant's own ops answered here (each after the host gate), the rest on to the agent — the
   // same call a typed line and a scheduled overview take.
+  // The household's export (the one format kept readable across versions): one a night into the bot's data dir, the
+  // last few kept, so the box's snapshot carries it off; the admin reads one back with /import.
+  const exportsDir = path.join(dataDir, 'exports');
+  const exportShelf = createExportShelf({
+    files: {
+      list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
+      // written whole or not at all: a crash mid-write leaves a temp file, never a cut-off export under its own name
+      write: async (name, text) => {
+        mkdirSync(exportsDir, { recursive: true, mode: 0o700 });
+        const tmp = path.join(exportsDir, `.${name}.tmp`);
+        writeFileSync(tmp, text, { mode: 0o600 });
+        renameSync(tmp, path.join(exportsDir, name));
+      },
+      read: async (name) => readFileSync(path.join(exportsDir, name), 'utf8'),
+      remove: async (name) => rmSync(path.join(exportsDir, name), { force: true }),
+    },
+    exportNow: () => exportFromHost({
+      items: () => agent.householdItems(),
+      people: () => botUsers.list(),
+      params: async () => (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? [],
+    }),
+    onWritten: (e) => walkLog({ kind: 'export', ok: e.ok, ...(e.name ? { name: e.name } : {}), ...(e.error ? { error: e.error } : {}) }),
+  });
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     admin: {
@@ -751,6 +776,9 @@ if (tgToken || inboxDoor.bridge) {
       admission,
       revoke: (who) => botUsers.revoke(who),
       setRole: (who, role) => botUsers.setRole(who, role),
+      exports: exportShelf,
+      // the file's things written back through their own ops, each as its person (the host vouches, as its door does)
+      importFile: (file) => importHousehold(file, { call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller }),
       // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
       inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
       status: async () => ({
@@ -806,6 +834,7 @@ if (tgToken || inboxDoor.bridge) {
       overviewFor: async (id) => (await doorCall('assistant', 'weekOverview', {}, { caller: id, threadId: id }))?.message ?? null,
     });
     reminderTick.start();
+    exportShelf.start();
     walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });
   }
   // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a

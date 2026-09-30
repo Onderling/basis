@@ -4149,6 +4149,38 @@
       "text": "Want a weekly overview, Sundays at 18:00? Switch it on with /overzicht aan.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
+    "exports_list": {
+      "text": "Export files on this box, newest first:\n{{names}}\nTo restore one: /import <name>.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "exports_none": {
+      "text": "There are no export files on this box yet.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm": {
+      "text": "Read this export file back into the household?",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm_counts": {
+      "text": "Restore \"{{name}}\"? It holds {{lists}} lists, {{entries}} entries, {{chores}} chores, {{appointments}} appointments and {{people}} people. What is already there stays.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_no_file": {
+      "text": "I don't know an export file \"{{name}}\". /exports shows which there are.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_unreadable": {
+      "text": "I can't read \"{{name}}\" as an export file.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_done": {
+      "text": "Restored: {{lists}} lists, {{entries}} entries, {{chores}} chores, {{appointments}} appointments, {{people}} people.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_missed": {
+      "text": "{{count}} things could not be restored.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
     "welcome_admin": {
       "text": "You are the admin. With /instellingen you set, for the whole household, who may give chores, who sees names, the reminders and the quiet hours.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."

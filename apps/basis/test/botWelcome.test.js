@@ -36,6 +36,8 @@ describe('the welcome, derived', () => {
     expect(text).toContain('/instellingen');
     expect(text).not.toContain('21:00');
     expect(text).not.toContain('/herinneringen uit');
+    // the weekly overview is its own line, offered whether the household's reminders are on or off
+    expect(text).toContain(t('circle.bot.welcome_overview'));
   });
 
   it('only what the tools reach: no Agenda without addEvent, an observer reads along and gets no reminders', () => {

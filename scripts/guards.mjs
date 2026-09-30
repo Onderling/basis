@@ -26,7 +26,10 @@ for (const f of lints) {
 }
 // The guards' own self-tests — a guard whose test is red is not a guard.
 const vt = spawnSync('npx', ['vitest', 'run', 'scripts/', '--reporter=dot'], { cwd: ROOT, encoding: 'utf8' });
-results.push({ name: 'guard-self-tests', ok: vt.status === 0, out: (vt.stdout + vt.stderr).split('\n').slice(-6).join('\n') });
+// On red, say WHICH test failed (the FAIL lines), not only the tail — a flake that names no test cannot be chased.
+const vtOut = (vt.stdout + vt.stderr).split('\n');
+const failed = vtOut.filter((l) => /\bFAIL\b|AssertionError|Error:/.test(l)).slice(0, 12);
+results.push({ name: 'guard-self-tests', ok: vt.status === 0, out: [...failed, ...vtOut.slice(-6)].join('\n') });
 
 let red = 0;
 console.log('\n── guards ─────────────────────────────────────────────');

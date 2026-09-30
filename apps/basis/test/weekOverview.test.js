@@ -64,9 +64,21 @@ describe('the week overview', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(r.message).toContain('circle.bot.overview_head');
     expect(r.message).toContain('kleurenwiezen');
+    expect(r.message).toContain(`kleurenwiezen (${tomorrow})`);   // its date on the household's clock, not the UTC day
     expect(r.message).not.toContain('bladeren');                 // Bert's, not mine
     expect(r.message).toContain('tandarts');
     expect(r.message).toContain('"n":2');                        // two open on the shopping list
     expect(r.message).toMatch(/overview_unheld[^\n]*"n":1/);     // one chore nobody holds
   }, 180_000);
+
+  it('"wat staat er deze week" is the overview by the gate — the model does not summarise it itself', async () => {
+    const { listsGateRules } = await import('../src/v2/circleGate.js');
+    const { templateLists } = await import('../src/v2/householdTemplate.js');
+    const rules = listsGateRules('nl', templateLists(t));
+    const route = (text) => { for (const r of rules) { const hit = r.test instanceof RegExp ? r.test.test(text) : r.test(text); if (hit) { const c = r.command(text); if (c) return c; } } return null; };
+    for (const line of ['wat staat er deze week', 'Wat staat er deze week?', 'wat moet er nog gebeuren', 'wat moet er deze week gebeuren?']) {
+      expect(route(line), line).toMatchObject({ opId: 'weekOverview', appOrigin: 'assistant' });
+    }
+  });
 });
+

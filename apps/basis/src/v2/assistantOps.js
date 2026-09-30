@@ -132,6 +132,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * that person; the two counts (open on the shopping list, chores nobody holds) are the household's, and name nobody.
    */
   async function weekOverviewText(ctx) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const localDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso).slice(0, 10) : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
     const asThem = (a, o, x) => callSkill(a, o, x, ctx);
     const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
     const mine = itemsOf(await asThem('tasks', 'listMine', {}).catch(() => null));
@@ -142,7 +144,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const lines = [];
     if (mine.length) {
       lines.push(t('circle.bot.overview_mine'));
-      for (const c of mine) lines.push(`• ${c.text ?? c.title ?? c.label ?? ''}${c.dueAt ? ` (${String(c.dueAt).slice(0, 10)})` : ''}`);
+      // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
+      for (const c of mine) lines.push(`• ${c.text ?? c.title ?? c.label ?? ''}${c.dueAt ? ` (${localDay(c.dueAt)})` : ''}`);
     }
     if (events.length) {
       lines.push(t('circle.bot.overview_events'));

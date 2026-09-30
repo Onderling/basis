@@ -90,7 +90,9 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const days = Number(args?.days) > 0 ? Number(args.days) : 7;
       const now = Date.now();
       const open = eventsInWindow(await eventsOf(circleId), { since: now, until: now + days * 86_400_000 });
-      return { ok: true, items: open.map((e) => ({ id: e.id, label: label(e), type: 'calendar-event' })) };
+      // the list's own name above its appointments, as any list read says which list it is
+      const agenda = await agendaOf(circleId);
+      return { ok: true, ...(agenda?.text ? { title: agenda.text } : {}), items: open.map((e) => ({ id: e.id, label: label(e), type: 'calendar-event' })) };
     },
 
     getEventSnapshot: async (args) => {

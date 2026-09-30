@@ -2,7 +2,7 @@
  * A report about the past is a tick, not an rsvp (Frits: ticking is always possible): "ik ben bij de tandarts geweest"
  * ticks the appointment like any entry; the coming days no longer show it. What happens to a done chore, a ticked entry
  * and a passed appointment is ONE household setting (`assistant.passedItems`): keep (shown, marked) · hide (shown,
- * marked, for `assistant.passedKeepDays` days — the default, 7) · delete. One boot composed as the box composes a bot.
+ * marked, for `assistant.passedKeepDays` days — by default 0: a ticked "melk" leaves the next read) · delete. One boot composed as the box composes a bot.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -45,7 +45,10 @@ describe('what is done or has passed', () => {
     await call('calendar', 'addEvent', { title: 'tandarts', when: `${local(new Date(Date.now() + 86_400_000))}T10:00` });
     expect((await call('lists', 'markListItemDone', { item: 'tandarts' })).ok).toBe(true);
     expect(((await call('calendar', 'listEvents', { days: 7 })).items ?? []).length).toBe(0);
-    // hide (the default, 7 days): the ticked appointment is still shown on the Agenda, marked
+    // the default keeps nothing on a read: the ticked appointment leaves it at once (it stays in the store)
+    expect((await labels('Agenda')).join('|')).not.toContain('tandarts');
+    // hide for 7 days (the admin's choice): shown, marked
+    await set('assistant.passedKeepDays', 7);
     expect((await labels('Agenda')).join('|')).toContain('circle.lists.entry_done');
 
     // a passed appointment (yesterday) is shown marked as passed, not as an open one

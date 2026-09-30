@@ -56,6 +56,8 @@ describe('calendar on the household bot', () => {
     const second = await boot();
     const call2 = (a, o, x) => second.callSkill(a, o, x);
     const listed = await call2('calendar', 'listEvents', { days: 7 });
+    // the coming days say which list they are — the Agenda's own name, as any list read does
+    expect(listed.title).toBe('Agenda');
     const ev = (listed.items ?? []).find((i) => /tandarts/.test(i.label));
     expect(ev, `listed after the restart: ${JSON.stringify(listed)}`).toBeTruthy();
     const rsvp = await call2('calendar', 'rsvpAccept', { id: ev.id, actor: 'telegram:111' });

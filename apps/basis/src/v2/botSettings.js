@@ -65,14 +65,15 @@ export const isSelfWord = (w) => /^(mij|me|ik|mezelf|zelf|myself|self)$/i.test(S
  * What happens to what is DONE (a completed chore, a ticked entry) or has PASSED (an appointment before now) — one knob
  * for the three (Frits, 2026-09-30):
  *   - `keep`:   shown, marked as done / passed, however old;
- *   - `hide`   (default): shown marked for `assistant.passedKeepDays` days (default 7), then no longer read;
+ *   - `hide`   (default): shown marked for `assistant.passedKeepDays` days, then no longer read — by default 0 days: a
+ *               ticked "melk" leaves the next read at once and stays in the store (7 suited a chore, not a shopping list);
  *   - `delete`: removed from the list.
  */
 export const PASSED_POLICIES = Object.freeze(['keep', 'hide', 'delete']);
 export const PASSED_KEY = 'assistant.passedItems';
 export const PASSED_DAYS_KEY = 'assistant.passedKeepDays';
 export const PASSED_POLICY = param({ key: PASSED_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'hide' });
-export const PASSED_KEEP_DAYS = param({ key: PASSED_DAYS_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 7 });
+export const PASSED_KEEP_DAYS = param({ key: PASSED_DAYS_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 0 });
 export const passedPolicyFrom = (v) => (PASSED_POLICIES.includes(v) ? v : PASSED_POLICY);
 export const passedDaysFrom = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : PASSED_KEEP_DAYS);
 

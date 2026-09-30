@@ -54,6 +54,7 @@
     "device": "node bin/device-runner.mjs"
   },
   "dependencies": {
+    "@onderling/notifier": "workspace:*",
     "@inrupt/solid-client": "^3.0.0",
     "@inrupt/solid-client-authn-browser": "^2.4.0",
     "@onderling-app/agents": "workspace:*",
@@ -92,7 +93,6 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "@onderling/notifier": "workspace:*",
     "@onderling/pseudo-pod": "workspace:*",
     "@onderling/versioning": "workspace:*",
     "@onderling/relay": "workspace:*",

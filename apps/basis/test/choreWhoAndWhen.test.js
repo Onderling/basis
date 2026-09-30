@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { VaultNodeFs } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
-import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, templateLists } from '../src/v2/householdTemplate.js';
 import { botOpLevel } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 
@@ -95,7 +95,7 @@ describe('a chore that says who and when', () => {
   }, 180_000);
 
   it('the gate\'s typed rule takes "nieuwe taak: X" only; a person or a day goes to the model', () => {
-    const rules = listsGateRules('nl', (kind) => NAMES[`circle.lists.template.${{ errand: 'chores', shopping: 'shopping', repair: 'repairs', schedule: 'schedule' }[kind]}`] ?? null);
+    const rules = listsGateRules('nl', templateLists(t));
     const rule = rules.find((r) => r.name === 'lists:addToList(task-on-chores)');
     const hits = (s) => (rule.test.test ? rule.test.test(s) : rule.test(s));
     expect(hits('nieuwe taak: kleurenwiezen')).toBe(true);

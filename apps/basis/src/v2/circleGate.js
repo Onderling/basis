@@ -72,37 +72,47 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
 /**
  * The deterministic gate for a household BOT, whose household lives on LISTS: the same phrasings the household rules
  * read ("zet melk op de boodschappen", "wat staat er op de klusjes"), pointed at the lists — `addToList` and
- * `listEntries` on the list the template names for that kind — and "wat moet ik nog doen" at `listMine`.
+ * `listEntries` on the list the words name — and "wat moet ik nog doen" at `listMine`. The lists and the words people
+ * use for them come from the bot's TEMPLATE (`templateLists`), so another template's lists get the same rules.
  * @param {string} [_locale]
- * @param {(kind: 'shopping'|'errand'|'repair'|'schedule') => string|null} listNameOf  the template's list for a kind
+ * @param {Array<{name: string, aliases?: string[], defaultChild?: string|null}>} lists  the template's lists
  */
-export function listsGateRules(_locale, listNameOf) {
-  const nameOf = (kind) => (typeof listNameOf === 'function' ? listNameOf(kind) : null);
+export function listsGateRules(_locale, lists = []) {
+  const byWord = new Map();
+  for (const l of lists) for (const w of [l.name, ...(l.aliases ?? [])]) if (w) byWord.set(String(w).toLowerCase(), l.name);
+  const listFor = (word) => {
+    const w = String(word ?? '').trim().toLowerCase();
+    return byWord.get(w) ?? byWord.get(w.replace(/(?:lijstje|lijst|list)$/, '')) ?? null;
+  };
+  const escape = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const words = [...byWord.keys()].sort((a, b) => b.length - a.length).map(escape);
+  const listRead = words.length ? new RegExp(`^${HH_READ}\\b.*?\\b(${words.join('|')})\\b`, 'i') : null;
+  const chores = lists.find((l) => l.defaultChild === 'task')?.name ?? null;
   return [
     { name: 'lists:addToList(named-list)', test: HH_ADD_TYPED, command: (text) => {
       const m = HH_ADD_TYPED.exec(String(text || '').trim());
       if (!m) return null;
-      const list = nameOf(HH_LIST_ALIASES[m[2].toLowerCase()]);
+      const list = listFor(m[2]);
       const items = splitItems(m[1].trim());
       if (!list || !items.length) return null;
       return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addToList', args: { list, text: t } })) } : {}) };
     } },
-    { name: 'lists:listEntries(named-list-read)', test: HH_LIST_READ, command: (text) => {
-      const m = HH_LIST_READ.exec(String(text || '').trim());
-      const list = m ? nameOf(HH_LIST_ALIASES[m[1].toLowerCase()]) : null;
+    { name: 'lists:listEntries(named-list-read)', test: (text) => Boolean(listRead && listRead.test(String(text ?? ''))), command: (text) => {
+      const m = listRead ? listRead.exec(String(text || '').trim()) : null;
+      const list = m ? listFor(m[1]) : null;
       return list ? { opId: 'listEntries', args: { list } } : null;
     } },
     { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
     // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
-    // of the chores list (it defaults to a task there).
+    // of the list whose entries are chores (it defaults to a task there).
     { name: 'lists:addToList(task-on-chores)', test: (text) => LISTS_ADD_TASK.test(text), command: (text) => {
       const m = LISTS_ADD_TASK.exec(String(text || '').trim());
-      const list = nameOf('errand');
       const what = m ? m[1].trim() : '';
-      return list && what ? { opId: 'addToList', args: { list, text: what } } : null;
+      return chores && what ? { opId: 'addToList', args: { list: chores, text: what } } : null;
     } },
   ];
 }
+
 // A chore that says WHO ("voor mij", "voor Bert", "for me") or WHEN (a day word) is the model's: it has the assignee and
 // the due date to fill, which this typed rule cannot.
 const CHORE_WHO_OR_WHEN = /\b(?:voor\s+\S+|for\s+\S+|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|morgen|vandaag|overmorgen|volgende\s+week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next\s+week)\b/i;

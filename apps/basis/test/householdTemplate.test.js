@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, loadListItems, withTemplateApps } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, loadListItems, withTemplateApps, promptLinesFor } from '../src/v2/householdTemplate.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { mergeManifests } from '../src/manifestMerge.js';
 import { listsManifest } from '../../lists/manifest.js';
@@ -50,11 +50,11 @@ describe('the household template', () => {
     const engine = createAssistantEngine({
       catalogue: mergeManifests([{ manifest: listsManifest }]), dispatch: async () => ({}), lang: 'nl', collectMs: 0,
       llm: { invoke: async () => ({ text: 'ok' }) }, interpret: async (text, o = {}) => { seen.push(o.system); return null; },
-      promptLines: HOUSEHOLD_TEMPLATE.promptLines,
+      promptLines: promptLinesFor((k) => k),
     });
     await engine.ask('t1', 'hoe is het nu met de lijst van ons');
     await engine.idle();
-    expect(seen[0]).toContain(HOUSEHOLD_TEMPLATE.promptLines[0]);
+    expect(seen[0]).toContain(promptLinesFor((k) => k)[1]);
   });
 
   it('a household bot\'s model draws on its list entries: id, words and the list', async () => {

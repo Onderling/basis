@@ -12,7 +12,7 @@ import { buildToolDescriptors } from '../src/v2/interpretCommand.js';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { BOT_OP_MAP, botOpLevel, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
+import { HOUSEHOLD_TEMPLATE, templateLists } from '../src/v2/householdTemplate.js';
 import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 
 const nodes = [];
@@ -56,8 +56,8 @@ describe('the bot\'s slim map', () => {
   }, 90_000);
 
   it('the deterministic gate speaks the lists', () => {
-    const nameOf = (kind) => ({ shopping: 'Boodschappen', errand: 'Klusjes', repair: 'Reparaties', schedule: 'Agenda' }[kind]);
-    const rules = listsGateRules('nl', nameOf);
+    const names = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
+    const rules = listsGateRules('nl', templateLists((k) => names[k] ?? k));
     const run = (text) => { for (const r of rules) { const ok = typeof r.test === 'function' ? r.test(text) : r.test.test(text); if (ok) { const c = r.command(text, {}); if (c) return c; } } return null; };
     expect(run('zet melk op de boodschappen')).toMatchObject({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk' } });
     expect(run('wat staat er op de boodschappen')).toMatchObject({ opId: 'listEntries', args: { list: 'Boodschappen' } });

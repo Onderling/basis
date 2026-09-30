@@ -3984,6 +3984,14 @@
     "model_down": {
       "text": "The assistant is not answering right now. Please try again in a moment.",
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "settings_list": {
+      "text": "Settings — giving chores: {{assign}} (self: only yourself, the admin anyone · anyone: everyone · role: the roles {{roles}} anyone).",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "settings_usage": {
+      "text": "Use: /instellingen assign self|anyone|role · /instellingen roles admin,member",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     }
   },
   "op": {
@@ -6859,6 +6867,14 @@
     "already_yours": {
       "text": "You had already claimed '{{title}}'.",
       "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "assign_refused": {
+      "text": "You can only give a chore to yourself.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "no_such_person": {
+      "text": "I do not know anyone called \"{{name}}\". I know: {{known}}.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
     }
   }
 }

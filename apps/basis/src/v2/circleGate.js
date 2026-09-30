@@ -95,7 +95,7 @@ export function listsGateRules(_locale, listNameOf) {
     { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
     // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
     // of the chores list (it defaults to a task there).
-    { name: 'lists:addToList(task-on-chores)', test: LISTS_ADD_TASK, command: (text) => {
+    { name: 'lists:addToList(task-on-chores)', test: (text) => LISTS_ADD_TASK.test(text), command: (text) => {
       const m = LISTS_ADD_TASK.exec(String(text || '').trim());
       const list = nameOf('errand');
       const what = m ? m[1].trim() : '';
@@ -103,7 +103,11 @@ export function listsGateRules(_locale, listNameOf) {
     } },
   ];
 }
-const LISTS_ADD_TASK = /^(?:add|new|voeg|zet|nieuwe?|maak)?\s*(?:a|an|een)?\s*(?:task|taak|chore|klus|klusje)\s*:?\s+(.+?)\s*$/i;
+// A chore that says WHO ("voor mij", "voor Bert", "for me") or WHEN (a day word) is the model's: it has the assignee and
+// the due date to fill, which this typed rule cannot.
+const CHORE_WHO_OR_WHEN = /\b(?:voor\s+\S+|for\s+\S+|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|morgen|vandaag|overmorgen|volgende\s+week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next\s+week)\b/i;
+const LISTS_ADD_TASK_TYPED = /^(?:add|new|voeg|zet|nieuwe?|maak)?\s*(?:a|an|een)?\s*(?:task|taak|chore|klus|klusje)\s*:?\s+(.+?)\s*$/i;
+const LISTS_ADD_TASK = { test: (s) => LISTS_ADD_TASK_TYPED.test(String(s ?? '')) && !CHORE_WHO_OR_WHEN.test(String(s ?? '')), exec: (s) => LISTS_ADD_TASK_TYPED.exec(String(s ?? '')) };
 
 const HH_LIST_ALIASES = {
   shopping: 'shopping', groceries: 'shopping', grocery: 'shopping',

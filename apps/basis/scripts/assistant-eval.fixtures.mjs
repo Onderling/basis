@@ -77,4 +77,7 @@ export const FIXTURES = [
   { id: 'p-question-count',  text: 'hoeveel dingen staan er op de boodschappenlijst?', expect: { anyOf: [{ op: 'listEntries', args: { list: /boodschappen/ } }, { reply: 'asks' }] } },
   { id: 'p-who-does',        text: 'wie doet de lamp?', items: ['lamp vervangen (Klusjes)'], expect: { anyOf: [{ op: 'listEntries', args: { list: /klusjes/ } }, { op: 'listMine' }, { reply: 'asks' }, { reply: 'declines' }] } },
   { id: 'p-tick-partial',    text: 'kaas is gekocht', items: ['kaas en eieren (Boodschappen)', 'melk (Boodschappen)'], expect: { anyOf: [{ reply: 'asks' }, { op: 'markListItemDone' }] } },
+  // ── a chore that says who and when (Frits' session, 2026-09-30) ──
+  { id: 'chore-for-me-day',   text: 'nieuwe taak voor mij: kleurenwiezen, maandag', expect: { op: 'addToList', args: { list: /klusjes/, text: /^kleurenwiezen$/, assignee: /^(mij|me|ik)$/, due: /^\d{4}-\d{2}-\d{2}/ } } },
+  { id: 'chore-same-for-bert', text: 'voor Bert hetzelfde, dinsdag', before: ['you: nieuwe taak voor mij: kleurenwiezen, maandag', "system: 'kleurenwiezen' toegevoegd aan Klusjes."], expect: { anyOf: [{ reply: 'asks' }, { op: 'addToList', args: { text: /^kleurenwiezen$/, assignee: /bert/ } }] } },   // never "hetzelfde" as the chore
 ];

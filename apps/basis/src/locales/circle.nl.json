@@ -3984,6 +3984,14 @@
     "model_down": {
       "text": "De assistent reageert nu niet. Probeer het zo nog eens.",
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "settings_list": {
+      "text": "Instellingen — klusjes geven: {{assign}} (self: alleen jezelf, de beheerder iedereen · anyone: iedereen · role: de rollen {{roles}} iedereen).",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "settings_usage": {
+      "text": "Gebruik: /instellingen assign self|anyone|role · /instellingen roles admin,member",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     }
   },
   "op": {
@@ -6859,6 +6867,14 @@
     "already_yours": {
       "text": "Je had '{{title}}' al opgepakt.",
       "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "assign_refused": {
+      "text": "Je kunt alleen jezelf een klusje geven.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "no_such_person": {
+      "text": "Ik ken niemand die \"{{name}}\" heet. Ik ken: {{known}}.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
     }
   }
 }

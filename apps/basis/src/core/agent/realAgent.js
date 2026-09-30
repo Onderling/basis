@@ -241,7 +241,8 @@ import { mergeManifests }                  from '../../manifestMerge.js';       
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
-import { matchEntry, choicesOf }           from '../../v2/entryRef.js';                           // an entry by its id or a person's words
+import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
+import { assignAllowed, isSelfWord, ASSIGN_POLICY_KEY, ASSIGN_ROLES_KEY } from '../../v2/botSettings.js';   // who may give a chore to whom                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3954,6 +3955,51 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
 
   let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  /** The add of a chore with its person and its day (see the lists branch of `callSkill`). */
+  async function addChoreFor(args, ctx) {
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const { assignee, due, ...rest } = args;
+    const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
+    let who = null;
+    if (typeof assignee === 'string' && assignee.trim()) {
+      const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+      const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
+      if (isSelfWord(assignee)) who = caller ?? 'me';
+      else {
+        const name = assignee.trim().toLowerCase();
+        const hit = known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
+        if (hit.length !== 1) {
+          const names = known.map((c) => c.displayName).filter(Boolean).join(', ');
+          return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim(), known: names }) };
+        }
+        who = hit[0].webid;
+      }
+      const callerRole = caller ? (known.find((c) => c.webid === caller)?.role ?? null) : null;
+      const allowed = assignAllowed({
+        policy: paramsService.register.valueOf(ASSIGN_POLICY_KEY),
+        roles: paramsService.register.valueOf(ASSIGN_ROLES_KEY),
+        callerId: caller, callerRole, assigneeId: who,
+      });
+      if (!allowed) return { ok: false, error: tr('circle.tasks.assign_refused') };
+    }
+    const made = await callSkill('lists', 'addToList', rest, ctx);
+    if (!made?.ok || made.duplicate || made.kind !== 'task' || !made.itemId) return made;
+    const circleId = resolveCircleId(rest);
+    if (typeof due === 'string' && due.trim()) {
+      const at = new Date(due.trim());
+      if (!Number.isNaN(at.getTime())) {
+        const store = householdService.stores.getStore(circleId);
+        const item = await store.get(made.itemId);
+        if (item) await store.put({ ...item, dueAt: at.toISOString() }, { by: caller ?? 'me' });
+      }
+    }
+    if (who) {
+      // the claim path, the host vouching for the person the chore is for
+      const claimed = await callSkill('tasks', 'claimTask', { id: made.itemId, actor: who });
+      if (claimed?.ok === false) return claimed;
+    }
+    return made;
+  }
   const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
@@ -3965,6 +4011,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
     // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no
     // task are said so in the household's words, not the store's.
+    // A chore that says who and when (a household bot): "nieuwe taak voor Bert: X (maandag)". The add on a list whose
+    // entries are chores takes an `assignee` (me, or a person the bot knows by name) and a `due` day; WHO may be named
+    // is the bot's setting (`assistant.assignPolicy`), decided here — the model only passes the words on.
+    if (appOrigin === 'lists' && opId === 'addToList' && opts.tasksCircleId && (args?.assignee || args?.due)) {
+      return addChoreFor(args ?? {}, ctx);
+    }
     let namedTask = null;   // the task's words, when the door named it by them
     if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {
       const store = householdService?.stores?.getStore?.(resolveCircleId(args ?? {}));

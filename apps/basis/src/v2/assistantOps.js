@@ -2,12 +2,14 @@
  * assistantOps — the door's own ops (`assistantManifest`), answered by the door: a person's thread settings, and the
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
+import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, ASSIGN_ROLES_KEY, assignPolicyFrom, assignRolesFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 
 /**
  * The door's callSkill, with its own ops handled here, and nothing else changed.
  *   - `assistant-memory` / `assistant-language` set the CALLING thread's row (the thread id the door passes in `ctx`);
- *   - `assistant-apps` / `assistant-status` / `assistant-users` are the bot admin's: the app list, how it is doing,
+ *   - `assistant-apps` / `assistant-settings` / `assistant-status` / `assistant-users` are the bot admin's: the app list,
+ *     the bot's settings (who may give a chore to whom), how it is doing,
  *     who it serves.
  * Every one of them asks the host gate first (`refusal`), at the level its op declares (`visibility`, default
  * `authenticated`): a member reaches their own thread's settings, only the admin (`trusted`) the admin's ops.
@@ -35,6 +37,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     try {
       // `/apps on tasks`: with no required param the router keeps the line as `_match` for the op to split.
       if (op === 'assistant-apps') return appsOp(args?.change ?? args?._match);
+      if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match);
       if (op === 'assistant-status') return { ok: true, message: await statusText() };
       if (op === 'assistant-users') return { ok: true, message: await usersText() };
       if (op === 'assistant-cohort') return cohortOp(args?.spec ?? args?._match);
@@ -70,6 +73,27 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!next.length) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.apps_none_left') } };
     await cat.setApps(next);
     return { ok: true, message: list() };
+  }
+
+  /** The bot's settings (parameters of its device): who may give a chore to whom. The admin's; never the model's. */
+  async function settingsOp(change) {
+    const current = async () => {
+      const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+      const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), roles: assignRolesFrom(of(ASSIGN_ROLES_KEY)).join(', ') });
+    };
+    const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
+    if (!what) return { ok: true, message: await current() };
+    const usage = { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.settings_usage') } };
+    if (what === 'assign') {
+      if (!ASSIGN_POLICIES.includes(value)) return usage;
+      await callSkill('params', 'set-param', { key: ASSIGN_POLICY_KEY, value });
+    } else if (what === 'roles') {
+      const roles = String(value ?? '').split(',').map((r) => r.trim()).filter(Boolean);
+      if (!roles.length) return usage;
+      await callSkill('params', 'set-param', { key: ASSIGN_ROLES_KEY, value: roles });
+    } else return usage;
+    return { ok: true, message: await current() };
   }
 
   async function statusText() {

@@ -89,7 +89,8 @@ for (const f of fixtures) {
     // As the box: a read the model picks first is looked at (here: the fixture's entries, with their ids) and handed
     // back once; the member's thread names the admin's tools.
     peek: async (cmd) => { peeked = cmd.opId; return { payload: { items: (f.items ?? []).map((text, i) => ({ id: `i${i}`, label: text })) } }; },
-    threadHints: () => roleHintsFor('member'),
+    // with the door's translator, as the box hands it: the model is given the refusal sentence itself
+    threadHints: () => roleHintsFor('member', tNl),
     expand: expandAdds({ t: tNl }),
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
     onNoMatch: (_t, _c, extra) => replies.push(extra?.reply || '__unknown'),

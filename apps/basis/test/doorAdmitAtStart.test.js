@@ -21,7 +21,7 @@ describe('the gate knows the book at start', () => {
     const set = [];
     const admit = createDoorAdmit({ users: createBotUsers({ store, adminUid: '1' }), setDoorCaller: async (id, role) => { set.push([id, role]); } });
     expect(admit.roleOf(bert.id)).toBeNull();
-    await admit.atStart();
+    expect(await admit.atStart()).toBe(2);
     expect(set).toEqual(expect.arrayContaining([['telegram:1', 'admin'], [bert.id, 'member']]));
     expect(set.map(([id]) => id)).not.toContain(ann.id);
     expect(admit.roleOf(bert.id)).toBe('member');

@@ -179,6 +179,6 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
   admit.roleOf = (id) => tiered.get(id) ?? null;
   /** At start: every admitted person (the book; a revoked one is not in it) goes into the host's gate with their
    *  role, before they write — the box calls ops as a person (a reminder, the Sunday overview) after a restart too. */
-  admit.atStart = async () => { for (const row of await users.list()) if (row?.id && row.role) await tier(row); };
+  admit.atStart = async () => { let n = 0; for (const row of await users.list()) if (row?.id && row.role) { await tier(row); n += 1; } return n; };
   return admit;
 }

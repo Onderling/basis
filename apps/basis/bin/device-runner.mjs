@@ -724,7 +724,8 @@ if (tgToken || inboxDoor.bridge) {
   // Everyone in the book is in the gate from the start: the reminder tick and the Sunday overview act AS a person, and
   // after a restart nobody has written yet. A book the gate cannot take is said, not fatal (the door still tiers on the
   // next message).
-  await doorAdmit.atStart().catch((e) => console.warn(`device-runner: could not put the bot's people in the gate at start: ${e?.message ?? e}`));
+  const inGate = await doorAdmit.atStart().catch((e) => { console.warn(`device-runner: could not put the bot's people in the gate at start: ${e?.message ?? e}`); return null; });
+  walkLog({ kind: 'gate-at-start', people: inGate });
   // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
   // console, never a chat or the walk log) — the first person admitted is the bot's admin.
   let bootstrapCode = null;

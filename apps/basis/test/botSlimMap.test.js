@@ -18,8 +18,8 @@ import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 const nodes = [];
 afterAll(() => teardown(nodes));
 
-const MEMBER = ['listLists', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'listMine', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'assistant-memory', 'assistant-language'];
-const ADMIN_EXTRA = ['createList', 'removeList', 'reassignTask', 'removeTask', 'editTask', 'cancelEvent'];
+const MEMBER = ['listLists', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'listMine', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language'];
+const ADMIN_EXTRA = ['createList', 'removeList', 'reassignTask', 'removeTask', 'editTask'];
 
 describe('the bot\'s slim map', () => {
   const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });

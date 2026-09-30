@@ -655,6 +655,10 @@
     "say_when": {
       "text": "Een afspraak op {{name}} heeft een tijd nodig: zeg wanneer.",
       "doc": "A household bot's calendar reply."
+    },
+    "already_there": {
+      "text": "{{title}} staat al in de agenda ({{when}}).",
+      "doc": "A household bot's reply when the same appointment (title, at the same start) is added again: said, and no second one is made."
     }
   },
   "embed": {

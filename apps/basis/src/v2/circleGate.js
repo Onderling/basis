@@ -80,6 +80,7 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
 export function listsGateRules(_locale, lists = []) {
   const byWord = new Map();
   for (const l of lists) for (const w of [l.name, ...(l.aliases ?? [])]) if (w) byWord.set(String(w).toLowerCase(), l.name);
+  const holdsEvents = new Set(lists.filter((l) => l.defaultChild === 'calendar-event').map((l) => l.name));
   const listFor = (word) => {
     const w = String(word ?? '').trim().toLowerCase();
     return byWord.get(w) ?? byWord.get(w.replace(/(?:lijstje|lijst|list)$/, '')) ?? null;
@@ -100,7 +101,9 @@ export function listsGateRules(_locale, lists = []) {
     { name: 'lists:listEntries(named-list-read)', test: (text) => Boolean(listRead && listRead.test(String(text ?? ''))), command: (text) => {
       const m = listRead ? listRead.exec(String(text || '').trim()) : null;
       const list = m ? listFor(m[1]) : null;
-      return list ? { opId: 'listEntries', args: { list } } : null;
+      if (!list) return null;
+      // a list of appointments is read as the coming days, with their times — the calendar's own read
+      return holdsEvents.has(list) ? { opId: 'listEvents', args: {}, appOrigin: 'calendar' } : { opId: 'listEntries', args: { list } };
     } },
     { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
     // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child

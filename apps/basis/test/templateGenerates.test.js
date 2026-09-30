@@ -43,12 +43,14 @@ describe('the template generates', () => {
     expect(route(rules, 'zet melk op de boodschappen')).toMatchObject({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk' } });
     expect(route(rules, 'wat staat er op de takenlijst')).toMatchObject({ opId: 'listEntries', args: { list: 'Klusjes' } });
     expect(route(rules, 'nieuwe taak: lamp vervangen')).toMatchObject({ opId: 'addToList', args: { list: 'Klusjes', text: 'lamp vervangen' } });
+    // a list whose entries are appointments is read with their times: the calendar's window, not the plain entries
+    expect(route(rules, 'wat staat er in de agenda')).toMatchObject({ opId: 'listEvents', appOrigin: 'calendar' });
   });
 
   it('a tennis club\'s template: working gate rules and lines, with no other change', () => {
     const rules = listsGateRules('nl', templateLists(t, TENNIS));
     expect(route(rules, 'zet koffie op de bardienst')).toMatchObject({ opId: 'addToList', args: { list: 'Bardienst', text: 'koffie' } });
-    expect(route(rules, 'wat staat er op de wedstrijden')).toMatchObject({ opId: 'listEntries', args: { list: 'Wedstrijden' } });
+    expect(route(rules, 'wat staat er op de wedstrijden')).toMatchObject({ opId: 'listEvents', appOrigin: 'calendar' });   // appointments
     expect(route(rules, 'nieuwe taak: glazen spoelen')).toMatchObject({ opId: 'addToList', args: { list: 'Bardienst', text: 'glazen spoelen' } });
     const lines = promptLinesFor(t, TENNIS).join('\n');
     expect(lines).toContain('Wedstrijden');

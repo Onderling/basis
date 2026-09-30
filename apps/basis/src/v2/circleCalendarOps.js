@@ -74,6 +74,11 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       let event;
       try { event = buildEvent(args, { actorDefault: who(args) }); }
       catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+      // the same appointment again — its title (case aside) at the same start — is not a second one
+      const same = (await eventsOf(circleId)).find((e) => e.state !== 'cancelled' && !e.completedAt
+        && String(e.title ?? '').trim().toLowerCase() === String(event.title ?? '').trim().toLowerCase()
+        && new Date(e.startsAt).getTime() === new Date(event.startsAt).getTime());
+      if (same) return { ok: true, duplicate: true, itemId: same.id, message: t('circle.calendar.already_there', { title: same.title, when: stamp(same) }) };
       // The Agenda's child, with the event's own id; `text` so the list shows it as an entry too.
       const made = await addChildTo(storeFor(circleId), agenda.id, { ...event, text: event.title, completedAt: null, createdBy: who(args) });
       return { ok: true, itemId: made?.id ?? event.id, message: t('circle.calendar.added', { title: event.title, when: stamp(event) }) };

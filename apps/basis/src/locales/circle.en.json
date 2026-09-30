@@ -655,6 +655,10 @@
     "say_when": {
       "text": "An appointment on {{name}} needs a time: say when.",
       "doc": "A household bot's calendar reply."
+    },
+    "already_there": {
+      "text": "{{title}} is already on the agenda ({{when}}).",
+      "doc": "A household bot's reply when the same appointment (title, at the same start) is added again: said, and no second one is made."
     }
   },
   "embed": {

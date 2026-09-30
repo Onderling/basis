@@ -167,6 +167,19 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, title: target.text ?? ref, items };
     },
 
+    removeList: async (args) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
+      const ref = String(args?.list ?? '').trim();
+      const target = ref ? await findList(circleId, ref) : null;
+      if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
+      // the list and everything on it (done or not): nothing is left pointing at a list that is gone
+      const tree = await svc.tree(circleId, target.id);
+      for (const c of (Array.isArray(tree?.children) ? tree.children : [])) if (c?.id) await svc.remove(circleId, c.id);
+      await svc.remove(circleId, target.id);
+      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref }) };
+    },
+
     removeFromList: async (args) => {
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error };

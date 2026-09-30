@@ -3705,6 +3705,14 @@
     "done_named": {
       "text": "Afgevinkt: {{text}}.",
       "doc": "A household bot's reply naming the entry it ticked off."
+    },
+    "remove_list_confirm": {
+      "text": "De lijst \"{{list}}\" en alles wat erop staat verwijderen?",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "list_removed": {
+      "text": "De lijst \"{{name}}\" is weg.",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     }
   },
   "share": {

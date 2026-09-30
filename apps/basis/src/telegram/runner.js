@@ -229,7 +229,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       }
       case 'needsConfirm': {
         pending.set(threadId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
-        return say(chatId, t('circle.telegram.confirm', { message: r.message ?? '' }), [
+        return say(chatId, t('circle.telegram.confirm', { message: r.messageKey ? t(r.messageKey, r.args ?? {}) : (r.message ?? '') }), [
           { id: CONFIRM_YES, label: t('circle.telegram.confirm_yes') },
           { id: CONFIRM_NO,  label: t('circle.telegram.confirm_no') },
         ]);

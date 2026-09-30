@@ -21,7 +21,7 @@ export const BOT_OP_MAP = Object.freeze({
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative',
     'assistant-memory', 'assistant-language',
   ]),
-  admin: Object.freeze(['createList', 'reassignTask', 'removeTask', 'editTask', 'cancelEvent']),
+  admin: Object.freeze(['createList', 'removeList', 'reassignTask', 'removeTask', 'editTask', 'cancelEvent']),
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
   observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language']),
 });

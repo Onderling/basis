@@ -3705,6 +3705,14 @@
     "done_named": {
       "text": "Ticked off: {{text}}.",
       "doc": "A household bot's reply naming the entry it ticked off."
+    },
+    "remove_list_confirm": {
+      "text": "Remove the list \"{{list}}\" and everything on it?",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "list_removed": {
+      "text": "The list \"{{name}}\" is gone.",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     }
   },
   "share": {

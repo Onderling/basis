@@ -55,7 +55,7 @@ describe('the set-param op — the kind gate (decision D)', () => {
     // `assistant.memoryDefault`: how much of a person's thread the household bot keeps, until they choose;
     // `assistant.assignPolicy`: whether a household bot's roles decide who may give a chore to someone else.
     expect(params.map((p) => p.key).sort()).toEqual([
-      'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.memoryDefault', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
+      'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.memoryDefault', 'assistant.names', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
       'history.restore.maxPerCircle', 'history.restore.recencyDays',
       'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
       'privacy.shareNknAddress', 'relay.url', 'surface.pref',

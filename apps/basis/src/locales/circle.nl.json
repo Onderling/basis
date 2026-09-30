@@ -3986,11 +3986,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist, coördinator of hoger mag · anyone: iedereen mag · self: niemand).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand).",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /instellingen assign roles|anyone|self",
+      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
@@ -6887,6 +6887,22 @@
     "no_such_person": {
       "text": "Ik ken niemand die \"{{name}}\" heet.",
       "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "assignee_cannot": {
+      "text": "{{name}} kan geen klusjes oppakken (die rol kijkt alleen).",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "names_hidden": {
+      "text": "Namen zijn hier niet zichtbaar: je kunt een klusje alleen jezelf geven.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given_to": {
+      "text": "Voor {{name}}.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given": {
+      "text": "Toegewezen.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
     }
   }
 }

@@ -33,6 +33,28 @@ export function assignAllowed({ policy, roleMayAssign, callerId, assigneeId }) {
   return Boolean(roleMayAssign);
 }
 
+/**
+ * WHO may see the others' names on this bot — the household's CEILING over what each person disclosed (their display
+ * name, given at admission); it can only narrow, never widen. A circle's own `revealPolicy` takes its place in a circle.
+ *   - `members`   (default): every admitted person (a household knows itself);
+ *   - `assigners`: those who may give chores to others (the role rule), and the admin;
+ *   - `admin`:     only the admin;
+ *   - `none`:      nobody — no name leaves the bot, not even to the admin's door.
+ */
+export const NAMES_POLICIES = Object.freeze(['members', 'assigners', 'admin', 'none']);
+export const NAMES_KEY = 'assistant.names';
+export const NAMES_POLICY = param({ key: NAMES_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'members' });
+export const namesPolicyFrom = (v) => (NAMES_POLICIES.includes(v) ? v : NAMES_POLICY);
+
+/** May this person see the others' names? The bot's owner (no door caller) may, unless names leave the bot at all. */
+export function mayNamePeople({ setting, callerId, callerRole, roleMayAssign }) {
+  const p = namesPolicyFrom(setting);
+  if (p === 'none') return false;
+  if (!callerId || p === 'members') return true;
+  if (p === 'assigners') return Boolean(roleMayAssign) || callerRole === 'admin';
+  return callerRole === 'admin';
+}
+
 /** The roles an admin may give a person on the bot (the admin role is the door's, given at admission). */
 export const BOT_ROLES = Object.freeze(['coordinator', 'member', 'observer']);
 

@@ -424,7 +424,12 @@ function parseEvent(raw) {
   } catch { return null; }
 }
 
-function parseDateInput(input) {
+/**
+ * A date or time as a person gives it, read on the household's clock: ISO / datetime-local (a time without a zone is
+ * LOCAL), a bare date ("2026-10-05" — that local day, not UTC midnight, which `new Date` makes of it), or natural
+ * language via chrono. Returns an ISO string, or null.
+ */
+export function parseDateInput(input) {
   if (!input) return null;
   if (input instanceof Date && !Number.isNaN(input.getTime())) {
     return input.toISOString();
@@ -432,6 +437,10 @@ function parseDateInput(input) {
   if (typeof input !== 'string') return null;
   const trimmed = input.trim();
   if (trimmed === '') return null;
+
+  // A bare date is that LOCAL day: `new Date('2026-10-05')` is UTC midnight, the day before in a zone west of it.
+  const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (bare) return new Date(Number(bare[1]), Number(bare[2]) - 1, Number(bare[3])).toISOString();
 
   // Fast path 1: ISO + datetime-local + similar machine formats.
   // (datetime-local emits 'YYYY-MM-DDTHH:mm' without timezone; native

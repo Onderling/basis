@@ -3986,11 +3986,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides, coordinator or above may · anyone: everyone may · self: nobody).",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody).",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /instellingen assign roles|anyone|self",
+      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
@@ -6887,6 +6887,22 @@
     "no_such_person": {
       "text": "I do not know anyone called \"{{name}}\".",
       "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "assignee_cannot": {
+      "text": "{{name}} cannot take chores (that role only looks).",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "names_hidden": {
+      "text": "Names are not visible here: you can only give a chore to yourself.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given_to": {
+      "text": "For {{name}}.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given": {
+      "text": "Assigned.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
     }
   }
 }

@@ -59,7 +59,7 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
-import { botOpLevel, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
+import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
 import { turnLogFor } from '../src/v2/turnLog.js';
@@ -201,7 +201,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel } : {}),
+  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),

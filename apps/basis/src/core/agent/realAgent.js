@@ -217,7 +217,7 @@ import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@o
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
 import {
-  CalendarStore, registerCalendarSkills,
+  CalendarStore, registerCalendarSkills, parseDateInput as parseCalendarDate,
 } from '@onderling-app/calendar';
 // Imported by RELATIVE path (not the `@onderling-app/household` package name)
 // because basis doesn't carry household as a workspace dep yet (the
@@ -244,7 +244,7 @@ import { listsManifest }                   from '../../../../lists/manifest.js';
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
-import { assignAllowed, isSelfWord, ASSIGN_POLICY_KEY } from '../../v2/botSettings.js';   // who may give a chore to whom
+import { assignAllowed, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
@@ -3953,9 +3953,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     visibility = visibility ?? mapped ?? 'authenticated';
     try {
       await engine.checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility, enabled: true }, unknownAs: 'public' });
-      return null;
     } catch (e) { return e?.code ?? 'refused'; }
+    // …and the person's role, where the door narrows a role below its tier (an observer reads).
+    if (typeof opts.doorRoleAllows === 'function' && !opts.doorRoleAllows(doorRoles.get(caller) ?? null, opId)) return 'role';
+    return null;
   };
+  const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
   let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
   /** The add of a chore with its person and its day (see the lists branch of `callSkill`). */
@@ -3964,46 +3967,62 @@ export async function createRealHouseholdAgent(opts = {}) {
     const { assignee, due, ...rest } = args;
     const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
     let who = null;
+    let whoName = null;
     if (typeof assignee === 'string' && assignee.trim()) {
       const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
       const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
+      const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
+      const policy = buildStandardRolePolicy(roles);
+      const callerRole = caller ? (roles[caller] ?? null) : null;
+      const roleMayAssign = caller ? policy.canReassign(caller) : true;
+      // Whether this person may SEE the others' names is the household's ceiling (`assistant.names`); naming someone
+      // is seeing them, so where names are hidden a chore is given by name only by those who may see them.
+      const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
       if (isSelfWord(assignee)) who = caller ?? 'me';
       else {
+        if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden') };
         const name = assignee.trim().toLowerCase();
         const hit = known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
-        // Who the bot knows is not said here: whether names are shared, and with whom, is a household's choice still to
-        // be made — until then the bot says only that it does not know this one.
+        // Who the bot knows is never listed on a miss: a directory is not implied by anyone's own disclosure.
         if (hit.length !== 1) return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim() }) };
         who = hit[0].webid;
+        whoName = hit[0].displayName ?? null;
       }
-      // The role decides first — the tasks app's own rule (coordinator-or-above may reassign), over the bot's people and
-      // the roles they hold; the household's setting loosens or tightens it.
-      const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
       const allowed = assignAllowed({
         policy: paramsService.register.valueOf(ASSIGN_POLICY_KEY),
-        roleMayAssign: caller ? buildStandardRolePolicy(roles).canReassign(caller) : true,
-        callerId: caller, assigneeId: who,
+        roleMayAssign, callerId: caller, assigneeId: who,
       });
       if (!allowed) return { ok: false, error: tr('circle.tasks.assign_refused') };
+      // …and the one who gets it must be someone their OWN role lets claim (an observer looks, and holds no chore).
+      if (who !== 'me' && roles[who] !== undefined && !policy.canClaim(who)) {
+        return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? assignee.trim() }) };
+      }
     }
     const made = await callSkill('lists', 'addToList', rest, ctx);
     if (!made?.ok || made.duplicate || made.kind !== 'task' || !made.itemId) return made;
     const circleId = resolveCircleId(rest);
     if (typeof due === 'string' && due.trim()) {
-      const at = new Date(due.trim());
-      if (!Number.isNaN(at.getTime())) {
+      // the household's local day or time, as an appointment's `when` is read (a bare date is that day, not UTC)
+      const iso = parseCalendarDate(due.trim());
+      if (iso) {
         const store = householdService.stores.getStore(circleId);
         const item = await store.get(made.itemId);
-        if (item) await store.put({ ...item, dueAt: at.toISOString() }, { by: caller ?? 'me' });
+        if (item) await store.put({ ...item, dueAt: iso }, { by: caller ?? 'me' });
       }
     }
     if (who) {
       // the claim path, the host vouching for the person the chore is for
       const claimed = await callSkill('tasks', 'claimTask', { id: made.itemId, actor: who });
       if (claimed?.ok === false) return claimed;
+      // the reply names the one who got it only where names may be seen; to someone else it says it was given
+      if (who !== caller && who !== 'me') {
+        const given = whoName ? tr('circle.tasks.given_to', { name: whoName }) : tr('circle.tasks.given');
+        return { ...made, message: `${made.message ?? ''} ${given}`.trim() };
+      }
     }
     return made;
   }
+
   const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
@@ -6231,6 +6250,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     /** A door dropped a person (revoked): the gate treats them as a stranger from now on. */
     clearDoorCaller: async (callerId) => {
+      doorRoles.delete(callerId);
       if (!hostTrustRegistry) throw new Error('clearDoorCaller: the host gate is not attached');
       if (typeof callerId !== 'string' || !callerId) throw new Error('clearDoorCaller: a caller id is required');
       await hostTrustRegistry.setTier(callerId, 'public');
@@ -6241,6 +6261,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!hostTrustRegistry) throw new Error('setDoorCaller: the host gate is not attached');
       if (typeof callerId !== 'string' || !callerId) throw new Error('setDoorCaller: a caller id is required');
       await hostTrustRegistry.setTier(callerId, tier);
+      doorRoles.set(callerId, role);
     },
     // Who may retire this device's addresses: the owner root, at a ceremony (core ceremonyCommitment.js).
     ceremonyCommitmentFor, signCeremonyCommitment,

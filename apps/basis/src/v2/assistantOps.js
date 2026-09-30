@@ -129,10 +129,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function statusText() {
     const s = typeof admin.status === 'function' ? ((await admin.status()) ?? {}) : {};
     const apps = admin.catalogue ? admin.catalogue.apps().join(', ') : '';
-    return t('circle.bot.status', {
+    const status = t('circle.bot.status', {
       apps, model: s.model ?? '—', door: s.door ?? '—', turns: s.turns ?? 'off',
       memory: s.memory ?? '—', users: s.users ?? '—',
     });
+    // people the bot cannot write to first (no private chat): the admin hears how many
+    return Number(s.unreachable) > 0 ? `${status}\n${t('circle.bot.unreachable', { count: s.unreachable })}` : status;
   }
 
   async function cohortOp(spec) {

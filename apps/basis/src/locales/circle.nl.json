@@ -4076,6 +4076,10 @@
     "overview_off": {
       "text": "Het weekoverzicht staat uit.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_done": {
+      "text": "Klaar",
+      "doc": "The button under a chore's reminder: it is done."
     }
   },
   "op": {

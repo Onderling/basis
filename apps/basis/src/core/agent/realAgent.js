@@ -6253,6 +6253,12 @@ export async function createRealHouseholdAgent(opts = {}) {
      * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
      */
     doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /** A household bot's reminders read the household circle's chores and appointments, whole (dates, who comes). */
+    reminderSources: async () => {
+      const store = householdService.stores.getStore(resolveCircleId({}));
+      const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
+      return { chores: chores ?? [], events: events ?? [] };
+    },
     /**
      * Whose profile this node runs: a PERSON's (their devices keep their inbox; nothing answers it) or a FUNCTION's
      * (a household bot on its own node — its inbox is the bot's, and the assistant answers it). Read from the

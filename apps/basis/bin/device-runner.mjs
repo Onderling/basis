@@ -58,6 +58,9 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { createPersonReach } from '../src/v2/doorReach.js';
+import { createReminderTick } from '../src/v2/botReminderTick.js';
+import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom } from '../src/v2/botSettings.js';
 import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
@@ -750,6 +753,7 @@ if (tgToken || inboxDoor.bridge) {
         status: async () => ({
           model: llm ? llmModel : null, door: 'codes', turns: turnLogMode ?? 'off',
           memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
+          unreachable: (await botUsers.list()).filter((u) => threads.unreachableOf(u.id)).length,
         }),
       },
     }),
@@ -775,6 +779,18 @@ if (tgToken || inboxDoor.bridge) {
     } : {}),
   });
   await tgRunner.start();
+  // A household bot writes first, too: reminders of what people dated, on each person's own door (the tick asks the
+  // projection every few minutes; the household's switch and quiet hours are the admin's settings).
+  if (isFunctionProfile) {
+    const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
+    const reminderTick = createReminderTick({
+      sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
+      tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      settings: () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)) }),
+    });
+    reminderTick.start();
+    walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });
+  }
   // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a
   // person's node: their circle is theirs, and four lists would appear on every device of theirs.
   if (isFunctionProfile) {

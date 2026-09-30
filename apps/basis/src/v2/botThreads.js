@@ -129,6 +129,9 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { unreachable: _u, ...rest } = rowOf(id);
       return save(rest);
     },
+    /** Has this person had a reminder before (the first one says how to stop)? */
+    remindedOnce: (id) => rows.get(id)?.reminded === true,
+    markReminded(id) { return save({ ...rowOf(id), reminded: true }); },
     /** What was already said to this person: item id → the slot it was said for (the reminders' only state). */
     saidOf: (id) => ({ ...(rows.get(id)?.said ?? {}) }),
     setSaid(id, said) { return save({ ...rowOf(id), said: { ...said } }); },

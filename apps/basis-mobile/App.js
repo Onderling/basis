@@ -490,6 +490,8 @@ export default function App() {
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
         let eventSeq = 0;
         const b = await bootAgentBundle({
+          // the agent's own lines (list and calendar defaults, task confirmations) in the person's language — as web
+          t,
           // A message the hold queue GIVES UP ON must stop claiming "maybe received" (review, 2026-07-30).
           // `createSecureAgent` reports every drop; without a consumer the bubble kept the optimistic
           // state for a message that is gone — the one place the UI could say something untrue. App owns

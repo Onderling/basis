@@ -302,6 +302,8 @@ export async function bootAgentBundle(opts = {}) {
   try {
     const createRealHouseholdAgent = await loadCreateRealHouseholdAgent();
     agent = await createRealHouseholdAgent({
+      // the shell's translator (App.js hands it): the agent's own lines follow the person's language
+      t: opts.t,
       chatVault,
       hostVault,
       ownerRootVault,

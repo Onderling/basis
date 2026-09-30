@@ -6994,6 +6994,7 @@ snapshots:
       '@onderling/attribute-charter': link:../../packages/attribute-charter
       '@onderling/blob-gateway': link:../../packages/blob-gateway
       '@onderling/chat-nav': link:../../packages/chat-nav
+      '@onderling/circles': link:../../packages/circles
       '@onderling/core': link:../../packages/core
       '@onderling/item-store': link:../../packages/item-store
       '@onderling/item-types': link:../../packages/item-types
@@ -7002,6 +7003,7 @@ snapshots:
       '@onderling/local-store': link:../../packages/local-store
       '@onderling/logger': link:../../packages/logger
       '@onderling/manifest-host': link:../../packages/manifest-host
+      '@onderling/notifier': link:../../packages/notifier
       '@onderling/oidc-session': link:../../packages/oidc-session
       '@onderling/pod-client': link:../../packages/pod-client
       '@onderling/pod-onboarding': link:../../packages/pod-onboarding

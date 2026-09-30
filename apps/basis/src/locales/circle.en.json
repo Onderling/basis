@@ -3718,6 +3718,42 @@
       "text": "Remove the list \"{{list}}\" and everything on it?",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     },
+    "remove_list_confirm_counts": {
+      "text": "Remove the list \"{{list}}\", with {{what}}?",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_one": {
+      "text": "{{count}} entry",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_other": {
+      "text": "{{count}} entries",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries": {
+      "text": "{{count}} entries",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_one": {
+      "text": "{{count}} chore",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_other": {
+      "text": "{{count}} chores",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores": {
+      "text": "{{count}} chores",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_held": {
+      "text": "{{count}} taken by someone",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_kept": {
+      "text": "{{count}} stays on another list.",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
     "list_removed": {
       "text": "The list \"{{name}}\" is gone.",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."

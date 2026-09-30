@@ -89,6 +89,28 @@ export function confirmRequestForOp(op, { t, message } = {}) {
   });
 }
 
+/**
+ * A confirm whose question depends on what is there ("remove this list, with 3 chores?"): the op declares
+ * `surfaces.ui.confirm.preview`, and is first called with `preview: true` — a read that changes nothing, through the
+ * same gate as the act — and the question is its `message`. Null when the op declares no preview, or the preview
+ * did not answer (the declared question stands).
+ *
+ * @param {object} a
+ * @param {import('../router.js').NeedsConfirmDispatch} a.route
+ * @param {import('../manifestMerge.js').MergedCatalogue} [a.catalogue]
+ * @param {(app: string, op: string, args: object) => Promise<object>} a.call  the caller's gated call
+ * @returns {Promise<string|null>}
+ */
+export async function confirmPreviewMessage({ route, catalogue, call } = {}) {
+  if (!route || route.kind !== 'needsConfirm' || typeof call !== 'function') return null;
+  const op = catalogue?.opsById?.get?.(route.opId)?.op;
+  if (op?.surfaces?.ui?.confirm?.preview !== true) return null;
+  try {
+    const r = await call(route.appOrigin ?? null, route.opId, { ...(route.args ?? {}), preview: true });
+    return r?.ok && typeof r.message === 'string' && r.message ? r.message : null;
+  } catch { return null; }
+}
+
 /** The one ConfirmRequest shape, however the caller reached the gate. */
 function buildRequest({ severity, message, opId, appOrigin, t }) {
   const tr = translatorOr(t, 'confirmGate.js');

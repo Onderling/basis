@@ -3718,6 +3718,42 @@
       "text": "De lijst \"{{list}}\" en alles wat erop staat verwijderen?",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     },
+    "remove_list_confirm_counts": {
+      "text": "De lijst \"{{list}}\" verwijderen, met {{what}}?",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_one": {
+      "text": "{{count}} regel",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_other": {
+      "text": "{{count}} regels",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries": {
+      "text": "{{count}} regels",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_one": {
+      "text": "{{count}} klusje",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_other": {
+      "text": "{{count}} klusjes",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores": {
+      "text": "{{count}} klusjes",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_held": {
+      "text": "{{count}} opgepakt",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_kept": {
+      "text": "{{count}} blijft op een andere lijst staan.",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
     "list_removed": {
       "text": "De lijst \"{{name}}\" is weg.",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."

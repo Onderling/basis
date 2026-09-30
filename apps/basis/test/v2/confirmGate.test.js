@@ -18,6 +18,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import { agentsManifest } from '../../../agents/manifest.js';
+import { listsManifest as listsManifestForPreview } from '../../../lists/manifest.js';
 import { tasksManifest } from '../../../tasks-v0/manifest.js';
 import { mergeManifests } from '../../src/manifestMerge.js';
 import { resolveDispatch } from '../../src/router.js';
@@ -176,5 +177,21 @@ describe('runConfirmGate — accept executes exactly once; cancel never executes
   it('requires a needsConfirm route — a ready route cannot ride the gate', async () => {
     await expect(runConfirmGate({ route: { kind: 'ready' }, present: async () => true, execute: vi.fn() }))
       .rejects.toThrow(TypeError);
+  });
+});
+
+describe('a confirm that declares a preview', () => {
+  const lists = mergeManifests([{ manifest: listsManifestForPreview }]);
+  it('asks the op first (preview: true) and the question is its answer; no preview → null, and a failed one → null', async () => {
+    const { confirmPreviewMessage } = await import('../../src/v2/confirmGate.js');
+    const route = resolveDispatch({ kind: 'slash', opId: 'removeList', args: { list: 'werktaken' } }, lists);
+    expect(route.kind).toBe('needsConfirm');
+    const calls = [];
+    const call = async (app, op, args) => { calls.push({ app, op, args }); return { ok: true, message: 'met 3 klusjes?' }; };
+    expect(await confirmPreviewMessage({ route, catalogue: lists, call })).toBe('met 3 klusjes?');
+    expect(calls).toEqual([{ app: 'lists', op: 'removeList', args: { list: 'werktaken', preview: true } }]);
+    expect(await confirmPreviewMessage({ route, catalogue: lists, call: async () => ({ ok: false }) })).toBeNull();
+    const plain = resolveDispatch({ kind: 'slash', opId: 'revokeAgent', args: DANGER_FIXTURES[0]?.args ?? {} }, catalogue);
+    expect(await confirmPreviewMessage({ route: plain, catalogue, call })).toBeNull();
   });
 });

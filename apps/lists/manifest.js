@@ -170,7 +170,9 @@ export const listsManifest = {
         slash: { command: '/list-delete', body: 'argline' },
         chat:  { reply: 'text', hint: 'Remove a whole list and everything on it (a list made by mistake).' },
         // the list and its entries go at once: asked first, in the household's words
-        ui:    { confirm: { severity: 'danger', messageKey: 'circle.lists.remove_list_confirm', message: 'Remove this list and everything on it?' } },
+        // `preview`: the op is first called with `preview: true` (a read, no change) and its `vars` fill the question —
+        // how many entries and chores go, how many of those someone holds, how many stay on another list
+        ui:    { confirm: { severity: 'danger', messageKey: 'circle.lists.remove_list_confirm', message: 'Remove this list and everything on it?', preview: true } },
       },
     },
     {

@@ -4138,15 +4138,19 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "Ik stuur je een herinnering: de avond voor een afspraak (19:00) en de ochtend dat je klusje moet (08:00), nooit tussen {{from}} en {{to}}. Uitzetten: /herinneringen uit. Elke zondag om 18:00 een weekoverzicht: /overzicht aan.",
+      "text": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00) en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
-      "text": "Herinneringen staan voor dit huishouden uit. Elke zondag om 18:00 een weekoverzicht: /overzicht aan.",
+      "text": "Herinneringen staan voor dit huishouden uit.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_overview": {
+      "text": "Wil je elke zondag om 18:00 een weekoverzicht? Zet het aan met /overzicht aan.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_admin": {
-      "text": "Je bent de beheerder: /instellingen verandert de instellingen voor het hele huishouden (wie klusjes toewijst, namen, herinneringen, stille uren).",
+      "text": "Je bent beheerder. Met /instellingen regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "reminder_done": {

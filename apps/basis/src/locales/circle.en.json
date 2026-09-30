@@ -6920,5 +6920,59 @@
       "text": "Assigned.",
       "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
     }
+  },
+  "refusal": {
+    "role": {
+      "text": "Your role here cannot do that: you can only look.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "not-on-this-door": {
+      "text": "This bot does not do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "no-gate": {
+      "text": "The bot cannot check who you are right now; try again in a moment.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "DISABLED": {
+      "text": "That is switched off here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_FOUND": {
+      "text": "I do not know that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INVALID_TOKEN": {
+      "text": "You may not do that here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "refused": {
+      "text": "You may not do that here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_TIER": {
+      "text": "Only this bot's admin may do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_SELF": {
+      "text": "Only the owner may do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NO_TOKEN": {
+      "text": "You may not do that here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_ROLE": {
+      "text": "Your role here cannot do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_A_MEMBER": {
+      "text": "You are not (yet) part of this.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "POLICY_NEVER": {
+      "text": "That cannot be done here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    }
   }
 }

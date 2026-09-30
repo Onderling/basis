@@ -244,7 +244,9 @@ import { listsManifest }                   from '../../../../lists/manifest.js';
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
-import { assignAllowed, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
+import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
+import { botDoorChecks } from '../../v2/botRungs.js';                                            // the bot door's checks, declared once
+import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
@@ -3948,20 +3950,18 @@ export async function createRealHouseholdAgent(opts = {}) {
    * no door call.
    * @returns {Promise<string|null>} the refusal's code, or null when the caller may go on
    */
+  // The door's checks at the waist — tier · the door's map · the role — declared once (`botRungs.js`), asked in order,
+  // deny-wins; each no is a refusal `{layer, code}` (`refusal.js`).
   const doorRefusal = async (opId, caller, visibility) => {
     const engine = hostAgent.policyEngine;
-    if (!engine || typeof engine.checkCaller !== 'function') return 'no-gate';
-    // A door that declares its op map (a household bot, `opts.doorOpLevel`): an op off the map is refused however
-    // it is asked for, and an op on it is judged at the map's level. Without a map, an ordinary op is a member's.
-    const mapped = typeof opts.doorOpLevel === 'function' ? opts.doorOpLevel(opId) : undefined;
-    if (mapped === null && visibility === undefined) return 'not-on-this-door';
-    visibility = visibility ?? mapped ?? 'authenticated';
-    try {
-      await engine.checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility, enabled: true }, unknownAs: 'public' });
-    } catch (e) { return e?.code ?? 'refused'; }
-    // …and the person's role, where the door narrows a role below its tier (an observer reads).
-    if (typeof opts.doorRoleAllows === 'function' && !opts.doorRoleAllows(doorRoles.get(caller) ?? null, opId)) return 'role';
-    return null;
+    if (!engine || typeof engine.checkCaller !== 'function') return refuse('tier', 'no-gate');
+    const checks = botDoorChecks({
+      checkCaller: (q) => engine.checkCaller(q),
+      opLevel: typeof opts.doorOpLevel === 'function' ? opts.doorOpLevel : null,
+      roleAllows: typeof opts.doorRoleAllows === 'function' ? opts.doorRoleAllows : null,
+      roleOf: (c) => doorRoles.get(c) ?? null,
+    });
+    return firstRefusal(checks, { opId, caller, visibility });
   };
   const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
@@ -3985,7 +3985,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
       if (isSelfWord(assignee)) who = caller ?? 'me';
       else {
-        if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden') };
+        if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
         const name = assignee.trim().toLowerCase();
         const hit = known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
         // Who the bot knows is never listed on a miss: a directory is not implied by anyone's own disclosure.
@@ -3997,10 +3997,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         policy: paramsService.register.valueOf(ASSIGN_POLICY_KEY),
         roleMayAssign, callerId: caller, assigneeId: who,
       });
-      if (!allowed) return { ok: false, error: tr('circle.tasks.assign_refused') };
+      if (!allowed) {
+        // under `roles` the op's own rule said no (the tasks app's reassign rule); otherwise the household's setting did
+        const byRole = assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
+        return { ok: false, error: tr('circle.tasks.assign_refused'), refusal: byRole ? refuse('op-rule', 'cannot-reassign') : refuse('door-settings', 'setting:assign') };
+      }
       // …and the one who gets it must be someone their OWN role lets claim (an observer looks, and holds no chore).
       if (who !== 'me' && roles[who] !== undefined && !policy.canClaim(who)) {
-        return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? assignee.trim() }) };
+        return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? assignee.trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
       }
     }
     const made = await callSkill('lists', 'addToList', rest, ctx);
@@ -4033,7 +4037,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       const refusal = await doorRefusal(opId, ctx.caller);
-      if (refusal) return { ok: false, error: refusal };
+      if (refusal) return { ok: false, error: refusalText(refusal, typeof opts.t === 'function' ? opts.t : null), refusal };
       if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
     }
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words

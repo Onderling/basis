@@ -17,8 +17,8 @@ import { assistantManifest } from './assistantManifest.js';
  * @param {(app:string, op:string, args:object, ctx?:object) => Promise<any>} a.callSkill
  * @param {ReturnType<import('./botThreads.js').createBotThreads>} a.threads
  * @param {(key:string, params?:object) => string} a.t
- * @param {(opId:string, caller:string, visibility:string) => Promise<string|null>} [a.refusal]  the host gate: a
- *        refusal code, or null. Absent → no caller is checked (a door without admitted people).
+ * @param {(opId:string, caller:string, visibility:string) => Promise<object|null>} [a.refusal]  the host gate: a
+ *        refusal `{layer, code}`, or null. Absent → no caller is checked (a door without admitted people).
  * @param {{catalogue?: ReturnType<import('../telegram/assistantCatalogue.js').createDoorCatalogue>,
  *          status?: () => object|Promise<object>, users?: () => Promise<object[]>,
  *          admission?: ReturnType<import('./botAdmission.js').createBotAdmission>,
@@ -31,8 +31,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (app !== 'assistant') return callSkill(app, op, args, ctx);
     const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
     if (caller && typeof refusal === 'function') {
-      const code = await refusal(op, caller, levelOf(op));
-      if (code) return { ok: false, error: { code, message: t('circle.bot.admin_only') } };
+      const refused = await refusal(op, caller, levelOf(op));
+      // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
+      if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
     try {
       // `/apps on tasks`: with no required param the router keeps the line as `_match` for the op to split.

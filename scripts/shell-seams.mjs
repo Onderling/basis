@@ -108,9 +108,7 @@ export const SHELLS = Object.freeze([
 ]);
 
 /** Gaps a shell is known to have, each with what closes it. Remove the entry when the seam lands. */
-export const BASELINE = Object.freeze([
-  { seam: 'circle-peek', shell: 'mobile', closes: 'plans/briefs/BRIEF-assistant-language-pipeline-2026-09-28.md (ledger L159: the mobile commit after the web one)' },
-]);
+export const BASELINE = Object.freeze([]);
 
 /** Source with comments removed — a comment that EXPLAINS a seam is not the seam. */
 export const code = (src) => String(src).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

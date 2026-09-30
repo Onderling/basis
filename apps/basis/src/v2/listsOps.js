@@ -21,9 +21,11 @@ import { matchEntry, choicesOf } from './entryRef.js';
  * @param {(k: string, vars?: object) => string} a.t  locale resolver
  * @param {() => string|null} a.activeCircle  the circle a call means when it does not name one
  * @param {string} [a.localActor]
+ * @param {() => {mode: 'keep'|'hide'|'delete', days: number}} [a.passed]  a household bot's setting for what is done or
+ *        has passed (shown marked · shown marked for N days · deleted); absent → a done entry leaves the read at once
  * @returns {Record<string, (args: object) => Promise<object>>} opId → handler
  */
-export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = {}) {
+export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null } = {}) {
   // What a list may hold beyond its own entries and tasks: appointments (the calendar's `accepts` line).
   const svc = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   // A call names its circle, or means the one the person is looking at. Named wins: an agent or a
@@ -41,7 +43,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
   /** A list's open entries (its direct children), oldest first. */
   const entriesOf = async (circleId, listId) => {
     const tree = await svc.tree(circleId, listId);
-    return (Array.isArray(tree?.children) ? tree.children : []).filter((c) => c && !c.completedAt);
+    return (Array.isArray(tree?.children) ? tree.children : []).filter((c) => c && !c.completedAt && c.state !== 'cancelled');
   };
   /** An entry on a list, by its id or its words (`matchEntry`: exact words, else the one entry that contains them; several → which). */
   const findEntry = async (circleId, listId, ref) => matchEntry(await entriesOf(circleId, listId), ref, (c) => c.text, undefined, { partialAsks: true });
@@ -130,7 +132,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error };
       await svc.markDone(at.circleId, at.entry.id, localActor);
-      return { ok: true, message: t('circle.lists.done') };
+      // the reply names what was ticked — the entry found, not the words it was asked by
+      return { ok: true, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
     },
 
     listEntries: async (args) => {
@@ -139,9 +142,29 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me' } = 
       const ref = String(args?.list ?? '').trim();
       const target = ref ? await findList(circleId, ref) : null;
       if (!target) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
-      const open = await entriesOf(circleId, target.id);
       // the list's own name goes with its entries: a read of five lists says which is which
-      return { ok: true, title: target.text ?? ref, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
+      if (typeof passed !== 'function') {
+        const open = await entriesOf(circleId, target.id);
+        return { ok: true, title: target.text ?? ref, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
+      }
+      // A household bot: what is done (ticked, completed) or has passed (an appointment before now) follows its setting.
+      const { mode, days } = passed();
+      const now = Date.now();
+      const keepMs = Math.max(0, Number(days) || 0) * 86_400_000;
+      const tree = await svc.tree(circleId, target.id);
+      const items = [];
+      for (const c of (Array.isArray(tree?.children) ? tree.children : [])) {
+        if (!c || c.state === 'cancelled') continue;
+        const doneAt = c.completedAt ? new Date(c.completedAt).getTime() : null;
+        const startAt = c.type === 'calendar-event' && c.startsAt ? new Date(c.startsAt).getTime() : null;
+        const at = doneAt ?? (startAt !== null && startAt < now ? startAt : null);
+        if (at === null) { items.push({ id: c.id, label: c.text ?? c.id, type: c.type }); continue; }
+        if (mode === 'delete') { await svc.remove(circleId, c.id); continue; }
+        if (mode === 'keep' || now - at < keepMs) {
+          items.push({ id: c.id, label: t(doneAt !== null ? 'circle.lists.entry_done' : 'circle.lists.event_passed', { text: c.text ?? c.id }), type: c.type, done: true });
+        }
+      }
+      return { ok: true, title: target.text ?? ref, items };
     },
 
     removeFromList: async (args) => {

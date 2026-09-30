@@ -637,19 +637,19 @@
       "doc": "A household bot's calendar reply."
     },
     "cancelled": {
-      "text": "Afspraak geschrapt: {{title}}.",
+      "text": "Afspraak geschrapt: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "rsvp_accepted": {
-      "text": "Je komt naar {{title}}.",
+      "text": "Je komt: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "rsvp_declined": {
-      "text": "Je komt niet naar {{title}}.",
+      "text": "Je komt niet: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "rsvp_tentative": {
-      "text": "Misschien kom je naar {{title}}.",
+      "text": "Misschien: {{title}}, {{when}}.",
       "doc": "A household bot's calendar reply."
     },
     "say_when": {
@@ -3689,6 +3689,18 @@
     "already_there": {
       "text": "'{{item}}' staat al op {{list}}.",
       "doc": "An add whose words are already open on that list: said, and no second entry is made."
+    },
+    "entry_done": {
+      "text": "{{text}} — klaar",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "event_passed": {
+      "text": "{{text}} — geweest",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "done_named": {
+      "text": "Afgevinkt: {{text}}.",
+      "doc": "A household bot's reply naming the entry it ticked off."
     }
   },
   "share": {
@@ -3986,11 +3998,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg).",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none",
+      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <aantal>",
       "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {

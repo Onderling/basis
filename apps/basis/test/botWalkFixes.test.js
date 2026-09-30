@@ -97,6 +97,11 @@ describe('the household bot, as a walk found it', () => {
     expect(String(which?.error ?? '')).toContain('ramen lappen boven');
     expect(String(which?.error ?? '')).toContain('ramen lappen beneden');
 
+    // a tick names what was ticked ("Afgevinkt: melk.")
+    const ticked = await call('lists', 'markListItemDone', { item: 'melk' });
+    expect(ticked.message).toContain('circle.lists.done_named');
+    expect(ticked.message).toContain('"text":"melk"');
+
     // a tick of an entry that is not there says so
     const miss = await call('lists', 'markListItemDone', { item: '1' });
     expect(miss.ok).toBe(false);
@@ -104,6 +109,9 @@ describe('the household bot, as a walk found it', () => {
     // an appointment by its words: rsvp, then a soft cancel — the child stays (cancelled), the listing drops it
     const rsvp = await call('calendar', 'rsvpAccept', { id: 'tandarts', actor: 'telegram:111' });
     expect(rsvp.ok, JSON.stringify(rsvp)).toBe(true);
+    // the reply names what it answered, and when (the walk: "Je komt: huisarts, vr 2 okt 09:00")
+    expect(rsvp.message).toContain('"title":"tandarts"');
+    expect(rsvp.message).toContain(`"when":"${day} 10:00"`);
     const cancelled = await call('calendar', 'cancelEvent', { id: 'tandarts' });
     expect(cancelled.ok, JSON.stringify(cancelled)).toBe(true);
     const snap = await call('calendar', 'getEventSnapshot', { id: added.itemId });

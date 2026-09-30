@@ -244,7 +244,7 @@ import { listsManifest }                   from '../../../../lists/manifest.js';
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
-import { assignAllowed, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
+import { assignAllowed, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
@@ -3924,6 +3924,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         t: typeof opts.t === 'function' ? opts.t : (k) => k,
         activeCircle: () => resolveCircleId({}),
         localActor: 'me',
+        // a household bot: what is done or has passed follows the household's setting
+        ...(opts.tasksCircleId ? { passed: () => ({
+          mode: passedPolicyFrom(paramsService.register.valueOf(PASSED_KEY)),
+          days: passedDaysFrom(paramsService.register.valueOf(PASSED_DAYS_KEY)),
+        }) } : {}),
       }),
     });
   };

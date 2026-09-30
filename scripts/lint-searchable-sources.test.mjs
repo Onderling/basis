@@ -7,9 +7,10 @@
  * fails SILENTLY, so a version of it that could not fail would be indistinguishable from one that
  * works.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
 import { spawnSync, execSync } from 'node:child_process';
-import { writeFileSync, rmSync, existsSync } from 'node:fs';
+import { writeFileSync, rmSync, existsSync, copyFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,8 +20,19 @@ const GUARD = path.join(HERE, 'lint-searchable-sources.mjs');
 const PROBE_REL = 'packages/core/src/__searchable_probe.js';
 const PROBE = path.join(ROOT, PROBE_REL);
 
-const run = () => spawnSync(process.execPath, [GUARD], { encoding: 'utf8', cwd: ROOT });
-const git = (cmd) => execSync(`git ${cmd}`, { cwd: ROOT, stdio: 'pipe' });
+// A PRIVATE copy of the git index: the probe is staged there only, so the other guards' self-tests (running in
+// parallel, reading `git ls-files`) never see it, and this guard never sees what they stage. With the shared index
+// the aggregate went red now and then while each file passed alone.
+const INDEX = path.join(os.tmpdir(), `searchable-probe-index-${process.pid}-${Date.now()}`);
+const env = { ...process.env, GIT_INDEX_FILE: INDEX };
+const run = () => spawnSync(process.execPath, [GUARD], { encoding: 'utf8', cwd: ROOT, env });
+const git = (cmd) => execSync(`git ${cmd}`, { cwd: ROOT, stdio: 'pipe', env });
+
+beforeAll(() => {
+  const shared = execSync('git rev-parse --path-format=absolute --git-path index', { cwd: ROOT, encoding: 'utf8' }).trim();
+  copyFileSync(shared, INDEX);
+});
+afterAll(() => { if (existsSync(INDEX)) rmSync(INDEX); });
 
 afterEach(() => {
   // The probe must be staged to be seen (the guard reads `git ls-files`), so unstage AND delete.

@@ -11,14 +11,17 @@
  * line waits no longer than the window.
  *
  * A line the door takes itself (an answer to the form it asked, a confirmation, a slash command, a button tap) is
- * never gathered: `prepare` names it, and it is its own turn in the lane.
+ * never gathered: `prepare` names it, and it is its own turn in the lane. Neither is a line a gate rule takes: it does not
+ * wait for a window, and one arriving while earlier lines wait ends their window at once (they go first, in order).
  *
  * Pure over its callbacks and `setTimeout`; the assistant engine composes it, so every door gets it.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** How long a line the assistant has to understand waits for more lines of the same thread, in ms. */
-export const COLLECT_MS = param({ key: 'assistant.collectMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1500 });
+// Measured 2026-09-30: at 1.5 s every free-text line spent most of the person's wait here; ~0.8 s still gathers the
+// quick lines a person types one after another.
+export const COLLECT_MS = param({ key: 'assistant.collectMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 800 });
 
 /**
  * @template T
@@ -55,8 +58,16 @@ export function createThreadLanes({ collectMs = COLLECT_MS, prepare, runTurn, ar
           continue;
         }
         if (plan?.collect) {
+          // A line behind it that does not wait (a rule's, a command, the door's own) ends the window at once: the lines
+          // waiting go now, in order, and it follows — never held up behind a window it has no part in.
+          const waitsNot = (q) => { try { const p = prepare(q.entry); return typeof p?.own === 'function' || !p?.collect; } catch { return true; } };
           const wait = head.at + Math.max(0, Number(collectMs) || 0) - Date.now();
-          if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+          if (wait > 0 && !lane.queue.slice(1).some(waitsNot)) {
+            await new Promise((r) => {
+              const timer = setTimeout(() => { lane.wake = null; r(); }, wait);
+              lane.wake = () => { clearTimeout(timer); lane.wake = null; r(); };
+            });
+          }
           taken = [lane.queue.shift()];
           // Gather the lines behind it that may join (stop at the first the door takes itself, or a command).
           while (lane.queue.length) {
@@ -94,6 +105,12 @@ export function createThreadLanes({ collectMs = COLLECT_MS, prepare, runTurn, ar
       return new Promise((resolve, reject) => {
         const lane = laneFor(key);
         lane.queue.push({ entry, at: Date.now(), resolve, reject });
+        // a window is open and this line does not wait: close the window now
+        if (typeof lane.wake === 'function') {
+          let p = null;
+          try { p = prepare(entry); } catch { p = null; }
+          if (!p || typeof p.own === 'function' || !p.collect) lane.wake();
+        }
         if (!lane.busy) drain(key, lane);
       });
     },

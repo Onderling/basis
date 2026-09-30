@@ -181,16 +181,16 @@ describe('the collect window', () => {
     expect(results.every((r) => r === results[0] && r.via === 'llm')).toBe(true);
   });
 
-  it('a lone line waits for the window and no longer (default 1500 ms)', async () => {
+  it('a lone line for the model waits for the window and no longer (default 800 ms)', async () => {
     vi.useFakeTimers();
     const model = lineModel({ ms: 0 });
     const { engine, dispatched } = engineWith(model);
-    const turn = engine.ask('t', 'melk');
-    await vi.advanceTimersByTimeAsync(1499);
+    const turn = engine.ask('t', 'kun je nog wat melk halen');   // no rule takes it: the model's line
+    await vi.advanceTimersByTimeAsync(799);
     expect(dispatched).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(1);
     await turn;
-    expect(dispatched.map((d) => d.args.text)).toEqual(['melk']);
+    expect(dispatched.map((d) => d.args.text)).toEqual(['kun je nog wat melk halen']);
   });
 
   it('the gate reads each line on its own: a rule line is dispatched by its rule, the other lines go to the model together', async () => {

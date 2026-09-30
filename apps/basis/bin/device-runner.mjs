@@ -58,7 +58,7 @@ import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } fr
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateListNameOf, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -764,13 +764,14 @@ if (tgToken || inboxDoor.bridge) {
     // A household bot: its model is told about its household's lists (the template's words), each person sees their
     // own tools (a member's or the admin's), and the deterministic gate speaks the lists.
     ...(isFunctionProfile ? {
-      promptLines: HOUSEHOLD_TEMPLATE.promptLines,
+      // the model's lines and the gate's rules, generated from the template's lists (their names, their words)
+      promptLines: promptLinesFor(t),
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
       scopeToRole: scopeCatalogueToRole,
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds(),
-      gateRules: listsGateRules(values.lang, templateListNameOf(t)),
+      gateRules: listsGateRules(values.lang, templateLists(t)),
     } : {}),
   });
   await tgRunner.start();

@@ -23,7 +23,7 @@ import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { HOUSEHOLD_TEMPLATE, templateListNameOf, expandAdds } from '../src/v2/householdTemplate.js';
+import { HOUSEHOLD_TEMPLATE, templateLists, promptLinesFor, expandAdds } from '../src/v2/householdTemplate.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';
@@ -49,10 +49,15 @@ if (values['from-log']) {
 // What the household bot's door hands a MEMBER's model: the bot's slim map over its plugins (lists, tasks — the
 // template's), the template's words about its lists, and the deterministic gate that speaks the lists. Composed the
 // way the box composes a function profile (`bin/device-runner.mjs`).
-const TEMPLATE_NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
+// The template's list names as the box says them: read from the Dutch bundle, not a copy of its own.
+const NL = JSON.parse(readFileSync(new URL('../src/locales/circle.nl.json', import.meta.url), 'utf8'));
+const tNl = (key) => {
+  const v = key.replace(/^circle\./, '').split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), NL);
+  return typeof v === 'string' ? v : (v && typeof v.text === 'string' ? v.text : key);
+};
 const { catalogue: botCatalogue } = composeAssistantCatalogue({ apps: values.apps ? values.apps.split(',') : [...HOUSEHOLD_TEMPLATE.apps], slim: true });
 const catalogue = scopeCatalogueToRole(botCatalogue, 'member');
-const gateRulesFor = (lang) => listsGateRules(lang, templateListNameOf((k) => TEMPLATE_NAMES[k] ?? k));
+const gateRulesFor = (lang) => listsGateRules(lang, templateLists(tNl));
 let llm = null;
 if (!values.mock) {
   const { privatemodeProvider, readPrivatemodeKey } = await import('@onderling/llm-client/providers/privatemode');
@@ -74,7 +79,7 @@ for (const f of fixtures) {
   const engine = createAssistantEngine({
     // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
     catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm: counted, interpret: interpretToCommand,
-    promptLines: HOUSEHOLD_TEMPLATE.promptLines, gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
+    promptLines: promptLinesFor(tNl), gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
     // A one-line fixture does not wait for the collect window (its time is the model's); lines sent at once do.
     ...(f.lines ? {} : { collectMs: 0 }),
     // the bot's retrieval shape (`loadListItems`): an entry, with its list

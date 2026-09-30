@@ -21,11 +21,13 @@
  */
 export const HOUSEHOLD_TEMPLATE = Object.freeze({
   id: 'household',
+  // Each list: its name (a locale key), its kind (the placeholder its name fills in the lines: `{shopping}` …), what a
+  // bare add makes, and the words people use for it — the gate's aliases, read from here and nowhere else.
   lists: Object.freeze([
-    { key: 'circle.lists.template.shopping', kind: 'shopping' },
-    { key: 'circle.lists.template.chores', kind: 'errand', defaultChild: 'task' },
-    { key: 'circle.lists.template.repairs', kind: 'repair' },
-    { key: 'circle.lists.template.schedule', kind: 'schedule', defaultChild: 'calendar-event' },
+    { key: 'circle.lists.template.shopping', kind: 'shopping', aliases: Object.freeze(['boodschappen', 'boodschappenlijst', 'boodschappenlijstje', 'shopping', 'groceries', 'grocery']) },
+    { key: 'circle.lists.template.chores', kind: 'errand', defaultChild: 'task', aliases: Object.freeze(['klusjes', 'klusje', 'klusjeslijst', 'takenlijst', 'errand', 'errands', 'chores']) },
+    { key: 'circle.lists.template.repairs', kind: 'repair', aliases: Object.freeze(['reparaties', 'reparatie', 'repair', 'repairs']) },
+    { key: 'circle.lists.template.schedule', kind: 'schedule', defaultChild: 'calendar-event', aliases: Object.freeze(['agenda', 'schedule', 'schedules']) },
   ]),
   // The plugins this template composes on the bot (added to its app list at every start): lists hold, tasks move, the
   // calendar keeps the Agenda.
@@ -34,13 +36,14 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
   // purpose; the admin may grow it later.
   compoundEntries: Object.freeze(['peper en zout', 'zout en peper', 'brood en spelen']),
   required: Object.freeze({}),
-  // The model's household words (Fable's text, verbatim): the tool name beside the phrase it answers, in Dutch.
+  // The model's household words (Fable's text, verbatim): the tool name beside the phrase it answers, in Dutch. A list's
+  // name is its placeholder (`{errand}` → the chores list's name, `{lists}` → all of them); `promptLinesFor` fills them.
   promptLines: Object.freeze([
-    "Dit huishouden houdt alles op LIJSTEN: Boodschappen, Klusjes, Reparaties, Agenda.",
-    "addToList(list, text) voegt iets toe; eten, drinken en huishoudspullen zonder lijstnaam gaan op Boodschappen, zonder vraag.",
-    "Klusjes zijn TAKEN: \"nieuwe taak voor mij/voor Bert: X (maandag)\" → addToList(list: Klusjes, text: X, assignee: mij/Bert, due: de dag als datum). \"ik doe de lamp\" → claimTask(id: de woorden); \"de lamp is gemaakt\" → completeTask(id: de woorden). \"wat moet ik nog doen\" → listMine. \"wat staat er op de klusjes / de takenlijst\" → listEntries(list: Klusjes).",
+    "Dit huishouden houdt alles op LIJSTEN: {lists}.",
+    "addToList(list, text) voegt iets toe; eten, drinken en huishoudspullen zonder lijstnaam gaan op {shopping}, zonder vraag.",
+    "{errand} zijn TAKEN: \"nieuwe taak voor mij/voor Bert: X (maandag)\" → addToList(list: {errand}, text: X, assignee: mij/Bert, due: de dag als datum). \"ik doe de lamp\" → claimTask(id: de woorden); \"de lamp is gemaakt\" → completeTask(id: de woorden). \"wat moet ik nog doen\" → listMine. \"wat staat er op de klusjes / de takenlijst\" → listEntries(list: {errand}).",
     "\"… is gekocht / gedaan / gemaakt\" over een lijstregel → markListItemDone(item: de woorden). \"haal … van de lijst\" → removeFromList(item). \"verander … in …\" → editEntry(item, text). Geef alleen item (en text); laat list weg. Vraag NOOIT op welke lijst iets staat: het systeem zoekt de regel zelf.",
-    "Agenda zijn AFSPRAKEN: \"tandarts morgen om 10 uur\" → addEvent(title, when als lokale tijd zonder zone, bv. 2026-09-30T10:00). \"wat staat er in de agenda\" → listEvents. \"ik kom (naar de tandarts)\" / \"ik ben erbij\" → rsvpAccept(id: de woorden); \"ik kan niet\" → rsvpDecline; \"misschien\" → rsvpTentative.",
+    "{schedule} zijn AFSPRAKEN: \"tandarts morgen om 10 uur\" → addEvent(title, when als lokale tijd zonder zone, bv. 2026-09-30T10:00). \"wat staat er in de agenda\" → listEvents. \"ik kom (naar de tandarts)\" / \"ik ben erbij\" → rsvpAccept(id: de woorden); \"ik kan niet\" → rsvpDecline; \"misschien\" → rsvpTentative.",
     "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
     "Alleen de beheerder maakt of verwijdert lijsten en wijst klusjes toe. Vraagt een lid daarom: zeg dat alleen de beheerder dat kan, en stop daar.",
   ]),
@@ -83,15 +86,42 @@ export function withTemplateApps(current, template = HOUSEHOLD_TEMPLATE) {
 }
 
 /**
- * The template's list for a kind of list ("boodschappen" → the shopping list's name), for the deterministic gate.
+ * The template's lists as the gate and the lines use them: each list's name (in the door's language), kind, default
+ * child and the words people use for it.
  * @param {(key: string) => string} t
  * @param {object} [template]
+ * @returns {Array<{name: string, kind: string, defaultChild: string|null, aliases: string[]}>}
  */
-export function templateListNameOf(t, template = HOUSEHOLD_TEMPLATE) {
-  return (kind) => {
-    const entry = template.lists.find((l) => l.kind === kind);
-    return entry ? t(entry.key) : null;
-  };
+export function templateLists(t, template = HOUSEHOLD_TEMPLATE) {
+  return (template.lists ?? []).map((l) => ({
+    name: t(l.key), kind: l.kind, defaultChild: l.defaultChild ?? null, aliases: [...(l.aliases ?? [])],
+  }));
+}
+
+/** What a list is for, when a template brings no lines of its own: one line per list, from what it holds. LLM-facing. */
+function listLine({ name, defaultChild }) {
+  if (defaultChild === 'task') return `${name} zijn TAKEN: "nieuwe taak: X" → addToList(list: ${name}, text: X); "ik doe …" → claimTask(id: de woorden); "… is gedaan" → completeTask(id: de woorden).`;
+  if (defaultChild === 'calendar-event') return `${name} zijn AFSPRAKEN: addEvent(title, when als lokale tijd zonder zone, bv. 2026-09-30T10:00); "wat staat er in ${name}" → listEvents.`;
+  return `${name}: addToList(list: ${name}, text) zet er iets op; "wat staat er op ${name}" → listEntries(list: ${name}).`;
+}
+
+/**
+ * The model's lines for a template, its list names filled in: the template's own lines (placeholders `{<kind>}` and
+ * `{lists}`), or — for a template without them — one line per list from what it holds.
+ * @param {(key: string) => string} t
+ * @param {object} [template]
+ * @returns {string[]}
+ */
+export function promptLinesFor(t, template = HOUSEHOLD_TEMPLATE) {
+  const lists = templateLists(t, template);
+  const byKind = Object.fromEntries(lists.map((l) => [l.kind, l.name]));
+  const all = lists.map((l) => l.name).join(', ');
+  if (!Array.isArray(template.promptLines) || !template.promptLines.length) {
+    return [`Hier staat alles op LIJSTEN: ${all}.`, ...lists.map(listLine)];
+  }
+  return template.promptLines.map((line) => line
+    .replace(/\{lists\}/g, all)
+    .replace(/\{([a-z-]+)\}/g, (m, kind) => byKind[kind] ?? m));
 }
 
 /**

@@ -40,7 +40,7 @@
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
  * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -61,7 +61,7 @@ import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { welcomeLines } from '../src/v2/botWelcome.js';
-import { exportHousehold, importHousehold } from '../src/v2/householdExport.js';
+import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom } from '../src/v2/botSettings.js';
 import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
@@ -751,14 +751,21 @@ if (tgToken || inboxDoor.bridge) {
   const exportShelf = createExportShelf({
     files: {
       list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
-      write: async (name, text) => { mkdirSync(exportsDir, { recursive: true, mode: 0o700 }); writeFileSync(path.join(exportsDir, name), text, { mode: 0o600 }); },
+      // written whole or not at all: a crash mid-write leaves a temp file, never a cut-off export under its own name
+      write: async (name, text) => {
+        mkdirSync(exportsDir, { recursive: true, mode: 0o700 });
+        const tmp = path.join(exportsDir, `.${name}.tmp`);
+        writeFileSync(tmp, text, { mode: 0o600 });
+        renameSync(tmp, path.join(exportsDir, name));
+      },
       read: async (name) => readFileSync(path.join(exportsDir, name), 'utf8'),
       remove: async (name) => rmSync(path.join(exportsDir, name), { force: true }),
     },
-    exportNow: async () => {
-      const own = ((await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? []).filter((p) => String(p.key).startsWith('assistant.'));
-      return exportHousehold({ items: await agent.householdItems(), people: await botUsers.list(), settings: Object.fromEntries(own.map((p) => [p.key, p.value])) });
-    },
+    exportNow: () => exportFromHost({
+      items: () => agent.householdItems(),
+      people: () => botUsers.list(),
+      params: async () => (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? [],
+    }),
     onWritten: (e) => walkLog({ kind: 'export', ok: e.ok, ...(e.name ? { name: e.name } : {}), ...(e.error ? { error: e.error } : {}) }),
   });
   const doorCall = withAssistantOps({

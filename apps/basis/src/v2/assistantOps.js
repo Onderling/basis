@@ -112,7 +112,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const c = countExport(data);
     if (preview) return { ok: true, vars: c, message: t('circle.bot.import_confirm_counts', { name: file, ...c }) };
     const r = await admin.importFile(data);
-    if (!r?.ok) return { ok: false, error: t('circle.bot.import_unreadable', { name: file }) };
+    if (!r?.ok) {
+      // part-way: what was restored before it stopped is said too
+      const partly = r?.done ? `\n${t('circle.bot.import_done', { ...r.done })}` : '';
+      return { ok: false, error: { code: 'failed', message: t('circle.bot.import_unreadable', { name: file }) + partly } };
+    }
     const missed = (r.notRestored ?? []).length;
     return { ok: true, message: t('circle.bot.import_done', { ...r.done }) + (missed ? `\n${t('circle.bot.import_missed', { count: missed })}` : '') };
   }

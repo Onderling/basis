@@ -93,7 +93,7 @@ describe('the household export', () => {
     expect(countExport(file)).toMatchObject({ chores: 2, appointments: 1, people: 3 });
 
     const b = await bot({ people: false });
-    const r = await importHousehold(JSON.parse(JSON.stringify(file)), { call: b.own, admin: ADMIN, tier: (id, role) => b.agent.setDoorCaller(id, role) });
+    const r = await importHousehold(JSON.parse(JSON.stringify(file)), { call: b.own, tier: (id, role) => b.agent.setDoorCaller(id, role) });
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(r.notRestored, JSON.stringify(r.notRestored)).toEqual([]);
     expect(await reads(b)).toEqual(before);
@@ -108,12 +108,15 @@ describe('the household export', () => {
   it('the checked-in v1 file still imports, into the same reads', async () => {
     const file = JSON.parse(await readFile(FIXTURE, 'utf8'));
     const b = await bot({ people: false });
-    const r = await importHousehold(file, { call: b.own, admin: ADMIN, tier: (id, role) => b.agent.setDoorCaller(id, role) });
+    const r = await importHousehold(file, { call: b.own, tier: (id, role) => b.agent.setDoorCaller(id, role) });
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(r.notRestored).toEqual([]);
     const got = await reads(b);
     expect(got.boodschappen).toEqual(['melk']);
     expect(got.chores.map((c) => c.split('|').slice(0, 2).join('|')), JSON.stringify(got.chores)).toEqual(['kleurenwiezen|telegram:111', 'vuilnis|telegram:222']);
+    // the due MOMENT comes back exactly, whatever zone the importing box runs in (a day would shift)
+    const due = Object.fromEntries((await b.agent.householdItems()).filter((i) => i.type === 'task').map((i) => [i.text, i.dueAt]));
+    expect(due).toEqual({ kleurenwiezen: '2026-10-04T22:00:00.000Z', vuilnis: '2026-10-05T22:00:00.000Z' });
     expect(got.events).toHaveLength(1);
     expect(got.events[0]).toContain('tandarts|2026-10-07');
     expect(got.events[0]).toContain('"telegram:222":"accepted"');
@@ -122,8 +125,8 @@ describe('the household export', () => {
   it('a file that is not an export, or of a version this one cannot read, is refused before anything is written', async () => {
     const calls = [];
     const call = async (...x) => { calls.push(x); return { ok: true }; };
-    expect(await importHousehold({ format: 'something-else' }, { call, admin: ADMIN })).toEqual({ ok: false, reason: 'not-an-export' });
-    expect(await importHousehold({ format: 'onderling-household-export', v: 9 }, { call, admin: ADMIN })).toEqual({ ok: false, reason: 'unknown-version' });
+    expect(await importHousehold({ format: 'something-else' }, { call })).toEqual({ ok: false, reason: 'not-an-export' });
+    expect(await importHousehold({ format: 'onderling-household-export', v: 9 }, { call })).toEqual({ ok: false, reason: 'unknown-version' });
     expect(calls).toEqual([]);
   });
 });
@@ -136,9 +139,9 @@ describe('the export shelf', () => {
     let at = new Date('2026-10-01T02:00:00').getTime();
     const shelf = createExportShelf({ files, exportNow: async () => ({ format: 'onderling-household-export', v: 1, at }), keep: 3, now: () => at });
     for (let d = 0; d < 5; d++) { await shelf.writeNow(); at += 86_400_000; }
-    expect(await shelf.names()).toEqual(['household-export-2026-10-05.json', 'household-export-2026-10-04.json', 'household-export-2026-10-03.json']);
+    expect(await shelf.names()).toEqual(['household-export-2026-10-05-0200.json', 'household-export-2026-10-04-0200.json', 'household-export-2026-10-03-0200.json']);
     expect(disk.has('notes.txt')).toBe(true);
-    expect((await shelf.read('household-export-2026-10-05.json')).v).toBe(1);
+    expect((await shelf.read('household-export-2026-10-05-0200.json')).v).toBe(1);
     await expect(shelf.read('../vault.json')).rejects.toThrow('not-an-export-name');
   });
 });
@@ -151,15 +154,15 @@ describe('the admin\'s /exports and /import', () => {
     const { assistantManifest } = await import('../src/v2/assistantManifest.js');
     const file = JSON.parse(await readFile(FIXTURE, 'utf8'));
     const imported = [];
-    const exports = { names: async () => ['household-export-2026-10-01.json'], read: async (n) => { if (n !== 'household-export-2026-10-01.json') throw new Error('not-an-export-name'); return file; } };
+    const exports = { names: async () => ['household-export-2026-10-01-0200.json'], read: async (n) => { if (n !== 'household-export-2026-10-01-0200.json') throw new Error('not-an-export-name'); return file; } };
     const tt = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
     const call = withAssistantOps({ callSkill: async () => ({ ok: false }), threads: null, t: tt, admin: { exports, importFile: async (f) => { imported.push(f); return { ok: true, done: { lists: 0, entries: 1, chores: 2, appointments: 1, people: 3 }, notRestored: [] }; } } });
-    expect((await call('assistant', 'assistant-exports', {})).message).toContain('household-export-2026-10-01.json');
-    const asked = await call('assistant', 'assistant-import', { file: 'household-export-2026-10-01.json', preview: true });
+    expect((await call('assistant', 'assistant-exports', {})).message).toContain('household-export-2026-10-01-0200.json');
+    const asked = await call('assistant', 'assistant-import', { file: 'household-export-2026-10-01-0200.json', preview: true });
     expect(asked.message).toContain('"chores":2');
     expect(imported).toEqual([]);
     expect((await call('assistant', 'assistant-import', { file: '../vault.json' })).ok).toBe(false);
-    expect((await call('assistant', 'assistant-import', { file: 'household-export-2026-10-01.json' })).message).toContain('circle.bot.import_done');
+    expect((await call('assistant', 'assistant-import', { file: 'household-export-2026-10-01-0200.json' })).message).toContain('circle.bot.import_done');
     expect(imported).toHaveLength(1);
     // it is asked first: the manifest's danger confirm, with the preview
     const r = resolveDispatch({ kind: 'slash', opId: 'assistant-import', args: { file: 'x' } }, mergeManifests([{ manifest: assistantManifest }]));
@@ -180,5 +183,83 @@ describe('the export shelf, with its defaults', () => {
     expect(intervals).toEqual([24 * 3_600_000]);
     for (let d = 1; d < 10; d++) { at += 86_400_000; await shelf.writeNow(); }
     expect((await shelf.names()).length).toBe(7);
+  });
+});
+
+
+describe('importing onto a bot that already has a household', () => {
+  it('what is there stays: no doubles, and a person keeps the role the book gives them now', async () => {
+    const file = JSON.parse(await readFile(FIXTURE, 'utf8'));
+    const b = await bot({ people: false });
+    const tier = (id, role) => b.agent.setDoorCaller(id, role);
+    expect((await importHousehold(file, { call: b.own, tier })).ok).toBe(true);
+    // Bert was made an observer after the export; a second import of the same file
+    await b.own('stoop', 'addContact', { webid: BERT, channel: 'telegram', role: 'observer', displayName: 'Bert' });
+    const again = await importHousehold(file, { call: b.own, tier });
+    expect(again.ok).toBe(true);
+    const items = await b.agent.householdItems();
+    expect(items.filter((i) => i.type === 'task' && i.text === 'kleurenwiezen')).toHaveLength(1);
+    expect(items.filter((i) => i.type === 'calendar-event' && i.title === 'tandarts')).toHaveLength(1);
+    expect(items.filter((i) => i.type === 'list-item' && i.text === 'melk')).toHaveLength(1);
+    const book = await createBotUsers({ store: contactBookStore((x, y, z) => b.own(x, y, z)) }).list();
+    expect(book.find((u) => u.id === BERT)?.role).toBe('observer');
+  }, 120_000);
+});
+
+describe('a file is not trusted beyond the household', () => {
+  it('it cannot make an admin, cannot reach settings outside the household\'s own, and says so', async () => {
+    const calls = [];
+    const call = async (app, op, args, ctx) => { calls.push({ app, op, args, caller: ctx?.caller ?? null }); return op === 'listLists' ? { ok: true, items: [] } : (op === 'listContacts' ? { ok: true, contacts: [] } : { ok: true, itemId: 'x' }); };
+    const file = { format: 'onderling-household-export', v: 1, lists: [], loose: [],
+      people: [{ id: 'telegram:666', channel: 'telegram', uid: '666', role: 'admin' }],
+      settings: { 'assistant.reminders': 'off', 'relay.url': 'wss://evil.example' } };
+    const r = await importHousehold(file, { call });
+    expect(r.ok).toBe(true);
+    const contact = calls.find((c) => c.op === 'addContact');
+    expect(contact.args.role).toBe('member');
+    expect(calls.filter((c) => c.op === 'set-param').map((c) => c.args.key)).toEqual(['assistant.reminders']);
+    expect(r.notRestored).toEqual(expect.arrayContaining([
+      expect.objectContaining({ what: 'role-capped', id: 'telegram:666' }),
+      expect.objectContaining({ what: 'setting', key: 'relay.url' }),
+    ]));
+  });
+
+  it('a step the gate refuses after the thing was made is reported, not counted as done', async () => {
+    const call = async (app, op) => {
+      if (op === 'listLists') return { ok: true, items: [{ label: 'Agenda' }] };
+      if (op === 'listContacts') return { ok: true, contacts: [] };
+      if (op === 'rsvpAccept') return { ok: false, error: 'refused' };
+      return { ok: true, itemId: 'e1' };
+    };
+    const file = { format: 'onderling-household-export', v: 1, loose: [], settings: {},
+      people: [{ id: 'telegram:2', channel: 'telegram', uid: '2', role: 'member' }],
+      lists: [{ n: 1, name: 'Agenda', entries: [{ n: 2, type: 'calendar-event', title: 'x', startsAt: '2026-10-07T08:00:00.000Z', rsvp: { 'telegram:2': 'accepted' } }] }] };
+    const r = await importHousehold(file, { call });
+    expect(r.notRestored).toEqual([expect.objectContaining({ what: 'rsvp', who: 'telegram:2' })]);
+  });
+});
+
+describe('the shelf never loses the last good copy', () => {
+  it('no write at start; each write its own name; the newest file that holds something is always kept', async () => {
+    const { createExportShelf } = await import('../src/v2/householdExportShelf.js');
+    const disk = new Map();
+    const files = { list: async () => [...disk.keys()], write: async (n, t) => { disk.set(n, t); }, read: async (n) => disk.get(n), remove: async (n) => { disk.delete(n); } };
+    let at = new Date('2026-10-01T02:00:00').getTime();
+    let full = true;
+    const exportNow = async () => (full
+      ? { format: 'onderling-household-export', v: 1, lists: [{ n: 1, name: 'B', entries: [{ n: 2, type: 'list-item', text: 'melk' }] }], people: [], loose: [] }
+      : { format: 'onderling-household-export', v: 1, lists: [], people: [], loose: [] });
+    const shelf = createExportShelf({ files, exportNow, keep: 3, now: () => at, timers: { setInterval: () => 1, clearInterval: () => {} } });
+    await shelf.start();
+    expect(disk.size, 'a boot does not write').toBe(0);
+    await shelf.writeNow();
+    at += 3_600_000; await shelf.writeNow();   // the same day: a second file, not a replacement
+    expect(disk.size).toBe(2);
+    full = false;   // a version that cannot read its store boots empty: the empty ones pile up
+    for (let d = 1; d <= 5; d++) { at += 86_400_000; await shelf.writeNow(); }
+    const names = await shelf.names();
+    expect(names).toHaveLength(4);   // three newest + the newest one that holds something
+    const kept = await Promise.all(names.map((n) => shelf.read(n)));
+    expect(kept.some((f) => f.lists.length)).toBe(true);
   });
 });

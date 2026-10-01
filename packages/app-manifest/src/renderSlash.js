@@ -12,7 +12,8 @@
  * Driven by:
  *   - manifest.slashGrammar              (addressedPrefixes, specials,
  *                                          typeAliases, defaultType)
- *   - per-op surfaces.slash.match        (verbs, body, splitItems, onEmpty)
+ *   - per-op surfaces.slash.match        (body, splitItems, onEmpty; the verbs from the app's
+ *                                          gate words — `gateVerbs.js`)
  *
  * Pure.  Deterministic.  Verbs / operations tried in declaration order;
  * first match wins.  Patterns compiled once per `renderSlash` call so
@@ -26,6 +27,8 @@
  *
  * @param {import('./schema.js').Manifest} manifest
  */
+import { gateVerbsOf } from './gateVerbs.js';
+
 export function renderSlash(manifest, opts = {}) {
   // Per-locale TRAILING-verb support (opt-in via opts, used by renderGate for the circle bot): an op
   // whose `match.trailing` names an intent ALSO matches that intent's verbs at the END of the text
@@ -47,9 +50,9 @@ export function renderSlash(manifest, opts = {}) {
   const matchers = [];
   for (const op of ops) {
     const m = op?.surfaces?.slash?.match;
-    if (!m || !Array.isArray(m.verbs) || m.verbs.length === 0) continue;
-    const verbRes = m.verbs.map((v) => {
-      const tokens = Array.isArray(v) ? v : [v];
+    const verbs = m ? gateVerbsOf(manifest, op, trailLocale) : [];
+    if (!verbs.length) continue;
+    const verbRes = verbs.map((tokens) => {
       const head   = tokens.map(escapeRe).join('\\s+');
       return new RegExp(`^${head}\\b\\s*(.*)$`, 'i');
     });

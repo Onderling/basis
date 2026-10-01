@@ -138,12 +138,14 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return runDispatch(coerceEnums(r), callFor(chatId));
   }
 
-  async function run(chatId, ready) {
+  async function run(chatId, ready, { tryRule = false } = {}) {
     let reply;
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
     try { reply = await runDispatch(ready, callFor(chatId)); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
+    // a rule that may fall back to the model, whose words named nothing: not said — the line goes to the model
+    if (tryRule && (reply?.error?.reason === 'not-found' || (reply?.ok === false && reply?.code === 'not-found'))) { note(chatId, { fellBack: ready.opId }); return { notFound: true }; }
     await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
 
@@ -205,7 +207,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return { kind: 'slash', opId, args: args ?? {}, threadId, ...(appOrigin ? { appOrigin } : {}) };
   }
 
-  async function route(chatId, threadId, text) {
+  async function route(chatId, threadId, text, { tryRule = false } = {}) {
     if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
     let parse = typeof text === 'string'
       ? (tapToParse(text, threadId) ?? parseInput(text, catalogueOf(), { threadId }))
@@ -217,7 +219,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     note(chatId, { route: r?.kind });
     switch (r?.kind) {
       case 'ready':
-        return run(chatId, coerceEnums(r));
+        return run(chatId, coerceEnums(r), { tryRule });
       case 'needsForm': {
         const single = beginFollowUp({ dispatch: r, t });
         const p = single ?? beginFormFollowUp({ dispatch: r, t });
@@ -270,7 +272,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
-    dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
+    dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input, { tryRule: Boolean(ctx?.tryRule) }),
     peek: (cmd, ctx) => peekOp(ctx.chatId, ctx.id, cmd),
     onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
     // A model that is slow is SAID: "even geduld" while it retries, and when it does not come back, that it is not

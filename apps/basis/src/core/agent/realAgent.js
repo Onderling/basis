@@ -4061,7 +4061,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         const words = (it) => it?.text ?? it?.title;
         const { entry: task, among } = matchEntry(open, args.id, words);
         const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
-        if (!task) return { ok: false, error: among.length ? tr('circle.lists.which_one', { options: choicesOf(among, words) }) : tr('circle.tasks.no_such_task', { item: args.id }) };
+        // `code: 'not-found'` when the words name nothing (a rule that may fall back to the model reads it); two that
+        // match ask which, and that is an answer
+        if (!task) return among.length ? { ok: false, error: tr('circle.lists.which_one', { options: choicesOf(among, words) }) } : { ok: false, code: 'not-found', error: tr('circle.tasks.no_such_task', { item: args.id }) };
         args = { ...args, id: task.id };
         namedTask = words(task) || null;
       }

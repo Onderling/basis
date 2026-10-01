@@ -105,11 +105,20 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
         } else if (gate && typeof gate.evaluate === 'function') {
           const g = await gate.evaluate(stripped, ctx);
           if (g.via === 'rule' && g.command?.opId) {
-            await dispatchRule(g.command, ctx);
-            return { via: 'rule', cmd: g.command };
+            // A rule that names an item may fall back to the model: when the words name nothing ("ik doe mee"), the
+            // line is the model's if there is one; without a model the rule's refusal stands.
+            if (g.command.fallback === 'model' && llm) {
+              const out = await dispatch({ opId: g.command.opId, args: g.command.args || {}, appOrigin: g.command.appOrigin }, { ...ctx, tryRule: true });
+              if (!out?.notFound) return { via: 'rule', cmd: g.command };
+              context = g.context;
+            } else {
+              await dispatchRule(g.command, ctx);
+              return { via: 'rule', cmd: g.command };
+            }
+          } else {
+            if (g.via === 'skip') return { via: await sink(trimmed, ctx) };
+            context = g.context;
           }
-          if (g.via === 'skip') return { via: await sink(trimmed, ctx) };
-          context = g.context;
         }
 
         // The turn needs free-text UNDERSTANDING → the LLM, but only if smart chat is available.

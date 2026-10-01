@@ -132,5 +132,15 @@ describe('a chore that says who and when', () => {
     expect(given).toEqual([['Bert', 'coordinator']]);
     expect((await withRole('assistant', 'assistant-role', { spec: 'Bert admin' })).ok).toBe(false);
   });
-});
 
+  it('a person with no name is named by the id the bot shows for them (/users)', async () => {
+    const own = (a, o, x) => agent.callSkill(a, o, x);
+    const NONAME = 'web-person-without-a-name-1234567890abcdef';
+    await own('stoop', 'addContact', { webid: NONAME, channel: 'web', role: 'member' });
+    await agent.setDoorCaller(NONAME, 'member');
+    const r = await agent.callSkill('lists', 'addToList', { list: 'Klusjes', text: 'afwas', assignee: NONAME, due: '2026-10-07' }, { caller: ADMIN });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    const made = (((await own('tasks', 'listOpen', {})).items) ?? []).find((x) => x.text === 'afwas');
+    expect(made?.assignees ?? [made?.assignee]).toContain(NONAME);
+  });
+});

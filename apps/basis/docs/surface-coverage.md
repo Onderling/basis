@@ -87,7 +87,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `removeItem` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | remove, delete, cancel, nope, verwijder, weg |
 |  | `help` | help | ✅ | ✅ | ✅ | · | · | · | help, hulp |
 |  | `addTask` | add | ✅ | ✅ | ✅ | · | ✅ | · | task, taak |
-|  | `listTasks` | list | ✅ | ✅ | ✅ | · | · | · | tasks, tasks |
+|  | `listTasks` | list | ✅ | ✅ | ✅ | · | · | · | tasks, taken |
 |  | `claim` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | grab, oppakken |
 |  | `reassign` | reassign | ✅ | · | · | · | · | · |  |
 |  | `registerName` | register | ✅ | ✅ | ✅ | · | ✅ | · | register, registreer, naam |

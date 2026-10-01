@@ -1,0 +1,91 @@
+{
+  "household.addItem": {
+    "doc": "Add something to a household list (shopping, errands, repairs, the schedule); the rest of the line is the list and the item.",
+    "verbs": [
+      "add"
+    ],
+    "examples": [
+      "add milk"
+    ]
+  },
+  "household.listOpen": {
+    "doc": "Show what is open on a household list.",
+    "verbs": [
+      "list",
+      "show"
+    ],
+    "examples": [
+      "show shopping"
+    ]
+  },
+  "household.markComplete": {
+    "doc": "Tick something off a household list (bought, done).",
+    "verbs": [
+      "done",
+      "complete",
+      "bought",
+      "did",
+      "finished"
+    ],
+    "examples": [
+      "bought milk"
+    ]
+  },
+  "household.removeItem": {
+    "doc": "Remove something from a household list.",
+    "verbs": [
+      "remove",
+      "delete",
+      "cancel",
+      "nope"
+    ],
+    "examples": [
+      "remove milk"
+    ]
+  },
+  "household.help": {
+    "doc": "Show the commands.",
+    "verbs": [
+      "help"
+    ],
+    "examples": [
+      "help"
+    ]
+  },
+  "household.addTask": {
+    "doc": "Add a chore (it can be given to someone, and have a day); the rest of the line is the chore.",
+    "verbs": [
+      "task"
+    ],
+    "examples": [
+      "task clean the windows"
+    ]
+  },
+  "household.listTasks": {
+    "doc": "Show the open chores.",
+    "verbs": [
+      "tasks"
+    ],
+    "examples": [
+      "tasks"
+    ]
+  },
+  "household.claim": {
+    "doc": "Take on a chore.",
+    "verbs": [
+      "grab"
+    ],
+    "examples": [
+      "grab windows"
+    ]
+  },
+  "household.registerName": {
+    "doc": "Tell the household your name.",
+    "verbs": [
+      "register"
+    ],
+    "examples": [
+      "register Ann"
+    ]
+  }
+}

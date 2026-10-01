@@ -20,7 +20,7 @@
  * Env:
  *   ONDERLING_RELAY_URL      the relay to dial. Absent → local-only (no wire; useful for a first boot)
  *   BASIS_VAULT_PASSPHRASE   the vault key; absent → one is generated once beside the vault
- *   TG_BOT_TOKEN             optional — also answer on Telegram (or ~/.canopy-tg-token)
+ *   TG_BOT_TOKEN             optional — also answer on Telegram (from the environment only; empty = no Telegram)
  *   TG_ALLOWED_CHAT_IDS      Telegram ids let in without a code (a bootstrap); everyone else needs an admin's code
  *   ONDERLING_PROFILE_KIND   `function` on a household bot's own node: its profile is the bot's, its inbox a door
  *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
@@ -666,10 +666,8 @@ if (relayUrl) {
 }
 
 // ── Telegram, only if a token is here ───────────────────────────────────────────────────────────
-const tgToken = (() => {
-  if (process.env.TG_BOT_TOKEN) return process.env.TG_BOT_TOKEN.trim();
-  try { return readFileSync(path.join(homedir(), '.canopy-tg-token'), 'utf8').trim(); } catch { return null; }
-})();
+// From the environment only: a file in the home folder once handed a developer's local run the LIVE bot's token.
+const tgToken = String(process.env.TG_BOT_TOKEN ?? '').trim() || null;
 // ── Whose node this is: a bot's install names its profile a function's, once (refused on a person's profile) ────
 if (String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function') {
   try { await agent.markFunctionProfile(); } catch (err) { console.warn(`device-runner: ${err?.message ?? err}`); }

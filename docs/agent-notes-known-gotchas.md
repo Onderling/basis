@@ -721,8 +721,15 @@ Use the Detox suite (`apps/basis-mobile/e2e/`) first. When you must hand-drive:
 - **The routing log line names transports that exist, not ones that worked.** Say which transport carried
   each step from the transport's own log, never from the router's summary.
 
-## `npm run coverage` prints the snapshot; it does not write it (2026-09-30)
-`apps/basis`'s `npm run coverage` runs `scripts/surface-coverage.mjs`, which prints the matrix to stdout. The committed
-snapshot is refreshed with `node scripts/surface-coverage.mjs > docs/surface-coverage.md` (from `apps/basis`). Running
-only `npm run coverage` after a manifest change leaves the snapshot stale, and `test/fitness/surfaceCoverageFresh.test.js`
-goes red.
+## `npm run coverage` writes the snapshot (fixed 2026-10-01)
+Until 2026-10-01 `apps/basis`'s `npm run coverage` only PRINTED the matrix, so a manifest change left
+`docs/surface-coverage.md` stale and `test/fitness/surfaceCoverageFresh.test.js` red. It now writes it
+(`node scripts/surface-coverage.mjs > docs/surface-coverage.md`); the script itself still prints, which the fitness test reads.
+
+
+## The guards' self-tests run one file at a time (2026-10-01)
+Several guard self-tests write fixture files into the tree (`apps/.guard-fixture-tmp/`, a staged probe), because the
+guard they test scans the real tree; others run a guard on the tree at the same moment. In parallel that made the
+aggregate red now and then (`lint-searchable-sources`, `lint-journeys-reach-users`), always green alone. `npm run
+guards` now runs `vitest run scripts/ --no-file-parallelism` (about 25 s slower). A new self-test that touches the tree
+must clean up in a `finally` and must not assume it runs alone in a plain `npx vitest run scripts/`.

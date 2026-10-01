@@ -172,6 +172,12 @@ async function restore(file, { call, tier, done, notRestored }) {
     ? call(app, op, { ...args, actor: who }, { caller: who })
     : call(app, op, args));
   // a follow-up step (the rsvp, the tick, the cancel) that the gate refuses is said, and the thing is not counted done
+  // A tick or a cancel by someone no longer in the book is still made (the thing's state is restored), as the host's
+  // own — and said: the file named a person the book does not hold.
+  const byHost = (stepName, who, label, run) => {
+    if (who && !inBook.has(who)) notRestored.push({ what: 'by-the-host', step: stepName, who, of: label });
+    return run();
+  };
   const step = async (what, extra, promise) => { const r = await promise; if (r?.ok === false) { notRestored.push({ what, ...extra, why: r.error ?? 'refused' }); return false; } return true; };
 
   const existing = new Set((((await call('lists', 'listLists', {}))?.items) ?? []).map((l) => String(l.label ?? '').toLowerCase()));
@@ -186,10 +192,13 @@ async function restore(file, { call, tier, done, notRestored }) {
       let ok = true;
       for (const [who, answer] of Object.entries(e.rsvp ?? {})) {
         const op = { accepted: 'rsvpAccept', tentative: 'rsvpTentative', declined: 'rsvpDecline' }[answer];
-        if (op) ok = (await step('rsvp', { title: e.title, who }, as(who, 'calendar', op, { id: r.itemId }))) && ok;
+        if (!op) continue;
+        // an answer is a person's: someone not in the book is not answered for (the host does not "come")
+        if (!inBook.has(who)) { notRestored.push({ what: 'rsvp', title: e.title, who, why: 'not-in-the-book' }); ok = false; continue; }
+        ok = (await step('rsvp', { title: e.title, who }, as(who, 'calendar', op, { id: r.itemId }))) && ok;
       }
-      if (e.cancelled) ok = (await step('cancel', { title: e.title }, as(e.createdBy, 'calendar', 'cancelEvent', { id: r.itemId }))) && ok;
-      else if (e.completedAt) ok = (await step('passed', { title: e.title }, as(e.completedBy, 'lists', 'markListItemDone', { item: r.itemId }))) && ok;
+      if (e.cancelled) ok = (await step('cancel', { title: e.title }, byHost('cancel', e.createdBy, e.title, () => as(e.createdBy, 'calendar', 'cancelEvent', { id: r.itemId })))) && ok;
+      else if (e.completedAt) ok = (await step('passed', { title: e.title }, byHost('tick', e.completedBy, e.title, () => as(e.completedBy, 'lists', 'markListItemDone', { item: r.itemId })))) && ok;
       if (ok) done.appointments += 1;
       return;
     }
@@ -205,7 +214,7 @@ async function restore(file, { call, tier, done, notRestored }) {
       if (holder && !inBook.has(holder)) notRestored.push({ what: 'holder', text: e.text, holder });
       if ((e.holders ?? []).length > 1) notRestored.push({ what: 'second-holder', text: e.text, holders: e.holders.slice(1) });
       let ok = true;
-      if (e.completedAt && r.itemId) ok = await step('tick', { text: e.text }, as(e.completedBy ?? holder, 'tasks', 'completeTask', { id: r.itemId }));
+      if (e.completedAt && r.itemId) ok = await step('tick', { text: e.text }, byHost('tick', e.completedBy ?? holder, e.text, () => as(e.completedBy ?? holder, 'tasks', 'completeTask', { id: r.itemId })));
       for (const ch of e.children ?? []) notRestored.push({ what: 'sub-chore', text: ch.text ?? ch.title ?? '' });
       if (ok) done.chores += 1;
       return;
@@ -213,7 +222,7 @@ async function restore(file, { call, tier, done, notRestored }) {
     const r = await as(e.createdBy, 'lists', 'addToList', { list, text: e.text });
     if (!r?.ok) { notRestored.push({ what: 'entry', text: e.text, why: r?.error ?? 'refused' }); return; }
     if (r.duplicate) { done.kept += 1; return; }
-    const ok = e.completedAt ? await step('tick', { text: e.text }, as(e.completedBy, 'lists', 'markListItemDone', { item: r.itemId ?? e.text, list })) : true;
+    const ok = e.completedAt ? await step('tick', { text: e.text }, byHost('tick', e.completedBy, e.text, () => as(e.completedBy, 'lists', 'markListItemDone', { item: r.itemId ?? e.text, list }))) : true;
     if (ok) done.entries += 1;
   };
 

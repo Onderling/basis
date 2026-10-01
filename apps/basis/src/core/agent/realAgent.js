@@ -4042,7 +4042,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       const refusal = await doorRefusal(opId, ctx.caller);
       if (refusal) return { ok: false, error: refusalText(refusal, typeof opts.t === 'function' ? opts.t : null), refusal };
-      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
+      // ...and runs in the door's circle: a circle named in the args (a typed `--circleId=`, a model's pick, a
+      // screen's data) is not followed — the person's role and the token do not look at the circle, so it is pinned
+      // here, for every door alike. The bot's own calls (no caller) still name any circle.
+      const { circleId: _circle, groupId: _group, ...pinned } = args ?? {};
+      args = pinned;
+      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...args, actor: ctx.caller };
     }
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
     // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no

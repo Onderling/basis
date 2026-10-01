@@ -65,7 +65,9 @@ if (!values.mock) {
   if (!readPrivatemodeKey()) { console.error('assistant-eval: no Privatemode key — pass --mock or add ~/.privatemode-apikey'); process.exit(2); }
   llm = new LlmClient({ provider: await privatemodeProvider({ model: values.model || undefined, timeoutMs: 60_000 }) });
 } else {
-  llm = { invoke: async () => ({ toolCall: null, replyText: 'Welke lijst bedoel je?' }) };
+  // the same stand-in the browser specs use (llm-client's mockProvider), behind the real client
+  const { LlmClient, mockProvider } = await import('@onderling/llm-client');
+  llm = new LlmClient({ provider: mockProvider({ responses: [{ replyText: 'Welke lijst bedoel je?' }] }) });
 }
 
 const fixtures = FIXTURES.filter((f) => !values.only || f.id.includes(values.only));

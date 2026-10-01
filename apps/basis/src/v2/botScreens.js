@@ -48,8 +48,9 @@ export function parseScreenLink(link) {
  * @param {(person: string) => Promise<boolean>} a.isAdmitted  the person is in the book (not revoked)
  * @param {(person: string) => Promise<string[]>} a.columnOf  the op ids (`app.op`) this person's role reaches, minus
  *   what a screen never gets (the shell decides; the admin's own ops are not minted)
- * @param {(person: string, text: string) => Promise<{ok: boolean, reason?: string}>} a.sendPrivately  the person's
- *   PRIVATE door (their own chat, their inbox) — never the chat `/scherm` was typed in, which may be a group
+ * @param {(person: string, text: string, rememberAs: string|null) => Promise<{ok: boolean, reason?: string}>} a.sendPrivately
+ *   the person's PRIVATE door (their own chat, their inbox) — never the chat `/scherm` was typed in, which may be a
+ *   group; `rememberAs` is what their thread keeps instead of the link (a secret does not belong in memory)
  * @param {(g: {viewPubKey: string, ops: string[], actingAs: string, label: string, nonce: string}) => Promise<object>} a.grant
  * @param {(viewPubKey: string) => Promise<boolean>} a.revokeView
  * @param {() => Promise<Array<{viewPubKey: string, label: string|null, ops: string[], actingAs?: string}>>} a.listGrants
@@ -63,9 +64,10 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
   return {
     /**
      * `/scherm`: a fresh one-time link for this person (the previous pending one stops working), sent to their PRIVATE
-     * door only — a group must never see it. `text(link, minutes)` words it in the person's language.
+     * door only — a group must never see it. `text(link, minutes)` words it in the person's language; `remembered` is
+     * what their thread keeps instead (never the link).
      */
-    async start(person, text) {
+    async start(person, text, remembered = null) {
       const { appUrl, botAddress, relayUrl } = where() ?? {};
       if (!appUrl || !botAddress) return { ok: false, reason: 'no-app-url' };
       if (typeof sendPrivately !== 'function') return { ok: false, reason: 'no-private-door' };
@@ -73,7 +75,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       const until = now() + SCREEN_LINK_TTL_MS;
       threads.setScreenNonce(person, { hash: await sha256Hex(nonce), until });
       const link = encodeScreenLink(appUrl, { botAddress, relayUrl, nonce });
-      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_LINK_TTL_MS / 60000)));
+      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_LINK_TTL_MS / 60000)), remembered ?? '');
       if (!sent?.ok) { threads.setScreenNonce(person, null); return { ok: false, reason: sent?.reason ?? 'not-reachable' }; }
       return { ok: true, until };
     },

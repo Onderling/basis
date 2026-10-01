@@ -24,10 +24,11 @@ export function createPersonReach({ bridges = {}, users, threads }) {
   return {
     /**
      * @param {string} contactId
-     * @param {{text: string, buttons?: Array<{id:string, label:string}>}} message
+     * @param {{text: string, buttons?: Array<{id:string, label:string}>, rememberAs?: string}} message  `rememberAs`: what the
+     *   thread keeps instead of the text (a message carrying a secret — a one-time link — must not ride into memory)
      * @returns {Promise<{ok: true} | {ok: false, reason: 'revoked'|'no-door'|'no-private-chat'|'failed'}>}
      */
-    async sendToPerson(contactId, { text, buttons } = {}) {
+    async sendToPerson(contactId, { text, buttons, rememberAs } = {}) {
       const rows = (await users.list().catch(() => [])) ?? [];
       const row = rows.find((r) => r?.id === contactId) ?? null;
       if (row?.hidden) return { ok: false, reason: 'revoked' };
@@ -42,7 +43,7 @@ export function createPersonReach({ bridges = {}, users, threads }) {
         if (row.channel === 'telegram' && cannotStart(err)) { threads.markUnreachable(contactId, 'no-private-chat'); return { ok: false, reason: 'no-private-chat' }; }
         return { ok: false, reason: 'failed' };   // the next tick tries again
       }
-      threads.memory.remember(contactId, 'assistant', text);
+      threads.memory.remember(contactId, 'assistant', typeof rememberAs === 'string' ? rememberAs : text);
       return { ok: true };
     },
   };

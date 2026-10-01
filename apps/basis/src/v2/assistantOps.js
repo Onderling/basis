@@ -277,7 +277,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!person || !admin.screens) return { ok: false, error: 'unwired' };
     const tp = personT(person);
     // the link goes to the person's PRIVATE door only; the chat it was asked in (maybe a group) hears where it went
-    const r = await admin.screens.start(person, (link, minutes) => tp('circle.bot.screen_link', { link, minutes }));
+    const r = await admin.screens.start(person, (link, minutes) => tp('circle.bot.screen_link', { link, minutes }), tp('circle.bot.screen_link_remembered'));
     if (!r.ok) {
       const key = r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable';
       return { ok: false, error: { code: r.reason, message: tp(key) } };

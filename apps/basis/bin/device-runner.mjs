@@ -803,7 +803,7 @@ if (tgToken || inboxDoor.bridge) {
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
-    sendPrivately: (person, text) => reach.sendToPerson(person, { text }),
+    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs }),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
     grant: (g) => agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce }),
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,

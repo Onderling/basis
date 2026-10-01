@@ -47,3 +47,27 @@ export function welcomeLines({ ops, lists = [], role = null, settings = {}, t })
   if (role === 'admin') lines.push(t('circle.bot.welcome_admin'));
   return lines;
 }
+
+/**
+ * What works WITHOUT the model (it is off, or not answering): the word rules the door takes itself, for the person's
+ * tools, and where the commands are. Said instead of "I only understand commands" — the person learns what to type.
+ * @param {object} a
+ * @param {Set<string>} a.ops  the op ids this person's role reaches
+ * @param {Array<{name: string, defaultChild?: string|null}>} a.lists
+ * @param {(key: string, vars?: object) => string} a.t
+ * @returns {string[]}
+ */
+export function basicModeLines({ ops, lists = [], t }) {
+  const has = (op) => ops.has(op);
+  const plain = lists.filter((l) => !l.defaultChild);
+  const chores = lists.find((l) => l.defaultChild === 'task');
+  const lines = [];
+  const first = plain[0]?.name;
+  if (first && has('addToList')) lines.push(t('circle.bot.basic_add', { list: first.toLowerCase() }));
+  if (first && has('listEntries')) lines.push(t('circle.bot.basic_read', { list: first.toLowerCase() }));
+  if (chores && has('addToList')) lines.push(t('circle.bot.basic_chore'));
+  if (has('markListItemDone') || has('completeTask')) lines.push(t('circle.bot.basic_done'));
+  if (has('weekOverview')) lines.push(t('circle.bot.basic_week'));
+  lines.push(t('circle.bot.basic_help'));
+  return lines;
+}

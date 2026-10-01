@@ -4285,7 +4285,9 @@
     "screens_row": "{{i}}. {{label}}: {{n}} dingen",
     "screen_dropped": "Scherm {{i}} is losgekoppeld.",
     "screen_no_such": "Je hebt geen scherm {{i}}. Je schermen: /schermen.",
-    "revoked_screens": "Ook {{n}} gekoppelde schermen zijn losgekoppeld."
+    "revoked_screens": "Ook {{n}} gekoppelde schermen zijn losgekoppeld.",
+    "screen_sent_privately": "Ik heb je de link privé gestuurd.",
+    "screen_not_reachable": "Ik kan je niet privé schrijven. Stuur me eerst zelf een bericht in een privégesprek, en vraag dan opnieuw /scherm."
   },
   "op": {
     "not_in_this_circle": {

@@ -276,9 +276,13 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function screenOp(person) {
     if (!person || !admin.screens) return { ok: false, error: 'unwired' };
     const tp = personT(person);
-    const r = await admin.screens.start(person);
-    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_no_app') } };
-    return { ok: true, message: tp('circle.bot.screen_link', { link: r.link, minutes: Math.round((r.until - Date.now()) / 60000) }) };
+    // the link goes to the person's PRIVATE door only; the chat it was asked in (maybe a group) hears where it went
+    const r = await admin.screens.start(person, (link, minutes) => tp('circle.bot.screen_link', { link, minutes }));
+    if (!r.ok) {
+      const key = r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable';
+      return { ok: false, error: { code: r.reason, message: tp(key) } };
+    }
+    return { ok: true, message: tp('circle.bot.screen_sent_privately') };
   }
 
   /** `/schermen` (the person's screens) · `/schermen los <n>` (drop one). */

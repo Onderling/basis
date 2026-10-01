@@ -38,8 +38,14 @@ const holders = (i) => [...(i?.assignees ?? []), i?.assignee, i?.createdBy, i?.a
 
 describe('a screen acts as its person, and no further', () => {
   let dir; let agent; let own; let threads; let users; let bot; let view; let failBook = false;
-  const mint = async (skill, constraints, issuer = bot.identity, subject = view.pubKey, extra = {}) =>
-    (await CapabilityToken.issue(issuer, { subject, agentId: bot.identity.pubKey, skill, constraints, ...extra })).toJSON();
+  // the bot's own tokens come from its own grants (on the lane, as `/scherm` mints them); any other issuer signs directly
+  const mint = async (skill, constraints, issuer = null, subject = view.pubKey, extra = {}) => {
+    if (!issuer) {
+      const r = await own('household', 'grantSurface', { viewPubKey: subject, ops: [skill], ...(constraints?.actingAs ? { actingAs: constraints.actingAs } : {}) });
+      return r.tokens[0];
+    }
+    return (await CapabilityToken.issue(issuer, { subject, agentId: bot.identity.pubKey, skill, constraints, ...extra })).toJSON();
+  };
   const act = async (skillId, args, token, from = view) => {
     try { await bot.policyEngine.checkInbound({ peerPubKey: from.pubKey, skillId, token }); } catch (e) { return { refusedAt: 'token', code: e?.code, message: e?.message }; }
     return bot.skills.get(skillId).handler({ parts: [DataPart(args)], envelope: { payload: { _token: token } } });
@@ -55,7 +61,7 @@ describe('a screen acts as its person, and no further', () => {
     agent = await createRealHouseholdAgent({
       ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass), chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') }, seedDemoData: false, seedHousehold: false,
-      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, t,
+      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, t,
     });
     own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
@@ -66,11 +72,10 @@ describe('a screen acts as its person, and no further', () => {
     const doorCall = withAssistantOps({ callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), threads, t, refusal: agent.doorRefusal, admin: {} });
     const book = createBotUsers({ store: contactBookStore(own) });
     users = { list: async () => { if (failBook) throw new Error('book unreadable'); return book.list(); }, revoke: (w) => book.revoke(w) };
-    agent.exposeToPeers(renderA2A([listsManifest, calendarManifest, assistantManifest], { callSkill: doorCall }, { ctxFor: screenActsAs(users), never: BOT_SCREEN_NEVER }));
+    agent.exposeToPeers(renderA2A([listsManifest, calendarManifest, assistantManifest], { callSkill: doorCall }, { ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER }));
     bot = agent.sa.agent;
     view = await AgentIdentity.generate(new VaultMemory());
     await agent.sa.trust?.setTier?.(view.pubKey, 'authenticated');
-    await agent.sa.trust?.setTier?.(bot.identity.pubKey, 'trusted');
 
     // a second circle on the bot, with a list and an entry of its own (the host, which may name any circle)
     await own('lists', 'createList', { text: 'Geheim', circleId: OTHER });
@@ -192,6 +197,17 @@ describe('a screen acts as its person, and no further', () => {
     expect((await asMember('lists.listEntries', { list: 'Boodschappen' })).ok).not.toBe(false);
     await own('stoop', 'setContactRole', { webid: MEMBER, role: 'member' }).catch(() => {});
     await agent.setDoorCaller(MEMBER, 'member');
+  });
+
+  it('the lane is the allow-list: a token signed with the bot\'s own key but never granted, or one dropped, acts as nobody', async () => {
+    const offLane = (await CapabilityToken.issue(bot.identity, { subject: view.pubKey, agentId: bot.identity.pubKey, skill: 'lists.addToList', constraints: { role: 'surface', actingAs: MEMBER } })).toJSON();
+    expect(await act('lists.addToList', { list: 'Boodschappen', text: 'naast-de-lijn' }, offLane)).toMatchObject({ ok: false, error: 'not-bound' });
+    const granted = await mint('lists.addToList', { role: 'surface', actingAs: MEMBER });
+    expect((await act('lists.addToList', { list: 'Boodschappen', text: 'wel-gegeven' }, granted)).ok).toBe(true);
+    await own('household', 'revokeSurface', { viewPubKey: view.pubKey });
+    const after = await act('lists.addToList', { list: 'Boodschappen', text: 'na-los' }, granted);
+    expect(after.ok, JSON.stringify(after)).not.toBe(true);
+    expect((await items()).some((i) => ['naast-de-lijn', 'na-los'].includes(i.text))).toBe(false);
   });
 
   it('the book fails: the call fails, nothing runs as the host', async () => {

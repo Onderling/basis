@@ -39,7 +39,7 @@ describe('a screen acts as its person on the bot', () => {
     agent = await createRealHouseholdAgent({
       ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass), chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') }, seedDemoData: false, seedHousehold: false,
-      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, t,
+      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, t,
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
@@ -51,12 +51,11 @@ describe('a screen acts as its person on the bot', () => {
 
     // the bot exposes its door to screens
     expect(typeof agent.exposeToPeers).toBe('function');
-    agent.exposeToPeers(renderA2A([listsManifest, assistantManifest], { callSkill: doorCall }, { ctxFor: screenActsAs(users), never: BOT_SCREEN_NEVER }));
+    agent.exposeToPeers(renderA2A([listsManifest, assistantManifest], { callSkill: doorCall }, { ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER }));
     const bot = agent.sa.agent;
     const view = await AgentIdentity.generate(new VaultMemory());
     await agent.sa.trust?.setTier?.(view.pubKey, 'authenticated');
-    await agent.sa.trust?.setTier?.(bot.identity.pubKey, 'trusted');
-    const mint = async (skill, constraints) => (await CapabilityToken.issue(bot.identity, { subject: view.pubKey, agentId: bot.identity.pubKey, skill, constraints })).toJSON();
+    const mint = async (skill, constraints) => (await own('household', 'grantSurface', { viewPubKey: view.pubKey, ops: [skill], ...(constraints?.actingAs ? { actingAs: constraints.actingAs } : {}) })).tokens[0];
     const act = async (skillId, args, token) => {
       try { await bot.policyEngine.checkInbound({ peerPubKey: view.pubKey, skillId, token }); } catch (e) { return { refusedAt: 'token', code: e?.code }; }
       return bot.skills.get(skillId).handler({ parts: [DataPart(args)], envelope: { payload: { _token: token } } });

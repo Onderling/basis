@@ -214,7 +214,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows } : {}),
+  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -802,6 +802,8 @@ if (tgToken || inboxDoor.bridge) {
   const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
   const screens = isFunctionProfile ? createBotScreens({
     threads,
+    isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
+    sendPrivately: (person, text) => reach.sendToPerson(person, { text }),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
     grant: (g) => agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce }),
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
@@ -839,7 +841,13 @@ if (tgToken || inboxDoor.bridge) {
   if (screens) {
     // The door's ops, to a connected screen: each call runs as the person its token names, through this door's own
     // call — the same gate as their typed line — and what a screen never gets is withheld at the kernel's door.
-    const exposed = agent.exposeToPeers(renderA2A(Object.values(doorCatalogue.manifestsByOrigin()), { callSkill: doorCall }, { ctxFor: screenActsAs(botUsers), never: BOT_SCREEN_NEVER }));
+    // Only the ops on the bot's map are exposed (any role's), and the withheld ones as `never`: an unmapped op is an
+    // unknown skill to a screen, not one that merely has no token.
+    const mapped = new Set(screenColumnFor(doorCatalogue.catalogue(), 'admin').concat(screenColumnFor(doorCatalogue.catalogue(), 'member'), screenColumnFor(doorCatalogue.catalogue(), 'observer'), BOT_SCREEN_NEVER));
+    const defs = renderA2A(Object.values(doorCatalogue.manifestsByOrigin()), { callSkill: doorCall }, {
+      ctxFor: screenActsAs(botUsers, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER,
+    }).filter((d) => mapped.has(d.id));
+    const exposed = agent.exposeToPeers(defs);
     screenOffer.handle = async (from, payload) => {
       const offer = parsePairingOffer(payload?.offer);
       const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };

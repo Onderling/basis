@@ -29,7 +29,9 @@ export const BOT_SCREEN_NEVER = Object.freeze([
  * @returns {string[]}
  */
 export function screenColumnFor(catalogue, role) {
-  const scoped = scopeCatalogueToRole(catalogue, role ?? 'member');
+  // no role (not in the book, revoked): nothing — never a default column
+  if (typeof role !== 'string' || !role) return [];
+  const scoped = scopeCatalogueToRole(catalogue, role);
   const out = [];
   for (const [, entry] of scoped?.opsById ?? []) {
     const id = `${entry?.appOrigin}.${entry?.op?.id}`;
@@ -42,15 +44,22 @@ export function screenColumnFor(catalogue, role) {
 }
 
 /**
- * The `ctxFor` for `renderA2A` on a bot: the verified call's token's `actingAs`, when that person is in the book.
+ * The `ctxFor` for `renderA2A` on a bot: the verified call's token's `actingAs`, when that person is in the book AND the
+ * token is ACTIVE on the grants lane for that same person — an allow-list: a token the lane never saw (signed with the
+ * bot's key, but not granted), or one dropped by `/schermen los`, is refused here as well as by the revocation check.
  * @param {{list: () => Promise<Array<{id: string, hidden?: boolean}>>}} users  the bot's book (revoked rows are not listed)
+ * @param {object} a
+ * @param {(tokenId: string) => Promise<{viewPubKey: string, actingAs: string|null}|null>} a.activeEntry  the lane's answer
  * @returns {(handlerCtx: object) => Promise<{caller: string, threadId: string}|null>}
  */
-export function screenActsAs(users) {
+export function screenActsAs(users, { activeEntry } = {}) {
+  if (typeof activeEntry !== 'function') throw new TypeError('screenActsAs: the grants lane (activeEntry) is required');
   return async (hctx) => {
     const token = hctx?.envelope?.payload?._token ?? null;
     const actingAs = token?.constraints?.actingAs;
     if (typeof actingAs !== 'string' || !actingAs) return null;
+    const entry = await activeEntry(token?.id);
+    if (!entry || entry.actingAs !== actingAs || entry.viewPubKey !== token?.subject) return null;
     const row = ((await users.list()) ?? []).find((u) => u?.id === actingAs && !u.hidden);
     return row ? { caller: actingAs, threadId: actingAs } : null;
   };

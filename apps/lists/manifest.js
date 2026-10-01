@@ -159,6 +159,8 @@ export const listsManifest = {
       },
     },
     {
+      // The confirm below is the SURFACE's (a chat asks first; a screen paints it): the waist does not ask. A connected
+      // screen that calls this op directly removes the list — on a household bot that is the admin's own screen only.
       id:        'removeList', group: 'compose',
       verb:      'remove',
       writes:    { scope: 'circle' },

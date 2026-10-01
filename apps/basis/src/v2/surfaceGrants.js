@@ -374,6 +374,19 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
     /** Await any in-flight fold — for a caller that wants the revoke reflected before replying. */
     flush: () => settled(),
 
+    /**
+     * The live grant a token belongs to, or null: the token's id is among the tokens of a view's CURRENT grant on the
+     * lane (not superseded, not revoked). An allow-list answer — a token the lane never saw has no entry.
+     * @returns {{viewPubKey: string, actingAs: string|null}|null}
+     */
+    activeEntryOf(tokenId) {
+      if (typeof tokenId !== 'string' || !tokenId || !ready || folded.revokedIds.has(tokenId)) return null;
+      for (const [viewPubKey, e] of folded.granted) {
+        if (e.tokens.some((t) => t.id === tokenId)) return { viewPubKey, actingAs: e.actingAs ?? null };
+      }
+      return null;
+    },
+
     /** Current grants, for a settings surface: [{viewPubKey, label, ops, reads, actingAs}] (`actingAs` only when named). */
     list() {
       return [...folded.granted.entries()].map(([viewPubKey, e]) => ({ viewPubKey, label: e.label, ops: [...e.ops], reads: e.reads ?? null, ...(e.actingAs ? { actingAs: e.actingAs } : {}) }));

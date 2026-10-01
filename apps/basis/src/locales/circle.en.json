@@ -4285,7 +4285,9 @@
     "screens_row": "{{i}}. {{label}}: {{n}} things",
     "screen_dropped": "Screen {{i}} is disconnected.",
     "screen_no_such": "You have no screen {{i}}. Your screens: /schermen.",
-    "revoked_screens": "Their {{n}} connected screens are disconnected too."
+    "revoked_screens": "Their {{n}} connected screens are disconnected too.",
+    "screen_sent_privately": "I sent you the link privately.",
+    "screen_not_reachable": "I cannot write to you privately. Send me a message in a private chat first, then ask /scherm again."
   },
   "op": {
     "not_in_this_circle": {

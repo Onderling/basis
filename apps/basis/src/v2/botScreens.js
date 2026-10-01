@@ -45,8 +45,11 @@ export function parseScreenLink(link) {
 /**
  * @param {object} a
  * @param {object} a.threads  the bot's thread rows (`screenNonceOf` / `setScreenNonce` / `screenNonceOwner`)
+ * @param {(person: string) => Promise<boolean>} a.isAdmitted  the person is in the book (not revoked)
  * @param {(person: string) => Promise<string[]>} a.columnOf  the op ids (`app.op`) this person's role reaches, minus
  *   what a screen never gets (the shell decides; the admin's own ops are not minted)
+ * @param {(person: string, text: string) => Promise<{ok: boolean, reason?: string}>} a.sendPrivately  the person's
+ *   PRIVATE door (their own chat, their inbox) — never the chat `/scherm` was typed in, which may be a group
  * @param {(g: {viewPubKey: string, ops: string[], actingAs: string, label: string, nonce: string}) => Promise<object>} a.grant
  * @param {(viewPubKey: string) => Promise<boolean>} a.revokeView
  * @param {() => Promise<Array<{viewPubKey: string, label: string|null, ops: string[], actingAs?: string}>>} a.listGrants
@@ -54,18 +57,25 @@ export function parseScreenLink(link) {
  * @param {() => {appUrl: string|null, botAddress: string|null, relayUrl: string|null}} a.where
  * @param {() => number} [a.now]
  */
-export function createBotScreens({ threads, columnOf, grant, revokeView, listGrants, notify = null, where, now = Date.now }) {
+export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, sendPrivately, where, now = Date.now }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
 
   return {
-    /** `/scherm`: a fresh one-time link for this person (the previous pending one stops working). */
-    async start(person) {
+    /**
+     * `/scherm`: a fresh one-time link for this person (the previous pending one stops working), sent to their PRIVATE
+     * door only — a group must never see it. `text(link, minutes)` words it in the person's language.
+     */
+    async start(person, text) {
       const { appUrl, botAddress, relayUrl } = where() ?? {};
       if (!appUrl || !botAddress) return { ok: false, reason: 'no-app-url' };
+      if (typeof sendPrivately !== 'function') return { ok: false, reason: 'no-private-door' };
       const nonce = randomNonce();
       const until = now() + SCREEN_LINK_TTL_MS;
       threads.setScreenNonce(person, { hash: await sha256Hex(nonce), until });
-      return { ok: true, link: encodeScreenLink(appUrl, { botAddress, relayUrl, nonce }), until };
+      const link = encodeScreenLink(appUrl, { botAddress, relayUrl, nonce });
+      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_LINK_TTL_MS / 60000)));
+      if (!sent?.ok) { threads.setScreenNonce(person, null); return { ok: false, reason: sent?.reason ?? 'not-reachable' }; }
+      return { ok: true, until };
     },
 
     /**
@@ -81,6 +91,7 @@ export function createBotScreens({ threads, columnOf, grant, revokeView, listGra
       const pending = threads.screenNonceOf(person);
       threads.setScreenNonce(person, null);   // one use, whatever happens next
       if (!pending || pending.until < now()) return { ok: false, reason: 'expired' };
+      if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
       const ops = await columnOf(person);
       if (!ops.length) return { ok: false, reason: 'nothing-to-grant' };
       const r = await grant({ viewPubKey, ops, actingAs: person, label: label || 'scherm', nonce });
@@ -100,8 +111,9 @@ export function createBotScreens({ threads, columnOf, grant, revokeView, listGra
       return { ok: Boolean(await revokeView(g.viewPubKey)), viewPubKey: g.viewPubKey };
     },
 
-    /** Revoking a person drops every screen of theirs. */
+    /** Revoking a person drops every screen of theirs, and the link they may still hold. */
     async dropAll(person) {
+      threads.setScreenNonce(person, null);
       let n = 0;
       for (const g of await mine(person)) if (await revokeView(g.viewPubKey)) n += 1;
       return n;

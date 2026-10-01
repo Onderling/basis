@@ -3987,7 +3987,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       else {
         if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
         const name = assignee.trim().toLowerCase();
-        const hit = known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
+        // by their name, or — for someone without one — by the id the bot shows for them (`/users`), exactly
+        const byId = known.filter((c) => c.webid === assignee.trim());
+        const hit = byId.length ? byId : known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
         // Who the bot knows is never listed on a miss: a directory is not implied by anyone's own disclosure.
         if (hit.length !== 1) return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim() }) };
         who = hit[0].webid;

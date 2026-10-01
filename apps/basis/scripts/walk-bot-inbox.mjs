@@ -42,7 +42,12 @@ const node = await bootRealAgentNode('walker', {
 const replies = [];
 const channel = createContactThreadChannel({ sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload), sealFor: node.agent.contactSeal?.sealFor ?? null, openFor: node.agent.contactSeal?.openFor ?? null });
 // The bot answers as a person does (`contact-msg`); a bot-style `contact-reply` is taken too.
-const take = (r) => { replies.push({ at: Date.now(), text: r.text }); console.log(`< ${String(r.text).replace(/\n/g, '\n  ')}`); };
+// A reply's buttons are printed too (`[id] label`), so a walk can tap one by sending its id.
+const take = (r) => {
+  replies.push({ at: Date.now(), text: r.text });
+  console.log(`< ${String(r.text).replace(/\n/g, '\n  ')}`);
+  for (const b of Array.isArray(r.buttons) ? r.buttons : []) console.log(`  [${b.id ?? b.callbackData ?? '?'}] ${b.label ?? b.text ?? ''}`);
+};
 const onReply = channel.replyHandler(take);
 const onMessage = channel.messageHandler(take);
 await node.agent.connectPeerTransport({

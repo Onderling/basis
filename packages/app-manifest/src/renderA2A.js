@@ -55,7 +55,8 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
  * @param {(parts:any)=>object} [opts.readArgs] — how to read args off the inbound Parts
  * @param {(handlerCtx:object, op:{appOrigin:string, opId:string})=>Promise<object|null>|object|null} [opts.ctxFor] — who
  *   a peer's call runs AS: the waist's ctx, from the verified call (its token's `actingAs`). Returning nothing refuses
- *   the call before the op (`not-bound`). Absent → no ctx, as before (a person's own agent: its screen IS the owner).
+ *   the call before the op (`not-bound`), and only the op's declared params pass. Absent → no ctx and the args as sent,
+ *   as before (a person's own agent: its screen IS the owner).
  * @param {Iterable<string>} [opts.never] — the shell's own withheld ops (`app.opId`), besides the kernel's
  * @returns {Array<{id:string, handler:Function, visibility:string, policy:string, description:string}>}
  *   Skill definitions, ready for `SkillRegistry.register`. NOT registered here — this is a projector, and
@@ -93,12 +94,23 @@ export function renderA2A(manifestOrList, args, opts = {}) {
           // the shell answers as a person: no person for this call → refused before the op, never run as the host
           const ctx = await ctxFor(hctx ?? {}, { appOrigin, opId: op.id });
           if (!ctx) return { ok: false, error: 'not-bound', refusal: { layer: 'admission', code: 'not-bound' } };
-          return callSkill(appOrigin, op.id, readArgs(hctx?.parts), ctx);
+          return callSkill(appOrigin, op.id, declaredOnly(readArgs(hctx?.parts), op), ctx);
         },
       });
     }
   }
   return out;
+}
+
+/**
+ * A peer acting as a person sends the op's DECLARED params, nothing else — the manifest is the contract. A screen is
+ * someone else's code: a `circleId` would aim the op at another circle on this node, an `actor` or `threadId` at
+ * another person, and the token says neither. `preview` passes where the op declares a confirm preview (a read).
+ */
+function declaredOnly(args, op) {
+  const names = new Set((op.params ?? []).map((p) => p?.name).filter(Boolean));
+  if (op.surfaces?.ui?.confirm?.preview === true) names.add('preview');
+  return Object.fromEntries(Object.entries(args ?? {}).filter(([k]) => names.has(k)));
 }
 
 /** Read `{...args}` off the inbound Parts — a DataPart's data, or the first object-shaped part. */

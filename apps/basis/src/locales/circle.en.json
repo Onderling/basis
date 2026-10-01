@@ -623,6 +623,54 @@
     "invited": {
       "text": "📅 You're invited: {{title}} — it's on your calendar.",
       "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
+    },
+    "no_agenda": {
+      "text": "There is no agenda to put an appointment on.",
+      "doc": "A household bot's calendar reply."
+    },
+    "added": {
+      "text": "Appointment set: {{title}} ({{when}}).",
+      "doc": "A household bot's calendar reply."
+    },
+    "no_event": {
+      "text": "I do not know that appointment.",
+      "doc": "A household bot's calendar reply."
+    },
+    "cancelled": {
+      "text": "Appointment cancelled: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_accepted": {
+      "text": "You are coming: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_declined": {
+      "text": "You are not coming: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_tentative": {
+      "text": "Maybe: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "say_when": {
+      "text": "An appointment on {{name}} needs a time: say when.",
+      "doc": "A household bot's calendar reply."
+    },
+    "already_there": {
+      "text": "{{title}} is already on the agenda ({{when}}).",
+      "doc": "A household bot's reply when the same appointment (title, at the same start) is added again: said, and no second one is made."
+    },
+    "not_yours": {
+      "text": "Someone else set \"{{title}}\": only they (or the admin) can cancel it.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
+    },
+    "cancel_confirm": {
+      "text": "Cancel this appointment?",
+      "doc": "Cancelling an appointment (asked first)."
+    },
+    "cancel_admin_only": {
+      "text": "Here only the admin cancels appointments.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
     }
   },
   "embed": {
@@ -3611,6 +3659,108 @@
     "not_accepted": {
       "text": "That list does not take that kind of thing.",
       "doc": "Refusal when a container's accepts policy has no place for the requested kind of child."
+    },
+    "template": {
+      "shopping": {
+        "text": "Shopping",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "chores": {
+        "text": "Chores",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "repairs": {
+        "text": "Repairs",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "schedule": {
+        "text": "Schedule",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      }
+    },
+    "no_such_entry": {
+      "text": "\"{{item}}\" is not on {{name}}.",
+      "doc": "A lists reply in the chat."
+    },
+    "removed": {
+      "text": "Took \"{{text}}\" off {{name}}.",
+      "doc": "A lists reply in the chat."
+    },
+    "edited": {
+      "text": "Changed on {{name}}: \"{{text}}\".",
+      "doc": "A lists reply in the chat."
+    },
+    "not_there": {
+      "text": "\"{{item}}\" is on no list.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "which_one": {
+      "text": "Which one do you mean: {{options}}?",
+      "doc": "A household bot's question when a person's words fit several entries, chores or appointments (the choices, quoted)."
+    },
+    "mean_this": {
+      "text": "Do you mean '{{item}}'?",
+      "doc": "A household bot's question when a person's words are only part of one entry (it does not tick or change more than was said)."
+    },
+    "already_there": {
+      "text": "'{{item}}' is already on {{list}}.",
+      "doc": "An add whose words are already open on that list: said, and no second entry is made."
+    },
+    "entry_done": {
+      "text": "{{text}} — done",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "event_passed": {
+      "text": "{{text}} — passed",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "done_named": {
+      "text": "Ticked off: {{text}}.",
+      "doc": "A household bot's reply naming the entry it ticked off."
+    },
+    "remove_list_confirm": {
+      "text": "Remove the list \"{{list}}\" and everything on it?",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "remove_list_confirm_counts": {
+      "text": "Remove the list \"{{list}}\", with {{what}}?",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_one": {
+      "text": "{{count}} entry",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_other": {
+      "text": "{{count}} entries",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries": {
+      "text": "{{count}} entries",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_one": {
+      "text": "{{count}} chore",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_other": {
+      "text": "{{count}} chores",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores": {
+      "text": "{{count}} chores",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_held": {
+      "text": "{{count}} taken by someone",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_kept": {
+      "text": "{{count}} stays on another list.",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "list_removed": {
+      "text": "The list \"{{name}}\" is gone.",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     }
   },
   "share": {
@@ -3843,6 +3993,273 @@
     "more": {
       "text": "And what else?",
       "doc": "Assistant reply when a turn was cut short (too many acts at once, or a call the model left unfinished): the ones it could do are done, and it asks for the rest."
+    },
+    "memory_off": "I no longer keep this conversation: every message now stands on its own. What you put on a list stays.",
+    "memory_short": "I keep the last few messages of this conversation.",
+    "memory_long": "I keep the last messages of this conversation, and later also what I know about the household.",
+    "lang_set": "I will reply to you in: {{lang}}.",
+    "lang_auto": "I will reply in the language you write in again.",
+    "welcome": "Hi! I'm this household's assistant. Type /help to see what I can do.",
+    "help_memory": "I keep the last few messages of our conversation. With /geheugen off I keep nothing; /taal nl or /taal en picks the language I reply in.",
+    "log_disclosure": "Conversations are kept in redacted form and can be read by the administrator to improve the assistant.",
+    "admin_only": "Only this bot's administrator can do that.",
+    "apps_list": "On: {{on}}\nAvailable: {{available}}\nSwitch one with /apps on <name> or /apps off <name>.",
+    "apps_usage": "Use: /apps, /apps on <name> or /apps off <name>.",
+    "apps_unknown": "I don't know an app called \"{{app}}\". /apps shows which there are.",
+    "apps_none_left": "At least one app has to stay on.",
+    "status": "Apps: {{apps}}\nModel: {{model}}\nDoor: {{door}}\nConversations in the log: {{turns}}\nDefault memory: {{memory}}\nPeople admitted: {{users}}",
+    "users_none": "Nobody admitted yet.",
+    "admission_needs_code": {
+      "text": "To talk to this assistant you need a code from its administrator. Then send: /start <code>",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_invalid_code": {
+      "text": "That code isn't right. Ask the administrator for a new one.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_code_used": {
+      "text": "That code has already been used. Ask the administrator for a new one.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_expired": {
+      "text": "That code has expired. Ask the administrator for a new one.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_full": {
+      "text": "No more people can join right now. Ask the administrator.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_no_cohort": {
+      "text": "Nobody is being admitted right now. Ask the administrator.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "cohort_usage": "Use: /cohort <number of people> <number of days>, for example /cohort 4 7.",
+    "cohort_open": "New group open: up to {{people}} people, until {{until}}. Earlier codes no longer work. Make a code with /invite.",
+    "cohort_none": "No group is open. Open one with /cohort <number of people> <number of days>.",
+    "cohort_closed": "The group is closed: no code works any more.",
+    "invite_code": "Code (one person, once): {{code}}\nThat person sends the bot: /start {{code}}",
+    "revoke_unknown": "I know nobody called \"{{who}}\". /users shows who is here.",
+    "revoked": "{{who}} is no longer admitted. A new code brings them back.",
+    "invite_link": "Or send this link, which opens the bot and sends the code: {{link}}",
+    "not_done": {
+      "text": "I did not do that — tell me which list and what to change.",
+      "doc": "The assistant's line when the model twice described a result without doing anything (nothing changed)."
+    },
+    "welcome_talk": {
+      "text": "Hi! I'm this household's assistant. Tell me what you want to add or see.",
+      "doc": "The household bot's first words on a door without commands (its contact inbox)."
+    },
+    "slow": {
+      "text": "One moment — the assistant is slow, I am trying once more.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "model_down": {
+      "text": "The assistant is not answering right now. Please try again in a moment.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "settings_list": {
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}}.",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "settings_usage": {
+      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <number> · /instellingen cancel own|admin · /instellingen reminders on|off · /instellingen quiet 21:00-08:00",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "role_usage": {
+      "text": "Use: /role <name> coordinator|member|observer",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_nobody": {
+      "text": "I do not know anyone here called \"{{name}}\" (or it is the admin).",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_set": {
+      "text": "{{name}} is now {{role}}.",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "reminder_event": {
+      "text": "Tomorrow: {{title}}, {{time}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_chore": {
+      "text": "Today: {{text}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_first": {
+      "text": "You get this because it has a date. To stop: /herinneringen uit",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_head": {
+      "text": "This week",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_none": {
+      "text": "Nothing open this week.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "unreachable": {
+      "text": "{{count}} people cannot be reached for reminders (no private chat).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_on": {
+      "text": "Reminders are on.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_off": {
+      "text": "Reminders are off.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_on": {
+      "text": "The weekly overview is on (Sunday 18:00).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_off": {
+      "text": "The weekly overview is off.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "switch_usage": {
+      "text": "Use: {{command}} on or {{command}} off.",
+      "doc": "Reply when a person's switch (reminders, weekly overview) gets a word it does not know."
+    },
+    "welcome_lists": {
+      "text": "Lists: {{lists}}. Say for example \"milk on the shopping list\" or \"what's on the shopping list\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_chores": {
+      "text": "{{list}}: \"new chore for me: clean the windows, tomorrow\", \"I'll do the windows\", \"the windows are done\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_agenda": {
+      "text": "{{list}}: \"dentist tomorrow at 10\" adds an appointment; \"what's in the agenda\" shows them.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_week": {
+      "text": "\"What's on this week?\" or /week: your chores and the appointments of the coming seven days.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reader": {
+      "text": "You read along: ask what is on a list or in the agenda.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_on": {
+      "text": "When something has a date I remind you: the evening before an appointment (19:00) and on the morning of a chore (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_off": {
+      "text": "Reminders are off for this household.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_overview": {
+      "text": "Want a weekly overview, Sundays at 18:00? Switch it on with /overzicht aan.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "exports_list": {
+      "text": "Export files on this box, newest first:\n{{names}}\nTo restore one: /import <name>.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "exports_none": {
+      "text": "There are no export files on this box yet.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm": {
+      "text": "Read this export file back into the household?",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm_counts": {
+      "text": "Restore \"{{name}}\"? It holds {{lists}} lists, {{entries}} entries, {{chores}} chores, {{appointments}} appointments and {{people}} people. What is already there stays.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_no_file": {
+      "text": "I don't know an export file \"{{name}}\". /exports shows which there are.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_unreadable": {
+      "text": "I can't read \"{{name}}\" as an export file.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_locked": {
+      "text": "\"{{name}}\" is sealed. Unlock the key on the box first: node apps/basis/bin/export-key.mjs unlock (in the bot's container). Then /import again.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_not_this_key": {
+      "text": "The key that is unlocked does not open \"{{name}}\". Unlock that file's key: node apps/basis/bin/export-key.mjs unlock --from {{name}}.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_failed": {
+      "text": "I could not write the export file.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_sealed": {
+      "text": "Saved and sealed: {{name}}. Restore it with /import {{name}}, after unlocking the key on the box.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_plain": {
+      "text": "Saved: {{name}}. Note: not sealed — set a key on the box with node apps/basis/bin/export-key.mjs set.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_done": {
+      "text": "Restored: {{lists}} lists, {{entries}} entries, {{chores}} chores, {{appointments}} appointments, {{people}} people.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_missed": {
+      "text": "{{count}} things could not be restored.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "basic_head": {
+      "text": "I can't read ordinary sentences right now. This does work:",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_add": {
+      "text": "• \"add milk to the {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_read": {
+      "text": "• \"what's on the {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_chore": {
+      "text": "• \"new task: clean the windows\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_done": {
+      "text": "• \"windows is done\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_week": {
+      "text": "• \"what's on this week\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_help": {
+      "text": "• /help for all commands",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "welcome_admin": {
+      "text": "You are the admin. With /instellingen you set, for the whole household, who may give chores, who sees names, the reminders and the quiet hours.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_done_words": {
+      "text": "Done? Say: {{text}} is done.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_done": {
+      "text": "Done",
+      "doc": "The button under a chore's reminder: it is done."
+    },
+    "overview_mine": {
+      "text": "Your chores:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_events": {
+      "text": "Appointments:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_shopping": {
+      "text": "{{n}} open on {{list}}.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_unheld": {
+      "text": "{{n}} chores nobody has taken yet.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
     }
   },
   "op": {
@@ -6678,6 +7095,124 @@
     "share": {
       "text": "Share…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    }
+  },
+  "tasks": {
+    "no_such_task": {
+      "text": "No chore \"{{item}}\" here.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "reply": {
+      "claimed": {
+        "text": "✓ Claimed: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "completed": {
+        "text": "✓ Completed: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "submitted": {
+        "text": "✓ Submitted: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "approved": {
+        "text": "✓ Approved: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "rejected": {
+        "text": "✓ Rejected: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "edited": {
+        "text": "✓ Edited: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      }
+    },
+    "already_claimed": {
+      "text": "'{{title}}' has already been claimed.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "already_yours": {
+      "text": "You had already claimed '{{title}}'.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "assign_refused": {
+      "text": "You can only give a chore to yourself.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "no_such_person": {
+      "text": "I do not know anyone called \"{{name}}\".",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "assignee_cannot": {
+      "text": "{{name}} cannot take chores (that role only looks).",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "names_hidden": {
+      "text": "Names are not visible here: you can only give a chore to yourself.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given_to": {
+      "text": "For {{name}}.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given": {
+      "text": "Assigned.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    }
+  },
+  "refusal": {
+    "role": {
+      "text": "Your role here cannot do that: you can only look.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "not-on-this-door": {
+      "text": "This bot does not do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "no-gate": {
+      "text": "The bot cannot check who you are right now; try again in a moment.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "DISABLED": {
+      "text": "That is switched off here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_FOUND": {
+      "text": "I do not know that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INVALID_TOKEN": {
+      "text": "You may not do that here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "refused": {
+      "text": "You may not do that here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_TIER": {
+      "text": "Only this bot's admin may do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_SELF": {
+      "text": "Only the owner may do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NO_TOKEN": {
+      "text": "You may not do that here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_ROLE": {
+      "text": "Your role here cannot do that.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_A_MEMBER": {
+      "text": "You are not (yet) part of this.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "POLICY_NEVER": {
+      "text": "That cannot be done here.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
     }
   }
 }

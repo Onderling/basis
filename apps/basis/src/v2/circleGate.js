@@ -69,6 +69,74 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
 }
 
 // alias → canonical household list type (the addItem `type` enum: shopping·errand·repair·schedule).
+/**
+ * The deterministic gate for a household BOT, whose household lives on LISTS: the same phrasings the household rules
+ * read ("zet melk op de boodschappen", "wat staat er op de klusjes"), pointed at the lists — `addToList` and
+ * `listEntries` on the list the words name — and "wat moet ik nog doen" at `listMine`. The lists and the words people
+ * use for them come from the bot's TEMPLATE (`templateLists`), so another template's lists get the same rules.
+ * @param {string} [_locale]
+ * @param {Array<{name: string, aliases?: string[], defaultChild?: string|null}>} lists  the template's lists
+ */
+export function listsGateRules(_locale, lists = []) {
+  const byWord = new Map();
+  for (const l of lists) for (const w of [l.name, ...(l.aliases ?? [])]) if (w) byWord.set(String(w).toLowerCase(), l.name);
+  const holdsEvents = new Set(lists.filter((l) => l.defaultChild === 'calendar-event').map((l) => l.name));
+  const listFor = (word) => {
+    const w = String(word ?? '').trim().toLowerCase();
+    return byWord.get(w) ?? byWord.get(w.replace(/(?:lijstje|lijst|list)$/, '')) ?? null;
+  };
+  const escape = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const words = [...byWord.keys()].sort((a, b) => b.length - a.length).map(escape);
+  const listRead = words.length ? new RegExp(`^${HH_READ}\\b.*?\\b(${words.join('|')})\\b`, 'i') : null;
+  const chores = lists.find((l) => l.defaultChild === 'task')?.name ?? null;
+  return [
+    { name: 'lists:addToList(named-list)', test: HH_ADD_TYPED, command: (text) => {
+      const m = HH_ADD_TYPED.exec(String(text || '').trim());
+      if (!m) return null;
+      const list = listFor(m[2]);
+      const items = splitItems(m[1].trim());
+      if (!list || !items.length) return null;
+      return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addToList', args: { list, text: t } })) } : {}) };
+    } },
+    { name: 'lists:listEntries(named-list-read)', test: (text) => Boolean(listRead && listRead.test(String(text ?? ''))), command: (text) => {
+      const m = listRead ? listRead.exec(String(text || '').trim()) : null;
+      const list = m ? listFor(m[1]) : null;
+      if (!list) return null;
+      // a list of appointments is read as the coming days, with their times — the calendar's own read
+      return holdsEvents.has(list) ? { opId: 'listEvents', args: {}, appOrigin: 'calendar' } : { opId: 'listEntries', args: { list } };
+    } },
+    { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
+    // "wat staat er deze week" / "wat moet er nog gebeuren": the person's week overview — by rule, so the model does not
+    // summarise the week itself from what it happens to have in view
+    { name: 'assistant:weekOverview(read)', test: WEEK_READ, command: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
+    // "ramen is klaar" / "de melk is gekocht": mostly a reply to the bot's own reminder, so it works without a model.
+    // One rule, no type choice: the waist finds the one item the words name (or asks which), and a chore's tick is the
+    // chore's own verb underneath.
+    { name: 'lists:markListItemDone(stated)', test: STATED_DONE, command: (text) => { const m = STATED_DONE.exec(String(text).trim()); return m ? { opId: 'markListItemDone', args: { item: m[1].trim() } } : null; } },
+    // A person's own switch for what the bot writes first: "stop writing to me" must work every time, model or no
+    // model — so it is a rule, never the model's reading.
+    { name: 'assistant:reminders(off)', test: REMINDERS_OFF, command: () => ({ opId: 'assistant-reminders', args: { mode: 'off' }, appOrigin: 'assistant' }) },
+    { name: 'assistant:reminders(on)', test: REMINDERS_ON, command: () => ({ opId: 'assistant-reminders', args: { mode: 'on' }, appOrigin: 'assistant' }) },
+    // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
+    // of the list whose entries are chores (it defaults to a task there).
+    { name: 'lists:addToList(task-on-chores)', test: (text) => LISTS_ADD_TASK.test(text), command: (text) => {
+      const m = LISTS_ADD_TASK.exec(String(text || '').trim());
+      const what = m ? m[1].trim() : '';
+      return chores && what ? { opId: 'addToList', args: { list: chores, text: what } } : null;
+    } },
+  ];
+}
+
+const REMINDERS_OFF = /^(?:(?:(?:stuur|geef)\s+(?:me|mij)\s+)?geen\s+herinneringen(?:\s+meer)?(?:\s+(?:sturen|graag|aub|alsjeblieft))?|(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+uit|stop\s+(?:met\s+)?(?:de\s+)?herinneringen|no\s+more\s+reminders|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+off|stop\s+(?:the\s+)?reminders)\s*[.!]*$/i;
+const REMINDERS_ON = /^(?:(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+(?:weer\s+)?aan|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+(?:back\s+)?on)\s*[.!]*$/i;
+const STATED_DONE = /^(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:is|zijn|are)\s+(?:al\s+|already\s+)?(?:klaar|gedaan|gekocht|gemaakt|af|done|bought|fixed)[.!]*$/i;
+const WEEK_READ = /^(?:wat\s+staat\s+er\s+(?:voor\s+)?deze\s+week|wat\s+moet\s+er\s+(?:nog|deze\s+week)?\s*gebeuren|what(?:'s|\s+is)\s+on\s+this\s+week)\s*[?.!]*$/i;
+// A chore that says WHO ("voor mij", "voor Bert", "for me") or WHEN (a day word) is the model's: it has the assignee and
+// the due date to fill, which this typed rule cannot.
+const CHORE_WHO_OR_WHEN = /\b(?:voor\s+\S+|for\s+\S+|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|morgen|vandaag|overmorgen|volgende\s+week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next\s+week)\b/i;
+const LISTS_ADD_TASK_TYPED = /^(?:add|new|voeg|zet|nieuwe?|maak)?\s*(?:a|an|een)?\s*(?:task|taak|chore|klus|klusje)\s*:?\s+(.+?)\s*$/i;
+const LISTS_ADD_TASK = { test: (s) => LISTS_ADD_TASK_TYPED.test(String(s ?? '')) && !CHORE_WHO_OR_WHEN.test(String(s ?? '')), exec: (s) => LISTS_ADD_TASK_TYPED.exec(String(s ?? '')) };
+
 const HH_LIST_ALIASES = {
   shopping: 'shopping', groceries: 'shopping', grocery: 'shopping',
   boodschappen: 'shopping', boodschappenlijst: 'shopping', boodschappenlijstje: 'shopping',

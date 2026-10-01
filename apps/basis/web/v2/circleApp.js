@@ -25,6 +25,8 @@ import '../../src/web/shims/bufferPolyfill.js';
 import { configureLog, consoleSink } from '@onderling/logger';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
+import { createPeek } from '../../src/v2/circlePeek.js';
+import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
   scopeStoopCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
@@ -2370,6 +2372,11 @@ function buildCircleBot(agent) {
   const embedProviders = {};
   applyUserLlmRuntime({ userCfg: { preset: 'off' }, env: ENV_LLM, llmProviders, embedProviders });
   let userDefault = { mode: ENV_LLM.mode };
+  // A browser spec's stand-in model (development builds only, never a released one): the circle bot answers from the
+  // spec's script through the real route — prompt, tools, reading the answer. It wins over any saved model setting.
+  const testModel = import.meta.env?.DEV ? readTestModel(globalThis) : null;
+  const useTestModel = () => { if (testModel) { Object.assign(llmProviders, testModelProviders(testModel)); userDefault = { mode: 'local' }; } };
+  useTestModel();
   // Task #13 / #37 — whether the route actually in effect is the confidential preset (Privatemode/TEE).
   // Drives the HONEST help wording: a plain route must NOT be called "de vertrouwelijke assistent".
   let userLlmConfidential = !!ENV_LLM.confidential;
@@ -2378,6 +2385,7 @@ function buildCircleBot(agent) {
   circleApplyUserLlm = (cfg) => {
     const r = applyUserLlmRuntime({ userCfg: cfg, env: ENV_LLM, llmProviders, embedProviders });
     if (r.ok) { userDefault = { ...cfg, mode: r.mode }; userLlmConfidential = !!r.confidential; }
+    useTestModel();
     // 52.25 — the embed providers just changed → re-wire folio /zoek's embedder.
     try { circleSyncFolioNoteEmbedder?.(); } catch { /* /zoek stays lexical */ }
     return r;
@@ -2751,6 +2759,13 @@ function buildCircleBot(agent) {
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { _circleRender?.botBubble(t('circle.bot.basic_mode')); },
     botName: CIRCLE_BOT_NAME,
+    // Read-then-act: a read the model picks is looked at (gated as every dispatch here, painted nowhere) and handed
+    // back to it once, so "haal de melk eraf" acts instead of showing the list.
+    peek: createPeek({
+      catalogue: () => catalogue,
+      deny: (ready) => circleCapabilityDeny(ready.appOrigin, ready.opId, ready.args),
+      run: (ready) => runDispatch(scopeReadyDispatch(ready, getActiveCircle()), rawCallSkill),
+    }),
     // No collect window here: in a circle composer a person types one line on purpose, and a wait on every bot reply
     // would read as a slow app. The lane still takes the circle's lines one turn at a time.
     collectMs: 0,
@@ -4949,7 +4964,7 @@ function openListsPanel(circleId) {
             // THROUGH THE WAIST — the same op the "+" and a typed command dispatch. The panel used to
             // call the service directly, so "screen ≡ chat ≡ +" was a claim rather than a fact: three
             // doors into one feature, only two of which went through the contract.
-            if (op === 'markComplete') await rawCallSkill('lists', 'markListItemDone', { circleId, itemId: node.id });
+            if (op === 'markComplete') await rawCallSkill('lists', 'markListItemDone', { circleId, item: node.id });
             else if (op === 'removeItem') await svc.remove(circleId, node.id);
             draw();
           },
@@ -8128,6 +8143,8 @@ async function boot() {
 
   try {
     const agent = await createRealHouseholdAgent({
+      // the agent's own lines (list and calendar defaults, task confirmations, a paused circle) in the person's language
+      t,
       publishEvent: publishEventToLog,
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.

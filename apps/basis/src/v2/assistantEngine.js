@@ -38,8 +38,12 @@ import { circleGateRules } from './circleGate.js';
 import { makeCircleRetriever } from './circleRetriever.js';
 import { DEFAULT_INTERPRET_SYSTEM } from './interpretCommand.js';
 import { detectLang } from './assistantLanguage.js';
+import { chatHintFor } from './chatHints.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 export const ASSISTANT_MEMORY_TURNS = 6;
+/** How much the model may vary: low and fixed, so the same line picks the same tool. No `tool_choice`. */
+export const ASSISTANT_TEMPERATURE = param({ key: 'assistant.temperature', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 0.2 });
 const DEFAULT_THREAD = '__default__';
 
 /**
@@ -58,6 +62,16 @@ const DEFAULT_THREAD = '__default__';
  * @param {Function} [a.embed]             the older bare `embed(texts)` form
  * @param {object} [a.vectorStore] @param {number} [a.minScore] @param {string} [a.retrieverScope]
  * @param {() => string[]} [a.recentTurns] the door's own memory getter (rows on screen); absent → `remember()` memory
+ * @param {{remember:(threadId:string, who:string, text:string) => void, recent:(threadId:string) => string[]}} [a.memory]
+ *        where `remember()` keeps turns and what a thread reads back (a door's durable threads); absent → this process
+ * @param {(threadId:string) => object} [a.catalogueFor]  a door that offers each person their own tools (a household
+ *        bot: a member's or an admin's): the catalogue for a thread; absent → the one catalogue for every thread
+ * @param {Array<object>} [a.gateRules]  the deterministic gate's rules (a household bot's speak its lists); absent → the
+ *        circle rules
+ * @param {string[]} [a.promptLines]  what a door's template tells the model about its household (added to the stable
+ *        instruction: the same every turn, so it stays above the turn marker)
+ * @param {(threadId:string) => string|null} [a.threadLang]  the language a person fixed their thread to (`/taal`);
+ *        it replaces the detected one in the turn's hint
  * @param {string} [a.botName='assistant']
  * @param {number} [a.memoryTurns]
  * @param {Function} [a.postToCircle]      the chat sink for a line that is not for the bot (circle doors)
@@ -67,15 +81,20 @@ const DEFAULT_THREAD = '__default__';
  * @param {number} [a.collectMs]           the collect window (default `assistant.collectMs`)
  * @param {(text:string, ctx:object) => (null|(() => Promise<any>))} [a.claim]  a line the door handles itself: return
  *        the handling (it must not act yet — it runs when the line's turn comes), or null to leave the line to the engine
+ * @param {(ctx: object) => any} [a.onSlow]  the model route is slow and retrying (the door tells the person to wait)
+ * @param {(cmd: object) => object[]} [a.expand]  a door's rewrite of a chosen op into the ops it stands for (see `createCircleDispatch`)
+ * @param {(threadId: string) => string[]} [a.threadHints]  a thread's own lines for the model (its role's)
+ * @param {(cmd:{opId:string,args:object}, ctx:object) => Promise<any>} [a.peek]  run an op without showing it (a read the
+ *        model picks is handed back to it once, so the turn acts — see `createCircleDispatch`)
  * @param {(turn:{threadId:string, lines:string[], ctx:object, own:boolean}, run:() => Promise<any>) => Promise<any>} [a.around]
  *        the door's bookkeeping around every turn (its record of the turn, what it remembers afterwards)
  */
 export function createAssistantEngine({
   catalogue, dispatch, lang = 'nl', llm = null, llmProviders = null, policy, userDefault, interpret = null,
   loadItems = null, embedder = null, embed = null, vectorStore, minScore, retrieverScope,
-  recentTurns: recentTurnsIn = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
+  recentTurns: recentTurnsIn = null, memory: memoryIn = null, threadLang = null, promptLines = null, catalogueFor = null, gateRules = null, botName = 'assistant', memoryTurns = ASSISTANT_MEMORY_TURNS,
   postToCircle, onUnhandled, onLlmUnavailable, onNoMatch, dispatchSlash, gate: gateIn = null,
-  collectMs = COLLECT_MS, claim = null, around = null,
+  collectMs = COLLECT_MS, claim = null, around = null, peek = null, threadHints = null, expand = null, onSlow = null,
 } = {}) {
   if (!catalogue) throw new TypeError('createAssistantEngine: catalogue required');
   if (typeof dispatch !== 'function') throw new TypeError('createAssistantEngine: dispatch required');
@@ -85,10 +104,28 @@ export function createAssistantEngine({
   // an English greeting answered a Dutch "Maii", and "kun je … toevoegen?" was read as "show the list".
   // The stable instruction (the rules and this language's phrasings) and this turn's hints (the language line), kept
   // apart so the interpreter puts the stable part first and the hints below its turn marker.
-  const system = interpretSystemFor(lang);
+  const extra = Array.isArray(promptLines) ? promptLines.filter((l) => typeof l === 'string' && l.trim()) : [];
+  const system = extra.length ? `${interpretSystemFor(lang)}\n${extra.join('\n')}` : interpretSystemFor(lang);
   const interpretIn = typeof interpret === 'function'
     ? (text, o = {}) => interpret(text, { ...o, system: o.system ?? system, hints: o.hints ?? interpretHintsFor(text) })
     : null;
+  // A thread fixed to a language (`/taal`) says so in its hint instead of what the line looks like. The tools are
+  // described in the thread's language first (its own, what the line is written in, else the door's), and the model
+  // is called at the pinned temperature.
+  const interpretFor = (threadId) => (text, o = {}) => {
+    const fixed = typeof threadLang === 'function' && threadId ? threadLang(threadId) : null;
+    const toolLang = fixed ?? detectLang(text) ?? String(lang).slice(0, 2);
+    // The thread's own hints (a member told which tools are the admin's), below the language line.
+    const own = typeof threadHints === 'function' && threadId ? (threadHints(threadId) ?? []) : [];
+    const langHints = fixed ? [replyInHint(fixed)] : interpretHintsFor(text);
+    return interpretIn(text, {
+      ...o,
+      ...(fixed || own.length ? { hints: o.hints ?? [...langHints, ...own] } : {}),
+      options: o.options ?? { temperature: ASSISTANT_TEMPERATURE },
+      toolLang: o.toolLang ?? toolLang,
+      hintFor: o.hintFor ?? chatHintFor,
+    });
+  };
   const retrieve = typeof loadItems === 'function'
     ? makeCircleRetriever({
       loadItems,
@@ -97,21 +134,15 @@ export function createAssistantEngine({
       ...(retrieverScope ? { scope: retrieverScope } : {}),
     })
     : undefined;
-  const gate = gateIn ?? createTokenGate({ rules: circleGateRules(lang), ...(retrieve ? { retrieve } : {}) });
+  const gate = gateIn ?? createTokenGate({ rules: Array.isArray(gateRules) ? gateRules : circleGateRules(lang), ...(retrieve ? { retrieve } : {}) });
 
-  /** threadId → the last turns, oldest → newest, as self-describing lines. */
-  const memory = new Map();
-  const linesFor = (threadId) => memory.get(threadId) ?? [];
-  function remember(threadId, who, text) {
-    const t = String(text ?? '').trim();
-    if (!threadId || !t) return;
-    const lines = memory.get(threadId) ?? [];
-    // Three voices: you · assistant (the model's own words) · system (an op's result). Keeping the
-    // op results apart stops the model imitating "✓ added …" instead of calling the tool.
-    lines.push(`${who === 'assistant' ? 'assistant' : who === 'system' ? 'system' : 'you'}: ${t}`);
-    while (lines.length > memoryTurns) lines.shift();
-    memory.set(threadId, lines);
-  }
+  // Three voices: you · assistant (the model's own words) · system (an op's result). Keeping the op results apart
+  // stops the model imitating "✓ added …" instead of calling the tool.
+  const memory = memoryIn && typeof memoryIn.remember === 'function' && typeof memoryIn.recent === 'function'
+    ? memoryIn
+    : processMemory(memoryTurns);
+  const linesFor = (threadId) => memory.recent(threadId) ?? [];
+  const remember = (threadId, who, text) => memory.remember(threadId, who, text);
 
   /** One engine per thread — its `recentTurns` is bound to that thread (the door's getter, or the memory). */
   const engines = new Map();
@@ -120,11 +151,11 @@ export function createAssistantEngine({
     let e = engines.get(key);
     if (e) return e;
     e = createCircleDispatch({
-      catalogue,
+      catalogue: typeof catalogueFor === 'function' ? () => catalogueFor(threadId) : catalogue,
       policy: policy ?? { llmTool: smart ? 'local' : 'off' },
       ...(userDefault !== undefined ? { userDefault } : {}),
       llmProviders: smart ? providers : null,
-      interpret: smart ? interpretIn : async () => null,
+      interpret: smart ? interpretFor(threadId) : async () => null,
       gate,
       botName,
       recentTurns: typeof recentTurnsIn === 'function' ? recentTurnsIn : () => linesFor(threadId),
@@ -132,6 +163,9 @@ export function createAssistantEngine({
       ...(typeof postToCircle === 'function' ? { postToCircle } : {}),
       ...(dispatchSlash !== undefined ? { dispatchSlash } : {}),
       onUnhandled, onLlmUnavailable, onNoMatch,
+      ...(typeof peek === 'function' ? { peek } : {}),
+      ...(typeof expand === 'function' ? { expand } : {}),
+      ...(typeof onSlow === 'function' ? { onSlow } : {}),
     });
     engines.set(key, e);
     return e;
@@ -147,7 +181,10 @@ export function createAssistantEngine({
     prepare: (entry) => {
       const own = typeof claim === 'function' ? claim(entry.text, entry.ctx) : null;
       if (typeof own === 'function') return { own };
-      return { collect: entry.collect && !entry.line.startsWith('/') };
+      // a line a gate rule takes needs no model and waits for no window (the lane runs it at once, after any lines
+      // already waiting)
+      const ruled = typeof gate?.takes === 'function' && gate.takes(entry.line, entry.ctx);
+      return { collect: entry.collect && !entry.line.startsWith('/') && !ruled };
     },
     runTurn: ({ entries }) => {
       const [first] = entries;
@@ -188,6 +225,25 @@ export function createAssistantEngine({
 }
 
 /**
+ * Memory that lasts as long as the process: threadId → the last turns, oldest → newest, as self-describing lines.
+ * @param {number} memoryTurns
+ */
+function processMemory(memoryTurns) {
+  const lines = new Map();
+  return {
+    remember(threadId, who, text) {
+      const t = String(text ?? '').trim();
+      if (!threadId || !t) return;
+      const own = lines.get(threadId) ?? [];
+      own.push(`${who === 'assistant' ? 'assistant' : who === 'system' ? 'system' : 'you'}: ${t}`);
+      while (own.length > memoryTurns) own.shift();
+      lines.set(threadId, own);
+    },
+    recent: (threadId) => lines.get(threadId) ?? [],
+  };
+}
+
+/**
  * The line a door speaks when the assistant did not act on a turn (or did not finish it): the model's own words when
  * it spoke, "en verder?" when the turn was cut short (the per-turn cap, or a call the output cut off), else the
  * door's own fallback. One answer for every door, so a cut turn is asked about the same way everywhere.
@@ -198,6 +254,8 @@ export function createAssistantEngine({
 export function assistantReplyText(opts, t, fallbackKey) {
   if (opts && typeof opts.reply === 'string' && opts.reply) return opts.reply;
   if (opts && opts.partial === true) return t('circle.bot.more');
+  // a reply that claimed a result twice, with nothing done: said plainly instead
+  if (opts && opts.notDone === true) return t('circle.bot.not_done');
   return t(fallbackKey);
 }
 
@@ -209,9 +267,15 @@ const LANG_NAMES = { nl: 'Dutch', en: 'English', de: 'German', fr: 'French' };
 export function interpretSystemFor(lang = 'nl') {
   const name = LANG_NAMES[String(lang).slice(0, 2)] ?? 'the member\'s language';
   const add = lang === 'nl'
-    ? 'In Dutch, "zet … op", "voeg … toe", "doe … erbij", "kun je … toevoegen", "… moet nog gehaald worden" all mean ADD the named items to the list — call the add tool, one call per item when several are named. When you name a list to the member, use the Dutch names: boodschappen (shopping), klusjes (errand), reparaties (repair), agenda (schedule) — never the English enum words.'
+    ? "Nederlands: \"zet … op\", \"voeg … toe\", \"doe … erbij\", \"kun je … toevoegen\", \"… moet nog gehaald worden\", \"we hebben geen … meer\" betekenen allemaal TOEVOEGEN → addToList, één aanroep per ding. Noem lijsten bij hun naam: boodschappen, klusjes, reparaties, agenda."
     : 'Phrasings like "put … on", "add …", "we need …", "can you add …" all mean ADD the named items — call the add tool, one call per item when several are named.';
+  // (the newest-message rule is rule 8 of the shared instruction — said once)
   return `${DEFAULT_INTERPRET_SYSTEM}\nReply in the member's language; when you cannot tell, in ${name}.\n${add}`;
+}
+
+/** The hint for a thread the person fixed to a language. LLM-facing. */
+export function replyInHint(lang) {
+  return `Reply in ${LANG_NAMES[String(lang).slice(0, 2)] ?? lang}, whatever language the member writes in.`;
 }
 
 /** This turn's hints, below the prompt's turn marker: what the member's line was written in, when that is clear. */

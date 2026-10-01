@@ -104,4 +104,6 @@ describe('MemberMap — skill status enum (V2.5 migration)', () => {
     const found = await m.resolveByWebid(BOB);
     expect(found.offerings[0].categoryId).toBe('vervoer');
   });
+
 });
+

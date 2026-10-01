@@ -21,6 +21,7 @@
  * Only kind:user params are declared into the register (a kind:internal param is immutable by construction —
  * decision E — so it has no settable value and is never here). `set-param` refuses everything else.
  */
+import { ASSISTANT_MEMORY_DEFAULT_KEY, DEFAULT_MEMORY_MODE } from './botThreads.js';
 import { createParamRegistry, setParam, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { createSettingsModule } from '@onderling/local-store';
 // The default VALUE is imported from the declaration site, so there is one source of truth for the number;
@@ -33,6 +34,7 @@ import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
+import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, QUIET_KEY, QUIET_DEFAULT } from './botSettings.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -91,6 +93,22 @@ export const BASIS_USER_PARAMS = [
   // Which apps a door's assistant may act in when the door is not a circle (the box's Telegram chat). Set by the
   // owner, read at the door's boot; the model never sets it.
   { key: 'assistant.apps',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSISTANT_APPS },
+  // How much a door's assistant remembers of a person's conversation when they have not chosen (off · short · long);
+  // the person's own choice on their thread wins. Set by the bot's admin.
+  { key: ASSISTANT_MEMORY_DEFAULT_KEY,          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_MEMORY_MODE },
+  // Whether a household bot's roles decide who may give a chore to someone else (roles · anyone · self). Set by the
+  // bot's admin; enforced at the waist, never by the model.
+  { key: ASSIGN_POLICY_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSIGN_POLICY },
+  // Who may see the others' names on a household bot (members · assigners · admin · none): the household's ceiling.
+  { key: NAMES_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: NAMES_POLICY },
+  // What happens to what is done or has passed on a household bot (keep · hide · delete), and how long `hide` shows it.
+  { key: PASSED_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_POLICY },
+  { key: PASSED_DAYS_KEY,                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_KEEP_DAYS },
+  // Who may cancel an appointment on a household bot (own · admin).
+  { key: CANCEL_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: CANCEL_POLICY },
+  // Reminders on a household bot (on · off) and the hours nothing is sent ("21:00-08:00").
+  { key: REMINDERS_KEY,                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDERS_DEFAULT },
+  { key: QUIET_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: QUIET_DEFAULT },
 ];
 
 /**

@@ -623,6 +623,54 @@
     "invited": {
       "text": "📅 Je bent uitgenodigd: {{title}} — het staat in je agenda.",
       "doc": "Inbound calendar-invite circle heads-up; {{title}} is the event title."
+    },
+    "no_agenda": {
+      "text": "Er is geen agenda om een afspraak op te zetten.",
+      "doc": "A household bot's calendar reply."
+    },
+    "added": {
+      "text": "Afspraak gezet: {{title}} ({{when}}).",
+      "doc": "A household bot's calendar reply."
+    },
+    "no_event": {
+      "text": "Die afspraak ken ik niet.",
+      "doc": "A household bot's calendar reply."
+    },
+    "cancelled": {
+      "text": "Afspraak geschrapt: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_accepted": {
+      "text": "Je komt: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_declined": {
+      "text": "Je komt niet: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "rsvp_tentative": {
+      "text": "Misschien: {{title}}, {{when}}.",
+      "doc": "A household bot's calendar reply."
+    },
+    "say_when": {
+      "text": "Een afspraak op {{name}} heeft een tijd nodig: zeg wanneer.",
+      "doc": "A household bot's calendar reply."
+    },
+    "already_there": {
+      "text": "{{title}} staat al in de agenda ({{when}}).",
+      "doc": "A household bot's reply when the same appointment (title, at the same start) is added again: said, and no second one is made."
+    },
+    "not_yours": {
+      "text": "\"{{title}}\" heeft iemand anders gezet: die kan alleen diegene (of de beheerder) schrappen.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
+    },
+    "cancel_confirm": {
+      "text": "Deze afspraak schrappen?",
+      "doc": "Cancelling an appointment (asked first)."
+    },
+    "cancel_admin_only": {
+      "text": "Afspraken schrappen doet hier alleen de beheerder.",
+      "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
     }
   },
   "embed": {
@@ -3611,6 +3659,108 @@
     "not_accepted": {
       "text": "Die lijst neemt dat soort dingen niet aan.",
       "doc": "Refusal when a container's accepts policy has no place for the requested kind of child."
+    },
+    "template": {
+      "shopping": {
+        "text": "Boodschappen",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "chores": {
+        "text": "Klusjes",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "repairs": {
+        "text": "Reparaties",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      },
+      "schedule": {
+        "text": "Agenda",
+        "doc": "The name of a list a household bot starts with (made once, on its first start)."
+      }
+    },
+    "no_such_entry": {
+      "text": "\"{{item}}\" staat niet op {{name}}.",
+      "doc": "A lists reply in the chat."
+    },
+    "removed": {
+      "text": "\"{{text}}\" is van {{name}} gehaald.",
+      "doc": "A lists reply in the chat."
+    },
+    "edited": {
+      "text": "Aangepast op {{name}}: \"{{text}}\".",
+      "doc": "A lists reply in the chat."
+    },
+    "not_there": {
+      "text": "\"{{item}}\" staat op geen lijst.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "which_one": {
+      "text": "Welke bedoel je: {{options}}?",
+      "doc": "A household bot's question when a person's words fit several entries, chores or appointments (the choices, quoted)."
+    },
+    "mean_this": {
+      "text": "Bedoel je '{{item}}'?",
+      "doc": "A household bot's question when a person's words are only part of one entry (it does not tick or change more than was said)."
+    },
+    "already_there": {
+      "text": "'{{item}}' staat al op {{list}}.",
+      "doc": "An add whose words are already open on that list: said, and no second entry is made."
+    },
+    "entry_done": {
+      "text": "{{text}} — klaar",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "event_passed": {
+      "text": "{{text}} — geweest",
+      "doc": "A household bot's list read: an entry that is done, or an appointment that has passed, shown marked (the household's setting keeps it a while)."
+    },
+    "done_named": {
+      "text": "Afgevinkt: {{text}}.",
+      "doc": "A household bot's reply naming the entry it ticked off."
+    },
+    "remove_list_confirm": {
+      "text": "De lijst \"{{list}}\" en alles wat erop staat verwijderen?",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "remove_list_confirm_counts": {
+      "text": "De lijst \"{{list}}\" verwijderen, met {{what}}?",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_one": {
+      "text": "{{count}} regel",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries_other": {
+      "text": "{{count}} regels",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_entries": {
+      "text": "{{count}} regels",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_one": {
+      "text": "{{count}} klusje",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores_other": {
+      "text": "{{count}} klusjes",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_chores": {
+      "text": "{{count}} klusjes",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_held": {
+      "text": "{{count}} opgepakt",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "remove_count_kept": {
+      "text": "{{count}} blijft op een andere lijst staan.",
+      "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
+    },
+    "list_removed": {
+      "text": "De lijst \"{{name}}\" is weg.",
+      "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
     }
   },
   "share": {
@@ -3843,6 +3993,273 @@
     "more": {
       "text": "En verder?",
       "doc": "Assistant reply when a turn was cut short (too many acts at once, or a call the model left unfinished): the ones it could do are done, and it asks for the rest."
+    },
+    "memory_off": "Ik onthoud dit gesprek niet meer: elk bericht staat nu op zichzelf. Wat je op een lijst zet, blijft staan.",
+    "memory_short": "Ik onthoud de laatste paar berichten van dit gesprek.",
+    "memory_long": "Ik onthoud de laatste berichten van dit gesprek, en later ook wat ik over het huishouden weet.",
+    "lang_set": "Ik antwoord je voortaan in: {{lang}}.",
+    "lang_auto": "Ik antwoord je weer in de taal waarin je schrijft.",
+    "welcome": "Hoi! Ik ben de assistent van dit huishouden. Typ /help om te zien wat ik kan.",
+    "help_memory": "Ik onthoud de laatste paar berichten van ons gesprek. Met /geheugen off onthoud ik niets meer; /taal nl of /taal en kiest de taal waarin ik antwoord.",
+    "log_disclosure": "Gesprekken worden geredigeerd bewaard en kunnen door de beheerder worden nagelezen om de assistent te verbeteren.",
+    "admin_only": "Dat kan alleen de beheerder van deze bot.",
+    "apps_list": "Aan: {{on}}\nBeschikbaar: {{available}}\nZet er een aan of uit met /apps on <naam> of /apps off <naam>.",
+    "apps_usage": "Gebruik: /apps, /apps on <naam> of /apps off <naam>.",
+    "apps_unknown": "Een app met de naam \"{{app}}\" ken ik niet. /apps laat zien welke er zijn.",
+    "apps_none_left": "Er moet minstens één app aan blijven.",
+    "status": "Apps: {{apps}}\nModel: {{model}}\nDeur: {{door}}\nGesprekken in het logboek: {{turns}}\nStandaard geheugen: {{memory}}\nToegelaten mensen: {{users}}",
+    "users_none": "Nog niemand toegelaten.",
+    "admission_needs_code": {
+      "text": "Om met deze assistent te praten heb je een code nodig van de beheerder. Stuur dan: /start <code>",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_invalid_code": {
+      "text": "Die code klopt niet. Vraag de beheerder om een nieuwe.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_code_used": {
+      "text": "Die code is al gebruikt. Vraag de beheerder om een nieuwe.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_expired": {
+      "text": "Die code is verlopen. Vraag de beheerder om een nieuwe.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_cohort_full": {
+      "text": "Er kunnen op dit moment niet meer mensen bij. Vraag de beheerder.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "admission_no_cohort": {
+      "text": "Er worden op dit moment geen mensen toegelaten. Vraag de beheerder.",
+      "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
+    },
+    "cohort_usage": "Gebruik: /cohort <aantal mensen> <aantal dagen>, bijvoorbeeld /cohort 4 7.",
+    "cohort_open": "Nieuwe groep open: tot {{people}} mensen, tot {{until}}. Eerdere codes werken niet meer. Een code maak je met /invite.",
+    "cohort_none": "Er is geen open groep. Open er een met /cohort <aantal mensen> <aantal dagen>.",
+    "cohort_closed": "De groep is gesloten: geen enkele code werkt nog.",
+    "invite_code": "Code (één persoon, één keer): {{code}}\nDie persoon stuurt de bot: /start {{code}}",
+    "revoke_unknown": "Ik ken niemand die \"{{who}}\" heet. /users laat zien wie er is.",
+    "revoked": "{{who}} is niet meer toegelaten. Met een nieuwe code kan die persoon terugkomen.",
+    "invite_link": "Of stuur deze link, die opent de bot en stuurt de code: {{link}}",
+    "not_done": {
+      "text": "Dat heb ik niet gedaan — zeg me welke lijst en wat er moet veranderen.",
+      "doc": "The assistant's line when the model twice described a result without doing anything (nothing changed)."
+    },
+    "welcome_talk": {
+      "text": "Hoi! Ik ben de assistent van dit huishouden. Zeg me wat je wilt toevoegen of zien.",
+      "doc": "The household bot's first words on a door without commands (its contact inbox)."
+    },
+    "slow": {
+      "text": "Even geduld — de assistent is traag, ik probeer het nog één keer.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "model_down": {
+      "text": "De assistent reageert nu niet. Probeer het zo nog eens.",
+      "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
+    },
+    "settings_list": {
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}}.",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "settings_usage": {
+      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <aantal> · /instellingen cancel own|admin · /instellingen reminders on|off · /instellingen quiet 21:00-08:00",
+      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+    },
+    "role_usage": {
+      "text": "Gebruik: /role <naam> coordinator|member|observer",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_nobody": {
+      "text": "Ik ken hier niemand die \"{{name}}\" heet (of het is de beheerder).",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "role_set": {
+      "text": "{{name}} is nu {{role}}.",
+      "doc": "The household bot admin's role and settings commands, and a chore naming a person."
+    },
+    "reminder_event": {
+      "text": "Morgen: {{title}}, {{time}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_chore": {
+      "text": "Vandaag: {{text}}.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_first": {
+      "text": "Je krijgt dit omdat er een datum bij staat. Uitzetten: /herinneringen uit",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_head": {
+      "text": "Deze week",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_none": {
+      "text": "Niets open deze week.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "unreachable": {
+      "text": "{{count}} mensen zijn niet bereikbaar voor herinneringen (geen privéchat).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_on": {
+      "text": "Herinneringen staan aan.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminders_off": {
+      "text": "Herinneringen staan uit.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_on": {
+      "text": "Het weekoverzicht staat aan (zondag 18:00).",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "overview_off": {
+      "text": "Het weekoverzicht staat uit.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "switch_usage": {
+      "text": "Gebruik: {{command}} aan of {{command}} uit.",
+      "doc": "Reply when a person's switch (reminders, weekly overview) gets a word it does not know."
+    },
+    "welcome_lists": {
+      "text": "Lijsten: {{lists}}. Zeg bijvoorbeeld \"melk op de boodschappen\" of \"wat staat er op de boodschappen\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_chores": {
+      "text": "{{list}}: \"nieuwe taak voor mij: ramen lappen, morgen\", \"ik doe de ramen\", \"de ramen zijn klaar\".",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_agenda": {
+      "text": "{{list}}: \"tandarts morgen om 10 uur\" zet een afspraak; \"wat staat er in de agenda\" laat ze zien.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_week": {
+      "text": "\"Wat staat er deze week?\" of /week: jouw klusjes en de afspraken van de komende zeven dagen.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reader": {
+      "text": "Je leest mee: vraag wat er op een lijst of in de agenda staat.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_on": {
+      "text": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00) en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_reminders_off": {
+      "text": "Herinneringen staan voor dit huishouden uit.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "welcome_overview": {
+      "text": "Wil je elke zondag om 18:00 een weekoverzicht? Zet het aan met /overzicht aan.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "exports_list": {
+      "text": "Exportbestanden op deze box, nieuwste eerst:\n{{names}}\nTerugzetten: /import <naam>.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "exports_none": {
+      "text": "Er staan nog geen exportbestanden op deze box.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm": {
+      "text": "Dit exportbestand terugzetten in het huishouden?",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_confirm_counts": {
+      "text": "\"{{name}}\" terugzetten? Het bevat {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken en {{people}} mensen. Wat er al staat, blijft staan.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_no_file": {
+      "text": "Een exportbestand \"{{name}}\" ken ik niet. /exports laat zien welke er zijn.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_unreadable": {
+      "text": "\"{{name}}\" kan ik niet lezen als exportbestand.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_locked": {
+      "text": "\"{{name}}\" is verzegeld. Open de sleutel eerst op de box: node apps/basis/bin/export-key.mjs unlock (in de container van de bot). Daarna /import opnieuw.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_not_this_key": {
+      "text": "De sleutel die nu open staat, opent \"{{name}}\" niet. Open de sleutel van dat bestand: node apps/basis/bin/export-key.mjs unlock --from {{name}}.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_failed": {
+      "text": "Het exportbestand kon ik niet schrijven.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_sealed": {
+      "text": "Opgeslagen en verzegeld: {{name}}. Terugzetten kan met /import {{name}}, na het openen van de sleutel op de box.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_plain": {
+      "text": "Opgeslagen: {{name}}. Let op: niet verzegeld — zet een sleutel op de box met node apps/basis/bin/export-key.mjs set.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_done": {
+      "text": "Teruggezet: {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken, {{people}} mensen.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_missed": {
+      "text": "{{count}} dingen kon ik niet terugzetten.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "basic_head": {
+      "text": "Ik kan nu geen gewone zinnen lezen. Dit werkt wel:",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_add": {
+      "text": "• \"zet melk op de {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_read": {
+      "text": "• \"wat staat er op de {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_chore": {
+      "text": "• \"nieuwe taak: ramen lappen\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_done": {
+      "text": "• \"ramen is klaar\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_week": {
+      "text": "• \"wat staat er deze week\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_help": {
+      "text": "• /help voor alle opdrachten",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "welcome_admin": {
+      "text": "Je bent beheerder. Met /instellingen regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
+      "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_done_words": {
+      "text": "Klaar? Zeg: {{text}} is klaar.",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
+    },
+    "reminder_done": {
+      "text": "Klaar",
+      "doc": "The button under a chore's reminder: it is done."
+    },
+    "overview_mine": {
+      "text": "Jouw klusjes:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_events": {
+      "text": "Afspraken:",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_shopping": {
+      "text": "{{n}} open op {{list}}.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    },
+    "overview_unheld": {
+      "text": "{{n}} klusjes waar nog niemand voor staat.",
+      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
     }
   },
   "op": {
@@ -6678,6 +7095,124 @@
     "share": {
       "text": "Delen…",
       "doc": "Mobile's one button on the share panel: the phone's share sheet with the link (or the code when the app has no web URL)."
+    }
+  },
+  "tasks": {
+    "no_such_task": {
+      "text": "Geen klus \"{{item}}\" hier.",
+      "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "reply": {
+      "claimed": {
+        "text": "✓ Opgepakt: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "completed": {
+        "text": "✓ Klaar: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "submitted": {
+        "text": "✓ Ingeleverd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "approved": {
+        "text": "✓ Goedgekeurd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "rejected": {
+        "text": "✓ Afgekeurd: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "edited": {
+        "text": "✓ Aangepast: {{title}}{{note}}",
+        "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      }
+    },
+    "already_claimed": {
+      "text": "'{{title}}' is al opgepakt.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "already_yours": {
+      "text": "Je had '{{title}}' al opgepakt.",
+      "doc": "A claim that did not go through: the chore is someone else's already, or this person's own."
+    },
+    "assign_refused": {
+      "text": "Je kunt alleen jezelf een klusje geven.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "no_such_person": {
+      "text": "Ik ken niemand die \"{{name}}\" heet.",
+      "doc": "A household bot's reply when a chore names a person: the bot's setting does not let this person name someone else, or the name is not one the bot knows."
+    },
+    "assignee_cannot": {
+      "text": "{{name}} kan geen klusjes oppakken (die rol kijkt alleen).",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "names_hidden": {
+      "text": "Namen zijn hier niet zichtbaar: je kunt een klusje alleen jezelf geven.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given_to": {
+      "text": "Voor {{name}}.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "given": {
+      "text": "Toegewezen.",
+      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    }
+  },
+  "refusal": {
+    "role": {
+      "text": "Dat kan jouw rol hier niet: je kunt alleen kijken.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "not-on-this-door": {
+      "text": "Dat doet deze bot niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "no-gate": {
+      "text": "De bot kan nu niet nagaan wie je bent; probeer het zo nog eens.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "DISABLED": {
+      "text": "Dat staat hier uit.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_FOUND": {
+      "text": "Dat ken ik niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INVALID_TOKEN": {
+      "text": "Dat mag je hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "refused": {
+      "text": "Dat mag je hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_TIER": {
+      "text": "Dat mag alleen de beheerder van deze bot.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_SELF": {
+      "text": "Dat mag alleen de eigenaar zelf.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NO_TOKEN": {
+      "text": "Dat mag je hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "INSUFFICIENT_ROLE": {
+      "text": "Dat kan jouw rol hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "NOT_A_MEMBER": {
+      "text": "Je hoort hier (nog) niet bij.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
+    },
+    "POLICY_NEVER": {
+      "text": "Dat kan hier niet.",
+      "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
     }
   }
 }

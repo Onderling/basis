@@ -78,6 +78,9 @@ importers:
       '@onderling/manifest-host':
         specifier: workspace:*
         version: link:../../packages/manifest-host
+      '@onderling/notifier':
+        specifier: workspace:*
+        version: link:../../packages/notifier
       '@onderling/oidc-session':
         specifier: workspace:*
         version: link:../../packages/oidc-session

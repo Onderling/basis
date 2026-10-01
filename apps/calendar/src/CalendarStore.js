@@ -163,57 +163,7 @@ export class CalendarStore {
    * @returns {Promise<CalendarEvent>}
    */
   async addEvent(args = {}) {
-    const title = String(args.title ?? '').trim();
-    if (!title) throw new Error('CalendarStore.addEvent: title required');
-    // v0.7.-followup (3rd pass): accept `when` (canonical 2026-05-23+)
-    // OR `startsAt` (legacy alias).  Same for `until` / `endsAt`.
-    const startsAt = parseDateInput(args.when ?? args.startsAt);
-    if (!startsAt) throw new Error('CalendarStore.addEvent: when (or startsAt) required (ISO-8601)');
-    // v0.7.-followup: duration as a string ('1h' / '30m' / '2h30m').
-    // CalendarStore now also accepts an explicit until/endsAt + a
-    // duration override.  Default: 1 hour.
-    let endsAt = parseDateInput(args.until ?? args.endsAt);
-    if (!endsAt && typeof args.duration === 'string') {
-      const ms = parseDurationMs(args.duration);
-      if (ms != null) {
-        endsAt = new Date(new Date(startsAt).getTime() + ms).toISOString();
-      }
-    }
-    if (!endsAt) {
-      endsAt = new Date(new Date(startsAt).getTime() + 3_600_000).toISOString();
-    }
-    const attendees = normaliseAttendees(args.attendees);
-    const actor     = args.actor ?? this.#actorDefault;
-    const organiser = args.organiser ?? actor;
-    // Persist the attendees' peer addresses (the cross-peer fan-out routing
-    // arg) so a later cancelEvent can recover whom to notify — the event is
-    // soft-deleted on cancel, but `attendees-addr` is otherwise never stored.
-    // Mirrors the `_organiserAddr` stash above it.
-    const attendeeAddrs = String(args['attendees-addr'] ?? '')
-      .split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
-
-    // v0.7.P3c — accept an explicit id (used by receiver-side when
-    // ingesting an invite envelope; same id as organiser keeps the
-    // RSVP round-trip referentially consistent).  Also accept
-    // _organiserAddr so the receiver knows where to send the RSVP
-    // back via NKN.
-    const event = {
-      id:        typeof args.id === 'string' && args.id ? args.id : generateId(),
-      type:      TYPE,
-      title,
-      startsAt,
-      endsAt,
-      ...(args.location ? { location: String(args.location) } : {}),
-      attendees,
-      organiser,
-      rsvp:    {},
-      state:   'open',
-      addedAt: Date.now(),
-      addedBy: actor,
-      ...(args._organiserAddr ? { _organiserAddr: String(args._organiserAddr) } : {}),
-      ...(attendeeAddrs.length ? { attendeeAddrs } : {}),
-    };
-
+    const event = buildEvent(args, { actorDefault: this.#actorDefault });
     await this.#write(event);
     await this.#refreshIcsFeed();
     return event;
@@ -245,12 +195,9 @@ export class CalendarStore {
    * @returns {Promise<CalendarEvent>}
    */
   async rsvp({ eventId, actor, response }) {
-    if (!['accepted', 'declined', 'tentative'].includes(response)) {
-      throw new Error(`CalendarStore.rsvp: bad response "${response}"`);
-    }
     const event = await this.getById(eventId);
     if (!event) throw new Error(`CalendarStore.rsvp: no event with id "${eventId}"`);
-    const next = { ...event, rsvp: { ...(event.rsvp ?? {}), [actor]: response } };
+    const next = rsvpEvent(event, actor, response);
     await this.#write(next);
     await this.#refreshIcsFeed();
     return next;
@@ -381,6 +328,85 @@ export class CalendarStore {
 
 /* ─── helpers ─────────────────────────────────────────── */
 
+/**
+ * An event from what a person gave: the calendar's OWN validation (a title; `when` or `startsAt`, ISO-8601; `until` /
+ * `endsAt`, or a `duration` like '30m' / '2h30m', default one hour; attendees). Pure — the store that keeps it is the
+ * caller's (this app's in-memory pod, or a circle's store on the household bot).
+ * @param {object} args
+ * @param {{actorDefault?: string}} [o]
+ * @returns {object} the event
+ */
+export function buildEvent(args = {}, { actorDefault = 'webid:local-demo-user' } = {}) {
+    const title = String(args.title ?? '').trim();
+    if (!title) throw new Error('CalendarStore.addEvent: title required');
+    // v0.7.-followup (3rd pass): accept `when` (canonical 2026-05-23+)
+    // OR `startsAt` (legacy alias).  Same for `until` / `endsAt`.
+    const startsAt = parseDateInput(args.when ?? args.startsAt);
+    if (!startsAt) throw new Error('CalendarStore.addEvent: when (or startsAt) required (ISO-8601)');
+    // v0.7.-followup: duration as a string ('1h' / '30m' / '2h30m').
+    // CalendarStore now also accepts an explicit until/endsAt + a
+    // duration override.  Default: 1 hour.
+    let endsAt = parseDateInput(args.until ?? args.endsAt);
+    if (!endsAt && typeof args.duration === 'string') {
+      const ms = parseDurationMs(args.duration);
+      if (ms != null) {
+        endsAt = new Date(new Date(startsAt).getTime() + ms).toISOString();
+      }
+    }
+    if (!endsAt) {
+      endsAt = new Date(new Date(startsAt).getTime() + 3_600_000).toISOString();
+    }
+    const attendees = normaliseAttendees(args.attendees);
+    const actor     = args.actor ?? actorDefault;
+    const organiser = args.organiser ?? actor;
+    // Persist the attendees' peer addresses (the cross-peer fan-out routing
+    // arg) so a later cancelEvent can recover whom to notify — the event is
+    // soft-deleted on cancel, but `attendees-addr` is otherwise never stored.
+    // Mirrors the `_organiserAddr` stash above it.
+    const attendeeAddrs = String(args['attendees-addr'] ?? '')
+      .split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+
+    // v0.7.P3c — accept an explicit id (used by receiver-side when
+    // ingesting an invite envelope; same id as organiser keeps the
+    // RSVP round-trip referentially consistent).  Also accept
+    // _organiserAddr so the receiver knows where to send the RSVP
+    // back via NKN.
+    const event = {
+      id:        typeof args.id === 'string' && args.id ? args.id : generateId(),
+      type:      TYPE,
+      title,
+      startsAt,
+      endsAt,
+      ...(args.location ? { location: String(args.location) } : {}),
+      attendees,
+      organiser,
+      rsvp:    {},
+      state:   'open',
+      addedAt: Date.now(),
+      addedBy: actor,
+      ...(args._organiserAddr ? { _organiserAddr: String(args._organiserAddr) } : {}),
+      ...(attendeeAddrs.length ? { attendeeAddrs } : {}),
+    };
+
+    return event;
+}
+
+/** An event's RSVP by one person, as a new event (`accepted` · `declined` · `tentative`). */
+export function rsvpEvent(event, actor, response) {
+  if (!['accepted', 'declined', 'tentative'].includes(response)) throw new Error(`rsvp: bad response "${response}"`);
+  return { ...event, rsvp: { ...(event.rsvp ?? {}), [actor]: response } };
+}
+
+/** The open events whose start is in [since, until), soonest first (default: the next seven days). */
+export function eventsInWindow(events, { since, until } = {}) {
+  const from = toEpoch(since) ?? Date.now();
+  const to = toEpoch(until) ?? (from + 7 * 86_400_000);
+  return (Array.isArray(events) ? events : [])
+    .filter((e) => e && e.state !== 'cancelled' && e.state !== 'removed' && !e.completedAt)   // a ticked appointment has been
+    .filter((e) => { const t0 = new Date(e.startsAt).getTime(); return t0 >= from && t0 < to; })
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+}
+
 function parseEvent(raw) {
   if (raw === null || raw === undefined) return null;
   // Already a calendar-event object?
@@ -398,7 +424,12 @@ function parseEvent(raw) {
   } catch { return null; }
 }
 
-function parseDateInput(input) {
+/**
+ * A date or time as a person gives it, read on the household's clock: ISO / datetime-local (a time without a zone is
+ * LOCAL), a bare date ("2026-10-05" — that local day, not UTC midnight, which `new Date` makes of it), or natural
+ * language via chrono. Returns an ISO string, or null.
+ */
+export function parseDateInput(input) {
   if (!input) return null;
   if (input instanceof Date && !Number.isNaN(input.getTime())) {
     return input.toISOString();
@@ -406,6 +437,10 @@ function parseDateInput(input) {
   if (typeof input !== 'string') return null;
   const trimmed = input.trim();
   if (trimmed === '') return null;
+
+  // A bare date is that LOCAL day: `new Date('2026-10-05')` is UTC midnight, the day before in a zone west of it.
+  const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (bare) return new Date(Number(bare[1]), Number(bare[2]) - 1, Number(bare[3])).toISOString();
 
   // Fast path 1: ISO + datetime-local + similar machine formats.
   // (datetime-local emits 'YYYY-MM-DDTHH:mm' without timezone; native

@@ -172,14 +172,17 @@ export class PolicyEngine {
    * @param {object} opts
    * @param {string} opts.callerId   an identity string: a peer's pubKey, or a door's contact id (`telegram:123`)
    * @param {string} opts.skillId
+   * @param {object} [opts.skill]  the skill record, when the caller holds it (an op a door reaches that is not a skill in
+   *   this engine's registry — e.g. a service op — passes `{ visibility, enabled: true }`); else it is looked up by id
    * @param {'public'|'authenticated'|'trusted'|'private'} [opts.unknownAs]  the tier of a caller with no record
    * @returns {Promise<{ tier: string, skill: object }>}
    * @throws  {PolicyDeniedError} NOT_FOUND · DISABLED · INSUFFICIENT_TIER
    */
-  async checkCaller({ callerId, skillId, unknownAs = null }) {
+  async checkCaller({ callerId, skillId, skill: given = null, unknownAs = null }) {
     const known = unknownAs == null ? true : await this.#trustRegistry.has(callerId);
     const tier  = known ? await this.#trustRegistry.getTier(callerId) : unknownAs;
-    const skill = this.#skillRegistry.get(skillId);
+    // the registry's own record wins over a caller-supplied one: a skill the engine knows is judged by its own words
+    const skill = this.#skillRegistry.get(skillId) ?? given;
 
     if (!skill) {
       throw new PolicyDeniedError('NOT_FOUND', `Unknown skill: "${skillId}"`);

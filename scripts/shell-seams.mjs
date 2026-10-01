@@ -27,6 +27,27 @@ export const SEAMS = Object.freeze([
   // why this is a seam and not a convention. All three read ONE list now (`src/v2/enrolForgets.js`); a shell
   // supplies only how its storage is reached.
   { id: 'enrol-forgets-the-throwaway-self', pattern: /runPendingForget\(/, why: 'a device that keeps a former self\'s content greets it in every circle and warns about rows it cannot open, for ever — read the ceremony\'s note as the FIRST awaited act of boot, before any store is touched' },
+  // A FUNCTION profile's inbox is a door (the household bot on its own node): the shell that can run one reads the
+  // profile's kind and composes the door; a shell that ran one without it would leave the bot deaf on its inbox.
+  // Only the box runs a function profile today (web and mobile are a person's devices).
+  // The agent speaks in the person's language only when the shell hands it its translator: without one, its own lines
+  // (list and calendar defaults, task confirmations, a paused circle) come out as keys or English. The box passed it;
+  // web and mobile did not (found 2026-09-29).
+  { id: 'agent-translator', pattern: /createRealHouseholdAgent\(\{(?:(?!\n\s*\}\);)[\s\S])*?\n\s+t(?::\s*[\w.]+)?,/, why: 'the agent\'s own lines follow the person\'s language' },
+  // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
+  // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).
+  { id: 'circle-peek', pattern: /createPeek\(/, shells: ['web', 'mobile'], why: 'a circle bot acts on "haal de melk eraf" instead of showing the list' },
+  // A hosted bot keeps its household's export file (the one format kept readable across versions) on its own disk,
+  // one a night, so a snapshot carries it off and /import can read it back. A person's device keeps no such shelf.
+  { id: 'household-export-shelf', pattern: /createExportShelf\(/, shells: ['box'], why: 'a hosted bot\'s household survives a wipe, a lost disk and a new version' },
+  { id: 'bot-inbox-door', pattern: /createInboxDoor\(/, shells: ['box'], why: 'a function profile\'s contact inbox is answered by its assistant; a person\'s never is' },
+  // A household bot WRITES FIRST (reminders of what people dated): only a shell that hosts a bot runs the tick. Web and
+  // mobile are a person's devices and write first to nobody.
+  // A hosted bot's first message is derived from what it does for that person (their role's tools, the settings).
+  { id: 'bot-welcome', pattern: /welcomeLines\(/, shells: ['box'], why: 'a hosted bot tells a new person what it does for them; a person\'s device has no door to greet on' },
+  // Without its model a hosted bot says what does work (the word rules, the commands) instead of "only commands".
+  { id: 'bot-basic-help', pattern: /basicModeLines\(/, shells: ['box'], why: 'a person learns what to type when the model is off or down' },
+  { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
   // it on the governance change (live fan + catch-up), and serves its head at catch-up — the box above all, the

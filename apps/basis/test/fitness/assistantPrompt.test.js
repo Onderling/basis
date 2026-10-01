@@ -51,7 +51,7 @@ describe('the assistant prompt — stable first, then what changes every turn', 
   it('through the engine: rules, backgrounds and phrasing above the marker; the language and the date below it', async () => {
     const system = await promptFor('goedemorgen, hoe gaat het met je');   // a line the language counter can place
     expect(typeof TURN_MARKER).toBe('string');
-    const base = at(system, 'You are the assistant in a shared circle');
+    const base = at(system, "You turn a member's message into tool calls");
     const background = at(system, 'How to choose the type for addItem');
     const phrasing = at(system, '"zet … op"');
     const marker = at(system, TURN_MARKER);

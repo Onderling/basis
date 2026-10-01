@@ -56,8 +56,13 @@ import { translatorOr } from '../locales/translatorOr.js';
  */
 export function confirmRequestFromRoute(route, { t } = {}) {
   if (!route || route.kind !== 'needsConfirm') return null;
+  // the declared question in the person's words when the op names its key (the bot's door asks the same way)
+  const tr = typeof t === 'function' ? t : null;
+  const said = route.messageKey && tr ? tr(route.messageKey, route.args ?? {}) : null;
+  // a key without its words comes back as the key: then the manifest's own sentence, never a raw key
+  const message = said && said !== route.messageKey ? said : route.message;
   return buildRequest({
-    severity: route.severity, message: route.message, opId: route.opId, appOrigin: route.appOrigin, t,
+    severity: route.severity, message, opId: route.opId, appOrigin: route.appOrigin, t,
   });
 }
 
@@ -87,6 +92,39 @@ export function confirmRequestForOp(op, { t, message } = {}) {
     opId: op.id,
     t,
   });
+}
+
+/**
+ * A confirm whose question depends on what is there ("remove this list, with 3 chores?"): the op declares
+ * `surfaces.ui.confirm.preview`, and is first called with `preview: true` — a read that changes nothing, through the
+ * same gate as the act — and the question is its `message`. Null when the op declares no preview, or the preview
+ * did not answer (the declared question stands).
+ *
+ * @param {object} a
+ * @param {import('../router.js').NeedsConfirmDispatch} a.route
+ * @param {import('../manifestMerge.js').MergedCatalogue} [a.catalogue]
+ * @param {(app: string, op: string, args: object) => Promise<object>} a.call  the caller's gated call
+ * @returns {Promise<string|null>}
+ */
+export async function confirmPreviewMessage({ route, catalogue, call } = {}) {
+  const r = await confirmPreview({ route, catalogue, call });
+  return r?.message ?? null;
+}
+
+/**
+ * The same preview, saying also when the op REFUSED it: `{message}` (ask with it), `{refused}` (do not ask — say
+ * why: the act would be refused too, e.g. a sealed file whose key is not unlocked), or null (no preview; ask as declared).
+ */
+export async function confirmPreview({ route, catalogue, call } = {}) {
+  if (!route || route.kind !== 'needsConfirm' || typeof call !== 'function') return null;
+  const op = catalogue?.opsById?.get?.(route.opId)?.op;
+  if (op?.surfaces?.ui?.confirm?.preview !== true) return null;
+  let r;
+  try { r = await call(route.appOrigin ?? null, route.opId, { ...(route.args ?? {}), preview: true }); } catch { return null; }
+  if (r?.ok && typeof r.message === 'string' && r.message) return { message: r.message };
+  // only a sentence the op localised (`error.message`); a bare code is not words for a person — ask as declared
+  const why = r?.error?.message;
+  return r?.ok === false && typeof why === 'string' && why ? { refused: why } : null;
 }
 
 /** The one ConfirmRequest shape, however the caller reached the gate. */

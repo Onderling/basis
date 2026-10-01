@@ -109,10 +109,13 @@ describe('the per-thread lane', () => {
     await Promise.all(sent);
     await runner.idle?.('42');
 
-    expect(seen.map((s) => s.text)).toEqual(['wat staat er open', 'en nu?']);
+    // A read is looked at and handed back once (the turn may act on it), so each turn asks the model twice — the
+    // first turn's both calls before the second turn's.
+    expect(seen.map((s) => s.text)).toEqual(['wat staat er open', 'wat staat er open', 'en nu?', 'en nu?']);
     expect(maxRunning).toBe(1);
     // the first turn's op result reached the second turn as the app's note
-    expect(seen[1].history.some((m) => m.role === 'user' && m.content.startsWith('(the app answered:'))).toBe(true);
+    const second = seen.find((s) => s.text === 'en nu?');
+    expect(second.history.some((m) => m.role === 'user' && m.content.startsWith('(the app answered:'))).toBe(true);
   });
 
   it('a form answer arriving while a run is in flight is queued behind it and answers the form, not lost', async () => {
@@ -178,16 +181,16 @@ describe('the collect window', () => {
     expect(results.every((r) => r === results[0] && r.via === 'llm')).toBe(true);
   });
 
-  it('a lone line waits for the window and no longer (default 1500 ms)', async () => {
+  it('a lone line for the model waits for the window and no longer (default 800 ms)', async () => {
     vi.useFakeTimers();
     const model = lineModel({ ms: 0 });
     const { engine, dispatched } = engineWith(model);
-    const turn = engine.ask('t', 'melk');
-    await vi.advanceTimersByTimeAsync(1499);
+    const turn = engine.ask('t', 'kun je nog wat melk halen');   // no rule takes it: the model's line
+    await vi.advanceTimersByTimeAsync(799);
     expect(dispatched).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(1);
     await turn;
-    expect(dispatched.map((d) => d.args.text)).toEqual(['melk']);
+    expect(dispatched.map((d) => d.args.text)).toEqual(['kun je nog wat melk halen']);
   });
 
   it('the gate reads each line on its own: a rule line is dispatched by its rule, the other lines go to the model together', async () => {

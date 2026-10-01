@@ -27,8 +27,17 @@ services:
       # Telegram is OPTIONAL now: no token simply means this box is a device and not also a bot.
       TG_BOT_TOKEN: "${TG_BOT_TOKEN:-}"
       TG_ALLOWED_CHAT_IDS: "${TG_ALLOWED_CHAT_IDS:-}"
+      # The Telegram user id of the bot's admin; unset → the first person the bot admits.
+      TG_ADMIN_UID: "${TG_ADMIN_UID:-}"
+      # `function` on a household bot's own node: its profile is the bot's, and its contact inbox is a door to the
+      # assistant. Never on a box enrolled as a person's device (refused there).
+      ONDERLING_PROFILE_KIND: "${ONDERLING_PROFILE_KIND:-}"
+      # Conversation turns in the walk log: off (default) · redacted (a fixture-collecting week) · full (tests only).
+      ONDERLING_WALK_LOG_TURNS: "${ONDERLING_WALK_LOG_TURNS:-off}"
       PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"
+      # The household's clock: "morgen om 10 uur" is read and shown in this zone (the container's own is UTC).
+      TZ: "${TZ:-Europe/Amsterdam}"
     volumes:
       - assistant-data:/data/assistant
 volumes:

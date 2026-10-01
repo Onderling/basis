@@ -128,6 +128,8 @@ export function renderReply(reply, opts = {}) {
       messageId, threadId,
       lifecycleState: 'live',     // A2 hybrid — flips 'disabled' on next user msg
       items,
+      // the list's own name, when the op gives one (a lists read): the surface shows it above the entries
+      ...(typeof reply.payload?.title === 'string' && reply.payload.title ? { title: reply.payload.title } : {}),
       // v0.6 — list-level _sync from the reply itself (vs per-row
       // _lastSync extracted inside renderListItems).
       syncHint: formatSyncHints(reply.payload?._sync, t),
@@ -437,9 +439,11 @@ function renderListItems(payload, opts, t) {
     const ownButtons = (item && typeof item === 'object' && Array.isArray(item.buttons))
       ? item.buttons.filter((b) => b && b.label && b.callbackData).map((b) => ({ label: String(b.label), callbackData: String(b.callbackData) }))
       : null;
+    // A manifest button names its label by KEY; here it becomes the person's words (the literal is the fallback).
+    const worded = (b) => (b?.labelKey ? { label: t(b.labelKey), callbackData: b.callbackData } : { label: b.label, callbackData: b.callbackData });
     const buttons = (ownButtons && ownButtons.length)
       ? ownButtons
-      : (inlineKeyboardFor ? inlineKeyboardFor({ id, ...(typeof item === 'object' ? item : {}) }) : []);
+      : (inlineKeyboardFor ? inlineKeyboardFor({ id, ...(typeof item === 'object' ? item : {}) }).map(worded) : []);
     // v0.6 — per-row staleness label from item._lastSync.
     const staleHint = formatLastSync(item?._lastSync, t);
     // Bundle F -followup-1 — surface item.embed so a

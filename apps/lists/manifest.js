@@ -32,7 +32,7 @@ export const listsManifest = {
   // ops manage — no op names it directly, so it carries no atoms yet.
   nouns: {
     list:        { atoms: ['add', 'list'] },
-    'list-item': { atoms: ['add', 'complete'] },
+    'list-item': { atoms: ['add', 'complete', 'remove', 'update'] },
   },
   verbs:     [],
   operations: [
@@ -47,6 +47,9 @@ export const listsManifest = {
       resolves:  [{ field: 'text', policy: 'content' }],
       params: [
         { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
+        // What a bare add to this list makes — one of the kinds a list accepts (a chores list: `task`); absent → the
+        // list type's own default.
+        { name: 'defaultChild', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/new-list', body: 'argline' },
@@ -85,6 +88,10 @@ export const listsManifest = {
         // shells' own type picker (the Lists panel's, already built) is what asks it today; extending
         // the form contract to a dependent picker is the honest next step and is on the work list.
         { name: 'kind', kind: 'string', required: false },
+        // A chore's person and day, on a list whose entries are chores: `assignee` is "mij" or a name the bot knows,
+        // `due` a local date without a zone. Who may be named is the bot's setting, decided at the waist.
+        { name: 'assignee', kind: 'string', required: false },
+        { name: 'due', kind: 'string', required: false },
       ],
       surfaces: {
         slash: { command: '/add-to-list', body: 'flags' },
@@ -113,12 +120,77 @@ export const listsManifest = {
       // the claim cluster's no-downgrade rule applies to `task`, not here, but the shape is the same.)
       resolves:  [{ field: 'state', policy: 'claim' }],
       params: [
-        { name: 'itemId', kind: 'string', required: true, schema: { minLength: 1 } },
+        // the entry: its id, or its words as they stand on the list; the list only to tell two apart
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
       ],
       surfaces: {
         slash: { command: '/list-done', body: 'argline' },
         chat:  { reply: 'text', hint: 'Tick something off a list.' },
         ui:    { control: 'button', labelKey: 'circle.list.done' },
+      },
+    },
+    {
+      id:        'listEntries', group: 'data',
+      verb:      'list',
+      requires:  ['lists'],
+      params: [
+        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-entries', body: 'argline' },
+        chat:  { reply: 'list', hint: 'What is on one list (the open entries).' },
+      },
+    },
+    {
+      id:        'removeFromList', group: 'compose',
+      verb:      'remove',
+      writes:    { scope: 'circle' },
+      appliesTo: { type: 'list-item' },
+      requires:  ['lists'],
+      params: [
+        // the entry: its id, or its words as they stand on the list; the list only to tell two apart
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-remove', body: 'flags' },
+        chat:  { reply: 'text', hint: 'Take an entry off a list (a mistake, or no longer needed).' },
+      },
+    },
+    {
+      id:        'removeList', group: 'compose',
+      verb:      'remove',
+      writes:    { scope: 'circle' },
+      requires:  ['lists'],
+      params: [
+        { name: 'list', kind: 'string', required: true, schema: { minLength: 1 }, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-delete', body: 'argline' },
+        chat:  { reply: 'text', hint: 'Remove a whole list and everything on it (a list made by mistake).' },
+        // the list and its entries go at once: asked first, in the household's words
+        // `preview`: the op is first called with `preview: true` (a read, no change) and its `vars` fill the question —
+        // how many entries and chores go, how many of those someone holds, how many stay on another list
+        ui:    { confirm: { severity: 'danger', messageKey: 'circle.lists.remove_list_confirm', message: 'Remove this list and everything on it?', preview: true } },
+      },
+    },
+    {
+      id:        'editEntry', group: 'compose',
+      verb:      'edit',
+      writes:    { scope: 'circle' },
+      appliesTo: { type: 'list-item' },
+      requires:  ['lists'],
+      // Two people fixing the same entry write the same field; the text merges by content.
+      resolves:  [{ field: 'text', policy: 'content' }],
+      params: [
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-edit', body: 'flags' },
+        chat:  { reply: 'text', hint: 'Change the words of an entry on a list.' },
       },
     },
   ],

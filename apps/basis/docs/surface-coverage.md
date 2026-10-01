@@ -230,6 +230,10 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `addToList` | add | ✅ | ✅ | · | ✅ | ✅ | · |  |
 |  | `listLists` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `markListItemDone` | complete | ✅ | ✅ | · | · | ✅ | ✅ |  |
+|  | `listEntries` | list | ✅ | ✅ | · | · | · | · |  |
+|  | `removeFromList` | remove | ✅ | ✅ | · | · | · | · |  |
+|  | `removeList` | remove | ✅ | ✅ | · | · | ✅ | · |  |
+|  | `editEntry` | edit | ✅ | ✅ | · | · | · | · |  |
 | **agents** | `listAgents` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `viewAgent` | list | ✅ | · | · | · | · | · |  |
 |  | `setAgentSkillExposure` | update | ✅ | ✅ | · | · | · | · |  |
@@ -260,8 +264,25 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-probe` | restore-probe | · | · | · | · | · | · |  |
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
+| **assistant** | `assistant-memory` | set-memory | ✅ | ✅ | · | · | · | · |  |
+|  | `weekOverview` | week-overview | ✅ | ✅ | · | · | · | · |  |
+|  | `assistant-reminders` | set-reminders | ✅ | ✅ | · | · | · | · |  |
+|  | `assistant-overview` | set-overview | ✅ | ✅ | · | · | · | · |  |
+|  | `assistant-language` | set-language | ✅ | ✅ | · | · | · | · |  |
+|  | `assistant-apps` | set-apps | · | ✅ | · | · | · | · |  |
+|  | `assistant-settings` | set-settings | · | ✅ | · | · | · | · |  |
+|  | `assistant-role` | set-role | · | ✅ | · | · | · | · |  |
+|  | `assistant-status` | status | · | ✅ | · | · | · | · |  |
+|  | `assistant-users` | list-users | · | ✅ | · | · | · | · |  |
+|  | `assistant-cohort` | open-cohort | · | ✅ | · | · | · | · |  |
+|  | `assistant-invite` | invite | · | ✅ | · | · | · | · |  |
+|  | `assistant-rotate` | rotate | · | ✅ | · | · | · | · |  |
+|  | `assistant-revoke` | revoke-user | · | ✅ | · | · | · | · |  |
+|  | `assistant-exports` | list-exports | · | ✅ | · | · | · | · |  |
+|  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
+|  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 256 ops | | 230 | 125 | 33 | 5 | 149 | 72 | |
+| **totals** | 277 ops | | 239 | 146 | 33 | 5 | 151 | 72 | |
 
 ### Flows
 
@@ -276,6 +297,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (223/256): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:revokeTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks …
-- **missing inline** (184/256): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:addTask, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks, tasks:listMyPendingClaims …
-- **missing chat** (26/256): basis:signin, basis:signout, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch
+- **missing gate** (244/277): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:revokeTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks …
+- **missing inline** (205/277): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:addTask, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks, tasks:listMyPendingClaims …
+- **missing chat** (38/277): basis:signin, basis:signout, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch, assistant:assistant-apps, assistant:assistant-settings, assistant:assistant-role, assistant:assistant-status, assistant:assistant-users, assistant:assistant-cohort, assistant:assistant-invite, assistant:assistant-rotate, assistant:assistant-revoke, assistant:assistant-exports, assistant:assistant-export, assistant:assistant-import

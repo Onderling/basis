@@ -62,6 +62,11 @@ import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the govern
  *  (one replay serve is up to 1000 items against a burst-30 bucket). Replies only: requests and
  *  every other envelope stay bucketed, and each exempted reply still faces its rail's full
  *  verify-on-ingest gate. */
+// The tiers a door may give the people it admits, by role. Never `private`: that is the owner's own, self only.
+// A door's person reaches the member's ops at every role below admin (what a coordinator or an observer may do with
+// a chore is the tasks app's role rule, read at the op); the admin reaches the admin's.
+const DOOR_TIER_FOR_ROLE = Object.freeze({ coordinator: 'authenticated', member: 'authenticated', observer: 'authenticated', admin: 'trusted' });
+
 const CATCHUP_REPLY_SUBTYPES = new Set([
   GOV_CATCHUP_BATCH,
   MEMBERSHIP_CATCHUP_SUBTYPES.batch,
@@ -154,7 +159,7 @@ import {
   setCircleMembership as registrySetCircleMembership,
   removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
-  deviceDelegationOf, deviceDelegationsOf, setDeviceDelegation as registrySetDeviceDelegation,
+  deviceDelegationOf, deviceDelegationsOf, profileHasOtherDevices, setDeviceDelegation as registrySetDeviceDelegation,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -212,7 +217,7 @@ import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@o
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
 import {
-  CalendarStore, registerCalendarSkills,
+  CalendarStore, registerCalendarSkills, parseDateInput as parseCalendarDate,
 } from '@onderling-app/calendar';
 // Imported by RELATIVE path (not the `@onderling-app/household` package name)
 // because basis doesn't carry household as a workspace dep yet (the
@@ -236,7 +241,13 @@ import { basisManifest }                   from '../../../manifest.js';         
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
 import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
-import { makeListsOps }                    from '../../v2/listsOps.js';                  // the lists handlers, once (a shell mounts the same ones with its own seams)
+import { makeListsOps }                    from '../../v2/listsOps.js';
+import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
+import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
+import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
+import { botDoorChecks } from '../../v2/botRungs.js';                                            // the bot door's checks, declared once
+import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
+import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
@@ -3021,6 +3032,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * 5 + the mobile pivot).
    */
 
+  // The host gate's trust registry — the door sets the tier of the people it admits here (setDoorCaller).
+  let hostTrustRegistry = null;
   /* Identity step 2.4a/2.4b — attach a PolicyEngine to hostAgent so scoped access is ENFORCED
    * (the gate was structurally absent: hostAgent.policyEngine was null, so taskExchange/A2ATransport
    * skipped it for host traffic). The owner-only CONTROL + secret-material skills (the phrase, the root,
@@ -3031,7 +3044,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
   try {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
-    const hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? makeBrowserVault('cc-host-trust:'));
+    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? makeBrowserVault('cc-host-trust:'));
     hostAgent.policyEngine = new PolicyEngine({
       trustRegistry: hostTrustRegistry,
       skillRegistry: hostAgent.skills,
@@ -3094,8 +3107,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   // role; without the chatAgent's pubKey in the member list, every
   // call from basis would be treated as a stranger + denied
   // by RolePolicy.
+  // WHICH CIRCLE the tasks engine runs in when the shell names none. An engine is verbs over the circle's ONE store,
+  // not a store of its own: on the bot (`tasksCircleId`, the box) its tasks are the household circle's, so a task
+  // on a list (Klusjes) is the engine's to list, claim and complete. The painting shells keep their own default.
+  const tasksDefaultCircleId = (typeof opts.tasksCircleId === 'string' && opts.tasksCircleId) ? opts.tasksCircleId : 'cc-default';
   const tasksCircle = await createBrowserMultiCircleTasksAgent({
     bus,
+    // the host that may vouch for a door's person (`actor`): its caller here is the owner's chat agent
+    hostKey: chatId.pubKey,
     identityVault: tasksIdentityVault,
     // THE ONE MEMBERSHIP ANSWER for the tasks app's authority gates: this circle's folded roster,
     // read through the waist. The tasks bundle composes its own member list locally (with this
@@ -3111,7 +3130,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch { return null; }
     },
     primaryCircleConfig: opts.tasksCircleConfig ?? {
-      circleId:  'cc-default',
+      circleId:  tasksDefaultCircleId,
       name:    'Onderling tasks',
       kind:    'household',
       members: [
@@ -3168,7 +3187,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The primary tasks circle's single store needs its store<->mirror sync wired
   // so unscoped task ops (which don't carry a circleId, so the per-op wiring at
   // dispatch is skipped) still fan out. Idempotent with the dispatch-time wire.
-  const tasksPrimaryCircleId = opts.tasksCircleConfig?.circleId ?? 'cc-default';
+  const tasksPrimaryCircleId = opts.tasksCircleConfig?.circleId ?? tasksDefaultCircleId;
   await ensureCircleSync(tasksPrimaryCircleId);
 
   // Registry restore-and-open — the READ side of the circle-membership registry, the consumer that
@@ -3907,6 +3926,13 @@ export async function createRealHouseholdAgent(opts = {}) {
         t: typeof opts.t === 'function' ? opts.t : (k) => k,
         activeCircle: () => resolveCircleId({}),
         localActor: 'me',
+        // a household bot: a chore ticked by its words is the chore's own `completeTask`, as the person (the gate)
+        ...(opts.tasksCircleId ? { completeChore: ({ circleId, entry, ctx }) => callSkill('tasks', 'completeTask', { id: entry.id, circleId }, ctx) } : {}),
+        // a household bot: what is done or has passed follows the household's setting
+        ...(opts.tasksCircleId ? { passed: () => ({
+          mode: passedPolicyFrom(paramsService.register.valueOf(PASSED_KEY)),
+          days: passedDaysFrom(paramsService.register.valueOf(PASSED_DAYS_KEY)),
+        }) } : {}),
       }),
     });
   };
@@ -3918,7 +3944,128 @@ export async function createRealHouseholdAgent(opts = {}) {
     agent: selfAgent,
   }));
 
-  const callSkill = async (appOrigin, opId, args) => {
+  /**
+   * A person at a door is a CALLER: before a door's call runs, the host gate checks their tier against the op's
+   * visibility — the same check a peer meets (`checkCaller`). A host skill is judged by its own visibility (the
+   * owner's own skills are `private`: self only, whatever tier anyone holds); any other op a door reaches is an
+   * ordinary one (`authenticated`: an admitted member). A stranger (no record) is `public`. Fails closed: no gate,
+   * no door call.
+   * @returns {Promise<string|null>} the refusal's code, or null when the caller may go on
+   */
+  // The door's checks at the waist — tier · the door's map · the role — declared once (`botRungs.js`), asked in order,
+  // deny-wins; each no is a refusal `{layer, code}` (`refusal.js`).
+  const doorRefusal = async (opId, caller, visibility) => {
+    const engine = hostAgent.policyEngine;
+    if (!engine || typeof engine.checkCaller !== 'function') return refuse('tier', 'no-gate');
+    const checks = botDoorChecks({
+      checkCaller: (q) => engine.checkCaller(q),
+      opLevel: typeof opts.doorOpLevel === 'function' ? opts.doorOpLevel : null,
+      roleAllows: typeof opts.doorRoleAllows === 'function' ? opts.doorRoleAllows : null,
+      roleOf: (c) => doorRoles.get(c) ?? null,
+    });
+    return firstRefusal(checks, { opId, caller, visibility });
+  };
+  const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
+
+  let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  /** The add of a chore with its person and its day (see the lists branch of `callSkill`). */
+  async function addChoreFor(args, ctx) {
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const { assignee, due, ...rest } = args;
+    const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
+    let who = null;
+    let whoName = null;
+    if (typeof assignee === 'string' && assignee.trim()) {
+      const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+      const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
+      const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
+      const policy = buildStandardRolePolicy(roles);
+      const callerRole = caller ? (roles[caller] ?? null) : null;
+      const roleMayAssign = caller ? policy.canReassign(caller) : true;
+      // Whether this person may SEE the others' names is the household's ceiling (`assistant.names`); naming someone
+      // is seeing them, so where names are hidden a chore is given by name only by those who may see them.
+      const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
+      if (isSelfWord(assignee)) who = caller ?? 'me';
+      else {
+        if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
+        const name = assignee.trim().toLowerCase();
+        // by their name, or — for someone without one — by the id the bot shows for them (`/users`), exactly
+        const byId = known.filter((c) => c.webid === assignee.trim());
+        const hit = byId.length ? byId : known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
+        // Who the bot knows is never listed on a miss: a directory is not implied by anyone's own disclosure.
+        if (hit.length !== 1) return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim() }) };
+        who = hit[0].webid;
+        whoName = hit[0].displayName ?? null;
+      }
+      const allowed = assignAllowed({
+        policy: paramsService.register.valueOf(ASSIGN_POLICY_KEY),
+        roleMayAssign, callerId: caller, assigneeId: who,
+      });
+      if (!allowed) {
+        // under `roles` the op's own rule said no (the tasks app's reassign rule); otherwise the household's setting did
+        const byRole = assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
+        return { ok: false, error: tr('circle.tasks.assign_refused'), refusal: byRole ? refuse('op-rule', 'cannot-reassign') : refuse('door-settings', 'setting:assign') };
+      }
+      // …and the one who gets it must be someone their OWN role lets claim (an observer looks, and holds no chore).
+      if (who !== 'me' && roles[who] !== undefined && !policy.canClaim(who)) {
+        return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? assignee.trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
+      }
+    }
+    const made = await callSkill('lists', 'addToList', rest, ctx);
+    if (!made?.ok || made.duplicate || made.kind !== 'task' || !made.itemId) return made;
+    const circleId = resolveCircleId(rest);
+    if (typeof due === 'string' && due.trim()) {
+      // the household's local day or time, as an appointment's `when` is read (a bare date is that day, not UTC)
+      const iso = parseCalendarDate(due.trim());
+      if (iso) {
+        const store = householdService.stores.getStore(circleId);
+        const item = await store.get(made.itemId);
+        if (item) await store.put({ ...item, dueAt: iso }, { by: caller ?? 'me' });
+      }
+    }
+    if (who) {
+      // the claim path, the host vouching for the person the chore is for
+      const claimed = await callSkill('tasks', 'claimTask', { id: made.itemId, actor: who });
+      if (claimed?.ok === false) return claimed;
+      // the reply names the one who got it only where names may be seen; to someone else it says it was given
+      if (who !== caller && who !== 'me') {
+        const given = whoName ? tr('circle.tasks.given_to', { name: whoName }) : tr('circle.tasks.given');
+        return { ...made, message: `${made.message ?? ''} ${given}`.trim() };
+      }
+    }
+    return made;
+  }
+
+  const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
+  const callSkill = async (appOrigin, opId, args, ctx = {}) => {
+    // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
+    if (typeof ctx?.caller === 'string' && ctx.caller) {
+      const refusal = await doorRefusal(opId, ctx.caller);
+      if (refusal) return { ok: false, error: refusalText(refusal, typeof opts.t === 'function' ? opts.t : null), refusal };
+      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
+    }
+    // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
+    // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no
+    // task are said so in the household's words, not the store's.
+    // A chore that says who and when (a household bot): "nieuwe taak voor Bert: X (maandag)". The add on a list whose
+    // entries are chores takes an `assignee` (me, or a person the bot knows by name) and a `due` day; WHO may be named
+    // is the bot's setting (`assistant.assignPolicy`), decided here — the model only passes the words on.
+    if (appOrigin === 'lists' && opId === 'addToList' && opts.tasksCircleId && (args?.assignee || args?.due)) {
+      return addChoreFor(args ?? {}, ctx);
+    }
+    let namedTask = null;   // the task's words, when the door named it by them
+    if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {
+      const store = householdService?.stores?.getStore?.(resolveCircleId(args ?? {}));
+      if (store && typeof store.listByType === 'function') {
+        const open = ((await store.listByType('task')) ?? []).filter((it) => !it?.completedAt);
+        const words = (it) => it?.text ?? it?.title;
+        const { entry: task, among } = matchEntry(open, args.id, words);
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        if (!task) return { ok: false, error: among.length ? tr('circle.lists.which_one', { options: choicesOf(among, words) }) : tr('circle.tasks.no_such_task', { item: args.id }) };
+        args = { ...args, id: task.id };
+        namedTask = words(task) || null;
+      }
+    }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and
     // route to the app's capability entry ("declare a noun → get CRUD free"). ADDITIVE: a
@@ -4053,7 +4200,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Derived ops (not in the real circle agent): build the reply
       // from listMine + a small shape adapter.
       if (opId === 'briefSummary' || opId === 'tasks_briefSummary') {
-        const list = await callSkill('tasks', 'listMine', {});
+        const list = await callSkill('tasks', 'listMine', args?.actor ? { actor: args.actor } : {});
         const items = (list?.items ?? []).filter((t) => t.state === 'open');
         if (items.length === 0) return { ok: true };   // empty → /brief skips
         return {
@@ -4064,7 +4211,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (opId === 'searchTasks') {
         const q = String(args?.query ?? '').toLowerCase();
         if (!q) return { items: [] };
-        const list = await callSkill('tasks', 'listMine', {});
+        const list = await callSkill('tasks', 'listMine', args?.actor ? { actor: args.actor } : {});
         const hits = (list?.items ?? []).filter((t) =>
           String(t.text ?? t.title ?? '').toLowerCase().includes(q),
         );
@@ -4115,7 +4262,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         return adaptTasksReply('listCircleMembers', first?.data ?? null);
       }
       if (CIRCLE_AUTO_INJECT.has(realOpId) && !realArgs.circleId) {
-        const circleId = opts.tasksCircleConfig?.circleId ?? 'cc-default';
+        const circleId = opts.tasksCircleConfig?.circleId ?? tasksDefaultCircleId;
         realArgs = { ...realArgs, circleId };
       }
       if (realOpId === 'archiveCircle' && realArgs.confirm !== true) {
@@ -4216,7 +4363,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first = Array.isArray(result) ? result[0] : null;
       const data  = first?.data ?? null;
       if (data && noteHint) data.noteHint = noteHint;
-      return adaptTasksReply(opId, data);
+      const adapted = adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask, args: realArgs ?? args ?? {} });
+      // On a household bot "wat moet ik nog doen" is MINE: the open chores this person claimed (the chat-shell reading of
+      // `listMine` — everything open — stays for the painting shells, which show every chore on their own screen).
+      const mineOf = opts.tasksCircleId && opId === 'listMine' ? (args?.actor ?? null) : null;
+      if (mineOf && Array.isArray(adapted?.items)) {
+        const holds = (it) => [...(Array.isArray(it?.assignees) ? it.assignees : []), it?.assignee].filter(Boolean).includes(mineOf);
+        return { ...adapted, items: adapted.items.filter(holds) };
+      }
+      return adapted;
     }
     if (appOrigin === 'stoop') {
       // Derived: briefSummary builds a summary from listOpen since
@@ -4498,6 +4653,31 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first  = Array.isArray(result) ? result[0] : null;
       return first?.data ?? null;
     }
+    // A household bot (`opts.calendarInCircle`): the calendar's verbs over the circle's ONE store — events are the
+    // Agenda's children — not the per-agent in-memory CalendarStore below, which a person's node keeps.
+    // A household bot's appointment is cancelled by the one who added it, or the admin — unless the admin keeps that
+    // to themselves (`assistant.cancelPolicy`). The op's rule and the door's setting refuse in the one shape.
+    if (appOrigin === 'calendar' && opId === 'cancelEvent' && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
+        && doorRoles.get(ctx.caller) !== 'admin') {
+      const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+      if (cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {
+        return { ok: false, error: tr('circle.calendar.cancel_admin_only'), refusal: refuse('door-settings', 'setting:cancel') };
+      }
+      const snap = await callSkill('calendar', 'getEventSnapshot', { id: args?.id });
+      if (snap?.ok && snap.event && snap.event.createdBy !== ctx.caller) {
+        return { ok: false, error: tr('circle.calendar.not_yours', { title: snap.event.title ?? '' }), refusal: refuse('op-rule', 'not-yours') };
+      }
+    }
+    if (appOrigin === 'calendar' && opts.calendarInCircle) {
+      const ops = (circleCalendar ??= makeCircleCalendarOps({
+        storeFor: (circleId) => householdService.stores.getStore(circleId),
+        activeCircle: () => resolveCircleId({}),
+        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        localActor: 'me',
+      }));
+      const handler = ops[opId];
+      return handler ? handler(args ?? {}) : { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
+    }
     if (appOrigin === 'calendar') {
       // Calendar skills are registered on the household host agent with the
       // 'calendar_' prefix (v0.7.10 multi-app collision-avoidance).  Routing
@@ -4577,7 +4757,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // journey, and "true by accident of ordering" is how a fan-out path quietly stops being one.
       const inCircle = typeof args?.circleId === 'string' && args.circleId ? args.circleId : null;
       if (inCircle) await ensureCircleSync(inCircle);
-      return handler(args ?? {});
+      // the person asking rides along (a handler that acts as them — a chore's tick — passes it on)
+      return handler(args ?? {}, ctx);
     }
     throw new Error(`realAgent: unknown appOrigin "${appOrigin}"`);
   };
@@ -4686,7 +4867,13 @@ export async function createRealHouseholdAgent(opts = {}) {
    * tasks-v0 underneath.  Eventually the chat-shell renderer
    * absorbs the richer shape natively + these adapters fall away.
    */
-  function adaptTasksReply(opId, data) {
+  /**
+   * @param {string} opId
+   * @param {object|null} data  the tasks skill's answer
+   * @param {{actor?: string|null, named?: string|null}} [who]  the person the call was for, and the task's words when
+   *        the door named it by its words (the reply names the task FOUND, never the words it was asked by)
+   */
+  function adaptTasksReply(opId, data, { actor = null, named = null, args = {} } = {}) {
     if (data == null) return null;
     // (B8) — DAG hard-dep blocking surface. Real skill returns
     // {error: 'has-open-dependencies', openDeps: [...]} when the user
@@ -4709,6 +4896,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     // submitTask) OR {result: ...} (claimTask / completeTask) — the
     // field name differs by skill.  Normalise to a task variable.
     const task = data.task ?? data.result ?? null;
+    // A claim that LOST comes back as its result (`{error: 'already-claimed', current}`) — never a "✓": someone else has
+    // the task, or this person had it already.
+    if (task && typeof task.error === 'string' && task.error) {
+      const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+      const cur = task.current ?? {};
+      const title = cur.text || cur.title || named || '';
+      if (task.error === 'already-claimed') {
+        const holders = [...(Array.isArray(cur.assignees) ? cur.assignees : []), cur.assignee].filter(Boolean);
+        const yours = Boolean(actor && holders.includes(actor));
+        // In the person's words: every shell hands the agent its translator; a bare agent (a test) keeps the English.
+        if (typeof opts.t !== 'function') return { ok: false, error: yours ? `You had already claimed: ${title}` : `Already claimed: ${title}` };
+        return { ok: false, error: tr(yours ? 'circle.tasks.already_yours' : 'circle.tasks.already_claimed', { title }) };
+      }
+      return { ok: false, error: task.error };
+    }
 
     // addTask: {task} → {ok, message, itemId, _sync}
     if (opId === 'addTask' && task) {
@@ -4735,7 +4937,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       editTask:    'Edited',
     };
     if (verbMap[opId] && task) {
-      const title = task.text ?? task.title ?? task.id;
+      const title = task.text || task.title || named || task.id;
       // Reject path: surface the audit-log note in the message so
       // the chat-shell + user see WHY the task was rejected.
       const noteSuffix = (opId === 'rejectTask' && data.noteHint)
@@ -4746,7 +4948,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the chat-shell envelope returns immediately.  Default hook is a
       // no-op so existing tests keep their behaviour.
       if (opId === 'claimTask' && typeof claimRouterRef.hook === 'function') {
-        const circleId = args?.circleId ?? args?.circleId ?? args?.groupId ?? null;
+        // the call's own args (handed in: this adapter is not inside the call's scope)
+        const circleId = args?.circleId ?? args?.groupId ?? null;
         if (circleId) {
           Promise.resolve(claimRouterRef.hook({ task, circleId, args }))
             .catch((err) => publishEvent?.({
@@ -4755,9 +4958,13 @@ export async function createRealHouseholdAgent(opts = {}) {
             }));
         }
       }
+      // In the person's words: every shell hands the agent its translator; a bare agent (a test) keeps the English.
+      const message = typeof opts.t === 'function'
+        ? opts.t(`circle.tasks.reply.${verbMap[opId].toLowerCase()}`, { title, note: noteSuffix })
+        : `✓ ${verbMap[opId]}: ${title}${noteSuffix}`;
       return {
         ok:      true,
-        message: `✓ ${verbMap[opId]}: ${title}${noteSuffix}`,
+        message,
         itemId:  task.id,
         // S6.A — enrich with mock-era state/type so the post-action reply also
         // carries the right inline buttons (e.g. a claimed task → Mark complete).
@@ -6042,6 +6249,55 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Diagnostic (step 2.4a) — the enforcement gate on the host skills' agent. Non-null proves
     // the PolicyEngine attached (vs the try/catch having silently swallowed it).
     hostPolicyEngine: hostAgent.policyEngine ?? null,
+    /**
+     * A door admitted a person with a role: set their tier in the host gate. member → `authenticated`, admin →
+     * `trusted`. Nothing else: the owner's level (`private`) is self only and cannot be given from a door.
+     */
+    /**
+     * The host gate's answer for a door's person on an op the door answers itself (its own ops: a person's thread
+     * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
+     */
+    doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /** Every item of the household's circle store, as stored (the export writes its public fields from these). */
+    householdItems: async () => (await householdService.stores.getStore(resolveCircleId({})).list()) ?? [],
+    /** A household bot's reminders read the household circle's chores and appointments, whole (dates, who comes). */
+    reminderSources: async () => {
+      const store = householdService.stores.getStore(resolveCircleId({}));
+      const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
+      return { chores: chores ?? [], events: events ?? [] };
+    },
+    /**
+     * Whose profile this node runs: a PERSON's (their devices keep their inbox; nothing answers it) or a FUNCTION's
+     * (a household bot on its own node — its inbox is the bot's, and the assistant answers it). Read from the
+     * profile record, never from a flag or from "not enrolled".
+     */
+    profileKind: async () => ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function' ? 'function' : 'person'),
+    /**
+     * Name this node's profile a function's (once, at the bot's install: the bot IS its own profile, this node its
+     * device). Refused when the profile has another device: a profile with a phone and a laptop behind it is a
+     * person's, and their inbox must never start answering (the VPS box, enrolled as Frits' device).
+     */
+    markFunctionProfile: async () => {
+      if (!agentsRegistryRef || typeof agentsRegistryRef.updateKind !== 'function') throw new Error('markFunctionProfile: no profile registry');
+      const cur = await agentsRegistryRef.lookup('default');
+      if (profileHasOtherDevices(cur ?? {}, enrolledDevice?.deviceId ?? null)) throw new Error('markFunctionProfile: this profile has other devices — it is a person\'s, not a function\'s');
+      await agentsRegistryRef.updateKind('default', 'function');
+    },
+    /** A door dropped a person (revoked): the gate treats them as a stranger from now on. */
+    clearDoorCaller: async (callerId) => {
+      doorRoles.delete(callerId);
+      if (!hostTrustRegistry) throw new Error('clearDoorCaller: the host gate is not attached');
+      if (typeof callerId !== 'string' || !callerId) throw new Error('clearDoorCaller: a caller id is required');
+      await hostTrustRegistry.setTier(callerId, 'public');
+    },
+    setDoorCaller: async (callerId, role) => {
+      const tier = DOOR_TIER_FOR_ROLE[role];
+      if (!tier) throw new Error(`setDoorCaller: a door gives only ${Object.keys(DOOR_TIER_FOR_ROLE).join(' or ')} (got "${role}")`);
+      if (!hostTrustRegistry) throw new Error('setDoorCaller: the host gate is not attached');
+      if (typeof callerId !== 'string' || !callerId) throw new Error('setDoorCaller: a caller id is required');
+      await hostTrustRegistry.setTier(callerId, tier);
+      doorRoles.set(callerId, role);
+    },
     // Who may retire this device's addresses: the owner root, at a ceremony (core ceremonyCommitment.js).
     ceremonyCommitmentFor, signCeremonyCommitment,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)

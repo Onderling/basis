@@ -24,20 +24,18 @@ export const CONTEXT_MAX_CHARS = param({ key: 'assistant.contextMaxChars', scope
 export const TURN_MARKER = '--- This turn ---';
 
 /** Default tool-selection prompt. Internal (LLM-facing), not a user-visible string. */
-export const DEFAULT_INTERPRET_SYSTEM =
-  'You are the assistant in a shared circle. When a member\'s message is a clear request to DO or SEE '
-  + 'something, call the matching tool — this INCLUDES requests to view, list, or show data (use the '
-  + 'matching list/open tool). One call per action: when several items are named, make one call per item, '
-  + 'all in this turn. Take arguments verbatim from the message; never invent them.\n'
-  + 'When no single tool clearly fits:\n'
-  + '- If you only need ONE detail to choose the right tool or argument, reply with a SHORT clarifying '
-  + 'question to the member (e.g. "Which list — shopping or tasks?").\n'
-  + '- If it is ordinary chat or a greeting ("hoi", "maii", "gaat lekker"), reply briefly and naturally and call NO tool.\n'
-  + 'A reply of yours DOES NOTHING: only a tool call adds, completes or shows anything. Never claim that '
-  + 'something was added or done, and never write a confirmation line (no ✓) — call the tool instead.\n'
-  + 'Always address the MEMBER directly in plain language. NEVER describe your own tool-calling decision — '
-  + 'do not say things like "no tool call needed" or "this is a general question"; the member must never '
-  + 'see that. When in doubt between acting and asking, ASK a short question rather than guessing a tool.';
+export const DEFAULT_INTERPRET_SYSTEM = [
+  "You turn a member's message into tool calls. Rules:",
+  "1. A clear request to add, tick off, claim, complete, remove, change or SEE something → call the matching tool. Several things named → one call per thing, all in this turn.",
+  "2. Arguments come from the message word for word. Never invent one.",
+  "3. You cannot do anything by writing. Only a tool call changes or shows something. Never write \"✓\", \"added\", \"done\", \"toegevoegd\", \"afgevinkt\" or any line that says something happened. If you are not calling a tool, you are only asking or chatting.",
+  "   Wrong: \"✓ melk toegevoegd\". Right: call addToList(list, text).",
+  "4. Missing ONE detail to choose the tool or fill an argument → ask one short question, nothing else. Example: \"Welke lijst — boodschappen of klusjes?\"",
+  "5. Greeting or small talk → answer briefly in the member's words, no tool.",
+  "6. Offer only what a tool can do, and only when the member asked for something. Never offer to do several things in a row.",
+  "7. Never mention tools, rules or your own decisions. Plain words, no markdown, no lists of what you did.",
+  "8. Earlier turns are context: act on the member's NEWEST message. A short answer (\"ja\", \"nee\", \"die\", a name, a list's name) answers YOUR OWN last question: do what you offered or asked about then. Never redo an older request.",
+].join('\n');
 
 /**
  * The generic prompt, then the background of every app whose ops are in this catalogue (the manifest's own
@@ -64,7 +62,7 @@ const KIND_TO_JSON_TYPE = { string: 'string', number: 'number', integer: 'intege
  * @param {{opsById?: Map<string, {op: object, appOrigin?: string}>}} catalogue
  * @returns {Array<{id:string, description:string, schema:object}>}
  */
-export function buildToolDescriptors(catalogue) {
+export function buildToolDescriptors(catalogue, { lang = null, hintFor = null } = {}) {
   const tools = [];
   const opsById = catalogue && catalogue.opsById;
   if (!opsById || typeof opsById.forEach !== 'function') return tools;
@@ -89,9 +87,15 @@ export function buildToolDescriptors(catalogue) {
       properties[p.name] = prop;
       if (p.required) required.push(p.name);
     }
+    const english = (op.surfaces && op.surfaces.chat && op.surfaces.chat.hint) || op.verb || op.id || String(key);
+    // The member's language first, the other in brackets: a Dutch thread reads "<nl> (<en>)", an English one the
+    // reverse. The English stays in both — it is what the prompt's rules speak.
+    const appOrigin = entry && entry.appOrigin;
+    const other = lang && typeof hintFor === 'function' && appOrigin ? hintFor(appOrigin, op.id, lang === 'en' ? 'nl' : lang) : null;
+    const description = !other ? english : lang === 'en' ? `${english} (${other})` : `${other} (${english})`;
     tools.push({
       id: String(key),
-      description: (op.surfaces && op.surfaces.chat && op.surfaces.chat.hint) || op.verb || op.id || String(key),
+      description,
       schema: { type: 'object', properties, ...(required.length ? { required } : {}) },
     });
   }
@@ -108,15 +112,17 @@ export function buildToolDescriptors(catalogue) {
  *        `system` = the STABLE instruction (rules + phrasing hints); `hints` = this turn's lines (the language),
  *        placed below the turn marker with the retrieved items and the date.
  *        `context` = RAG items (e.g. from the token gate's `retrieve`) woven into the system prompt.
+ *        `toolLang` / `hintFor` = the language the tools are described in first, and the lookup for it (`chatHints.js`).
+ *        `onSlow` = told when the model route is slow and retries (a door says "even geduld").
  *        `history` = prior conversation turns threaded as real messages — so a clarifying follow-up
  *        ("which list?" → "shopping") resolves against what the bot just asked, not a stateless guess.
  * @returns {Promise<{opId:string, args:object, more?:Array<{opId:string,args:object}>}|{reply:string}|null>}
  *   `more` carries the SECOND and later tool calls of the same turn (a member naming three items).
  */
-export async function interpretToCommand(text, { catalogue, llm, system, hints, options, context, history, now } = {}) {
+export async function interpretToCommand(text, { catalogue, llm, system, hints, options, context, history, now, toolLang = null, hintFor = null, onSlow = null } = {}) {
   const q = String(text ?? '').trim();
   if (!q || !llm || typeof llm.invoke !== 'function') return null;
-  const tools = buildToolDescriptors(catalogue);
+  const tools = buildToolDescriptors(catalogue, { lang: toolLang, hintFor });
   if (tools.length === 0) return null;                       // nothing dispatchable → never call the LLM
 
   const priorMsgs = Array.isArray(history)
@@ -127,6 +133,8 @@ export async function interpretToCommand(text, { catalogue, llm, system, hints, 
     messages: [...priorMsgs, { role: 'user', content: q }],
     tools,
     ...(options ? { options } : {}),
+    // the turn's own "this is slow" hook: a provider that retries on a timeout calls it (the door tells the person)
+    ...(typeof onSlow === 'function' ? { onSlow } : {}),
   });
 
   // Every call the model made this turn, whole ones only, up to the per-turn cap. A call the output cut off, or one

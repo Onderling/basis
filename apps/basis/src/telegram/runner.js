@@ -20,6 +20,8 @@
 import { parseInput }      from '../parser.js';
 import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
+import { doorDisclosure } from '../v2/turnLog.js';
+import { confirmPreview } from '../v2/confirmGate.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
@@ -38,6 +40,9 @@ const CONFIRM_NO  = '__confirm:no';
  *   open-door mode for a first try; a list pairs exactly those chats and tells any other chat its id
  * @param {(key:string, params?:object) => string} a.t
  * @param {(chatId:string) => string} [a.threadFor]  the thread id a chat maps to (default: the chat id)
+ * @param {(who:{channel:string, uid:string, displayName:string|null}) => Promise<string|null>} [a.admit]  the host's
+ *   door: admits the person behind a message and returns their caller id. Every call the turn makes then carries it
+ *   (`callSkill(app, op, args, {caller})`) and the host's gate checks it. A door without it calls as the host.
  * @param {{evaluate:Function}|null} [a.gate]        (tests) an engine override — see `engine` below
  * @param {Function|null} [a.interpret]              the NL→op interpreter (`interpretToCommand`) — only with an LLM route
  * @param {object|null} [a.llm]                      the LlmClient the interpreter runs on (the confidential route); null → basic mode
@@ -45,20 +50,27 @@ const CONFIRM_NO  = '__confirm:no';
  * @param {object} [a.engine]                        (tests) a pre-built assistant engine
  * @param {number} [a.collectMs]                     the engine's collect window (default `assistant.collectMs`)
  * @param {string} [a.botName]
+ * @param {(a: {threadId: string, role: string|null, ops: Set<string>}) => Promise<string[]>|string[]} [a.welcomeFor]  the lines a new person's welcome adds: what this door does for them
  * @param {(entry: object) => void} [a.walkLog]  a sink for one record per turn — what came in, which path
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsByOrigin = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null, basicHelpFor = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
-  if (!catalogue) throw new TypeError('createTelegramRunner: a catalogue is required');
+  if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
+  // Static, or a getter: a door whose admin switches apps recomposes its catalogue, and every surface reads the new one.
+  const catalogueOf = () => (typeof catalogueIn === 'function' ? catalogueIn() : catalogueIn);
+  const manifestsOf = () => (typeof manifestsIn === 'function' ? manifestsIn() : manifestsIn);
   if (typeof t !== 'function') throw new TypeError('createTelegramRunner: t is required');
 
   const open = allowedChatIds === '*' || !Array.isArray(allowedChatIds) || allowedChatIds.length === 0;
   const allowed = new Set(open ? [] : allowedChatIds.map(String));
-  /** chatId → a pending follow-up (single/multi field) or a pending confirmation. */
-  const pending = new Map();
+  /** threadId → a pending follow-up (single/multi field) or a pending confirmation — on the thread's row when the
+   *  door keeps its threads (it survives a restart), else for this process. */
+  const pending = threads
+    ? { get: (id) => threads.pendingOf(id), set: (id, v) => threads.setPending(id, v), delete: (id) => threads.setPending(id, null) }
+    : new Map();
 
   /** The turn under way (one per chat at a time) — the walk log's record in the making. */
   const turns = new Map();
@@ -69,19 +81,36 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   };
 
   /** Paint a RenderedReply as bridge messages. */
+  /**
+   * The ops this chat's person may be OFFERED: their role's map (the same scoping their tools get), or null — no map,
+   * everything the catalogue holds. A button for an op off the map would be refused on tap; it is never shown.
+   */
+  function offeredOps(chatId) {
+    if (typeof roleFor !== 'function' || typeof scopeToRole !== 'function') return null;
+    const rec = turns.get(chatId);
+    const scoped = scopeToRole(catalogueOf(), roleFor(rec?.caller ?? rec?.thread ?? threadFor(chatId)));
+    const ops = new Set();
+    for (const [key, entry] of scoped?.opsById ?? []) ops.add(entry?.op?.id ?? key);
+    return ops;
+  }
+
   async function paint(chatId, rendered) {
     if (!rendered) return;
+    const offered = offeredOps(chatId);
+    const onMap = (b) => !offered || offered.has(String(b?.callbackData ?? '').split(':')[0]);
     if (rendered.kind === 'list') {
       const items = Array.isArray(rendered.items) ? rendered.items : [];
-      if (!items.length) { await say(chatId, rendered.text ?? t('circle.telegram.empty_list')); return; }
-      const lines = items.map((it, i) => `${i + 1}. ${it.label}`);
+      // A read of a named list says which list, always — one list or five in a turn.
+      const head = rendered.title ? [`${rendered.title}:`] : [];
+      if (!items.length) { await say(chatId, [...head, rendered.text ?? t('circle.telegram.empty_list')].join('\n')); return; }
+      const lines = [...head, ...items.map((it, i) => `${i + 1}. ${it.label}`)];
       const buttons = [];
       // A button names the ITEM, not its row number ("Done: melk", not "Done 1") — read from a phone, the
       // number was a puzzle (walk 2). Long labels are cut; the row number stays as a tiebreaker.
       items.forEach((it, i) => {
         const name = String(it.label ?? '').trim();
         const short = name.length > 18 ? `${name.slice(0, 17)}…` : name;
-        for (const b of (it.buttons ?? [])) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
+        for (const b of (it.buttons ?? []).filter(onMap)) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
       });
       await say(chatId, lines.join('\n'), buttons);
       return;
@@ -91,22 +120,46 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   /** Run a ready route and paint its reply. */
+  /** The call for this chat's turn: it carries the person, so the host's gate decides what they reach. */
+  function callFor(chatId) {
+    const rec = turns.get(chatId);
+    const caller = rec?.caller ?? null;
+    const threadId = rec?.thread ?? null;
+    return caller || threadId
+      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}) })
+      : callSkill;
+  }
+
+  /** A read the model asked for, run through the same gated call as any op but not shown (the turn acts on it). */
+  async function peekOp(chatId, threadId, cmd) {
+    const r = resolveDispatch(splitTypedMatch(opToParse(cmd, threadId)), catalogueOf());
+    if (r?.kind !== 'ready') return null;
+    note(chatId, { peeked: r.opId });
+    return runDispatch(coerceEnums(r), callFor(chatId));
+  }
+
   async function run(chatId, ready) {
     let reply;
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
-    try { reply = await runDispatch(ready, callSkill); }
+    // The person this turn is for: every call carries them, so the host's gate decides what they reach.
+    try { reply = await runDispatch(ready, callFor(chatId)); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
-    await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin }));
+    await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
 
-  /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue. */
-  function helpText() {
-    const lines = (catalogue.commandMenu ?? []).map((e) => {
-      const op = catalogue.opsById?.get?.(e.opId)?.op;
+  /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to
+   *  this person's role (a member is not shown the admin's commands). */
+  function helpText(chatId, threadId) {
+    const who = turns.get(chatId)?.caller ?? threadId;
+    const scoped = typeof roleFor === 'function' && typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), roleFor(who)) : catalogueOf();
+    const lines = (scoped?.commandMenu ?? []).map((e) => {
+      const op = catalogueOf().opsById?.get?.(e.opId)?.op;
       const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
       return hint ? `${e.command} — ${hint}` : e.command;
     });
-    return lines.join('\n');
+    // How to turn memory off, always; and, when turns are logged, that they are.
+    const disclosure = doorDisclosure(turnLogMode, t);
+    return [...lines, '', t('circle.bot.help_memory'), ...(disclosure ? [disclosure] : [])].join('\n');
   }
 
   /**
@@ -117,7 +170,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   function splitTypedMatch(parse) {
     const m = parse?.args?._match;
     if (typeof m !== 'string' || !m.includes(' ')) return parse;
-    const op = catalogue.opsById?.get?.(parse.opId)?.op;
+    const op = catalogueOf().opsById?.get?.(parse.opId)?.op;
     const params = Array.isArray(op?.params) ? op.params : [];
     const enumP = params.find((p) => p?.required && p.kind === 'enum' && Array.isArray(p.of));
     const textP = params.find((p) => p !== enumP && p?.required && p.kind === 'string');
@@ -130,7 +183,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   /** An enum arg named the way people say it ("boodschappen") → the declared value ("shopping"). */
-  const coerceEnums = (ready) => coerceListArgs(ready, catalogue);
+  const coerceEnums = (ready) => coerceListArgs(ready, catalogueOf());
 
   /**
    * A button tap arrives as its callbackData `opId:itemId` — dispatch it like `/command item`. Only an op OFFERED as a
@@ -141,7 +194,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   function tapToParse(text, threadId) {
     const m = /^([A-Za-z][\w-]*):(.*)$/.exec(text);
     if (!m) return null;
-    const op = catalogue.opsById?.get?.(m[1]);
+    const op = catalogueOf().opsById?.get?.(m[1]);
     if (!op) return null;
     if ((op.op ?? op)?.surfaces?.ui?.control !== 'button') return null;
     return { kind: 'slash', opId: m[1], args: m[2] ? { _match: m[2] } : {}, threadId };
@@ -153,14 +206,14 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   }
 
   async function route(chatId, threadId, text) {
-    if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText()); }
+    if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
     let parse = typeof text === 'string'
-      ? (tapToParse(text, threadId) ?? parseInput(text, catalogue, { threadId }))
+      ? (tapToParse(text, threadId) ?? parseInput(text, catalogueOf(), { threadId }))
       : opToParse(text, threadId);
     if (typeof text === 'string') note(chatId, { via: tapToParse(text, threadId) ? 'tap' : 'slash' });
     if (parse?.kind === 'slash') parse = splitTypedMatch(parse);
-    if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText()); }
-    const r = resolveDispatch(parse, catalogue);
+    if (parse?.kind === 'slash' && parse.opId === 'help') { note(chatId, { route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
+    const r = resolveDispatch(parse, catalogueOf());
     note(chatId, { route: r?.kind });
     switch (r?.kind) {
       case 'ready':
@@ -170,18 +223,22 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
         const p = single ?? beginFormFollowUp({ dispatch: r, t });
         if (!p) return say(chatId, t('circle.telegram.unknown'));
         if (p.kind === 'multi') p.values = {};
-        pending.set(chatId, { kind: 'form', p });
+        pending.set(threadId, { kind: 'form', p });
         const fields = p.kind === 'single' ? p.missingParam : p.fields.map((f) => f.name).join(', ');
         // An enum field asks with BUTTONS: the declared values, named the way people say them.
-        const op = catalogue.opsById?.get?.(r.opId)?.op;
+        const op = catalogueOf().opsById?.get?.(r.opId)?.op;
         const askName = p.kind === 'single' ? p.missingParam : p.fields[0].name;
         const enumP = (op?.params ?? []).find((q) => q?.name === askName && q.kind === 'enum' && Array.isArray(q.of));
         const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: t(`circle.telegram.list_${v}`) })) : undefined;
         return say(chatId, `${t('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`, buttons);
       }
       case 'needsConfirm': {
-        pending.set(chatId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
-        return say(chatId, t('circle.telegram.confirm', { message: r.message ?? '' }), [
+        pending.set(threadId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
+        // a confirm that declares a preview asks with what is there (asked as this person, through the same gate)
+        const previewed = await confirmPreview({ route: r, catalogue: catalogueOf(), call: callFor(chatId) });
+        // the preview refused (the act would be too): say why, and ask nothing
+        if (previewed?.refused) { pending.delete(threadId); return say(chatId, previewed.refused); }
+        return say(chatId, t('circle.telegram.confirm', { message: previewed?.message ?? (r.messageKey ? t(r.messageKey, r.args ?? {}) : (r.message ?? '')) }), [
           { id: CONFIRM_YES, label: t('circle.telegram.confirm_yes') },
           { id: CONFIRM_NO,  label: t('circle.telegram.confirm_no') },
         ]);
@@ -201,12 +258,31 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
   // answer to its ask, a confirmation, a command, a button tap) is CLAIMED, so it waits its turn instead of racing
   // the turn before it; quick free-text lines are gathered into one turn by the engine's collect window.
   const engine = engineIn ?? createAssistantEngine({
-    catalogue, lang, llm, interpret, loadItems, botName,
+    catalogue: catalogueOf, lang, llm, interpret, loadItems, botName,
+    ...(threads ? { memory: threads.memory, threadLang: (id) => threads.langOf(id) } : {}),
+    ...(promptLines ? { promptLines } : {}),
+    ...(Array.isArray(gateRules) ? { gateRules } : {}),
+    ...(typeof hintsFor === 'function' ? { threadHints: hintsFor } : {}),
+    ...(typeof expand === 'function' ? { expand } : {}),
+    // Each person sees their own tools (a household bot: a member's, or an admin's): the thread is the person.
+    ...(typeof roleFor === 'function' && typeof scopeToRole === 'function'
+      ? { catalogueFor: (threadId) => scopeToRole(catalogueOf(), roleFor(threadId)) }
+      : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
     dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
+    peek: (cmd, ctx) => peekOp(ctx.chatId, ctx.id, cmd),
     onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
-    onLlmUnavailable: (_text, ctx) => say(ctx.chatId, t('circle.telegram.unknown')),
+    // A model that is slow is SAID: "even geduld" while it retries, and when it does not come back, that it is not
+    // reachable now — never "I did not understand" for a model that did not answer.
+    onSlow: (ctx) => say(ctx.chatId, t('circle.bot.slow')),
+    // Without the model (off, or not answering) the person is told what DOES work — the word rules and the commands —
+    // when the door can say it; else the old line.
+    onLlmUnavailable: async (_text, ctx, info) => {
+      const lines = await basicHelp(ctx.id);
+      if (lines.length) return say(ctx.chatId, [t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.bot.basic_head'), ...(info?.reason === 'unreachable' ? [t('circle.bot.basic_head')] : []), ...lines].join('\n'));
+      return say(ctx.chatId, t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown'));
+    },
     onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),
     claim: (text, ctx) => (claims(ctx.chatId, ctx.id, text) ? () => doorLine(ctx.chatId, ctx.id, text) : null),
     around: (turn, run) => aroundTurn(turn, run),
@@ -214,13 +290,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
 
   /** Does this shell take the line itself? Asked when the line's turn comes, so an ask the turn before made counts. */
   function claims(chatId, threadId, text) {
-    const pend = pending.get(chatId);
+    const pend = pending.get(threadId);
     if (pend && (pend.kind === 'form' || text === CONFIRM_YES || text === CONFIRM_NO)) return true;
     return text.startsWith('/') || Boolean(tapToParse(text, threadId));
   }
   /** A line this shell takes: the answer to its pending ask, else a command or a tap. */
   async function doorLine(chatId, threadId, text) {
-    if (await continuePending(chatId, text)) return { via: 'door' };
+    if (await continuePending(chatId, threadId, text)) return { via: 'door' };
     await route(chatId, threadId, text);
     return { via: 'door' };
   }
@@ -233,9 +309,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const chatId = ctx.chatId;
     const text = lines.map((l) => String(l ?? '').trim()).join('\n');
     const started = Date.now();
-    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}) });
+    turns.set(chatId, { ts: new Date(started).toISOString(), chat: chatId.slice(-4), text, ...(lines.length > 1 ? { lines: lines.length } : {}), ...(ctx.caller ? { caller: ctx.caller } : {}), thread: threadId });
     let r;
     try {
+      await greetOnce(chatId, threadId);
       r = await run();
       if (!own) note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
@@ -247,23 +324,53 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
       // An op's result is the SYSTEM speaking; only a model reply is the assistant's own words.
       const voice = rec?.opId || rec?.route === 'help' ? 'system' : 'assistant';
       for (const reply of rec?.replies ?? []) engine.remember(threadId, voice, reply.text);
-      if (rec && typeof walkLog === 'function') { try { walkLog({ ...rec, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
+      // The log keeps the chat's last digits, never the person's id.
+      if (rec && typeof walkLog === 'function') { try { const { caller: _who, thread: _thread, ...logged } = rec; walkLog({ ...logged, ms: Date.now() - started }); } catch { /* a log must never break a turn */ } }
     }
     return r;
   }
 
+  /** The ops this person's role reaches (their scoped catalogue), and their role. */
+  function personOps(threadId) {
+    const role = typeof roleFor === 'function' ? roleFor(threadId) : null;
+    const scoped = typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), role) : catalogueOf();
+    return { role, ops: new Set([...(scoped?.opsById ?? [])].map(([key, entry]) => entry?.op?.id ?? key)) };
+  }
+
+  /** What works without the model, for this person (the door derives it), or nothing. */
+  async function basicHelp(threadId) {
+    if (typeof basicHelpFor !== 'function') return [];
+    try { return (await basicHelpFor({ threadId, ...personOps(threadId) })) ?? []; } catch { return []; }
+  }
+
+  /** A person's first turn with this door: who it is and what it keeps — once. */
+  // The chats that came in on a door without commands (the bot's contact inbox): their welcome does not say "typ /help".
+  const slashless = new Set();
+  async function greetOnce(chatId, threadId) {
+    if (!threads || !threadId || threads.greeted(threadId)) return;
+    const disclosure = doorDisclosure(turnLogMode, t);
+    const welcome = slashless.has(String(chatId)) ? t('circle.bot.welcome_talk') : t('circle.bot.welcome');
+    // what this bot does for THIS person (their role's tools, the household's settings), when the door derives it
+    let derived = [];
+    if (typeof welcomeFor === 'function') {
+      try { derived = (await welcomeFor({ threadId, ...personOps(threadId) })) ?? []; } catch { derived = []; }
+    }
+    await say(chatId, [welcome, ...derived, ...(disclosure ? [disclosure] : [])].join('\n'));
+    threads.markGreeted(threadId);
+  }
+
   /** Continue a pending follow-up or confirmation with this line; false when nothing was pending. */
-  async function continuePending(chatId, text) {
-    const pend = pending.get(chatId);
+  async function continuePending(chatId, threadId, text) {
+    const pend = pending.get(threadId);
     if (!pend) return false;
     if (pend.kind === 'confirm') {
       if (text !== CONFIRM_YES && text !== CONFIRM_NO) return false;   // something else — leave the confirm standing
-      pending.delete(chatId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
+      pending.delete(threadId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
       if (text === CONFIRM_YES) await run(chatId, pend.ready);
       return true;
     }
-    if (text.startsWith('/')) { pending.delete(chatId); return false; }   // a new command cancels the ask
-    pending.delete(chatId); note(chatId, { via: 'form' });
+    if (text.startsWith('/')) { pending.delete(threadId); return false; }   // a new command cancels the ask
+    pending.delete(threadId); note(chatId, { via: 'form' });
     // The answer is typed the way people say it ("boodschappen"): an enum field takes its declared value.
     if (pend.p.kind === 'single') { await run(chatId, coerceEnums(completeFollowUp({ pending: pend.p, text }))); return true; }
     // multi: one field per line, in order
@@ -271,7 +378,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const next = p.fields[Object.keys(p.values).length];
     p.values[next.name] = text;
     if (Object.keys(p.values).length < p.fields.length) {
-      pending.set(chatId, pend);
+      pending.set(threadId, pend);
       await say(chatId, p.fields[Object.keys(p.values).length].label);
       return true;
     }
@@ -284,23 +391,70 @@ export function createTelegramRunner({ bridge, callSkill, catalogue, manifestsBy
     const chatId = String(msg?.chatId ?? '');
     const text = String(msg?.text ?? '').trim();
     if (!chatId || !text) return;
-    if (!open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
-    await engine.ask(threadFor(chatId), text, { chatId });
+    // A door that admits people decides who may talk (a code, its bootstrap ids); without one, the chat allow-list.
+    if (typeof admit !== 'function' && !open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
+    // Who is asking: the person, not the chat (a group chat holds several). No admission, no turn.
+    let caller = null;
+    if (typeof admit === 'function') {
+      let r = null;
+      try {
+        r = await admit({
+          channel: msg?.channel ?? 'telegram', uid: String(msg?.sender?.bridgeUid || chatId),
+          displayName: msg?.sender?.displayName ?? null, text,
+          ...(typeof msg?.admission === 'string' ? { admission: msg.admission } : {}),
+        });
+      } catch { r = null; }
+      // Refused: the reason, and nothing else — never the chat's id.
+      if (r && typeof r === 'object' && r.refused) {
+        // A door that tells a stranger once (the bot's inbox): "you need a code" the first time, kept on their row, then
+        // silence. A message that carried a code is told why it failed, every time: that is a new question.
+        if (msg?.refuseOnce && threads && r.id && r.refused === 'needs-code') {
+          if (threads.refused(r.id)) return;
+          threads.markRefused(r.id);
+        }
+        await say(chatId, t(`circle.bot.admission_${String(r.refused).replace(/-/g, "_")}`));
+        return;
+      }
+      caller = typeof r === 'string' ? r : (r && typeof r === 'object' ? r.id : null);
+      if (!caller) { await say(chatId, t('circle.telegram.unknown')); return; }
+      // The line was the code that admitted them: the welcome, and nothing to dispatch.
+      if (r && typeof r === 'object' && r.consumed) {
+        if (threads) await greetOnce(chatId, caller); else await say(chatId, t('circle.bot.welcome'));
+        return;
+      }
+    }
+    // A person who writes can be written to again: a kept refusal (the bot could not start a chat with them) is cleared.
+    if (caller && threads && typeof threads.clearUnreachable === 'function') threads.clearUnreachable(caller);
+    // The thread is the PERSON's when the door admits people (their contact id), so what one said is never another's
+    // memory, in a group chat too; without admission, the chat's.
+    await engine.ask(caller ?? threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
   }
 
   // The bridge is let go as soon as the line is in its lane: a long-polling bridge fetches the next updates only when
   // the handler returns, so holding it for the whole turn would keep the chat's next quick line (and every other
   // chat) waiting, and the lane could never gather or run anything side by side. Replies go out through `say`.
-  bridge.onMessage((msg) => { handle(msg).catch(() => { /* a turn's error was already told to the chat */ }); });
+  // A line still being ADMITTED is not in a lane yet; `idle` waits for those too, or it would answer "nothing queued".
+  const admitting = new Set();
+  bridge.onMessage((msg) => {
+    if (msg?.slash === false && msg?.chatId) slashless.add(String(msg.chatId));
+    const p = handle(msg).catch(() => { /* a turn's error was already told to the chat */ });
+    admitting.add(p);
+    p.finally(() => admitting.delete(p));
+  });
   return {
     handle,
-    /** Resolves when a chat's turns (every chat's, without an id) are all done. */
-    idle: (chatId) => (engine.idle ? engine.idle(chatId === undefined ? undefined : threadFor(String(chatId))) : Promise.resolve()),
+    /** Resolves when every turn under way is done. */
+    // Every lane, whatever the argument: a person's thread is keyed by who they are, not by the chat they wrote in.
+    idle: async () => {
+      while (admitting.size) await Promise.all([...admitting]);
+      return engine.idle ? engine.idle() : undefined;
+    },
     start: () => bridge.start(),
     stop:  () => bridge.stop(),
     /** test seam: the memory lines for a thread. */
     recentTurns: (threadId) => engine.recentTurns(threadId),
     /** test seam: is a follow-up or confirmation pending for this chat? */
-    pendingFor: (chatId) => pending.get(String(chatId))?.kind ?? null,
+    /** test seam: is a follow-up or confirmation pending — for a thread id, or a chat's own thread? */
+    pendingFor: (id) => (pending.get(String(id)) ?? pending.get(threadFor(String(id))))?.kind ?? null,
   };
 }

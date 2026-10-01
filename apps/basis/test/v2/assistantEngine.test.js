@@ -98,6 +98,28 @@ describe('createAssistantEngine', () => {
     expect(interpretHintsFor('add some milk to the list please')).toContain('The member wrote in: en.');
     expect(interpretHintsFor('maii')).toEqual([]);
   });
+  it('a thread\'s own hints reach the model below the language line; and it acts on the newest message only', async () => {
+    const seen = [];
+    const interpret = async (text, o) => { seen.push(o); return null; };
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: () => {}, llm, interpret, lang: 'nl', onNoMatch: () => {},
+      threadHints: (id) => (id === 'member-thread' ? ['only the admin makes lists'] : []) });
+    await e.ask('member-thread', 'maak een nieuwe lijst: cadeaus');
+    expect(seen[0].hints).toEqual(['The member wrote in: nl.', 'only the admin makes lists']);
+    expect(seen[0].system).toContain("act on the member's NEWEST message");
+    // a short answer answers the bot's own last question; an offer is only of what a tool can do
+    expect(seen[0].system).toContain("answers YOUR OWN last question");
+    expect(seen[0].system).toContain("Offer only what a tool can do");
+    await e.ask('other', 'maak een nieuwe lijst: cadeaus');
+    expect(seen[1].hints).toEqual(['The member wrote in: nl.']);
+  });
+  it('a door\'s expand reaches the dispatcher: one chosen add becomes the adds it stands for', async () => {
+    const dispatched = [];
+    const interpret = async () => ({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk en kaas' } });
+    const e = createAssistantEngine({ collectMs: 0, catalogue, dispatch: (i) => { dispatched.push(i.args.text); }, llm, interpret, onNoMatch: () => {},
+      expand: (c) => c.args.text.split(' en ').map((text) => ({ ...c, args: { ...c.args, text } })) });
+    await e.ask('t', 'melk en kaas graag');
+    expect(dispatched).toEqual(['melk', 'kaas']);
+  });
 
   it('three items named → three dispatches in one turn (the interpreter\'s `more`)', async () => {
     const dispatched = [];

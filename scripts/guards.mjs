@@ -25,8 +25,13 @@ for (const f of lints) {
   results.push({ name: f.replace(/^lint-|\.mjs$/g, ''), ok: r.status === 0, out: (r.stdout + r.stderr).trim() });
 }
 // The guards' own self-tests — a guard whose test is red is not a guard.
-const vt = spawnSync('npx', ['vitest', 'run', 'scripts/', '--reporter=dot'], { cwd: ROOT, encoding: 'utf8' });
-results.push({ name: 'guard-self-tests', ok: vt.status === 0, out: (vt.stdout + vt.stderr).split('\n').slice(-6).join('\n') });
+// One file at a time: several self-tests write fixture files INTO the tree (a guard scans the real tree), and others
+// run a guard on the tree at the same moment — in parallel that went red now and then, green alone. ~25 s slower.
+const vt = spawnSync('npx', ['vitest', 'run', 'scripts/', '--reporter=dot', '--no-file-parallelism'], { cwd: ROOT, encoding: 'utf8' });
+// On red, say WHICH test failed (the FAIL lines), not only the tail — a flake that names no test cannot be chased.
+const vtOut = (vt.stdout + vt.stderr).split('\n');
+const failed = vtOut.filter((l) => /\bFAIL\b|AssertionError|Error:/.test(l)).slice(0, 12);
+results.push({ name: 'guard-self-tests', ok: vt.status === 0, out: [...failed, ...vtOut.slice(-6)].join('\n') });
 
 let red = 0;
 console.log('\n── guards ─────────────────────────────────────────────');

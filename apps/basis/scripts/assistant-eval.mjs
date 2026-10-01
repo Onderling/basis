@@ -12,7 +12,7 @@
  *   node scripts/assistant-eval.mjs                 # real route (needs ~/.privatemode-apikey)
  *   node scripts/assistant-eval.mjs --model gpt-oss-120b
  *   node scripts/assistant-eval.mjs --only add        # fixtures whose id contains "add"
- *   node scripts/assistant-eval.mjs --apps household,lists,tasks   # the bot's app list (default: the box's)
+ *   node scripts/assistant-eval.mjs --apps lists   # the bot's app list (default: the household template's — lists, tasks)
  *   node scripts/assistant-eval.mjs --from-log ~/.basis-telegram/walk-log-*.jsonl   # print fixture stubs from a walk
  *
  * Exit code 1 when the pass rate is under --min (default 0.85). Fixtures: scripts/assistant-eval.fixtures.mjs.
@@ -21,6 +21,9 @@ import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
+import { scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
+import { listsGateRules } from '../src/v2/circleGate.js';
+import { HOUSEHOLD_TEMPLATE, templateLists, promptLinesFor, expandAdds } from '../src/v2/householdTemplate.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';
@@ -43,8 +46,18 @@ if (values['from-log']) {
   process.exit(0);
 }
 
-// The catalogue the box's Telegram door hands its model: composed the same way, from the same app list.
-const { catalogue } = composeAssistantCatalogue({ apps: values.apps ? values.apps.split(',') : undefined });
+// What the household bot's door hands a MEMBER's model: the bot's slim map over its plugins (lists, tasks — the
+// template's), the template's words about its lists, and the deterministic gate that speaks the lists. Composed the
+// way the box composes a function profile (`bin/device-runner.mjs`).
+// The template's list names as the box says them: read from the Dutch bundle, not a copy of its own.
+const NL = JSON.parse(readFileSync(new URL('../src/locales/circle.nl.json', import.meta.url), 'utf8'));
+const tNl = (key) => {
+  const v = key.replace(/^circle\./, '').split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), NL);
+  return typeof v === 'string' ? v : (v && typeof v.text === 'string' ? v.text : key);
+};
+const { catalogue: botCatalogue } = composeAssistantCatalogue({ apps: values.apps ? values.apps.split(',') : [...HOUSEHOLD_TEMPLATE.apps], slim: true });
+const catalogue = scopeCatalogueToRole(botCatalogue, 'member');
+const gateRulesFor = (lang) => listsGateRules(lang, templateLists(tNl));
 let llm = null;
 if (!values.mock) {
   const { privatemodeProvider, readPrivatemodeKey } = await import('@onderling/llm-client/providers/privatemode');
@@ -52,7 +65,9 @@ if (!values.mock) {
   if (!readPrivatemodeKey()) { console.error('assistant-eval: no Privatemode key — pass --mock or add ~/.privatemode-apikey'); process.exit(2); }
   llm = new LlmClient({ provider: await privatemodeProvider({ model: values.model || undefined, timeoutMs: 60_000 }) });
 } else {
-  llm = { invoke: async () => ({ toolCall: null, replyText: 'Welke lijst bedoel je?' }) };
+  // the same stand-in the browser specs use (llm-client's mockProvider), behind the real client
+  const { LlmClient, mockProvider } = await import('@onderling/llm-client');
+  llm = new LlmClient({ provider: mockProvider({ responses: [{ replyText: 'Welke lijst bedoel je?' }] }) });
 }
 
 const fixtures = FIXTURES.filter((f) => !values.only || f.id.includes(values.only));
@@ -61,14 +76,24 @@ for (const f of fixtures) {
   const dispatched = [];
   const replies = [];
   let modelCalls = 0;
+  let peeked = null;   // a read the model picked first and the turn looked at (the box's read-then-act step)
   const counted = { invoke: (req) => { modelCalls += 1; return llm.invoke(req); } };
   const engine = createAssistantEngine({
     // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
     catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm: counted, interpret: interpretToCommand,
+    promptLines: promptLinesFor(tNl), gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
     // A one-line fixture does not wait for the collect window (its time is the model's); lines sent at once do.
     ...(f.lines ? {} : { collectMs: 0 }),
-    loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'shopping', text })),
+    // the bot's retrieval shape (`loadListItems`): an entry, with its list
+    // (an item that names its list — "lamp vervangen (Klusjes)" — keeps it; one that does not is a Boodschappen entry)
+    loadItems: async () => (f.items ?? []).map((text, i) => ({ id: `i${i}`, type: 'list-item', text: /\([^)]+\)\s*$/.test(text) ? text : `${text} (Boodschappen)` })),
     dispatch: (input) => { dispatched.push(input); },
+    // As the box: a read the model picks first is looked at (here: the fixture's entries, with their ids) and handed
+    // back once; the member's thread names the admin's tools.
+    peek: async (cmd) => { peeked = cmd.opId; return { payload: { items: (f.items ?? []).map((text, i) => ({ id: `i${i}`, label: text })) } }; },
+    // with the door's translator, as the box hands it: the model is given the refusal sentence itself
+    threadHints: () => roleHintsFor('member', tNl),
+    expand: expandAdds({ t: tNl }),
     onUnhandled: async () => 'hint', onLlmUnavailable: () => replies.push('__unavailable'),
     onNoMatch: (_t, _c, extra) => replies.push(extra?.reply || '__unknown'),
   });
@@ -84,12 +109,15 @@ for (const f of fixtures) {
   const got = dispatched[0] ? { op: dispatched[0].opId, args: dispatched[0].args ?? {} } : (replies[0] ? { reply: replies[0] } : null);
   let verdict = judge(f.expect, got, dispatched.length);
   if (verdict.ok && f.lines && modelCalls > 1) verdict = { ok: false, why: `${modelCalls} model calls, wanted one turn` };
-  results.push({ id: f.id, text, via, ms, got, ok: verdict.ok, why: verdict.why });
-  console.log(`${verdict.ok ? '✓' : '✗'} ${f.id.padEnd(22)} ${String(ms).padStart(5)}ms ${via.padEnd(15)} ${text.slice(0, 48).padEnd(48)} → ${verdict.ok ? describe(got) : `${describe(got)}  (wanted ${describe(f.expect)}) ${verdict.why}`}`);
+  results.push({ id: f.id, text, via, ms, got, ok: verdict.ok, why: verdict.why, readFirst: Boolean(peeked) });
+  console.log(`${verdict.ok ? '✓' : '✗'} ${f.id.padEnd(22)} ${String(ms).padStart(5)}ms ${(peeked ? `${via}·read` : via).padEnd(15)} ${text.slice(0, 48).padEnd(48)} → ${verdict.ok ? describe(got) : `${describe(got)}  (wanted ${describe(f.expect)}) ${verdict.why}`}`);
 }
 const pass = results.filter((r) => r.ok).length;
 const rate = results.length ? pass / results.length : 0;
 console.log(`\n${pass}/${results.length} passed (${Math.round(rate * 100)}%) · model ${values.mock ? 'mock' : (values.model || 'default')} · median ${median(results.map((r) => r.ms))} ms`);
+// What the read-before-act step costs: the turns whose first pick was a read (one more model call each).
+const readFirst = results.filter((r) => r.readFirst);
+console.log(`read-first turns: ${readFirst.length}/${results.length}${readFirst.length ? ` (${readFirst.map((r) => r.id).join(', ')})` : ''}`);
 process.exit(rate >= Number(values.min) ? 0 : 1);
 
 function judge(expect, got, n) {
@@ -108,6 +136,7 @@ function judge(expect, got, n) {
       if (re ? !re.test(String(g ?? '')) : String(g ?? '').toLowerCase() !== String(v).toLowerCase()) return { ok: false, why: `arg ${k}=${JSON.stringify(g)}` };
     }
     if (expect.count && n < expect.count) return { ok: false, why: `${n} call(s), wanted ${expect.count}` };
+    if (expect.exact && n !== (expect.count ?? 1)) return { ok: false, why: `${n} call(s), wanted exactly ${expect.count ?? 1}` };
     return { ok: true, why: '' };
   }
   if (expect.reply) {

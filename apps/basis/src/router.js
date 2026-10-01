@@ -221,6 +221,8 @@ export function resolveDispatch(parseResult, catalogue) {
       kind: 'needsConfirm',
       severity: confirm.severity,
       message:  confirm.message,
+      // the message's locale key, when the op names one — the surface says it in the person's words
+      ...(typeof confirm.messageKey === 'string' && confirm.messageKey ? { messageKey: confirm.messageKey } : {}),
       opId,
       args: boundArgs,
       appOrigin,

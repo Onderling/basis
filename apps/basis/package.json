@@ -50,10 +50,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "coverage": "node scripts/surface-coverage.mjs",
+    "coverage": "node scripts/surface-coverage.mjs > docs/surface-coverage.md",
     "device": "node bin/device-runner.mjs"
   },
   "dependencies": {
+    "@onderling/notifier": "workspace:*",
     "@inrupt/solid-client": "^3.0.0",
     "@inrupt/solid-client-authn-browser": "^2.4.0",
     "@onderling-app/agents": "workspace:*",

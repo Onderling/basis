@@ -20,8 +20,11 @@
  * Env:
  *   ONDERLING_RELAY_URL      the relay to dial. Absent → local-only (no wire; useful for a first boot)
  *   BASIS_VAULT_PASSPHRASE   the vault key; absent → one is generated once beside the vault
- *   TG_BOT_TOKEN             optional — also answer on Telegram (or ~/.canopy-tg-token)
- *   TG_ALLOWED_CHAT_IDS      which chats may use it; unset/'*' is an OPEN DOOR
+ *   TG_BOT_TOKEN             optional — also answer on Telegram (from the environment only; empty = no Telegram)
+ *   TG_ALLOWED_CHAT_IDS      Telegram ids let in without a code (a bootstrap); everyone else needs an admin's code
+ *   ONDERLING_PROFILE_KIND   `function` on a household bot's own node: its profile is the bot's, its inbox a door
+ *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
+ *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            optional — the web app, so a printed enrolment offer is also a link
  *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
@@ -30,14 +33,14 @@
  *                            lands HERE and not on the phone. The headless form of the tap on Mij / My data;
  *                            enrolling alone never makes a box primary. Claimed once per start, carried to the siblings.
  *
- * Flags: --data-dir · --lang · --walk-log · --show-offer (print an add-a-device offer and exit) ·
+ * Flags: --data-dir · --lang · --walk-log · --walk-log-turns off|redacted|full (default off) · --show-offer (print an add-a-device offer and exit) ·
  *        --enrol (phone-first: paste the phone's offer, type the phrase, exit; then start as usual)
  *
  * The recovery phrase is NEVER read from the environment or a file here. A device is enrolled by a
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
  * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -50,8 +53,24 @@ import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
+import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
+import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
+import { withAssistantOps } from '../src/v2/assistantOps.js';
+import { createBotAdmission } from '../src/v2/botAdmission.js';
+import { createInboxDoor } from '../src/v2/inboxDoor.js';
+import { createPersonReach } from '../src/v2/doorReach.js';
+import { createReminderTick } from '../src/v2/botReminderTick.js';
+import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
+import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
+import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
+import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom } from '../src/v2/botSettings.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
+import { listsGateRules } from '../src/v2/circleGate.js';
+import { multiplexBridges } from '../src/v2/doorBridges.js';
+import { turnLogFor } from '../src/v2/turnLog.js';
 import { buildAssistantLlm } from '../src/telegram/assistantLlm.js';
-import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
+import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 
 import { EventLog } from '../src/eventLog.js';
@@ -79,8 +98,11 @@ import { runPendingForget } from '../src/v2/enrolForgets.js';
 
 const { values } = parseArgs({ options: {
   'data-dir':   { type: 'string',  default: path.join(homedir(), '.basis-device') },
-  lang:         { type: 'string',  default: 'nl' },
+  // The door's language; the box's .env sets it as ASSISTANT_LANG (roles/assistant.yml).
+  lang:         { type: 'string',  default: process.env.ASSISTANT_LANG || 'nl' },
   'walk-log':   { type: 'string' },
+  // Whether conversation turns go into the walk log: off (default) · redacted · full.
+  'walk-log-turns': { type: 'string' },
   'show-offer': { type: 'boolean', default: false },
   enrol:        { type: 'boolean', default: false },
 } });
@@ -179,7 +201,13 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // device is in, which devices the person has), the item store (rosters, contacts, the trail) and the
 // settings were memory, and a restart — every deploy of a box — came back to no circles at all. The
 // same descriptors the web app passes, with a file where it has an IndexedDB store.
+// A household bot's install (a function profile) runs its tasks engine in its household circle, so a task on one of its
+// lists is the engine's — one store per circle. A person's node keeps its tasks where they are. (The profile record is
+// only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
+const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
+  // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
+  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -197,7 +225,8 @@ const agent = await createRealHouseholdAgent({
   seedHousehold: false,
   enrollOfferStorage: offerStash,
 });
-const callSkill = (app, op, args) => agent.callSkill(app, op, args);
+// `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
+const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
 
 // The walk log — one JSON line per event, so a run can be read afterwards rather than retold.
 // `--walk-log` names a FILE (stamped before its extension) or a DIRECTORY (a trailing slash, or one that
@@ -303,6 +332,8 @@ if (values.enrol) { process.exit(await enrolOnce()); }
 
 // ── The wire ────────────────────────────────────────────────────────────────────────────────────
 let contactChannel = null;
+// The bot's inbox door (a function profile only), late-bound: the contact channel is composed below, the door after it.
+let inboxDoor = { bridge: null, feed: () => false };
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
@@ -445,9 +476,18 @@ if (relayUrl) {
   // on the maker's web app under a key its Contacten row never opened).
   const landTurn = ({ fromAddr, text, buttons, messageId, replyTo, ts }) => {
     const contactId = agent.identityOfAddress?.(fromAddr) ?? fromAddr;
-    contactChannel.persistInbound({ contactId, fromAddr, text, buttons, messageId, replyTo, ts })
-      ?.then((r) => { if (!r?.deduped) walkLog({ kind: 'contact-turn', from: String(fromAddr).slice(0, 12), text }); })
+    return contactChannel.persistInbound({ contactId, fromAddr, text, buttons, messageId, replyTo, ts })
+      ?.then((r) => { if (!r?.deduped) walkLog({ kind: 'contact-turn', from: String(fromAddr).slice(0, 12), text }); return r; })
       ?.catch(() => { /* durability is best-effort, as in the shells */ });
+  };
+  // A person's MESSAGE (never a bot's reply: two bots must not answer each other) lands in the inbox like any other,
+  // and on a function profile's node it then goes to the assistant.
+  const landMessage = (m) => {
+    const landed = landTurn(m);
+    Promise.resolve(landed).then((r) => {
+      if (r?.deduped) return;
+      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId });
+    }).catch(() => {});
   };
 
   // The redeem pair (the join's wire), as both shells wire it — here for the pair roster: the box founds or joins
@@ -474,7 +514,7 @@ if (relayUrl) {
     handlers: {
       ...lanes.handlers,
       [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
-      [contactChannel.subtypes.out]: contactChannel.messageHandler(landTurn),
+      [contactChannel.subtypes.out]: contactChannel.messageHandler(landMessage),
       // A join request — for the box, a contact joining the pair circle it founded: admit, promote to co-admin
       // (the pair roster's rule), return the box's proven per-circle address, hand the circle the newcomer's.
       'group-redeem-request': makeHandleGroupRedeemRequest({
@@ -626,40 +666,224 @@ if (relayUrl) {
 }
 
 // ── Telegram, only if a token is here ───────────────────────────────────────────────────────────
-const tgToken = (() => {
-  if (process.env.TG_BOT_TOKEN) return process.env.TG_BOT_TOKEN.trim();
-  try { return readFileSync(path.join(homedir(), '.canopy-tg-token'), 'utf8').trim(); } catch { return null; }
-})();
+// From the environment only: a file in the home folder once handed a developer's local run the LIVE bot's token.
+const tgToken = String(process.env.TG_BOT_TOKEN ?? '').trim() || null;
+// ── Whose node this is: a bot's install names its profile a function's, once (refused on a person's profile) ────
+if (String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function') {
+  try { await agent.markFunctionProfile(); } catch (err) { console.warn(`device-runner: ${err?.message ?? err}`); }
+}
+// The bot's inbox door follows the profile: a person's node never answers its inbox.
+if (contactChannel) {
+  inboxDoor = await createInboxDoor({ profileKind: () => agent.profileKind(), sendTurn: (turn) => contactChannel.sendTurn(turn) });
+}
+
+// ── The assistant: its doors (Telegram, the bot's inbox), ONE engine behind them ─────────────────────────────
 let tgRunner = null;
-if (tgToken) {
-  const { TelegramBridge } = await import('@onderling/chat-agent/bridges/telegram');
-  const raw = String(process.env.TG_ALLOWED_CHAT_IDS ?? '').trim();
-  const allowedChatIds = raw && raw !== '*' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : '*';
-  if (allowedChatIds === '*') console.warn('device-runner: OPEN TELEGRAM DOOR — no TG_ALLOWED_CHAT_IDS, every chat is admitted');
+if (tgToken || inboxDoor.bridge) {
+  const { TelegramBridge } = tgToken ? await import('@onderling/chat-agent/bridges/telegram') : {};
+  // Who gets in without a code: the admin named at start and a configured allow-list (the bootstrap). Everyone else
+  // needs a code the admin hands out (`/cohort`, `/invite`). There is no open door any more.
+  const adminUid = String(process.env.TG_ADMIN_UID ?? '').trim() || null;
+  const bootstrapUids = [adminUid, ...String(process.env.TG_ALLOWED_CHAT_IDS ?? '').split(',')]
+    .map((s) => String(s ?? '').trim()).filter((s) => s && s !== '*');
 
   // Scope, then interpret: the apps this bot acts in are the owner's setting, read at boot, and the catalogue
   // every surface of the door projects — the model's tools included — holds only theirs.
-  const { catalogue, manifestsByOrigin, apps } = composeAssistantCatalogue({ apps: agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY), householdManifest: agent.manifest });
+  // The admin switches apps from the door (`/apps on tasks`): the parameter is written and the catalogue recomposed.
+  const isFunctionProfile = (await agent.profileKind?.()) === 'function';
+  const doorCatalogue = createDoorCatalogue({
+    householdManifest: agent.manifest,
+    // A household bot composes exactly its map (`botOpMap.js`); a person's box its app list, as before.
+    slim: isFunctionProfile,
+    getApps: () => agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY),
+    setApps: (list) => callSkill('params', 'set-param', { key: ASSISTANT_APPS_PARAM_KEY, value: list }),
+  });
+  const apps = doorCatalogue.apps();
   // The model is the optional half of this optional half: a key without its SDK is a warning and a
   // Telegram that answers without a model, never a device that is not there.
-  const built = await buildAssistantLlm({ model: process.env.PRIVATEMODE_MODEL });
+  const built = await buildAssistantLlm({
+    model: process.env.PRIVATEMODE_MODEL,
+    // One retry on the fallback model after a timeout — said in the walk log, so a slow route is visible.
+    onFallback: (e) => walkLog({ kind: 'llm-fallback', ...e }),
+  });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
+  // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
+  const tgBridge = tgToken ? new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }) : null;
+  // the household's reminder settings as the admin set them (the welcome says them; the tick obeys them)
+  const reminderSettings = () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)) });
+  const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
+  // Every person is a contact with a role, and their calls carry them to the host gate.
+  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
+  // Admission by code: the signing secret in the bot's sealed vault, the cohort and spent codes in a sealed store.
+  const admission = createBotAdmission({
+    secretVault: chatVault,
+    store: dataSourceRowStore(await stores.botAdmissionSource(), 'mem://basis/bot-admission/'),
+  });
+  // The door's admission, once: who is let in, their tier in the gate, and the role their thread's tools follow.
+  const doorAdmit = createDoorAdmit({ users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller });
+  // Everyone in the book is in the gate from the start: the reminder tick and the Sunday overview act AS a person, and
+  // after a restart nobody has written yet. A book the gate cannot take is said, not fatal (the door still tiers on the
+  // next message).
+  const inGate = await doorAdmit.atStart().catch((e) => { console.warn(`device-runner: could not put the bot's people in the gate at start: ${e?.message ?? e}`); return null; });
+  walkLog({ kind: 'gate-at-start', people: inGate });
+  // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
+  // console, never a chat or the walk log) — the first person admitted is the bot's admin.
+  let bootstrapCode = null;
+  if (!bootstrapUids.length && !(await botUsers.list()).some((u) => u.role === 'admin')) {
+    await admission.openCohort({ ceiling: 1, days: 1 });
+    bootstrapCode = await admission.code();
+    console.log(`device-runner: this bot has no admin yet — send it, within a day:  /start ${bootstrapCode}`);
+  }
+  // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
+  const threads = createBotThreads({
+    eventLog: deviceLog,
+    store: dataSourceRowStore(await stores.botThreadsSource()),
+    memoryDefault: () => agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY),
+  });
+  await threads.load();
+  // The door's call: the assistant's own ops answered here (each after the host gate), the rest on to the agent — the
+  // same call a typed line and a scheduled overview take.
+  // The household's export (the one format kept readable across versions): one a night into the bot's data dir, the
+  // last few kept, so the box's snapshot carries it off; the admin reads one back with /import.
+  const exportsDir = path.join(dataDir, 'exports');
+  // An unlocked export key does not outlive its hour (an admin who unlocked and then said No, or never imported):
+  // removed when it is read past its time, and swept every minute.
+  const sweepUnlocked = () => {
+    const p = path.join(dataDir, UNLOCKED_KEY_FILE);
+    try { if (!unlockedSecret(readFileSync(p, 'utf8'))) rmSync(p, { force: true }); } catch { /* none */ }
+  };
+  sweepUnlocked();
+  setInterval(sweepUnlocked, 60_000).unref?.();
+  const exportShelf = createExportShelf({
+    files: {
+      list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
+      // written whole or not at all: a crash mid-write leaves a temp file, never a cut-off export under its own name
+      write: async (name, text) => {
+        mkdirSync(exportsDir, { recursive: true, mode: 0o700 });
+        const tmp = path.join(exportsDir, `.${name}.tmp`);
+        writeFileSync(tmp, text, { mode: 0o600 });
+        renameSync(tmp, path.join(exportsDir, name));
+      },
+      read: async (name) => readFileSync(path.join(exportsDir, name), 'utf8'),
+      remove: async (name) => rmSync(path.join(exportsDir, name), { force: true }),
+    },
+    exportNow: async () => {
+      // beside it, the bot's own recovery file (its circles and their members, sealed to its recovery phrase — the
+      // existing carrier): one snapshot of the folder then holds all a restore needs besides the phrase
+      try {
+        const rec = await callSkill('household', 'exportRecoveryFile', {});
+        if (rec?.ok && typeof rec.file === 'string') { mkdirSync(exportsDir, { recursive: true, mode: 0o700 }); writeFileSync(path.join(exportsDir, 'recovery-file.txt'), rec.file, { mode: 0o600 }); }
+      } catch { /* the export goes on without it */ }
+      return exportFromHost({
+        items: () => agent.householdItems(),
+        people: () => botUsers.list(),
+        params: async () => (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? [],
+      });
+    },
+    // sealed to the admin's export key once one is set (`bin/export-key.mjs set`, on the box)
+    // no key set → plain; a key that cannot be read (permissions, a cut-off file) → the write FAILS, never goes out plain
+    sealWith: async () => {
+      let text;
+      try { text = readFileSync(path.join(dataDir, EXPORT_KEY_FILE), 'utf8'); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; }
+      return JSON.parse(text);
+    },
+    onWritten: (e) => walkLog({ kind: 'export', ok: e.ok, sealed: Boolean(e.sealed), ...(e.name ? { name: e.name } : {}), ...(e.error ? { error: e.error } : {}) }),
+  });
+  const doorCall = withAssistantOps({
+    callSkill, threads, t, refusal: agent.doorRefusal,
+    admin: {
+      catalogue: doorCatalogue,
+      users: () => botUsers.list(),
+      admission,
+      revoke: (who) => botUsers.revoke(who),
+      setRole: (who, role) => botUsers.setRole(who, role),
+      exports: exportShelf,
+      // a sealed file opens with the key the admin unlocked on the box (`bin/export-key.mjs unlock`); the import closes it
+      unlockedKey: async () => { sweepUnlocked(); try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
+      lockKey: async () => rmSync(path.join(dataDir, UNLOCKED_KEY_FILE), { force: true }),
+      // the file's things written back through their own ops, each as its person (the host vouches, as its door does)
+      importFile: (file) => importHousehold(file, { call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller }),
+      // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
+      inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
+      status: async () => ({
+        model: llm ? llmModel : null, door: 'codes', turns: turnLogMode ?? 'off',
+        memory: agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY), users: (await botUsers.list()).length,
+        unreachable: (await botUsers.list()).filter((u) => threads.unreachableOf(u.id)).length,
+      }),
+    },
+  });
   tgRunner = createTelegramRunner({
-    bridge: new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }),
-    catalogue,
-    manifestsByOrigin,
-    allowedChatIds, t, callSkill, lang: values.lang,
-    loadItems: loadAssistantItems({ callSkill }),
+    bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
+    catalogue: doorCatalogue.catalogue,
+    manifestsByOrigin: doorCatalogue.manifestsByOrigin,
+    // The door's own ops — a person's memory mode and language, the admin's app list, status and users — are
+    // answered here, each after the host gate said yes at the op's level; the rest go on to the agent.
+    t, lang: values.lang,
+    callSkill: doorCall,
+    admit: doorAdmit,
+    threads,
+    // What the model may draw on: a household bot's list entries, a person's household items.
+    loadItems: isFunctionProfile ? loadListItems({ callSkill }) : loadAssistantItems({ callSkill }),
     ...(llm ? { llm, interpret: interpretToCommand } : {}),
-    walkLog,
+    // Turns go into the walk log only when the operator asks, and then the people in the house are told.
+    walkLog: turnLogFor(turnLogMode, walkLog),
+    turnLogMode,
+    // A household bot: its model is told about its household's lists (the template's words), each person sees their
+    // own tools (a member's or the admin's), and the deterministic gate speaks the lists.
+    ...(isFunctionProfile ? {
+      // the model's lines and the gate's rules, generated from the template's lists (their names, their words)
+      promptLines: promptLinesFor(t),
+      roleFor: (threadId) => doorAdmit.roleOf(threadId),
+      scopeToRole: scopeCatalogueToRole,
+      hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),
+      // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
+      expand: expandAdds({ t }),
+      gateRules: listsGateRules(values.lang, templateLists(t)),
+      // the first message says what this bot does for this person, and how the reminders stand and change
+      welcomeFor: ({ role, ops }) => welcomeLines({ ops, role, lists: templateLists(t), t, settings: reminderSettings() }),
+      // without the model (off, or not answering): what does work, for this person — the word rules and the commands
+      basicHelpFor: ({ ops }) => basicModeLines({ ops, lists: templateLists(t), t }),
+    } : {}),
   });
   await tgRunner.start();
-  walkLog({ kind: 'telegram', door: allowedChatIds === '*' ? 'open' : 'allow-list', llm: llm ? llmModel : null, apps });
+  // A household bot writes first, too: reminders of what people dated, on each person's own door (the tick asks the
+  // projection every few minutes; the household's switch and quiet hours are the admin's settings).
+  if (isFunctionProfile) {
+    const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
+    const reminderTick = createReminderTick({
+      sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
+      tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      settings: reminderSettings,
+      // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
+      onSent: (e) => walkLog({ kind: 'reminder', to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}) }),
+      // the Sunday overview is the weekOverview op asked AS the person — the gate, the role and the names apply
+      overviewFor: async (id) => (await doorCall('assistant', 'weekOverview', {}, { caller: id, threadId: id }))?.message ?? null,
+    });
+    reminderTick.start();
+    exportShelf.start();
+    walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });
+  }
+  // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a
+  // person's node: their circle is theirs, and four lists would appear on every device of theirs.
+  if (isFunctionProfile) {
+    ensureHouseholdLists({ callSkill, t })
+      .then(async (made) => {
+        // Every start: the template's plugins are in the bot's app list (lists hold, tasks move, the calendar keeps the
+        // Agenda) — also on a bot whose list was set before the template grew; the owner's own apps stay.
+        const next = withTemplateApps(doorCatalogue.apps());
+        if (next) await doorCatalogue.setApps(next).catch(() => {});
+        if (made.length || next) walkLog({ kind: 'household-template', lists: made.length, apps: next ?? doorCatalogue.apps() });
+      })
+      .catch((err) => console.warn(`device-runner: the household lists were not made (${err?.message ?? err})`));
+  }
+  if (bootstrapCode && tgBridge?.botUsername) console.log(`device-runner: …or open  https://t.me/${tgBridge.botUsername}?start=${bootstrapCode}`);
+  walkLog({ kind: 'assistant', doors: [tgBridge ? 'telegram' : null, inboxDoor.bridge ? 'inbox' : null].filter(Boolean), admission: 'codes', bootstrap: bootstrapUids.length, llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
 }
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────
 const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null);
-walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken });
+// `clock`: the zone the household's times are read and shown in (the role's TZ; a bare container is UTC).
+walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);

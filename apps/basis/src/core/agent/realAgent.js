@@ -717,6 +717,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   const primaryDeviceRef = { current: null };
   const sa = await createSecureMeshAgent({
     bus,
+    // Other agents' kernel task requests over the relay (a connected screen calling the door's ops): only where the
+    // composition asks — a household bot. A person's agent takes none until its door allows only lane-active tokens.
+    ...(opts.acceptPeerSkillCalls ? { acceptPeerSkillCalls: opts.acceptPeerSkillCalls } : {}),
     vault:               chatVault,
     primaryDevice:       () => primaryDeviceRef.current?.isMine() === true,
     identityVaultPrefix: 'cc-chat-id:',   // no effect when `vault` is supplied; documents the prefix

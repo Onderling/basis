@@ -5,11 +5,13 @@
  * The person asks for `/scherm` and gets a one-time link; the screen sends its offer (its key, the link's nonce) to
  * the bot's address; the bot grants that key the person's role column, each token signed by the bot and acting as the
  * person, delivers it to the screen, and tells the person in their own chat. The same nonce a second time is not
- * granted again.
+ * granted again. Then the screen ACTS: a second screen, a full agent as a browser view is, calls the bot's ops with the tokens it was
+ * granted (the kernel's own task exchange, carried on both secure channels): as the person, only the declared
+ * params, refused for a key that was not granted, and refused once the person drops the screen.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +20,7 @@ import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './sup
 import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from '../src/v2/connectionPairing.js';
 import { parseScreenLink } from '../src/v2/botScreens.js';
+import { DataPart } from '@onderling/core';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
@@ -25,6 +28,7 @@ const botSaid = async (node) => (await node.contactThreadChannel.rehydrateAll())
 
 describe('a person connects a screen to the bot over the relay', () => {
   let relay; let dataDir; let child; let out = ''; let ann; let screen;
+  const walkTail = () => { try { const dir = path.join(dataDir, 'walks'); return readdirSync(dir).map((f) => readFileSync(path.join(dir, f), 'utf8')).join('').split('\n').filter((l) => /screen|unrouted/.test(l)).slice(-10).join('\n'); } catch (e) { return `(no walk log: ${e.message})`; } };
 
   beforeAll(async () => {
     relay = await startJourneyRelay();
@@ -98,4 +102,50 @@ describe('a person connects a screen to the bot over the relay', () => {
     await new Promise((r) => setTimeout(r, 3000));
     expect(screen.received.filter((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE).length).toBe(before);
   }, 150_000);
+
+  it('the screen acts over the relay: as the person, declared params only; another key and a dropped screen are refused', async () => {
+    const card = cardFrom(out);
+    const send = (text) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text }).sent;
+    const seen = (await botSaid(ann)).length;
+    await send('/scherm');
+    const linkLine = await until(async () => (await botSaid(ann)).slice(seen).find((t) => t.includes('#scherm=')) ?? null, { timeout: 30_000, step: 500 });
+    const link = parseScreenLink(/https?:\/\/\S+/.exec(linkLine)[0]);
+
+    // a second screen, a full agent as a browser view is: its own key, its offer, the grant it receives
+    const view = await bootRealAgentNode('screen2');
+    const thief = await bootRealAgentNode('thief');
+    await connectNodesOverRelay([view, thief], { relayUrl: relay.url });
+    try {
+      await view.agent.sendPeerMessage(link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey: view.pubKey, relayUrl: relay.url, nonce: link.nonce }) });
+      const grant = await until(async () => view.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
+      expect(grant, `no grant reached the screen:\n${out.slice(-1500)}`).toBeTruthy();
+      const accepted = acceptConnectionGrant(grant, { nonce: link.nonce, viewPubKey: view.pubKey });
+      expect(accepted.ok).toBe(true);
+      const tokenFor = (skill) => accepted.tokens.find((tk) => tk.skill === skill);
+
+      // acting, over the wire, as the person — with args the op does not declare, which are dropped
+      const call = (node, skill, args, token = tokenFor(skill)) => node.agent.sa.peer.invoke(link.botAddress, skill, [DataPart(args)], { token });
+      const added = await call(view, 'lists.addToList', { list: 'Boodschappen', text: 'over-de-draad', circleId: 'pair-x', actor: 'someone-else' });
+      expect(JSON.stringify(added), `the screen's add came back: ${JSON.stringify(added)}`).toContain('"ok":true');
+      const read = await call(view, 'lists.listEntries', { list: 'Boodschappen' });
+      expect(JSON.stringify(read)).toContain('over-de-draad');
+
+      // another key presenting the same token: refused at the token check (its subject is the screen)
+      await expect(call(thief, 'lists.addToList', { list: 'Boodschappen', text: 'gestolen' }, tokenFor('lists.addToList'))).rejects.toThrow();
+      // an op the token does not name, with another op's token: refused
+      await expect(call(view, 'lists.removeList', { list: 'Reparaties' }, tokenFor('lists.listEntries'))).rejects.toThrow();
+
+      // the person drops the screen: its next call is refused
+      const before = (await botSaid(ann)).length;
+      await send('/schermen');
+      const listed = await until(async () => (await botSaid(ann)).slice(before).find((t) => /\d\./.test(t)) ?? null, { timeout: 20_000, step: 500 });
+      // this screen's row (the first test's is "laptop"; this one has the default label)
+      const n = /^(\d+)\. scherm:/m.exec(listed)?.[1];
+      expect(n, `this screen is not in the list:\n${listed}`).toBeTruthy();
+      await send(`/schermen los ${n}`);
+      await until(async () => ((await botSaid(ann)).slice(before).some((t) => /losgekoppeld|disconnected/i.test(t)) ? true : null), { timeout: 20_000, step: 500 });
+      const after = await call(view, 'lists.addToList', { list: 'Boodschappen', text: 'na-los' }).then((r) => JSON.stringify(r), (e) => `refused: ${e?.message}`);
+      expect(after.includes('"ok":true'), `a dropped screen still acted: ${after}`).toBe(false);
+    } finally { await teardown(view, thief); }
+  }, 180_000);
 });

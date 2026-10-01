@@ -89,5 +89,20 @@ describe('the reminder tick', () => {
     await tick.pass();
     expect(sent).toHaveLength(1);
   });
-});
 
+  it('a person on a door without buttons (the inbox) is told in words how to tick it off', async () => {
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    await threads.load();
+    const sent = [];
+    const webPerson = { id: 'webid:ann', channel: 'web', uid: 'webid:ann', role: 'member' };
+    const tick = createReminderTick({
+      sources: async () => ({ chores: [{ ...vuilnis, assignees: ['webid:ann'] }], events: [] }),
+      users: { list: async () => [webPerson] }, threads, t, tz: TZ,
+      reach: { sendToPerson: async (id, m) => { sent.push({ id, ...m }); return { ok: true }; } },
+      settings: () => ({ reminders: 'on', quiet: '21:00-08:00' }), now: () => new Date('2026-10-02T09:00:00.000Z').getTime(),
+    });
+    await tick.pass();
+    expect(sent[0].text).toContain('circle.bot.reminder_done_words');
+    expect(sent[0].text).toContain('vuilnis');
+  });
+});

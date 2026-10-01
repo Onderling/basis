@@ -206,3 +206,14 @@ describe('a preview the op refuses', () => {
     expect(await confirmPreview({ route, catalogue: lists, call: async () => ({ ok: true, message: 'met 3?' }) })).toEqual({ message: 'met 3?' });
   });
 });
+
+describe('the dialog asks in the person\'s words', () => {
+  it('a confirm with a messageKey is asked with it on web and mobile too (not the English fallback)', async () => {
+    const { calendarManifest } = await import('../../../calendar/manifest.js');
+    const cat = mergeManifests([{ manifest: calendarManifest }]);
+    const route = resolveDispatch({ kind: 'slash', opId: 'cancelEvent', args: { id: 'e1' } }, cat);
+    expect(route.kind).toBe('needsConfirm');
+    const req = confirmRequestFromRoute(route, { t: (k) => (k === 'circle.calendar.cancel_confirm' ? 'Deze afspraak schrappen?' : k) });
+    expect(req.message).toBe('Deze afspraak schrappen?');
+  });
+});

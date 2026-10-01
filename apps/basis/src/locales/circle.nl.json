@@ -664,6 +664,10 @@
       "text": "\"{{title}}\" heeft iemand anders gezet: die kan alleen diegene (of de beheerder) schrappen.",
       "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
     },
+    "cancel_confirm": {
+      "text": "Deze afspraak schrappen?",
+      "doc": "Cancelling an appointment (asked first)."
+    },
     "cancel_admin_only": {
       "text": "Afspraken schrappen doet hier alleen de beheerder.",
       "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
@@ -4204,6 +4208,10 @@
     "welcome_admin": {
       "text": "Je bent beheerder. Met /instellingen regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_done_words": {
+      "text": "Klaar? Stuur: /complete-task {{text}}",
+      "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
     "reminder_done": {
       "text": "Klaar",

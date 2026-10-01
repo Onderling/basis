@@ -52,7 +52,10 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     let sent = 0;
     for (const { personId, items } of due) {
       const first = !threads.remindedOnce(personId);
-      const text = [...items.map(lineOf), ...(first ? [t('circle.bot.reminder_first')] : [])].join('\n');
+      // a door that carries no buttons (the bot's inbox: a contact turn is text) says in words how to tick it off
+      const chore = items.find((i) => i.kind === 'chore');
+      const textOnly = rows.find((r) => r.id === personId)?.channel === 'web';
+      const text = [...items.map(lineOf), ...(textOnly && chore ? [t('circle.bot.reminder_done_words', { text: chore.text })] : []), ...(first ? [t('circle.bot.reminder_first')] : [])].join('\n');
       const buttons = items.filter((i) => i.kind === 'chore').map((i) => ({ id: `completeTask:${i.id}`, label: t('circle.bot.reminder_done') }));
       const r = await reach.sendToPerson(personId, { text, buttons });
       try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null }); } catch { /* a listener never stops the tick */ }

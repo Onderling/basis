@@ -6260,6 +6260,21 @@ export async function createRealHouseholdAgent(opts = {}) {
      * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
      */
     doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /**
+     * Expose skill definitions to peers (from `renderA2A`) after boot: a door that answers as a PERSON builds them over
+     * its own call, which exists only once the door does. Token-gated like the boot-time ones. It never REPLACES a
+     * skill (the registry is last-write-wins): an id already registered — a kernel skill, an op withheld with
+     * `policy: 'never'` — throws, before any of the defs is registered.
+     * @param {Array<{id: string, handler: Function}>} defs
+     * @returns {number} how many were registered
+     */
+    exposeToPeers: (defs) => {
+      const list = (Array.isArray(defs) ? defs : []).filter((def) => def?.id && typeof def.handler === 'function');
+      const taken = list.filter((def) => chatAgent.skills.has(def.id)).map((def) => def.id);
+      if (taken.length) throw new Error(`exposeToPeers: already registered, not replaced: ${taken.join(', ')}`);
+      for (const def of list) chatAgent.skills.register(def.id, def.handler, def);
+      return list.length;
+    },
     /** Every item of the household's circle store, as stored (the export writes its public fields from these). */
     householdItems: async () => (await householdService.stores.getStore(resolveCircleId({})).list()) ?? [],
     /** A household bot's reminders read the household circle's chores and appointments, whole (dates, who comes). */

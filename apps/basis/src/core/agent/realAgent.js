@@ -6258,6 +6258,13 @@ export async function createRealHouseholdAgent(opts = {}) {
      * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
      */
     doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /**
+     * Expose skill definitions to peers (from `renderA2A`) after boot: a door that answers as a PERSON builds them over
+     * its own call, which exists only once the door does. Token-gated like the boot-time ones.
+     * @param {Array<{id: string, handler: Function}>} defs
+     * @returns {number} how many were registered
+     */
+    exposeToPeers: (defs) => { let n = 0; for (const def of Array.isArray(defs) ? defs : []) { if (def?.id && typeof def.handler === 'function') { chatAgent.skills.register(def.id, def.handler, def); n += 1; } } return n; },
     /** Every item of the household's circle store, as stored (the export writes its public fields from these). */
     householdItems: async () => (await householdService.stores.getStore(resolveCircleId({})).list()) ?? [],
     /** A household bot's reminders read the household circle's chores and appointments, whole (dates, who comes). */

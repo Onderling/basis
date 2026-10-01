@@ -1,0 +1,63 @@
+{
+  "folio.syncOnce": {
+    "doc": "Sync the folder once, now.",
+    "verbs": [
+      "sync"
+    ],
+    "examples": [
+      "sync"
+    ]
+  },
+  "folio.watchStart": {
+    "doc": "Start watching the folder for changes.",
+    "verbs": [
+      "watch",
+      "watch folder"
+    ],
+    "examples": [
+      "watch folder"
+    ]
+  },
+  "folio.shareFolder": {
+    "doc": "Share a folder with a contact; the rest of the line is the folder.",
+    "verbs": [
+      "share"
+    ],
+    "dropTrailing": [
+      "with",
+      "to"
+    ],
+    "examples": [
+      "share photos with Bert"
+    ]
+  },
+  "folio.downloadFile": {
+    "doc": "Download a file someone sent you.",
+    "verbs": [
+      "download"
+    ],
+    "examples": [
+      "download budget.xlsx"
+    ]
+  },
+  "folio.saveToMyPod": {
+    "doc": "Save a shared file to your own pod.",
+    "verbs": [
+      "save",
+      "save to my pod"
+    ],
+    "examples": [
+      "save budget.xlsx"
+    ]
+  },
+  "folio.searchNotes": {
+    "doc": "Search your notes; the rest of the line is what to look for.",
+    "verbs": [
+      "search",
+      "find"
+    ],
+    "examples": [
+      "search holiday plans"
+    ]
+  }
+}

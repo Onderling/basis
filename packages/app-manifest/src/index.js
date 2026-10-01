@@ -134,7 +134,7 @@ export { renderChat, matchesAppliesTo as chatMatchesAppliesTo,
   itemRowButtons } from './renderChat.js';
 export { renderSlash } from './renderSlash.js';
 export { renderGate } from './renderGate.js';
-export { gateVerbsOf } from './gateVerbs.js';
+export { gateVerbsOf, gateDropTrailingOf } from './gateVerbs.js';
 export { renderA2A, NEVER_DELEGABLE } from './renderA2A.js';
 export { renderAttachments } from './renderAttachments.js';
 

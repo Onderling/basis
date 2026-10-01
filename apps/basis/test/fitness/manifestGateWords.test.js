@@ -45,6 +45,11 @@ describe('FITNESS: the apps\' gate words', () => {
           expect(typeof e.doc === 'string' && e.doc.length > 5, `${lang} ${id}: doc`).toBe(true);
           expect(Array.isArray(e.verbs) && e.verbs.length > 0, `${lang} ${id}: verbs`).toBe(true);
           expect(Array.isArray(e.examples) && e.examples.length > 0, `${lang} ${id}: examples`).toBe(true);
+          // the doc is for whoever translates (a person or a model): English in every language's file
+          if (m.gateWords.en) expect(e.doc, `${lang} ${id}: the doc is the English one`).toBe(m.gateWords.en[id]?.doc);
+          const drops = matched(m).find((op) => `${app}.${op.id}` === id)?.surfaces.slash.match.dropTrailing;
+          expect(Array.isArray(drops), `${id}: the dropped words are in the files, not on the manifest`).toBe(false);
+          if (e.dropTrailing !== undefined) expect(drops, `${lang} ${id}: words to drop, but the match does not say it drops them`).toBe(true);
         }
       });
 
@@ -69,5 +74,13 @@ describe('FITNESS: the apps\' gate words', () => {
     expect(take(en, 'accepteer tandarts')).toBeNull();
     expect(take(any, 'accept dentist')).toBe('rsvpAccept');
     expect(take(any, 'accepteer tandarts')).toBe('rsvpAccept');
+  });
+
+  it('the connector words a match drops are its language\'s: "met" is a Dutch word, not an English one', () => {
+    const title = (locale, text) => createGate([calendarManifest], { locale }).rules.map((r) => r.command(text)).find(Boolean)?.args?.title;
+    expect(title('en', 'new appointment dentist with Bert')).toBe('dentist');
+    expect(title('nl', 'nieuwe afspraak tandarts met Bert')).toBe('tandarts');
+    expect(title('en', 'schedule dinner met Sarah')).toBe('dinner met Sarah');
+    expect(title('nl', 'plan etentje with Sarah')).toBe('etentje with Sarah');
   });
 });

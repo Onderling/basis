@@ -27,7 +27,7 @@
  *
  * @param {import('./schema.js').Manifest} manifest
  */
-import { gateVerbsOf } from './gateVerbs.js';
+import { gateVerbsOf, gateDropTrailingOf } from './gateVerbs.js';
 
 export function renderSlash(manifest, opts = {}) {
   // Per-locale TRAILING-verb support (opt-in via opts, used by renderGate for the circle bot): an op
@@ -68,7 +68,7 @@ export function renderSlash(manifest, opts = {}) {
       //   dropTrailing — strip a trailing connector clause ("add milk TO THE LIST" → "milk").
       // Both inert unless declared, so household's slash byte-equivalence is untouched.
       arg:          typeof m.arg === 'string' ? m.arg : null,
-      dropTrailing: Array.isArray(m.dropTrailing) && m.dropTrailing.length ? m.dropTrailing : null,
+      dropTrailing: gateDropTrailingOf(manifest, op, trailLocale),
       // Trailing pass — `<body> <verb>` matched at the END ("kaas done"). Verbs come from the
       // per-locale lexicon by the `match.trailing` intent key; SINGLE words only. Empty unless
       // the op declares `trailing` AND a lexicon+locale were supplied.

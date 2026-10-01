@@ -59,10 +59,9 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
-import { renderA2A } from '@onderling/app-manifest';
 import { createBotScreens } from '../src/v2/botScreens.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
-import { screenActsAs, screenColumnFor, BOT_SCREEN_NEVER } from '../src/v2/screenActing.js';
+import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
@@ -841,13 +840,7 @@ if (tgToken || inboxDoor.bridge) {
   if (screens) {
     // The door's ops, to a connected screen: each call runs as the person its token names, through this door's own
     // call — the same gate as their typed line — and what a screen never gets is withheld at the kernel's door.
-    // Only the ops on the bot's map are exposed (any role's), and the withheld ones as `never`: an unmapped op is an
-    // unknown skill to a screen, not one that merely has no token.
-    const mapped = new Set(screenColumnFor(doorCatalogue.catalogue(), 'admin').concat(screenColumnFor(doorCatalogue.catalogue(), 'member'), screenColumnFor(doorCatalogue.catalogue(), 'observer'), BOT_SCREEN_NEVER));
-    const defs = renderA2A(Object.values(doorCatalogue.manifestsByOrigin()), { callSkill: doorCall }, {
-      ctxFor: screenActsAs(botUsers, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER,
-    }).filter((d) => mapped.has(d.id));
-    const exposed = agent.exposeToPeers(defs);
+    const exposed = exposeDoorToScreens({ agent, catalogue: doorCatalogue.catalogue(), manifests: Object.values(doorCatalogue.manifestsByOrigin()), doorCall, users: botUsers });
     screenOffer.handle = async (from, payload) => {
       const offer = parsePairingOffer(payload?.offer);
       const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };

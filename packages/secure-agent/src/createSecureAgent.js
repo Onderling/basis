@@ -2660,6 +2660,8 @@ export async function createSecureAgent(opts = {}) {
       connect: connectPeer,
       sendTo:  sendToPeer,
       invoke:  invokePeer,
+      /** The skills other agents' task requests reach here (`acceptPeerSkillCalls`); [] when the route is off. */
+      callableSkills: () => (peerSkillCalls ? peerSkillCalls.reachableSkills() : []),
       get status()  { return peerState.status;  },
       get address() { return peerState.address; },
       get error()   { return peerState.error;   },

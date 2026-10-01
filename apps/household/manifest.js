@@ -27,6 +27,11 @@
  *           body → `args.text`), for `addTask` and `registerName`.
  */
 
+// The words the deterministic gate starts an op with, per language (the manifest declares the match's shape; the
+// words are data beside it — see `gateVerbsOf` in @onderling/app-manifest).
+import gateEn from './gate.en.json' with { type: 'json' };
+import gateNl from './gate.nl.json' with { type: 'json' };
+
 import { SYSTEM_PROMPT_CLASSIFY } from './src/llm/prompts.js';
 
 const STR_NONEMPTY = { schema: { minLength: 1 } };
@@ -39,6 +44,7 @@ const LIST_TYPES = ['shopping', 'errand', 'repair', 'schedule'];
 /** @type {import('@onderling/app-manifest').__types__} */
 export const householdManifest = {
   app:       'household',
+  gateWords:  { en: gateEn, nl: gateNl },
   // The network hosts this app's code reaches: the language-model providers the household web server
   // can be started with (a local model needs no host). The person's pod is theirs to configure.
   hosts:     ['api.anthropic.com', 'api.openai.com'],
@@ -113,7 +119,6 @@ export const householdManifest = {
         slash: {
           command: '/add',
           match: {
-            verbs:      ['add', 'toevoegen', 'noteer', ['voeg', 'toe']],
             body:       'type+text',
             splitItems: true,
             onEmpty:    { skillId: 'help', args: {} },
@@ -139,7 +144,6 @@ export const householdManifest = {
         slash: {
           command: '/list',
           match: {
-            verbs:   ['list', 'show', 'lijst', 'toon'],
             body:    'type-only',
             onEmpty: { skillId: 'help', args: {} },
           },
@@ -162,8 +166,6 @@ export const householdManifest = {
         slash: {
           command: '/done',
           match: {
-            verbs:      ['done', 'complete', 'bought', 'did', 'finished',
-                         'klaar', 'gedaan', 'gekocht'],
             body:       'match',
             splitItems: true,
             onEmpty:    { skillId: 'help', args: {} },
@@ -185,8 +187,6 @@ export const householdManifest = {
         slash: {
           command: '/remove',
           match: {
-            verbs:      ['remove', 'delete', 'cancel', 'nope',
-                         'verwijder', 'weg'],
             body:       'match',
             splitItems: true,
             onEmpty:    { skillId: 'help', args: {} },
@@ -203,7 +203,7 @@ export const householdManifest = {
         chat:  { hint: 'Print the command list.' },
         slash: {
           command: '/help',
-          match:   { verbs: ['help', 'hulp'], body: 'none' },
+          match:   { body: 'none' },
           // Slash dedup (2026-06-19): `/help` stays for STANDALONE household (the
           // bot + the byte-equivalence grammar + the bare-command fallback
           // target). But in a merged circle the basis SHELL owns the global
@@ -231,7 +231,6 @@ export const householdManifest = {
         slash: {
           command: '/task',
           match: {
-            verbs:      ['task', 'taak'],
             body:       'text-only',                         // F-SP2-a
             splitItems: true,
             onEmpty:    { skillId: 'help', args: {} },
@@ -248,7 +247,7 @@ export const householdManifest = {
         chat:  { hint: 'List open tasks.' },
         slash: {
           command: '/tasks',
-          match: { verbs: ['tasks', 'tasks'], body: 'none' },
+          match: { body: 'none' },
         },
       },
     },
@@ -273,7 +272,6 @@ export const householdManifest = {
           // 2026-06-18; backwards-compat intentionally dropped).
           command: '/grab',
           match: {
-            verbs:   ['grab', 'oppakken'],
             body:    'match',
             onEmpty: { skillId: 'help', args: {} },
           },
@@ -313,7 +311,6 @@ export const householdManifest = {
         slash: {
           command: '/register',
           match: {
-            verbs:   ['register', 'registreer', 'naam'],
             body:    'text-only',                            // F-SP2-a
             onEmpty: { skillId: 'help', args: {} },
           },

@@ -315,7 +315,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!spec || !(await reaches(o.id))) continue;
       const now = spec.now(person);
       lines.push(tp('circle.bot.menu_row', { label: tp(`circle.bot.menu_${o.id}`), value: valueLabel(now) }));
-      for (const v of spec.values) if (v !== now) buttons.push({ label: `${tp(`circle.bot.menu_${o.id}`)}: ${valueLabel(v)}`, slash: `${slashOf(o.id)} ${v}` });
+      for (const v of spec.values) buttons.push({ label: `${tp(`circle.bot.menu_${o.id}`)}: ${valueLabel(v)}${v === now ? ' ✓' : ''}`, slash: `${slashOf(o.id)} ${v}` });
     }
     if (await reaches('assistant-settings')) {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
@@ -324,7 +324,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       for (const [key, paramKey, values, from] of HOUSEHOLD_SETTINGS) {
         const now = from(of(paramKey));
         lines.push(tp('circle.bot.menu_row', { label: tp(`circle.bot.menu_${key}`), value: valueLabel(now) }));
-        for (const v of values) if (v !== now) buttons.push({ label: `${tp(`circle.bot.menu_${key}`)}: ${valueLabel(v)}`, slash: `${slashOf('assistant-settings')} ${key} ${v}` });
+        for (const v of values) buttons.push({ label: `${tp(`circle.bot.menu_${key}`)}: ${valueLabel(v)}${v === now ? ' ✓' : ''}`, slash: `${slashOf('assistant-settings')} ${key} ${v}` });
       }
     }
     if (view === 'chat') return { ok: true, message: [...lines, '', tp('circle.bot.menu_in_words')].join('\n') };

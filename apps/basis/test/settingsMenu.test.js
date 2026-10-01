@@ -53,6 +53,8 @@ describe('the settings menu', () => {
     const ids = (r.buttons ?? []).map((b) => b.id);
     expect(ids).toContain('/herinneringen off');
     expect(ids).toContain('/taal en');
+    // the button of the value it has now shows it
+    expect((r.buttons ?? []).find((b) => b.id === '/herinneringen on')?.label).toContain('✓');
     expect(ids.some((id) => id.startsWith('/huishouden'))).toBe(false);
     await say('42', '/herinneringen off');
     expect(threads.remindersOn(ANN)).toBe(false);

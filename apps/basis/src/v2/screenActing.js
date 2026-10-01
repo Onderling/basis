@@ -9,6 +9,7 @@
  * the same gate as that person's typed line — and refuses a call with no person, or a person not in its book.
  */
 
+import { renderA2A } from '@onderling/app-manifest';
 import { scopeCatalogueToRole } from './botOpMap.js';
 
 /** The bot's ops a screen never reaches, whatever token it holds: reading a file back, or pairing more screens. */
@@ -63,4 +64,24 @@ export function screenActsAs(users, { activeEntry } = {}) {
     const row = ((await users.list()) ?? []).find((u) => u?.id === actingAs && !u.hidden);
     return row ? { caller: actingAs, threadId: actingAs } : null;
   };
+}
+
+/**
+ * A bot exposes its door to connected screens: the door's ops as kernel skills (`renderA2A` over the door's call), each
+ * acting as the person its token names (`screenActsAs`, the grants lane as allow-list), the withheld ones as `never`,
+ * and only the ops on the bot's map (any role's) — an unmapped op is an unknown skill to a screen.
+ * @param {object} a
+ * @param {object} a.agent      the bot's agent (`exposeToPeers`, `surfaceTokenEntry`)
+ * @param {object} a.catalogue  the door's catalogue as composed
+ * @param {object[]} a.manifests the door's manifests
+ * @param {Function} a.doorCall the door's call (`withAssistantOps` over the host gate)
+ * @param {object} a.users      the bot's book
+ * @returns {number} how many skills were exposed
+ */
+export function exposeDoorToScreens({ agent, catalogue, manifests, doorCall, users }) {
+  const mapped = new Set([...screenColumnFor(catalogue, 'admin'), ...screenColumnFor(catalogue, 'member'), ...screenColumnFor(catalogue, 'observer'), ...BOT_SCREEN_NEVER]);
+  const defs = renderA2A(manifests, { callSkill: doorCall }, {
+    ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER,
+  }).filter((d) => mapped.has(d.id));
+  return agent.exposeToPeers(defs);
 }

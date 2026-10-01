@@ -71,6 +71,8 @@ function _effectiveTtl(requested, ceiling) {
  * @param {object}    [opts]
  * @param {number}    [opts.timeout=30000]
  * @param {number}    [opts.ttl]   — suggested task TTL ms (receiver may cap)
+ * @param {object}    [opts.token] — a capability token to present (a CapabilityToken or its JSON); else the
+ *                                   agent's token registry is asked
  * @returns {Task}
  */
 export function invokeAgentSkill(agent, peerId, skillId, parts, opts = {}) {
@@ -82,9 +84,10 @@ export function invokeAgentSkill(agent, peerId, skillId, parts, opts = {}) {
   const timeout = opts.timeout ?? 30_000;
 
   (async () => {
-    // Attach a capability token if the agent holds one for this peer + skill.
-    let tokenJson = null;
-    if (agent.tokenRegistry) {
+    // Attach a capability token: the one the caller hands in (`opts.token` — a holder that keeps its grants outside
+    // a token registry, e.g. a connected screen), else the one the agent holds for this peer + skill.
+    let tokenJson = opts.token ? (typeof opts.token.toJSON === 'function' ? opts.token.toJSON() : opts.token) : null;
+    if (!tokenJson && agent.tokenRegistry) {
       const token = await agent.tokenRegistry.get(peerId, skillId);
       if (token) tokenJson = token.toJSON();
     }

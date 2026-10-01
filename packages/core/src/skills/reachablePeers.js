@@ -36,6 +36,8 @@ import { param, PARAM_SCOPE, PARAM_KIND }   from '../params.js';
 export const DEFAULT_TTL_MS             = param({ key: 'reachablePeers.ttlMs',          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60_000 });
 export const DEFAULT_REFRESH_BEFORE_MS  = param({ key: 'reachablePeers.refreshBeforeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 export const DEFAULT_MAX_PEERS          = param({ key: 'reachablePeers.maxPeers',        scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
+/** Callers whose signed claim is kept: the oldest is dropped beyond this, so a stream of new keys cannot grow it. */
+export const DEFAULT_MAX_CACHED_CALLERS = param({ key: 'reachablePeers.maxCachedCallers', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
 
 /**
  * Register the `reachable-peers` skill on `agent`.
@@ -66,6 +68,7 @@ export function registerReachablePeersSkill(agent, opts = {}) {
   const ttlMs           = resolve('ttlMs',           DEFAULT_TTL_MS);
   const refreshBeforeMs = resolve('refreshBeforeMs', DEFAULT_REFRESH_BEFORE_MS);
   const maxPeers        = resolve('maxPeers',        DEFAULT_MAX_PEERS);
+  const maxCallers      = resolve('maxCachedCallers', DEFAULT_MAX_CACHED_CALLERS);
   const seqStore        = opts.seqStore;   // undefined → helper's default store
   const peerScope       = typeof opts.peerScope === 'function' ? opts.peerScope : null;
   let warnedNoScope     = false;
@@ -115,7 +118,9 @@ export function registerReachablePeersSkill(agent, opts = {}) {
         peers,
         { ttlMs, seqStore },
       );
+      cacheByCaller.delete(cacheKey);   // re-inserted as the newest
       cacheByCaller.set(cacheKey, { claim, signedAt: now, peerSetKey: setKey });
+      while (cacheByCaller.size > maxCallers) cacheByCaller.delete(cacheByCaller.keys().next().value);
       return [DataPart(claim)];
     }
 

@@ -46,7 +46,9 @@ function leaves(node, prefix, out = []) {
 
 function offenders(dir) {
   const found = [];
-  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+  // gate.<lang>.json holds the gate's phrase TEMPLATES ({item}, {list}, …): slots a compiler reads, never text on a
+  // screen — its own guard (gateWordsComplete) holds them
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json') && !/^gate\.[a-z]{2}\.json$/.test(f))) {
     const json = JSON.parse(readFileSync(path.join(dir, file), 'utf8'));
     for (const [key, text] of leaves(json, '')) {
       if (key.endsWith('.doc')) continue;                    // documentation ABOUT a placeholder, not copy

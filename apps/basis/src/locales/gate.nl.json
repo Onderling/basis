@@ -1,0 +1,190 @@
+{
+  "lists.addToList.named": {
+    "doc": "Put one or more things on a list the household names (\"melk en kaas\" are two).",
+    "patterns": [
+      "(zet|noteer|voeg) {items} (toe)? (op|aan|naar|bij) (de|het|mijn)? {list}"
+    ],
+    "examples": [
+      "zet melk op de boodschappen",
+      "voeg kaas toe aan de boodschappen",
+      "noteer brood op het boodschappenlijstje"
+    ],
+    "not": [
+      "zet de verwarming op 20",
+      "zet melk op de schuur"
+    ]
+  },
+  "lists.listEntries.named": {
+    "doc": "Read what is on a list the household names (the agenda reads its appointments).",
+    "patterns": [
+      "(wat|welke|laat|toon) {any} {list} {any}"
+    ],
+    "examples": [
+      "wat staat er op de boodschappen",
+      "wat staat er in de agenda",
+      "laat de klusjes zien"
+    ],
+    "not": [
+      "wat moet ik nog doen"
+    ]
+  },
+  "tasks.listMine": {
+    "doc": "The person's own open chores.",
+    "patterns": [
+      "wat moet ik (nog)? doen",
+      "(wat|welke|laat|toon) {any} taken {any}"
+    ],
+    "examples": [
+      "wat moet ik nog doen",
+      "Wat moet ik doen?",
+      "welke taken heb ik"
+    ],
+    "not": [
+      "wat moet ik doen met de melk dan"
+    ]
+  },
+  "assistant.weekOverview": {
+    "doc": "The person's week: their chores, the appointments, what is open.",
+    "patterns": [
+      "wat staat er (voor)? deze week",
+      "wat moet er (nog|deze week)? gebeuren"
+    ],
+    "examples": [
+      "wat staat er deze week",
+      "Wat staat er deze week?",
+      "wat moet er nog gebeuren"
+    ],
+    "not": [
+      "wat staat er op de boodschappen"
+    ]
+  },
+  "lists.markListItemDone.stated": {
+    "doc": "Something is done, bought or fixed: tick it off (a chore is completed). Mostly a reply to the bot's own reminder.",
+    "patterns": [
+      "(de|het)? {item} (is|zijn) (al)? (klaar|gedaan|gekocht|gemaakt|af)"
+    ],
+    "examples": [
+      "ramen is klaar",
+      "De melk is gekocht!",
+      "de lamp is gemaakt",
+      "de afwas is af"
+    ],
+    "not": [
+      "is het eten klaar?",
+      "wanneer is de lamp klaar"
+    ]
+  },
+  "assistant.reminders.off": {
+    "doc": "The person switches their own reminders off.",
+    "patterns": [
+      "geen herinneringen (meer)? (sturen|graag|aub|alsjeblieft)?",
+      "(stuur|geef) (me|mij) geen herinneringen (meer)? (sturen|graag|aub|alsjeblieft)?",
+      "(zet)? (de|mijn)? herinneringen uit",
+      "stop (met)? (de)? herinneringen"
+    ],
+    "examples": [
+      "stuur me geen herinneringen meer",
+      "geen herinneringen",
+      "zet mijn herinneringen uit"
+    ],
+    "not": [
+      "herinner me aan de tandarts",
+      "geen herinneringen voor Bert"
+    ]
+  },
+  "assistant.reminders.on": {
+    "doc": "The person switches their own reminders on again.",
+    "patterns": [
+      "(zet)? (de|mijn)? herinneringen (weer)? aan"
+    ],
+    "examples": [
+      "herinneringen aan",
+      "zet de herinneringen weer aan"
+    ],
+    "not": [
+      "herinneringen aan de tandarts"
+    ]
+  },
+  "lists.addToList.task": {
+    "doc": "A new chore on the chores list, without a who or a day.",
+    "patterns": [
+      "(nieuwe|nieuw|voeg|zet|maak)? (een)? (taak|klus|klusje): {text}",
+      "(nieuwe|nieuw|voeg|zet|maak)? (een)? (taak|klus|klusje) {text}"
+    ],
+    "examples": [
+      "nieuwe taak: lamp vervangen",
+      "zet een klusje: band plakken"
+    ],
+    "not": [
+      "nieuwe taak voor mij: ramen, morgen"
+    ]
+  },
+  "tasks.claimTask": {
+    "doc": "The person takes a chore (\"I'll do the windows\"). Words that name no chore go to the model.",
+    "patterns": [
+      "ik doe (de|het)? {item}"
+    ],
+    "examples": [
+      "ik doe de ramen"
+    ],
+    "not": [
+      "ik doe mee",
+      "ik doe het morgen"
+    ]
+  },
+  "lists.removeFromList": {
+    "doc": "Take something off a list (a mistake, or no longer needed). Words that name nothing go to the model.",
+    "patterns": [
+      "haal (de|het)? {item} (van|uit) (de|het|mijn)? (lijst|lijstje)",
+      "haal (de|het)? {item} (van|uit) (de|het|mijn)? {list}"
+    ],
+    "examples": [
+      "haal melk van de lijst",
+      "haal de melk van de boodschappen"
+    ],
+    "not": [
+      "haal de kinderen van school"
+    ]
+  },
+  "lists.createList": {
+    "doc": "Make a new list (the admin's).",
+    "patterns": [
+      "maak (een)? (nieuwe)? lijst (voor|genaamd)? {name}",
+      "maak (een)? (nieuwe)? lijst met (de)? naam {name}"
+    ],
+    "examples": [
+      "maak een lijst werk",
+      "maak een nieuwe lijst Vakantie"
+    ],
+    "not": [
+      "maak het eten"
+    ]
+  },
+  "lists.addToList.choreFor": {
+    "doc": "A new chore for a person (me, or a name), optionally with a day after a comma.",
+    "patterns": [
+      "(nieuwe taak|nieuw klusje|nieuwe klus) voor {person}: {text}"
+    ],
+    "examples": [
+      "nieuwe taak voor mij: ramen lappen, morgen",
+      "nieuwe taak voor Bert: vuilnis"
+    ],
+    "not": [
+      "nieuwe taak voor mij: ramen, eind van de maand"
+    ]
+  },
+  "calendar.addEvent.dayTime": {
+    "doc": "An appointment: a short title, a day and a time (\"tandarts morgen om 10 uur\"). A sentence about someone, or without a time, is not one.",
+    "patterns": [
+      "{title} {day} {time}"
+    ],
+    "examples": [
+      "tandarts morgen om 10 uur",
+      "Kapper vrijdag om half 3"
+    ],
+    "not": [
+      "ik ben morgen om 10 uur weg",
+      "tandarts morgen"
+    ]
+  }
+}

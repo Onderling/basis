@@ -26,6 +26,7 @@ import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../core
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { CIRCLE_GATE_TRAIL, DEFAULT_GATE_LOCALE } from './circleGateLexicon.js';
 import { readDayAndTime } from '../forms/parseDate.js';
+import { compileGateWords, GATE_WORDS } from './gateWords.js';
 
 /**
  * Token-gate rules for the circle bot, projected from the circle apps' manifests.
@@ -86,108 +87,95 @@ export function listsGateRules(_locale, lists = []) {
     const w = String(word ?? '').trim().toLowerCase();
     return byWord.get(w) ?? byWord.get(w.replace(/(?:lijstje|lijst|list)$/, '')) ?? null;
   };
-  const escape = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const words = [...byWord.keys()].sort((a, b) => b.length - a.length).map(escape);
-  const listRead = words.length ? new RegExp(`^${HH_READ}\\b.*?\\b(${words.join('|')})\\b`, 'i') : null;
   const chores = lists.find((l) => l.defaultChild === 'task')?.name ?? null;
-  return [
-    { name: 'lists:addToList(named-list)', test: HH_ADD_TYPED, command: (text) => {
-      const m = HH_ADD_TYPED.exec(String(text || '').trim());
-      if (!m) return null;
-      const list = listFor(m[2]);
-      const items = splitItems(m[1].trim());
-      if (!list || !items.length) return null;
-      return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addToList', args: { list, text: t } })) } : {}) };
-    } },
-    { name: 'lists:listEntries(named-list-read)', test: (text) => Boolean(listRead && listRead.test(String(text ?? ''))), command: (text) => {
-      const m = listRead ? listRead.exec(String(text || '').trim()) : null;
-      const list = m ? listFor(m[1]) : null;
-      if (!list) return null;
-      // a list of appointments is read as the coming days, with their times — the calendar's own read
-      return holdsEvents.has(list) ? { opId: 'listEvents', args: {}, appOrigin: 'calendar' } : { opId: 'listEntries', args: { list } };
-    } },
-    { name: 'tasks:listMine(read)', test: HH_TASKS_READ, command: () => ({ opId: 'listMine', args: {} }) },
-    // "wat staat er deze week" / "wat moet er nog gebeuren": the person's week overview — by rule, so the model does not
-    // summarise the week itself from what it happens to have in view
-    { name: 'assistant:weekOverview(read)', test: WEEK_READ, command: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
-    // "ramen is klaar" / "de melk is gekocht": mostly a reply to the bot's own reminder, so it works without a model.
-    // One rule, no type choice: the waist finds the one item the words name (or asks which), and a chore's tick is the
-    // chore's own verb underneath.
-    { name: 'lists:markListItemDone(stated)', test: STATED_DONE, command: (text) => { const m = STATED_DONE.exec(String(text).trim()); return m ? { opId: 'markListItemDone', args: { item: m[1].trim() } } : null; } },
-    // A person's own switch for what the bot writes first: "stop writing to me" must work every time, model or no
-    // model — so it is a rule, never the model's reading.
-    { name: 'assistant:reminders(off)', test: REMINDERS_OFF, command: () => ({ opId: 'assistant-reminders', args: { mode: 'off' }, appOrigin: 'assistant' }) },
-    { name: 'assistant:reminders(on)', test: REMINDERS_ON, command: () => ({ opId: 'assistant-reminders', args: { mode: 'on' }, appOrigin: 'assistant' }) },
-    // The deterministic floor: a household's everyday sentences work without a model (Fable, 2026-10-01). Exact
-    // imperatives — the words go to the waist, which finds one item or asks which.
-    { name: 'tasks:listMine(mine)', test: MINE_READ, command: () => ({ opId: 'listMine', args: {} }) },
-    { name: 'tasks:claimTask(i-do)', test: I_DO, command: (text) => {
-      const what = (I_DO.exec(String(text).trim())?.[1] ?? '').trim();
-      // "ik doe mee" / "ik doe het morgen" are talk, not a claim: they stay the model's
-      if (!what || NOT_A_THING.test(what) || readDayAndTime(what)) return null;
-      return { opId: 'claimTask', args: { id: what }, fallback: 'model' };
-    } },
-    { name: 'lists:removeFromList(take-off)', test: TAKE_OFF, command: (text) => {
-      const m = TAKE_OFF.exec(String(text).trim());
-      const where = m ? m[2].trim() : '';
-      if (!m || !(/^(?:lijst|lijstje|list)$/i.test(where) || listFor(where))) return null;
-      return { opId: 'removeFromList', args: { item: m[1].trim() }, fallback: 'model' };
-    } },
-    { name: 'lists:createList(make)', test: MAKE_LIST, command: (text) => {
-      const name = (MAKE_LIST.exec(String(text).trim())?.[1] ?? '').trim();
-      return name ? { opId: 'createList', args: { text: name } } : null;
-    } },
-    // a chore that says who (and a day the bounded reader reads): "nieuwe taak voor mij: ramen lappen, morgen"
-    { name: 'lists:addToList(chore-who-when)', test: CHORE_FOR, command: (text) => {
-      const m = CHORE_FOR.exec(String(text).trim());
-      if (!m || !chores) return null;
-      const who = /^(?:mij|me|ik|myself)$/i.test(m[1]) ? 'mij' : m[1];
-      const body = m[2].trim();
-      // a tail after a comma is the chore's day ("…, morgen"): one the reader cannot read is the model's
-      const tail = /,\s*([^,]+)$/.exec(body)?.[1] ?? null;
-      if (tail && !readDayAndTime(tail)) return null;
-      if (!CHORE_WHO_OR_WHEN.test(body)) return { opId: 'addToList', args: { list: chores, text: body.replace(/[,.;]+$/, ''), assignee: who } };
-      const read = readDayAndTime(body);
-      if (!read || read.time || !read.rest) return null;   // a day it does not read, or a time: the model's
-      return { opId: 'addToList', args: { list: chores, text: caseOf(body, read.rest), assignee: who, due: read.day } };
-    } },
-    // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
-    // of the list whose entries are chores (it defaults to a task there).
-    { name: 'lists:addToList(task-on-chores)', test: (text) => LISTS_ADD_TASK.test(text), command: (text) => {
-      const m = LISTS_ADD_TASK.exec(String(text || '').trim());
-      const what = m ? m[1].trim() : '';
-      return chores && what ? { opId: 'addToList', args: { list: chores, text: what } } : null;
-    } },
-    // LAST: an appointment — a short title, a day and a time the bounded reader reads ("tandarts morgen om 10 uur").
-    // Narrow on purpose: a sentence about someone ("ik ben morgen om 10 uur weg") or without a time stays the model's.
-    { name: 'calendar:addEvent(day-and-time)', test: (text) => CHORE_WHO_OR_WHEN.test(String(text ?? '')), command: (text) => {
-      const read = readDayAndTime(String(text));
-      if (!read || !read.time || !read.rest) return null;
-      const words = read.rest.split(' ');
-      if (words.length > 4 || words.some((w) => PERSON_WORDS.has(w))) return null;
-      return { opId: 'addEvent', args: { title: caseOf(String(text), read.rest), when: `${read.day}T${read.time}` }, appOrigin: 'calendar' };
-    } },
-  ];
+  // The WORDS are the locale files' (gate.<lang>.json: patterns, examples, what must not match); the household bot
+  // understands its languages side by side. What each rule DOES stays here, keyed by the entry's id.
+  const compiled = compileGateWords(GATE_WORDS, { list: [...byWord.keys()] });
+  return GATE_RULES.map(({ id, name, build }) => {
+    const forms = compiled.get(id) ?? [];
+    const slotsOf = (text) => { for (const f of forms) { const m = f.match(text); if (m) return m; } return null; };
+    const command = (text) => { const m = slotsOf(String(text ?? '')); return m ? build(m, String(text).trim(), { listFor, holdsEvents, chores }) : null; };
+    // a rule TAKES a line when it builds a command for it — its own checks included, not only its words
+    return { name, test: (text) => Boolean(command(text)), command };
+  });
 }
 
-const MINE_READ = /^(?:wat\s+moet\s+ik\s+(?:nog\s+)?doen|what\s+(?:do|should)\s+i\s+(?:still\s+)?(?:have\s+to\s+)?do)\s*[?.!]*$/i;
-const I_DO = /^(?:ik\s+doe|i(?:'ll|\s+will)\s+do)\s+(?:de\s+|het\s+|the\s+)?(.+?)\s*[.!]*$/i;
+/** What each of the household's word rules does, in order (the first that builds a command wins). */
+const GATE_RULES = [
+  { id: 'lists.addToList.named', name: 'lists:addToList(named-list)', build: (m, _t, { listFor }) => {
+    const list = listFor(m.list);
+    const items = splitItems(m.items);
+    if (!list || !items.length) return null;
+    return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((x) => ({ opId: 'addToList', args: { list, text: x } })) } : {}) };
+  } },
+  { id: 'lists.listEntries.named', name: 'lists:listEntries(named-list-read)', build: (m, _t, { listFor, holdsEvents }) => {
+    const list = listFor(m.list);
+    if (!list) return null;
+    // a list of appointments is read as the coming days, with their times — the calendar's own read
+    return holdsEvents.has(list) ? { opId: 'listEvents', args: {}, appOrigin: 'calendar' } : { opId: 'listEntries', args: { list } };
+  } },
+  { id: 'tasks.listMine', name: 'tasks:listMine(read)', build: () => ({ opId: 'listMine', args: {} }) },
+  // the person's week overview — by rule, so the model does not summarise the week itself
+  { id: 'assistant.weekOverview', name: 'assistant:weekOverview(read)', build: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
+  // mostly a reply to the bot's own reminder, so it works without a model; the waist finds the one item (or asks),
+  // and a chore's tick is the chore's own verb underneath
+  { id: 'lists.markListItemDone.stated', name: 'lists:markListItemDone(stated)', build: (m) => ({ opId: 'markListItemDone', args: { item: m.item } }) },
+  // a person's own switch for what the bot writes first: every time, model or no model
+  { id: 'assistant.reminders.off', name: 'assistant:reminders(off)', build: () => ({ opId: 'assistant-reminders', args: { mode: 'off' }, appOrigin: 'assistant' }) },
+  { id: 'assistant.reminders.on', name: 'assistant:reminders(on)', build: () => ({ opId: 'assistant-reminders', args: { mode: 'on' }, appOrigin: 'assistant' }) },
+  // the deterministic floor: exact imperatives; the words go to the waist, which finds one item or asks which
+  { id: 'tasks.claimTask', name: 'tasks:claimTask(i-do)', build: (m) => {
+    const what = m.item;
+    // "ik doe mee" / "ik doe het morgen" are talk, not a claim: they stay the model's
+    if (!what || NOT_A_THING.test(what) || readDayAndTime(what)) return null;
+    return { opId: 'claimTask', args: { id: what }, fallback: 'model' };
+  } },
+  { id: 'lists.removeFromList', name: 'lists:removeFromList(take-off)', build: (m, _t, { listFor }) => {
+    if (m.list && !listFor(m.list)) return null;
+    return { opId: 'removeFromList', args: { item: m.item }, fallback: 'model' };
+  } },
+  { id: 'lists.createList', name: 'lists:createList(make)', build: (m) => (m.name ? { opId: 'createList', args: { text: m.name } } : null) },
+  // a chore that says who (and a day the bounded reader reads): "nieuwe taak voor mij: ramen lappen, morgen"
+  { id: 'lists.addToList.choreFor', name: 'lists:addToList(chore-who-when)', build: (m, _t, { chores }) => {
+    if (!chores) return null;
+    const who = /^(?:mij|me|ik|myself)$/i.test(m.person) ? 'mij' : m.person;
+    const body = m.text;
+    // a tail after a comma is the chore's day ("…, morgen"): one the reader cannot read is the model's
+    const tail = /,\s*([^,]+)$/.exec(body)?.[1] ?? null;
+    if (tail && !readDayAndTime(tail)) return null;
+    if (!CHORE_WHO_OR_WHEN.test(body)) return { opId: 'addToList', args: { list: chores, text: body.replace(/[,.;]+$/, ''), assignee: who } };
+    const read = readDayAndTime(body);
+    if (!read || read.time || !read.rest) return null;   // a day it does not read, or a time: the model's
+    return { opId: 'addToList', args: { list: chores, text: caseOf(body, read.rest), assignee: who, due: read.day } };
+  } },
+  // "nieuwe taak: lamp vervangen" — a child of the list whose entries are chores; one that says who or when is the
+  // rule above's, or the model's
+  { id: 'lists.addToList.task', name: 'lists:addToList(task-on-chores)', build: (m, text, { chores }) => {
+    if (!chores || !m.text || CHORE_WHO_OR_WHEN.test(text)) return null;
+    return { opId: 'addToList', args: { list: chores, text: m.text } };
+  } },
+  // LAST: an appointment — a short title, a day and a time the bounded reader reads. Narrow on purpose: a sentence
+  // about someone ("ik ben morgen om 10 uur weg") or without a time stays the model's.
+  { id: 'calendar.addEvent.dayTime', name: 'calendar:addEvent(day-and-time)', build: (_m, text) => {
+    const read = readDayAndTime(text);
+    if (!read || !read.time || !read.rest) return null;
+    const words = read.rest.split(' ');
+    if (words.length > 4 || words.some((w) => PERSON_WORDS.has(w))) return null;
+    return { opId: 'addEvent', args: { title: caseOf(text, read.rest), when: `${read.day}T${read.time}` }, appOrigin: 'calendar' };
+  } },
+];
+
+/** Every rule id the household's words must carry in every language (the guard reads it). */
+export const GATE_RULE_IDS = Object.freeze(GATE_RULES.map((r) => r.id));
+
+
 const NOT_A_THING = /^(?:mee|het|dat|dit|niks|niets|wat|ook|even|it|that|this|nothing)\b/i;
-const TAKE_OFF = /^(?:haal|remove|take)\s+(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:van|uit|from|off)\s+(?:de\s+|het\s+|mijn\s+|the\s+|my\s+)?(\S+?)\s*[.!]*$/i;
-const MAKE_LIST = /^(?:maak|make|create)\s+(?:een\s+|a\s+)?(?:nieuwe\s+|new\s+)?(?:lijst|list)(?:\s+(?:voor|met\s+(?:de\s+)?naam|genaamd|called|named))?\s+(.+?)\s*[.!]*$/i;
-const CHORE_FOR = /^(?:nieuwe?\s+taak|new\s+task|nieuw\s+klusje)\s+(?:voor|for)\s+(\S+?)\s*:\s*(.+)$/i;
 const PERSON_WORDS = new Set(['ik', 'je', 'jij', 'we', 'wij', 'hij', 'zij', 'ze', 'u', 'jullie', 'mij', 'me', 'i', 'you', 'he', 'she', 'they', 'my', 'mijn']);
 /** The words of `lower` as they were typed in `original` (the reader lowercases). */
 const caseOf = (original, lower) => { const i = original.toLowerCase().indexOf(lower); return i >= 0 ? original.slice(i, i + lower.length) : lower; };
-const REMINDERS_OFF = /^(?:(?:(?:stuur|geef)\s+(?:me|mij)\s+)?geen\s+herinneringen(?:\s+meer)?(?:\s+(?:sturen|graag|aub|alsjeblieft))?|(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+uit|stop\s+(?:met\s+)?(?:de\s+)?herinneringen|no\s+more\s+reminders|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+off|stop\s+(?:the\s+)?reminders)\s*[.!]*$/i;
-const REMINDERS_ON = /^(?:(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+(?:weer\s+)?aan|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+(?:back\s+)?on)\s*[.!]*$/i;
-const STATED_DONE = /^(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:is|zijn|are)\s+(?:al\s+|already\s+)?(?:klaar|gedaan|gekocht|gemaakt|af|done|bought|fixed)[.!]*$/i;
-const WEEK_READ = /^(?:wat\s+staat\s+er\s+(?:voor\s+)?deze\s+week|wat\s+moet\s+er\s+(?:nog|deze\s+week)?\s*gebeuren|what(?:'s|\s+is)\s+on\s+this\s+week)\s*[?.!]*$/i;
-// A chore that says WHO ("voor mij", "voor Bert", "for me") or WHEN (a day word) is the model's: it has the assignee and
-// the due date to fill, which this typed rule cannot.
+// A chore that says WHO ("voor mij", "voor Bert") or WHEN (a day word): the who-and-when rule reads it when it can
+// (a person, and a day the bounded reader reads); the plain chore rule leaves it alone, and anything else is the model's.
 const CHORE_WHO_OR_WHEN = /\b(?:voor\s+\S+|for\s+\S+|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|morgen|vandaag|overmorgen|volgende\s+week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next\s+week)\b/i;
-const LISTS_ADD_TASK_TYPED = /^(?:add|new|voeg|zet|nieuwe?|maak)?\s*(?:a|an|een)?\s*(?:task|taak|chore|klus|klusje)\s*:?\s+(.+?)\s*$/i;
-const LISTS_ADD_TASK = { test: (s) => LISTS_ADD_TASK_TYPED.test(String(s ?? '')) && !CHORE_WHO_OR_WHEN.test(String(s ?? '')), exec: (s) => LISTS_ADD_TASK_TYPED.exec(String(s ?? '')) };
 
 const HH_LIST_ALIASES = {
   shopping: 'shopping', groceries: 'shopping', grocery: 'shopping',

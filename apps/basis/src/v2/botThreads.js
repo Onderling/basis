@@ -18,6 +18,7 @@
  *               the household's and stays; only the conversation is not kept;
  *   - `long`  — short, plus what the bot knows about the household once that exists; until then it reads as short.
  */
+import { SURFACE_PREFS } from './surfacePref.js';
 import { ASSISTANT_MEMORY_TURNS } from './assistantEngine.js';
 
 export const MEMORY_MODES = Object.freeze(['off', 'short', 'long']);
@@ -140,6 +141,12 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     setPending(id, pending) {
       const { pending: _p, ...rest } = rowOf(id);
       return save(pending ? { ...rest, pending } : rest);
+    },
+    /** How this person's menus are painted (`inline` · `screen` · `chat`, the surface preference words); default inline. */
+    viewOf: (id) => (SURFACE_PREFS.includes(rows.get(id)?.view) ? rows.get(id).view : 'inline'),
+    setView(id, view) {
+      if (!SURFACE_PREFS.includes(view)) throw new TypeError(`botThreads: unknown view "${view}"`);
+      return save({ ...rowOf(id), view });
     },
     /** The screen this person asked to connect (`/scherm`): `{hash, until}` of its one-time nonce, or null. */
     screenNonceOf: (id) => rows.get(id)?.screenNonce ?? null,

@@ -24,11 +24,13 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write',
   },
   operations: [
     {
       id:     'assistant-memory',
+      // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
+      group:  'settings',
       verb:   'set-memory',
       // The thread row lives on the door's own device.
       writes: { scope: 'device' },
@@ -50,6 +52,8 @@ export const assistantManifest = {
     },
     {
       id:     'assistant-reminders',
+      // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
+      group:  'settings',
       verb:   'set-reminders',
       // a person's own switch for the reminders the bot writes first (only things they dated); on the thread row
       writes: { scope: 'device' },
@@ -61,6 +65,8 @@ export const assistantManifest = {
     },
     {
       id:     'assistant-overview',
+      // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
+      group:  'settings',
       verb:   'set-overview',
       // a person's own switch for the weekly overview (off until they switch it on); on the thread row
       writes: { scope: 'device' },
@@ -73,6 +79,8 @@ export const assistantManifest = {
 
     {
       id:     'assistant-language',
+      // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
+      group:  'settings',
       verb:   'set-language',
       writes: { scope: 'device' },
       params: [{ name: 'lang', kind: 'enum', of: [...THREAD_LANGS, 'auto'], required: true }],
@@ -93,13 +101,15 @@ export const assistantManifest = {
     },
     {
       id:     'assistant-settings',
+      // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
+      group:  'settings',
       verb:   'set-settings',
       visibility: 'trusted',
       // The bot's own settings are parameters of the door's device (who may give a chore to whom).
       writes: { scope: 'device' },
       // `assign self|anyone|role` · `roles admin,member` · nothing (the settings as they stand)
       params: [{ name: 'change', kind: 'string', required: false }],
-      surfaces: { slash: { command: '/instellingen', body: 'argline' } },
+      surfaces: { slash: { command: '/huishouden', body: 'argline' } },
     },
     {
       id:     'assistant-role',
@@ -160,6 +170,25 @@ export const assistantManifest = {
       writes: { scope: 'person' },
       params: [{ name: 'who', kind: 'string', required: true }],
       surfaces: { slash: { command: '/revoke', body: 'argline' } },
+    },
+    {
+      // The person's settings menu: one row per settings op their role reaches (their own switches; for the admin the
+      // household's too), each with its current value and buttons that call that op through its own gate.
+      id:     'assistant-menu',
+      verb:   'show-settings',
+      visibility: 'authenticated',
+      params: [],
+      surfaces: { slash: { command: '/instellingen', body: 'none' } },
+    },
+    {
+      // How this person's menus are painted: buttons in the chat (inline), on their connected screen, or in words.
+      id:     'assistant-view',
+      verb:   'set-view',
+      visibility: 'authenticated',
+      group:  'settings',
+      writes: { scope: 'device' },
+      params: [{ name: 'mode', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/weergave', body: 'argline' } },
     },
     {
       // A person connects a screen (their own app, in a browser) to act through: a one-time link, ten minutes, for

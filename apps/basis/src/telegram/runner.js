@@ -121,7 +121,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       return;
     }
     const text = rendered.text ?? (rendered.error ? rendered.error.message : '');
-    if (text) await say(chatId, text);
+    // a reply's quick replies (a settings menu) are buttons; a tap sends the button's slash line, which the person's
+    // own gate decides like a typed one
+    const quick = (rendered.quickReplies ?? []).map((q) => ({ id: q.slash, label: q.label }));
+    if (text) await say(chatId, text, quick.length ? quick : undefined);
   }
 
   /** Run a ready route and paint its reply. */

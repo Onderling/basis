@@ -263,3 +263,29 @@ describe('the shelf never loses the last good copy', () => {
     expect(kept.some((f) => f.lists.length)).toBe(true);
   });
 });
+
+describe('a step by someone not in the book', () => {
+  it('an rsvp is not written as the host (the host does not "come"); a tick or cancel is, and is reported', async () => {
+    const calls = [];
+    const call = async (app, op, args, ctx) => {
+      calls.push({ op, caller: ctx?.caller ?? null });
+      if (op === 'listLists') return { ok: true, items: [{ label: 'Agenda' }, { label: 'Boodschappen' }] };
+      if (op === 'listContacts') return { ok: true, contacts: [] };
+      return { ok: true, itemId: 'x1' };
+    };
+    const file = { format: 'onderling-household-export', v: 1, loose: [], settings: {}, people: [],
+      lists: [
+        { n: 1, name: 'Agenda', entries: [{ n: 2, type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-07T08:00:00.000Z', rsvp: { 'telegram:77': 'accepted' }, cancelled: true, createdBy: 'telegram:77' }] },
+        { n: 3, name: 'Boodschappen', entries: [{ n: 4, type: 'list-item', text: 'melk', completedAt: '2026-10-01T08:00:00.000Z', completedBy: 'telegram:77' }] },
+      ] };
+    const r = await importHousehold(file, { call });
+    expect(calls.filter((c) => c.op === 'rsvpAccept')).toEqual([]);
+    expect(calls.find((c) => c.op === 'cancelEvent')?.caller).toBeNull();
+    expect(calls.find((c) => c.op === 'markListItemDone')?.caller).toBeNull();
+    expect(r.notRestored).toEqual(expect.arrayContaining([
+      expect.objectContaining({ what: 'rsvp', who: 'telegram:77', why: 'not-in-the-book' }),
+      expect.objectContaining({ what: 'by-the-host', step: 'cancel', who: 'telegram:77' }),
+      expect.objectContaining({ what: 'by-the-host', step: 'tick', who: 'telegram:77' }),
+    ]));
+  });
+});

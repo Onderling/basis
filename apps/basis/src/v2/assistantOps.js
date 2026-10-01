@@ -53,6 +53,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
       if (op === 'assistant-exports') return exportsOp();
+      if (op === 'assistant-export') return exportNowOp();
       if (op === 'assistant-import') return importOp(args?.file ?? args?._match, { preview: args?.preview === true });
       const threadId = typeof ctx?.threadId === 'string' && ctx.threadId ? ctx.threadId : null;
       if (!threadId) return { ok: false, error: 'no-thread' };
@@ -99,6 +100,15 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!admin.exports) return { ok: false, error: 'unwired' };
     const names = await admin.exports.names();
     return { ok: true, message: names.length ? t('circle.bot.exports_list', { names: names.join('\n') }) : t('circle.bot.exports_none') };
+  }
+
+  /** One export now, onto the shelf: its name, and whether it is sealed. */
+  async function exportNowOp() {
+    if (!admin.exports || typeof admin.exports.writeNow !== 'function') return { ok: false, error: 'unwired' };
+    const name = await admin.exports.writeNow();
+    if (!name) return { ok: false, error: { code: 'failed', message: t('circle.bot.export_failed') } };
+    const sealed = typeof admin.exports.read === 'function' ? isSealedExport(await admin.exports.read(name).catch(() => null)) : false;
+    return { ok: true, message: t(sealed ? 'circle.bot.export_written_sealed' : 'circle.bot.export_written_plain', { name }) };
   }
 
   /** Read an export back (the admin's; asked first — `preview` answers the question with what the file holds). */

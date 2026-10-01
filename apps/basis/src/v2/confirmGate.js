@@ -102,13 +102,23 @@ export function confirmRequestForOp(op, { t, message } = {}) {
  * @returns {Promise<string|null>}
  */
 export async function confirmPreviewMessage({ route, catalogue, call } = {}) {
+  const r = await confirmPreview({ route, catalogue, call });
+  return r?.message ?? null;
+}
+
+/**
+ * The same preview, saying also when the op REFUSED it: `{message}` (ask with it), `{refused}` (do not ask — say
+ * why: the act would be refused too, e.g. a sealed file whose key is not unlocked), or null (no preview; ask as declared).
+ */
+export async function confirmPreview({ route, catalogue, call } = {}) {
   if (!route || route.kind !== 'needsConfirm' || typeof call !== 'function') return null;
   const op = catalogue?.opsById?.get?.(route.opId)?.op;
   if (op?.surfaces?.ui?.confirm?.preview !== true) return null;
-  try {
-    const r = await call(route.appOrigin ?? null, route.opId, { ...(route.args ?? {}), preview: true });
-    return r?.ok && typeof r.message === 'string' && r.message ? r.message : null;
-  } catch { return null; }
+  let r;
+  try { r = await call(route.appOrigin ?? null, route.opId, { ...(route.args ?? {}), preview: true }); } catch { return null; }
+  if (r?.ok && typeof r.message === 'string' && r.message) return { message: r.message };
+  const why = typeof r?.error === 'string' ? r.error : r?.error?.message;
+  return r?.ok === false && typeof why === 'string' && why ? { refused: why } : null;
 }
 
 /** The one ConfirmRequest shape, however the caller reached the gate. */

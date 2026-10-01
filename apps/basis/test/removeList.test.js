@@ -97,4 +97,16 @@ describe('removing a list', () => {
     expect(bridge.outbox.map((m) => m.text).join('\n')).toContain('met 3 klusjes (1 opgepakt)');
     expect(calls.map((c) => c.args?.preview ?? false)).toEqual([true]);
   });
+
+  it('a preview the op refuses is said, and nothing is asked or left pending', async () => {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const callSkill = async (_a, _o, args) => (args?.preview ? { ok: false, error: { code: 'locked', message: 'eerst de sleutel openen' } } : { ok: true, message: 'weg' });
+    const runner = createTelegramRunner({ bridge, t: (k, v) => (v?.message ? `${k} ${v.message}` : k), collectMs: 0, catalogue: mergeManifests([{ manifest: listsManifest }]), callSkill });
+    await runner.start();
+    await bridge.simulateIncoming({ chatId: '10', text: '/list-delete werktaken', sender: { bridgeUid: '10' } });
+    await runner.idle();
+    expect(bridge.outbox.map((m) => m.text)).toEqual(['eerst de sleutel openen']);
+    expect(bridge.outbox[0].buttons ?? []).toEqual([]);
+    expect(runner.hasPending?.('10') ?? false).toBe(false);
+  });
 });

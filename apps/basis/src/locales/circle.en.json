@@ -4181,6 +4181,18 @@
       "text": "The key that is unlocked does not open \"{{name}}\". Unlock that file's key: node apps/basis/bin/export-key.mjs unlock --from {{name}}.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "export_failed": {
+      "text": "I could not write the export file.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_sealed": {
+      "text": "Saved and sealed: {{name}}. Restore it with /import {{name}}, after unlocking the key on the box.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_plain": {
+      "text": "Saved: {{name}}. Note: not sealed — set a key on the box with node apps/basis/bin/export-key.mjs set.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
     "import_done": {
       "text": "Restored: {{lists}} lists, {{entries}} entries, {{chores}} chores, {{appointments}} appointments, {{people}} people.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."

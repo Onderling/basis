@@ -23,7 +23,7 @@ export const assistantManifest = {
   itemTypes: ['chat-thread'],
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
-    'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'import-household': 'write',
+    'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
   },
   operations: [
     {
@@ -168,6 +168,15 @@ export const assistantManifest = {
       params: [],
       // slash only, like the admin's other ops: never a tool the model is handed
       surfaces: { slash: { command: '/exports', body: 'none' } },
+    },
+    {
+      id:     'assistant-export',
+      verb:   'export-household',
+      visibility: 'trusted',
+      // one export now, onto the box's shelf (before an upgrade: export, upgrade, import) — sealed when a key is set
+      writes: { scope: 'device' },
+      params: [],
+      surfaces: { slash: { command: '/export', body: 'none' } },
     },
     {
       id:     'assistant-import',

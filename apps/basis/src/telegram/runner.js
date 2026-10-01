@@ -21,7 +21,7 @@ import { parseInput }      from '../parser.js';
 import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
 import { doorDisclosure } from '../v2/turnLog.js';
-import { confirmPreviewMessage } from '../v2/confirmGate.js';
+import { confirmPreview } from '../v2/confirmGate.js';
 import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
@@ -235,8 +235,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       case 'needsConfirm': {
         pending.set(threadId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
         // a confirm that declares a preview asks with what is there (asked as this person, through the same gate)
-        const previewed = await confirmPreviewMessage({ route: r, catalogue: catalogueOf(), call: callFor(chatId) });
-        return say(chatId, t('circle.telegram.confirm', { message: previewed ?? (r.messageKey ? t(r.messageKey, r.args ?? {}) : (r.message ?? '')) }), [
+        const previewed = await confirmPreview({ route: r, catalogue: catalogueOf(), call: callFor(chatId) });
+        // the preview refused (the act would be too): say why, and ask nothing
+        if (previewed?.refused) { pending.delete(threadId); return say(chatId, previewed.refused); }
+        return say(chatId, t('circle.telegram.confirm', { message: previewed?.message ?? (r.messageKey ? t(r.messageKey, r.args ?? {}) : (r.message ?? '')) }), [
           { id: CONFIRM_YES, label: t('circle.telegram.confirm_yes') },
           { id: CONFIRM_NO,  label: t('circle.telegram.confirm_no') },
         ]);

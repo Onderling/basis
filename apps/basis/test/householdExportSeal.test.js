@@ -82,3 +82,15 @@ describe('/import of a sealed file', () => {
     expect(locked).toBe(1);
   });
 });
+
+describe('/export', () => {
+  it('writes one now and says whether it is sealed', async () => {
+    const { withAssistantOps } = await import('../src/v2/assistantOps.js');
+    const key = await createExportKey({ passphrase: 'correct horse battery', argonOpts: LIGHT });
+    const files = new Map();
+    const exports = { writeNow: async () => { files.set('household-export-2026-10-01-0900.json', sealExport(FILE, key)); return 'household-export-2026-10-01-0900.json'; }, read: async (n) => files.get(n), names: async () => [...files.keys()] };
+    const tt = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
+    const call = withAssistantOps({ callSkill: async () => ({ ok: false }), threads: null, t: tt, admin: { exports } });
+    expect((await call('assistant', 'assistant-export', {})).message).toContain('circle.bot.export_written_sealed');
+  });
+});

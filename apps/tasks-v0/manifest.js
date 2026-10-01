@@ -43,11 +43,17 @@
  * get re-modelled by 's renderWeb.
  */
 
+// The words the deterministic gate starts an op with, per language (the manifest declares the match's shape; the
+// words are data beside it — see `gateVerbsOf` in @onderling/app-manifest).
+import gateEn from './gate.en.json' with { type: 'json' };
+import gateNl from './gate.nl.json' with { type: 'json' };
+
 const ID_NONEMPTY  = { schema: { minLength: 1 } };
 const STR_NONEMPTY = { schema: { minLength: 1 } };
 
 export const tasksManifest = {
   app:       'tasks',
+  gateWords:  { en: gateEn, nl: gateNl },
   // The network hosts this app's code reaches: the Telegram bot bridge of the tasks server, and Expo's
   // push service when that server is started with push.
   hosts:     ['api.telegram.org', 'exp.host'],
@@ -120,9 +126,8 @@ export const tasksManifest = {
           // here without the LLM. `text-only` → the body is the task text; dropTrailing strips the
           // "… to/op the list" qualifier so "add milk to the list" → text "milk".
           match: {
-            verbs:        ['add', 'todo', ['new', 'task'], 'voeg', 'zet', ['maak', 'taak'], ['nieuwe', 'taak']],
             body:         'text-only',
-            dropTrailing: ['to', 'aan', 'op', 'toe'],
+            dropTrailing: true,
           } },
         chat: {
           reply: 'text', hint: 'Create a task; rejects on dependency cycles. Blocked when circle is paused/archived.',
@@ -161,7 +166,6 @@ export const tasksManifest = {
           // NL gate — "claim X" / "I'll take X" / "ik pak X" → claimTask{id}. `arg:'id'` targets the
           // pickerSource param so the clarifying dispatch resolves the label → a real task id.
           match: {
-            verbs: ['claim', 'pak', 'neem', ["i'll", 'take'], ["i'll", 'do'], ['ik', 'pak'], ['ik', 'doe'], ['ik', 'neem']],
             body:  'match',
             arg:   'id',
           } },
@@ -193,7 +197,6 @@ export const tasksManifest = {
       surfaces: {
         slash: { command: '/confirm',
           match: {
-            verbs: ['confirm', 'bevestig', 'keur', ['keur', 'goed'], ['ken', 'toe']],
             body:  'match',
             arg:   'id',
           } },
@@ -222,7 +225,6 @@ export const tasksManifest = {
           // NL gate — "done X" / "klaar met X" → completeTask{id}. Multiword phrases first so
           // "klaar met afwas" beats the bare "klaar". `arg:'id'` for the pickerSource resolution.
           match: {
-            verbs: [['klaar', 'met'], ['done', 'with'], 'done', 'complete', 'completed', 'finished', 'klaar', 'voltooid', 'gedaan'],
             body:  'match',
             arg:   'id',
             // Also match the verb TRAILING the object ("kaas done", "afwas klaar") — the per-locale
@@ -339,7 +341,7 @@ export const tasksManifest = {
         // Part G (2026-06-17) — slash/gate + pickerSource folded in.
         slash: { command: '/submit', body: 'flags',
           // Part C gate — "submit X" → submitTask{id}; id already has pickerSource:listMine.
-          match: { verbs: ['submit', ['hand', 'in'], 'indienen', 'inleveren', ['ter', 'review']], body: 'match', arg: 'id' } },
+          match: { body: 'match', arg: 'id' } },
         chat: { reply: 'text', hint: 'Submit a claimed task for approval.' },
         ui:   { control: 'button', labelKey: 'circle.button.tasks.submitTask', label: 'Submit for review' },
       },
@@ -360,7 +362,7 @@ export const tasksManifest = {
         // Part G (2026-06-17) — slash/gate + pickerSource folded in.
         // Part C gate — bare 'accept' is calendar.rsvpAccept's (collision); approveTask keeps approve/goedkeuren/akkoord.
         slash: { command: '/approve',
-          match: { verbs: ['approve', 'goedkeuren', 'akkoord'], body: 'match', arg: 'id' } },
+          match: { body: 'match', arg: 'id' } },
         chat: { reply: 'text', hint: 'Approve a submitted task.' },
         ui:   { control: 'button', labelKey: 'circle.button.tasks.approveTask', label: 'Approve' },
       },
@@ -386,7 +388,7 @@ export const tasksManifest = {
         // `body:'flags'` carries `--note=…`; Part C gate — rejectTask owns reject/afkeuren/afwijzen
         // (collision vs calendar.rsvpDecline, which keeps 'decline').
         slash: { command: '/reject', body: 'flags',
-          match: { verbs: ['reject', 'afkeuren', 'afwijzen', 'weiger'], body: 'match', arg: 'id' } },
+          match: { body: 'match', arg: 'id' } },
         chat: { reply: 'text', hint: 'Reject a submitted task with a mandatory note.' },
         ui:   { control: 'button', labelKey: 'circle.button.tasks.rejectTask', label: 'Reject' },
       },

@@ -34,9 +34,9 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `test-peer` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `signout` | remove | · | ✅ | · | · | · | · |  |
 | **tasks** | `addTask` | add | ✅ | ✅ | ✅ | ✅ | ✅ | · | add, todo, new task, voeg, zet, maak taak, nieuwe taak |
-|  | `claimTask` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | claim, pak, neem, i'll take, i'll do, ik pak, ik doe, ik neem |
+|  | `claimTask` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | claim, i'll take, i'll do, pak, neem, ik pak, ik doe, ik neem |
 |  | `confirmClaim` | confirm | ✅ | ✅ | ✅ | · | ✅ | ✅ | confirm, bevestig, keur, keur goed, ken toe |
-|  | `completeTask` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | klaar met, done with, done, complete, completed, finished, klaar, voltooid, gedaan |
+|  | `completeTask` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | done with, done, complete, completed, finished, klaar met, klaar, voltooid, gedaan |
 |  | `removeTask` | remove | ✅ | · | · | · | · | · |  |
 |  | `attachTaskGrant` | update | ✅ | · | · | · | ✅ | · |  |
 |  | `reassignTask` | reassign | ✅ | · | · | · | · | · |  |

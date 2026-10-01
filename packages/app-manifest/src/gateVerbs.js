@@ -27,7 +27,8 @@ export function gateVerbsOf(manifest, op, locale = null) {
     for (const lang of langs) {
       for (const v of words[lang]?.[key]?.verbs ?? []) {
         const tokens = String(v).trim().split(/\s+/).filter(Boolean);
-        if (tokens.length) out.push(tokens);
+        // a word both languages use ("download") is in both files; it matches once
+        if (tokens.length && !out.some((o) => o.join(' ').toLowerCase() === tokens.join(' ').toLowerCase())) out.push(tokens);
       }
     }
     if (out.length || langs.some((l) => words[l]?.[key])) return out;

@@ -66,6 +66,11 @@
  * PLAN-gui-chat-uplift.md.
  */
 
+// The words the deterministic gate starts an op with, per language (the manifest declares the match's shape; the
+// words are data beside it — see `gateVerbsOf` in @onderling/app-manifest).
+import gateEn from './gate.en.json' with { type: 'json' };
+import gateNl from './gate.nl.json' with { type: 'json' };
+
 const STR_NONEMPTY = { schema: { minLength: 1 } };
 const ID_NONEMPTY  = { schema: { minLength: 1 } };
 
@@ -106,6 +111,7 @@ const NOTICEBOARD_INTENTS = ['ask', 'offer', 'lend'];
 /** @type {import('@onderling/app-manifest').__types__} */
 export const stoopManifest = {
   app:       'stoop',
+  gateWords:  { en: gateEn, nl: gateNl },
   // The network hosts this app's code reaches: place lookup for a typed location, and Expo's push service
   // for waking a phone. Web-push endpoints come from each subscription, so they are not fixed hosts.
   hosts:     ['nominatim.openstreetmap.org', 'exp.host'],
@@ -195,9 +201,8 @@ export const stoopManifest = {
           shape:   '/post <ask|offer|lend> <text>',
           body:    'flags',
           match: {
-            verbs:   ['post', 'ask', 'borrow', 'vraag', 'plaats', 'leen', ['bied', 'aan']],
             body:    'text-only',
-            dropTrailing: ['to', 'aan', 'op', 'in', 'voor'],
+            dropTrailing: true,
           },
         },
       },
@@ -250,7 +255,7 @@ export const stoopManifest = {
           // Resolved 2026-05-21 (owner): `/mine` (EN).  Collision-free
           // with household.  NL alias `mijn` kept as a match verb.
           command: '/mine',
-          match:   { verbs: ['mine', 'mijn'], body: 'none' },
+          match:   { body: 'none' },
         },
       },
     },
@@ -286,7 +291,6 @@ export const stoopManifest = {
           command: '/respond',
           shape:   '/respond <itemId> <message>',
           match: {
-            verbs: [['help', 'with'], ['respond', 'to'], 'offer', ['ik', 'help'], ['help', 'met'], ['reageer', 'op'], ['bied', 'hulp']],
             body:  'match',
             arg:   'itemId',
           },
@@ -330,7 +334,6 @@ export const stoopManifest = {
           // the NL aliases.
           command: '/withdraw',
           match: {
-            verbs:   ['withdraw', 'intrekken', 'annuleer'],
             body:    'match',
             onEmpty: { skillId: 'cancelRequest', args: {} },
           },
@@ -391,7 +394,6 @@ export const stoopManifest = {
         slash: {
           command: '/lend-return',
           match: {
-            verbs:   ['returned', 'teruggebracht', 'terug', ['mark', 'returned']],
             body:    'match',
             arg:     'requestId',
             onEmpty: { skillId: 'markReturned', args: {} },
@@ -425,7 +427,6 @@ export const stoopManifest = {
           // "rapporteer".
           command: '/report',
           match: {
-            verbs:   ['report', 'rapporteer', 'flag'],
             body:    'match',
             onEmpty: { skillId: 'reportPost', args: {} },
           },

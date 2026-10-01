@@ -24,10 +24,21 @@ export function compileGateWords(words = GATE_WORDS, slots = {}) {
   const out = new Map();
   for (const entries of Object.values(words)) {
     for (const [id, entry] of Object.entries(entries ?? {})) {
+      if (id.startsWith('_')) continue;   // a word list, not a rule (the trailing verbs)
       const forms = out.get(id) ?? [];
       for (const p of entry?.patterns ?? []) forms.push(compilePhrase(p, slots));
       out.set(id, forms);
     }
+  }
+  return out;
+}
+
+/** The trailing verbs per language ("afwas klaar"), as the manifest gate reads them: `{ <lang>: { complete: [...] } }`. */
+export function trailingLexicon(words = GATE_WORDS) {
+  const out = {};
+  for (const [lang, entries] of Object.entries(words)) {
+    const tr = entries?._trailing ?? {};
+    out[lang] = Object.fromEntries(Object.entries(tr).filter(([k, v]) => k !== 'doc' && Array.isArray(v)));
   }
   return out;
 }

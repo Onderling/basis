@@ -38,29 +38,16 @@ import { compileGateWords, GATE_WORDS } from './gateWords.js';
  */
 export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
   const loc = CIRCLE_GATE_TRAIL[locale] ? locale : DEFAULT_GATE_LOCALE;
+  // The household circle's own rules, first-match-wins, before the manifest-derived ones. Their WORDS are the gate's
+  // locale files (gate.<lang>.json, the `circle.*` entries); what each does is CIRCLE_RULES below.
+  const compiled = compileGateWords(GATE_WORDS, { list: Object.keys(HH_LIST_ALIASES) });
   return [
-    // Household TYPED-LIST add (prepended, first-match-wins). The tasks-derived gate below treats EVERY
-    // "add" as a generic addTask and DROPS the list qualifier (see circleGate.test "add X to the list").
-    // But a household circle has typed lists — shopping/errand/repair/schedule — so "add bananas to the
-    // shopping list" must reach addItem({type:'shopping'}), not addTask. This catches the TYPED phrasing
-    // (English + common Dutch); generic "add X to the list" (no type word) returns null → falls through
-    // to the unchanged addTask rule. Types mirror the household manifest's addItem enum.
-    { name: 'household:addItem(typed-list)', test: HH_ADD_TYPED, command: householdTypedListAdd },
-    // An UNTYPED add ("voeg melk toe", "add milk to the list", "zet kaas erbij") is a household list item
-    // whose LIST is unknown → addItem WITHOUT a type, so the shell asks "which list?" (a needsForm on `type`)
-    // instead of the July default that made every bare add a task (ledger L90, 2026-09-05). A task is still
-    // reachable by saying so ("add task …", "taak: …") — that falls through to the tasks rule.
-    { name: 'household:addItem(untyped-asks)', test: (t) => HH_ADD_COLON.test(t) || HH_ADD_UNTYPED.test(t), command: householdUntypedAdd },
-    // "kaas is gekocht" · "de afwas is gedaan" · "milk is bought" — a statement that an item is done; the model
-    // asked "do you want me to …?" instead (eval 2026-09-05). Deterministic: markComplete by name.
-    { name: 'household:markComplete(stated-done)', test: HH_STATED_DONE, command: householdStatedDone },
-    // Household READ rules (prepended). The tasks-derived gate skips read phrasing ("show the shopping
-    // list", "what tasks do we have") → the LLM, which (small models) mis-picks markComplete and dumps a
-    // confusing "which one to complete?" clarify ON A READ (the markComplete-on-read bug, 2026-06-25).
-    // Route reads deterministically to listOpen/listTasks so they never reach the model. A read with no
-    // recognised list-type/tasks keyword (e.g. "what lists do we have") returns null → falls through.
-    { name: 'household:listOpen(typed-list-read)', test: HH_LIST_READ,  command: householdListRead },
-    { name: 'household:listTasks(read)',           test: HH_TASKS_READ, command: householdTasksRead },
+    ...CIRCLE_RULES.map(({ id, name, build }) => {
+      const forms = compiled.get(id) ?? [];
+      const slotsOf = (text) => { for (const f of forms) { const m = f.match(text); if (m) return m; } return null; };
+      const command = (text, ctx) => { const m = slotsOf(String(text ?? '')); return m ? build(m, String(text).trim(), ctx) : null; };
+      return { name, test: (text) => Boolean(slotsOf(String(text ?? ''))), command };
+    }),
     ...createGate([
       mockTasksManifest,
       mockStoopManifest,
@@ -215,69 +202,29 @@ export function coerceListArgs(cmd, catalogue) {
   }
   return { ...cmd, args };
 }
-// "<item> is gekocht/gedaan/klaar/af" · "<item> is bought/done" — a statement, not a command.
-const HH_STATED_DONE = /^(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:is|zijn|are)\s+(?:al\s+|already\s+)?(gekocht|gehaald|gedaan|klaar|af|binnen|bought|done|finished)[.!]?$/i;
-function householdStatedDone(text) {
-  const m = HH_STATED_DONE.exec(String(text || '').trim());
-  if (!m) return null;
-  const item = m[1].trim();
-  return item ? { opId: 'markComplete', args: { match: item } } : null;
-}
-// "add <item>" · "voeg <item> toe" · "zet <item> erbij" · "add <item> to the list" — no list named.
-const HH_ADD_UNTYPED =
-  /^(?:add|voeg|zet|doe|noteer)\s+(.+?)(?:\s+(?:toe|erbij|op\s+de\s+lijst|op\s+het\s+lijstje|to\s+the\s+list|on\s+the\s+list))?\s*$/i;
-// "voeg toe: spruiten kopen" · "add: milk" — the verb first, then a colon, then the item (walk 3: the tasks rule
-// took "Voeg toe: …" and made a task named "toe: spruiten kopen").
-const HH_ADD_COLON = /^(?:voeg\s+toe|add|zet\s+erbij|noteer)\s*:\s*(.+?)\s*$/i;
-function householdUntypedAdd(text, ctx) {
-  const colon = HH_ADD_COLON.exec(String(text || '').trim());
-  if (colon) return { opId: 'addItem', args: { text: colon[1].trim() } };   // explicit form: always ours, never a task
-  // With a conversation under way the MODEL decides — it has the recent turns ("doe broccoli erbij" after a
-  // shopping-list exchange means shopping); the memory-less gate would only ask what the model already knows.
-  if (Number(ctx?.memoryTurns) > 0) return null;
-  const m = HH_ADD_UNTYPED.exec(String(text || '').trim());
-  if (!m) return null;
-  const item = m[1].trim().replace(/^(?:a|an|the|een|de|het)\s+/i, '');
-  if (!item) return null;
-  if (/^(?:task|taak|klus)\b/i.test(item)) return null;   // "add task …" is a task — the tasks rule takes it
-  return { opId: 'addItem', args: { text: item } };        // no type → the shell asks which list
-}
-// "add <item> to [the] <type> [list]" · "noteer <item> op de <type>lijst" · "voeg <item> toe aan de <type>"
-const HH_ADD_TYPED =
-  /^(?:add|noteer|zet|voeg)\s+(.+?)\s+(?:toe\s+)?(?:to|on|op|aan|naar)\s+(?:the\s+|de\s+|het\s+|my\s+|mijn\s+)?([a-zA-Z]+?)(?:[-\s]?(?:list|lijst|lijstje))?\.?$/i;
-
-/**
- * "add X to the <type> list" → `addItem({type, text:X})` when <type> is a known household list type;
- * otherwise null so the generic addTask rule handles it. Pure + deterministic (gate-safe).
- * @param {string} text
- * @returns {{opId:'addItem', args:{type:string, text:string}}|null}
- */
-function householdTypedListAdd(text) {
-  const m = HH_ADD_TYPED.exec(String(text || '').trim());
-  if (!m) return null;
-  const item = m[1].trim();
-  const type = HH_LIST_ALIASES[m[2].toLowerCase()];
-  if (!item || !type) return null;   // no known list type → generic add (addTask) takes it
-  const items = splitItems(item);
-  return { opId: 'addItem', args: { type, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addItem', args: { type, text: t } })) } : {}) };
-}
-
-// Read intent (EN + common NL); leading verb so a mutate phrase ("add"/"done"/"complete") never matches.
-const HH_READ = '(?:show|list|see|view|display|open|give|what(?:\'?s| is| are)?(?: on| in| left)?|which|welke|laat|toon|wat)';
-// read intent + a recognised list-type keyword → listOpen({type}); the type is the capture group.
-const HH_LIST_READ = new RegExp('^' + HH_READ +
-  '\\b.*?\\b(shopping|groceries|grocery|boodschappen|boodschappenlijst|errand|errands|klusje|klusjes|repair|repairs|reparatie|reparaties|schedule|schedules|agenda)\\b', 'i');
-// read intent + a tasks/chores keyword → listTasks.
-const HH_TASKS_READ = new RegExp('^' + HH_READ + '\\b.*?\\b(tasks?|chores?|to-?dos?|taken)\\b', 'i');
-
-/** "show the <type> list" / "what's on the <type> list" → `listOpen({type})`; null if no known type. */
-function householdListRead(text) {
-  const m = HH_LIST_READ.exec(String(text || '').trim());
-  if (!m) return null;
-  const type = HH_LIST_ALIASES[m[1].toLowerCase()];
-  return type ? { opId: 'listOpen', args: { type } } : null;
-}
-/** "what tasks do we have" / "show the chores" → `listTasks`. */
-function householdTasksRead(text) {
-  return HH_TASKS_READ.test(String(text || '').trim()) ? { opId: 'listTasks', args: {} } : null;
-}
+// The household circle's own rules: what each one does with the slots its words (gate.<lang>.json) hand back.
+const CIRCLE_RULES = [
+  // "zet melk op de boodschappen" · "add milk to the shopping list" — a known list type, one or more things
+  { id: 'circle.addItem.typed', name: 'household:addItem(typed-list)', build: (m) => {
+    const type = householdListType(m.list);
+    const items = splitItems(m.items);
+    if (!type || !items[0]) return null;
+    return { opId: 'addItem', args: { type, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addItem', args: { type, text: t } })) } : {}) };
+  } },
+  // "voeg toe: spruiten kopen" (always ours, never a task) · "voeg melk toe" (no list named → the shell asks which)
+  { id: 'circle.addItem.untyped', name: 'household:addItem(untyped-asks)', build: (m, _text, ctx) => {
+    if (m.text !== undefined) return m.text ? { opId: 'addItem', args: { text: m.text } } : null;
+    // With a conversation under way the MODEL decides — it has the recent turns ("doe broccoli erbij" after a
+    // shopping-list exchange means shopping); the memory-less gate would only ask what the model already knows.
+    if (Number(ctx?.memoryTurns) > 0) return null;
+    const item = String(m.item ?? '').replace(/^(?:a|an|the|een|de|het)\s+/i, '');
+    if (!item || /^(?:task|taak|klus)\b/i.test(item)) return null;   // "add task …" is a task — the tasks rule takes it
+    return { opId: 'addItem', args: { text: item } };
+  } },
+  // "kaas is gekocht" · "the dishes are done" — a statement, not a command
+  { id: 'circle.markComplete.stated', name: 'household:markComplete(stated-done)', build: (m) => (m.item ? { opId: 'markComplete', args: { match: m.item } } : null) },
+  { id: 'circle.listOpen.typed', name: 'household:listOpen(typed-list-read)', build: (m) => { const type = householdListType(m.list); return type ? { opId: 'listOpen', args: { type } } : null; } },
+  { id: 'circle.listTasks.read', name: 'household:listTasks(read)', build: () => ({ opId: 'listTasks', args: {} }) },
+];
+/** The circle rules' ids, in order — what the words guard checks each language against. */
+export const CIRCLE_GATE_RULE_IDS = Object.freeze(CIRCLE_RULES.map((r) => r.id));

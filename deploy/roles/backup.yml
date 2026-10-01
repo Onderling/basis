@@ -18,6 +18,9 @@ services:
       - ../backup/backup.sh:/backup/backup.sh:ro
       - ../backup/run-scheduled.sh:/backup/run-scheduled.sh:ro
       - ${BOX_DIR}/data/backup-targets:/backup/targets:ro
+      # a LOCAL destination: a folder on the box outside every volume (a target names it as /backup/local/<repo>).
+      # A different disk or a mount later is the same line; a remote target (sftp, s3) needs no folder at all.
+      - ${BOX_DIR}/data/backup-local:/backup/local
       - ${BOX_DIR}/state.json:/backup/data/box/state.json:ro
       - relay-data:/backup/data/relay:ro
       - pod-data:/backup/data/pod:ro

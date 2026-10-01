@@ -170,5 +170,80 @@
     "not": [
       "i am away tomorrow at 10"
     ]
+  },
+  "circle.addItem.typed": {
+    "doc": "In a household circle: put one or more things on a typed list (shopping, chores, repairs, the agenda).",
+    "patterns": [
+      "add {items} (to|on) (the|my)? {list}"
+    ],
+    "examples": [
+      "add bananas to the shopping list",
+      "add milk to the groceries"
+    ],
+    "not": [
+      "add a note to the garage"
+    ]
+  },
+  "circle.addItem.untyped": {
+    "doc": "In a household circle: add something without naming the list — the app asks which (\"voeg toe: X\" always; a plain \"voeg X toe\" only when no conversation is under way, else the model decides).",
+    "patterns": [
+      "add: {text}",
+      "add {item} (to the list|on the list)?"
+    ],
+    "examples": [
+      "add: milk",
+      "add milk to the list"
+    ],
+    "not": [
+      "add task call the plumber"
+    ]
+  },
+  "circle.markComplete.stated": {
+    "doc": "In a household circle: something is bought or done — tick it off by its words.",
+    "patterns": [
+      "(the)? {item} (is|are) (already)? (bought|done|finished)"
+    ],
+    "examples": [
+      "milk is bought",
+      "the dishes are done"
+    ],
+    "not": [
+      "is dinner done"
+    ]
+  },
+  "circle.listOpen.typed": {
+    "doc": "In a household circle: read a typed list (shopping, chores, repairs, the agenda).",
+    "patterns": [
+      "(show|list|see|view|display|open|give|what|what's|which) {any} {list} {any}"
+    ],
+    "examples": [
+      "show the shopping list",
+      "what's on the groceries"
+    ],
+    "not": [
+      "what do we have"
+    ]
+  },
+  "circle.listTasks.read": {
+    "doc": "In a household circle: read the tasks.",
+    "patterns": [
+      "(show|list|see|view|display|open|give|what|what's|which) {any} (tasks|task|chores|chore|to-dos|todos|to-do|todo) {any}"
+    ],
+    "examples": [
+      "what tasks do we have",
+      "show the chores"
+    ],
+    "not": [
+      "show the shopping list"
+    ]
+  },
+  "_trailing": {
+    "doc": "Single words that, AFTER an item, mean it is done (\"afwas klaar\"). Dutch speakers code-switch, so English ones may be here too.",
+    "complete": [
+      "done",
+      "complete",
+      "completed",
+      "finished"
+    ]
   }
 }

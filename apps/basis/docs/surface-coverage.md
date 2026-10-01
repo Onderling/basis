@@ -112,8 +112,8 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `respondToItem` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | help with, respond to, offer, ik help, help met, reageer op, bied hulp |
 |  | `cancelRequest` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | withdraw, intrekken, annuleer |
 |  | `assignLend` | reassign | ✅ | ✅ | · | · | · | · |  |
-|  | `markReturned` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | returned, teruggebracht, terug, mark returned |
-|  | `reportPost` | report | ✅ | ✅ | ✅ | · | ✅ | ✅ | report, rapporteer, flag |
+|  | `markReturned` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | returned, mark returned, teruggebracht, terug |
+|  | `reportPost` | report | ✅ | ✅ | ✅ | · | ✅ | ✅ | report, flag, rapporteer |
 |  | `setMyOfferings` | set | ✅ | ✅ | · | · | · | · |  |
 |  | `setPeerReveal` | set | ✅ | ✅ | · | · | · | · |  |
 |  | `leaveGroup` | remove | ✅ | ✅ | · | · | · | · |  |

@@ -15,7 +15,7 @@ import { householdManifest } from '../../../household/manifest.js';
 
 const MANIFESTS = [calendarManifest, mockTasksManifest, mockStoopManifest, mockFolioManifest, householdManifest];
 // words still in `match.verbs` — moved one app at a time; an app leaves this list when its files land
-const NOT_MOVED_YET = new Set(['stoop', 'folio', 'household']);
+const NOT_MOVED_YET = new Set(['folio', 'household']);
 const appOf = (m) => m.appId ?? m.app;
 const matched = (m) => (m.operations ?? []).filter((op) => op?.surfaces?.slash?.match);
 

@@ -3,6 +3,7 @@
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
 import { checkExport, countExport } from './householdExport.js';
+import { isSealedExport, openExport } from './householdExportSeal.js';
 import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 
@@ -52,6 +53,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
       if (op === 'assistant-exports') return exportsOp();
+      if (op === 'assistant-export') return exportNowOp();
       if (op === 'assistant-import') return importOp(args?.file ?? args?._match, { preview: args?.preview === true });
       const threadId = typeof ctx?.threadId === 'string' && ctx.threadId ? ctx.threadId : null;
       if (!threadId) return { ok: false, error: 'no-thread' };
@@ -100,6 +102,18 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: names.length ? t('circle.bot.exports_list', { names: names.join('\n') }) : t('circle.bot.exports_none') };
   }
 
+  /** One export now, onto the shelf: its name, and whether it is sealed. */
+  async function exportNowOp() {
+    if (!admin.exports || typeof admin.exports.writeNow !== 'function') return { ok: false, error: 'unwired' };
+    const name = await admin.exports.writeNow();
+    if (!name) return { ok: false, error: { code: 'failed', message: t('circle.bot.export_failed') } };
+    const sealed = typeof admin.exports.read === 'function' ? isSealedExport(await admin.exports.read(name).catch(() => null)) : false;
+    return { ok: true, message: t(sealed ? 'circle.bot.export_written_sealed' : 'circle.bot.export_written_plain', { name }) };
+  }
+
+  /** Close the key unlocked on the box (after an import, or a real attempt that failed). */
+  async function lock() { if (typeof admin.lockKey === 'function') await admin.lockKey().catch(() => {}); }
+
   /** Read an export back (the admin's; asked first — `preview` answers the question with what the file holds). */
   async function importOp(name, { preview = false } = {}) {
     if (!admin.exports || typeof admin.importFile !== 'function') return { ok: false, error: 'unwired' };
@@ -107,11 +121,24 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     let data;
     try { data = await admin.exports.read(file); }
     catch { return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_no_file', { name: file }) } }; }
+    // A sealed file opens only with the admin's key, unlocked ON THE BOX with the passphrase (never through a chat)
+    if (isSealedExport(data)) {
+      const secret = typeof admin.unlockedKey === 'function' ? await admin.unlockedKey() : null;
+      if (!secret) return { ok: false, error: { code: 'locked', message: t('circle.bot.import_locked', { name: file }) } };
+      try { data = openExport(data, secret); }
+      catch {
+        // a real attempt that failed closes the key too (a preview keeps it open: its question needs it)
+        if (!preview) await lock();
+        return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_not_this_key', { name: file }) } };
+      }
+    }
     const checked = checkExport(data);
-    if (!checked.ok) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_unreadable', { name: file }) } };
+    if (!checked.ok) { if (!preview) await lock(); return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_unreadable', { name: file }) } }; }
     const c = countExport(data);
     if (preview) return { ok: true, vars: c, message: t('circle.bot.import_confirm_counts', { name: file, ...c }) };
-    const r = await admin.importFile(data);
+    // the unlocked key was for this import: it does not stay on the box, whatever the import did
+    let r;
+    try { r = await admin.importFile(data); } finally { await lock(); }
     if (!r?.ok) {
       // part-way: what was restored before it stopped is said too
       const partly = r?.done ? `\n${t('circle.bot.import_done', { ...r.done })}` : '';

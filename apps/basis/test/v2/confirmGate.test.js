@@ -195,3 +195,14 @@ describe('a confirm that declares a preview', () => {
     expect(await confirmPreviewMessage({ route: plain, catalogue, call })).toBeNull();
   });
 });
+
+
+describe('a preview the op refuses', () => {
+  it('is not asked: the refusal is said instead', async () => {
+    const { confirmPreview } = await import('../../src/v2/confirmGate.js');
+    const lists = mergeManifests([{ manifest: listsManifestForPreview }]);
+    const route = resolveDispatch({ kind: 'slash', opId: 'removeList', args: { list: 'werktaken' } }, lists);
+    expect(await confirmPreview({ route, catalogue: lists, call: async () => ({ ok: false, error: { code: 'locked', message: 'eerst ontgrendelen' } }) })).toEqual({ refused: 'eerst ontgrendelen' });
+    expect(await confirmPreview({ route, catalogue: lists, call: async () => ({ ok: true, message: 'met 3?' }) })).toEqual({ message: 'met 3?' });
+  });
+});

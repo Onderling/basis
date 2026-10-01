@@ -4173,6 +4173,26 @@
       "text": "\"{{name}}\" kan ik niet lezen als exportbestand.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "import_locked": {
+      "text": "\"{{name}}\" is verzegeld. Open de sleutel eerst op de box: node apps/basis/bin/export-key.mjs unlock (in de container van de bot). Daarna /import opnieuw.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_not_this_key": {
+      "text": "De sleutel die nu open staat, opent \"{{name}}\" niet. Open de sleutel van dat bestand: node apps/basis/bin/export-key.mjs unlock --from {{name}}.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_failed": {
+      "text": "Het exportbestand kon ik niet schrijven.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_sealed": {
+      "text": "Opgeslagen en verzegeld: {{name}}. Terugzetten kan met /import {{name}}, na het openen van de sleutel op de box.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "export_written_plain": {
+      "text": "Opgeslagen: {{name}}. Let op: niet verzegeld — zet een sleutel op de box met node apps/basis/bin/export-key.mjs set.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
     "import_done": {
       "text": "Teruggezet: {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken, {{people}} mensen.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."

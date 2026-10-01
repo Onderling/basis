@@ -62,7 +62,7 @@ import { createPersonReach } from '../src/v2/doorReach.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { welcomeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
-import { createExportShelf } from '../src/v2/householdExportShelf.js';
+import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom } from '../src/v2/botSettings.js';
 import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
@@ -748,6 +748,14 @@ if (tgToken || inboxDoor.bridge) {
   // The household's export (the one format kept readable across versions): one a night into the bot's data dir, the
   // last few kept, so the box's snapshot carries it off; the admin reads one back with /import.
   const exportsDir = path.join(dataDir, 'exports');
+  // An unlocked export key does not outlive its hour (an admin who unlocked and then said No, or never imported):
+  // removed when it is read past its time, and swept every minute.
+  const sweepUnlocked = () => {
+    const p = path.join(dataDir, UNLOCKED_KEY_FILE);
+    try { if (!unlockedSecret(readFileSync(p, 'utf8'))) rmSync(p, { force: true }); } catch { /* none */ }
+  };
+  sweepUnlocked();
+  setInterval(sweepUnlocked, 60_000).unref?.();
   const exportShelf = createExportShelf({
     files: {
       list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
@@ -761,12 +769,27 @@ if (tgToken || inboxDoor.bridge) {
       read: async (name) => readFileSync(path.join(exportsDir, name), 'utf8'),
       remove: async (name) => rmSync(path.join(exportsDir, name), { force: true }),
     },
-    exportNow: () => exportFromHost({
-      items: () => agent.householdItems(),
-      people: () => botUsers.list(),
-      params: async () => (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? [],
-    }),
-    onWritten: (e) => walkLog({ kind: 'export', ok: e.ok, ...(e.name ? { name: e.name } : {}), ...(e.error ? { error: e.error } : {}) }),
+    exportNow: async () => {
+      // beside it, the bot's own recovery file (its circles and their members, sealed to its recovery phrase — the
+      // existing carrier): one snapshot of the folder then holds all a restore needs besides the phrase
+      try {
+        const rec = await callSkill('household', 'exportRecoveryFile', {});
+        if (rec?.ok && typeof rec.file === 'string') { mkdirSync(exportsDir, { recursive: true, mode: 0o700 }); writeFileSync(path.join(exportsDir, 'recovery-file.txt'), rec.file, { mode: 0o600 }); }
+      } catch { /* the export goes on without it */ }
+      return exportFromHost({
+        items: () => agent.householdItems(),
+        people: () => botUsers.list(),
+        params: async () => (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? [],
+      });
+    },
+    // sealed to the admin's export key once one is set (`bin/export-key.mjs set`, on the box)
+    // no key set → plain; a key that cannot be read (permissions, a cut-off file) → the write FAILS, never goes out plain
+    sealWith: async () => {
+      let text;
+      try { text = readFileSync(path.join(dataDir, EXPORT_KEY_FILE), 'utf8'); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; }
+      return JSON.parse(text);
+    },
+    onWritten: (e) => walkLog({ kind: 'export', ok: e.ok, sealed: Boolean(e.sealed), ...(e.name ? { name: e.name } : {}), ...(e.error ? { error: e.error } : {}) }),
   });
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
@@ -777,6 +800,9 @@ if (tgToken || inboxDoor.bridge) {
       revoke: (who) => botUsers.revoke(who),
       setRole: (who, role) => botUsers.setRole(who, role),
       exports: exportShelf,
+      // a sealed file opens with the key the admin unlocked on the box (`bin/export-key.mjs unlock`); the import closes it
+      unlockedKey: async () => { sweepUnlocked(); try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
+      lockKey: async () => rmSync(path.join(dataDir, UNLOCKED_KEY_FILE), { force: true }),
       // the file's things written back through their own ops, each as its person (the host vouches, as its door does)
       importFile: (file) => importHousehold(file, { call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller }),
       // Telegram's own link: tapping it opens the bot and sends `/start <code>`.

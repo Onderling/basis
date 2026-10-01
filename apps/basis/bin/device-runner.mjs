@@ -59,6 +59,11 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
+import { renderA2A } from '@onderling/app-manifest';
+import { createBotScreens } from '../src/v2/botScreens.js';
+import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
+import { screenActsAs, screenColumnFor, BOT_SCREEN_NEVER } from '../src/v2/screenActing.js';
+import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
@@ -113,6 +118,8 @@ await initLocalisation({ lng: values.lang });
 
 const relayUrl = (process.env.ONDERLING_RELAY_URL ?? '').trim();
 const appUrl   = (process.env.BASIS_APP_URL ?? '').trim();
+// A screen's offer (`/scherm`) arrives on the peer router, which is up before the door that answers it exists.
+const screenOffer = { handle: null };
 
 /** The vault key: the environment if set, else one generated once beside the vault — the machine that
  *  runs unattended holds it, which is the same trust as the disk the vault itself is on. */
@@ -207,7 +214,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows } : {}),
+  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -533,6 +540,8 @@ if (relayUrl) {
       'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent, logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} } }),
       // A roster owner says a row changed; the values are re-read, never carried on this wire.
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
+      // A screen a person asked to connect (`/scherm`) sends its offer; the door, once up, grants it.
+      'screen-offer': (from, payload) => screenOffer.handle?.(from, payload),
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -789,9 +798,26 @@ if (tgToken || inboxDoor.bridge) {
     },
     onWritten: (e) => walkLog({ kind: 'export', ok: e.ok, sealed: Boolean(e.sealed), ...(e.name ? { name: e.name } : {}), ...(e.error ? { error: e.error } : {}) }),
   });
+  // A household bot's people connect screens (`/scherm`): the grant is their role column, each token acting as them.
+  const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
+  const screens = isFunctionProfile ? createBotScreens({
+    threads,
+    isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
+    sendPrivately: (person, text) => reach.sendToPerson(person, { text }),
+    columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
+    grant: (g) => agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce }),
+    revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
+    listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
+    notify: async (person, key, params) => {
+      const lang = threads.langOf(person);
+      await reach.sendToPerson(person, { text: t(key, { ...params, days: Math.round(SURFACE_GRANT_TTL_MS / 86_400_000) }, lang ?? undefined) });
+    },
+    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null }),
+  }) : null;
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     admin: {
+      screens,
       catalogue: doorCatalogue,
       users: () => botUsers.list(),
       admission,
@@ -812,6 +838,23 @@ if (tgToken || inboxDoor.bridge) {
       }),
     },
   });
+  if (screens) {
+    // The door's ops, to a connected screen: each call runs as the person its token names, through this door's own
+    // call — the same gate as their typed line — and what a screen never gets is withheld at the kernel's door.
+    // Only the ops on the bot's map are exposed (any role's), and the withheld ones as `never`: an unmapped op is an
+    // unknown skill to a screen, not one that merely has no token.
+    const mapped = new Set(screenColumnFor(doorCatalogue.catalogue(), 'admin').concat(screenColumnFor(doorCatalogue.catalogue(), 'member'), screenColumnFor(doorCatalogue.catalogue(), 'observer'), BOT_SCREEN_NEVER));
+    const defs = renderA2A(Object.values(doorCatalogue.manifestsByOrigin()), { callSkill: doorCall }, {
+      ctxFor: screenActsAs(botUsers, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER,
+    }).filter((d) => mapped.has(d.id));
+    const exposed = agent.exposeToPeers(defs);
+    screenOffer.handle = async (from, payload) => {
+      const offer = parsePairingOffer(payload?.offer);
+      const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };
+      walkLog({ kind: 'screen-offer', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });
+    };
+    walkLog({ kind: 'screens', exposed });
+  }
   tgRunner = createTelegramRunner({
     bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),
     catalogue: doorCatalogue.catalogue,
@@ -849,7 +892,6 @@ if (tgToken || inboxDoor.bridge) {
   // A household bot writes first, too: reminders of what people dated, on each person's own door (the tick asks the
   // projection every few minutes; the household's switch and quiet hours are the admin's settings).
   if (isFunctionProfile) {
-    const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
     const reminderTick = createReminderTick({
       sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
       tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,

@@ -52,6 +52,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-invite') return inviteOp();
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
+      if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId);
+      if (op === 'assistant-screens') return screensOp(caller ?? ctx?.threadId, args?.change ?? args?._match);
       if (op === 'assistant-exports') return exportsOp();
       if (op === 'assistant-export') return exportNowOp();
       if (op === 'assistant-import') return importOp(args?.file ?? args?._match, { preview: args?.preview === true });
@@ -264,7 +266,39 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (typeof admin.revoke !== 'function') return { ok: false, error: 'unwired' };
     const row = await admin.revoke(who);
     if (!row) return { ok: false, error: { code: 'unknown-user', message: t('circle.bot.revoke_unknown', { who: String(who ?? '') }) } };
-    return { ok: true, message: t('circle.bot.revoked', { who: row.displayName ?? row.id }) };
+    // a person who is no longer admitted keeps no screen
+    const dropped = typeof admin.screens?.dropAll === 'function' ? await admin.screens.dropAll(row.id) : 0;
+    const said = t('circle.bot.revoked', { who: row.displayName ?? row.id });
+    return { ok: true, message: dropped ? `${said} ${t('circle.bot.revoked_screens', { n: dropped })}` : said };
+  }
+
+  /** `/scherm`: a one-time link for this person's screen. */
+  async function screenOp(person) {
+    if (!person || !admin.screens) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    // the link goes to the person's PRIVATE door only; the chat it was asked in (maybe a group) hears where it went
+    const r = await admin.screens.start(person, (link, minutes) => tp('circle.bot.screen_link', { link, minutes }));
+    if (!r.ok) {
+      const key = r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable';
+      return { ok: false, error: { code: r.reason, message: tp(key) } };
+    }
+    return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+  }
+
+  /** `/schermen` (the person's screens) · `/schermen los <n>` (drop one). */
+  async function screensOp(person, change) {
+    if (!person || !admin.screens) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const m = /^\s*(?:los|drop|remove)\s+(\d+)\s*$/i.exec(String(change ?? ''));
+    if (m) {
+      const r = await admin.screens.drop(person, Number(m[1]));
+      return r.ok ? { ok: true, message: tp('circle.bot.screen_dropped', { i: m[1] }) }
+        : { ok: false, error: { code: r.reason ?? 'no-such-screen', message: tp('circle.bot.screen_no_such', { i: m[1] }) } };
+    }
+    const list = await admin.screens.list(person);
+    if (!list.length) return { ok: true, message: tp('circle.bot.screens_none') };
+    const rows = list.map((g, i) => tp('circle.bot.screens_row', { i: i + 1, label: g.label ?? 'scherm', n: (g.ops ?? []).length }));
+    return { ok: true, message: tp('circle.bot.screens_list', { list: rows.join('\n') }) };
   }
 
   async function usersText() {

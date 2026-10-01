@@ -9,23 +9,57 @@
  * the same gate as that person's typed line — and refuses a call with no person, or a person not in its book.
  */
 
+import { scopeCatalogueToRole } from './botOpMap.js';
+
 /** The bot's ops a screen never reaches, whatever token it holds: reading a file back, or pairing more screens. */
 export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-import',
   'assistant.assistant-export',
   'assistant.assistant-exports',
+  'assistant.assistant-screen',
+  'assistant.assistant-screens',
 ]);
 
 /**
- * The `ctxFor` for `renderA2A` on a bot: the verified call's token's `actingAs`, when that person is in the book.
+ * The ops a person's screen is granted: their ROLE COLUMN as the door composes it (`scopeCatalogueToRole` over the
+ * door's catalogue — the same ops their typed line reaches), as skill ids (`app.op`), without what a screen never gets
+ * and without the admin's own assistant ops (managing people and exports comes with its own step).
+ * @param {object} catalogue  the door's merged catalogue
+ * @param {string|null} role  the person's role on the bot
+ * @returns {string[]}
+ */
+export function screenColumnFor(catalogue, role) {
+  // no role (not in the book, revoked): nothing — never a default column
+  if (typeof role !== 'string' || !role) return [];
+  const scoped = scopeCatalogueToRole(catalogue, role);
+  const out = [];
+  for (const [, entry] of scoped?.opsById ?? []) {
+    const id = `${entry?.appOrigin}.${entry?.op?.id}`;
+    if (!entry?.appOrigin || !entry?.op?.id || out.includes(id)) continue;
+    if (BOT_SCREEN_NEVER.includes(id)) continue;
+    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted') continue;
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * The `ctxFor` for `renderA2A` on a bot: the verified call's token's `actingAs`, when that person is in the book AND the
+ * token is ACTIVE on the grants lane for that same person — an allow-list: a token the lane never saw (signed with the
+ * bot's key, but not granted), or one dropped by `/schermen los`, is refused here as well as by the revocation check.
  * @param {{list: () => Promise<Array<{id: string, hidden?: boolean}>>}} users  the bot's book (revoked rows are not listed)
+ * @param {object} a
+ * @param {(tokenId: string) => Promise<{viewPubKey: string, actingAs: string|null}|null>} a.activeEntry  the lane's answer
  * @returns {(handlerCtx: object) => Promise<{caller: string, threadId: string}|null>}
  */
-export function screenActsAs(users) {
+export function screenActsAs(users, { activeEntry } = {}) {
+  if (typeof activeEntry !== 'function') throw new TypeError('screenActsAs: the grants lane (activeEntry) is required');
   return async (hctx) => {
     const token = hctx?.envelope?.payload?._token ?? null;
     const actingAs = token?.constraints?.actingAs;
     if (typeof actingAs !== 'string' || !actingAs) return null;
+    const entry = await activeEntry(token?.id);
+    if (!entry || entry.actingAs !== actingAs || entry.viewPubKey !== token?.subject) return null;
     const row = ((await users.list()) ?? []).find((u) => u?.id === actingAs && !u.hidden);
     return row ? { caller: actingAs, threadId: actingAs } : null;
   };

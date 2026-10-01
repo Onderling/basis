@@ -141,6 +141,17 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { pending: _p, ...rest } = rowOf(id);
       return save(pending ? { ...rest, pending } : rest);
     },
+    /** The screen this person asked to connect (`/scherm`): `{hash, until}` of its one-time nonce, or null. */
+    screenNonceOf: (id) => rows.get(id)?.screenNonce ?? null,
+    setScreenNonce(id, nonce) {
+      const { screenNonce: _n, ...rest } = rowOf(id);
+      return save(nonce ? { ...rest, screenNonce: { hash: nonce.hash, until: nonce.until } } : rest);
+    },
+    /** Whose pending screen nonce has this hash (one pending per person), or null. */
+    screenNonceOwner(hash) {
+      for (const [id, r] of rows) if (r?.screenNonce?.hash === hash) return id;
+      return null;
+    },
     /** The engine's memory: what a thread remembers, and the last turns it reads. */
     memory: {
       remember(threadId, who, text) {

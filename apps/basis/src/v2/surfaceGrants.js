@@ -224,6 +224,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
           label: typeof p.label === 'string' ? p.label : null,
           ops: Object.freeze((Array.isArray(p.ops) ? p.ops : []).filter((o) => typeof o === 'string' && o)),
           reads: normaliseReads(p.reads),
+          actingAs: typeof p.actingAs === 'string' && p.actingAs ? p.actingAs : null,
           tokens: Object.freeze((Array.isArray(p.tokens) ? p.tokens : [])
             .filter((t) => typeof t?.id === 'string' && t.id)
             .map((t) => Object.freeze({ id: t.id, expiresAt: t.expiresAt }))),
@@ -282,12 +283,15 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
      * @param {string[]} g.ops        picked skill ids
      * @param {string} [g.label]      display label for the surface
      * @param {number} [g.expiresIn=SURFACE_GRANT_TTL_MS]
+     * @param {string} [g.actingAs]   the PERSON this screen acts as, when the issuer answers for several (a household
+     *   bot): stamped, signed, on every token, and kept on the lane entry. Omitted → the issuer itself (its own screen).
      */
-    async grant({ viewPubKey, ops, reads = null, label = null, expiresIn = SURFACE_GRANT_TTL_MS } = {}) {
+    async grant({ viewPubKey, ops, reads = null, label = null, expiresIn = SURFACE_GRANT_TTL_MS, actingAs = null } = {}) {
       if (typeof viewPubKey !== 'string' || viewPubKey.length === 0) {
         throw new Error('surfaceGrants.grant: viewPubKey required');
       }
-      const bundle = compileSurfaceBundle(ops, { actingAs: identity.pubKey, label });
+      const person = typeof actingAs === 'string' && actingAs ? actingAs : null;
+      const bundle = compileSurfaceBundle(ops, { actingAs: person ?? identity.pubKey, label });
       const normReads = normaliseReads(reads);
       const tokens = [];
       for (const g of bundle.grants) {
@@ -304,14 +308,14 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
         kind: 'grant',
         subject: viewPubKey,
         payload: statementPayload({
-          viewPubKey, label, ops: [...ops], reads: normReads,
+          viewPubKey, label, ops: [...ops], reads: normReads, ...(person ? { actingAs: person } : {}),
           tokens: tokens.map((t) => ({ id: t.id, expiresAt: t.expiresAt })),
         }),
       });
       if (!res) throw new Error('surfaceGrants.grant: the grants lane refused the append (no device signer)');
       await recompute();
       if (typeof fan === 'function') { try { fan(res.statement); } catch { /* fan is best-effort */ } }
-      return { viewPubKey, label, ops: [...ops], reads: normReads, laneId: normReads ? viewLaneId(viewPubKey) : null, tokens: tokens.map((t) => t.toJSON()) };
+      return { viewPubKey, label, ops: [...ops], reads: normReads, ...(person ? { actingAs: person } : {}), laneId: normReads ? viewLaneId(viewPubKey) : null, tokens: tokens.map((t) => t.toJSON()) };
     },
 
     /**
@@ -370,9 +374,22 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
     /** Await any in-flight fold — for a caller that wants the revoke reflected before replying. */
     flush: () => settled(),
 
-    /** Current grants, for a settings surface: [{viewPubKey, label, ops, reads}]. */
+    /**
+     * The live grant a token belongs to, or null: the token's id is among the tokens of a view's CURRENT grant on the
+     * lane (not superseded, not revoked). An allow-list answer — a token the lane never saw has no entry.
+     * @returns {{viewPubKey: string, actingAs: string|null}|null}
+     */
+    activeEntryOf(tokenId) {
+      if (typeof tokenId !== 'string' || !tokenId || !ready || folded.revokedIds.has(tokenId)) return null;
+      for (const [viewPubKey, e] of folded.granted) {
+        if (e.tokens.some((t) => t.id === tokenId)) return { viewPubKey, actingAs: e.actingAs ?? null };
+      }
+      return null;
+    },
+
+    /** Current grants, for a settings surface: [{viewPubKey, label, ops, reads, actingAs}] (`actingAs` only when named). */
     list() {
-      return [...folded.granted.entries()].map(([viewPubKey, e]) => ({ viewPubKey, label: e.label, ops: [...e.ops], reads: e.reads ?? null }));
+      return [...folded.granted.entries()].map(([viewPubKey, e]) => ({ viewPubKey, label: e.label, ops: [...e.ops], reads: e.reads ?? null, ...(e.actingAs ? { actingAs: e.actingAs } : {}) }));
     },
 
     /** The views holding a READ grant — what the mirror side reconciles its lanes against. */

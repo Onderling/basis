@@ -828,6 +828,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+  // A token this agent mints (a screen's grant) is checked at its own door, which wants the issuer at `trusted` in
+  // this registry — the kernel's documented enablement step. Only where the composition asks (`trustOwnGrants`: a
+  // household bot, whose chat key lives on one box). NOT on a person's agent yet: their chat key is on every device,
+  // a revoked device keeps it, and the door's revocation check is a deny-list — so a revoked device could sign a
+  // token the lane never saw. That needs the door to ALLOW only tokens active on the grants lane first.
+  if (opts.trustOwnGrants === true) {
+    try { await sa.trust?.setTier?.(chatId.pubKey, 'trusted'); } catch (err) { console.warn(`[realAgent] own issuer tier not set: ${err?.message ?? err}`); }
+  }
 
   // The agent-activity trail — the record of an AGENT acting on this device (one-log step E).
   // The kernel's dispatch membrane (`runGatedSkill`) reports every gate-passed skill exercise
@@ -2339,6 +2347,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         reads: d.reads ?? null,
         label: typeof d.label === 'string' && d.label.trim() ? d.label.trim() : null,
         ...(expiresIn ? { expiresIn } : {}),
+        // the person the screen acts as, when this agent answers for several (a household bot); else its own
+        ...(typeof d.actingAs === 'string' && d.actingAs ? { actingAs: d.actingAs } : {}),
       });
       // The lane reconciler runs on the grant hook; surface its honest state: a read grant with
       // the mirror OFF (or no backend) yields no lane until the mirror runs.
@@ -5811,6 +5821,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),
       });
     },
+    /** The live grants-lane entry a surface token belongs to, or null (an allow-list answer; see `surfaceGrants`). */
+    surfaceTokenEntry: async (tokenId) => { await surfaceGrantsReady; return surfaceGrants.activeEntryOf(tokenId); },
     /** Resolves once the durable surface registry has loaded (grants are refused until then). */
     surfaceGrantsReady: () => surfaceGrantsReady,
     llmProviders,

@@ -1,0 +1,70 @@
+{
+  "folio.syncOnce": {
+    "doc": "Sync the folder once, now.",
+    "verbs": [
+      "sync",
+      "synchroniseer",
+      "synchroniseren"
+    ],
+    "examples": [
+      "synchroniseer"
+    ]
+  },
+  "folio.watchStart": {
+    "doc": "Start watching the folder for changes.",
+    "verbs": [
+      "let op",
+      "bewaak",
+      "bewaak map"
+    ],
+    "examples": [
+      "bewaak map"
+    ]
+  },
+  "folio.shareFolder": {
+    "doc": "Share a folder with a contact; the rest of the line is the folder.",
+    "verbs": [
+      "deel"
+    ],
+    "dropTrailing": [
+      "met",
+      "aan"
+    ],
+    "examples": [
+      "deel fotos met Bert"
+    ]
+  },
+  "folio.downloadFile": {
+    "doc": "Download a file someone sent you.",
+    "verbs": [
+      "download",
+      "haal",
+      "haal op",
+      "download bestand"
+    ],
+    "examples": [
+      "haal op budget.xlsx"
+    ]
+  },
+  "folio.saveToMyPod": {
+    "doc": "Save a shared file to your own pod.",
+    "verbs": [
+      "bewaar",
+      "opslaan",
+      "bewaar in mijn pod"
+    ],
+    "examples": [
+      "bewaar budget.xlsx"
+    ]
+  },
+  "folio.searchNotes": {
+    "doc": "Search your notes; the rest of the line is what to look for.",
+    "verbs": [
+      "zoek",
+      "zoeken"
+    ],
+    "examples": [
+      "zoek vakantieplannen"
+    ]
+  }
+}

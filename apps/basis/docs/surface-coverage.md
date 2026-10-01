@@ -212,10 +212,10 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `readNote` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `shareFolder` | add | ✅ | ✅ | ✅ | · | ✅ | · | share, deel |
 |  | `downloadFile` | list | ✅ | · | ✅ | · | ✅ | ✅ | download, haal, haal op, download bestand |
-|  | `saveToMyPod` | add | ✅ | · | ✅ | · | ✅ | ✅ | save, bewaar, save to my pod, opslaan, bewaar in mijn pod |
+|  | `saveToMyPod` | add | ✅ | · | ✅ | · | ✅ | ✅ | save, save to my pod, bewaar, opslaan, bewaar in mijn pod |
 |  | `folioStatus` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `listFiles` | list | ✅ | ✅ | · | · | · | · |  |
-|  | `searchNotes` | list | ✅ | ✅ | ✅ | · | · | · | zoek, zoeken, search, find |
+|  | `searchNotes` | list | ✅ | ✅ | ✅ | · | · | · | search, find, zoek, zoeken |
 | **calendar** | `addEvent` | add | ✅ | ✅ | ✅ | · | ✅ | · | schedule, add event, new event, add appointment, new appointment, afspraak, plan, zet afspraak, nieuwe afspraak |
 |  | `listEvents` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `rsvpAccept` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | accept, accept invite, yes, accepteer, ja |

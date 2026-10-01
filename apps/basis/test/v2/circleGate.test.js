@@ -118,7 +118,7 @@ describe('circle gate — Part C: multi-app verbs, collisions, removed declarati
 
   it('resolves each cross-app collision to its single owner', async () => {
     expect(await op('share the deck')).toBe('shareFolder');      // not stoop.postRequest
-    expect(await op('deel de fotos')).toBe('shareFolder');
+    expect(await opNl('deel de fotos')).toBe('shareFolder');
     expect(await op('accept the invite')).toBe('rsvpAccept');    // not tasks.approveTask
     expect(await op('reject the draft')).toBe('rejectTask');     // not calendar.rsvpDecline
     expect(await op('decline the invite')).toBe('rsvpDecline');  // calendar keeps 'decline'

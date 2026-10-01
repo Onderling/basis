@@ -4173,6 +4173,14 @@
       "text": "I can't read \"{{name}}\" as an export file.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "import_locked": {
+      "text": "\"{{name}}\" is sealed. Unlock the key on the box first: node apps/basis/bin/export-key.mjs unlock (in the bot's container). Then /import again.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_not_this_key": {
+      "text": "The key that is unlocked does not open \"{{name}}\". Unlock that file's key: node apps/basis/bin/export-key.mjs unlock --from {{name}}.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
     "import_done": {
       "text": "Restored: {{lists}} lists, {{entries}} entries, {{chores}} chores, {{appointments}} appointments, {{people}} people.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."

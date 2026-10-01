@@ -4173,6 +4173,14 @@
       "text": "\"{{name}}\" kan ik niet lezen als exportbestand.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "import_locked": {
+      "text": "\"{{name}}\" is verzegeld. Open de sleutel eerst op de box: node apps/basis/bin/export-key.mjs unlock (in de container van de bot). Daarna /import opnieuw.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
+    "import_not_this_key": {
+      "text": "De sleutel die nu open staat, opent \"{{name}}\" niet. Open de sleutel van dat bestand: node apps/basis/bin/export-key.mjs unlock --from {{name}}.",
+      "doc": "The household's export files and reading one back (the admin's /exports and /import)."
+    },
     "import_done": {
       "text": "Teruggezet: {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken, {{people}} mensen.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."

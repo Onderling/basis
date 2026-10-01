@@ -111,6 +111,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: t(sealed ? 'circle.bot.export_written_sealed' : 'circle.bot.export_written_plain', { name }) };
   }
 
+  /** Close the key unlocked on the box (after an import, or a real attempt that failed). */
+  async function lock() { if (typeof admin.lockKey === 'function') await admin.lockKey().catch(() => {}); }
+
   /** Read an export back (the admin's; asked first — `preview` answers the question with what the file holds). */
   async function importOp(name, { preview = false } = {}) {
     if (!admin.exports || typeof admin.importFile !== 'function') return { ok: false, error: 'unwired' };
@@ -123,15 +126,19 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       const secret = typeof admin.unlockedKey === 'function' ? await admin.unlockedKey() : null;
       if (!secret) return { ok: false, error: { code: 'locked', message: t('circle.bot.import_locked', { name: file }) } };
       try { data = openExport(data, secret); }
-      catch { return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_not_this_key', { name: file }) } }; }
+      catch {
+        // a real attempt that failed closes the key too (a preview keeps it open: its question needs it)
+        if (!preview) await lock();
+        return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_not_this_key', { name: file }) } };
+      }
     }
     const checked = checkExport(data);
-    if (!checked.ok) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_unreadable', { name: file }) } };
+    if (!checked.ok) { if (!preview) await lock(); return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.import_unreadable', { name: file }) } }; }
     const c = countExport(data);
     if (preview) return { ok: true, vars: c, message: t('circle.bot.import_confirm_counts', { name: file, ...c }) };
-    const r = await admin.importFile(data);
-    // the unlocked key was for this import: it does not stay on the box
-    if (typeof admin.lockKey === 'function') await admin.lockKey().catch(() => {});
+    // the unlocked key was for this import: it does not stay on the box, whatever the import did
+    let r;
+    try { r = await admin.importFile(data); } finally { await lock(); }
     if (!r?.ok) {
       // part-way: what was restored before it stopped is said too
       const partly = r?.done ? `\n${t('circle.bot.import_done', { ...r.done })}` : '';

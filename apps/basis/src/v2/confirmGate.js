@@ -117,7 +117,8 @@ export async function confirmPreview({ route, catalogue, call } = {}) {
   let r;
   try { r = await call(route.appOrigin ?? null, route.opId, { ...(route.args ?? {}), preview: true }); } catch { return null; }
   if (r?.ok && typeof r.message === 'string' && r.message) return { message: r.message };
-  const why = typeof r?.error === 'string' ? r.error : r?.error?.message;
+  // only a sentence the op localised (`error.message`); a bare code is not words for a person — ask as declared
+  const why = r?.error?.message;
   return r?.ok === false && typeof why === 'string' && why ? { refused: why } : null;
 }
 

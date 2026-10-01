@@ -17,13 +17,18 @@ import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
-import { createExportKey, unlockExportKey } from '../src/v2/householdExportSeal.js';
+import { createExportKey, unlockExportKey, MIN_PASSPHRASE } from '../src/v2/householdExportSeal.js';
 import { EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, UNLOCK_FOR_MS } from '../src/v2/householdExportShelf.js';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { 'data-dir': { type: 'string', default: '/data/assistant' }, from: { type: 'string' } } });
 const dataDir = path.resolve(values['data-dir']);
 const keyPath = path.join(dataDir, EXPORT_KEY_FILE);
 const unlockedPath = path.join(dataDir, UNLOCKED_KEY_FILE);
+
+/** Ask with what is typed shown (a yes/no). */
+function askPlain(question) {
+  return new Promise((resolve) => { const rl = createInterface({ input: process.stdin, output: process.stdout }); rl.question(question, (x) => { rl.close(); resolve(x); }); });
+}
 
 /** Ask without echoing what is typed. */
 function ask(question) {
@@ -36,10 +41,15 @@ function ask(question) {
 
 const cmd = positionals[0];
 if (cmd === 'set') {
-  if (existsSync(keyPath)) console.log('export-key: a key is already set; files sealed with it need its passphrase. A new key seals only the files from now on.');
-  const a = await ask('Passphrase for the household export: ');
+  if (existsSync(keyPath)) {
+    console.log('export-key: a key is already set. Files sealed with it keep needing ITS passphrase (unlock --from <file>); a new key seals only the files from now on.');
+    if ((await askPlain('Replace it? Type yes: ')).trim().toLowerCase() !== 'yes') { console.log('export-key: nothing changed.'); process.exit(0); }
+  }
+  const a = await ask(`Passphrase for the household export (at least ${MIN_PASSPHRASE} characters): `);
+  if (a.length < MIN_PASSPHRASE) { console.error(`export-key: at least ${MIN_PASSPHRASE} characters; nothing changed.`); process.exit(1); }
   const b = await ask('The same again: ');
   if (a !== b) { console.error('export-key: the two do not match; nothing changed.'); process.exit(1); }
+  rmSync(unlockedPath, { force: true });   // an old key left unlocked does not stay
   const key = await createExportKey({ passphrase: a });
   writeFileSync(keyPath, JSON.stringify(key, null, 1), { mode: 0o600 });
   console.log(`export-key: set. Each night's export is sealed from now on. Keep the passphrase OFF this box: without it no sealed file opens.`);
@@ -56,7 +66,7 @@ if (cmd === 'set') {
   try {
     const secretKey = await unlockExportKey({ key: source, passphrase: pass });
     writeFileSync(unlockedPath, JSON.stringify({ secretKey, until: Date.now() + UNLOCK_FOR_MS }), { mode: 0o600 });
-    console.log('export-key: unlocked for one hour, or until the next /import.');
+    console.log('export-key: unlocked — it closes after the next /import, or by itself within the hour. `lock` closes it now.');
   } catch (e) {
     console.error(`export-key: ${e?.message === 'wrong-passphrase' ? 'that passphrase does not open this key' : e?.message ?? e}`);
     process.exit(1);

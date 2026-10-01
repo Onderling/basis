@@ -8,6 +8,8 @@
  *   - that key, sealed with the passphrase in core's `CloudBackup` envelope (argon2id + xsalsa20poly1305, the one the
  *     profile-registry export uses) — carried inside every sealed file, so a file opens on its own, even on a new
  *     box after the old one is gone.
+ * Not authenticated: anyone holding the public key (it is in every file) could seal a file of their own; a plain
+ * export was just as forgeable, and writing to the shelf already takes the box. `holds` and `exportedAt` are in clear.
  * Opening a file takes the passphrase (`bin/export-key.mjs unlock`): it leaves the opened key on the box for a short
  * while, for the admin's `/import`, and the import removes it.
  */
@@ -15,6 +17,8 @@ import nacl from 'tweetnacl';
 import { Bootstrap, CloudBackup } from '@onderling/core';
 
 export const SEALED_FORMAT = 'onderling-household-export-sealed';
+/** Every sealed file carries the passphrase-sealed key, so a leaked file can be guessed at offline: not too short. */
+export const MIN_PASSPHRASE = 12;
 const KEY_LABEL = 'household-export';
 // base64 in every shell (a browser has no Buffer)
 const enc = (u8) => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s); };
@@ -35,7 +39,7 @@ const boxKeyOf = (bootstrap) => nacl.box.keyPair.fromSecretKey(bootstrap.deriveA
  * @returns {Promise<{v: 1, publicKey: string, sealedSecret: string}>}
  */
 export async function createExportKey({ passphrase, argonOpts } = {}) {
-  if (typeof passphrase !== 'string' || passphrase.length < 8) throw new Error('export-key: a passphrase of at least 8 characters is required');
+  if (typeof passphrase !== 'string' || passphrase.length < MIN_PASSPHRASE) throw new Error(`export-key: a passphrase of at least ${MIN_PASSPHRASE} characters is required`);
   const { bootstrap } = Bootstrap.create();
   const adapter = bytesAdapter();
   await new CloudBackup({ adapter, ...(argonOpts ? { argonOpts } : {}) }).upload({ bootstrap, passphrase });

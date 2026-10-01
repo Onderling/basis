@@ -748,6 +748,14 @@ if (tgToken || inboxDoor.bridge) {
   // The household's export (the one format kept readable across versions): one a night into the bot's data dir, the
   // last few kept, so the box's snapshot carries it off; the admin reads one back with /import.
   const exportsDir = path.join(dataDir, 'exports');
+  // An unlocked export key does not outlive its hour (an admin who unlocked and then said No, or never imported):
+  // removed when it is read past its time, and swept every minute.
+  const sweepUnlocked = () => {
+    const p = path.join(dataDir, UNLOCKED_KEY_FILE);
+    try { if (!unlockedSecret(readFileSync(p, 'utf8'))) rmSync(p, { force: true }); } catch { /* none */ }
+  };
+  sweepUnlocked();
+  setInterval(sweepUnlocked, 60_000).unref?.();
   const exportShelf = createExportShelf({
     files: {
       list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
@@ -775,7 +783,12 @@ if (tgToken || inboxDoor.bridge) {
       });
     },
     // sealed to the admin's export key once one is set (`bin/export-key.mjs set`, on the box)
-    sealWith: async () => { try { return JSON.parse(readFileSync(path.join(dataDir, EXPORT_KEY_FILE), 'utf8')); } catch { return null; } },
+    // no key set → plain; a key that cannot be read (permissions, a cut-off file) → the write FAILS, never goes out plain
+    sealWith: async () => {
+      let text;
+      try { text = readFileSync(path.join(dataDir, EXPORT_KEY_FILE), 'utf8'); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; }
+      return JSON.parse(text);
+    },
     onWritten: (e) => walkLog({ kind: 'export', ok: e.ok, sealed: Boolean(e.sealed), ...(e.name ? { name: e.name } : {}), ...(e.error ? { error: e.error } : {}) }),
   });
   const doorCall = withAssistantOps({
@@ -788,7 +801,7 @@ if (tgToken || inboxDoor.bridge) {
       setRole: (who, role) => botUsers.setRole(who, role),
       exports: exportShelf,
       // a sealed file opens with the key the admin unlocked on the box (`bin/export-key.mjs unlock`); the import closes it
-      unlockedKey: async () => { try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
+      unlockedKey: async () => { sweepUnlocked(); try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
       lockKey: async () => rmSync(path.join(dataDir, UNLOCKED_KEY_FILE), { force: true }),
       // the file's things written back through their own ops, each as its person (the host vouches, as its door does)
       importFile: (file) => importHousehold(file, { call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller }),

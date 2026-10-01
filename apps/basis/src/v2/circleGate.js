@@ -25,6 +25,7 @@ import { createGate } from '@onderling/manifest-host';
 import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../core/manifests/mockManifests.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { CIRCLE_GATE_TRAIL, DEFAULT_GATE_LOCALE } from './circleGateLexicon.js';
+import { readDayAndTime } from '../forms/parseDate.js';
 
 /**
  * Token-gate rules for the circle bot, projected from the circle apps' manifests.
@@ -117,6 +118,39 @@ export function listsGateRules(_locale, lists = []) {
     // model — so it is a rule, never the model's reading.
     { name: 'assistant:reminders(off)', test: REMINDERS_OFF, command: () => ({ opId: 'assistant-reminders', args: { mode: 'off' }, appOrigin: 'assistant' }) },
     { name: 'assistant:reminders(on)', test: REMINDERS_ON, command: () => ({ opId: 'assistant-reminders', args: { mode: 'on' }, appOrigin: 'assistant' }) },
+    // The deterministic floor: a household's everyday sentences work without a model (Fable, 2026-10-01). Exact
+    // imperatives — the words go to the waist, which finds one item or asks which.
+    { name: 'tasks:listMine(mine)', test: MINE_READ, command: () => ({ opId: 'listMine', args: {} }) },
+    { name: 'tasks:claimTask(i-do)', test: I_DO, command: (text) => {
+      const what = (I_DO.exec(String(text).trim())?.[1] ?? '').trim();
+      // "ik doe mee" / "ik doe het morgen" are talk, not a claim: they stay the model's
+      if (!what || NOT_A_THING.test(what) || readDayAndTime(what)) return null;
+      return { opId: 'claimTask', args: { id: what }, fallback: 'model' };
+    } },
+    { name: 'lists:removeFromList(take-off)', test: TAKE_OFF, command: (text) => {
+      const m = TAKE_OFF.exec(String(text).trim());
+      const where = m ? m[2].trim() : '';
+      if (!m || !(/^(?:lijst|lijstje|list)$/i.test(where) || listFor(where))) return null;
+      return { opId: 'removeFromList', args: { item: m[1].trim() }, fallback: 'model' };
+    } },
+    { name: 'lists:createList(make)', test: MAKE_LIST, command: (text) => {
+      const name = (MAKE_LIST.exec(String(text).trim())?.[1] ?? '').trim();
+      return name ? { opId: 'createList', args: { text: name } } : null;
+    } },
+    // a chore that says who (and a day the bounded reader reads): "nieuwe taak voor mij: ramen lappen, morgen"
+    { name: 'lists:addToList(chore-who-when)', test: CHORE_FOR, command: (text) => {
+      const m = CHORE_FOR.exec(String(text).trim());
+      if (!m || !chores) return null;
+      const who = /^(?:mij|me|ik|myself)$/i.test(m[1]) ? 'mij' : m[1];
+      const body = m[2].trim();
+      // a tail after a comma is the chore's day ("…, morgen"): one the reader cannot read is the model's
+      const tail = /,\s*([^,]+)$/.exec(body)?.[1] ?? null;
+      if (tail && !readDayAndTime(tail)) return null;
+      if (!CHORE_WHO_OR_WHEN.test(body)) return { opId: 'addToList', args: { list: chores, text: body.replace(/[,.;]+$/, ''), assignee: who } };
+      const read = readDayAndTime(body);
+      if (!read || read.time || !read.rest) return null;   // a day it does not read, or a time: the model's
+      return { opId: 'addToList', args: { list: chores, text: caseOf(body, read.rest), assignee: who, due: read.day } };
+    } },
     // "add task call the plumber" · "nieuwe taak: lamp vervangen" · "zet een klusje: band plakken" — a task is a child
     // of the list whose entries are chores (it defaults to a task there).
     { name: 'lists:addToList(task-on-chores)', test: (text) => LISTS_ADD_TASK.test(text), command: (text) => {
@@ -124,9 +158,27 @@ export function listsGateRules(_locale, lists = []) {
       const what = m ? m[1].trim() : '';
       return chores && what ? { opId: 'addToList', args: { list: chores, text: what } } : null;
     } },
+    // LAST: an appointment — a short title, a day and a time the bounded reader reads ("tandarts morgen om 10 uur").
+    // Narrow on purpose: a sentence about someone ("ik ben morgen om 10 uur weg") or without a time stays the model's.
+    { name: 'calendar:addEvent(day-and-time)', test: (text) => CHORE_WHO_OR_WHEN.test(String(text ?? '')), command: (text) => {
+      const read = readDayAndTime(String(text));
+      if (!read || !read.time || !read.rest) return null;
+      const words = read.rest.split(' ');
+      if (words.length > 4 || words.some((w) => PERSON_WORDS.has(w))) return null;
+      return { opId: 'addEvent', args: { title: caseOf(String(text), read.rest), when: `${read.day}T${read.time}` }, appOrigin: 'calendar' };
+    } },
   ];
 }
 
+const MINE_READ = /^(?:wat\s+moet\s+ik\s+(?:nog\s+)?doen|what\s+(?:do|should)\s+i\s+(?:still\s+)?(?:have\s+to\s+)?do)\s*[?.!]*$/i;
+const I_DO = /^(?:ik\s+doe|i(?:'ll|\s+will)\s+do)\s+(?:de\s+|het\s+|the\s+)?(.+?)\s*[.!]*$/i;
+const NOT_A_THING = /^(?:mee|het|dat|dit|niks|niets|wat|ook|even|it|that|this|nothing)\b/i;
+const TAKE_OFF = /^(?:haal|remove|take)\s+(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:van|uit|from|off)\s+(?:de\s+|het\s+|mijn\s+|the\s+|my\s+)?(\S+?)\s*[.!]*$/i;
+const MAKE_LIST = /^(?:maak|make|create)\s+(?:een\s+|a\s+)?(?:nieuwe\s+|new\s+)?(?:lijst|list)(?:\s+(?:voor|met\s+(?:de\s+)?naam|genaamd|called|named))?\s+(.+?)\s*[.!]*$/i;
+const CHORE_FOR = /^(?:nieuwe?\s+taak|new\s+task|nieuw\s+klusje)\s+(?:voor|for)\s+(\S+?)\s*:\s*(.+)$/i;
+const PERSON_WORDS = new Set(['ik', 'je', 'jij', 'we', 'wij', 'hij', 'zij', 'ze', 'u', 'jullie', 'mij', 'me', 'i', 'you', 'he', 'she', 'they', 'my', 'mijn']);
+/** The words of `lower` as they were typed in `original` (the reader lowercases). */
+const caseOf = (original, lower) => { const i = original.toLowerCase().indexOf(lower); return i >= 0 ? original.slice(i, i + lower.length) : lower; };
 const REMINDERS_OFF = /^(?:(?:(?:stuur|geef)\s+(?:me|mij)\s+)?geen\s+herinneringen(?:\s+meer)?(?:\s+(?:sturen|graag|aub|alsjeblieft))?|(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+uit|stop\s+(?:met\s+)?(?:de\s+)?herinneringen|no\s+more\s+reminders|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+off|stop\s+(?:the\s+)?reminders)\s*[.!]*$/i;
 const REMINDERS_ON = /^(?:(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+(?:weer\s+)?aan|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+(?:back\s+)?on)\s*[.!]*$/i;
 const STATED_DONE = /^(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:is|zijn|are)\s+(?:al\s+|already\s+)?(?:klaar|gedaan|gekocht|gemaakt|af|done|bought|fixed)[.!]*$/i;

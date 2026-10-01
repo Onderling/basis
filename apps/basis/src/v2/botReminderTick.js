@@ -35,9 +35,11 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
   let handle = null;
   let running = null;
   const timeOf = (iso) => { const w = wallClockInTz(new Date(iso).getTime(), tz); return `${pad(w.hour)}:${pad(w.minute)}`; };
-  const lineOf = (item) => (item.kind === 'event'
-    ? t('circle.bot.reminder_event', { title: item.text, time: timeOf(item.at) })
-    : t('circle.bot.reminder_chore', { text: item.text }));
+  // in each person's own language when they fixed one (`/taal`), else the bot's
+  const tFor = (personId) => { const lang = threads?.langOf?.(personId) ?? null; return lang ? (k, p) => t(k, p, lang) : t; };
+  const lineOf = (item, tp = t) => (item.kind === 'event'
+    ? tp('circle.bot.reminder_event', { title: item.text, time: timeOf(item.at) })
+    : tp('circle.bot.reminder_chore', { text: item.text }));
 
   async function passOnce() {
     const s = typeof settings === 'function' ? (settings() ?? {}) : {};
@@ -55,8 +57,9 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       // a door that carries no buttons (the bot's inbox: a contact turn is text) says in words how to tick it off
       const chore = items.find((i) => i.kind === 'chore');
       const textOnly = rows.find((r) => r.id === personId)?.channel === 'web';
-      const text = [...items.map(lineOf), ...(textOnly && chore ? [t('circle.bot.reminder_done_words', { text: chore.text })] : []), ...(first ? [t('circle.bot.reminder_first')] : [])].join('\n');
-      const buttons = items.filter((i) => i.kind === 'chore').map((i) => ({ id: `completeTask:${i.id}`, label: t('circle.bot.reminder_done') }));
+      const tp = tFor(personId);
+      const text = [...items.map((i) => lineOf(i, tp)), ...(textOnly && chore ? [tp('circle.bot.reminder_done_words', { text: chore.text })] : []), ...(first ? [tp('circle.bot.reminder_first')] : [])].join('\n');
+      const buttons = items.filter((i) => i.kind === 'chore').map((i) => ({ id: `completeTask:${i.id}`, label: tp('circle.bot.reminder_done') }));
       const r = await reach.sendToPerson(personId, { text, buttons });
       try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null }); } catch { /* a listener never stops the tick */ }
       if (!r?.ok) continue;

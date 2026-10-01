@@ -840,9 +840,9 @@ if (tgToken || inboxDoor.bridge) {
       expand: expandAdds({ t }),
       gateRules: listsGateRules(values.lang, templateLists(t)),
       // the first message says what this bot does for this person, and how the reminders stand and change
-      welcomeFor: ({ role, ops }) => welcomeLines({ ops, role, lists: templateLists(t), t, settings: reminderSettings() }),
+      welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings() }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
-      basicHelpFor: ({ ops }) => basicModeLines({ ops, lists: templateLists(t), t }),
+      basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
     } : {}),
   });
   await tgRunner.start();

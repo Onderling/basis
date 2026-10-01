@@ -1,7 +1,7 @@
 /**
  * A `/scherm` link never appears in a group. Whoever holds the link within ten minutes can connect a screen as the
  * person, so it goes ONLY to their private door (their own chat); the chat it was asked in — a Telegram group is a
- * chat too — hears that it was sent privately. Through the real Telegram runner and the bot's own door call.
+ * chat too — hears that it was sent privately; and the person's thread remembers that a link was sent, not the link. Through the real Telegram runner and the bot's own door call.
  */
 import { describe, it, expect } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
@@ -26,7 +26,7 @@ describe('the /scherm link and a group', () => {
     const screens = createBotScreens({
       threads, isAdmitted: async () => true, columnOf: async () => ['lists.addToList'],
       grant: async () => ({ ok: true }), revokeView: async () => true, listGrants: async () => [],
-      sendPrivately: (person, text) => reach.sendToPerson(person, { text }),
+      sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs }),
       where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: null }),
     });
     const { catalogue, manifestsByOrigin } = composeAssistantCatalogue({ apps: ['lists'], slim: true });
@@ -43,5 +43,9 @@ describe('the /scherm link and a group', () => {
     expect(inGroup).toContain('screen_sent_privately');
     expect(inGroup, 'the group must never see the link').not.toContain('#scherm=');
     expect(inPrivate).toContain('#scherm=');
+    // the link is a secret: the person's thread remembers that it was sent, never the link (it would ride to the model)
+    const memory = JSON.stringify(threads.memory.recent(ANN));
+    expect(memory).not.toContain('#scherm=');
+    expect(memory).toContain('screen_link_remembered');
   });
 });

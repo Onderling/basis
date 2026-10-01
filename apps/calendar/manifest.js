@@ -180,7 +180,7 @@ export const calendarManifest = {
         ui:    {
           control: 'button', labelKey: 'circle.button.calendar.cancelEvent',
           label:   'Cancel event',
-          confirm: { severity: 'warn', message: 'Cancel this event?' },
+          confirm: { severity: 'warn', messageKey: 'circle.calendar.cancel_confirm', message: 'Cancel this event?' },
         },
         chat: { hint: 'cancel an event (organiser only)' },
       },

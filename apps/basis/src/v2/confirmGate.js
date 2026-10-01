@@ -56,8 +56,13 @@ import { translatorOr } from '../locales/translatorOr.js';
  */
 export function confirmRequestFromRoute(route, { t } = {}) {
   if (!route || route.kind !== 'needsConfirm') return null;
+  // the declared question in the person's words when the op names its key (the bot's door asks the same way)
+  const tr = typeof t === 'function' ? t : null;
+  const said = route.messageKey && tr ? tr(route.messageKey, route.args ?? {}) : null;
+  // a key without its words comes back as the key: then the manifest's own sentence, never a raw key
+  const message = said && said !== route.messageKey ? said : route.message;
   return buildRequest({
-    severity: route.severity, message: route.message, opId: route.opId, appOrigin: route.appOrigin, t,
+    severity: route.severity, message, opId: route.opId, appOrigin: route.appOrigin, t,
   });
 }
 

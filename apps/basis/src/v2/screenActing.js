@@ -9,12 +9,37 @@
  * the same gate as that person's typed line — and refuses a call with no person, or a person not in its book.
  */
 
+import { scopeCatalogueToRole } from './botOpMap.js';
+
 /** The bot's ops a screen never reaches, whatever token it holds: reading a file back, or pairing more screens. */
 export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-import',
   'assistant.assistant-export',
   'assistant.assistant-exports',
+  'assistant.assistant-screen',
+  'assistant.assistant-screens',
 ]);
+
+/**
+ * The ops a person's screen is granted: their ROLE COLUMN as the door composes it (`scopeCatalogueToRole` over the
+ * door's catalogue — the same ops their typed line reaches), as skill ids (`app.op`), without what a screen never gets
+ * and without the admin's own assistant ops (managing people and exports comes with its own step).
+ * @param {object} catalogue  the door's merged catalogue
+ * @param {string|null} role  the person's role on the bot
+ * @returns {string[]}
+ */
+export function screenColumnFor(catalogue, role) {
+  const scoped = scopeCatalogueToRole(catalogue, role ?? 'member');
+  const out = [];
+  for (const [, entry] of scoped?.opsById ?? []) {
+    const id = `${entry?.appOrigin}.${entry?.op?.id}`;
+    if (!entry?.appOrigin || !entry?.op?.id || out.includes(id)) continue;
+    if (BOT_SCREEN_NEVER.includes(id)) continue;
+    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted') continue;
+    out.push(id);
+  }
+  return out;
+}
 
 /**
  * The `ctxFor` for `renderA2A` on a bot: the verified call's token's `actingAs`, when that person is in the book.

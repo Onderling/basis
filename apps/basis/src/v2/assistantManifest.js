@@ -24,6 +24,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write',
   },
   operations: [
     {
@@ -159,6 +160,26 @@ export const assistantManifest = {
       writes: { scope: 'person' },
       params: [{ name: 'who', kind: 'string', required: true }],
       surfaces: { slash: { command: '/revoke', body: 'argline' } },
+    },
+    {
+      // A person connects a screen (their own app, in a browser) to act through: a one-time link, ten minutes, for
+      // them alone. Whoever holds the link in that time can connect a screen as them — one use, the notice in their
+      // chat and `/schermen` are the mitigation. Slash only: the model never hands out a link.
+      id:     'assistant-screen',
+      verb:   'connect-screen',
+      visibility: 'authenticated',
+      writes: { scope: 'device' },
+      params: [],
+      surfaces: { slash: { command: '/scherm', body: 'none' } },
+    },
+    {
+      // The person's own screens, and dropping one (`/schermen los 2`).
+      id:     'assistant-screens',
+      verb:   'manage-screens',
+      visibility: 'authenticated',
+      writes: { scope: 'device' },
+      params: [{ name: 'change', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/schermen', body: 'argline' } },
     },
     {
       id:     'assistant-exports',

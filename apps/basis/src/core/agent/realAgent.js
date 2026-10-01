@@ -828,6 +828,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+  // A token this agent mints (a screen's grant) is checked at its own door, which wants the issuer at `trusted` in
+  // this registry — the kernel's documented enablement step. Its own chat key, and nobody else, is raised here, so
+  // the grants it signs verify where they are presented; a key that is not this agent's stays where it was.
+  try { await sa.trust?.setTier?.(chatId.pubKey, 'trusted'); } catch (err) { console.warn(`[realAgent] own issuer tier not set: ${err?.message ?? err}`); }
 
   // The agent-activity trail — the record of an AGENT acting on this device (one-log step E).
   // The kernel's dispatch membrane (`runGatedSkill`) reports every gate-passed skill exercise
@@ -2339,6 +2343,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         reads: d.reads ?? null,
         label: typeof d.label === 'string' && d.label.trim() ? d.label.trim() : null,
         ...(expiresIn ? { expiresIn } : {}),
+        // the person the screen acts as, when this agent answers for several (a household bot); else its own
+        ...(typeof d.actingAs === 'string' && d.actingAs ? { actingAs: d.actingAs } : {}),
       });
       // The lane reconciler runs on the grant hook; surface its honest state: a read grant with
       // the mirror OFF (or no backend) yields no lane until the mirror runs.

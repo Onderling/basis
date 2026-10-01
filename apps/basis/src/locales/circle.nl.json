@@ -4276,7 +4276,16 @@
     "overview_unheld": {
       "text": "{{n}} klusjes waar nog niemand voor staat.",
       "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    }
+    },
+    "screen_link": "Open deze link binnen {{minutes}} minuten op het scherm dat je wilt koppelen. Hij werkt één keer:\n{{link}}\nDeel hem met niemand: wie hem heeft, kan een scherm als jou koppelen.",
+    "screen_no_app": "Een scherm koppelen kan op deze bot nog niet: er is geen app-adres ingesteld.",
+    "screen_connected": "Je hebt een scherm gekoppeld. Het mag {{n}} dingen doen, {{days}} dagen lang. Loskoppelen: /schermen.",
+    "screens_none": "Je hebt geen schermen gekoppeld. Een scherm koppelen: /scherm.",
+    "screens_list": "Je schermen:\n{{list}}\nLoskoppelen: /schermen los <nummer>.",
+    "screens_row": "{{i}}. {{label}}: {{n}} dingen",
+    "screen_dropped": "Scherm {{i}} is losgekoppeld.",
+    "screen_no_such": "Je hebt geen scherm {{i}}. Je schermen: /schermen.",
+    "revoked_screens": "Ook {{n}} gekoppelde schermen zijn losgekoppeld."
   },
   "op": {
     "not_in_this_circle": {

@@ -30,7 +30,7 @@ async function hmacHex(secret, msg) {
   const key = await globalThis.crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return hex(await globalThis.crypto.subtle.sign('HMAC', key, enc.encode(msg)));
 }
-const sha256Hex = async (s) => hex(await globalThis.crypto.subtle.digest('SHA-256', enc.encode(String(s))));
+export const sha256Hex = async (s) => hex(await globalThis.crypto.subtle.digest('SHA-256', enc.encode(String(s))));
 
 /** Constant-time for equal lengths (the signature is fixed-length). */
 function sameText(a, b) {

@@ -4276,7 +4276,16 @@
     "overview_unheld": {
       "text": "{{n}} chores nobody has taken yet.",
       "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    }
+    },
+    "screen_link": "Open this link within {{minutes}} minutes on the screen you want to connect. It works once:\n{{link}}\nShare it with nobody: whoever has it can connect a screen as you.",
+    "screen_no_app": "Connecting a screen is not possible on this bot yet: no app address is set.",
+    "screen_connected": "You connected a screen. It may do {{n}} things, for {{days}} days. To disconnect: /schermen.",
+    "screens_none": "You have no screens connected. To connect one: /scherm.",
+    "screens_list": "Your screens:\n{{list}}\nTo disconnect: /schermen los <number>.",
+    "screens_row": "{{i}}. {{label}}: {{n}} things",
+    "screen_dropped": "Screen {{i}} is disconnected.",
+    "screen_no_such": "You have no screen {{i}}. Your screens: /schermen.",
+    "revoked_screens": "Their {{n}} connected screens are disconnected too."
   },
   "op": {
     "not_in_this_circle": {

@@ -232,10 +232,11 @@
  *                                                 name instead of the default ('match' for 'match',
  *                                                 'text' for 'text-only'/'type+text'). E.g. `'id'`
  *                                                 for ops whose param is `id`. Inert if absent.
- * @property {string[]}               [dropTrailing] F-SP2: strip a trailing connector clause from
+ * @property {string[]|true}          [dropTrailing] strip a trailing connector clause from
  *                                                 the body — words like ['to','op','toe'] turn
  *                                                 "milk to the list" → "milk". Applies to 'match',
- *                                                 'text-only', 'type+text'. Inert if absent.
+ *                                                 'text-only', 'type+text'. Inert if absent. `true`: the
+ *                                                 words are the app's gate words, per language.
  */
 
 /** @typedef {{ skillId: string, args: object }} Call */

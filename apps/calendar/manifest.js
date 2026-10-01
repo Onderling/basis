@@ -74,7 +74,7 @@ export const calendarManifest = {
         // Part C gate — "schedule X" / "afspraak X" → addEvent{title}. PARTIAL: binds title; the
         // required `when` (a date) is form-elicited.
         slash: { command: '/addappt', body: 'flags',
-          match: { body: 'text-only', arg: 'title', dropTrailing: ['to', 'with', 'op', 'met'] } },
+          match: { body: 'text-only', arg: 'title', dropTrailing: true } },
         chat:  { reply: 'text', hint: 'create an appointment' },
       },
     },

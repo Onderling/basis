@@ -1,32 +1,85 @@
 {
   "calendar.addEvent": {
     "doc": "Make an appointment; the rest of the line is its title (the form asks for the day and time).",
-    "verbs": ["schedule", "add event", "new event", "add appointment", "new appointment"],
-    "examples": ["new appointment dentist", "schedule haircut"],
-    "not": ["what is on the agenda"]
+    "verbs": [
+      "schedule",
+      "add event",
+      "new event",
+      "add appointment",
+      "new appointment"
+    ],
+    "examples": [
+      "new appointment dentist",
+      "schedule haircut",
+      "new appointment dentist with Bert"
+    ],
+    "not": [
+      "what is on the agenda"
+    ],
+    "dropTrailing": [
+      "to",
+      "with"
+    ]
   },
   "calendar.rsvpAccept": {
     "doc": "Accept an invitation.",
-    "verbs": ["accept", "accept invite", "yes"],
-    "examples": ["accept dentist"],
-    "not": ["decline dentist"]
+    "verbs": [
+      "accept",
+      "accept invite",
+      "yes"
+    ],
+    "examples": [
+      "accept dentist"
+    ],
+    "not": [
+      "decline dentist",
+      "yes",
+      "yes!"
+    ]
   },
   "calendar.rsvpDecline": {
     "doc": "Decline an invitation.",
-    "verbs": ["decline", "decline invite", "no"],
-    "examples": ["decline dentist"],
-    "not": ["accept dentist"]
+    "verbs": [
+      "decline",
+      "decline invite",
+      "no"
+    ],
+    "examples": [
+      "decline dentist"
+    ],
+    "not": [
+      "accept dentist",
+      "no",
+      "no."
+    ]
   },
   "calendar.rsvpTentative": {
     "doc": "Accept an invitation tentatively.",
-    "verbs": ["tentative", "maybe"],
-    "examples": ["maybe dentist"],
-    "not": ["accept dentist"]
+    "verbs": [
+      "tentative",
+      "maybe"
+    ],
+    "examples": [
+      "maybe dentist"
+    ],
+    "not": [
+      "accept dentist",
+      "maybe"
+    ]
   },
   "calendar.cancelEvent": {
     "doc": "Cancel an appointment.",
-    "verbs": ["cancel event", "cancel appointment", "cancel"],
-    "examples": ["cancel appointment dentist", "cancel haircut"],
-    "not": ["maybe dentist"]
+    "verbs": [
+      "cancel event",
+      "cancel appointment",
+      "cancel"
+    ],
+    "examples": [
+      "cancel appointment dentist",
+      "cancel haircut"
+    ],
+    "not": [
+      "maybe dentist"
+    ]
   }
 }

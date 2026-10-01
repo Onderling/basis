@@ -65,8 +65,12 @@ export function basicModeLines({ ops, lists = [], t }) {
   const first = plain[0]?.name;
   if (first && has('addToList')) lines.push(t('circle.bot.basic_add', { list: first.toLowerCase() }));
   if (first && has('listEntries')) lines.push(t('circle.bot.basic_read', { list: first.toLowerCase() }));
+  if (first && has('removeFromList')) lines.push(t('circle.bot.basic_remove'));
   if (chores && has('addToList')) lines.push(t('circle.bot.basic_chore'));
+  if (has('claimTask')) lines.push(t('circle.bot.basic_claim'));
+  if (has('listMine')) lines.push(t('circle.bot.basic_mine'));
   if (has('markListItemDone') || has('completeTask')) lines.push(t('circle.bot.basic_done'));
+  if (has('addEvent')) lines.push(t('circle.bot.basic_appt'));
   if (has('weekOverview')) lines.push(t('circle.bot.basic_week'));
   lines.push(t('circle.bot.basic_help'));
   return lines;

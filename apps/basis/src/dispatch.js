@@ -76,6 +76,9 @@ export async function runDispatch(ready, callSkill) {
         error: {
           code:    'skill-error',
           message: payload.error,
+          // the op's own reason, when it gave one ("not-found": the words named nothing) — read by a rule that may
+          // fall back to the model
+          ...(typeof payload.code === 'string' && payload.code ? { reason: payload.code } : {}),
         },
       };
     }

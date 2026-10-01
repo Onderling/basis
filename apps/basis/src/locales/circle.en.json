@@ -4221,6 +4221,22 @@
       "text": "• \"new task: clean the windows\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
     },
+    "basic_remove": {
+      "text": "• \"remove milk from the list\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_claim": {
+      "text": "• \"i'll do the windows\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_mine": {
+      "text": "• \"what do i still have to do\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_appt": {
+      "text": "• \"dentist tomorrow at 10am\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
     "basic_done": {
       "text": "• \"windows is done\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."

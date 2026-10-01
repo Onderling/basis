@@ -76,13 +76,13 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
     const ref = String(args?.list ?? '').trim();
     if (!ref) {
       const { entry, among, target } = await findAnyEntry(circleId, item);
-      if (!entry) return { error: among.length ? which(among) : t('circle.lists.not_there', { item }) };
+      if (!entry) return among.length ? { error: which(among) } : { error: t('circle.lists.not_there', { item }), notFound: true };
       return { circleId, target, entry };
     }
     const target = await findList(circleId, ref);
     if (!target) return { error: t('circle.lists.no_such_list', { name: ref }) };
     const { entry, among } = await findEntry(circleId, target.id, item);
-    if (!entry) return { error: among.length ? which(among) : t('circle.lists.no_such_entry', { item, name: target.text ?? ref }) };
+    if (!entry) return among.length ? { error: which(among) } : { error: t('circle.lists.no_such_entry', { item, name: target.text ?? ref }), notFound: true };
     return { circleId, target, entry };
   };
 
@@ -133,7 +133,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
     markListItemDone: async (args, ctx) => {
       // Never "done" for an entry that is not there: nothing would have been ticked.
       const at = await locate(args);
-      if (at.error) return { ok: false, error: at.error };
+      if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       // A chore is ticked by the chore's own verb (its rules, its state, its reply) — one entry point, the noun's verb
       // underneath — as the person asking.
       if (at.entry.type === 'task' && typeof completeChore === 'function') return completeChore({ circleId: at.circleId, entry: at.entry, ctx });
@@ -213,7 +213,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
 
     removeFromList: async (args) => {
       const at = await locate(args);
-      if (at.error) return { ok: false, error: at.error };
+      if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       await svc.remove(at.circleId, at.entry.id);
       return { ok: true, message: t('circle.lists.removed', { text: at.entry.text ?? '', name: at.target.text ?? '' }) };
     },
@@ -222,7 +222,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const text = String(args?.text ?? '').trim();
       if (!text) return { ok: false, error: t('circle.lists.need_list_and_text') };
       const at = await locate(args);
-      if (at.error) return { ok: false, error: at.error };
+      if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       await svc.storeFor(at.circleId).put({ ...at.entry, text }, { by: localActor });
       return { ok: true, message: t('circle.lists.edited', { text, name: at.target.text ?? '' }) };
     },

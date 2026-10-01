@@ -13,14 +13,10 @@
 // speakers code-switch ("kaas done"). A new language = a new locale block. Keyed by INTENT (the op's
 // `surfaces.slash.match.trailing` value), not op-id, so several ops can share one intent. Trailing
 // verbs are SINGLE words only — multiword leading phrases ("klaar met") don't trail.
-export const CIRCLE_GATE_TRAIL = {
-  en: {
-    complete: ['done', 'complete', 'completed', 'finished'],
-  },
-  nl: {
-    complete: ['klaar', 'gedaan', 'voltooid', 'af', 'done', 'finished'],
-  },
-};
+// The words themselves live in the gate's locale files (`gate.<lang>.json`, `_trailing`), beside the rules' words —
+// one place for a translator; this keeps the shape the manifest gate reads.
+import { trailingLexicon } from './gateWords.js';
+export const CIRCLE_GATE_TRAIL = Object.freeze(trailingLexicon());
 
 /** Fallback locale when the user's setting is missing or unsupported. */
 export const DEFAULT_GATE_LOCALE = 'en';

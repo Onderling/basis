@@ -16,7 +16,7 @@ import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 
 let lists;
 beforeAll(async () => { await initLocalisation({ lng: 'nl' }); lists = templateLists(t); });
-const all = new Set(['addToList', 'listEntries', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'weekOverview', 'assistant-reminders', 'assistant-overview']);
+const all = new Set(['addToList', 'listEntries', 'removeFromList', 'claimTask', 'completeTask', 'listMine', 'addEvent', 'listEvents', 'weekOverview', 'assistant-reminders', 'assistant-overview']);
 
 describe('the welcome, derived', () => {
   it('a member: the lists by name, chores, the Agenda, the week, and reminders on with the quiet hours and the switches', () => {

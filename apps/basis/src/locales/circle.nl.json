@@ -4221,6 +4221,22 @@
       "text": "• \"nieuwe taak: ramen lappen\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
     },
+    "basic_remove": {
+      "text": "• \"haal melk van de lijst\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_claim": {
+      "text": "• \"ik doe de ramen\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_mine": {
+      "text": "• \"wat moet ik nog doen\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_appt": {
+      "text": "• \"tandarts morgen om 10 uur\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
     "basic_done": {
       "text": "• \"ramen is klaar\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."

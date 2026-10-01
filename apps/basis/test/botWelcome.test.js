@@ -6,7 +6,8 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { initLocalisation, t } from '../src/localisation.js';
-import { welcomeLines } from '../src/v2/botWelcome.js';
+import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
+const require_basic = () => ({ basicModeLines });
 import { templateLists } from '../src/v2/householdTemplate.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { InMemoryBridge } from '@onderling/chat-agent';
@@ -87,5 +88,42 @@ describe('the welcome, derived', () => {
     const help = bridge.outbox.map((m) => m.text).join('\n');
     expect(help).toContain('/a');
     expect(help).not.toContain('/b');
+  });
+});
+
+describe('without a model, the bot says what works', () => {
+  it('the lines a person can use without a model, from their tools', () => {
+    const { basicModeLines } = require_basic();
+    const text = basicModeLines({ ops: all, lists, t }).join('\n');
+    expect(text).toContain('Boodschappen'.toLowerCase());
+    expect(text).toMatch(/is klaar/);
+    expect(text).toContain('/help');
+    expect(text).not.toMatch(/circle\.bot\./);
+    // an observer: only the reads
+    const reader = basicModeLines({ ops: new Set(['listEntries', 'weekOverview']), lists, t }).join('\n');
+    expect(reader).not.toMatch(/is klaar/);
+  });
+
+  it('the runner answers an unknown line with them when there is no model', async () => {
+    const bridge = new InMemoryBridge({ id: 'telegram' });
+    const runner = createTelegramRunner({ bridge, t, collectMs: 0, catalogue: { opsById: new Map() }, callSkill: async () => ({ ok: true }),
+      basicHelpFor: async () => ['• "melk op de boodschappen"'], roleFor: () => 'member', scopeToRole: (c) => c });
+    await runner.start();
+    await bridge.simulateIncoming({ chatId: '11', text: 'kun je iets voor me doen', sender: { bridgeUid: '11' } });
+    await runner.idle();
+    const said = bridge.outbox.map((m) => m.text).join('\n');
+    expect(said).toContain('melk op de boodschappen');
+    expect(said).toContain(t('circle.bot.basic_head'));
+  });
+});
+
+describe('what the bot suggests without a model really works without one', () => {
+  it('every suggested line is taken by a word rule (no model)', async () => {
+    const { listsGateRules } = await import('../src/v2/circleGate.js');
+    const rules = listsGateRules('nl', lists);
+    const run = (text) => { for (const r of rules) { const ok = typeof r.test === 'function' ? r.test(text) : r.test.test(text); if (ok) { const c = r.command(text, {}); if (c) return c; } } return null; };
+    const lines = basicModeLines({ ops: all, lists, t }).map((l) => (/"([^"]+)"/.exec(l) ?? [])[1]).filter(Boolean);
+    expect(lines.length).toBeGreaterThan(3);
+    for (const line of lines) expect(run(line), line).not.toBeNull();
   });
 });

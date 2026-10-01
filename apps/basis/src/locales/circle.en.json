@@ -4205,12 +4205,40 @@
       "text": "{{count}} things could not be restored.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "basic_head": {
+      "text": "I can't read ordinary sentences right now. This does work:",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_add": {
+      "text": "• \"add milk to the {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_read": {
+      "text": "• \"what's on the {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_chore": {
+      "text": "• \"new task: clean the windows\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_done": {
+      "text": "• \"windows is done\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_week": {
+      "text": "• \"what's on this week\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_help": {
+      "text": "• /help for all commands",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
     "welcome_admin": {
       "text": "You are the admin. With /instellingen you set, for the whole household, who may give chores, who sees names, the reminders and the quiet hours.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "reminder_done_words": {
-      "text": "Done? Send: /complete-task {{text}}",
+      "text": "Done? Say: {{text}} is done.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
     "reminder_done": {

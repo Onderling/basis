@@ -109,6 +109,10 @@ export function listsGateRules(_locale, lists = []) {
     // "wat staat er deze week" / "wat moet er nog gebeuren": the person's week overview — by rule, so the model does not
     // summarise the week itself from what it happens to have in view
     { name: 'assistant:weekOverview(read)', test: WEEK_READ, command: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
+    // "ramen is klaar" / "de melk is gekocht": mostly a reply to the bot's own reminder, so it works without a model.
+    // One rule, no type choice: the waist finds the one item the words name (or asks which), and a chore's tick is the
+    // chore's own verb underneath.
+    { name: 'lists:markListItemDone(stated)', test: STATED_DONE, command: (text) => { const m = STATED_DONE.exec(String(text).trim()); return m ? { opId: 'markListItemDone', args: { item: m[1].trim() } } : null; } },
     // A person's own switch for what the bot writes first: "stop writing to me" must work every time, model or no
     // model — so it is a rule, never the model's reading.
     { name: 'assistant:reminders(off)', test: REMINDERS_OFF, command: () => ({ opId: 'assistant-reminders', args: { mode: 'off' }, appOrigin: 'assistant' }) },
@@ -125,6 +129,7 @@ export function listsGateRules(_locale, lists = []) {
 
 const REMINDERS_OFF = /^(?:(?:(?:stuur|geef)\s+(?:me|mij)\s+)?geen\s+herinneringen(?:\s+meer)?(?:\s+(?:sturen|graag|aub|alsjeblieft))?|(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+uit|stop\s+(?:met\s+)?(?:de\s+)?herinneringen|no\s+more\s+reminders|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+off|stop\s+(?:the\s+)?reminders)\s*[.!]*$/i;
 const REMINDERS_ON = /^(?:(?:zet\s+)?(?:de\s+|mijn\s+)?herinneringen\s+(?:weer\s+)?aan|(?:turn\s+)?(?:the\s+|my\s+)?reminders\s+(?:back\s+)?on)\s*[.!]*$/i;
+const STATED_DONE = /^(?:de\s+|het\s+|the\s+)?(.+?)\s+(?:is|zijn|are)\s+(?:al\s+|already\s+)?(?:klaar|gedaan|gekocht|gemaakt|af|done|bought|fixed)[.!]*$/i;
 const WEEK_READ = /^(?:wat\s+staat\s+er\s+(?:voor\s+)?deze\s+week|wat\s+moet\s+er\s+(?:nog|deze\s+week)?\s*gebeuren|what(?:'s|\s+is)\s+on\s+this\s+week)\s*[?.!]*$/i;
 // A chore that says WHO ("voor mij", "voor Bert", "for me") or WHEN (a day word) is the model's: it has the assignee and
 // the due date to fill, which this typed rule cannot.

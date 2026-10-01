@@ -60,7 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
-import { welcomeLines } from '../src/v2/botWelcome.js';
+import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom } from '../src/v2/botSettings.js';
@@ -841,6 +841,8 @@ if (tgToken || inboxDoor.bridge) {
       gateRules: listsGateRules(values.lang, templateLists(t)),
       // the first message says what this bot does for this person, and how the reminders stand and change
       welcomeFor: ({ role, ops }) => welcomeLines({ ops, role, lists: templateLists(t), t, settings: reminderSettings() }),
+      // without the model (off, or not answering): what does work, for this person — the word rules and the commands
+      basicHelpFor: ({ ops }) => basicModeLines({ ops, lists: templateLists(t), t }),
     } : {}),
   });
   await tgRunner.start();

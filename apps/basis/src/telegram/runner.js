@@ -55,7 +55,7 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null, basicHelpFor = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -276,7 +276,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // A model that is slow is SAID: "even geduld" while it retries, and when it does not come back, that it is not
     // reachable now — never "I did not understand" for a model that did not answer.
     onSlow: (ctx) => say(ctx.chatId, t('circle.bot.slow')),
-    onLlmUnavailable: (_text, ctx, info) => say(ctx.chatId, t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown')),
+    // Without the model (off, or not answering) the person is told what DOES work — the word rules and the commands —
+    // when the door can say it; else the old line.
+    onLlmUnavailable: async (_text, ctx, info) => {
+      const lines = await basicHelp(ctx.id);
+      if (lines.length) return say(ctx.chatId, [t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.bot.basic_head'), ...(info?.reason === 'unreachable' ? [t('circle.bot.basic_head')] : []), ...lines].join('\n'));
+      return say(ctx.chatId, t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown'));
+    },
     onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),
     claim: (text, ctx) => (claims(ctx.chatId, ctx.id, text) ? () => doorLine(ctx.chatId, ctx.id, text) : null),
     around: (turn, run) => aroundTurn(turn, run),
@@ -324,6 +330,19 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return r;
   }
 
+  /** The ops this person's role reaches (their scoped catalogue), and their role. */
+  function personOps(threadId) {
+    const role = typeof roleFor === 'function' ? roleFor(threadId) : null;
+    const scoped = typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), role) : catalogueOf();
+    return { role, ops: new Set([...(scoped?.opsById ?? [])].map(([key, entry]) => entry?.op?.id ?? key)) };
+  }
+
+  /** What works without the model, for this person (the door derives it), or nothing. */
+  async function basicHelp(threadId) {
+    if (typeof basicHelpFor !== 'function') return [];
+    try { return (await basicHelpFor({ threadId, ...personOps(threadId) })) ?? []; } catch { return []; }
+  }
+
   /** A person's first turn with this door: who it is and what it keeps — once. */
   // The chats that came in on a door without commands (the bot's contact inbox): their welcome does not say "typ /help".
   const slashless = new Set();
@@ -334,10 +353,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // what this bot does for THIS person (their role's tools, the household's settings), when the door derives it
     let derived = [];
     if (typeof welcomeFor === 'function') {
-      const role = typeof roleFor === 'function' ? roleFor(threadId) : null;
-      const scoped = typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), role) : catalogueOf();
-      const ops = new Set([...(scoped?.opsById ?? [])].map(([key, entry]) => entry?.op?.id ?? key));
-      try { derived = (await welcomeFor({ threadId, role, ops })) ?? []; } catch { derived = []; }
+      try { derived = (await welcomeFor({ threadId, ...personOps(threadId) })) ?? []; } catch { derived = []; }
     }
     await say(chatId, [welcome, ...derived, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);

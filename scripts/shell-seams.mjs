@@ -45,6 +45,8 @@ export const SEAMS = Object.freeze([
   // mobile are a person's devices and write first to nobody.
   // A hosted bot's first message is derived from what it does for that person (their role's tools, the settings).
   { id: 'bot-welcome', pattern: /welcomeLines\(/, shells: ['box'], why: 'a hosted bot tells a new person what it does for them; a person\'s device has no door to greet on' },
+  // Without its model a hosted bot says what does work (the word rules, the commands) instead of "only commands".
+  { id: 'bot-basic-help', pattern: /basicModeLines\(/, shells: ['box'], why: 'a person learns what to type when the model is off or down' },
   { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds

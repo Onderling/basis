@@ -24,9 +24,11 @@ import { childIdsOf, deleteContainer } from '@onderling/item-store';
  * @param {string} [a.localActor]
  * @param {() => {mode: 'keep'|'hide'|'delete', days: number}} [a.passed]  a household bot's setting for what is done or
  *        has passed (shown marked · shown marked for N days · deleted); absent → a done entry leaves the read at once
- * @returns {Record<string, (args: object) => Promise<object>>} opId → handler
+ * @param {(a: {circleId: string, entry: object, ctx?: object}) => Promise<object>} [a.completeChore]  how a chore on a
+ *        list is ticked: the chore's own verb (a household bot's tasks); absent → a plain tick
+ * @returns {Record<string, (args: object, ctx?: object) => Promise<object>>} opId → handler
  */
-export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null } = {}) {
+export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null, completeChore = null } = {}) {
   // What a list may hold beyond its own entries and tasks: appointments (the calendar's `accepts` line).
   const svc = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   // A call names its circle, or means the one the person is looking at. Named wins: an agent or a
@@ -128,10 +130,13 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, items: containers.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
     },
 
-    markListItemDone: async (args) => {
+    markListItemDone: async (args, ctx) => {
       // Never "done" for an entry that is not there: nothing would have been ticked.
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error };
+      // A chore is ticked by the chore's own verb (its rules, its state, its reply) — one entry point, the noun's verb
+      // underneath — as the person asking.
+      if (at.entry.type === 'task' && typeof completeChore === 'function') return completeChore({ circleId: at.circleId, entry: at.entry, ctx });
       await svc.markDone(at.circleId, at.entry.id, localActor);
       // the reply names what was ticked — the entry found, not the words it was asked by
       return { ok: true, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };

@@ -3926,6 +3926,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         t: typeof opts.t === 'function' ? opts.t : (k) => k,
         activeCircle: () => resolveCircleId({}),
         localActor: 'me',
+        // a household bot: a chore ticked by its words is the chore's own `completeTask`, as the person (the gate)
+        ...(opts.tasksCircleId ? { completeChore: ({ circleId, entry, ctx }) => callSkill('tasks', 'completeTask', { id: entry.id, circleId }, ctx) } : {}),
         // a household bot: what is done or has passed follows the household's setting
         ...(opts.tasksCircleId ? { passed: () => ({
           mode: passedPolicyFrom(paramsService.register.valueOf(PASSED_KEY)),
@@ -4755,7 +4757,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // journey, and "true by accident of ordering" is how a fan-out path quietly stops being one.
       const inCircle = typeof args?.circleId === 'string' && args.circleId ? args.circleId : null;
       if (inCircle) await ensureCircleSync(inCircle);
-      return handler(args ?? {});
+      // the person asking rides along (a handler that acts as them — a chore's tick — passes it on)
+      return handler(args ?? {}, ctx);
     }
     throw new Error(`realAgent: unknown appOrigin "${appOrigin}"`);
   };

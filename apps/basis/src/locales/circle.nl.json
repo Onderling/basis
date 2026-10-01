@@ -4205,12 +4205,40 @@
       "text": "{{count}} dingen kon ik niet terugzetten.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "basic_head": {
+      "text": "Ik kan nu geen gewone zinnen lezen. Dit werkt wel:",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_add": {
+      "text": "• \"zet melk op de {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_read": {
+      "text": "• \"wat staat er op de {{list}}\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_chore": {
+      "text": "• \"nieuwe taak: ramen lappen\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_done": {
+      "text": "• \"ramen is klaar\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_week": {
+      "text": "• \"wat staat er deze week\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_help": {
+      "text": "• /help voor alle opdrachten",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
     "welcome_admin": {
       "text": "Je bent beheerder. Met /instellingen regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "reminder_done_words": {
-      "text": "Klaar? Stuur: /complete-task {{text}}",
+      "text": "Klaar? Zeg: {{text}} is klaar.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
     "reminder_done": {

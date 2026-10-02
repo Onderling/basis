@@ -3349,6 +3349,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: chatId.pubKey,
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      }).then((r) => {
+        // a leave or an evict is told once, with no later chance: say whom it did not reach (a probe that names its
+        // branch — a member who never learns of it is then delivery, not the fold)
+        const kind = statement?.body?.kind;
+        if ((kind === 'leave' || kind === 'evict') && (r?.error || (r?.attempted ?? 0) > (r?.sent ?? 0))) {
+          console.info(`[membership-fan] ${kind} in ${String(circleId).slice(0, 8)}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}${r?.error ? ` (${r.error})` : ''}${(r?.errors ?? []).length ? ` — ${JSON.stringify(r.errors).slice(0, 200)}` : ''}`);
+        }
+        return r;
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
         .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),

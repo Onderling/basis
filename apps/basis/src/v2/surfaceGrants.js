@@ -382,7 +382,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
     activeEntryOf(tokenId) {
       if (typeof tokenId !== 'string' || !tokenId || !ready || folded.revokedIds.has(tokenId)) return null;
       for (const [viewPubKey, e] of folded.granted) {
-        if (e.tokens.some((t) => t.id === tokenId)) return { viewPubKey, actingAs: e.actingAs ?? null };
+        if (e.tokens.some((t) => t.id === tokenId)) return { viewPubKey, actingAs: e.actingAs ?? null, label: e.label ?? null };
       }
       return null;
     },

@@ -24,5 +24,8 @@ describe('the screen\'s panels', () => {
     const admin = panels.at(-1).items;
     expect(admin[0]).toMatchObject({ skill: 'lists.removeList', confirm: expect.objectContaining({ severity: 'danger' }) });
     expect(JSON.stringify(panels)).not.toContain('nope.nothing');
+    // the household's settings: the screen asks only for the two changes that take something from everyone
+    const settings = screenPanels({ ops: ['assistant.assistant-settings'], catalogue, isAdmin, t })[0].items[0];
+    expect(settings.confirm.when).toEqual(['names none', 'reminders off']);
   });
 });

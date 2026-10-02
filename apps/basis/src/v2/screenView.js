@@ -18,6 +18,7 @@
 import { DataPart } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
 import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
+import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERED } from './screenStepUp.js';
 
 /** The peer-message subtype a screen's offer travels as (the bot's router takes it). */
 export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
@@ -43,8 +44,10 @@ export const screenAddressFor = (botAddress) => `#scherm-bot=${encodeURIComponen
  * @param {() => Promise<object>} a.makeAgent  a secure agent (`createSecureAgent`, `transportMode: 'relay'`) with this browser's
  *   persistent key
  * @param {{getItem: Function, setItem: Function, removeItem?: Function}} a.storage  where the grant is kept
+ * @param {(fn: Function, ms: number) => any} [a.setTimer]
+ * @param {(h: any) => void} [a.clearTimer]
  */
-export function createScreenView({ link, makeAgent, storage }) {
+export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (h) => clearTimeout(h) }) {
   const load = (botAddress) => { try { return JSON.parse(storage.getItem(storeKey(botAddress)) ?? 'null'); } catch { return null; } };
   // a later visit (`#scherm-bot=`): the bot's address, and the relay from the grant this browser kept
   const resolve = () => {
@@ -67,6 +70,18 @@ export function createScreenView({ link, makeAgent, storage }) {
   let rejectGrant = null;
   const grantArrived = new Promise((resolve, reject) => { resolveGrant = resolve; rejectGrant = reject; });
   grantArrived.catch(() => { /* a refusal nobody awaits yet is not an unhandled rejection */ });
+  // what the bot says later about a request that waited for a yes in the person's chat (`{outcome, op}`)
+  const notices = new Set();
+  const emit = (notice) => { for (const fn of notices) { try { fn(notice); } catch { /* a listener's fault is its own */ } } };
+  // a call the bot holds for the person's yes: the screen waits its own ten minutes, then says "no answer" itself
+  let waiting = null;
+  const stopWaiting = () => { if (waiting) { clearTimer(waiting); waiting = null; } };
+  const noticeOf = ({ from, payload } = {}) => {
+    if (from !== parsed.botAddress || payload?.subtype !== SCREEN_STEP_UP_SUBTYPE) return false;
+    stopWaiting();
+    emit({ outcome: String(payload.outcome ?? ''), op: typeof payload.op === 'string' ? payload.op : null });
+    return true;
+  };
 
   return {
     /** What the link says (bot address, relay): `{ok, botAddress, relayUrl}` or `{ok: false, reason}`. No secret in it. */
@@ -97,6 +112,7 @@ export function createScreenView({ link, makeAgent, storage }) {
           // only the bot this screen offered to speaks for it: a grant- or refusal-shaped message from any other key is
           // not this pairing's (its tokens would fail at the door — confusion, not access — but it would look connected)
           if (from !== parsed.botAddress) return;
+          if (noticeOf({ from, payload })) return;
           if (payload?.subtype === SCREEN_REFUSED_SUBTYPE) { rejectGrant(new Error('refused')); return; }
           if (payload?.subtype !== CONNECTION_GRANT_SUBTYPE) return;
           const r = acceptConnectionGrant(payload, { nonce: parsed.nonce, viewPubKey });
@@ -118,7 +134,7 @@ export function createScreenView({ link, makeAgent, storage }) {
       const kept = parsed.ok ? load(parsed.botAddress) : null;
       if (!kept) return false;
       sa = await makeAgent();
-      await sa.relay.connect({ relayUrl: parsed.relayUrl });
+      await sa.relay.connect({ relayUrl: parsed.relayUrl, onPeerMessage: noticeOf });
       granted = kept;
       resolveGrant(granted);
       return true;
@@ -132,6 +148,12 @@ export function createScreenView({ link, makeAgent, storage }) {
       grantArrived,
       new Promise((_, reject) => { const h = setTimeout(() => reject(new Error('timed-out')), timeoutMs); h?.unref?.(); }),
     ]),
+
+    /**
+     * Hear what became of a request that waited for a yes in the person's own chat: `fn({outcome, op})`, outcome one of
+     * done · declined · expired · replaced · failed. Returns the unsubscribe.
+     */
+    onNotice(fn) { notices.add(fn); return () => notices.delete(fn); },
 
     /** The ops this screen may call (`app.op`), from the grant. */
     ops: () => (granted?.tokens ?? []).map((t) => t.skill),
@@ -147,6 +169,10 @@ export function createScreenView({ link, makeAgent, storage }) {
       if (!token) throw new Error(`screenView: no grant for ${skill}`);
       const parts = await sa.peer.invoke(granted.botAddress, skill, [DataPart(args)], { token });
       const data = (parts ?? []).map((p) => p?.data ?? p?.content).find((d) => d && typeof d === 'object');
+      if (data?.pending === true) {
+        stopWaiting();
+        waiting = setTimer(() => { waiting = null; emit({ outcome: SCREEN_STEP_UP_UNANSWERED, op: skill.split('.').pop() }); }, SCREEN_STEP_UP_TTL_MS);
+      }
       return data ?? null;
     },
   };

@@ -48,7 +48,7 @@ test('the screen in a browser: the link read and hidden, the tap, the code, the 
     const send = (text, extra = {}) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text, ...extra }).sent;
     await send('hallo', { admission: /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1] });
     expect(await until(async () => ((await said()).length ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
-    await send('/scherm');
+    await send('/scherm link');   // Ann is the admin: the link on request
     const linkLine = await until(async () => (await said()).find((x) => x.includes('#scherm=')) ?? null, { timeout: 30_000, step: 500 });
     expect(linkLine, `no link:\n${out.slice(-1200)}`).toBeTruthy();
     const link = /https?:\/\/\S+/.exec(linkLine)[0];

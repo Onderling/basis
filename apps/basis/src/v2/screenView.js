@@ -17,7 +17,7 @@
  */
 import { DataPart } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
-import { parseScreenLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
+import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
 
 /** The peer-message subtype a screen's offer travels as (the bot's router takes it). */
 export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
@@ -25,13 +25,14 @@ export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
 export const SCREEN_REFUSED_SUBTYPE = 'screen-offer-refused';
 
 const storeKey = (botAddress) => `onderling.screen.${botAddress}`;
+const randomNonce = () => { const b = new Uint8Array(16); globalThis.crypto.getRandomValues(b); return [...b].map((x) => x.toString(16).padStart(2, '0')).join(''); };
 
 /**
  * Is this address a screen's? `#scherm=<link>` (pairing: the one-time link) or `#scherm-bot=<address>` (a later visit:
  * the address bar keeps only the bot's address — the link's secret is removed as soon as it is read).
  */
 export function isScreenAddress(hash) {
-  return /#scherm(?:-bot)?=/.test(String(hash ?? ''));
+  return /#scherm(?:-bot|-nieuw)?=/.test(String(hash ?? ''));
 }
 /** The address a screen keeps in its address bar once the link is read: the bot's, no secret. */
 export const screenAddressFor = (botAddress) => `#scherm-bot=${encodeURIComponent(botAddress)}`;
@@ -48,7 +49,12 @@ export function createScreenView({ link, makeAgent, storage }) {
   // a later visit (`#scherm-bot=`): the bot's address, and the relay from the grant this browser kept
   const resolve = () => {
     const kept = /#scherm-bot=([^&]+)/.exec(String(link ?? ''));
-    if (!kept) return parseScreenLink(link);
+    if (!kept) {
+      // the paste route: the screen makes its own connect code (the person pastes it into their chat)
+      const start = parseScreenStartLink(link);
+      if (start.ok) return { ...start, nonce: null, pasteMode: true };
+      return parseScreenLink(link);
+    }
     const botAddress = decodeURIComponent(kept[1]);
     const rec = load(botAddress);
     return rec ? { ok: true, botAddress, relayUrl: rec.relayUrl ?? null, nonce: null, resumeOnly: true } : { ok: false, reason: 'no-kept-grant' };
@@ -64,7 +70,7 @@ export function createScreenView({ link, makeAgent, storage }) {
 
   return {
     /** What the link says (bot address, relay): `{ok, botAddress, relayUrl}` or `{ok: false, reason}`. No secret in it. */
-    get link() { return parsed.ok ? { ok: true, botAddress: parsed.botAddress, relayUrl: parsed.relayUrl, botName: parsed.botName ?? kept()?.botName ?? null, resumeOnly: Boolean(parsed.resumeOnly) } : parsed; },
+    get link() { return parsed.ok ? { ok: true, botAddress: parsed.botAddress, relayUrl: parsed.relayUrl, botName: parsed.botName ?? kept()?.botName ?? null, resumeOnly: Boolean(parsed.resumeOnly), pasteMode: Boolean(parsed.pasteMode) } : parsed; },
 
     /** A grant this browser already holds for this bot (a later visit), or null. */
     stored: () => (parsed.ok ? load(parsed.botAddress) : null),
@@ -74,8 +80,15 @@ export function createScreenView({ link, makeAgent, storage }) {
      * the offer is sent; `granted()` resolves when the bot's grant arrives (after the person's yes).
      * @returns {Promise<{code: string}>}
      */
+    /**
+     * The person tapped "connect" (the link) or "make a connect code" (the paste route). Resolves once the offer is out —
+     * sent over the relay, or, on the paste route, as `offer` for the person to copy into their own chat — with the code
+     * to pick. `granted()` resolves when the bot's grant arrives.
+     * @returns {Promise<{code: string, offer?: string}>}
+     */
     async connect({ label = null } = {}) {
       if (!parsed.ok || parsed.resumeOnly) throw new Error(`screenView: not a screen link (${parsed.reason ?? 'a kept grant resumes, it does not pair'})`);
+      if (parsed.pasteMode) parsed.nonce = randomNonce();
       sa = await makeAgent();
       const viewPubKey = sa.agent.pubKey;
       await sa.relay.connect({
@@ -94,8 +107,10 @@ export function createScreenView({ link, makeAgent, storage }) {
         },
       });
       const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label });
+      const code = await screenCode(viewPubKey, parsed.nonce);
+      if (parsed.pasteMode) return { code, offer };   // nothing sent: the person carries the offer to their own chat
       await sa.peer.sendTo(parsed.botAddress, { subtype: SCREEN_OFFER_SUBTYPE, offer });
-      return { code: await screenCode(viewPubKey, parsed.nonce) };
+      return { code };
     },
 
     /** A later visit: this browser's key and the grant it kept, back on the relay — no pairing again. */

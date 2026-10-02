@@ -4402,11 +4402,15 @@
           "assistant-exports": "the nightly exports",
           "assistant-export": "make an export now",
           "assistant-import": "restore an export",
+          "assistant-screen-paste": "connect a screen with its own connect code",
           "assistant-screen-confirm": "pick the code of a screen that wants to connect"
         }
       }
     },
-    "admission_failed": "Letting you in went wrong on the bot's side. Try again in a few minutes; if it still fails, ask the admin."
+    "admission_failed": "Letting you in went wrong on the bot's side. Try again in a few minutes; if it still fails, ask the admin.",
+    "screen_paste_link": "Open this on the screen you want to connect (in your own browser): {{link}}\nTap \"Make a connect code\" there and paste that code here: /koppel-scherm <code>. No secret goes through this chat this way.",
+    "screen_paste_usage": "Paste the screen's connect code: /koppel-scherm onderling-connect://…",
+    "screen_paste_asked": "Received. I am asking you now which code that screen shows."
   },
   "op": {
     "not_in_this_circle": {
@@ -7374,6 +7378,9 @@
     "failed": "Connecting did not work: {{reason}}",
     "not_a_link": "This link is not (or no longer) valid. Ask the bot for a new one: /scherm.",
     "refused": "Not connected: another code, or \"none of these\", was picked in your chat with the bot. Ask for a new link: /scherm.",
-    "timed_out": "Not connected: no answer came within ten minutes. Ask for a new link: /scherm."
+    "timed_out": "Not connected: no answer came within ten minutes. Ask for a new link: /scherm.",
+    "make_code": "Make a connect code",
+    "paste_this": "Paste this into your own chat with the bot:",
+    "copy": "Copy"
   }
 }

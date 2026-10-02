@@ -30,7 +30,9 @@ export async function startScreenShell(win = window) {
   });
   const link = view.link;
   // the link's secret leaves the address bar before anything else happens; the bot's address stays for a reload
-  try { win.history.replaceState(null, '', win.location.pathname + win.location.search + (link.ok ? screenAddressFor(link.botAddress) : '')); } catch { /* cosmetic */ }
+  const keepBotAddress = () => { try { win.history.replaceState(null, '', win.location.pathname + win.location.search + (link.ok ? screenAddressFor(link.botAddress) : '')); } catch { /* cosmetic */ } };
+  // a link's secret leaves the address bar at once; the paste route's address holds none, and stays until the grant
+  if (!link.pasteMode) keepBotAddress();
 
   const root = el('main', { class: 'screen-shell', 'data-screen': 'shell' });
   document.body.replaceChildren(root);
@@ -41,6 +43,7 @@ export async function startScreenShell(win = window) {
   const bot = link.botName ? `${link.botName} (${link.botAddress.slice(0, 8)}…)` : `${link.botAddress.slice(0, 10)}…`;
 
   const showOps = () => {
+    keepBotAddress();   // connected: a reload finds the kept grant
     const rows = view.ops().map((op) => {
       const out = el('span', { class: 'screen-result' });
       const run = el('button', { type: 'button', 'data-op': op, onclick: async () => {
@@ -62,8 +65,14 @@ export async function startScreenShell(win = window) {
   const tap = el('button', { type: 'button', 'data-screen': 'connect', onclick: async () => {
     tap.disabled = true;
     try {
-      const { code } = await view.connect({ label: t('circle.connectScreen.label') });
-      say(el('p', { 'data-screen': 'code' }, t('circle.connectScreen.code', { bot })), el('p', { class: 'screen-code', 'data-code': code }, code), el('p', {}, t('circle.connectScreen.waiting')));
+      const { code, offer } = await view.connect({ label: t('circle.connectScreen.label') });
+      // the paste route: this screen's own connect code, for the person to paste into their chat with the bot
+      const paste = offer ? [
+        el('p', {}, t('circle.connectScreen.paste_this')),
+        el('textarea', { readonly: 'readonly', rows: '3', 'data-offer': offer, class: 'screen-offer' }, `/koppel-scherm ${offer}`),
+        el('button', { type: 'button', onclick: () => { try { win.navigator.clipboard?.writeText(`/koppel-scherm ${offer}`); } catch { /* select it by hand */ } } }, t('circle.connectScreen.copy')),
+      ] : [];
+      say(...paste, el('p', { 'data-screen': 'code' }, t('circle.connectScreen.code', { bot })), el('p', { class: 'screen-code', 'data-code': code }, code), el('p', {}, t('circle.connectScreen.waiting')));
       await view.granted();
       showOps();
     } catch (e) {

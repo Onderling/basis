@@ -2,6 +2,7 @@
  * assistantOps — the door's own ops (`assistantManifest`), answered by the door: a person's thread settings, and the
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
+import { parsePairingOffer } from './connectionPairing.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
@@ -70,7 +71,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-revoke') return revokeOp(args?.who);
       if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller);
       if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
-      if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId);
+      if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId, args?.how ?? args?._match);
+      if (op === 'assistant-screen-paste') return screenPasteOp(caller ?? ctx?.threadId, args?.offer ?? args?._match);
       if (op === 'assistant-screen-confirm') return screenConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-screens') return screensOp(caller ?? ctx?.threadId, args?.change ?? args?._match);
       if (op === 'assistant-exports') return exportsOp();
@@ -374,10 +376,20 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: tp('circle.bot.view_set', { view: tp(`circle.bot.view_word_${view}`) }) };
   }
 
-  /** `/scherm`: a one-time link for this person's screen. */
-  async function screenOp(person) {
+  /**
+   * `/scherm`: a screen for this person. A member gets the one-time link; the admin, by default, the paste route (the
+   * screen makes its own code and they paste it back — no secret in the chat); `/scherm link` gives anyone the link.
+   */
+  async function screenOp(person, how) {
     if (!person || !admin.screens) return { ok: false, error: 'unwired' };
     const tp = personT(person);
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const wantsLink = /^\s*link\s*$/i.test(String(how ?? ''));
+    if (row?.role === 'admin' && !wantsLink && typeof admin.screens.startPaste === 'function') {
+      const r = await admin.screens.startPaste(person, (link) => tp('circle.bot.screen_paste_link', { link }));
+      if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable') } };
+      return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+    }
     // the link goes to the person's PRIVATE door only; the chat it was asked in (maybe a group) hears where it went
     const r = await admin.screens.start(person, (link, minutes) => tp('circle.bot.screen_link', { link, minutes }), tp('circle.bot.screen_link_remembered'));
     if (!r.ok) {
@@ -403,6 +415,17 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (r.ok) return { ok: true, message: tp(r.declined ? 'circle.bot.screen_declined' : 'circle.bot.screen_confirmed') };
     const key = { 'not-private': 'screen_confirm_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'screen_confirm_nothing' }[r.reason] ?? 'screen_confirm_failed';
     return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
+  }
+
+  /** `/koppel-scherm <code>`: a screen's own connect code, pasted; the same question follows. */
+  async function screenPasteOp(person, text) {
+    if (!person || !admin.screens?.pasted) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const offer = parsePairingOffer(String(text ?? '').trim());
+    if (!offer.ok) return { ok: false, error: { code: offer.reason, message: tp('circle.bot.screen_paste_usage') } };
+    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label });
+    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_confirm_failed') } };
+    return { ok: true, message: tp('circle.bot.screen_paste_asked') };
   }
 
   /** `/schermen` (the person's screens) · `/schermen los <n>` (drop one). */

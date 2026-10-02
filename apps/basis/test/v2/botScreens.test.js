@@ -164,3 +164,25 @@ describe('a person connects a screen to the bot', () => {
     expect(await s.start('telegram:1', linkText)).toMatchObject({ ok: false, reason: 'no-app-url' });
   });
 });
+
+describe('the paste route (/koppel-scherm)', () => {
+  it('the start address holds no secret; a pasted offer asks the same question; only the right code grants', async () => {
+    const { encodeScreenStartLink, parseScreenStartLink } = await import('../../src/v2/botScreens.js');
+    const start = encodeScreenStartLink('https://basis.example/app', { botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' });
+    expect(start).toContain('#scherm-nieuw=');
+    expect(parseScreenStartLink(start)).toEqual({ ok: true, botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' });
+    expect(JSON.stringify(parseScreenStartLink(start))).not.toMatch(/"n"|nonce/);
+    const ctx = setup();
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: '', nonce: 'x' })).toMatchObject({ ok: false, reason: 'not-an-offer' });
+    ctx.admitted.delete('telegram:1');
+    expect(await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' })).toMatchObject({ ok: false, reason: 'not-admitted' });
+    ctx.admitted.add('telegram:1');
+    const r = await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9', label: 'laptop' });
+    expect(r).toMatchObject({ ok: true, pending: true, code: await screenCode('P', 'n9') });
+    expect(ctx.grants).toEqual([]);
+    expect(await ctx.screens.confirm('telegram:1', 'ja', { isPrivate: true })).toMatchObject({ declined: true });
+    await ctx.screens.pasted('telegram:1', { viewPubKey: 'P', nonce: 'n9' });
+    expect((await ctx.screens.confirm('telegram:1', await screenCode('P', 'n9'), { isPrivate: true })).ok).toBe(true);
+    expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['P']);
+  });
+});

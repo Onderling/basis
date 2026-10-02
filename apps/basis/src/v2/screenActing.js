@@ -20,6 +20,7 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-screen',
   'assistant.assistant-screens',
   'assistant.assistant-screen-confirm',
+  'assistant.assistant-screen-paste',
 ]);
 
 /**

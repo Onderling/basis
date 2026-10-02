@@ -17,6 +17,7 @@ import { screenPanelsForGrant } from '../../src/v2/screenPaint.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
 import { renderForm } from '../../src/web/domForm.js';
 import { confirmApplies } from '../../src/confirmApplies.js';
+import { SCREEN_STEP_UP_OUTCOMES } from '../../src/v2/screenStepUp.js';
 
 const el = (tag, attrs = {}, ...kids) => {
   const n = document.createElement(tag);
@@ -77,8 +78,14 @@ export async function startScreenShell(win = window) {
         } }, item.label);
         return el('div', { class: 'screen-op' }, open, area, out);
       })));
-    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), ...sections);
+    // what became of a request that waited for a yes in the person's own chat
+    const notice = el('p', { class: 'screen-notice', role: 'status', 'data-screen': 'notice' });
+    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), notice, ...sections);
   };
+  view.onNotice(({ outcome }) => {
+    const at = root.querySelector('[data-screen="notice"]');
+    if (at && SCREEN_STEP_UP_OUTCOMES.includes(outcome)) at.textContent = t(`circle.connectScreen.stepup_${outcome}`);
+  });
 
 
   // a later visit: the kept grant, back on the relay — no pairing

@@ -50,7 +50,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     ['reminders', REMINDERS_KEY, REMINDERS_MODES, remindersModeFrom],
   ];
   const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
-  return async (app, op, args = {}, ctx = {}) => {
+  const stepUpOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.stepUp ?? null;
+  const door = async (app, op, args = {}, ctx = {}) => {
     if (app !== 'assistant') return callSkill(app, op, args, ctx);
     const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
     if (caller && typeof refusal === 'function') {
@@ -58,7 +59,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
+    // a screen's call to an op that admits, removes or re-roles people runs only after a yes in the private chat: the op
+    // declares it, and it is enforced here, so a screen that skips its own confirm changes nothing
+    if (ctx?.via === 'screen' && stepUpOf(op) === 'private-door') return holdForYes(caller, op, args, ctx);
     try {
+      if (op === 'assistant-screen-approve') return approveOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       // `/apps on tasks`: with no required param the router keeps the line as `_match` for the op to split.
       if (op === 'assistant-apps') return appsOp(args?.change ?? args?._match);
       if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match);
@@ -108,6 +113,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     return { ok: false, error: 'unknown-op', app, op };
   };
+  return door;
 
   /** The translator for a person: their fixed `/taal` language, else the door's. */
   function personT(threadId) {
@@ -415,6 +421,39 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (r.ok) return { ok: true, message: tp(r.declined ? 'circle.bot.screen_declined' : 'circle.bot.screen_confirmed') };
     const key = { 'not-private': 'screen_confirm_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'screen_confirm_nothing' }[r.reason] ?? 'screen_confirm_failed';
     return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
+  }
+
+  /** A screen's step-up request: held, and the question asked in the person's private chat. */
+  async function holdForYes(person, op, args, ctx) {
+    const tp = personT(person);
+    if (!person || !admin.stepUp || !ctx?.viewPubKey) return { ok: false, error: { code: 'step-up-unwired', message: tp('circle.bot.stepup_unwired') } };
+    const arg = String(args?.who ?? args?.spec ?? args?._match ?? '').trim() || '—';
+    const what = tp(`circle.bot.stepup_what.${op}`, { arg });
+    const text = tp('circle.bot.stepup_question', { screen: ctx.screenLabel ?? tp('circle.connectScreen.label'), what });
+    const buttons = [{ id: '/bevestig ja', label: tp('circle.bot.stepup_yes') }, { id: '/bevestig nee', label: tp('circle.bot.stepup_no') }];
+    const r = await admin.stepUp.hold(person, { op, args, viewPubKey: ctx.viewPubKey }, { text, buttons });
+    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_not_reachable') } };
+    return { ok: true, pending: true, message: tp('circle.bot.stepup_asked') };
+  }
+
+  /**
+   * `/bevestig ja|nee`: the answer to a screen's step-up request. It counts only from the person's PRIVATE door (on
+   * Telegram the chat whose id is their own; never a group, never a screen). A yes runs the op as their typed line —
+   * the host gate asks again — and the screen hears the outcome.
+   */
+  async function approveOp(person, word, ctx) {
+    if (!person || !admin.stepUp) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const yes = switchOf(word);
+    if (!yes) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.stepup_usage') } };
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const isPrivate = ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+    const r = await admin.stepUp.answer(person, yes === 'on', { isPrivate });
+    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(`circle.bot.stepup_${{ 'not-private': 'not_private', expired: 'expired' }[r.reason] ?? 'nothing'}`) } };
+    if (r.declined) return { ok: true, message: tp('circle.bot.stepup_declined') };
+    const out = await door('assistant', r.req.op, r.req.args, { caller: person, threadId: person, ...(ctx?.chatId != null ? { chatId: ctx.chatId } : {}) });
+    await admin.stepUp.done(r.req, out?.ok !== false);
+    return out;
   }
 
   /** `/koppel-scherm <code>`: a screen's own connect code, pasted; the same question follows. */

@@ -4403,7 +4403,8 @@
           "assistant-export": "make an export now",
           "assistant-import": "restore an export",
           "assistant-screen-paste": "connect a screen with its own connect code",
-          "assistant-screen-confirm": "pick the code of a screen that wants to connect"
+          "assistant-screen-confirm": "pick the code of a screen that wants to connect",
+          "assistant-screen-approve": "your yes or no to what a screen asked"
         }
       }
     },
@@ -4411,7 +4412,24 @@
     "screen_paste_link": "Open this on the screen you want to connect (in your own browser): {{link}}\nTap \"Make a connect code\" there and paste that code here: /koppel-scherm <code>. No secret goes through this chat this way.",
     "screen_paste_usage": "Paste the screen's connect code: /koppel-scherm onderling-connect://…",
     "screen_paste_asked": "Received. I am asking you now which code that screen shows.",
-    "settings_confirm": "This changes it for everyone in the house. Are you sure?"
+    "settings_confirm": "This changes it for everyone in the house. Are you sure?",
+    "stepup_question": "Screen '{{screen}}' wants to {{what}}. Go ahead?",
+    "stepup_what": {
+      "assistant-revoke": "remove {{arg}} from the household",
+      "assistant-invite": "make an invite",
+      "assistant-cohort": "open a group of invites ({{arg}})",
+      "assistant-role": "change a role ({{arg}})",
+      "assistant-rotate": "replace the invite code"
+    },
+    "stepup_yes": "Yes",
+    "stepup_no": "No",
+    "stepup_asked": "Asked in your own chat with the bot. Say yes there.",
+    "stepup_usage": "Answer with /bevestig ja or /bevestig nee.",
+    "stepup_not_private": "That only counts in your own chat with the bot.",
+    "stepup_nothing": "Nothing is waiting for a yes.",
+    "stepup_expired": "Too late: the request lapsed. Ask again from the screen.",
+    "stepup_declined": "Not done.",
+    "stepup_unwired": "That can only be done in the chat here."
   },
   "op": {
     "not_in_this_circle": {
@@ -7384,6 +7402,11 @@
     "paste_this": "Paste this into your own chat with the bot:",
     "copy": "Copy",
     "empty": "Nothing yet.",
-    "sure": "Are you sure?"
+    "sure": "Are you sure?",
+    "stepup_done": "Done.",
+    "stepup_declined": "Not done: you said no.",
+    "stepup_expired": "Not done: no yes came within ten minutes.",
+    "stepup_replaced": "Not done: a newer request took its place.",
+    "stepup_failed": "That did not work; see your chat."
   }
 }

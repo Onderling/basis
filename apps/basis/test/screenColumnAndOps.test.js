@@ -23,9 +23,12 @@ describe('the screen column', () => {
     expect(adminCol).toContain('lists.removeList');
     for (const col of [member, adminCol]) {
       for (const id of BOT_SCREEN_NEVER) expect(col).not.toContain(id);
-      // what admits people, removes them or changes what they may do waits for the chat yes; /apps stays in the chat
-      expect(col.filter((id) => ['invite', 'cohort', 'role', 'revoke', 'rotate', 'apps', 'import'].some((w) => id === `assistant.assistant-${w}`))).toEqual([]);
+      // /apps stays in the chat; import never
+      expect(col.filter((id) => ['apps', 'import'].some((w) => id === `assistant.assistant-${w}`))).toEqual([]);
     }
+    // what admits people, removes them or changes what they may do: on the admin's screen (held for the chat yes), not a member's
+    const held = ['invite', 'cohort', 'role', 'revoke', 'rotate'].map((w) => `assistant.assistant-${w}`);
+    for (const id of held) { expect(adminCol).toContain(id); expect(member).not.toContain(id); }
     // the admin's screen: the reads, the household's settings and an export now (Fable's list); a member's: none of them
     for (const id of SCREEN_ADMIN_OPS) { expect(adminCol).toContain(id); expect(member).not.toContain(id); }
     // no role (not in the book): nothing, never a default column

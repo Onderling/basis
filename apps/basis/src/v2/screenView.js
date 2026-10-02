@@ -18,6 +18,7 @@
 import { DataPart } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
 import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
+import { SCREEN_STEP_UP_SUBTYPE } from './screenStepUp.js';
 
 /** The peer-message subtype a screen's offer travels as (the bot's router takes it). */
 export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
@@ -67,6 +68,14 @@ export function createScreenView({ link, makeAgent, storage }) {
   let rejectGrant = null;
   const grantArrived = new Promise((resolve, reject) => { resolveGrant = resolve; rejectGrant = reject; });
   grantArrived.catch(() => { /* a refusal nobody awaits yet is not an unhandled rejection */ });
+  // what the bot says later about a request that waited for a yes in the person's chat (`{outcome, op}`)
+  const notices = new Set();
+  const noticeOf = ({ from, payload } = {}) => {
+    if (from !== parsed.botAddress || payload?.subtype !== SCREEN_STEP_UP_SUBTYPE) return false;
+    const notice = { outcome: String(payload.outcome ?? ''), op: typeof payload.op === 'string' ? payload.op : null };
+    for (const fn of notices) { try { fn(notice); } catch { /* a listener's fault is its own */ } }
+    return true;
+  };
 
   return {
     /** What the link says (bot address, relay): `{ok, botAddress, relayUrl}` or `{ok: false, reason}`. No secret in it. */
@@ -97,6 +106,7 @@ export function createScreenView({ link, makeAgent, storage }) {
           // only the bot this screen offered to speaks for it: a grant- or refusal-shaped message from any other key is
           // not this pairing's (its tokens would fail at the door — confusion, not access — but it would look connected)
           if (from !== parsed.botAddress) return;
+          if (noticeOf({ from, payload })) return;
           if (payload?.subtype === SCREEN_REFUSED_SUBTYPE) { rejectGrant(new Error('refused')); return; }
           if (payload?.subtype !== CONNECTION_GRANT_SUBTYPE) return;
           const r = acceptConnectionGrant(payload, { nonce: parsed.nonce, viewPubKey });
@@ -118,7 +128,7 @@ export function createScreenView({ link, makeAgent, storage }) {
       const kept = parsed.ok ? load(parsed.botAddress) : null;
       if (!kept) return false;
       sa = await makeAgent();
-      await sa.relay.connect({ relayUrl: parsed.relayUrl });
+      await sa.relay.connect({ relayUrl: parsed.relayUrl, onPeerMessage: noticeOf });
       granted = kept;
       resolveGrant(granted);
       return true;
@@ -132,6 +142,12 @@ export function createScreenView({ link, makeAgent, storage }) {
       grantArrived,
       new Promise((_, reject) => { const h = setTimeout(() => reject(new Error('timed-out')), timeoutMs); h?.unref?.(); }),
     ]),
+
+    /**
+     * Hear what became of a request that waited for a yes in the person's own chat: `fn({outcome, op})`, outcome one of
+     * done · declined · expired · replaced · failed. Returns the unsubscribe.
+     */
+    onNotice(fn) { notices.add(fn); return () => notices.delete(fn); },
 
     /** The ops this screen may call (`app.op`), from the grant. */
     ops: () => (granted?.tokens ?? []).map((t) => t.skill),

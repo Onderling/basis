@@ -4058,11 +4058,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}}.",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}} · {{lead}} minutes beforehand (0: none).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00",
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|15|30|60",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
@@ -4331,6 +4331,11 @@
     "value_hide": "hide",
     "value_delete": "delete",
     "value_own": "their own",
+    "reminder_event_soon": "Soon: {{title}}, {{time}}.",
+    "welcome_reminders_on_lead": "When something has a date, I remind you: the evening before an appointment (19:00), {{lead}} minutes before it, and the morning a chore is due (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
+    "menu_lead": "Reminder beforehand",
+    "value_lead_min": "{{n}} minutes",
+    "value_lead_off": "none",
     "help": {
       "sections": {
         "lists": "Lists",

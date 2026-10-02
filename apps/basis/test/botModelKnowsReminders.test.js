@@ -13,7 +13,8 @@ describe('what the model knows of reminders and the time', () => {
     expect(lines).toContain(REMINDER_MOMENTS.evening);
     expect(lines).toContain(REMINDER_MOMENTS.morning);
     expect(lines).toContain('/herinneringen');
-    expect(lines).toMatch(/NO reminder at a chosen time/);
+    expect(lines).toMatch(/NO reminder at a time a person chooses/);
+    expect(lines).toMatch(/shortly before it starts/);
     expect(lines).toMatch(/never promise one/);
   });
 

@@ -24,7 +24,8 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {{sendToPerson: Function}} a.reach  `doorReach`
  * @param {(key: string, vars?: object) => string} a.t
  * @param {string} a.tz  the household's zone
- * @param {() => {reminders?: string, quiet?: string}} a.settings  the household's switch and quiet hours
+ * @param {() => {reminders?: string, quiet?: string, lead?: number}} a.settings  the household's switch, quiet hours and the
+ *   minutes before an appointment for the short-notice reminder
  * @param {() => number} [a.now]
  * @param {number} [a.every]
  * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
@@ -38,7 +39,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
   // in each person's own language when they fixed one (`/taal`), else the bot's
   const tFor = (personId) => { const lang = threads?.langOf?.(personId) ?? null; return lang ? (k, p) => t(k, p, lang) : t; };
   const lineOf = (item, tp = t) => (item.kind === 'event'
-    ? tp('circle.bot.reminder_event', { title: item.text, time: timeOf(item.at) })
+    ? tp(item.soon ? 'circle.bot.reminder_event_soon' : 'circle.bot.reminder_event', { title: item.text, time: timeOf(item.at) })
     : tp('circle.bot.reminder_chore', { text: item.text }));
 
   async function passOnce() {
@@ -50,7 +51,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     const { chores = [], events = [] } = (await sources()) ?? {};
     const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id) }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
-    const due = dueReminders({ chores, events, people, said, now: at, tz, ...(s.quiet ? { quiet: s.quiet } : {}) });
+    const due = dueReminders({ chores, events, people, said, now: at, tz, ...(s.quiet ? { quiet: s.quiet } : {}), ...(s.lead !== undefined ? { lead: s.lead } : {}) });
     let sent = 0;
     for (const { personId, items } of due) {
       const first = !threads.remindedOnce(personId);

@@ -4331,11 +4331,72 @@
     "value_hide": "hide",
     "value_delete": "delete",
     "value_own": "their own",
+<<<<<<< HEAD
     "reminder_event_soon": "Soon: {{title}}, {{time}}.",
     "welcome_reminders_on_lead": "When something has a date, I remind you: the evening before an appointment (19:00), {{lead}} minutes before it, and the morning a chore is due (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
     "menu_lead": "Reminder beforehand",
     "value_lead_min": "{{n}} minutes",
     "value_lead_off": "none"
+=======
+    "help": {
+      "sections": {
+        "lists": "Lists",
+        "chores": "Chores",
+        "agenda": "Agenda",
+        "you": "You",
+        "admin": "For the admin"
+      },
+      "ops": {
+        "lists": {
+          "listLists": "which lists there are",
+          "listEntries": "what is on a list",
+          "addToList": "put something on a list (or say: put milk on the shopping)",
+          "markListItemDone": "tick something off (or say: milk is bought)",
+          "removeFromList": "take something off a list",
+          "editEntry": "change the words of an entry",
+          "createList": "a new list",
+          "removeList": "throw away a whole list"
+        },
+        "tasks": {
+          "listMine": "your own chores",
+          "claimTask": "take on a chore (or say: I'll do the windows)",
+          "completeTask": "report a chore done (or say: windows are done)",
+          "editTask": "change a chore"
+        },
+        "calendar": {
+          "addEvent": "make an appointment (or say: dentist tomorrow at 10)",
+          "listEvents": "the coming appointments",
+          "rsvpAccept": "say you come",
+          "rsvpDecline": "say you do not come",
+          "rsvpTentative": "maybe come",
+          "cancelEvent": "cancel an appointment"
+        },
+        "assistant": {
+          "weekOverview": "your week: chores, appointments, shopping",
+          "assistant-menu": "your settings, with buttons",
+          "assistant-reminders": "reminders on or off",
+          "assistant-overview": "the Sunday overview on or off",
+          "assistant-language": "the language I answer you in",
+          "assistant-memory": "how much of our conversation I remember",
+          "assistant-view": "buttons, your screen, or words",
+          "assistant-screen": "connect a screen",
+          "assistant-screens": "your connected screens",
+          "assistant-settings": "settings for the whole household",
+          "assistant-users": "who is in the household",
+          "assistant-role": "change someone's role",
+          "assistant-cohort": "a code for several people",
+          "assistant-invite": "a code for one person",
+          "assistant-revoke": "take someone out",
+          "assistant-rotate": "replace the codes",
+          "assistant-apps": "which apps the bot uses",
+          "assistant-status": "how the bot is doing",
+          "assistant-exports": "the nightly exports",
+          "assistant-export": "make an export now",
+          "assistant-import": "restore an export"
+        }
+      }
+    }
+>>>>>>> origin/fix/bot-words-from-first-chat
   },
   "op": {
     "not_in_this_circle": {

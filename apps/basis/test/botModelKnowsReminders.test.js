@@ -13,7 +13,9 @@ describe('what the model knows of reminders and the time', () => {
     expect(lines).toContain(REMINDER_MOMENTS.evening);
     expect(lines).toContain(REMINDER_MOMENTS.morning);
     expect(lines).toContain('/herinneringen');
-    expect(lines).toMatch(/NO reminder at a time a person chooses/);
+    expect(lines).toMatch(/cannot remind at a time a person chooses/);
+    // second person: the model IS the bot — told in the third person it answered "ik stuur zelf geen herinneringen"
+    expect(lines).toMatch(/you \(this bot\) send them yourself/);
     expect(lines).toMatch(/shortly before it starts/);
     expect(lines).toMatch(/never promise one/);
   });

@@ -1,19 +1,23 @@
 /**
  * FITNESS: every command a household bot offers has a person-facing `/help` line in every language
- * (`circle.bot.help.ops.<app>.<op>`), and no line names an op the bot does not offer. A new op on the bot's map is red
- * here until someone words it for a person — the manifest's hint is for the model, not for `/help`.
+ * (`circle.bot.help.ops.<app>.<op>`), and no line names an op the bot does not offer. Offered = a command in its chat
+ * menu, or a button on a connected screen (a screen paints the same line, else the bare op id). A new op on the bot's
+ * map is red here until someone words it for a person — the manifest's hint is for the model, not for `/help`.
  */
 import { describe, it, expect } from 'vitest';
 import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
 import { scopeCatalogueToRole } from '../../src/v2/botOpMap.js';
+import { screenColumnFor } from '../../src/v2/screenActing.js';
 import nl from '../../src/locales/circle.nl.json' with { type: 'json' };
 import en from '../../src/locales/circle.en.json' with { type: 'json' };
 
 const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
-const offered = [...new Set((scopeCatalogueToRole(catalogue, null).commandMenu ?? []).map((e) => {
+const commands = (scopeCatalogueToRole(catalogue, null).commandMenu ?? []).map((e) => {
   const entry = catalogue.opsById.get(e.opId);
   return `${entry?.appOrigin}.${entry?.op?.id}`;
-}))].sort();
+});
+const onScreens = ['admin', 'member', 'observer'].flatMap((role) => screenColumnFor(catalogue, role));
+const offered = [...new Set([...commands, ...onScreens])].sort();
 
 describe('FITNESS: the bot\'s /help lines', () => {
   for (const [lang, bundle] of [['nl', nl], ['en', en]]) {

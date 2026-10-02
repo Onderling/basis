@@ -4374,7 +4374,9 @@
           "listMine": "your own chores",
           "claimTask": "take on a chore (or say: I'll do the windows)",
           "completeTask": "report a chore done (or say: windows are done)",
-          "editTask": "change a chore"
+          "editTask": "change a chore",
+          "removeTask": "remove a chore",
+          "reassignTask": "give a chore to someone else"
         },
         "calendar": {
           "addEvent": "make an appointment (or say: dentist tomorrow at 10)",

@@ -17,6 +17,18 @@ import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
 
 /** The two moments of a day, on the household's clock. */
 export const REMINDER_MOMENTS = Object.freeze({ morning: '08:00', evening: '19:00' });
+/**
+ * What the bot's model is told about its reminders — exactly what the tick does, so it neither denies them ("I cannot
+ * set reminders") nor invents others ("an hour before and five minutes before", seen on the real bot 2026-10-02).
+ * LLM-facing; the moments are the tick's own constants.
+ */
+export function reminderPromptLines() {
+  return [
+    `REMINDERS — what this bot really does, and nothing else: an appointment is reminded the evening before at ${REMINDER_MOMENTS.evening}, to whoever added it and whoever comes; a chore due today is reminded that morning at ${REMINDER_MOMENTS.morning}, to whoever holds it; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). Nothing is sent in the household's quiet hours (the admin's /huishouden shows them).`,
+    'Each person switches their own reminders on or off (the assistant-reminders tool; /herinneringen aan | uit). There is NO reminder at a chosen time, and none a set time before an appointment: say so plainly, never promise one, and offer the appointment (reminded the evening before) instead.',
+  ];
+}
+
 /** Quiet hours, on the household's clock: nothing is said inside them. */
 export const QUIET_HOURS = '21:00-08:00';
 

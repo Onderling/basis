@@ -79,22 +79,26 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!threadId) return { ok: false, error: 'no-thread' };
       // a person's own op answers in their language (`/taal`, set after this call for the language op itself)
       const tp = personT(threadId);
+      // a switch asked without its value: how it stands now, with a button per value (as `/instellingen` paints it)
+      if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?._match)) return oneSettingOp(threadId, op);
       if (op === 'assistant-memory') {
-        threads.setMode(threadId, args?.mode);
-        return { ok: true, message: tp(`circle.bot.memory_${args.mode}`) };
+        const mode = args?.mode ?? args?._match;
+        threads.setMode(threadId, mode);
+        return { ok: true, message: tp(`circle.bot.memory_${mode}`) };
       }
       if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx, tp) };
       if (op === 'assistant-reminders' || op === 'assistant-overview') {
-        const mode = switchOf(args?.mode);
+        const mode = switchOf(args?.mode ?? args?._match);
         if (!mode) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
         const which = op === 'assistant-reminders' ? 'reminders' : 'overview';
         if (which === 'reminders') threads.setReminders(threadId, mode === 'on'); else threads.setOverview(threadId, mode === 'on');
         return { ok: true, message: tp(`circle.bot.${which}_${mode}`) };
       }
       if (op === 'assistant-language') {
-        threads.setLang(threadId, args?.lang);
+        const lang = args?.lang ?? args?._match;
+        threads.setLang(threadId, lang);
         const tn = personT(threadId);
-        return { ok: true, message: args.lang === 'auto' ? tn('circle.bot.lang_auto') : tn('circle.bot.lang_set', { lang: args.lang }) };
+        return { ok: true, message: lang === 'auto' ? tn('circle.bot.lang_auto') : tn('circle.bot.lang_set', { lang }) };
       }
     } catch (err) {
       return { ok: false, error: { code: 'invalid-argument', message: err?.message ?? String(err) } };
@@ -329,6 +333,19 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     if (view === 'chat') return { ok: true, message: [...lines, '', tp('circle.bot.menu_in_words')].join('\n') };
     return { ok: true, message: lines.join('\n'), quickReplies: buttons };
+  }
+
+  /** One person setting as it stands, with a button per value (the bare `/herinneringen`, `/taal`, …). */
+  function oneSettingOp(person, opId) {
+    const tp = personT(person);
+    const spec = PERSON_SETTINGS[opId];
+    const now = spec.now(person);
+    const label = tp(`circle.bot.menu_${opId}`);
+    return {
+      ok: true,
+      message: tp('circle.bot.menu_row', { label, value: tp(`circle.bot.value_${now}`) }),
+      quickReplies: spec.values.map((v) => ({ label: `${tp(`circle.bot.value_${v}`)}${v === now ? ' ✓' : ''}`, slash: `${slashOf(opId)} ${v}` })),
+    };
   }
 
   /** `/weergave knoppen|scherm|chat` (the words of either language, or the values themselves). */

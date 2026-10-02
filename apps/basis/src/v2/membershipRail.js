@@ -218,6 +218,9 @@ export function makeMembershipPeerHandler({ rail, onChange = null, onLanded = nu
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
     try {
       const res = await rail.ingest(circleId, statement);
+      // a statement that arrived and was refused says why: a member who never learns of a leave is then the fold's
+      // gate, not delivery
+      if (res && !res.ok) console.info(`[membership] refused a ${statement?.body?.kind ?? '?'} from ${String(fromPeerAddr ?? '').slice(0, 8)} in ${String(circleId).slice(0, 8)}: ${res.reason ?? '?'}`);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
         try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }

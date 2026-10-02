@@ -4330,7 +4330,8 @@
     "value_keep": "keep",
     "value_hide": "hide",
     "value_delete": "delete",
-    "value_own": "their own"
+    "value_own": "their own",
+    "admission_failed": "Letting you in went wrong on the bot's side. Try again in a few minutes; if it still fails, ask the admin."
   },
   "op": {
     "not_in_this_circle": {

@@ -4330,7 +4330,8 @@
     "value_keep": "bewaren",
     "value_hide": "verbergen",
     "value_delete": "weggooien",
-    "value_own": "je eigen"
+    "value_own": "je eigen",
+    "admission_failed": "Het toelaten ging mis aan de kant van de bot. Probeer het over een paar minuten opnieuw; lukt het dan niet, vraag de beheerder."
   },
   "op": {
     "not_in_this_circle": {

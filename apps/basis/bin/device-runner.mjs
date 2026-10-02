@@ -60,6 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
@@ -836,10 +837,17 @@ if (tgToken || inboxDoor.bridge) {
     },
     where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
   }) : null;
+  // What admits, removes or re-roles people runs from a screen only after a yes in the person's private chat; the
+  // screen hears the outcome (the answer itself — an invite link — is said in that chat).
+  const stepUp = screens ? createScreenStepUp({
+    ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
+    tell: (viewPubKey, o) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_STEP_UP_SUBTYPE, ...o }),
+  }) : null;
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     admin: {
       screens,
+      stepUp,
       catalogue: doorCatalogue,
       users: () => botUsers.list(),
       admission,

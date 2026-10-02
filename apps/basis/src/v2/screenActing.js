@@ -12,21 +12,33 @@
 import { renderA2A } from '@onderling/app-manifest';
 import { scopeCatalogueToRole } from './botOpMap.js';
 
-/** The bot's ops a screen never reaches, whatever token it holds: reading a file back, or pairing more screens. */
+/** The bot's ops a screen never reaches, whatever token it holds: restoring an export, or pairing more screens. */
 export const BOT_SCREEN_NEVER = Object.freeze([
-  'assistant.assistant-import',
-  'assistant.assistant-export',
-  'assistant.assistant-exports',
+  'assistant.assistant-import',   // restoring writes the whole household and opens a sealed file: never on a screen
   'assistant.assistant-screen',
   'assistant.assistant-screens',
   'assistant.assistant-screen-confirm',
   'assistant.assistant-screen-paste',
+  'assistant.assistant-screen-approve',   // the yes to a screen's request is said in the private chat, never by a screen
+]);
+
+/**
+ * The admin's own assistant ops a screen may have: the reads, the household's settings and an export. What admits
+ * people, removes them or changes what they may do (the ops declaring `stepUp: 'private-door'`) is on the screen too,
+ * and runs only after a yes in the admin's own chat (the door's call holds it); `/apps` stays in the chat.
+ */
+export const SCREEN_ADMIN_OPS = Object.freeze([
+  'assistant.assistant-status',
+  'assistant.assistant-users',
+  'assistant.assistant-exports',
+  'assistant.assistant-settings',
+  'assistant.assistant-export',
 ]);
 
 /**
  * The ops a person's screen is granted: their ROLE COLUMN as the door composes it (`scopeCatalogueToRole` over the
  * door's catalogue — the same ops their typed line reaches), as skill ids (`app.op`), without what a screen never gets
- * and without the admin's own assistant ops (managing people and exports comes with its own step).
+ * and of the admin's own assistant ops only `SCREEN_ADMIN_OPS`.
  * @param {object} catalogue  the door's merged catalogue
  * @param {string|null} role  the person's role on the bot
  * @returns {string[]}
@@ -40,7 +52,7 @@ export function screenColumnFor(catalogue, role) {
     const id = `${entry?.appOrigin}.${entry?.op?.id}`;
     if (!entry?.appOrigin || !entry?.op?.id || out.includes(id)) continue;
     if (BOT_SCREEN_NEVER.includes(id)) continue;
-    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted') continue;
+    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted' && !SCREEN_ADMIN_OPS.includes(id) && entry.op.stepUp !== 'private-door') continue;
     out.push(id);
   }
   return out;
@@ -64,7 +76,8 @@ export function screenActsAs(users, { activeEntry } = {}) {
     const entry = await activeEntry(token?.id);
     if (!entry || entry.actingAs !== actingAs || entry.viewPubKey !== token?.subject) return null;
     const row = ((await users.list()) ?? []).find((u) => u?.id === actingAs && !u.hidden);
-    return row ? { caller: actingAs, threadId: actingAs } : null;
+    // marked as a screen's, with its key and name: an op that needs the private chat's yes is held, and the screen told
+    return row ? { caller: actingAs, threadId: actingAs, via: 'screen', viewPubKey: entry.viewPubKey, screenLabel: entry.label ?? null } : null;
   };
 }
 

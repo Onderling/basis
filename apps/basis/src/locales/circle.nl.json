@@ -4409,14 +4409,35 @@
           "assistant-export": "nu een export maken",
           "assistant-import": "een export terugzetten",
           "assistant-screen-paste": "een scherm koppelen met zijn eigen koppelcode",
-          "assistant-screen-confirm": "de code van een scherm kiezen dat wil koppelen"
+          "assistant-screen-confirm": "de code van een scherm kiezen dat wil koppelen",
+          "assistant-screen-approve": "je ja of nee op wat een scherm vroeg"
         }
       }
     },
     "admission_failed": "Het toelaten ging mis aan de kant van de bot. Probeer het over een paar minuten opnieuw; lukt het dan niet, vraag de beheerder.",
     "screen_paste_link": "Open dit op het scherm dat je wilt koppelen (in je eigen browser): {{link}}\nTik daar op \"Maak een koppelcode\" en plak die code hier: /koppel-scherm <code>. Er gaat zo geen geheim door dit gesprek.",
     "screen_paste_usage": "Plak de koppelcode van het scherm: /koppel-scherm onderling-connect://…",
-    "screen_paste_asked": "Ontvangen. Ik vraag je nu welke code er op dat scherm staat."
+    "screen_paste_asked": "Ontvangen. Ik vraag je nu welke code er op dat scherm staat.",
+    "settings_confirm": "Dit verandert het voor iedereen in huis. Weet je het zeker?",
+    "stepup_question": "Scherm '{{screen}}' wil {{what}}. Doen? (verzoek {{id}}: /bevestig ja {{id}} of /bevestig nee {{id}})",
+    "stepup_what": {
+      "assistant-revoke": "{{arg}} uit het huishouden halen",
+      "assistant-invite": "een uitnodiging maken",
+      "assistant-cohort": "een groep uitnodigingen openen ({{arg}})",
+      "assistant-role": "een rol veranderen ({{arg}})",
+      "assistant-rotate": "de uitnodigingscode vervangen"
+    },
+    "stepup_yes": "Ja",
+    "stepup_no": "Nee",
+    "stepup_asked": "Gevraagd in je eigen chat met de bot. Zeg daar ja.",
+    "stepup_usage": "Tik op Ja of Nee onder de vraag (of typ /bevestig ja en de code erbij).",
+    "stepup_not_private": "Dat telt alleen in je eigen chat met de bot.",
+    "stepup_nothing": "Er wacht niets op een ja.",
+    "stepup_expired": "Te laat: het verzoek is vervallen. Vraag het opnieuw vanaf het scherm.",
+    "stepup_declined": "Niet gedaan.",
+    "stepup_unwired": "Dat kan hier alleen in de chat.",
+    "stepup_replaced": "Dat verzoek is vervangen door een nieuwer; daar is niets mee gedaan.",
+    "stepup_what_op": "{{op}} doen ({{arg}})"
   },
   "op": {
     "not_in_this_circle": {
@@ -7387,6 +7408,15 @@
     "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm.",
     "make_code": "Maak een koppelcode",
     "paste_this": "Plak dit in je eigen gesprek met de bot:",
-    "copy": "Kopiëren"
+    "copy": "Kopiëren",
+    "empty": "Nog niets.",
+    "sure": "Weet je het zeker?",
+    "stepup_done": "Gedaan.",
+    "stepup_declined": "Niet gedaan: je zei nee.",
+    "stepup_expired": "Niet gedaan: er kwam geen ja binnen tien minuten.",
+    "stepup_replaced": "Niet gedaan: een nieuwer verzoek kwam ervoor in de plaats.",
+    "stepup_failed": "Het lukte niet; kijk in je chat.",
+    "stepup_unanswered": "Geen antwoord: er kwam binnen tien minuten geen ja. Niets veranderd.",
+    "rate_limited": "Even rustig: dit scherm vroeg te veel in korte tijd. Probeer het over een paar seconden opnieuw."
   }
 }

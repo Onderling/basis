@@ -9,7 +9,7 @@
  *   - then the code, to compare with the one the bot shows in their private chat, and their yes there;
  *   - then the ops this screen may do, for now as a plain list (painting them as forms comes next).
  */
-import { createSecureAgent, makeBrowserVault } from '@onderling/secure-agent';
+import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
 import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
 
@@ -25,7 +25,7 @@ export async function startScreenShell(win = window) {
   await initLocalisation({ lng: detectDeviceLang() });
   const view = createScreenView({
     link: win.location.href,
-    makeAgent: () => createSecureAgent({ vault: makeBrowserVault('onderling-screen:'), transportMode: 'relay', warnOnInsecure: false }),
+    makeAgent: makeBrowserScreenAgent,
     storage: win.localStorage,
   });
   const link = view.link;

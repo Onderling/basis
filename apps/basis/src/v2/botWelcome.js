@@ -39,7 +39,7 @@ export function welcomeLines({ ops, lists = [], role = null, settings = {}, t })
     if (settings.reminders === 'off') lines.push(t('circle.bot.welcome_reminders_off'));
     else {
       const [from, to] = String(settings.quiet || QUIET_HOURS).split('-');
-      lines.push(t('circle.bot.welcome_reminders_on', { from, to }));
+      lines.push(Number(settings.lead) > 0 ? t('circle.bot.welcome_reminders_on_lead', { from, to, lead: settings.lead }) : t('circle.bot.welcome_reminders_on', { from, to }));
     }
     // the weekly overview is off until the person switches it on: its own line, after either reminders line
     if (has('assistant-overview')) lines.push(t('circle.bot.welcome_overview'));

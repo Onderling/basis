@@ -60,6 +60,19 @@ describe('the bot\'s own screen tokens verify at its door', () => {
     await expect(own.policyEngine.checkInbound({ peerPubKey: view.pubKey, skillId: 'lists.addToList', token: g.tokens[0] })).resolves.toBeTruthy();
     const offRecord = (await CapabilityToken.issue(own.identity, { subject: view.pubKey, agentId: own.identity.pubKey, skill: 'lists.addToList', constraints: { role: 'surface' } })).toJSON();
     await expect(own.policyEngine.checkInbound({ peerPubKey: view.pubKey, skillId: 'lists.addToList', token: offRecord })).rejects.toThrow(/not active/);
+    // the attacker writes the token: an off-record token signed with the agent's own key is refused whatever it says
+    // it is — no role, another role, a wildcard skill — on a person's agent and on the bot
+    for (const [agentLabel, ag] of [['person', own], ['bot', bot]]) {
+      for (const [label, extra] of [['no role', {}], ['role member', { constraints: { role: 'member' } }], ['wildcard skill', { skill: '*' }]]) {
+        const forged = (await CapabilityToken.issue(ag.identity, { subject: view.pubKey, agentId: ag.identity.pubKey, skill: 'lists.addToList', ...extra })).toJSON();
+        await expect(ag.policyEngine.checkInbound({ peerPubKey: view.pubKey, skillId: 'lists.addToList', token: forged }), `${agentLabel}: ${label}`).rejects.toThrow(/not active/);
+      }
+    }
+    // a recorded grant for ANOTHER subject does not make this one active either
+    const otherView = await AgentIdentity.generate(new VaultMemory());
+    const g2 = await personAgent.callSkill('household', 'grantSurface', { viewPubKey: otherView.pubKey, ops: ['lists.addToList'] });
+    const stolen = g2.tokens[0];
+    await expect(own.policyEngine.checkInbound({ peerPubKey: view.pubKey, skillId: 'lists.addToList', token: stolen })).rejects.toThrow();
     // the bot's off-record surface token too
     const botOff = (await CapabilityToken.issue(bot.identity, { subject: view.pubKey, agentId: bot.identity.pubKey, skill: 'lists.addToList', constraints: { role: 'surface', actingAs: 'telegram:1' } })).toJSON();
     await expect(bot.policyEngine.checkInbound({ peerPubKey: view.pubKey, skillId: 'lists.addToList', token: botOff })).rejects.toThrow(/not active/);

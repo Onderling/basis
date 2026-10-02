@@ -13,7 +13,7 @@
 import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
 import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
-import { screenPanelsForGrant } from '../../src/v2/screenPaint.js';
+import { screenPanelsForGrant, screenReplies } from '../../src/v2/screenPaint.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
 import { renderForm } from '../../src/web/domForm.js';
 import { confirmApplies } from '../../src/confirmApplies.js';
@@ -49,8 +49,10 @@ export async function startScreenShell(win = window) {
   const bot = link.botName ? `${link.botName} (${link.botAddress.slice(0, 8)}…)` : `${link.botAddress.slice(0, 10)}…`;
 
   // what an op answered, in words: its message, or the entries it read, or a tick
+  // the door's refusal of too many calls at once, in words (the kernel's word for it is a code)
+  const inWords = (msg) => (/rate-limited/.test(String(msg)) ? t('circle.connectScreen.rate_limited') : String(msg));
   const answerOf = (r) => {
-    if (r?.ok === false) return String(r?.error?.message ?? r?.error ?? '');
+    if (r?.ok === false) return inWords(r?.error?.message ?? r?.error ?? '');
     if (typeof r?.message === 'string' && r.message) return r.message;
     const items = Array.isArray(r?.items) ? r.items : (Array.isArray(r?.entries) ? r.entries : null);
     if (items) return items.length ? items.map((i, n) => `${n + 1}. ${i?.label ?? i?.text ?? i?.title ?? i?.name ?? ''}`).join('\n') : t('circle.connectScreen.empty');
@@ -65,18 +67,24 @@ export async function startScreenShell(win = window) {
       ...panel.items.map((item) => {
         const out = el('div', { class: 'screen-result', role: 'status', 'data-result-op': item.opId });
         const area = el('div', { class: 'screen-form' });
-        const run = async (args) => {
-          // the op's own confirm, here: the surface asks (the waist does not)
-          if (confirmApplies(item.confirm, args) && !win.confirm(t(item.confirm.messageKey ?? '') || item.confirm.message || t('circle.connectScreen.sure'))) return;
+        const replies = el('div', { class: 'screen-replies' });
+        // one call of the screen's: the op's own confirm (the surface asks; the waist does not), then its token
+        const call = async (skill, args, confirm) => {
+          if (confirmApplies(confirm, args) && !win.confirm(t(confirm.messageKey ?? '') || confirm.message || t('circle.connectScreen.sure'))) return;
           out.textContent = '…';
-          try { out.textContent = answerOf(await view.call(item.skill, args)); } catch (e) { out.textContent = String(e?.message ?? e); }
+          replies.replaceChildren();
+          let r;
+          try { r = await view.call(skill, args); out.textContent = answerOf(r); } catch (e) { out.textContent = inWords(e?.message ?? e); return; }
+          // the answer's own buttons (a menu): only those the screen resolves to an op it holds a token for
+          replies.replaceChildren(...screenReplies(r, view.ops()).map((b) => el('button', { type: 'button', 'data-reply': b.skill, onclick: () => call(b.skill, b.args, b.confirm) }, b.label)));
         };
+        const run = (args) => call(item.skill, args, item.confirm);
         const open = el('button', { type: 'button', 'data-op': item.skill, onclick: () => {
           if (!item.needsForm) { run({}); return; }
           const spec = buildFormSpec({ opParams: item.params, missing: item.params.filter((q) => q?.required).map((q) => q.name), prefilledArgs: {}, opId: item.opId, appOrigin: item.appOrigin });
           area.replaceChildren(renderForm(spec, { doc: document, t, onSubmit: (values) => { area.replaceChildren(); run(values); }, onCancel: () => area.replaceChildren() }));
         } }, item.label);
-        return el('div', { class: 'screen-op' }, open, area, out);
+        return el('div', { class: 'screen-op' }, open, area, out, replies);
       })));
     say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), ...sections);
   };

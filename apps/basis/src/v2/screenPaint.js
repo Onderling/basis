@@ -7,6 +7,8 @@
 
 import { composeAssistantCatalogue } from '../telegram/assistantCatalogue.js';
 import { botOpLevel } from './botOpMap.js';
+import { parseInput } from '../parser.js';
+import { resolveDispatch } from '../router.js';
 
 const SECTION_OF = { lists: 'lists', tasks: 'chores', calendar: 'agenda', assistant: 'you' };
 const ORDER = ['lists', 'chores', 'agenda', 'you', 'admin'];
@@ -50,4 +52,47 @@ export function screenPanelsForGrant(ops, t) {
   const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
   const isAdmin = (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibility === 'trusted' : botOpLevel(entry.op?.id) === 'trusted');
   return screenPanels({ ops, catalogue, isAdmin, t });
+}
+
+/** The bot's catalogue as the screen's code knows it (its own manifests), composed once. */
+let screenCatalogue = null;
+const catalogueForScreen = () => (screenCatalogue ??= composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true }).catalogue);
+
+/**
+ * A reply's quick replies as buttons on a screen. Each `{label, slash}` is resolved by the SCREEN's own parser over its
+ * own manifests into an op and args — the bot's text is a menu, never something the screen runs as text. A button is
+ * kept only when the screen holds a token for the op it resolves to (the screen ops, `/bevestig`, anything withheld
+ * fall away); the call it makes is any other call of the screen's (its token, the door's gate, the step-up where
+ * declared), and the op's own confirm rides along for the surface to ask.
+ * @param {object|null} result  an op's answer (`quickReplies: [{label, slash}]`)
+ * @param {string[]} ops  the skills this screen holds tokens for (`app.op`)
+ * @returns {Array<{label: string, skill: string, args: object, confirm: object|null}>}
+ */
+export function screenReplies(result, ops) {
+  const replies = Array.isArray(result?.quickReplies) ? result.quickReplies : [];
+  if (!replies.length) return [];
+  const catalogue = catalogueForScreen();
+  const held = new Set(ops ?? []);
+  const out = [];
+  for (const r of replies) {
+    const slash = typeof r?.slash === 'string' ? r.slash.trim() : '';
+    if (!slash.startsWith('/')) continue;
+    let route = null;
+    try { route = resolveDispatch(parseInput(slash, catalogue, {}), catalogue); } catch { route = null; }
+    if (!route || (route.kind !== 'ready' && route.kind !== 'needsConfirm')) continue;
+    const entry = catalogue.opsById?.get?.(route.opId);
+    const skill = `${entry?.appOrigin ?? route.appOrigin}.${entry?.op?.id ?? route.opId}`;
+    if (!held.has(skill)) continue;
+    out.push({ label: String(r.label ?? slash), skill, args: declaredArgs(route.args, entry?.op), confirm: entry?.op?.surfaces?.ui?.confirm ?? null });
+  }
+  return out;
+}
+
+// The words a slash leaves unsplit (`_match`) belong to the op's one param: a screen's call carries declared params only.
+function declaredArgs(args, op) {
+  const { _match, ...rest } = args ?? {};
+  const params = Array.isArray(op?.params) ? op.params : [];
+  const open = params.filter((p) => p?.name && rest[p.name] === undefined);
+  if (typeof _match === 'string' && _match.trim() && open.length === 1) rest[open[0].name] = _match.trim();
+  return rest;
 }

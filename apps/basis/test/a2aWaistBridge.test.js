@@ -35,11 +35,16 @@ async function ownerAndCaller() {
   return { A, owner, caller };
 }
 
-/** Mint a grant for one op, exactly as a connection grant does. */
-const grantFor = async (owner, caller, skill) =>
-  (await CapabilityToken.issue(owner.identity, {
-    subject: caller.pubKey, agentId: owner.address, skill, expiresIn: 60_000,
-  })).toJSON();
+/**
+ * A grant for one op, the way a connection grant is made: through the owner's own `grantSurface`, so it is ON the
+ * grants lane — the door honours a token of the owner's own key only while it is active there.
+ */
+const grantFor = async (A, caller, skill) => {
+  await A.surfaceGrantsReady?.();
+  const r = await A.callSkill('household', 'grantSurface', { viewPubKey: caller.pubKey, ops: [skill] });
+  if (!r?.ok) throw new Error(`grantSurface: ${JSON.stringify(r)}`);
+  return r.tokens[0];
+};
 
 describe('the A2A bridge — a peer invokes a declared op through the waist', () => {
   it('refuses a token-less call: reaching the agent is not authority to act as it', async () => {
@@ -52,7 +57,7 @@ describe('the A2A bridge — a peer invokes a declared op through the waist', ()
 
   it('admits a granted call AND the waist actually runs — the value changes', async () => {
     const { A, owner, caller } = await ownerAndCaller();
-    const token = await grantFor(owner, caller, 'params.set-param');
+    const token = await grantFor(A, caller, 'params.set-param');
     await A.sa.trust?.setTier?.(owner.identity.pubKey, 'trusted');   // the token's issuer must be trusted
 
     await expect(owner.policyEngine.checkInbound({
@@ -69,7 +74,7 @@ describe('the A2A bridge — a peer invokes a declared op through the waist', ()
 
   it('a token for ONE op does not admit another — scoping is the token’s job', async () => {
     const { A, owner, caller } = await ownerAndCaller();
-    const token = await grantFor(owner, caller, 'params.set-param');
+    const token = await grantFor(A, caller, 'params.set-param');
     await A.sa.trust?.setTier?.(owner.identity.pubKey, 'trusted');
     await expect(
       owner.policyEngine.checkInbound({ peerPubKey: caller.pubKey, skillId: 'params.get-param', token }),
@@ -79,7 +84,7 @@ describe('the A2A bridge — a peer invokes a declared op through the waist', ()
 
   it('a withheld op is refused even holding a token for it — `never` beats any grant', async () => {
     const { A, owner, caller } = await ownerAndCaller();
-    const token = await grantFor(owner, caller, 'household.revealOwnerPhrase');
+    const token = await grantFor(A, caller, 'household.revealOwnerPhrase');
     await A.sa.trust?.setTier?.(owner.identity.pubKey, 'trusted');
     await expect(
       owner.policyEngine.checkInbound({

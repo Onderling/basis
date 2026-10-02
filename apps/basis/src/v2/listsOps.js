@@ -28,6 +28,13 @@ import { childIdsOf, deleteContainer } from '@onderling/item-store';
  *        list is ticked: the chore's own verb (a household bot's tasks); absent → a plain tick
  * @returns {Record<string, (args: object, ctx?: object) => Promise<object>>} opId → handler
  */
+/** Who holds a chore (contact ids — data; the door words them as far as the names setting lets the asker see). */
+const holdersOf = (c) => {
+  if (c?.type !== 'task') return {};
+  const ids = [...new Set([...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter((x) => typeof x === 'string' && x))];
+  return { holders: ids };
+};
+
 export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null, completeChore = null } = {}) {
   // What a list may hold beyond its own entries and tasks: appointments (the calendar's `accepts` line).
   const svc = makeCircleLists({ storeFor, manifests: [calendarManifest] });
@@ -151,7 +158,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // the list's own name goes with its entries: a read of five lists says which is which
       if (typeof passed !== 'function') {
         const open = await entriesOf(circleId, target.id);
-        return { ok: true, title: target.text ?? ref, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
+        return { ok: true, title: target.text ?? ref, items: open.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type, ...holdersOf(c) })) };
       }
       // A household bot: what is done (ticked, completed) or has passed (an appointment before now) follows its setting.
       const { mode, days } = passed();
@@ -164,7 +171,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         const doneAt = c.completedAt ? new Date(c.completedAt).getTime() : null;
         const startAt = c.type === 'calendar-event' && c.startsAt ? new Date(c.startsAt).getTime() : null;
         const at = doneAt ?? (startAt !== null && startAt < now ? startAt : null);
-        if (at === null) { items.push({ id: c.id, label: c.text ?? c.id, type: c.type }); continue; }
+        if (at === null) { items.push({ id: c.id, label: c.text ?? c.id, type: c.type, ...holdersOf(c) }); continue; }
         if (mode === 'delete') { await svc.remove(circleId, c.id); continue; }
         if (mode === 'keep' || now - at < keepMs) {
           items.push({ id: c.id, label: t(doneAt !== null ? 'circle.lists.entry_done' : 'circle.lists.event_passed', { text: c.text ?? c.id }), type: c.type, done: true });

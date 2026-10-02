@@ -3761,7 +3761,11 @@
     "list_removed": {
       "text": "De lijst \"{{name}}\" is weg.",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
-    }
+    },
+    "chore_held": "{{text}} — {{who}}",
+    "chore_taken": "{{text}} — opgepakt",
+    "chore_open": "{{text}} — nog niemand",
+    "chore_you": "jij"
   },
   "share": {
     "error": {

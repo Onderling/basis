@@ -80,6 +80,29 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
     const exports = await run('assistant.assistant-exports');
     testInfo.annotations.push({ type: 'answers', description: JSON.stringify({ status, users, settings, exported, exports }) });
 
+    // ── the settings menu on the screen: its buttons, resolved by the screen; a change that takes something from
+    //    everyone asks first (the browser's own dialog), and then it is so ──
+    await page.locator('[data-op="assistant.assistant-menu"]').click();
+    const menuOp = page.locator('.screen-op', { has: page.locator('[data-op="assistant.assistant-menu"]') });
+    const namesNone = menuOp.locator('[data-reply="assistant.assistant-settings"]', { hasText: /Namen zien: niemand/ });
+    await expect(namesNone).toBeVisible({ timeout: 30_000 });
+    await expect(menuOp.locator('[data-reply="assistant.assistant-screen"]')).toHaveCount(0);
+    const asksBefore = dialogs.length;
+    await namesNone.click();
+    await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: none/, { timeout: 30_000 });
+    expect(dialogs.slice(asksBefore).join(' '), 'the screen asked first').toMatch(/Weet je het zeker/);
+    // and back, without a question (it takes nothing away)
+    await page.locator('[data-op="assistant.assistant-menu"]').click();
+    const namesAll = menuOp.locator('[data-reply="assistant.assistant-settings"]', { hasText: /Namen zien: iedereen/ });
+    await expect(namesAll).toBeVisible({ timeout: 30_000 });
+    const asksBack = dialogs.length;
+    await namesAll.click();
+    await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: members/, { timeout: 30_000 });
+    expect(dialogs.length).toBe(asksBack);
+
+    // a person's pace: the door takes ten calls at once from one screen, then one every two seconds
+    await page.waitForTimeout(15_000);
+
     // ── a step-up said yes to: held, asked in her chat with the request's id, the screen told "Gedaan." ──
     const asked = (await said()).length;
     const held = await run('assistant.assistant-rotate');
@@ -96,7 +119,7 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
     await run('assistant.assistant-invite');
     const q2 = await until(async () => (await said()).slice(asked2).find((x) => /Scherm/.test(x)) ?? null, { timeout: 30_000, step: 500 });
     const id2 = /\/bevestig nee ([A-Z2-9]{4})/.exec(q2 ?? '')?.[1];
-    expect(id2).toBeTruthy();
+    expect(id2, `no id in the invite question; the screen said: ${await resultOf('assistant.assistant-invite').textContent()} | Ann was told: ${(await said()).slice(asked2).join(' // ')}`).toBeTruthy();
     await send(`/bevestig nee ${id2}`);
     await expect(resultOf('assistant.assistant-invite')).toHaveText(/je zei nee/, { timeout: 30_000 });
 

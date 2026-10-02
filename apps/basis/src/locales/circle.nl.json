@@ -7410,6 +7410,7 @@
     "stepup_expired": "Niet gedaan: er kwam geen ja binnen tien minuten.",
     "stepup_replaced": "Niet gedaan: een nieuwer verzoek kwam ervoor in de plaats.",
     "stepup_failed": "Het lukte niet; kijk in je chat.",
-    "stepup_unanswered": "Geen antwoord: er kwam binnen tien minuten geen ja. Niets veranderd."
+    "stepup_unanswered": "Geen antwoord: er kwam binnen tien minuten geen ja. Niets veranderd.",
+    "rate_limited": "Even rustig: dit scherm vroeg te veel in korte tijd. Probeer het over een paar seconden opnieuw."
   }
 }

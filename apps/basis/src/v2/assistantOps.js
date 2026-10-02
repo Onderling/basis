@@ -87,7 +87,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-invite') return inviteOp();
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
-      if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller);
+      if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller, ctx);
       if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
       if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId, args?.how ?? args?._match);
       if (op === 'assistant-screen-paste') return screenPasteOp(caller ?? ctx?.threadId, args?.offer ?? args?._match);
@@ -328,12 +328,13 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * its value now and a button per value that calls the op. Painted per the person's view: buttons in the chat
    * (`inline`), a pointer to their connected screen (`screen`), or words (`chat`; the inbox door is always chat).
    */
-  async function menuOp(person, caller) {
+  async function menuOp(person, caller, ctx = {}) {
     if (!person) return { ok: false, error: 'no-thread' };
     const tp = personT(person);
     const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(opId, caller, levelOf(opId)));
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
-    const view = row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person);
+    // asked from a screen: the screen paints the buttons, whatever the person's chat view is
+    const view = ctx?.via === 'screen' ? 'inline' : (row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person));
     if (view === 'screen') {
       const mine = typeof admin.screens?.list === 'function' ? await admin.screens.list(person) : [];
       return { ok: true, message: tp(mine.length ? 'circle.bot.menu_on_screen' : 'circle.bot.menu_offer_screen') };

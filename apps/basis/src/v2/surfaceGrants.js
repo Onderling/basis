@@ -135,6 +135,25 @@ const readsKeyOf = (reads) => (reads ? JSON.stringify(reads) : null);
  * @param {object|null} [a.delegationRecord]  this device's root-signed delegation record,
  *   carried on every statement so a sibling can verify the chain without the owner's registry
  */
+/**
+ * The kernel's allow-list for an agent's surface tokens: a token issued by the agent's OWN key is honoured only while
+ * its id is ACTIVE on the grants lane, for the same subject. Keyed on the ISSUER, which a forger cannot choose — never
+ * on a field of the token (its `role`, its skill), which whoever signs it writes. Tokens from other issuers are judged
+ * as before (they need a trusted issuer). While the agent's own key is not known yet, it cannot tell: it refuses.
+ * @param {() => string|null} ownKeyOf  the agent's own chat key, once it is set
+ * @param {() => {activeEntryOf: (tokenId: string) => {viewPubKey: string}|null}|null} grantsOf  the grants lane
+ * @returns {(token: object) => Promise<boolean>}
+ */
+export function ownGrantsAllowList(ownKeyOf, grantsOf) {
+  return async (token) => {
+    const ownKey = ownKeyOf() ?? null;
+    if (!ownKey) return false;
+    if (token?.issuer !== ownKey) return true;
+    const entry = grantsOf()?.activeEntryOf?.(token.id) ?? null;
+    return Boolean(entry && entry.viewPubKey === token.subject);
+  };
+}
+
 export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail, fan = null, delegationRecord = null } = {}) {
   if (!identity || typeof identity.sign !== 'function') {
     throw new Error('createSurfaceGrants: a signing identity is required');
@@ -382,7 +401,7 @@ export function createSurfaceGrants({ identity, agentId, onReadGrantChange, rail
     activeEntryOf(tokenId) {
       if (typeof tokenId !== 'string' || !tokenId || !ready || folded.revokedIds.has(tokenId)) return null;
       for (const [viewPubKey, e] of folded.granted) {
-        if (e.tokens.some((t) => t.id === tokenId)) return { viewPubKey, actingAs: e.actingAs ?? null };
+        if (e.tokens.some((t) => t.id === tokenId)) return { viewPubKey, actingAs: e.actingAs ?? null, label: e.label ?? null };
       }
       return null;
     },

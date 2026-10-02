@@ -77,6 +77,7 @@ export class PolicyEngine {
   #trustRegistry;
   #skillRegistry;
   #agentPubKey;   // this agent's pubKey, used to verify token.agentId binding
+  #isAllowed = null;   // the allow-list (see the constructor)
 
   #groupManager;
   #isRevoked;
@@ -104,6 +105,11 @@ export class PolicyEngine {
    *   here. There is deliberately no setter: a settable resolver is
    *   last-writer-wins, and on 2026-08-19 that silently disarmed connection
    *   revocation — unpairing left the connection working.
+   * @param {(token: object) => boolean | Promise<boolean>} [opts.isAllowed]
+   *   An ALLOW-list beside the revocation deny-list, fixed at construction like it: called after every other check
+   *   passes, with the parsed token; falsy (or a throw) rejects it as `INVALID_TOKEN: not active`. A revocation list
+   *   only stops what it has heard of — a token signed off the record by a key that is still trusted (a revoked device
+   *   keeps the agent's key) is in no list; an allow-list asks "is this one of ours, now?" instead.
    * @param {import('./ActorResolver.js').ActorResolver} [opts.actorResolver]
    *   Phase 50.9.1 — optional resolver mapping any of pubKey / webid /
    *   agentUri to an `ActorRecord`. Core defines the interface but never
@@ -124,12 +130,14 @@ export class PolicyEngine {
     isRevoked     = null,
     actorResolver = null,
     selfIds       = [],
+    isAllowed     = null,
   }) {
     this.#trustRegistry = trustRegistry;
     this.#skillRegistry = skillRegistry;
     this.#agentPubKey   = agentPubKey;
     this.#groupManager  = groupManager;
     this.#isRevoked     = typeof isRevoked === 'function' ? isRevoked : null;
+    this.#isAllowed     = typeof isAllowed === 'function' ? isAllowed : null;
     // SELF, for `private` skills: this agent's own key plus the owner keys its host names here (an in-process host
     // whose only caller is the owner's chat agent names that key). Fixed at construction, like `isRevoked`: there
     // is no setter, so no door, peer or token can be added to self later.
@@ -384,6 +392,11 @@ export class PolicyEngine {
             : 'Token has been revoked',
         );
       }
+    }
+    if (this.#isAllowed) {
+      let allowed = false;
+      try { allowed = Boolean(await this.#isAllowed(parsed)); } catch { allowed = false; }
+      if (!allowed) throw new PolicyDeniedError('INVALID_TOKEN', 'Token is not active (not on the record)');
     }
   }
 

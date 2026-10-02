@@ -18,6 +18,7 @@
  * Phase v0.1 per `/Project Files/basis/coding-plan.md`.
  */
 
+import { confirmApplies } from './confirmApplies.js';
 import { isBulkKeyword } from './bulkOps.js';
 
 /**
@@ -216,7 +217,7 @@ export function resolveDispatch(parseResult, catalogue) {
   // gate.  'info' is informational only; chat shell may show the
   // message but does not block dispatch.
   const confirm = op?.surfaces?.ui?.confirm;
-  if (confirm && (confirm.severity === 'warn' || confirm.severity === 'danger')) {
+  if (confirm && (confirm.severity === 'warn' || confirm.severity === 'danger') && confirmApplies(confirm, boundArgs)) {
     return {
       kind: 'needsConfirm',
       severity: confirm.severity,

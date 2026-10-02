@@ -25,10 +25,11 @@ export function createPersonReach({ bridges = {}, users, threads }) {
     /**
      * @param {string} contactId
      * @param {{text: string, buttons?: Array<{id:string, label:string}>, rememberAs?: string}} message  `rememberAs`: what the
-     *   thread keeps instead of the text (a message carrying a secret — a one-time link — must not ride into memory)
+     *   thread keeps instead of the text (a message carrying a secret — a one-time link — must not ride into memory);
+     *   `noPreview`: the door must not fetch a preview of a link in it
      * @returns {Promise<{ok: true} | {ok: false, reason: 'revoked'|'no-door'|'no-private-chat'|'failed'}>}
      */
-    async sendToPerson(contactId, { text, buttons, rememberAs } = {}) {
+    async sendToPerson(contactId, { text, buttons, rememberAs, noPreview = false } = {}) {
       const rows = (await users.list().catch(() => [])) ?? [];
       const row = rows.find((r) => r?.id === contactId) ?? null;
       if (row?.hidden) return { ok: false, reason: 'revoked' };
@@ -38,7 +39,7 @@ export function createPersonReach({ bridges = {}, users, threads }) {
       if (kept) return { ok: false, reason: kept };
       const chatId = row.channel === 'web' ? contactId : String(row.uid ?? '').trim();
       try {
-        await door.sendReply({ chatId, text, ...(Array.isArray(buttons) && buttons.length ? { buttons } : {}) });
+        await door.sendReply({ chatId, text, ...(Array.isArray(buttons) && buttons.length ? { buttons } : {}), ...(noPreview ? { noPreview: true } : {}) });
       } catch (err) {
         if (row.channel === 'telegram' && cannotStart(err)) { threads.markUnreachable(contactId, 'no-private-chat'); return { ok: false, reason: 'no-private-chat' }; }
         return { ok: false, reason: 'failed' };   // the next tick tries again

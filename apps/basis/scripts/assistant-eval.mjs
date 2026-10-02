@@ -23,10 +23,9 @@ import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { HOUSEHOLD_TEMPLATE, templateLists, promptLinesFor, expandAdds } from '../src/v2/householdTemplate.js';
+import { HOUSEHOLD_TEMPLATE, templateLists, botPromptLines, expandAdds } from '../src/v2/householdTemplate.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
-import { reminderPromptLines } from '../src/v2/botReminders.js';   // the box adds these to the template's lines; so does the eval
 import { detectLang } from '../src/v2/assistantLanguage.js';
 
 const { values } = parseArgs({ options: {
@@ -82,7 +81,7 @@ for (const f of fixtures) {
   const engine = createAssistantEngine({
     // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
     catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm: counted, interpret: interpretToCommand,
-    promptLines: [...promptLinesFor(tNl), ...reminderPromptLines()], gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
+    promptLines: botPromptLines(tNl), gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
     // A one-line fixture does not wait for the collect window (its time is the model's); lines sent at once do.
     ...(f.lines ? {} : { collectMs: 0 }),
     // the bot's retrieval shape (`loadListItems`): an entry, with its list
@@ -145,6 +144,8 @@ function judge(expect, got, n) {
     const text = got?.reply ?? '';
     if (expect.reply === 'asks') return /\?/.test(text) ? { ok: true, why: '' } : { ok: false, why: 'no question' };
     if (expect.reply === 'declines' && !(text && text !== '__unknown')) return { ok: false, why: 'silence' };
+    // `says`: what the reply must SAY (a RegExp over its text) — "it answered" is not "it answered right"
+    if (expect.says instanceof RegExp && !expect.says.test(text)) return { ok: false, why: `does not say ${expect.says}` };
     // `in`: the answer's language, read by the same counter the hint uses (undecided counts as a pass)
     if (expect.in && detectLang(text) && detectLang(text) !== expect.in) return { ok: false, why: `answered in ${detectLang(text)}` };
     if (expect.reply === 'declines') return { ok: true, why: '' };

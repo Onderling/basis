@@ -23,7 +23,7 @@ export const BOT_OP_MAP = Object.freeze({
   ]),
   admin: Object.freeze(['createList', 'removeList', 'reassignTask', 'removeTask', 'editTask']),
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview', 'weekOverview', 'assistant-screen', 'assistant-screens', 'assistant-menu', 'assistant-view']),
+  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview', 'weekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view']),
 });
 
 const MEMBER = new Set(BOT_OP_MAP.member);
@@ -64,24 +64,32 @@ export const onBotMap = (opId) => botOpLevel(opId) !== null;
  * @param {object} catalogue  a merged catalogue (`opsById`, `commandMenu`)
  * @param {'member'|'admin'|null} role  null (the owner, no door caller) → everything on the map
  */
+/**
+ * Does the bot offer this op to this role (`null`: the bot's whole map, any role)? One rule for narrowing a merged
+ * catalogue and for narrowing an app's manifest before it is merged.
+ * @param {string} appOrigin
+ * @param {{id: string, visibility?: string}} op
+ * @param {string|null} role
+ */
+export function botOffers(appOrigin, op, role) {
+  const id = op?.id;
+  // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too, and
+  // the admin's own (`trusted`) are not offered to anyone else — their /help does not list what they cannot do
+  if (appOrigin === 'assistant') {
+    if (role === 'observer') return botRoleAllows(role, id);
+    return op?.visibility !== 'trusted' || role == null || role === 'admin';
+  }
+  const level = botOpLevel(id);
+  if (!level) return false;
+  if (!botRoleAllows(role, id)) return false;
+  // the admin's column is the ADMIN's (and the owner's, no door caller) — never a coordinator's or an observer's
+  return level === 'authenticated' || role == null || role === 'admin';
+}
+
 export function scopeCatalogueToRole(catalogue, role) {
   if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function') return catalogue;
-  const allowed = (key, entry) => {
-    const id = entry?.op?.id ?? key;
-    // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too, and
-    // the admin's own (`trusted`) are not offered to anyone else — their /help does not list what they cannot do
-    if (entry?.appOrigin === 'assistant') {
-      if (role === 'observer') return botRoleAllows(role, id);
-      return entry?.op?.visibility !== 'trusted' || role == null || role === 'admin';
-    }
-    const level = botOpLevel(id);
-    if (!level) return false;
-    if (!botRoleAllows(role, id)) return false;
-    // the admin's column is the ADMIN's (and the owner's, no door caller) — never a coordinator's or an observer's
-    return level === 'authenticated' || role == null || role === 'admin';
-  };
   const opsById = new Map();
-  for (const [k, entry] of catalogue.opsById) if (allowed(k, entry)) opsById.set(k, entry);
+  for (const [k, entry] of catalogue.opsById) if (botOffers(entry?.appOrigin, { ...(entry?.op ?? {}), id: entry?.op?.id ?? k }, role)) opsById.set(k, entry);
   const commandMenu = Array.isArray(catalogue.commandMenu)
     ? catalogue.commandMenu.filter((e) => opsById.has(e?.opId))
     : catalogue.commandMenu;

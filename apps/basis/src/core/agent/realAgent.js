@@ -77,7 +77,7 @@ const CATCHUP_REPLY_SUBTYPES = new Set([
   CHAT_CATCHUP_SUBTYPES.offer,
   KEY_CATCHUP_SUBTYPES.batch,
 ]);
-import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
+import { createSurfaceGrants, compileReadFilter, ownGrantsAllowList } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
 // The grants LANE (V1 closing wave row 1): grant/revoke statements ride the device log between the
 // owner's own devices; the registry above is a projection of this lane.
 import {
@@ -824,6 +824,11 @@ export async function createRealHouseholdAgent(opts = {}) {
           async (tokenId) => Boolean(await surfaceGrants?.isRevoked(tokenId)),
           async (tokenId) => (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false),
         ]),
+        // A token issued by THIS agent's own key is honoured only while its id is ACTIVE on the grants lane, for the
+        // same subject — statements count there only from this person's enrolled, unrevoked devices — so a token
+        // signed off the record with this key (a revoked device keeps it) is refused, whatever it says it is. Before
+        // the agent's own key is set, nothing is allowed (the gate cannot tell).
+        isAllowed: ownGrantsAllowList(() => secureAgentRef.current?.agent?.identity?.pubKey ?? null, () => surfaceGrants),
       },
     }),
   });
@@ -832,11 +837,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
   // A token this agent mints (a screen's grant) is checked at its own door, which wants the issuer at `trusted` in
-  // this registry — the kernel's documented enablement step. Only where the composition asks (`trustOwnGrants`: a
-  // household bot, whose chat key lives on one box). NOT on a person's agent yet: their chat key is on every device,
-  // a revoked device keeps it, and the door's revocation check is a deny-list — so a revoked device could sign a
-  // token the lane never saw. That needs the door to ALLOW only tokens active on the grants lane first.
-  if (opts.trustOwnGrants === true) {
+  // this registry — the kernel's documented enablement step. On every agent now that the door ALLOWS only surface
+  // tokens active on the grants lane (`isAllowed` below): a token signed off the record with this key — a revoked
+  // device keeps it — is refused there. A composition can still opt out (`trustOwnGrants: false`).
+  if (opts.trustOwnGrants !== false) {
     try { await sa.trust?.setTier?.(chatId.pubKey, 'trusted'); } catch (err) { console.warn(`[realAgent] own issuer tier not set: ${err?.message ?? err}`); }
   }
 
@@ -3345,6 +3349,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: chatId.pubKey,
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      }).then((r) => {
+        // a leave or an evict is told once, with no later chance: say whom it did not reach (a probe that names its
+        // branch — a member who never learns of it is then delivery, not the fold)
+        const kind = statement?.body?.kind;
+        if ((kind === 'leave' || kind === 'evict') && (r?.error || (r?.attempted ?? 0) > (r?.sent ?? 0))) {
+          console.info(`[membership-fan] ${kind} in ${String(circleId).slice(0, 8)}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}${r?.error ? ` (${r.error})` : ''}${(r?.errors ?? []).length ? ` — ${JSON.stringify(r.errors).slice(0, 200)}` : ''}`);
+        }
+        return r;
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
         .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
@@ -3981,6 +3993,29 @@ export async function createRealHouseholdAgent(opts = {}) {
   const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
   let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  /**
+   * A chores read for a door's person: each chore's holder, named when the household's names setting lets this person
+   * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
+   * entry the person (and their model) reads.
+   */
+  async function withChoreHolders(items, caller) {
+    if (!items.some((i) => Array.isArray(i?.holders))) return items;
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+    const known = people.filter((c) => c && !c.hidden && c.webid);
+    const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
+    const policy = buildStandardRolePolicy(roles);
+    const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole: roles[caller] ?? null, roleMayAssign: policy.canReassign(caller) });
+    const nameOf = (id) => (id === caller ? tr('circle.lists.chore_you') : (known.find((c) => c.webid === id)?.displayName ?? null));
+    return items.map((i) => {
+      if (!Array.isArray(i?.holders)) return i;
+      const { holders, ...rest } = i;
+      if (!holders.length) return { ...rest, label: tr('circle.lists.chore_open', { text: i.label }) };
+      const names = holders.map((h) => (h === caller || mayName ? nameOf(h) : null)).filter(Boolean);
+      return { ...rest, label: names.length ? tr('circle.lists.chore_held', { text: i.label, who: names.join(', ') }) : tr('circle.lists.chore_taken', { text: i.label }) };
+    });
+  }
+
   /** The add of a chore with its person and its day (see the lists branch of `callSkill`). */
   async function addChoreFor(args, ctx) {
     const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
@@ -4778,7 +4813,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       const inCircle = typeof args?.circleId === 'string' && args.circleId ? args.circleId : null;
       if (inCircle) await ensureCircleSync(inCircle);
       // the person asking rides along (a handler that acts as them — a chore's tick — passes it on)
-      return handler(args ?? {}, ctx);
+      const result = await handler(args ?? {}, ctx);
+      // A door's read of a chores list says who holds each chore — as far as the names setting lets the asker see names
+      if (appOrigin === 'lists' && opId === 'listEntries' && typeof ctx?.caller === 'string' && ctx.caller && Array.isArray(result?.items)) {
+        return { ...result, items: await withChoreHolders(result.items, ctx.caller) };
+      }
+      return result;
     }
     throw new Error(`realAgent: unknown appOrigin "${appOrigin}"`);
   };

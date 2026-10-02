@@ -134,7 +134,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const caller = rec?.caller ?? null;
     const threadId = rec?.thread ?? null;
     return caller || threadId
-      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}) })
+      // the chat the line came from rides along: an answer that counts only in the person's private chat reads it
+      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}), chatId })
       : callSkill;
   }
 

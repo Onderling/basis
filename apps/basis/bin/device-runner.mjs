@@ -60,17 +60,18 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
+import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
-import { reminderPromptLines } from '../src/v2/botReminders.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, REMINDER_LEAD_KEY, reminderLeadFrom } from '../src/v2/botSettings.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -542,7 +543,7 @@ if (relayUrl) {
       // A roster owner says a row changed; the values are re-read, never carried on this wire.
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       // A screen a person asked to connect (`/scherm`) sends its offer; the door, once up, grants it.
-      'screen-offer': (from, payload) => screenOffer.handle?.(from, payload),
+      [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -811,7 +812,21 @@ if (tgToken || inboxDoor.bridge) {
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
-    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs }),
+    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs, noPreview: true }),
+    // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
+    // `/koppelen`, which counts only from this private door
+    ask: (person, { codes, replaced }) => {
+      const lang = threads.langOf(person) ?? undefined;
+      const tp = (k, p) => t(k, p, lang);
+      const text = [tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
+      // the person PICKS the code their screen shows; "none of these" when it is not there (or they did not ask)
+      return reach.sendToPerson(person, {
+        text, rememberAs: tp('circle.bot.screen_confirm_remembered'),
+        buttons: [...codes.map((c) => ({ id: `/koppelen ${c}`, label: c })), { id: '/koppelen geen', label: tp('circle.bot.screen_confirm_none') }],
+      });
+    },
+    // a screen whose offer was not taken is told, so it says so instead of waiting
+    tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
     grant: (g) => agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce }),
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
@@ -820,12 +835,19 @@ if (tgToken || inboxDoor.bridge) {
       const lang = threads.langOf(person);
       await reach.sendToPerson(person, { text: t(key, { ...params, days: Math.round(SURFACE_GRANT_TTL_MS / 86_400_000) }, lang ?? undefined) });
     },
-    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null }),
+    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
+  }) : null;
+  // What admits, removes or re-roles people runs from a screen only after a yes in the person's private chat; the
+  // screen hears the outcome (the answer itself — an invite link — is said in that chat).
+  const stepUp = screens ? createScreenStepUp({
+    ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
+    tell: (viewPubKey, o) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_STEP_UP_SUBTYPE, ...o }),
   }) : null;
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     admin: {
       screens,
+      stepUp,
       catalogue: doorCatalogue,
       users: () => botUsers.list(),
       admission,
@@ -877,7 +899,7 @@ if (tgToken || inboxDoor.bridge) {
     // own tools (a member's or the admin's), and the deterministic gate speaks the lists.
     ...(isFunctionProfile ? {
       // the model's lines and the gate's rules, generated from the template's lists (their names, their words)
-      promptLines: [...promptLinesFor(t), ...reminderPromptLines()],
+      promptLines: botPromptLines(t),
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
       scopeToRole: scopeCatalogueToRole,
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),

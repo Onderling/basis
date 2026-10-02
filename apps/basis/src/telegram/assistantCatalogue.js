@@ -21,7 +21,7 @@ import { mergeManifests } from '../manifestMerge.js';
 import { scopeCatalogueToApps } from '../v2/circleCatalogueScope.js';
 import { catalogueManifests, DOOR_MANIFESTS } from '../v2/manifestSources.js';
 import { assistantAppsFrom } from '../v2/assistantApps.js';
-import { scopeCatalogueToRole } from '../v2/botOpMap.js';
+import { scopeCatalogueToRole, botOffers } from '../v2/botOpMap.js';
 
 /**
  * @param {object} [a]
@@ -37,7 +37,11 @@ export function composeAssistantCatalogue({ apps, householdManifest, slim = fals
   // The door's own ops (the person's memory mode, their language) come whatever the app list says: they are about
   // the conversation, not an app.
   const inScope = [...ordered.filter((m) => list.includes(m.app)), ...DOOR_MANIFESTS];
-  const scoped = scopeCatalogueToApps(mergeManifests(inScope.map((manifest) => ({ manifest }))), [...list, ...DOOR_MANIFESTS.map((m) => m.app)]);
+  // A household bot (`slim`) narrows each app to the bot's map BEFORE the merge: a command is prefixed only when two
+  // ops the bot offers share it, never for an op it drops (the tasks app's own `/invite` beside the door's).
+  const merged = (slim ? inScope.map((m) => ({ ...m, operations: (m.operations ?? []).filter((op) => botOffers(m.app, op, null)) })) : inScope)
+    .map((manifest) => ({ manifest }));
+  const scoped = scopeCatalogueToApps(mergeManifests(merged), [...list, ...DOOR_MANIFESTS.map((m) => m.app)]);
   // A household bot (`slim`): exactly the bot's map (`botOpMap.js`) — nothing else of the apps is composed.
   const catalogue = slim ? scopeCatalogueToRole(scoped, null) : scoped;
   const manifestsByOrigin = Object.fromEntries(inScope.map((m) => [m.app, m]));

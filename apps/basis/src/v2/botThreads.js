@@ -154,6 +154,12 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { screenNonce: _n, ...rest } = rowOf(id);
       return save(nonce ? { ...rest, screenNonce: { hash: nonce.hash, until: nonce.until } } : rest);
     },
+    /** A screen's offer waiting for this person's yes: `{viewPubKey, nonce, label, until}`, or null. */
+    screenOfferOf: (id) => rows.get(id)?.screenOffer ?? null,
+    setScreenOffer(id, offer) {
+      const { screenOffer: _o, ...rest } = rowOf(id);
+      return save(offer ? { ...rest, screenOffer: { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label ?? null, until: offer.until } } : rest);
+    },
     /** Whose pending screen nonce has this hash (one pending per person), or null. */
     screenNonceOwner(hash) {
       for (const [id, r] of rows) if (r?.screenNonce?.hash === hash) return id;

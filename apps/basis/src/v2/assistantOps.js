@@ -2,6 +2,9 @@
  * assistantOps — the door's own ops (`assistantManifest`), answered by the door: a person's thread settings, and the
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
+import { parsePairingOffer } from './connectionPairing.js';
+import { screenLabel } from './botScreens.js';
+import { personNamed } from './botUsers.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
@@ -49,15 +52,31 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     ['reminders', REMINDERS_KEY, REMINDERS_MODES, remindersModeFrom],
   ];
   const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
-  return async (app, op, args = {}, ctx = {}) => {
-    if (app !== 'assistant') return callSkill(app, op, args, ctx);
+  /** An op's declared step-up, from the door's catalogue (any app), else the door's own manifest. */
+  const stepUpOf = (app, opId) => {
+    for (const e of admin.catalogue?.catalogue?.()?.opsById?.values?.() ?? []) {
+      if (e?.appOrigin === app && e?.op?.id === opId) return e.op.stepUp ?? null;
+    }
+    return app === 'assistant' ? (assistantManifest.operations.find((o) => o.id === opId)?.stepUp ?? null) : null;
+  };
+  const door = async (app, op, args = {}, ctx = {}) => {
     const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
+    // A screen's call to an op that declares a step-up (any app's) runs only after a yes in the private chat: held here,
+    // before any app is handed the call, so a screen that skips its own confirm changes nothing. The host gate first: a
+    // screen whose person may not do it is refused, not asked about.
+    if (ctx?.via === 'screen' && stepUpOf(app, op) === 'private-door') {
+      const refused = caller && typeof refusal === 'function' ? await refusal(op, caller, app === 'assistant' ? levelOf(op) : undefined) : null;
+      if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
+      return holdForYes(caller, app, op, args, ctx);
+    }
+    if (app !== 'assistant') return callSkill(app, op, args, ctx);
     if (caller && typeof refusal === 'function') {
       const refused = await refusal(op, caller, levelOf(op));
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
     try {
+      if (op === 'assistant-screen-approve') return approveOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       // `/apps on tasks`: with no required param the router keeps the line as `_match` for the op to split.
       if (op === 'assistant-apps') return appsOp(args?.change ?? args?._match);
       if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match);
@@ -68,9 +87,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-invite') return inviteOp();
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
-      if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller);
+      if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller, ctx);
       if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
-      if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId);
+      if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId, args?.how ?? args?._match);
+      if (op === 'assistant-screen-paste') return screenPasteOp(caller ?? ctx?.threadId, args?.offer ?? args?._match);
+      if (op === 'assistant-screen-confirm') return screenConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-screens') return screensOp(caller ?? ctx?.threadId, args?.change ?? args?._match);
       if (op === 'assistant-exports') return exportsOp();
       if (op === 'assistant-export') return exportNowOp();
@@ -105,6 +126,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     return { ok: false, error: 'unknown-op', app, op };
   };
+  return door;
 
   /** The translator for a person: their fixed `/taal` language, else the door's. */
   function personT(threadId) {
@@ -306,12 +328,13 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * its value now and a button per value that calls the op. Painted per the person's view: buttons in the chat
    * (`inline`), a pointer to their connected screen (`screen`), or words (`chat`; the inbox door is always chat).
    */
-  async function menuOp(person, caller) {
+  async function menuOp(person, caller, ctx = {}) {
     if (!person) return { ok: false, error: 'no-thread' };
     const tp = personT(person);
     const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(opId, caller, levelOf(opId)));
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
-    const view = row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person);
+    // asked from a screen: the screen paints the buttons, whatever the person's chat view is
+    const view = ctx?.via === 'screen' ? 'inline' : (row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person));
     if (view === 'screen') {
       const mine = typeof admin.screens?.list === 'function' ? await admin.screens.list(person) : [];
       return { ok: true, message: tp(mine.length ? 'circle.bot.menu_on_screen' : 'circle.bot.menu_offer_screen') };
@@ -373,10 +396,20 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: tp('circle.bot.view_set', { view: tp(`circle.bot.view_word_${view}`) }) };
   }
 
-  /** `/scherm`: a one-time link for this person's screen. */
-  async function screenOp(person) {
+  /**
+   * `/scherm`: a screen for this person. A member gets the one-time link; the admin, by default, the paste route (the
+   * screen makes its own code and they paste it back — no secret in the chat); `/scherm link` gives anyone the link.
+   */
+  async function screenOp(person, how) {
     if (!person || !admin.screens) return { ok: false, error: 'unwired' };
     const tp = personT(person);
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const wantsLink = /^\s*link\s*$/i.test(String(how ?? ''));
+    if (row?.role === 'admin' && !wantsLink && typeof admin.screens.startPaste === 'function') {
+      const r = await admin.screens.startPaste(person, (link) => tp('circle.bot.screen_paste_link', { link }));
+      if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable') } };
+      return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+    }
     // the link goes to the person's PRIVATE door only; the chat it was asked in (maybe a group) hears where it went
     const r = await admin.screens.start(person, (link, minutes) => tp('circle.bot.screen_link', { link, minutes }), tp('circle.bot.screen_link_remembered'));
     if (!r.ok) {
@@ -384,6 +417,110 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return { ok: false, error: { code: r.reason, message: tp(key) } };
     }
     return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+  }
+
+  /**
+   * `/koppelen <code>` (or `/koppelen geen`): the answer to a screen's offer — the code the person picked. It counts only from the person's PRIVATE door: on Telegram the
+   * chat whose id is their own (a group's is not), the inbox always.
+   */
+  async function screenConfirmOp(person, word, ctx) {
+    if (!person || !admin.screens?.confirm) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    // the code the person picked (or typed), or "none of these"; anything else drops the offer too
+    const answer = String(word ?? '').trim();
+    if (!answer) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.screen_confirm_usage') } };
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const isPrivate = Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+    const r = await admin.screens.confirm(person, answer, { isPrivate });
+    if (r.ok) return { ok: true, message: tp(r.declined ? 'circle.bot.screen_declined' : 'circle.bot.screen_confirmed') };
+    const key = { 'not-private': 'screen_confirm_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'screen_confirm_nothing' }[r.reason] ?? 'screen_confirm_failed';
+    return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
+  }
+
+  /**
+   * A screen's step-up request: what it will do, in the book's words, then held and asked in the person's private chat.
+   * The person a revoke or a role change names is looked up FIRST — unknown → refused, nothing asked — and the held
+   * request takes their id, so the question and the act cannot differ. What the screen typed is one line, capped.
+   */
+  async function holdForYes(person, app, op, args, ctx) {
+    const tp = personT(person);
+    if (!person || !admin.stepUp || !ctx?.viewPubKey) return { ok: false, error: { code: 'step-up-unwired', message: tp('circle.bot.stepup_unwired') } };
+    const plan = await stepUpPlan(app, op, args, tp);
+    if (!plan.ok) return plan;
+    const what = said(tp, `circle.bot.stepup_what.${op}`, { arg: plan.shown }) ?? tp('circle.bot.stepup_what_op', { op: slashOf(op) ?? op, arg: plan.shown });
+    // the request's id is in the words too: a door with no buttons (the inbox) answers by typing it
+    const screen = screenLabel(ctx.screenLabel) ?? tp('circle.connectScreen.label');
+    const question = (id) => ({ text: tp('circle.bot.stepup_question', { screen, what, id }), buttons: [{ id: `/bevestig ja ${id}`, label: tp('circle.bot.stepup_yes') }, { id: `/bevestig nee ${id}`, label: tp('circle.bot.stepup_no') }] });
+    const r = await admin.stepUp.hold(person, { app, op, args: plan.args, viewPubKey: ctx.viewPubKey }, question);
+    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_not_reachable') } };
+    return { ok: true, pending: true, message: tp('circle.bot.stepup_asked') };
+  }
+
+  /** The args a held request runs with, and how the question shows them: `{ok, args, shown}` or a refusal. */
+  async function stepUpPlan(app, op, args, tp) {
+    const typed = screenLabel(args?.who ?? args?.spec ?? args?._match) ?? '—';
+    if (app !== 'assistant' || (op !== 'assistant-revoke' && op !== 'assistant-role')) return { ok: true, args, shown: typed };
+    const rows = typeof admin.users === 'function' ? ((await admin.users()) ?? []) : [];
+    const nameOf = async (row) => ((await namesHidden()) ? row.id : (row.displayName ?? row.id));
+    if (op === 'assistant-revoke') {
+      const row = personNamed(rows, args?.who ?? args?._match);
+      if (!row) return { ok: false, error: { code: 'unknown-user', message: tp('circle.bot.revoke_unknown', { who: typed }) } };
+      return { ok: true, args: { who: row.id }, shown: await nameOf(row) };
+    }
+    const words = String(args?.spec ?? args?._match ?? '').trim().split(/\s+/).filter(Boolean);
+    const role = words.pop();
+    if (!words.length || !BOT_ROLES.includes(role)) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.role_usage') } };
+    const row = personNamed(rows, words.join(' '));
+    if (!row || row.role === 'admin') return { ok: false, error: { code: 'unknown-user', message: tp('circle.bot.role_nobody', { name: screenLabel(words.join(' ')) ?? '—' }) } };
+    return { ok: true, args: { spec: `${row.id} ${role}` }, shown: `${await nameOf(row)} → ${role}` };
+  }
+
+  /**
+   * `/bevestig ja|nee <id>`: the answer to the screen's request with that id. It counts only from the person's PRIVATE
+   * door (on Telegram the chat whose id is their own; never a group, never a screen). A yes runs that request as their
+   * typed line — the host gate asks again — and the screen hears the outcome; an answer naming a replaced request runs
+   * nothing.
+   */
+  async function approveOp(person, word, ctx) {
+    if (!person || !admin.stepUp) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const [answer, id] = String(word ?? '').trim().split(/\s+/);
+    const yes = switchOf(answer);
+    if (!yes) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.stepup_usage') } };
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const isPrivate = ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+    const r = await admin.stepUp.answer(person, yes === 'on', id, { isPrivate });
+    if (!r.ok) {
+      const key = { 'not-private': 'not_private', expired: 'expired', replaced: 'replaced', 'no-id': 'usage' }[r.reason] ?? 'nothing';
+      return { ok: false, error: { code: r.reason, message: tp(`circle.bot.stepup_${key}`) } };
+    }
+    if (r.declined) return { ok: true, message: tp('circle.bot.stepup_declined') };
+    const out = await door(r.req.app, r.req.op, r.req.args, { caller: person, threadId: person, ...(ctx?.chatId != null ? { chatId: ctx.chatId } : {}) });
+    await admin.stepUp.done(r.req, out?.ok !== false);
+    return out;
+  }
+
+  /** Under `assistant.names: none` no name leaves the bot — not even to the admin's door. */
+  async function namesHidden() {
+    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+    return namesPolicyFrom((r?.params ?? []).find((p) => p.key === NAMES_KEY)?.value) === 'none';
+  }
+
+  /** A locale line, or null when the key has no words (it comes back as the key). */
+  function said(tr, key, params) {
+    const out = tr(key, params);
+    return typeof out === 'string' && out && !out.startsWith(key) ? out : null;
+  }
+
+  /** `/koppel-scherm <code>`: a screen's own connect code, pasted; the same question follows. */
+  async function screenPasteOp(person, text) {
+    if (!person || !admin.screens?.pasted) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const offer = parsePairingOffer(String(text ?? '').trim());
+    if (!offer.ok) return { ok: false, error: { code: offer.reason, message: tp('circle.bot.screen_paste_usage') } };
+    const r = await admin.screens.pasted(person, { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label });
+    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_confirm_failed') } };
+    return { ok: true, message: tp('circle.bot.screen_paste_asked') };
   }
 
   /** `/schermen` (the person's screens) · `/schermen los <n>` (drop one). */
@@ -405,9 +542,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function usersText() {
     const rows = typeof admin.users === 'function' ? await admin.users() : [];
     if (!rows.length) return t('circle.bot.users_none');
-    // Under `assistant.names: none` no name leaves the bot — not even to the admin's door: the rows by their id.
-    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
-    const hideNames = namesPolicyFrom((r?.params ?? []).find((p) => p.key === NAMES_KEY)?.value) === 'none';
+    // Under `assistant.names: none` the rows by their id.
+    const hideNames = await namesHidden();
     return rows.map((u) => `${hideNames ? u.id : (u.displayName ?? u.id)} — ${u.role ?? '?'}`).join('\n');
   }
 }

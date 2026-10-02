@@ -27,7 +27,7 @@ describe('/help for a person', () => {
     const admin = h.slice(h.indexOf('Voor de beheerder:'));
     expect(h.indexOf('Voor de beheerder:')).toBeGreaterThan(h.indexOf('Jij:'));
     expect(admin).toContain('/huishouden — instellingen voor het hele huishouden');
-    expect(admin).toContain('/assistant:invite — een code voor één persoon');
+    expect(admin).toContain('/invite — een code voor één persoon');
     expect(admin.split('\n').slice(1).every((l) => l.includes(' — '))).toBe(true);
   });
 });

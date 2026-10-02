@@ -67,8 +67,14 @@ describe('the settings menu', () => {
     expect(r.text).toContain('Voor het hele huishouden:');
     expect(r.text).toContain('Namen zien: iedereen in huis');
     expect((r.buttons ?? []).map((b) => b.id)).toContain('/huishouden names none');
-    await say('9', '/huishouden names none');
+    // a change that takes something from everyone asks first; one that does not, runs
+    const asked = await say('9', '/huishouden names none');
+    expect(asked.text).toContain('Weet je het zeker');
+    expect(params.get('assistant.names')).not.toBe('none');
+    await say('9', (asked.buttons ?? [])[0].id);
     expect(params.get('assistant.names')).toBe('none');
+    await say('9', '/huishouden names admin');
+    expect(params.get('assistant.names')).toBe('admin');
     const member = await say('42', '/huishouden names members');
     expect(member.text).toContain('beheerder');
   });

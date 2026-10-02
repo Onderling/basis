@@ -18,6 +18,19 @@ import { CHANNELS, isChannel } from '@onderling/item-types';
 export { CHANNELS, isChannel };
 
 /**
+ * The admitted person a name or contact id means, among the book's rows: the id first, else the display name (any
+ * case). One rule for the book's own changes and for the question that asks before one.
+ * @param {Array<{id: string, displayName?: string}>} rows
+ * @param {string} nameOrId
+ * @returns {object|null}
+ */
+export function personNamed(rows, nameOrId) {
+  const want = String(nameOrId ?? '').trim();
+  if (!want) return null;
+  return (rows ?? []).find((r) => r?.id === want) ?? (rows ?? []).find((r) => (r?.displayName ?? '').toLowerCase() === want.toLowerCase()) ?? null;
+}
+
+/**
  * @param {object} a
  * @param {{get: (id: string) => Promise<object|null>, put: (row: object) => Promise<object>, list: () => Promise<object[]>}} a.store
  * @param {string|null} [a.adminUid]  the uid (on any channel) the bot was started naming as its admin
@@ -74,16 +87,14 @@ export function createBotUsers({ store, adminUid = null } = {}) {
     async setRole(nameOrId, role) {
       const want = String(nameOrId ?? '').trim();
       if (!want || !['coordinator', 'member', 'observer'].includes(role)) return null;
-      const rows = (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden);
-      const row = rows.find((r) => r.id === want) ?? rows.find((r) => (r.displayName ?? '').toLowerCase() === want.toLowerCase());
+      const row = personNamed((await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden), want);
       if (!row || row.role === ROLES.ADMIN) return null;
       return store.put({ ...row, role });
     },
     async revoke(nameOrId) {
       const want = String(nameOrId ?? '').trim();
       if (!want) return null;
-      const rows = (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden);
-      const row = rows.find((r) => r.id === want) ?? rows.find((r) => (r.displayName ?? '').toLowerCase() === want.toLowerCase());
+      const row = personNamed((await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden), want);
       if (!row) return null;
       if (typeof store.hide === 'function') await store.hide(row.id);
       else await store.put({ ...row, hidden: true });

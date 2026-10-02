@@ -4331,6 +4331,64 @@
     "value_hide": "verbergen",
     "value_delete": "weggooien",
     "value_own": "je eigen",
+    "help": {
+      "sections": {
+        "lists": "Lijsten",
+        "chores": "Klusjes",
+        "agenda": "Agenda",
+        "you": "Jij",
+        "admin": "Voor de beheerder"
+      },
+      "ops": {
+        "lists": {
+          "listLists": "welke lijsten er zijn",
+          "listEntries": "wat er op een lijst staat",
+          "addToList": "iets op een lijst zetten (of zeg: zet melk op de boodschappen)",
+          "markListItemDone": "iets afvinken (of zeg: melk is gekocht)",
+          "removeFromList": "iets van een lijst halen",
+          "editEntry": "de woorden van een regel veranderen",
+          "createList": "een nieuwe lijst",
+          "removeList": "een hele lijst weggooien"
+        },
+        "tasks": {
+          "listMine": "je eigen klusjes",
+          "claimTask": "een klusje oppakken (of zeg: ik doe de ramen)",
+          "completeTask": "een klusje afmelden (of zeg: ramen is klaar)",
+          "editTask": "een klusje aanpassen"
+        },
+        "calendar": {
+          "addEvent": "een afspraak zetten (of zeg: tandarts morgen om 10 uur)",
+          "listEvents": "de komende afspraken",
+          "rsvpAccept": "zeggen dat je komt",
+          "rsvpDecline": "zeggen dat je niet komt",
+          "rsvpTentative": "misschien komen",
+          "cancelEvent": "een afspraak afzeggen"
+        },
+        "assistant": {
+          "weekOverview": "jouw week: klusjes, afspraken, boodschappen",
+          "assistant-menu": "je instellingen, met knoppen",
+          "assistant-reminders": "herinneringen aan of uit",
+          "assistant-overview": "het zondagsoverzicht aan of uit",
+          "assistant-language": "de taal waarin ik je antwoord",
+          "assistant-memory": "hoeveel ik van ons gesprek onthoud",
+          "assistant-view": "knoppen, je scherm of woorden",
+          "assistant-screen": "een scherm koppelen",
+          "assistant-screens": "je gekoppelde schermen",
+          "assistant-settings": "instellingen voor het hele huishouden",
+          "assistant-users": "wie er in het huishouden zitten",
+          "assistant-role": "iemands rol veranderen",
+          "assistant-cohort": "een code voor meerdere mensen",
+          "assistant-invite": "een code voor één persoon",
+          "assistant-revoke": "iemand eruit halen",
+          "assistant-rotate": "de codes vervangen",
+          "assistant-apps": "welke apps de bot gebruikt",
+          "assistant-status": "hoe de bot ervoor staat",
+          "assistant-exports": "de nachtelijke exports",
+          "assistant-export": "nu een export maken",
+          "assistant-import": "een export terugzetten"
+        }
+      }
+    },
     "admission_failed": "Het toelaten ging mis aan de kant van de bot. Probeer het over een paar minuten opnieuw; lukt het dan niet, vraag de beheerder."
   },
   "op": {

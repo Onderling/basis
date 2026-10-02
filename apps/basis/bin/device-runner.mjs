@@ -64,6 +64,8 @@ import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
+import { reminderPromptLines } from '../src/v2/botReminders.js';
+import { botHelpLines } from '../src/v2/botHelp.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
@@ -875,7 +877,7 @@ if (tgToken || inboxDoor.bridge) {
     // own tools (a member's or the admin's), and the deterministic gate speaks the lists.
     ...(isFunctionProfile ? {
       // the model's lines and the gate's rules, generated from the template's lists (their names, their words)
-      promptLines: promptLinesFor(t),
+      promptLines: [...promptLinesFor(t), ...reminderPromptLines()],
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
       scopeToRole: scopeCatalogueToRole,
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),
@@ -886,6 +888,11 @@ if (tgToken || inboxDoor.bridge) {
       welcomeFor: ({ role, ops, t: tp }) => welcomeLines({ ops, role, lists: templateLists(t), t: tp ?? t, settings: reminderSettings() }),
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
       basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
+      // `/help` for a person: their language, grouped, the admin's commands last (their level on the bot's map)
+      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({
+        commandMenu, opsById, t: tp,
+        isAdmin: (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibility === 'trusted' : botOpLevel(entry.op?.id) === 'trusted'),
+      }),
     } : {}),
   });
   await tgRunner.start();

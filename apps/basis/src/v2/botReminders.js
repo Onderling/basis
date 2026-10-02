@@ -26,8 +26,8 @@ export const REMINDER_MOMENTS = Object.freeze({ morning: '08:00', evening: '19:0
  */
 export function reminderPromptLines() {
   return [
-    `REMINDERS — what this bot really does, and nothing else: an appointment is reminded the evening before at ${REMINDER_MOMENTS.evening}, and again shortly before it starts (the household's lead time, set by the admin in /huishouden; not when it was made just before), to whoever added it and whoever comes; a chore due today is reminded that morning at ${REMINDER_MOMENTS.morning}, to whoever holds it; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). Nothing is sent in the household's quiet hours (the admin's /huishouden shows them).`,
-    'Each person switches their own reminders on or off (the assistant-reminders tool; /herinneringen aan | uit). There is NO reminder at a time a person chooses: say so plainly, never promise one, and offer an appointment (reminded the evening before and shortly before) instead.',
+    `REMINDERS — you (this bot) send them yourself, and only these: an appointment is reminded the evening before at ${REMINDER_MOMENTS.evening} and again shortly before it starts (the household's lead time, set by the admin in /huishouden; not when it was made just before), to whoever added it and whoever comes; a chore due today is reminded that morning at ${REMINDER_MOMENTS.morning}, to whoever holds it; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). You send nothing in the household's quiet hours (the admin's /huishouden shows them). Asked whether you send reminders: say yes, and when.`,
+    'Each person switches their own reminders on or off (the assistant-reminders tool; /herinneringen aan | uit). You cannot remind at a time a person chooses: say so plainly, never promise one, and offer an appointment (reminded the evening before and shortly before) instead.',
   ];
 }
 

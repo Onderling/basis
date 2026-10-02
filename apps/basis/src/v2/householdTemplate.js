@@ -78,16 +78,13 @@ export async function ensureHouseholdLists({ callSkill, t, template = HOUSEHOLD_
 }
 
 /**
- * The bot's app list with the template's apps in it: what a start writes when the template has grown since the list
- * was set (a bot made before tasks or calendar were in it), or null when nothing is missing. The owner's own apps
- * stay; only the template's missing ones are added.
- * @param {string[]|null|undefined} current
- * @returns {string[]|null}
+ * What a household bot composes: the household and the template's plugins — fixed. There is no app switch on a bot:
+ * what it holds is its lists and what each list's lines are; a person's own box keeps its app list (`assistant.apps`).
+ * @param {object} [template]
+ * @returns {string[]}
  */
-export function withTemplateApps(current, template = HOUSEHOLD_TEMPLATE) {
-  const have = Array.isArray(current) ? current : [];
-  const missing = template.apps.filter((a) => !have.includes(a));
-  return missing.length ? [...have, ...missing] : null;
+export function householdBotApps(template = HOUSEHOLD_TEMPLATE) {
+  return ['household', ...template.apps];
 }
 
 /**

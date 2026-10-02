@@ -57,7 +57,8 @@ export function composeAssistantCatalogue({ apps, householdManifest, slim = fals
  * @param {object} [a.householdManifest]
  */
 export function createDoorCatalogue({ getApps, setApps, householdManifest, slim = false } = {}) {
-  if (typeof getApps !== 'function' || typeof setApps !== 'function') throw new TypeError('createDoorCatalogue: getApps and setApps are required');
+  if (typeof getApps !== 'function') throw new TypeError('createDoorCatalogue: getApps is required');
+  // no `setApps`: a door whose apps are fixed (a household bot composes its template's) — there is no switch
   let current = composeAssistantCatalogue({ apps: getApps(), householdManifest, slim });
   // The apps a door can offer: every app manifest the shells compose, but the shell's own.
   const available = catalogueManifests({ householdManifest }).map((m) => m.app).filter((a) => a && a !== 'basis');
@@ -68,6 +69,7 @@ export function createDoorCatalogue({ getApps, setApps, householdManifest, slim 
     available: () => [...available],
     /** @param {string[]} list */
     async setApps(list) {
+      if (typeof setApps !== 'function') throw new Error('createDoorCatalogue: this door\'s apps are fixed');
       await setApps(list);
       current = composeAssistantCatalogue({ apps: list, householdManifest, slim });
       return current.apps;

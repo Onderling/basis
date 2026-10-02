@@ -64,6 +64,9 @@ export const onBotMap = (opId) => botOpLevel(opId) !== null;
  * @param {object} catalogue  a merged catalogue (`opsById`, `commandMenu`)
  * @param {'member'|'admin'|null} role  null (the owner, no door caller) → everything on the map
  */
+/** The door's own ops a household bot does not have: its plugins are its template's, so there is no app switch. */
+const NOT_ON_A_BOT = new Set(['assistant-apps']);
+
 /**
  * Does the bot offer this op to this role (`null`: the bot's whole map, any role)? One rule for narrowing a merged
  * catalogue and for narrowing an app's manifest before it is merged.
@@ -76,6 +79,7 @@ export function botOffers(appOrigin, op, role) {
   // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too, and
   // the admin's own (`trusted`) are not offered to anyone else — their /help does not list what they cannot do
   if (appOrigin === 'assistant') {
+    if (NOT_ON_A_BOT.has(id)) return false;
     if (role === 'observer') return botRoleAllows(role, id);
     return op?.visibility !== 'trusted' || role == null || role === 'admin';
   }

@@ -538,7 +538,9 @@ export class Agent extends Emitter {
     if (opts.transport) {
       const t = this.#transports.get(opts.transport);
       if (!t) throw new Error(`Unknown transport: ${opts.transport}`);
-      return invokeAgentSkill({ ...this._asCallCtx(), _overrideTransport: t }, peerId, skillId, parts, opts);
+      // the agent itself (a spread copy loses its prototype getters), the transport in the call's own options — where
+      // `invokeAgentSkill` reads it
+      return invokeAgentSkill(this, peerId, skillId, parts, { ...opts, _overrideTransport: t });
     }
     return invokeAgentSkill(this, peerId, skillId, parts, opts);
   }

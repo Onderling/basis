@@ -6,6 +6,7 @@ import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
+import { SURFACE_PREFS } from './surfacePref.js';
 
 /**
  * The door's callSkill, with its own ops handled here, and nothing else changed.
@@ -33,6 +34,21 @@ const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()]
 
 export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {} }) {
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
+  /** What a settings op's buttons can set, and the value it has now, for this person. */
+  const PERSON_SETTINGS = {
+    'assistant-memory':    { values: ['off', 'short', 'long'], now: (id) => threads.modeOf(id) },
+    'assistant-reminders': { values: ['on', 'off'], now: (id) => (threads.remindersOn(id) ? 'on' : 'off') },
+    'assistant-overview':  { values: ['on', 'off'], now: (id) => (threads.overviewOn(id) ? 'on' : 'off') },
+    'assistant-language':  { values: ['nl', 'en', 'auto'], now: (id) => threads.langOf(id) ?? 'auto' },
+    'assistant-view':      { values: [...SURFACE_PREFS], now: (id) => threads.viewOf(id) },
+  };
+  /** The household's settings (`/huishouden <key> <value>`), each a row. */
+  const HOUSEHOLD_SETTINGS = [
+    ['assign', ASSIGN_POLICY_KEY, ASSIGN_POLICIES, assignPolicyFrom], ['names', NAMES_KEY, NAMES_POLICIES, namesPolicyFrom],
+    ['passed', PASSED_KEY, PASSED_POLICIES, passedPolicyFrom], ['cancel', CANCEL_KEY, CANCEL_POLICIES, cancelPolicyFrom],
+    ['reminders', REMINDERS_KEY, REMINDERS_MODES, remindersModeFrom],
+  ];
+  const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
   return async (app, op, args = {}, ctx = {}) => {
     if (app !== 'assistant') return callSkill(app, op, args, ctx);
     const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
@@ -52,6 +68,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-invite') return inviteOp();
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
+      if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller);
+      if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
       if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId);
       if (op === 'assistant-screens') return screensOp(caller ?? ctx?.threadId, args?.change ?? args?._match);
       if (op === 'assistant-exports') return exportsOp();
@@ -270,6 +288,58 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const dropped = typeof admin.screens?.dropAll === 'function' ? await admin.screens.dropAll(row.id) : 0;
     const said = t('circle.bot.revoked', { who: row.displayName ?? row.id });
     return { ok: true, message: dropped ? `${said} ${t('circle.bot.revoked_screens', { n: dropped })}` : said };
+  }
+
+
+  /**
+   * `/instellingen`: one row per settings op this person's role reaches — the gate decides, as for the op itself — with
+   * its value now and a button per value that calls the op. Painted per the person's view: buttons in the chat
+   * (`inline`), a pointer to their connected screen (`screen`), or words (`chat`; the inbox door is always chat).
+   */
+  async function menuOp(person, caller) {
+    if (!person) return { ok: false, error: 'no-thread' };
+    const tp = personT(person);
+    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(opId, caller, levelOf(opId)));
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const view = row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person);
+    if (view === 'screen') {
+      const mine = typeof admin.screens?.list === 'function' ? await admin.screens.list(person) : [];
+      return { ok: true, message: tp(mine.length ? 'circle.bot.menu_on_screen' : 'circle.bot.menu_offer_screen') };
+    }
+    const lines = [tp('circle.bot.menu_head')];
+    const buttons = [];
+    const valueLabel = (v) => tp(`circle.bot.value_${v}`);
+    const settingsOps = assistantManifest.operations.filter((o) => o.group === 'settings' && o.id !== 'assistant-settings');
+    for (const o of settingsOps) {
+      const spec = PERSON_SETTINGS[o.id];
+      if (!spec || !(await reaches(o.id))) continue;
+      const now = spec.now(person);
+      lines.push(tp('circle.bot.menu_row', { label: tp(`circle.bot.menu_${o.id}`), value: valueLabel(now) }));
+      for (const v of spec.values) buttons.push({ label: `${tp(`circle.bot.menu_${o.id}`)}: ${valueLabel(v)}${v === now ? ' ✓' : ''}`, slash: `${slashOf(o.id)} ${v}` });
+    }
+    if (await reaches('assistant-settings')) {
+      const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+      const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
+      lines.push('', tp('circle.bot.menu_household'));
+      for (const [key, paramKey, values, from] of HOUSEHOLD_SETTINGS) {
+        const now = from(of(paramKey));
+        lines.push(tp('circle.bot.menu_row', { label: tp(`circle.bot.menu_${key}`), value: valueLabel(now) }));
+        for (const v of values) buttons.push({ label: `${tp(`circle.bot.menu_${key}`)}: ${valueLabel(v)}${v === now ? ' ✓' : ''}`, slash: `${slashOf('assistant-settings')} ${key} ${v}` });
+      }
+    }
+    if (view === 'chat') return { ok: true, message: [...lines, '', tp('circle.bot.menu_in_words')].join('\n') };
+    return { ok: true, message: lines.join('\n'), quickReplies: buttons };
+  }
+
+  /** `/weergave knoppen|scherm|chat` (the words of either language, or the values themselves). */
+  function viewOp(person, word) {
+    if (!person) return { ok: false, error: 'no-thread' };
+    const tp = personT(person);
+    const w = String(word ?? '').trim().toLowerCase();
+    const view = SURFACE_PREFS.find((v) => v === w || ['nl', 'en'].some((lng) => String(t(`circle.bot.view_word_${v}`, undefined, lng)).toLowerCase() === w));
+    if (!view) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.view_usage') } };
+    threads.setView(person, view);
+    return { ok: true, message: tp('circle.bot.view_set', { view: tp(`circle.bot.view_word_${view}`) }) };
   }
 
   /** `/scherm`: a one-time link for this person's screen. */

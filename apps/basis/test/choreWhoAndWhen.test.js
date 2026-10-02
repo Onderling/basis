@@ -105,7 +105,7 @@ describe('a chore that says who and when', () => {
     expect(hits('add task call the plumber')).toBe(true);
   });
 
-  it('the admin sets it with /instellingen; anything else is the usage line', async () => {
+  it('the admin sets it with /huishouden; anything else is the usage line', async () => {
     const { withAssistantOps } = await import('../src/v2/assistantOps.js');
     const stored = new Map();
     const inner = async (app, op, args) => {

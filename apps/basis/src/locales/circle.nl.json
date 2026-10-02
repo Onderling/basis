@@ -4413,7 +4413,7 @@
     "screen_paste_usage": "Plak de koppelcode van het scherm: /koppel-scherm onderling-connect://…",
     "screen_paste_asked": "Ontvangen. Ik vraag je nu welke code er op dat scherm staat.",
     "settings_confirm": "Dit verandert het voor iedereen in huis. Weet je het zeker?",
-    "stepup_question": "Scherm '{{screen}}' wil {{what}}. Doen?",
+    "stepup_question": "Scherm '{{screen}}' wil {{what}}. Doen? (verzoek {{id}}: /bevestig ja {{id}} of /bevestig nee {{id}})",
     "stepup_what": {
       "assistant-revoke": "{{arg}} uit het huishouden halen",
       "assistant-invite": "een uitnodiging maken",
@@ -4424,12 +4424,14 @@
     "stepup_yes": "Ja",
     "stepup_no": "Nee",
     "stepup_asked": "Gevraagd in je eigen chat met de bot. Zeg daar ja.",
-    "stepup_usage": "Antwoord met /bevestig ja of /bevestig nee.",
+    "stepup_usage": "Tik op Ja of Nee onder de vraag (of typ /bevestig ja en de code erbij).",
     "stepup_not_private": "Dat telt alleen in je eigen chat met de bot.",
     "stepup_nothing": "Er wacht niets op een ja.",
     "stepup_expired": "Te laat: het verzoek is vervallen. Vraag het opnieuw vanaf het scherm.",
     "stepup_declined": "Niet gedaan.",
-    "stepup_unwired": "Dat kan hier alleen in de chat."
+    "stepup_unwired": "Dat kan hier alleen in de chat.",
+    "stepup_replaced": "Dat verzoek is vervangen door een nieuwer; daar is niets mee gedaan.",
+    "stepup_what_op": "{{op}} doen ({{arg}})"
   },
   "op": {
     "not_in_this_circle": {
@@ -7407,6 +7409,7 @@
     "stepup_declined": "Niet gedaan: je zei nee.",
     "stepup_expired": "Niet gedaan: er kwam geen ja binnen tien minuten.",
     "stepup_replaced": "Niet gedaan: een nieuwer verzoek kwam ervoor in de plaats.",
-    "stepup_failed": "Het lukte niet; kijk in je chat."
+    "stepup_failed": "Het lukte niet; kijk in je chat.",
+    "stepup_unanswered": "Geen antwoord: er kwam binnen tien minuten geen ja. Niets veranderd."
   }
 }

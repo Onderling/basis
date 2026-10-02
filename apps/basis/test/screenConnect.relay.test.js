@@ -159,7 +159,10 @@ describe('a person connects a screen to the bot over the relay', () => {
       expect(JSON.stringify(held), `the screen's rotate came back: ${JSON.stringify(held)}`).toContain('"pending":true');
       const question = await until(async () => (await botSaid(ann)).slice(asking).find((t) => /Scherm|Screen/.test(t)) ?? null, { timeout: 30_000, step: 500 });
       expect(question, `no question in Ann's chat:\n${out.slice(-1500)}`).toBeTruthy();
-      await send('/bevestig ja');
+      // the inbox shows words, no buttons: the request's id is in them
+      const id = /\/bevestig ja ([A-Z2-9]{4})/.exec(question)?.[1];
+      expect(id, `no request id in the question: ${question}`).toBeTruthy();
+      await send(`/bevestig ja ${id}`);
       const notice = await until(async () => view.received.find((m) => m.payload?.subtype === 'screen-step-up')?.payload ?? null, { timeout: 30_000, step: 500 });
       expect(notice, `the screen heard nothing:\n${walkTail()}`).toMatchObject({ outcome: 'done', op: 'assistant-rotate' });
 

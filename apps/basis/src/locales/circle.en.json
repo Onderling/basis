@@ -4413,7 +4413,7 @@
     "screen_paste_usage": "Paste the screen's connect code: /koppel-scherm onderling-connect://…",
     "screen_paste_asked": "Received. I am asking you now which code that screen shows.",
     "settings_confirm": "This changes it for everyone in the house. Are you sure?",
-    "stepup_question": "Screen '{{screen}}' wants to {{what}}. Go ahead?",
+    "stepup_question": "Screen '{{screen}}' wants to {{what}}. Go ahead? (request {{id}}: /bevestig ja {{id}} or /bevestig nee {{id}})",
     "stepup_what": {
       "assistant-revoke": "remove {{arg}} from the household",
       "assistant-invite": "make an invite",
@@ -4424,12 +4424,14 @@
     "stepup_yes": "Yes",
     "stepup_no": "No",
     "stepup_asked": "Asked in your own chat with the bot. Say yes there.",
-    "stepup_usage": "Answer with /bevestig ja or /bevestig nee.",
+    "stepup_usage": "Tap Yes or No under the question (or type /bevestig ja with its code).",
     "stepup_not_private": "That only counts in your own chat with the bot.",
     "stepup_nothing": "Nothing is waiting for a yes.",
     "stepup_expired": "Too late: the request lapsed. Ask again from the screen.",
     "stepup_declined": "Not done.",
-    "stepup_unwired": "That can only be done in the chat here."
+    "stepup_unwired": "That can only be done in the chat here.",
+    "stepup_replaced": "That request was replaced by a newer one; nothing was done with it.",
+    "stepup_what_op": "do {{op}} ({{arg}})"
   },
   "op": {
     "not_in_this_circle": {
@@ -7407,6 +7409,7 @@
     "stepup_declined": "Not done: you said no.",
     "stepup_expired": "Not done: no yes came within ten minutes.",
     "stepup_replaced": "Not done: a newer request took its place.",
-    "stepup_failed": "That did not work; see your chat."
+    "stepup_failed": "That did not work; see your chat.",
+    "stepup_unanswered": "No answer: no yes came within ten minutes. Nothing changed."
   }
 }

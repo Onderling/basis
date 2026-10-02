@@ -17,7 +17,7 @@ import { screenPanelsForGrant } from '../../src/v2/screenPaint.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
 import { renderForm } from '../../src/web/domForm.js';
 import { confirmApplies } from '../../src/confirmApplies.js';
-import { SCREEN_STEP_UP_OUTCOMES } from '../../src/v2/screenStepUp.js';
+import { SCREEN_STEP_UP_OUTCOMES, SCREEN_STEP_UP_UNANSWERED } from '../../src/v2/screenStepUp.js';
 
 const el = (tag, attrs = {}, ...kids) => {
   const n = document.createElement(tag);
@@ -63,7 +63,7 @@ export async function startScreenShell(win = window) {
     const sections = panels.map((panel) => el('section', { 'data-section': panel.section },
       el('h2', {}, panel.title),
       ...panel.items.map((item) => {
-        const out = el('div', { class: 'screen-result', role: 'status' });
+        const out = el('div', { class: 'screen-result', role: 'status', 'data-result-op': item.opId });
         const area = el('div', { class: 'screen-form' });
         const run = async (args) => {
           // the op's own confirm, here: the surface asks (the waist does not)
@@ -78,13 +78,13 @@ export async function startScreenShell(win = window) {
         } }, item.label);
         return el('div', { class: 'screen-op' }, open, area, out);
       })));
-    // what became of a request that waited for a yes in the person's own chat
-    const notice = el('p', { class: 'screen-notice', role: 'status', 'data-screen': 'notice' });
-    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), notice, ...sections);
+    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), ...sections);
   };
-  view.onNotice(({ outcome }) => {
-    const at = root.querySelector('[data-screen="notice"]');
-    if (at && SCREEN_STEP_UP_OUTCOMES.includes(outcome)) at.textContent = t(`circle.connectScreen.stepup_${outcome}`);
+  // what became of a request that waited for a yes in the person's own chat: said on that op's own line
+  view.onNotice(({ outcome, op }) => {
+    if (!SCREEN_STEP_UP_OUTCOMES.includes(outcome) && outcome !== SCREEN_STEP_UP_UNANSWERED) return;
+    const at = [...root.querySelectorAll('[data-result-op]')].find((n) => n.getAttribute('data-result-op') === op);
+    if (at) { at.textContent = t(`circle.connectScreen.stepup_${outcome}`); at.setAttribute('data-outcome', outcome); }
   });
 
 

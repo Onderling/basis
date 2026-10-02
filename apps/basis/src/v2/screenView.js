@@ -18,7 +18,7 @@
 import { DataPart } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
 import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
-import { SCREEN_STEP_UP_SUBTYPE } from './screenStepUp.js';
+import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERED } from './screenStepUp.js';
 
 /** The peer-message subtype a screen's offer travels as (the bot's router takes it). */
 export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
@@ -44,8 +44,10 @@ export const screenAddressFor = (botAddress) => `#scherm-bot=${encodeURIComponen
  * @param {() => Promise<object>} a.makeAgent  a secure agent (`createSecureAgent`, `transportMode: 'relay'`) with this browser's
  *   persistent key
  * @param {{getItem: Function, setItem: Function, removeItem?: Function}} a.storage  where the grant is kept
+ * @param {(fn: Function, ms: number) => any} [a.setTimer]
+ * @param {(h: any) => void} [a.clearTimer]
  */
-export function createScreenView({ link, makeAgent, storage }) {
+export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (h) => clearTimeout(h) }) {
   const load = (botAddress) => { try { return JSON.parse(storage.getItem(storeKey(botAddress)) ?? 'null'); } catch { return null; } };
   // a later visit (`#scherm-bot=`): the bot's address, and the relay from the grant this browser kept
   const resolve = () => {
@@ -70,10 +72,14 @@ export function createScreenView({ link, makeAgent, storage }) {
   grantArrived.catch(() => { /* a refusal nobody awaits yet is not an unhandled rejection */ });
   // what the bot says later about a request that waited for a yes in the person's chat (`{outcome, op}`)
   const notices = new Set();
+  const emit = (notice) => { for (const fn of notices) { try { fn(notice); } catch { /* a listener's fault is its own */ } } };
+  // a call the bot holds for the person's yes: the screen waits its own ten minutes, then says "no answer" itself
+  let waiting = null;
+  const stopWaiting = () => { if (waiting) { clearTimer(waiting); waiting = null; } };
   const noticeOf = ({ from, payload } = {}) => {
     if (from !== parsed.botAddress || payload?.subtype !== SCREEN_STEP_UP_SUBTYPE) return false;
-    const notice = { outcome: String(payload.outcome ?? ''), op: typeof payload.op === 'string' ? payload.op : null };
-    for (const fn of notices) { try { fn(notice); } catch { /* a listener's fault is its own */ } }
+    stopWaiting();
+    emit({ outcome: String(payload.outcome ?? ''), op: typeof payload.op === 'string' ? payload.op : null });
     return true;
   };
 
@@ -163,6 +169,10 @@ export function createScreenView({ link, makeAgent, storage }) {
       if (!token) throw new Error(`screenView: no grant for ${skill}`);
       const parts = await sa.peer.invoke(granted.botAddress, skill, [DataPart(args)], { token });
       const data = (parts ?? []).map((p) => p?.data ?? p?.content).find((d) => d && typeof d === 'object');
+      if (data?.pending === true) {
+        stopWaiting();
+        waiting = setTimer(() => { waiting = null; emit({ outcome: SCREEN_STEP_UP_UNANSWERED, op: skill.split('.').pop() }); }, SCREEN_STEP_UP_TTL_MS);
+      }
       return data ?? null;
     },
   };

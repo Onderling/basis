@@ -94,4 +94,8 @@ export const FIXTURES = [
   { id: 'chore-for-me-after-same-refusal', text: 'nieuwe taak voor mij: ramen lappen, morgen', before: ['you: nieuwe taak voor mij: ramen lappen, morgen', 'assistant: Dat kan alleen de beheerder van deze bot.'], expect: { op: 'addToList', args: { list: /klusjes/, text: /^ramen lappen$/, assignee: /^(mij|me|ik)$/ } } },
   { id: 'reminders-off-plain', text: 'geen herinneringen meer graag', expect: { op: 'assistant-reminders', args: { mode: 'off' } } },
   { id: 'reminders-on',       text: 'zet de herinneringen weer aan', expect: { op: 'assistant-reminders', args: { mode: 'on' } } },
+  // ── what the bot says about its own reminders (the real bot denied them, then invented others; 2026-10-02) ──
+  { id: 'remind-at-chosen-time', text: 'herinner me om 5 uur aan de was', expect: { reply: 'declines' } },
+  { id: 'do-you-remind',       text: 'stuur jij herinneringen?', expect: { reply: 'declines' } },
+  { id: 'when-do-you-remind',  text: 'wanneer herinner je me aan de tandarts?', expect: { reply: 'declines' } },
 ];

@@ -743,6 +743,13 @@ if (tgToken || inboxDoor.bridge) {
     await admission.openCohort({ ceiling: 1, days: 1 });
     bootstrapCode = await admission.code();
     console.log(`device-runner: this bot has no admin yet — send it, within a day:  /start ${bootstrapCode}`);
+    // A code the door hands out on a node that is NOT a household bot admits people into a person's assistant: no bot map,
+    // no roles' columns, no reminders. Said where the operator reads the code (seen on the tablet, 2026-10-02: the
+    // profile kind was left empty in the box's .env).
+    if (!isFunctionProfile) {
+      console.warn('device-runner: ⚠ this node is not a household bot (ONDERLING_PROFILE_KIND is not "function") — the code admits people into a PERSON\'s assistant. Set ONDERLING_PROFILE_KIND=function in the box\'s .env for a household bot.');
+      walkLog({ kind: 'not-a-household-bot', admission: 'codes' });
+    }
   }
   // Each person's thread: its turns on the (sealed) device log, its settings in a sealed store — kept across restarts.
   const threads = createBotThreads({

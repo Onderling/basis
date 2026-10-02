@@ -610,6 +610,8 @@ export async function createSecureAgent(opts = {}) {
       // pre-built GroupManager" escape hatch).
       groupManager:  peOpts.groupManager  ?? groupManager ?? null,
       isRevoked:     peOpts.isRevoked     ?? null,
+      // the allow-list beside the revocation list (fixed at construction like it): see PolicyEngine
+      isAllowed:     peOpts.isAllowed     ?? null,
       actorResolver: peOpts.actorResolver ?? null,
     });
     // ATTACH it to the agent — without this the engine is built + exposed as

@@ -824,6 +824,10 @@ export async function createRealHouseholdAgent(opts = {}) {
           async (tokenId) => Boolean(await surfaceGrants?.isRevoked(tokenId)),
           async (tokenId) => (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false),
         ]),
+        // A surface token (a connected screen's) acts only while its id is ACTIVE on the grants lane — statements count
+        // there only from this person's enrolled, unrevoked devices — so a token signed off the record with this agent's
+        // key (a revoked device keeps it) is refused, whatever the revocation list knows. Other tokens are unaffected.
+        isAllowed: async (token) => token?.constraints?.role !== 'surface' || Boolean(surfaceGrants?.activeEntryOf?.(token.id)),
       },
     }),
   });
@@ -832,11 +836,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
   // A token this agent mints (a screen's grant) is checked at its own door, which wants the issuer at `trusted` in
-  // this registry — the kernel's documented enablement step. Only where the composition asks (`trustOwnGrants`: a
-  // household bot, whose chat key lives on one box). NOT on a person's agent yet: their chat key is on every device,
-  // a revoked device keeps it, and the door's revocation check is a deny-list — so a revoked device could sign a
-  // token the lane never saw. That needs the door to ALLOW only tokens active on the grants lane first.
-  if (opts.trustOwnGrants === true) {
+  // this registry — the kernel's documented enablement step. On every agent now that the door ALLOWS only surface
+  // tokens active on the grants lane (`isAllowed` below): a token signed off the record with this key — a revoked
+  // device keeps it — is refused there. A composition can still opt out (`trustOwnGrants: false`).
+  if (opts.trustOwnGrants !== false) {
     try { await sa.trust?.setTier?.(chatId.pubKey, 'trusted'); } catch (err) { console.warn(`[realAgent] own issuer tier not set: ${err?.message ?? err}`); }
   }
 

@@ -201,7 +201,9 @@ describe('a screen acts as its person, and no further', () => {
 
   it('the lane is the allow-list: a token signed with the bot\'s own key but never granted, or one dropped, acts as nobody', async () => {
     const offLane = (await CapabilityToken.issue(bot.identity, { subject: view.pubKey, agentId: bot.identity.pubKey, skill: 'lists.addToList', constraints: { role: 'surface', actingAs: MEMBER } })).toJSON();
-    expect(await act('lists.addToList', { list: 'Boodschappen', text: 'naast-de-lijn' }, offLane)).toMatchObject({ ok: false, error: 'not-bound' });
+    // refused already at the token check (the door allows only surface tokens active on the lane); `screenActsAs`
+    // would refuse it too, as `not-bound`
+    expect(await act('lists.addToList', { list: 'Boodschappen', text: 'naast-de-lijn' }, offLane)).toMatchObject({ refusedAt: 'token' });
     const granted = await mint('lists.addToList', { role: 'surface', actingAs: MEMBER });
     expect((await act('lists.addToList', { list: 'Boodschappen', text: 'wel-gegeven' }, granted)).ok).toBe(true);
     await own('household', 'revokeSurface', { viewPubKey: view.pubKey });

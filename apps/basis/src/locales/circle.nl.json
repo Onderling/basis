@@ -4331,13 +4331,11 @@
     "value_hide": "verbergen",
     "value_delete": "weggooien",
     "value_own": "je eigen",
-<<<<<<< HEAD
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
     "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00), {{lead}} minuten van tevoren, en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
     "value_lead_min": "{{n}} minuten",
-    "value_lead_off": "geen"
-=======
+    "value_lead_off": "geen",
     "help": {
       "sections": {
         "lists": "Lijsten",
@@ -4396,7 +4394,6 @@
         }
       }
     }
->>>>>>> origin/fix/bot-words-from-first-chat
   },
   "op": {
     "not_in_this_circle": {

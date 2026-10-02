@@ -4331,13 +4331,11 @@
     "value_hide": "hide",
     "value_delete": "delete",
     "value_own": "their own",
-<<<<<<< HEAD
     "reminder_event_soon": "Soon: {{title}}, {{time}}.",
     "welcome_reminders_on_lead": "When something has a date, I remind you: the evening before an appointment (19:00), {{lead}} minutes before it, and the morning a chore is due (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
     "menu_lead": "Reminder beforehand",
     "value_lead_min": "{{n}} minutes",
-    "value_lead_off": "none"
-=======
+    "value_lead_off": "none",
     "help": {
       "sections": {
         "lists": "Lists",
@@ -4396,7 +4394,6 @@
         }
       }
     }
->>>>>>> origin/fix/bot-words-from-first-chat
   },
   "op": {
     "not_in_this_circle": {

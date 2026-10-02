@@ -7381,6 +7381,8 @@
     "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm.",
     "make_code": "Maak een koppelcode",
     "paste_this": "Plak dit in je eigen gesprek met de bot:",
-    "copy": "Kopiëren"
+    "copy": "Kopiëren",
+    "empty": "Nog niets.",
+    "sure": "Weet je het zeker?"
   }
 }

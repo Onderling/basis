@@ -54,7 +54,7 @@ test('the screen in a browser: the link read and hidden, the tap, the code, the 
     const link = /https?:\/\/\S+/.exec(linkLine)[0];
 
     // ── the page: the secret gone from the address bar, the bot named, nothing sent before the tap ──
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ locale: 'nl-NL' });   // the screen speaks the browser's language
     const page = await ctx.newPage();
     await page.goto(link);
     await expect(page.locator('[data-screen="connect"]')).toBeVisible({ timeout: 60_000 });
@@ -74,12 +74,21 @@ test('the screen in a browser: the link read and hidden, the tap, the code, the 
     expect(await until(async () => ((await said()).some((x) => /koppelen|connect/i.test(x)) ? true : null), { timeout: 30_000, step: 500 }), 'the question reached her chat').toBe(true);
     await send(`/koppelen ${code}`);   // she picks the code her screen shows
 
-    // ── connected: the ops, and one run from the page ──
+    // ── connected: the ops painted (sections, the person's words), a read run, and a form filled ──
     await expect(page.locator('[data-screen="connected"]')).toBeVisible({ timeout: 30_000 });
-    const run = page.locator('[data-op="lists.listLists"]');
-    await expect(run).toBeVisible();
-    await run.click();
-    await expect(page.locator('li', { has: run }).locator('.screen-result')).toContainText(/Boodschappen|✓/, { timeout: 30_000 });
+    await expect(page.locator('section[data-section="lists"] h2')).toHaveText('Lijsten');
+    const read = page.locator('[data-op="lists.listLists"]');
+    await expect(read).toContainText('welke lijsten er zijn');
+    await read.click();
+    await expect(page.locator('.screen-op', { has: read }).locator('.screen-result')).toContainText(/Boodschappen/, { timeout: 30_000 });
+    const add = page.locator('[data-op="lists.addToList"]');
+    await add.click();
+    const form = page.locator('.screen-op', { has: add }).locator('form, .cc-form');
+    await expect(form.first()).toBeVisible();
+    await form.locator('[name="list"]').first().fill('Boodschappen');
+    await form.locator('[name="text"]').first().fill('vanuit-het-formulier');
+    await form.locator('.cc-form-submit').first().click();
+    await expect(page.locator('.screen-op', { has: add }).locator('.screen-result')).toContainText(/vanuit-het-formulier/, { timeout: 30_000 });
 
     // ── a reload: the same browser's key and kept grant act again, no pairing ──
     await page.reload();

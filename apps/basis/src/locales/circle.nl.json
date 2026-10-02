@@ -4401,11 +4401,16 @@
           "assistant-status": "hoe de bot ervoor staat",
           "assistant-exports": "de nachtelijke exports",
           "assistant-export": "nu een export maken",
-          "assistant-import": "een export terugzetten"
+          "assistant-import": "een export terugzetten",
+          "assistant-screen-paste": "een scherm koppelen met zijn eigen koppelcode",
+          "assistant-screen-confirm": "de code van een scherm kiezen dat wil koppelen"
         }
       }
     },
-    "admission_failed": "Het toelaten ging mis aan de kant van de bot. Probeer het over een paar minuten opnieuw; lukt het dan niet, vraag de beheerder."
+    "admission_failed": "Het toelaten ging mis aan de kant van de bot. Probeer het over een paar minuten opnieuw; lukt het dan niet, vraag de beheerder.",
+    "screen_paste_link": "Open dit op het scherm dat je wilt koppelen (in je eigen browser): {{link}}\nTik daar op \"Maak een koppelcode\" en plak die code hier: /koppel-scherm <code>. Er gaat zo geen geheim door dit gesprek.",
+    "screen_paste_usage": "Plak de koppelcode van het scherm: /koppel-scherm onderling-connect://…",
+    "screen_paste_asked": "Ontvangen. Ik vraag je nu welke code er op dat scherm staat."
   },
   "op": {
     "not_in_this_circle": {
@@ -7373,6 +7378,9 @@
     "failed": "Koppelen lukte niet: {{reason}}",
     "not_a_link": "Deze link is niet (meer) geldig. Vraag de bot een nieuwe: /scherm.",
     "refused": "Niet gekoppeld: in je gesprek met de bot is een andere code of \"geen van deze\" gekozen. Vraag een nieuwe link: /scherm.",
-    "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm."
+    "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm.",
+    "make_code": "Maak een koppelcode",
+    "paste_this": "Plak dit in je eigen gesprek met de bot:",
+    "copy": "Kopiëren"
   }
 }

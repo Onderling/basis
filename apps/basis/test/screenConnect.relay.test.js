@@ -77,7 +77,7 @@ describe('a person connects a screen to the bot over the relay', () => {
     await send('hallo', { admission: code });
     expect(await until(async () => ((await botSaid(ann)).length >= 1 ? true : null), { timeout: 30_000, step: 500 }), `not admitted:\n${out.slice(-1200)}`).toBe(true);
 
-    await send('/scherm');
+    await send('/scherm link');   // Ann is the admin: the link on request
     const linkLine = await until(async () => (await botSaid(ann)).find((t) => t.includes('#scherm=')) ?? null, { timeout: 30_000, step: 500 });
     expect(linkLine, `no /scherm link came back:\n${out.slice(-1500)}`).toBeTruthy();
     const link = parseScreenLink(/https?:\/\/\S+/.exec(linkLine)[0]);
@@ -120,7 +120,7 @@ describe('a person connects a screen to the bot over the relay', () => {
     const card = cardFrom(out);
     const send = (text) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text }).sent;
     const seen = (await botSaid(ann)).length;
-    await send('/scherm');
+    await send('/scherm link');   // Ann is the admin: the link on request
     const linkLine = await until(async () => (await botSaid(ann)).slice(seen).find((t) => t.includes('#scherm=')) ?? null, { timeout: 30_000, step: 500 });
     const link = parseScreenLink(/https?:\/\/\S+/.exec(linkLine)[0]);
 
@@ -167,7 +167,7 @@ describe('a person connects a screen to the bot over the relay', () => {
     const card = cardFrom(out);
     const send = (text) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text }).sent;
     const seen = (await botSaid(ann)).length;
-    await send('/scherm');
+    await send('/scherm link');   // Ann is the admin: the link on request
     const linkLine = await until(async () => (await botSaid(ann)).slice(seen).find((t) => t.includes('#scherm=')) ?? null, { timeout: 30_000, step: 500 });
     const link = /https?:\/\/\S+/.exec(linkLine)[0];
 
@@ -196,6 +196,33 @@ describe('a person connects a screen to the bot over the relay', () => {
       const again = createScreenView({ link: `https://basis.example/app/${screenAddressFor(card.peerAddr)}`, makeAgent, storage: store });
       expect(await again.resume()).toBe(true);
       expect(JSON.stringify(await again.call('lists.listEntries', { list: 'Boodschappen' }))).toContain('vanuit-het-scherm');
+    } finally { for (const a of agents) await a.stop?.().catch(() => {}); }
+  }, 180_000);
+
+  it('the paste route: the admin\'s /scherm sends the start address; the screen makes its own code; pasted, picked, acting', async () => {
+    const card = cardFrom(out);
+    const send = (text) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text }).sent;
+    const seen = (await botSaid(ann)).length;
+    await send('/scherm');   // Ann is the admin: the paste route by default
+    const line = await until(async () => (await botSaid(ann)).slice(seen).find((t) => t.includes('#scherm-nieuw=')) ?? null, { timeout: 30_000, step: 500 });
+    expect(line, 'the admin got the start address').toBeTruthy();
+    expect(line).not.toContain('#scherm=');
+    const start = /https?:\/\/\S+/.exec(line)[0];
+    const vault = new VaultMemory();
+    const agents = [];
+    const makeAgent = async () => { const a = await createSecureAgent({ vault, transportMode: 'relay', warnOnInsecure: false }); agents.push(a); return a; };
+    const m = new Map();
+    try {
+      const view = createScreenView({ link: start, makeAgent, storage: { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) } });
+      expect(view.link).toMatchObject({ ok: true, pasteMode: true, botAddress: card.peerAddr });
+      const { code, offer } = await view.connect({ label: 'paste' });
+      expect(offer).toMatch(/^onderling-connect:\/\//);
+      const before = (await botSaid(ann)).length;
+      await send(`/koppel-scherm ${offer}`);
+      expect(await answerYes(ann, card.peerAddr, code, async () => (await botSaid(ann)).slice(before))).toBe(true);
+      await view.granted({ timeoutMs: 30_000 });
+      const added = await view.call('lists.addToList', { list: 'Boodschappen', text: 'geplakt' });
+      expect(added, JSON.stringify(added)).toMatchObject({ ok: true });
     } finally { for (const a of agents) await a.stop?.().catch(() => {}); }
   }, 180_000);
 });

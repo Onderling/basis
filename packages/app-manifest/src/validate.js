@@ -491,6 +491,12 @@ function validateOperation(op, path, manifest, errors, idSet, opts = {}) {
     });
   }
 
+  // optional `stepUp`: a call from a screen (not the person's own chat) runs only after a yes in their private chat —
+  // the door that answers screens holds it. One value today.
+  if (op?.stepUp !== undefined && op.stepUp !== 'private-door') {
+    errors.push({ path: `${path}/stepUp`, message: "op.stepUp must be 'private-door' if present" });
+  }
+
   // optional `surfaces.ui.confirm` severity
   // hint for destructive / side-effect-bearing ops.  Adapters style
   // the confirm button accordingly (red for danger, yellow for warn,

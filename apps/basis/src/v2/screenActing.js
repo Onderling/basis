@@ -19,12 +19,13 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-screens',
   'assistant.assistant-screen-confirm',
   'assistant.assistant-screen-paste',
+  'assistant.assistant-screen-approve',   // the yes to a screen's request is said in the private chat, never by a screen
 ]);
 
 /**
- * The admin's own assistant ops a screen may have (Fable's list, the setup brief §19): the reads, the household's
- * settings and an export now. What admits people, removes them or changes what they may do (invite, cohort, role,
- * revoke, rotate) comes with a yes in the admin's own chat, enforced at the waist; `/apps` stays in the chat.
+ * The admin's own assistant ops a screen may have: the reads, the household's settings and an export. What admits
+ * people, removes them or changes what they may do (the ops declaring `stepUp: 'private-door'`) is on the screen too,
+ * and runs only after a yes in the admin's own chat (the door's call holds it); `/apps` stays in the chat.
  */
 export const SCREEN_ADMIN_OPS = Object.freeze([
   'assistant.assistant-status',
@@ -51,7 +52,7 @@ export function screenColumnFor(catalogue, role) {
     const id = `${entry?.appOrigin}.${entry?.op?.id}`;
     if (!entry?.appOrigin || !entry?.op?.id || out.includes(id)) continue;
     if (BOT_SCREEN_NEVER.includes(id)) continue;
-    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted' && !SCREEN_ADMIN_OPS.includes(id)) continue;
+    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted' && !SCREEN_ADMIN_OPS.includes(id) && entry.op.stepUp !== 'private-door') continue;
     out.push(id);
   }
   return out;
@@ -75,7 +76,8 @@ export function screenActsAs(users, { activeEntry } = {}) {
     const entry = await activeEntry(token?.id);
     if (!entry || entry.actingAs !== actingAs || entry.viewPubKey !== token?.subject) return null;
     const row = ((await users.list()) ?? []).find((u) => u?.id === actingAs && !u.hidden);
-    return row ? { caller: actingAs, threadId: actingAs } : null;
+    // marked as a screen's, with its key and name: an op that needs the private chat's yes is held, and the screen told
+    return row ? { caller: actingAs, threadId: actingAs, via: 'screen', viewPubKey: entry.viewPubKey, screenLabel: entry.label ?? null } : null;
   };
 }
 

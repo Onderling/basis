@@ -98,9 +98,11 @@ describe('a person connects a screen to the bot over the relay', () => {
     expect(skills).toContain('lists.addToList');
     expect(skills).toContain('assistant.assistant-overview');
     // Ann came in on the bootstrap code: she is the admin, and her screen gets the admin's lists column — but not the
-    // admin's assistant ops that admit, remove or change people (those wait for the chat yes), nor what a screen never gets
+    // admin's `/apps`, nor what a screen never gets
     expect(skills).toContain('lists.removeList');
-    for (const forbidden of ['assistant.assistant-screen', 'assistant.assistant-screens', 'assistant.assistant-import', 'assistant.assistant-role', 'assistant.assistant-revoke', 'assistant.assistant-invite', 'assistant.assistant-apps']) expect(skills).not.toContain(forbidden);
+    for (const forbidden of ['assistant.assistant-screen', 'assistant.assistant-screens', 'assistant.assistant-screen-approve', 'assistant.assistant-import', 'assistant.assistant-apps']) expect(skills).not.toContain(forbidden);
+    // what changes who is in is on the admin's screen, held for a yes in their own chat
+    for (const held of ['assistant.assistant-role', 'assistant.assistant-revoke', 'assistant.assistant-invite', 'assistant.assistant-cohort', 'assistant.assistant-rotate']) expect(skills).toContain(held);
     // the admin's reads, settings and export now are on the admin's screen (Fable's list)
     for (const allowed of ['assistant.assistant-users', 'assistant.assistant-export']) expect(skills).toContain(allowed);
     const actingAs = new Set(accepted.tokens.map((tk) => tk.constraints?.actingAs));
@@ -150,6 +152,19 @@ describe('a person connects a screen to the bot over the relay', () => {
       await expect(call(thief, 'lists.addToList', { list: 'Boodschappen', text: 'gestolen' }, tokenFor('lists.addToList'))).rejects.toThrow();
       // an op the token does not name, with another op's token: refused
       await expect(call(view, 'lists.removeList', { list: 'Reparaties' }, tokenFor('lists.listEntries'))).rejects.toThrow();
+
+      // what changes who is in waits for a yes in Ann's own chat: the screen's /rotate is held, asked, said yes to, done
+      const asking = (await botSaid(ann)).length;
+      const held = await call(view, 'assistant.assistant-rotate', {});
+      expect(JSON.stringify(held), `the screen's rotate came back: ${JSON.stringify(held)}`).toContain('"pending":true');
+      const question = await until(async () => (await botSaid(ann)).slice(asking).find((t) => /Scherm|Screen/.test(t)) ?? null, { timeout: 30_000, step: 500 });
+      expect(question, `no question in Ann's chat:\n${out.slice(-1500)}`).toBeTruthy();
+      // the inbox shows words, no buttons: the request's id is in them
+      const id = /\/bevestig ja ([A-Z2-9]{4})/.exec(question)?.[1];
+      expect(id, `no request id in the question: ${question}`).toBeTruthy();
+      await send(`/bevestig ja ${id}`);
+      const notice = await until(async () => view.received.find((m) => m.payload?.subtype === 'screen-step-up')?.payload ?? null, { timeout: 30_000, step: 500 });
+      expect(notice, `the screen heard nothing:\n${walkTail()}`).toMatchObject({ outcome: 'done', op: 'assistant-rotate' });
 
       // the person drops the screen: its next call is refused
       const before = (await botSaid(ann)).length;

@@ -551,6 +551,17 @@ describe('validateManifest', () => {
     });
   });
 
+  describe('op.stepUp — a call from a screen runs only after a yes in the private chat', () => {
+    const m = (op) => ({ app: 'c', itemTypes: ['t'], operations: [op], views: [{ id: 'v', title: 'V', type: 't' }] });
+    it('accepts private-door', () => {
+      expect(ok(m({ id: 'doIt', verb: 'do', params: [], stepUp: 'private-door' }))).toBe(true);
+    });
+    it('rejects any other value', () => {
+      const e = errs(m({ id: 'doIt', verb: 'do', params: [], stepUp: 'sometimes' }));
+      expect(e.some((x) => /op\.stepUp must be 'private-door'/.test(x.message))).toBe(true);
+    });
+  });
+
   describe('V0.8 Q27 surfaces.ui.confirm severity hint', () => {
     const baseManifest = (op) => ({
       app:        'c',

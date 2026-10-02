@@ -24,7 +24,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write',
   },
   operations: [
     {
@@ -117,6 +117,8 @@ export const assistantManifest = {
       id:     'assistant-role',
       verb:   'set-role',
       visibility: 'trusted',
+      // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
+      stepUp: 'private-door',
       // A person's role on the bot is on their contact row (the bot's people), the same words as a circle's roster.
       writes: { scope: 'device' },
       // `<naam> coordinator|member|observer`
@@ -142,6 +144,8 @@ export const assistantManifest = {
       id:     'assistant-cohort',
       verb:   'open-cohort',
       visibility: 'trusted',
+      // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
+      stepUp: 'private-door',
       writes: { scope: 'device' },
       // `<people> <days>` — a new cohort; the one before stops admitting
       params: [{ name: 'spec', kind: 'string', required: false }],
@@ -151,6 +155,8 @@ export const assistantManifest = {
       id:     'assistant-invite',
       verb:   'invite',
       visibility: 'trusted',
+      // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
+      stepUp: 'private-door',
       // a code is minted, not stored — but the cohort's state is this device's
       writes: { scope: 'device' },
       params: [],
@@ -160,6 +166,8 @@ export const assistantManifest = {
       id:     'assistant-rotate',
       verb:   'rotate',
       visibility: 'trusted',
+      // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
+      stepUp: 'private-door',
       writes: { scope: 'device' },
       params: [],
       surfaces: { slash: { command: '/rotate', body: 'none' } },
@@ -168,6 +176,8 @@ export const assistantManifest = {
       id:     'assistant-revoke',
       verb:   'revoke-user',
       visibility: 'trusted',
+      // from a screen: only after a yes in the admin's own private chat (who is in, and what they may do)
+      stepUp: 'private-door',
       // the person's contact row is hidden, which the book carries to the person's other devices
       writes: { scope: 'person' },
       params: [{ name: 'who', kind: 'string', required: true }],
@@ -223,6 +233,16 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       params: [{ name: 'answer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/koppelen', body: 'argline' } },
+    },
+    {
+      // The admin's yes (or no) to what a screen asked: counts from the private chat only (`/bevestig ja|nee`).
+      id:     'assistant-screen-approve',
+      verb:   'approve-screen',
+      visibility: 'trusted',
+      // the held request is this device's; what the yes runs writes as its own op declares
+      writes: { scope: 'device' },
+      params: [{ name: 'answer', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/bevestig', body: 'argline' } },
     },
     {
       // The person's own screens, and dropping one (`/schermen los 2`).

@@ -6,7 +6,7 @@
  *     reload finds the kept grant) — it is never logged;
  *   - the page says WHICH bot, and that this browser keeps the key (Telegram's own window forgets it);
  *   - NOTHING is sent until the person taps "Koppel dit scherm" — a preview service that opens the page sends nothing;
- *   - then the code, to compare with the one the bot shows in their private chat, and their yes there;
+ *   - then the code, which the person PICKS from three in their private chat with the bot;
  *   - then the ops this screen may do, for now as a plain list (painting them as forms comes next).
  */
 import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
@@ -37,7 +37,8 @@ export async function startScreenShell(win = window) {
   const say = (...nodes) => root.replaceChildren(el('h1', {}, t('circle.connectScreen.title')), ...nodes);
 
   if (!link.ok) { say(el('p', { 'data-screen': 'invalid' }, t('circle.connectScreen.not_a_link'))); return; }
-  const bot = link.botName ?? `${link.botAddress.slice(0, 10)}…`;
+  // the name is the link's own claim (unauthenticated): the address's first characters stand beside it
+  const bot = link.botName ? `${link.botName} (${link.botAddress.slice(0, 8)}…)` : `${link.botAddress.slice(0, 10)}…`;
 
   const showOps = () => {
     const rows = view.ops().map((op) => {
@@ -66,7 +67,9 @@ export async function startScreenShell(win = window) {
       await view.granted();
       showOps();
     } catch (e) {
-      say(el('p', { 'data-screen': 'failed' }, t('circle.connectScreen.failed', { reason: String(e?.message ?? e) })));
+      const why = e?.message === 'refused' ? 'refused' : (e?.message === 'timed-out' ? 'timed_out' : null);
+      say(why ? el('p', { 'data-screen': why }, t(`circle.connectScreen.${why}`))
+        : el('p', { 'data-screen': 'failed' }, t('circle.connectScreen.failed', { reason: String(e?.message ?? e) })));
     }
   } }, t('circle.connectScreen.connect'));
   say(el('p', {}, t('circle.connectScreen.which_bot', { bot })), el('p', {}, t('circle.connectScreen.own_browser')), tap);

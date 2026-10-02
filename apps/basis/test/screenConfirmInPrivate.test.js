@@ -1,8 +1,8 @@
 /**
  * A screen's offer is granted only after the person says yes in their own PRIVATE chat, to the code their screen shows.
  * Through the real Telegram runner and the bot's door call: the question arrives in Ann's private chat with the code and
- * Ja / Nee buttons; a `/koppelen ja` typed in a group is not accepted (nothing granted, the offer still waits); the same
- * yes in her private chat grants. The link that started it went out without a link preview.
+ * three code buttons and "geen"; the right code typed in a group is not accepted (nothing granted, the offer still waits); the same
+ * code in her private chat grants. The link that started it went out without a link preview.
  */
 import { describe, it, expect } from 'vitest';
 import { InMemoryBridge } from '@onderling/chat-agent';
@@ -31,7 +31,7 @@ describe('the screen confirm, in the private chat only', () => {
       threads, isAdmitted: async () => true, columnOf: async () => ['lists.addToList'],
       grant: async (g) => { grants.push(g); return { ok: true }; }, revokeView: async () => true, listGrants: async () => [],
       sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs, noPreview: true }),
-      ask: (person, { code }) => reach.sendToPerson(person, { text: t('circle.bot.screen_confirm_question', { code }), buttons: [{ id: '/koppelen ja', label: 'ja' }, { id: '/koppelen nee', label: 'nee' }] }),
+      ask: (person, { codes }) => reach.sendToPerson(person, { text: t('circle.bot.screen_confirm_question'), buttons: [...codes.map((c) => ({ id: `/koppelen ${c}`, label: c })), { id: '/koppelen geen', label: 'geen' }] }),
       where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: null }),
     });
     const { catalogue, manifestsByOrigin } = composeAssistantCatalogue({ apps: ['lists'], slim: true });
@@ -58,15 +58,18 @@ describe('the screen confirm, in the private chat only', () => {
     expect(r).toMatchObject({ ok: true, pending: true });
     const question = sent.at(-1);
     expect(String(question.chatId)).toBe('42');
-    expect(question.text).toContain(await screenCode('VIEW', nonce));
-    expect((question.buttons ?? []).map((b) => b.id)).toEqual(['/koppelen ja', '/koppelen nee']);
+    const code = await screenCode('VIEW', nonce);
+    const ids = (question.buttons ?? []).map((b) => b.id);
+    expect(ids).toHaveLength(4);
+    expect(ids).toContain(`/koppelen ${code}`);
+    expect(ids.at(-1)).toBe('/koppelen geen');
     expect(grants).toEqual([]);
 
     // a yes typed in a group: not accepted, nothing granted, the offer still waits
-    expect(await say(GROUP, '/koppelen ja')).toContain('screen_confirm_not_private');
+    expect(await say(GROUP, `/koppelen ${code}`)).toContain('screen_confirm_not_private');
     expect(grants).toEqual([]);
     // the yes in her private chat: granted
-    expect(await say('42', '/koppelen ja')).toContain('screen_confirmed');
+    expect(await say('42', `/koppelen ${code}`)).toContain('screen_confirmed');
     expect(grants).toHaveLength(1);
     expect(grants[0]).toMatchObject({ viewPubKey: 'VIEW', actingAs: ANN });
   });

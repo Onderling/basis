@@ -29,9 +29,10 @@ const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
 /** Ann answers the bot's "a screen wants to connect — code X" with yes, in her own door (the inbox is private). */
 const answerYes = async (ann, peerAddr, code, said) => {
-  const asked = await until(async () => ((await said()).some((t) => t.includes(code)) ? true : null), { timeout: 30_000, step: 500 });
+  // the question arrives (its buttons carry the codes; the inbox shows the words), then she picks the one her screen shows
+  const asked = await until(async () => ((await said()).some((t) => /koppelen|connect/i.test(t)) ? true : null), { timeout: 30_000, step: 500 });
   if (!asked) return false;
-  await ann.contactThreadChannel.sendTurn({ peerAddr, threadId: peerAddr, text: '/koppelen ja' }).sent;
+  await ann.contactThreadChannel.sendTurn({ peerAddr, threadId: peerAddr, text: `/koppelen ${code}` }).sent;
   return true;
 };
 const botSaid = async (node) => (await node.contactThreadChannel.rehydrateAll()).filter((t) => t.origin === 'bot').map((t) => t.text);

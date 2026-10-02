@@ -4331,10 +4331,8 @@
     "value_hide": "hide",
     "value_delete": "delete",
     "value_own": "their own",
-    "screen_confirm_question": "A screen wants to connect as you — code {{code}}. Does that match the code on that screen? Only if you just did this yourself: tap Yes (or answer /koppelen ja).",
+    "screen_confirm_question": "A screen wants to connect as you. Which code does that screen show? Tap that code. If you do not see it, or did not do this yourself: tap \"None of these\".",
     "screen_confirm_replaced": "An earlier request to connect has lapsed.",
-    "screen_confirm_yes": "Yes, connect",
-    "screen_confirm_no": "No",
     "screen_confirm_remembered": "I asked you whether a screen may connect.",
     "screen_confirmed": "Connected.",
     "screen_declined": "Not connected.",
@@ -4342,7 +4340,8 @@
     "screen_confirm_expired": "This request has lapsed. Ask for a new link: /scherm.",
     "screen_confirm_nothing": "No request to connect is waiting.",
     "screen_confirm_failed": "Connecting did not work. Ask for a new link: /scherm.",
-    "screen_confirm_usage": "Answer with /koppelen ja or /koppelen nee."
+    "screen_confirm_usage": "Answer with the screen's code, for example /koppelen 4F7K, or /koppelen geen.",
+    "screen_confirm_none": "None of these"
   },
   "op": {
     "not_in_this_circle": {
@@ -7304,10 +7303,12 @@
     "own_browser": "Open this in your own browser (Chrome, Firefox, Safari), not in Telegram's window: the screen remembers nothing there. This screen's key stays in this browser.",
     "connect": "Connect this screen",
     "code": "Your code for {{bot}}:",
-    "waiting": "Look in your own chat with the bot: does it show the same code? Tap Yes there. This screen waits.",
+    "waiting": "Look in your own chat with the bot and tap this code there. This screen waits.",
     "connected": "Connected to {{bot}}. This screen can do this for you:",
     "run": "Do",
     "failed": "Connecting did not work: {{reason}}",
-    "not_a_link": "This link is not (or no longer) valid. Ask the bot for a new one: /scherm."
+    "not_a_link": "This link is not (or no longer) valid. Ask the bot for a new one: /scherm.",
+    "refused": "Not connected: another code, or \"none of these\", was picked in your chat with the bot. Ask for a new link: /scherm.",
+    "timed_out": "Not connected: no answer came within ten minutes. Ask for a new link: /scherm."
   }
 }

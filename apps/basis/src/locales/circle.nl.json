@@ -4331,10 +4331,8 @@
     "value_hide": "verbergen",
     "value_delete": "weggooien",
     "value_own": "je eigen",
-    "screen_confirm_question": "Een scherm wil koppelen als jou — code {{code}}. Klopt dat met de code op dat scherm? Alleen als je dit net zelf deed: tik Ja (of antwoord /koppelen ja).",
+    "screen_confirm_question": "Een scherm wil koppelen als jou. Welke code staat op dat scherm? Tik die code. Zie je hem niet, of deed je dit niet zelf: tik \"Geen van deze\".",
     "screen_confirm_replaced": "Een eerder koppelverzoek is daarmee vervallen.",
-    "screen_confirm_yes": "Ja, koppelen",
-    "screen_confirm_no": "Nee",
     "screen_confirm_remembered": "Ik vroeg je of een scherm mocht koppelen.",
     "screen_confirmed": "Gekoppeld.",
     "screen_declined": "Niet gekoppeld.",
@@ -4342,7 +4340,8 @@
     "screen_confirm_expired": "Dit koppelverzoek is verlopen. Vraag een nieuwe link: /scherm.",
     "screen_confirm_nothing": "Er wacht geen koppelverzoek.",
     "screen_confirm_failed": "Koppelen lukte niet. Vraag een nieuwe link: /scherm.",
-    "screen_confirm_usage": "Antwoord met /koppelen ja of /koppelen nee."
+    "screen_confirm_usage": "Antwoord met de code van het scherm, bijvoorbeeld /koppelen 4F7K, of /koppelen geen.",
+    "screen_confirm_none": "Geen van deze"
   },
   "op": {
     "not_in_this_circle": {
@@ -7304,10 +7303,12 @@
     "own_browser": "Open dit in je eigen browser (Chrome, Firefox, Safari), niet in het venster van Telegram: daar onthoudt het scherm niets. De sleutel van dit scherm blijft in deze browser.",
     "connect": "Koppel dit scherm",
     "code": "Je code voor {{bot}}:",
-    "waiting": "Kijk in je eigen gesprek met de bot: staat daar dezelfde code? Tik daar op Ja. Dit scherm wacht.",
+    "waiting": "Kijk in je eigen gesprek met de bot en tik daar deze code aan. Dit scherm wacht.",
     "connected": "Gekoppeld aan {{bot}}. Dit kan dit scherm voor je doen:",
     "run": "Doen",
     "failed": "Koppelen lukte niet: {{reason}}",
-    "not_a_link": "Deze link is niet (meer) geldig. Vraag de bot een nieuwe: /scherm."
+    "not_a_link": "Deze link is niet (meer) geldig. Vraag de bot een nieuwe: /scherm.",
+    "refused": "Niet gekoppeld: in je gesprek met de bot is een andere code of \"geen van deze\" gekozen. Vraag een nieuwe link: /scherm.",
+    "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm."
   }
 }

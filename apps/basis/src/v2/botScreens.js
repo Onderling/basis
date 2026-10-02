@@ -8,8 +8,9 @@
  * same as a typed line). `/schermen` lists the person's screens and drops one; revoking the person drops them all.
  *
  * Holding the link is not enough: an offer is never granted on arrival. The person is asked, in their own PRIVATE chat,
- * whether a screen showing a short code (a fingerprint of the screen's key and the link's nonce, which the screen shows
- * too) may connect as them — Ja / Nee. Only a yes from that private door grants; no answer within ten minutes drops
+ * to PICK the code their screen shows (a fingerprint of the screen's key and the link's nonce) from three, or "none of
+ * these". Only the real code, from that private door, grants — a bare yes does not, so a link someone else used first
+ * yields a code the person cannot find on their own screen; no answer within ten minutes drops
  * the offer; a second offer drops the first, and the person is told. A stolen or planted link yields a question the
  * person did not expect, with a code they cannot see on any screen of theirs.
  *
@@ -35,6 +36,21 @@ const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O, 1/I/L: rea
  * The code a person compares between their chat and the screen: a short fingerprint of the screen's key and the link's
  * nonce. Both sides compute it from what they hold; neither sends it.
  */
+/** Two other codes beside the real one, the three shuffled: the person must PICK the code their screen shows. */
+export function codeChoices(real, rand = Math.random) {
+  const pick = () => Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)]).join('');
+  const set = new Set([real]);
+  for (let tries = 0; set.size < 3 && tries < 50; tries++) set.add(pick());
+  // a random source that keeps repeating itself still yields three distinct codes (and never loops)
+  for (let i = 0; set.size < 3; i++) set.add([...real].map((ch, k) => CODE_ALPHABET[(CODE_ALPHABET.indexOf(ch) + i + 1 + k) % CODE_ALPHABET.length]).join(''));
+  const out = [...set];
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+
+/** A screen's label is someone else's text: one line, 40 characters at most. */
+export const screenLabel = (label) => String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40) || null;
+
 export async function screenCode(viewPubKey, nonce) {
   const hex = await sha256Hex(`${viewPubKey}|${nonce}`);
   let out = '';
@@ -70,12 +86,13 @@ export function parseScreenLink(link) {
  * @param {(viewPubKey: string) => Promise<boolean>} a.revokeView
  * @param {() => Promise<Array<{viewPubKey: string, label: string|null, ops: string[], actingAs?: string}>>} a.listGrants
  * @param {(person: string, key: string, params?: object) => Promise<void>|void} [a.notify]  a line in the person's chat
- * @param {(person: string, q: {code: string, replaced: boolean}) => Promise<{ok: boolean}>} a.ask  the yes/no question,
- *   to the person's PRIVATE door, with the code
+ * @param {(person: string, q: {codes: string[], replaced: boolean}) => Promise<{ok: boolean}>} a.ask  the question, to
+ *   the person's PRIVATE door: three codes (the real one and two others) to pick from, and "none of these"
+ * @param {(viewPubKey: string) => Promise<void>|void} [a.tellRefused]  tells the screen its offer was not taken
  * @param {() => {appUrl: string|null, botAddress: string|null, relayUrl: string|null}} a.where
  * @param {() => number} [a.now]
  */
-export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, sendPrivately, where, now = Date.now }) {
+export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
 
   return {
@@ -112,10 +129,11 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (!pending || pending.until < now()) return { ok: false, reason: 'expired' };
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
       if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
-      const replaced = Boolean(threads.screenOfferOf(person));   // a second offer drops the first
+      const previous = threads.screenOfferOf(person);   // a second offer drops the first, and its screen is told
+      if (previous) { try { await tellRefused?.(previous.viewPubKey); } catch { /* the screen times out on its own */ } }
       const code = await screenCode(viewPubKey, nonce);
-      threads.setScreenOffer(person, { viewPubKey, nonce, label: label || 'scherm', until: now() + SCREEN_LINK_TTL_MS });
-      const asked = await ask(person, { code, replaced });
+      threads.setScreenOffer(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm', until: now() + SCREEN_LINK_TTL_MS });
+      const asked = await ask(person, { codes: codeChoices(code, rand), replaced: Boolean(previous) });
       if (!asked?.ok) { threads.setScreenOffer(person, null); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
       return { ok: true, pending: true, person, code };
     },
@@ -129,8 +147,11 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (!offer) return { ok: false, reason: 'nothing-pending' };
       if (!isPrivate) return { ok: false, reason: 'not-private' };
       threads.setScreenOffer(person, null);   // answered (or late): the offer is gone either way
-      if (offer.until < now()) return { ok: false, reason: 'expired' };
-      if (answer !== 'yes') return { ok: true, declined: true };
+      const refuse = async () => { try { await tellRefused?.(offer.viewPubKey); } catch { /* the screen times out on its own */ } };
+      if (offer.until < now()) { await refuse(); return { ok: false, reason: 'expired' }; }
+      // only the code the screen shows grants: a wrong code, "none of these", or a bare yes drops the offer
+      const real = await screenCode(offer.viewPubKey, offer.nonce);
+      if (String(answer ?? '').trim().toUpperCase() !== real) { await refuse(); return { ok: true, declined: true }; }
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
       const ops = await columnOf(person);
       if (!ops.length) return { ok: false, reason: 'nothing-to-grant' };

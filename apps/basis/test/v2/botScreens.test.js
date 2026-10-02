@@ -4,7 +4,7 @@
  * lists and drops them; revoking the person drops them all.
  */
 import { describe, it, expect } from 'vitest';
-import { createBotScreens, parseScreenLink, screenCode, SCREEN_LINK_TTL_MS } from '../../src/v2/botScreens.js';
+import { createBotScreens, parseScreenLink, screenCode, codeChoices, screenLabel, SCREEN_LINK_TTL_MS } from '../../src/v2/botScreens.js';
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
@@ -35,8 +35,9 @@ function setup() {
 const linkText = (link, minutes) => `link ${link} (${minutes} min)`;
 const start = async (ctx, person = 'telegram:1') => { const r = await ctx.screens.start(person, linkText); return r.ok ? ctx.privately.at(-1).text : null; };
 const connect = async (ctx, v, person = 'telegram:1') => {
-  await ctx.screens.offer({ from: v, viewPubKey: v, nonce: nonceOf(await start(ctx, person)) });
-  return ctx.screens.confirm(person, 'yes', { isPrivate: true });
+  const nonce = nonceOf(await start(ctx, person));
+  await ctx.screens.offer({ from: v, viewPubKey: v, nonce });
+  return ctx.screens.confirm(person, await screenCode(v, nonce), { isPrivate: true });
 };
 const nonceOf = (text) => parseScreenLink(/https?:\/\/\S+/.exec(text)[0]).nonce;
 
@@ -79,8 +80,10 @@ describe('a person connects a screen to the bot', () => {
     const offered = await screens.offer({ from: 'VIEW1', viewPubKey: 'VIEW1', nonce: n });
     expect(offered).toMatchObject({ ok: true, pending: true, person: 'telegram:1', code: await screenCode('VIEW1', n) });
     expect(grants, 'nothing is granted before the person says yes').toEqual([]);
-    expect(ctx.asked).toEqual([{ person: 'telegram:1', code: offered.code, replaced: false }]);
-    const ok = await screens.confirm('telegram:1', 'yes', { isPrivate: true });
+    expect(ctx.asked).toHaveLength(1);
+    expect(ctx.asked[0].codes).toHaveLength(3);
+    expect(ctx.asked[0].codes).toContain(offered.code);
+    const ok = await screens.confirm('telegram:1', offered.code, { isPrivate: true });
     expect(ok).toMatchObject({ ok: true, person: 'telegram:1' });
     expect(grants[0]).toMatchObject({ viewPubKey: 'VIEW1', actingAs: 'telegram:1', ops: ['lists.addToList', 'assistant.assistant-overview'], nonce: n });
     expect(told).toEqual([{ person: 'telegram:1', key: 'circle.bot.screen_connected', params: { n: 2 } }]);
@@ -114,27 +117,38 @@ describe('a person connects a screen to the bot', () => {
     expect(grants.map((g) => g.viewPubKey)).toEqual(['OTHERS']);
   });
 
-  it('the confirm: no yes, no grant; a yes from a group is not accepted; no; ten minutes; a second offer drops the first', async () => {
+  it('the confirm: only the code the screen shows grants; a wrong code, "geen" or a bare yes drop the offer; a group, ten minutes, a second offer', async () => {
     const ctx = setup();
-    const offerFor = async (v) => ctx.screens.offer({ from: v, viewPubKey: v, nonce: nonceOf(await start(ctx)) });
-    await offerFor('A');
-    expect(ctx.grants, 'a valid nonce and no yes: nothing on the lane').toEqual([]);
-    expect(await ctx.screens.confirm('telegram:1', 'yes', { isPrivate: false })).toMatchObject({ ok: false, reason: 'not-private' });
-    expect(ctx.grants, 'a yes from a group is not accepted').toEqual([]);
-    expect(ctx.threads.screenOfferOf('telegram:1'), 'the offer still waits for the private yes').toBeTruthy();
-    // a second offer while one waits: the first is dropped, and the person is told
-    await offerFor('B');
+    const offerFor = async (v) => { const nonce = nonceOf(await start(ctx)); await ctx.screens.offer({ from: v, viewPubKey: v, nonce }); return screenCode(v, nonce); };
+    let code = await offerFor('A');
+    expect(ctx.grants, 'a valid nonce and no answer: nothing on the lane').toEqual([]);
+    expect(await ctx.screens.confirm('telegram:1', code, { isPrivate: false })).toMatchObject({ ok: false, reason: 'not-private' });
+    expect(ctx.threads.screenOfferOf('telegram:1'), 'a group answer does not spend the offer').toBeTruthy();
+    // a wrong code, "geen", and a bare yes: nothing granted, the offer dropped
+    for (const wrong of ['ZZZZ', 'geen', 'ja']) {
+      code = await offerFor('W');
+      expect(await ctx.screens.confirm('telegram:1', wrong, { isPrivate: true }), wrong).toMatchObject({ ok: true, declined: true });
+      expect(ctx.threads.screenOfferOf('telegram:1')).toBeNull();
+    }
+    expect(ctx.grants).toEqual([]);
+    // a second offer while one waits: the first is dropped, the person told
+    await offerFor('B1');
+    const codeB = await offerFor('B');
     expect(ctx.asked.at(-1)).toMatchObject({ replaced: true });
-    expect((await ctx.screens.confirm('telegram:1', 'yes', { isPrivate: true })).ok).toBe(true);
+    expect((await ctx.screens.confirm('telegram:1', codeB, { isPrivate: true })).ok).toBe(true);
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['B']);
-    // no: nothing; and too late: nothing
-    await offerFor('C');
-    expect(await ctx.screens.confirm('telegram:1', 'no', { isPrivate: true })).toMatchObject({ ok: true, declined: true });
-    await offerFor('D');
+    // too late
+    const codeD = await offerFor('D');
     ctx.tick(SCREEN_LINK_TTL_MS + 1);
-    expect(await ctx.screens.confirm('telegram:1', 'yes', { isPrivate: true })).toMatchObject({ ok: false, reason: 'expired' });
+    expect(await ctx.screens.confirm('telegram:1', codeD, { isPrivate: true })).toMatchObject({ ok: false, reason: 'expired' });
     expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['B']);
-    expect(await ctx.screens.confirm('telegram:1', 'yes', { isPrivate: true })).toMatchObject({ ok: false, reason: 'nothing-pending' });
+  });
+
+  it('three codes to pick from, the real one among them; a label is one line of 40 characters', () => {
+    const c = codeChoices('4F7K', () => 0.42);
+    expect(new Set(c).size).toBe(3);
+    expect(c).toContain('4F7K');
+    expect(screenLabel('a\nvery   long\tlabel that goes on and on past forty characters for sure')).toMatch(/^[^\n]{1,40}$/);
   });
 
   it('the code is what both sides compute: four letters, the same for the same key and nonce, different otherwise', async () => {

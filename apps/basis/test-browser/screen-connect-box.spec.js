@@ -71,8 +71,8 @@ test('the screen in a browser: the link read and hidden, the tap, the code, the 
     await expect(codeEl).toBeVisible({ timeout: 30_000 });
     const code = await codeEl.getAttribute('data-code');
     expect(code).toMatch(/^[A-HJKMNP-Z2-9]{4}$/);
-    expect(await until(async () => ((await said()).some((x) => x.includes(code)) ? true : null), { timeout: 30_000, step: 500 }), 'the same code reached her chat').toBe(true);
-    await send('/koppelen ja');
+    expect(await until(async () => ((await said()).some((x) => /koppelen|connect/i.test(x)) ? true : null), { timeout: 30_000, step: 500 }), 'the question reached her chat').toBe(true);
+    await send(`/koppelen ${code}`);   // she picks the code her screen shows
 
     // ── connected: the ops, and one run from the page ──
     await expect(page.locator('[data-screen="connected"]')).toBeVisible({ timeout: 30_000 });

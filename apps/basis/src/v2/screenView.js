@@ -17,10 +17,12 @@
  */
 import { DataPart } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
-import { parseScreenLink, screenCode } from './botScreens.js';
+import { parseScreenLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
 
 /** The peer-message subtype a screen's offer travels as (the bot's router takes it). */
 export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
+/** What the bot tells a screen whose offer was not taken (a wrong code, "none of these", too late, replaced). */
+export const SCREEN_REFUSED_SUBTYPE = 'screen-offer-refused';
 
 const storeKey = (botAddress) => `onderling.screen.${botAddress}`;
 
@@ -56,7 +58,9 @@ export function createScreenView({ link, makeAgent, storage }) {
   let sa = null;
   let granted = null;          // { tokens, label, botAddress }
   let resolveGrant = null;
-  const grantArrived = new Promise((resolve) => { resolveGrant = resolve; });
+  let rejectGrant = null;
+  const grantArrived = new Promise((resolve, reject) => { resolveGrant = resolve; rejectGrant = reject; });
+  grantArrived.catch(() => { /* a refusal nobody awaits yet is not an unhandled rejection */ });
 
   return {
     /** What the link says (bot address, relay): `{ok, botAddress, relayUrl}` or `{ok: false, reason}`. No secret in it. */
@@ -76,7 +80,11 @@ export function createScreenView({ link, makeAgent, storage }) {
       const viewPubKey = sa.agent.pubKey;
       await sa.relay.connect({
         relayUrl: parsed.relayUrl,
-        onPeerMessage: ({ payload } = {}) => {
+        onPeerMessage: ({ from, payload } = {}) => {
+          // only the bot this screen offered to speaks for it: a grant- or refusal-shaped message from any other key is
+          // not this pairing's (its tokens would fail at the door — confusion, not access — but it would look connected)
+          if (from !== parsed.botAddress) return;
+          if (payload?.subtype === SCREEN_REFUSED_SUBTYPE) { rejectGrant(new Error('refused')); return; }
           if (payload?.subtype !== CONNECTION_GRANT_SUBTYPE) return;
           const r = acceptConnectionGrant(payload, { nonce: parsed.nonce, viewPubKey });
           if (!r.ok) return;
@@ -101,8 +109,14 @@ export function createScreenView({ link, makeAgent, storage }) {
       return true;
     },
 
-    /** Resolves with the grant once the bot sent it (the person said yes). */
-    granted: () => grantArrived,
+    /**
+     * Resolves with the grant once the bot sent it (the person picked the right code); rejects with `refused` (the bot
+     * said it was not taken) or `timed-out` (nothing within the link's ten minutes) — never waits for ever.
+     */
+    granted: ({ timeoutMs = SCREEN_LINK_TTL_MS } = {}) => Promise.race([
+      grantArrived,
+      new Promise((_, reject) => { const h = setTimeout(() => reject(new Error('timed-out')), timeoutMs); h?.unref?.(); }),
+    ]),
 
     /** The ops this screen may call (`app.op`), from the grant. */
     ops: () => (granted?.tokens ?? []).map((t) => t.skill),

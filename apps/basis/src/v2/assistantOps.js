@@ -357,14 +357,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
   /**
-   * `/koppelen ja|nee`: the answer to a screen's offer. It counts only from the person's PRIVATE door: on Telegram the
+   * `/koppelen <code>` (or `/koppelen geen`): the answer to a screen's offer — the code the person picked. It counts only from the person's PRIVATE door: on Telegram the
    * chat whose id is their own (a group's is not), the inbox always.
    */
   async function screenConfirmOp(person, word, ctx) {
     if (!person || !admin.screens?.confirm) return { ok: false, error: 'unwired' };
     const tp = personT(person);
-    const w = String(word ?? '').trim().toLowerCase();
-    const answer = ['ja', 'yes', 'j', 'y'].includes(w) ? 'yes' : (['nee', 'no', 'n'].includes(w) ? 'no' : null);
+    // the code the person picked (or typed), or "none of these"; anything else drops the offer too
+    const answer = String(word ?? '').trim();
     if (!answer) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.screen_confirm_usage') } };
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     const isPrivate = Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));

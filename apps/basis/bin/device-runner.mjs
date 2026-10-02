@@ -65,13 +65,12 @@ import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
-import { reminderPromptLines } from '../src/v2/botReminders.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, REMINDER_LEAD_KEY, reminderLeadFrom } from '../src/v2/botSettings.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, promptLinesFor, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -892,7 +891,7 @@ if (tgToken || inboxDoor.bridge) {
     // own tools (a member's or the admin's), and the deterministic gate speaks the lists.
     ...(isFunctionProfile ? {
       // the model's lines and the gate's rules, generated from the template's lists (their names, their words)
-      promptLines: [...promptLinesFor(t), ...reminderPromptLines()],
+      promptLines: botPromptLines(t),
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
       scopeToRole: scopeCatalogueToRole,
       hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),

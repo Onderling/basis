@@ -74,6 +74,24 @@ export function parseScreenLink(link) {
 }
 
 /**
+ * The address a screen opens to make its OWN connect code (the paste route, `/koppel-scherm`): the bot's address, its
+ * relay and its name — no nonce, no secret. The screen makes a key and a nonce, shows its offer to copy and the code to
+ * pick, and the person pastes the offer into their own chat.
+ */
+export function encodeScreenStartLink(appUrl, { botAddress, relayUrl = null, botName = null }) {
+  const body = b64url(JSON.stringify({ v: 1, b: botAddress, ...(relayUrl ? { r: relayUrl } : {}), ...(botName ? { m: botName } : {}) }));
+  return `${String(appUrl).replace(/[#?].*$/, '').replace(/\/+$/, '')}/#scherm-nieuw=${body}`;
+}
+/** @returns {{ok: true, botAddress: string, relayUrl: string|null, botName: string|null}|{ok: false, reason: string}} */
+export function parseScreenStartLink(link) {
+  const m = /#scherm-nieuw=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
+  if (!m) return { ok: false, reason: 'not-a-start-link' };
+  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  if (d?.v !== 1 || typeof d.b !== 'string' || !d.b) return { ok: false, reason: 'incomplete' };
+  return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, botName: typeof d.m === 'string' && d.m ? d.m : null };
+}
+
+/**
  * @param {object} a
  * @param {object} a.threads  the bot's thread rows (`screenNonceOf` / `setScreenNonce` / `screenNonceOwner`)
  * @param {(person: string) => Promise<boolean>} a.isAdmitted  the person is in the book (not revoked)
@@ -95,6 +113,18 @@ export function parseScreenLink(link) {
 export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
 
+  /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
+  async function askAbout(person, { viewPubKey, nonce, label }) {
+    if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
+    const previous = threads.screenOfferOf(person);   // a second offer drops the first, and its screen is told
+    if (previous) { try { await tellRefused?.(previous.viewPubKey); } catch { /* the screen times out on its own */ } }
+    const code = await screenCode(viewPubKey, nonce);
+    threads.setScreenOffer(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm', until: now() + SCREEN_LINK_TTL_MS });
+    const asked = await ask(person, { codes: codeChoices(code, rand), replaced: Boolean(previous) });
+    if (!asked?.ok) { threads.setScreenOffer(person, null); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
+    return { ok: true, pending: true, person, code };
+  }
+
   return {
     /**
      * `/scherm`: a fresh one-time link for this person (the previous pending one stops working), sent to their PRIVATE
@@ -115,6 +145,29 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
     },
 
     /**
+     * The paste route (`/scherm` for the admin, by default): the person gets the address a screen opens to make its own
+     * connect code — no secret travels through the chat; the screen's offer comes back pasted (`/koppel-scherm`).
+     */
+    async startPaste(person, text) {
+      const { appUrl, botAddress, relayUrl, botName = null } = where() ?? {};
+      if (!appUrl || !botAddress) return { ok: false, reason: 'no-app-url' };
+      if (typeof sendPrivately !== 'function') return { ok: false, reason: 'no-private-door' };
+      const sent = await sendPrivately(person, text(encodeScreenStartLink(appUrl, { botAddress, relayUrl, botName })), null);
+      return sent?.ok ? { ok: true } : { ok: false, reason: sent?.reason ?? 'not-reachable' };
+    },
+
+    /**
+     * A screen's offer PASTED by the person into their own chat (`/koppel-scherm <offer>`). The person is the one who
+     * pasted it; a pasted offer can be planted ("paste this into your bot") as a link can be stolen — so nothing is
+     * granted here either: the same question, the code to pick from three.
+     */
+    async pasted(person, { viewPubKey, nonce, label = null }) {
+      if (typeof viewPubKey !== 'string' || !viewPubKey || typeof nonce !== 'string' || !nonce) return { ok: false, reason: 'not-an-offer' };
+      if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
+      return askAbout(person, { viewPubKey, nonce, label });
+    },
+
+    /**
      * A screen's offer arrived (over the relay, from `from`): the nonce names the person; one use, in time; the key
      * that sends the offer is the key it names. NOTHING is granted yet: the person is asked, privately, with the code.
      */
@@ -128,14 +181,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       threads.setScreenNonce(person, null);   // one use, whatever happens next
       if (!pending || pending.until < now()) return { ok: false, reason: 'expired' };
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
-      if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
-      const previous = threads.screenOfferOf(person);   // a second offer drops the first, and its screen is told
-      if (previous) { try { await tellRefused?.(previous.viewPubKey); } catch { /* the screen times out on its own */ } }
-      const code = await screenCode(viewPubKey, nonce);
-      threads.setScreenOffer(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm', until: now() + SCREEN_LINK_TTL_MS });
-      const asked = await ask(person, { codes: codeChoices(code, rand), replaced: Boolean(previous) });
-      if (!asked?.ok) { threads.setScreenOffer(person, null); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
-      return { ok: true, pending: true, person, code };
+      return askAbout(person, { viewPubKey, nonce, label });
     },
 
     /**

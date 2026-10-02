@@ -24,7 +24,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write',
   },
   operations: [
     {
@@ -198,8 +198,19 @@ export const assistantManifest = {
       verb:   'connect-screen',
       visibility: 'authenticated',
       writes: { scope: 'device' },
-      params: [],
-      surfaces: { slash: { command: '/scherm', body: 'none' } },
+      // the admin's default is the paste route (no secret in the chat); `/scherm link` asks for the one-time link
+      params: [{ name: 'how', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/scherm', body: 'argline' } },
+    },
+    {
+      // A screen's own connect code, pasted by the person into their own chat. Nothing is granted on the paste: the
+      // same question follows (the code to pick from three).
+      id:     'assistant-screen-paste',
+      verb:   'paste-screen',
+      visibility: 'authenticated',
+      writes: { scope: 'device' },
+      params: [{ name: 'offer', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/koppel-scherm', body: 'argline' } },
     },
     {
       // The person's answer to "a screen wants to connect as you — code 4F7K, is that the one you see?": counted only

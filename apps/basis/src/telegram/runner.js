@@ -55,7 +55,7 @@ const CONFIRM_NO  = '__confirm:no';
  *   the turn took (slash · tap · form · confirm · gate rule · llm · hint), what was dispatched, what went
  *   back, how long it took — so a walk can be read afterwards instead of retold. Chat ids are shortened.
  */
-export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null, basicHelpFor = null } = {}) {
+export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn, manifestsByOrigin: manifestsIn = {}, allowedChatIds = [], t, threadFor = (chatId) => `tg:${chatId}`, gate = null, interpret = null, llm = null, botName = 'assistant', walkLog = null, loadItems = null, engine: engineIn = null, lang = 'nl', collectMs, admit = null, threads = null, turnLogMode, promptLines = null, roleFor = null, scopeToRole = null, gateRules = null, hintsFor = null, expand = null, welcomeFor = null, basicHelpFor = null, helpLines = null } = {}) {
   if (!bridge || typeof bridge.onMessage !== 'function' || typeof bridge.sendReply !== 'function') throw new TypeError('createTelegramRunner: a MessagingBridge is required');
   if (typeof callSkill !== 'function') throw new TypeError('createTelegramRunner: callSkill is required');
   if (!catalogueIn) throw new TypeError('createTelegramRunner: a catalogue is required');
@@ -162,11 +162,14 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   function helpText(chatId, threadId) {
     const who = turns.get(chatId)?.caller ?? threadId;
     const scoped = typeof roleFor === 'function' && typeof scopeToRole === 'function' ? scopeToRole(catalogueOf(), roleFor(who)) : catalogueOf();
-    const lines = (scoped?.commandMenu ?? []).map((e) => {
-      const op = catalogueOf().opsById?.get?.(e.opId)?.op;
-      const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
-      return hint ? `${e.command} — ${hint}` : e.command;
-    });
+    // a door that words its own help (a household bot: the person's language, grouped, the admin's last); else the hints
+    const lines = typeof helpLines === 'function'
+      ? helpLines({ commandMenu: scoped?.commandMenu ?? [], opsById: catalogueOf().opsById, t: tc(chatId) })
+      : (scoped?.commandMenu ?? []).map((e) => {
+        const op = catalogueOf().opsById?.get?.(e.opId)?.op;
+        const hint = op?.surfaces?.chat?.hint ?? op?.description ?? '';
+        return hint ? `${e.command} — ${hint}` : e.command;
+      });
     // How to turn memory off, always; and, when turns are logged, that they are.
     const disclosure = doorDisclosure(turnLogMode, tc(chatId));
     return [...lines, '', tc(chatId)('circle.bot.help_memory'), ...(disclosure ? [disclosure] : [])].join('\n');
@@ -239,7 +242,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         const op = catalogueOf().opsById?.get?.(r.opId)?.op;
         const askName = p.kind === 'single' ? p.missingParam : p.fields[0].name;
         const enumP = (op?.params ?? []).find((q) => q?.name === askName && q.kind === 'enum' && Array.isArray(q.of));
-        const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: tc(chatId)(`circle.telegram.list_${v}`) })) : undefined;
+        const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: valueLabel(chatId, v) })) : undefined;
         return say(chatId, `${tc(chatId)('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`, buttons);
       }
       case 'needsConfirm': {
@@ -369,6 +372,30 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     threads.markGreeted(threadId);
   }
 
+  /**
+   * A declared value named for a person: a list type ("boodschappen"), a setting's value ("aan"), or the value itself —
+   * never a locale key.
+   */
+  function valueLabel(chatId, v) {
+    const tr = tc(chatId);
+    for (const key of [`circle.telegram.list_${v}`, `circle.bot.value_${v}`]) {
+      const s = tr(key);
+      if (typeof s === 'string' && s && s !== key) return s;
+    }
+    return String(v);
+  }
+
+  /** Does this line answer a waiting enum question: one of its values, or a value's name in the person's words? */
+  function answersEnum(chatId, p, text) {
+    const op = catalogueOf().opsById?.get?.(p.opId)?.op;
+    const param = (op?.params ?? []).find((q) => q?.name === p.missingParam);
+    if (!param || param.kind !== 'enum' || !Array.isArray(param.of)) return true;   // not an enum: any words answer it
+    const w = String(text ?? '').trim().toLowerCase();
+    if (param.of.some((v) => String(v).toLowerCase() === w || valueLabel(chatId, v).toLowerCase() === w)) return true;
+    const coerced = coerceEnums({ opId: p.opId, args: { [p.missingParam]: text } }).args?.[p.missingParam];
+    return param.of.includes(coerced);
+  }
+
   /** Continue a pending follow-up or confirmation with this line; false when nothing was pending. */
   async function continuePending(chatId, threadId, text) {
     const pend = pending.get(threadId);
@@ -380,6 +407,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       return true;
     }
     if (text.startsWith('/')) { pending.delete(threadId); return false; }   // a new command cancels the ask
+    // A question with set answers takes only one of them: anything else ("Halloo 🥬", a new request) drops the question
+    // and the line goes on as any other — it is never refused as a wrong answer to a question asked long ago.
+    if (pend.p.kind === 'single' && !answersEnum(chatId, pend.p, text)) { pending.delete(threadId); note(chatId, { via: 'form', dropped: true }); return false; }
     pending.delete(threadId); note(chatId, { via: 'form' });
     // The answer is typed the way people say it ("boodschappen"): an enum field takes its declared value.
     if (pend.p.kind === 'single') { await run(chatId, coerceEnums(completeFollowUp({ pending: pend.p, text }))); return true; }
@@ -413,7 +443,15 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
           displayName: msg?.sender?.displayName ?? null, text,
           ...(typeof msg?.admission === 'string' ? { admission: msg.admission } : {}),
         });
-      } catch { r = null; }
+      } catch (err) {
+        // A failing admission is SAID, never passed off as "I only understand commands": the reason on the console and
+        // in the walk log (never the person's id), and the person hears that letting them in went wrong.
+        const reason = err?.message ?? String(err);
+        console.warn(`telegram runner: admission failed (${reason})`);
+        if (typeof walkLog === 'function') { try { walkLog({ kind: 'admission-error', error: reason }); } catch { /* a log must never break a turn */ } }
+        await say(chatId, tc(chatId)('circle.bot.admission_failed'));
+        return;
+      }
       // Refused: the reason, and nothing else — never the chat's id.
       if (r && typeof r === 'object' && r.refused) {
         // A door that tells a stranger once (the bot's inbox): "you need a code" the first time, kept on their row, then

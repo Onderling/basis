@@ -175,9 +175,18 @@ function assemblePrompt({ stable, hints, context, now }) {
   const items = contextBlock(context);
   if (items) volatile.push(items);
   const at = typeof now === 'function' ? now() : Date.now();
-  // The date only: given a date, the model invented a clock time ("It's about 9:28 AM") — so it is told it has none.
-  volatile.push(`Today is ${new Date(at).toISOString().slice(0, 10)}. You do not know the current time.`);
+  // The real local date and time. (Given the date alone, the model once invented a clock time; and a UTC date was
+  // yesterday's between midnight and the UTC offset.) Local = the runtime's own clock: the box's TZ, the browser's.
+  volatile.push(`It is now ${localNow(at)} (local time).`);
   return `${stable}\n\n${TURN_MARKER}\n${volatile.join('\n\n')}`;
+}
+
+/** `2026-10-02 10:05, Friday` on the runtime's own clock. */
+export function localNow(at) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'long', hour12: false,
+  }).formatToParts(new Date(at)).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}, ${parts.weekday}`;
 }
 
 /** The retrieved items as a compact block, cut at `CONTEXT_MAX_CHARS` with a notice. Null without items. */

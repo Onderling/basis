@@ -7382,6 +7382,8 @@
     "timed_out": "Not connected: no answer came within ten minutes. Ask for a new link: /scherm.",
     "make_code": "Make a connect code",
     "paste_this": "Paste this into your own chat with the bot:",
-    "copy": "Copy"
+    "copy": "Copy",
+    "empty": "Nothing yet.",
+    "sure": "Are you sure?"
   }
 }

@@ -7,11 +7,15 @@
  *   - the page says WHICH bot, and that this browser keeps the key (Telegram's own window forgets it);
  *   - NOTHING is sent until the person taps "Koppel dit scherm" — a preview service that opens the page sends nothing;
  *   - then the code, which the person PICKS from three in their private chat with the bot;
- *   - then the ops this screen may do, for now as a plain list (painting them as forms comes next).
+ *   - then the ops this screen may do, grouped as `/help` groups them, each a button — a form when it has params, the
+ *     op's own confirm where it declares one (`src/v2/screenPaint.js`).
  */
 import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
 import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
+import { screenPanelsForGrant } from '../../src/v2/screenPaint.js';
+import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
+import { renderForm } from '../../src/web/domForm.js';
 
 const el = (tag, attrs = {}, ...kids) => {
   const n = document.createElement(tag);
@@ -42,18 +46,39 @@ export async function startScreenShell(win = window) {
   // the name is the link's own claim (unauthenticated): the address's first characters stand beside it
   const bot = link.botName ? `${link.botName} (${link.botAddress.slice(0, 8)}…)` : `${link.botAddress.slice(0, 10)}…`;
 
+  // what an op answered, in words: its message, or the entries it read, or a tick
+  const answerOf = (r) => {
+    if (r?.ok === false) return String(r?.error?.message ?? r?.error ?? '');
+    if (typeof r?.message === 'string' && r.message) return r.message;
+    const items = Array.isArray(r?.items) ? r.items : (Array.isArray(r?.entries) ? r.entries : null);
+    if (items) return items.length ? items.map((i, n) => `${n + 1}. ${i?.label ?? i?.text ?? i?.title ?? i?.name ?? ''}`).join('\n') : t('circle.connectScreen.empty');
+    return '✓';
+  };
+
   const showOps = () => {
     keepBotAddress();   // connected: a reload finds the kept grant
-    const rows = view.ops().map((op) => {
-      const out = el('span', { class: 'screen-result' });
-      const run = el('button', { type: 'button', 'data-op': op, onclick: async () => {
-        out.textContent = '…';
-        try { const r = await view.call(op, {}); out.textContent = r?.message ?? (r?.ok === false ? String(r?.error?.message ?? r?.error ?? '') : '✓'); } catch (e) { out.textContent = String(e?.message ?? e); }
-      } }, t('circle.connectScreen.run'));
-      return el('li', {}, el('code', {}, op), ' ', run, ' ', out);
-    });
-    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), el('ul', {}, ...rows));
+    const panels = screenPanelsForGrant(view.ops(), t);
+    const sections = panels.map((panel) => el('section', { 'data-section': panel.section },
+      el('h2', {}, panel.title),
+      ...panel.items.map((item) => {
+        const out = el('div', { class: 'screen-result', role: 'status' });
+        const area = el('div', { class: 'screen-form' });
+        const run = async (args) => {
+          // the op's own confirm, here: the surface asks (the waist does not)
+          if (item.confirm && !win.confirm(t(item.confirm.messageKey ?? '') || item.confirm.message || t('circle.connectScreen.sure'))) return;
+          out.textContent = '…';
+          try { out.textContent = answerOf(await view.call(item.skill, args)); } catch (e) { out.textContent = String(e?.message ?? e); }
+        };
+        const open = el('button', { type: 'button', 'data-op': item.skill, onclick: () => {
+          if (!item.needsForm) { run({}); return; }
+          const spec = buildFormSpec({ opParams: item.params, missing: item.params.filter((q) => q?.required).map((q) => q.name), prefilledArgs: {}, opId: item.opId, appOrigin: item.appOrigin });
+          area.replaceChildren(renderForm(spec, { doc: document, t, onSubmit: (values) => { area.replaceChildren(); run(values); }, onCancel: () => area.replaceChildren() }));
+        } }, item.label);
+        return el('div', { class: 'screen-op' }, open, area, out);
+      })));
+    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), ...sections);
   };
+
 
   // a later visit: the kept grant, back on the relay — no pairing
   if (link.resumeOnly) {

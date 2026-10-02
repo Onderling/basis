@@ -24,10 +24,11 @@ export const PRIVATEMODE_ENDPOINT = 'https://api.privatemode.ai';
 /**
  * Measured 2026-09-05 on a Dutch two-item request with native tool calling: kimi-k2.6 with thinking
  * OFF answered in 2.1 s with both items; gpt-oss-120b (low reasoning) in 0.8 s but dropped one item;
- * glm-5.3 returned nothing in 5.5 s. Kimi also leads the open models on the agentic indices. So the
- * default is Kimi with thinking off; `gpt-oss-120b` is the fast fallback.
+ * glm-5.3 returned nothing in 5.5 s. Kimi was the default until Privatemode retired it (2026-10-03: "404 model
+ * kimi-k2.6 not found"; the chat models served then: glm-5.3, glm-5.2, glm-5.3-flash, gpt-oss-120b). So the default
+ * is gpt-oss-120b, the one measured to answer — until the models served now are measured again.
  */
-export const PRIVATEMODE_DEFAULT_MODEL = 'kimi-k2.6';
+export const PRIVATEMODE_DEFAULT_MODEL = 'gpt-oss-120b';
 
 /**
  * Privatemode has no unified reasoning switch — it is per model family (`chat_template_kwargs` for

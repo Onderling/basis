@@ -4331,6 +4331,17 @@
     "value_hide": "verbergen",
     "value_delete": "weggooien",
     "value_own": "je eigen",
+    "screen_confirm_question": "Een scherm wil koppelen als jou. Welke code staat op dat scherm? Tik die code. Zie je hem niet, of deed je dit niet zelf: tik \"Geen van deze\".",
+    "screen_confirm_replaced": "Een eerder koppelverzoek is daarmee vervallen.",
+    "screen_confirm_remembered": "Ik vroeg je of een scherm mocht koppelen.",
+    "screen_confirmed": "Gekoppeld.",
+    "screen_declined": "Niet gekoppeld.",
+    "screen_confirm_not_private": "Bevestig dit in je eigen gesprek met mij, niet in een groep.",
+    "screen_confirm_expired": "Dit koppelverzoek is verlopen. Vraag een nieuwe link: /scherm.",
+    "screen_confirm_nothing": "Er wacht geen koppelverzoek.",
+    "screen_confirm_failed": "Koppelen lukte niet. Vraag een nieuwe link: /scherm.",
+    "screen_confirm_usage": "Antwoord met de code van het scherm, bijvoorbeeld /koppelen 4F7K, of /koppelen geen.",
+    "screen_confirm_none": "Geen van deze",
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
     "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00), {{lead}} minuten van tevoren, en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
@@ -4390,7 +4401,8 @@
           "assistant-status": "hoe de bot ervoor staat",
           "assistant-exports": "de nachtelijke exports",
           "assistant-export": "nu een export maken",
-          "assistant-import": "een export terugzetten"
+          "assistant-import": "een export terugzetten",
+          "assistant-screen-confirm": "de code van een scherm kiezen dat wil koppelen"
         }
       }
     },
@@ -7348,5 +7360,20 @@
       "text": "Dat kan hier niet.",
       "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
     }
+  },
+  "connectScreen": {
+    "title": "Scherm koppelen",
+    "label": "browser",
+    "which_bot": "Dit scherm koppelen aan {{bot}}.",
+    "own_browser": "Open dit in je eigen browser (Chrome, Firefox, Safari), niet in het venster van Telegram: daar onthoudt het scherm niets. De sleutel van dit scherm blijft in deze browser.",
+    "connect": "Koppel dit scherm",
+    "code": "Je code voor {{bot}}:",
+    "waiting": "Kijk in je eigen gesprek met de bot en tik daar deze code aan. Dit scherm wacht.",
+    "connected": "Gekoppeld aan {{bot}}. Dit kan dit scherm voor je doen:",
+    "run": "Doen",
+    "failed": "Koppelen lukte niet: {{reason}}",
+    "not_a_link": "Deze link is niet (meer) geldig. Vraag de bot een nieuwe: /scherm.",
+    "refused": "Niet gekoppeld: in je gesprek met de bot is een andere code of \"geen van deze\" gekozen. Vraag een nieuwe link: /scherm.",
+    "timed_out": "Niet gekoppeld: er kwam binnen tien minuten geen antwoord. Vraag een nieuwe link: /scherm."
   }
 }

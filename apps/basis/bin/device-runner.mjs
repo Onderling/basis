@@ -60,6 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
@@ -542,7 +543,7 @@ if (relayUrl) {
       // A roster owner says a row changed; the values are re-read, never carried on this wire.
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       // A screen a person asked to connect (`/scherm`) sends its offer; the door, once up, grants it.
-      'screen-offer': (from, payload) => screenOffer.handle?.(from, payload),
+      [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -811,7 +812,21 @@ if (tgToken || inboxDoor.bridge) {
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
-    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs }),
+    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs, noPreview: true }),
+    // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
+    // `/koppelen`, which counts only from this private door
+    ask: (person, { codes, replaced }) => {
+      const lang = threads.langOf(person) ?? undefined;
+      const tp = (k, p) => t(k, p, lang);
+      const text = [tp('circle.bot.screen_confirm_question'), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
+      // the person PICKS the code their screen shows; "none of these" when it is not there (or they did not ask)
+      return reach.sendToPerson(person, {
+        text, rememberAs: tp('circle.bot.screen_confirm_remembered'),
+        buttons: [...codes.map((c) => ({ id: `/koppelen ${c}`, label: c })), { id: '/koppelen geen', label: tp('circle.bot.screen_confirm_none') }],
+      });
+    },
+    // a screen whose offer was not taken is told, so it says so instead of waiting
+    tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
     grant: (g) => agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce }),
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
@@ -820,7 +835,7 @@ if (tgToken || inboxDoor.bridge) {
       const lang = threads.langOf(person);
       await reach.sendToPerson(person, { text: t(key, { ...params, days: Math.round(SURFACE_GRANT_TTL_MS / 86_400_000) }, lang ?? undefined) });
     },
-    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null }),
+    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
   }) : null;
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,

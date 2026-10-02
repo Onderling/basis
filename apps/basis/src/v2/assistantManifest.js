@@ -24,7 +24,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write',
   },
   operations: [
     {
@@ -200,6 +200,16 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       params: [],
       surfaces: { slash: { command: '/scherm', body: 'none' } },
+    },
+    {
+      // The person's answer to "a screen wants to connect as you — code 4F7K, is that the one you see?": counted only
+      // from their PRIVATE door (never a group). The buttons of that question send it; it can be typed too.
+      id:     'assistant-screen-confirm',
+      verb:   'confirm-screen',
+      visibility: 'authenticated',
+      writes: { scope: 'device' },
+      params: [{ name: 'answer', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/koppelen', body: 'argline' } },
     },
     {
       // The person's own screens, and dropping one (`/schermen los 2`).

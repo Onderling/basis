@@ -16,6 +16,7 @@ import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
 import { screenPanelsForGrant } from '../../src/v2/screenPaint.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
 import { renderForm } from '../../src/web/domForm.js';
+import { confirmApplies } from '../../src/confirmApplies.js';
 
 const el = (tag, attrs = {}, ...kids) => {
   const n = document.createElement(tag);
@@ -65,7 +66,7 @@ export async function startScreenShell(win = window) {
         const area = el('div', { class: 'screen-form' });
         const run = async (args) => {
           // the op's own confirm, here: the surface asks (the waist does not)
-          if (item.confirm && !win.confirm(t(item.confirm.messageKey ?? '') || item.confirm.message || t('circle.connectScreen.sure'))) return;
+          if (confirmApplies(item.confirm, args) && !win.confirm(t(item.confirm.messageKey ?? '') || item.confirm.message || t('circle.connectScreen.sure'))) return;
           out.textContent = '…';
           try { out.textContent = answerOf(await view.call(item.skill, args)); } catch (e) { out.textContent = String(e?.message ?? e); }
         };

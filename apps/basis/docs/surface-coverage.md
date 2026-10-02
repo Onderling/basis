@@ -270,7 +270,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-overview` | set-overview | ✅ | ✅ | · | · | · | · |  |
 |  | `assistant-language` | set-language | ✅ | ✅ | · | · | · | · |  |
 |  | `assistant-apps` | set-apps | · | ✅ | · | · | · | · |  |
-|  | `assistant-settings` | set-settings | · | ✅ | · | · | · | · |  |
+|  | `assistant-settings` | set-settings | · | ✅ | · | · | ✅ | · |  |
 |  | `assistant-role` | set-role | · | ✅ | · | · | · | · |  |
 |  | `assistant-status` | status | · | ✅ | · | · | · | · |  |
 |  | `assistant-users` | list-users | · | ✅ | · | · | · | · |  |
@@ -288,7 +288,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
 |  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 283 ops | | 239 | 152 | 33 | 5 | 151 | 72 | |
+| **totals** | 283 ops | | 239 | 152 | 33 | 5 | 152 | 72 | |
 
 ### Flows
 

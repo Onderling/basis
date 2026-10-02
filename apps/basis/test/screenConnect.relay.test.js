@@ -98,9 +98,11 @@ describe('a person connects a screen to the bot over the relay', () => {
     expect(skills).toContain('lists.addToList');
     expect(skills).toContain('assistant.assistant-overview');
     // Ann came in on the bootstrap code: she is the admin, and her screen gets the admin's lists column — but not the
-    // admin's own assistant ops (people, exports), nor what a screen never gets
+    // admin's assistant ops that admit, remove or change people (those wait for the chat yes), nor what a screen never gets
     expect(skills).toContain('lists.removeList');
-    for (const forbidden of ['assistant.assistant-screen', 'assistant.assistant-screens', 'assistant.assistant-import', 'assistant.assistant-export', 'assistant.assistant-users', 'assistant.assistant-role', 'assistant.assistant-revoke']) expect(skills).not.toContain(forbidden);
+    for (const forbidden of ['assistant.assistant-screen', 'assistant.assistant-screens', 'assistant.assistant-import', 'assistant.assistant-role', 'assistant.assistant-revoke', 'assistant.assistant-invite', 'assistant.assistant-apps']) expect(skills).not.toContain(forbidden);
+    // the admin's reads, settings and export now are on the admin's screen (Fable's list)
+    for (const allowed of ['assistant.assistant-users', 'assistant.assistant-export']) expect(skills).toContain(allowed);
     const actingAs = new Set(accepted.tokens.map((tk) => tk.constraints?.actingAs));
     expect(actingAs.size, 'every token acts as one person').toBe(1);
     expect([...actingAs][0]).not.toBe(link.botAddress);

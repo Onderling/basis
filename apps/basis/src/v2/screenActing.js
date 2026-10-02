@@ -12,11 +12,9 @@
 import { renderA2A } from '@onderling/app-manifest';
 import { scopeCatalogueToRole } from './botOpMap.js';
 
-/** The bot's ops a screen never reaches, whatever token it holds: reading a file back, or pairing more screens. */
+/** The bot's ops a screen never reaches, whatever token it holds: restoring an export, or pairing more screens. */
 export const BOT_SCREEN_NEVER = Object.freeze([
-  'assistant.assistant-import',
-  'assistant.assistant-export',
-  'assistant.assistant-exports',
+  'assistant.assistant-import',   // restoring writes the whole household and opens a sealed file: never on a screen
   'assistant.assistant-screen',
   'assistant.assistant-screens',
   'assistant.assistant-screen-confirm',

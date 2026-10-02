@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
-import { screenColumnFor, BOT_SCREEN_NEVER } from '../src/v2/screenActing.js';
+import { screenColumnFor, BOT_SCREEN_NEVER, SCREEN_ADMIN_OPS } from '../src/v2/screenActing.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 import { EventLog } from '../src/eventLog.js';
@@ -23,8 +23,11 @@ describe('the screen column', () => {
     expect(adminCol).toContain('lists.removeList');
     for (const col of [member, adminCol]) {
       for (const id of BOT_SCREEN_NEVER) expect(col).not.toContain(id);
-      expect(col.filter((id) => id.startsWith('assistant.') && ['users', 'role', 'cohort', 'invite', 'revoke', 'settings', 'apps', 'rotate', 'status'].some((w) => id.endsWith(`-${w}`)))).toEqual([]);
+      // what admits people, removes them or changes what they may do waits for the chat yes; /apps stays in the chat
+      expect(col.filter((id) => ['invite', 'cohort', 'role', 'revoke', 'rotate', 'apps', 'import'].some((w) => id === `assistant.assistant-${w}`))).toEqual([]);
     }
+    // the admin's screen: the reads, the household's settings and an export now (Fable's list); a member's: none of them
+    for (const id of SCREEN_ADMIN_OPS) { expect(adminCol).toContain(id); expect(member).not.toContain(id); }
     // no role (not in the book): nothing, never a default column
     expect(screenColumnFor(catalogue, null)).toEqual([]);
     const observer = screenColumnFor(catalogue, 'observer');

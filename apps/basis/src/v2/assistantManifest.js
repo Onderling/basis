@@ -111,7 +111,7 @@ export const assistantManifest = {
       params: [{ name: 'change', kind: 'string', required: false }],
       // Two changes ask first on a screen (they take something from everyone at once); the rest are shown at once
       // and undone the same way. The confirm is the surface's: it guards a slip, the waist decides as the admin.
-      surfaces: { slash: { command: '/huishouden', body: 'argline' }, ui: { confirm: { when: ['names none', 'reminders off'], messageKey: 'circle.bot.settings_confirm', message: 'This changes it for everyone. Sure?' } } },
+      surfaces: { slash: { command: '/huishouden', body: 'argline' }, ui: { confirm: { severity: 'warn', when: ['names none', 'reminders off'], messageKey: 'circle.bot.settings_confirm', message: 'This changes it for everyone. Sure?' } } },
     },
     {
       id:     'assistant-role',

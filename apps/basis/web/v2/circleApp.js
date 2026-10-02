@@ -18,6 +18,8 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { startScreenShell } from './screenShell.js';
+import { isScreenAddress } from '../../src/v2/screenView.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -8858,4 +8860,6 @@ async function boot() {
   showLauncher();
 }
 
-boot();
+// A `/scherm` link opens the web app as a SCREEN for a household bot (no account, no person's agent): the screen shell
+// instead of the app.
+if (isScreenAddress(window.location.hash)) startScreenShell(window); else boot();

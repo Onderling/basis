@@ -43,8 +43,8 @@ export async function screenCode(viewPubKey, nonce) {
 }
 
 /** The `/scherm` link's fragment: the bot's address, its relay and the nonce. No authority — a screen still needs the grant. */
-export function encodeScreenLink(appUrl, { botAddress, relayUrl = null, nonce }) {
-  const body = b64url(JSON.stringify({ v: 1, b: botAddress, ...(relayUrl ? { r: relayUrl } : {}), n: nonce }));
+export function encodeScreenLink(appUrl, { botAddress, relayUrl = null, nonce, botName = null }) {
+  const body = b64url(JSON.stringify({ v: 1, b: botAddress, ...(relayUrl ? { r: relayUrl } : {}), n: nonce, ...(botName ? { m: botName } : {}) }));
   return `${String(appUrl).replace(/[#?].*$/, '').replace(/\/+$/, '')}/#scherm=${body}`;
 }
 /** @returns {{ok: true, botAddress: string, relayUrl: string|null, nonce: string}|{ok: false, reason: string}} */
@@ -54,7 +54,7 @@ export function parseScreenLink(link) {
   let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1) return { ok: false, reason: 'wrong-version' };
   if (typeof d.b !== 'string' || !d.b || typeof d.n !== 'string' || !d.n) return { ok: false, reason: 'incomplete' };
-  return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, nonce: d.n };
+  return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, nonce: d.n, botName: typeof d.m === 'string' && d.m ? d.m : null };
 }
 
 /**
@@ -85,13 +85,13 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
      * what their thread keeps instead (never the link).
      */
     async start(person, text, remembered = null) {
-      const { appUrl, botAddress, relayUrl } = where() ?? {};
+      const { appUrl, botAddress, relayUrl, botName = null } = where() ?? {};
       if (!appUrl || !botAddress) return { ok: false, reason: 'no-app-url' };
       if (typeof sendPrivately !== 'function') return { ok: false, reason: 'no-private-door' };
       const nonce = randomNonce();
       const until = now() + SCREEN_LINK_TTL_MS;
       threads.setScreenNonce(person, { hash: await sha256Hex(nonce), until });
-      const link = encodeScreenLink(appUrl, { botAddress, relayUrl, nonce });
+      const link = encodeScreenLink(appUrl, { botAddress, relayUrl, nonce, botName });
       const sent = await sendPrivately(person, text(link, Math.round(SCREEN_LINK_TTL_MS / 60000)), remembered ?? '');
       if (!sent?.ok) { threads.setScreenNonce(person, null); return { ok: false, reason: sent?.reason ?? 'not-reachable' }; }
       return { ok: true, until };

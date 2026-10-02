@@ -7296,5 +7296,18 @@
       "text": "That cannot be done here.",
       "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
     }
+  },
+  "connectScreen": {
+    "title": "Connect a screen",
+    "label": "browser",
+    "which_bot": "Connect this screen to {{bot}}.",
+    "own_browser": "Open this in your own browser (Chrome, Firefox, Safari), not in Telegram's window: the screen remembers nothing there. This screen's key stays in this browser.",
+    "connect": "Connect this screen",
+    "code": "Your code for {{bot}}:",
+    "waiting": "Look in your own chat with the bot: does it show the same code? Tap Yes there. This screen waits.",
+    "connected": "Connected to {{bot}}. This screen can do this for you:",
+    "run": "Do",
+    "failed": "Connecting did not work: {{reason}}",
+    "not_a_link": "This link is not (or no longer) valid. Ask the bot for a new one: /scherm."
   }
 }

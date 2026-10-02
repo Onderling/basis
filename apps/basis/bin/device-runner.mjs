@@ -60,6 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { SCREEN_OFFER_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
@@ -540,7 +541,7 @@ if (relayUrl) {
       // A roster owner says a row changed; the values are re-read, never carried on this wire.
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       // A screen a person asked to connect (`/scherm`) sends its offer; the door, once up, grants it.
-      'screen-offer': (from, payload) => screenOffer.handle?.(from, payload),
+      [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -822,7 +823,7 @@ if (tgToken || inboxDoor.bridge) {
       const lang = threads.langOf(person);
       await reach.sendToPerson(person, { text: t(key, { ...params, days: Math.round(SURFACE_GRANT_TTL_MS / 86_400_000) }, lang ?? undefined) });
     },
-    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null }),
+    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
   }) : null;
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,

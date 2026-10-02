@@ -7296,5 +7296,18 @@
       "text": "Dat kan hier niet.",
       "doc": "A door's words for a refusal, by its code (the one refusal shape: {layer, code})."
     }
+  },
+  "connectScreen": {
+    "title": "Scherm koppelen",
+    "label": "browser",
+    "which_bot": "Dit scherm koppelen aan {{bot}}.",
+    "own_browser": "Open dit in je eigen browser (Chrome, Firefox, Safari), niet in het venster van Telegram: daar onthoudt het scherm niets. De sleutel van dit scherm blijft in deze browser.",
+    "connect": "Koppel dit scherm",
+    "code": "Je code voor {{bot}}:",
+    "waiting": "Kijk in je eigen gesprek met de bot: staat daar dezelfde code? Tik daar op Ja. Dit scherm wacht.",
+    "connected": "Gekoppeld aan {{bot}}. Dit kan dit scherm voor je doen:",
+    "run": "Doen",
+    "failed": "Koppelen lukte niet: {{reason}}",
+    "not_a_link": "Deze link is niet (meer) geldig. Vraag de bot een nieuwe: /scherm."
   }
 }

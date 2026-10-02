@@ -21,6 +21,9 @@ import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/co
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from '../src/v2/connectionPairing.js';
 import { parseScreenLink, screenCode } from '../src/v2/botScreens.js';
 import { DataPart } from '@onderling/core';
+import { VaultMemory } from '@onderling/vault';
+import { createSecureAgent } from '@onderling/secure-agent';
+import { createScreenView, screenAddressFor } from '../src/v2/screenView.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
@@ -157,5 +160,41 @@ describe('a person connects a screen to the bot over the relay', () => {
       const after = await call(view, 'lists.addToList', { list: 'Boodschappen', text: 'na-los' }).then((r) => JSON.stringify(r), (e) => `refused: ${e?.message}`);
       expect(after.includes('"ok":true'), `a dropped screen still acted: ${after}`).toBe(false);
     } finally { await teardown(view, thief); }
+  }, 180_000);
+
+  it('the screen as the browser runs it: nothing sent before the tap; the code; the yes; acting; a later visit resumes', async () => {
+    const card = cardFrom(out);
+    const send = (text) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text }).sent;
+    const seen = (await botSaid(ann)).length;
+    await send('/scherm');
+    const linkLine = await until(async () => (await botSaid(ann)).slice(seen).find((t) => t.includes('#scherm=')) ?? null, { timeout: 30_000, step: 500 });
+    const link = /https?:\/\/\S+/.exec(linkLine)[0];
+
+    // one browser's key, kept across visits (the vault the browser would keep)
+    const vault = new VaultMemory();
+    const agents = [];
+    const makeAgent = async () => { const a = await createSecureAgent({ vault, transportMode: 'relay', warnOnInsecure: false }); agents.push(a); return a; };
+    const storage = new Map();
+    const store = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) };
+    try {
+      const view = createScreenView({ link, makeAgent, storage: store });
+      expect(view.link).toMatchObject({ ok: true, botAddress: card.peerAddr });
+      expect(agents, 'opening the link makes no key and sends nothing').toHaveLength(0);
+      const before = (await botSaid(ann)).length;
+      const { code } = await view.connect({ label: 'browser' });
+      expect(code).toMatch(/^[A-HJKMNP-Z2-9]{4}$/);
+      // the person sees THE SAME code in their chat, and says yes
+      expect(await answerYes(ann, card.peerAddr, code, async () => (await botSaid(ann)).slice(before))).toBe(true);
+      await until(async () => (view.ops().length ? true : null), { timeout: 30_000, step: 300 });
+      await view.granted();
+      expect(view.ops()).toContain('lists.addToList');
+      const added = await view.call('lists.addToList', { list: 'Boodschappen', text: 'vanuit-het-scherm' });
+      expect(added, JSON.stringify(added)).toMatchObject({ ok: true });
+
+      // a later visit: the same browser's key and the kept grant — acting again without pairing
+      const again = createScreenView({ link: `https://basis.example/app/${screenAddressFor(card.peerAddr)}`, makeAgent, storage: store });
+      expect(await again.resume()).toBe(true);
+      expect(JSON.stringify(await again.call('lists.listEntries', { list: 'Boodschappen' }))).toContain('vanuit-het-scherm');
+    } finally { for (const a of agents) await a.stop?.().catch(() => {}); }
   }, 180_000);
 });

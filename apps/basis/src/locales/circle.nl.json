@@ -4058,11 +4058,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}}.",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00",
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|15|30|60",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
@@ -4341,7 +4341,71 @@
     "screen_confirm_nothing": "Er wacht geen koppelverzoek.",
     "screen_confirm_failed": "Koppelen lukte niet. Vraag een nieuwe link: /scherm.",
     "screen_confirm_usage": "Antwoord met de code van het scherm, bijvoorbeeld /koppelen 4F7K, of /koppelen geen.",
-    "screen_confirm_none": "Geen van deze"
+    "screen_confirm_none": "Geen van deze",
+    "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
+    "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00), {{lead}} minuten van tevoren, en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
+    "menu_lead": "Herinnering vooraf",
+    "value_lead_min": "{{n}} minuten",
+    "value_lead_off": "geen",
+    "help": {
+      "sections": {
+        "lists": "Lijsten",
+        "chores": "Klusjes",
+        "agenda": "Agenda",
+        "you": "Jij",
+        "admin": "Voor de beheerder"
+      },
+      "ops": {
+        "lists": {
+          "listLists": "welke lijsten er zijn",
+          "listEntries": "wat er op een lijst staat",
+          "addToList": "iets op een lijst zetten (of zeg: zet melk op de boodschappen)",
+          "markListItemDone": "iets afvinken (of zeg: melk is gekocht)",
+          "removeFromList": "iets van een lijst halen",
+          "editEntry": "de woorden van een regel veranderen",
+          "createList": "een nieuwe lijst",
+          "removeList": "een hele lijst weggooien"
+        },
+        "tasks": {
+          "listMine": "je eigen klusjes",
+          "claimTask": "een klusje oppakken (of zeg: ik doe de ramen)",
+          "completeTask": "een klusje afmelden (of zeg: ramen is klaar)",
+          "editTask": "een klusje aanpassen"
+        },
+        "calendar": {
+          "addEvent": "een afspraak zetten (of zeg: tandarts morgen om 10 uur)",
+          "listEvents": "de komende afspraken",
+          "rsvpAccept": "zeggen dat je komt",
+          "rsvpDecline": "zeggen dat je niet komt",
+          "rsvpTentative": "misschien komen",
+          "cancelEvent": "een afspraak afzeggen"
+        },
+        "assistant": {
+          "weekOverview": "jouw week: klusjes, afspraken, boodschappen",
+          "assistant-menu": "je instellingen, met knoppen",
+          "assistant-reminders": "herinneringen aan of uit",
+          "assistant-overview": "het zondagsoverzicht aan of uit",
+          "assistant-language": "de taal waarin ik je antwoord",
+          "assistant-memory": "hoeveel ik van ons gesprek onthoud",
+          "assistant-view": "knoppen, je scherm of woorden",
+          "assistant-screen": "een scherm koppelen",
+          "assistant-screens": "je gekoppelde schermen",
+          "assistant-settings": "instellingen voor het hele huishouden",
+          "assistant-users": "wie er in het huishouden zitten",
+          "assistant-role": "iemands rol veranderen",
+          "assistant-cohort": "een code voor meerdere mensen",
+          "assistant-invite": "een code voor één persoon",
+          "assistant-revoke": "iemand eruit halen",
+          "assistant-rotate": "de codes vervangen",
+          "assistant-apps": "welke apps de bot gebruikt",
+          "assistant-status": "hoe de bot ervoor staat",
+          "assistant-exports": "de nachtelijke exports",
+          "assistant-export": "nu een export maken",
+          "assistant-import": "een export terugzetten"
+        }
+      }
+    },
+    "admission_failed": "Het toelaten ging mis aan de kant van de bot. Probeer het over een paar minuten opnieuw; lukt het dan niet, vraag de beheerder."
   },
   "op": {
     "not_in_this_circle": {

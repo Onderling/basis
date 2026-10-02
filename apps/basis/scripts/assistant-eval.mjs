@@ -26,6 +26,7 @@ import { listsGateRules } from '../src/v2/circleGate.js';
 import { HOUSEHOLD_TEMPLATE, templateLists, promptLinesFor, expandAdds } from '../src/v2/householdTemplate.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
+import { reminderPromptLines } from '../src/v2/botReminders.js';   // the box adds these to the template's lines; so does the eval
 import { detectLang } from '../src/v2/assistantLanguage.js';
 
 const { values } = parseArgs({ options: {
@@ -81,7 +82,7 @@ for (const f of fixtures) {
   const engine = createAssistantEngine({
     // --door-lang puts EVERY fixture on one door (an English line on a Dutch door must still be answered in English)
     catalogue, lang: values['door-lang'] ?? f.lang ?? values.lang, llm: counted, interpret: interpretToCommand,
-    promptLines: promptLinesFor(tNl), gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
+    promptLines: [...promptLinesFor(tNl), ...reminderPromptLines()], gateRules: gateRulesFor(values['door-lang'] ?? f.lang ?? values.lang),
     // A one-line fixture does not wait for the collect window (its time is the model's); lines sent at once do.
     ...(f.lines ? {} : { collectMs: 0 }),
     // the bot's retrieval shape (`loadListItems`): an entry, with its list

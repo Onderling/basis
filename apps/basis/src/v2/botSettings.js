@@ -101,3 +101,12 @@ const QUIET_SHAPE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
 export const isQuietHours = (v) => QUIET_SHAPE.test(String(v ?? ''));
 export const quietHoursFrom = (v) => (isQuietHours(v) ? v : QUIET_DEFAULT);
 
+/**
+ * How many minutes before an appointment the short-notice reminder comes (on top of the evening before); 0 = none.
+ * The household's (`/huishouden lead 30`), the admin's; the tick runs every five minutes, so 30 means 30–25.
+ */
+export const REMINDER_LEAD_KEY = 'assistant.reminderLeadMin';
+export const REMINDER_LEAD_CHOICES = Object.freeze([0, 15, 30, 60]);
+export const REMINDER_LEAD_DEFAULT = param({ key: REMINDER_LEAD_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 30 });
+export const reminderLeadFrom = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 && n <= 240 ? n : REMINDER_LEAD_DEFAULT; };
+

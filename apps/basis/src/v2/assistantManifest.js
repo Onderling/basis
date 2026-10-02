@@ -34,7 +34,7 @@ export const assistantManifest = {
       verb:   'set-memory',
       // The thread row lives on the door's own device.
       writes: { scope: 'device' },
-      params: [{ name: 'mode', kind: 'enum', of: [...MEMORY_MODES], required: true }],
+      params: [{ name: 'mode', kind: 'enum', of: [...MEMORY_MODES], required: false }],
       surfaces: {
         slash: { command: '/geheugen', body: 'argline' },
         chat:  { reply: 'text', hint: 'How much of this conversation the assistant keeps: off (nothing), short (the last few turns), long.' },
@@ -57,7 +57,7 @@ export const assistantManifest = {
       verb:   'set-reminders',
       // a person's own switch for the reminders the bot writes first (only things they dated); on the thread row
       writes: { scope: 'device' },
-      params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: true }],
+      params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: false }],
       surfaces: {
         slash: { command: '/herinneringen', body: 'argline' },
         chat:  { reply: 'text', hint: 'Reminders on or off for this person (mode = on or off).' },
@@ -70,7 +70,7 @@ export const assistantManifest = {
       verb:   'set-overview',
       // a person's own switch for the weekly overview (off until they switch it on); on the thread row
       writes: { scope: 'device' },
-      params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: true }],
+      params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: false }],
       surfaces: {
         slash: { command: '/overzicht', body: 'argline' },
         chat:  { reply: 'text', hint: 'The weekly overview on or off for this person (mode = on or off).' },
@@ -83,7 +83,7 @@ export const assistantManifest = {
       group:  'settings',
       verb:   'set-language',
       writes: { scope: 'device' },
-      params: [{ name: 'lang', kind: 'enum', of: [...THREAD_LANGS, 'auto'], required: true }],
+      params: [{ name: 'lang', kind: 'enum', of: [...THREAD_LANGS, 'auto'], required: false }],
       surfaces: {
         slash: { command: '/taal', body: 'argline' },
         chat:  { reply: 'text', hint: 'The language the assistant replies in for this person; auto follows how they write.' },

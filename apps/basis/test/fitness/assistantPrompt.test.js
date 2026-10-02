@@ -57,7 +57,7 @@ describe('the assistant prompt — stable first, then what changes every turn', 
     const marker = at(system, TURN_MARKER);
     const rule = at(system, "Reply in the member's language");
     const language = at(system, 'The member wrote in: nl');
-    const date = at(system, /Today is \d{4}-\d{2}-\d{2}/);
+    const date = at(system, /It is now \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
     expect(rule).toBeLessThan(marker);
     expect(base).toBeLessThan(background);
     expect(background).toBeLessThan(marker);
@@ -75,8 +75,8 @@ describe('the assistant prompt — stable first, then what changes every turn', 
     const marker = at(system, TURN_MARKER);
     const language = at(system, 'The member wrote in: nl');
     const items = at(system, 'Relevant items already in this circle');
-    const date = at(system, 'Today is 2026-09-28');
-    expect(system).toContain('You do not know the current time.');   // a date alone made the model invent a clock time
+    const date = at(system, /It is now 2026-09-2[78] \d{2}:\d{2}, \w+day \(local time\)/);
+    // the real local time, not the date alone (given only a date, the model once invented a clock time)
     expect(marker).toBeLessThan(language);
     expect(language).toBeLessThan(items);
     expect(items).toBeLessThan(date);

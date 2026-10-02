@@ -2,7 +2,8 @@
  * CHORES ON THE REAL BOX: the box runner as a household bot (its own process, a real relay), Ann (its first person, so
  * its admin) and Bert (a member, on a code she made) in its inbox. Ann puts a chore on Klusjes; Bert claims it
  * by its words, finds it under his own chores (not Ann's), and completes it — each a typed command, as `/help` names
- * it. On a red, the box's turn log says which route each line took.
+ * it. The chores are the task verbs over the household circle's one store, not a separate tasks agent. On a red, the
+ * box's turn log says which route each line took.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';

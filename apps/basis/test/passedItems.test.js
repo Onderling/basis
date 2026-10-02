@@ -13,6 +13,7 @@ import { VaultNodeFs } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, vars) => NAMES[k] ?? (vars ? `${k} ${JSON.stringify(vars)}` : k);
 const local = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -34,7 +35,7 @@ describe('what is done or has passed', () => {
       chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') },
       seedDemoData: false, seedHousehold: false,
-      tasksCircleId: 'household', calendarInCircle: true, t,
+      ...HOUSEHOLD_BOT_STORE_OPTS, t,
     });
     const call = (a, o, x) => agent.callSkill(a, o, x);
     const set = (key, value) => call('params', 'set-param', { key, value });

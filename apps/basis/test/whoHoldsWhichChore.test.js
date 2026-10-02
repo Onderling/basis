@@ -8,6 +8,7 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { botOpLevel, botRoleAllows } from '../src/v2/botOpMap.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, p) => NAMES[k] ?? (p ? `${k} ${JSON.stringify(p)}` : k);
 
@@ -16,7 +17,7 @@ describe('who holds which chore', () => {
   afterAll(async () => { await agent?.stop?.().catch(() => {}); });
 
   it('the chores read names the holder, within the names setting', async () => {
-    agent = await createRealHouseholdAgent({ seedDemoData: false, seedHousehold: false, t, tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows });
+    agent = await createRealHouseholdAgent({ seedDemoData: false, seedHousehold: false, t, ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows });
     const own = (a, o, x, c) => agent.callSkill(a, o, x, c);
     await ensureHouseholdLists({ callSkill: (a, o, x) => own(a, o, x), t });
     for (const [w, n, r] of [['telegram:1', 'Ann', 'member'], ['telegram:2', 'Bert', 'member'], ['telegram:9', 'Frits', 'admin']]) {

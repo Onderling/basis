@@ -242,6 +242,7 @@ import { createLocalBuiltins }             from '../localBuiltins.js';          
 import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
+import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
@@ -3993,6 +3994,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
   let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  let circleTasks = null;      // the bot's chores over the circle store, made on first use
   /**
    * A chores read for a door's person: each chore's holder, named when the household's names setting lets this person
    * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
@@ -4273,6 +4275,20 @@ export async function createRealHouseholdAgent(opts = {}) {
         return {
           items: hits.map((t) => ({ id: t.id, label: t.text ?? t.title, type: 'task' })),
         };
+      }
+      // A household bot (`opts.tasksInCircle`): the chores are the task noun's verbs over the circle's ONE store, beside
+      // the lists and the calendar — not the separate tasks agent, its op aliases and arg shims. The bot's key is the
+      // authority (the door's role gate ran first); the person a call is for is who the chore records.
+      if (opts.tasksInCircle && TASKS_IN_CIRCLE_OPS.includes(opId)) {
+        const ops = (circleTasks ??= makeTasksOps({
+          storeFor: (circleId) => householdService.stores.getStore(circleId),
+          activeCircle: () => resolveCircleId({}),
+          hostActor: chatId.pubKey,
+          rolePolicy: buildStandardRolePolicy({ [chatId.pubKey]: 'admin' }),
+        }));
+        await ensureCircleSync(resolveCircleId(args ?? {}));
+        const data = await ops[opId](args ?? {});
+        return adaptTasksReply(opId, data, { actor: args?.actor ?? null, named: namedTask, args: args ?? {} });
       }
       const realOpId = TASKS_OP_ALIAS[opId] ?? opId;
       // Per-op arg normalisation between the chat-shell vocabulary

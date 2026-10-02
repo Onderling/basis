@@ -16,6 +16,7 @@ import { VaultNodeFs } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k) => NAMES[k] ?? k;
 
@@ -32,7 +33,7 @@ describe('calendar on the household bot', () => {
       chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') },
       seedDemoData: false, seedHousehold: false,
-      ...(bot ? { tasksCircleId: 'household', calendarInCircle: true } : {}),
+      ...(bot ? { ...HOUSEHOLD_BOT_STORE_OPTS } : {}),
     });
     const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 

@@ -24,9 +24,22 @@ export const BOT_SCREEN_NEVER = Object.freeze([
 ]);
 
 /**
+ * The admin's own assistant ops a screen may have (Fable's list, the setup brief §19): the reads, the household's
+ * settings and an export now. What admits people, removes them or changes what they may do (invite, cohort, role,
+ * revoke, rotate) comes with a yes in the admin's own chat, enforced at the waist; `/apps` stays in the chat.
+ */
+export const SCREEN_ADMIN_OPS = Object.freeze([
+  'assistant.assistant-status',
+  'assistant.assistant-users',
+  'assistant.assistant-exports',
+  'assistant.assistant-settings',
+  'assistant.assistant-export',
+]);
+
+/**
  * The ops a person's screen is granted: their ROLE COLUMN as the door composes it (`scopeCatalogueToRole` over the
  * door's catalogue — the same ops their typed line reaches), as skill ids (`app.op`), without what a screen never gets
- * and without the admin's own assistant ops (managing people and exports comes with its own step).
+ * and of the admin's own assistant ops only `SCREEN_ADMIN_OPS`.
  * @param {object} catalogue  the door's merged catalogue
  * @param {string|null} role  the person's role on the bot
  * @returns {string[]}
@@ -40,7 +53,7 @@ export function screenColumnFor(catalogue, role) {
     const id = `${entry?.appOrigin}.${entry?.op?.id}`;
     if (!entry?.appOrigin || !entry?.op?.id || out.includes(id)) continue;
     if (BOT_SCREEN_NEVER.includes(id)) continue;
-    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted') continue;
+    if (entry.appOrigin === 'assistant' && entry.op.visibility === 'trusted' && !SCREEN_ADMIN_OPS.includes(id)) continue;
     out.push(id);
   }
   return out;

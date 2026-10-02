@@ -4410,7 +4410,8 @@
     "admission_failed": "Het toelaten ging mis aan de kant van de bot. Probeer het over een paar minuten opnieuw; lukt het dan niet, vraag de beheerder.",
     "screen_paste_link": "Open dit op het scherm dat je wilt koppelen (in je eigen browser): {{link}}\nTik daar op \"Maak een koppelcode\" en plak die code hier: /koppel-scherm <code>. Er gaat zo geen geheim door dit gesprek.",
     "screen_paste_usage": "Plak de koppelcode van het scherm: /koppel-scherm onderling-connect://…",
-    "screen_paste_asked": "Ontvangen. Ik vraag je nu welke code er op dat scherm staat."
+    "screen_paste_asked": "Ontvangen. Ik vraag je nu welke code er op dat scherm staat.",
+    "settings_confirm": "Dit verandert het voor iedereen in huis. Weet je het zeker?"
   },
   "op": {
     "not_in_this_circle": {

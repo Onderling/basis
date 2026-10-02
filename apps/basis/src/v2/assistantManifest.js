@@ -109,7 +109,9 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       // `assign self|anyone|role` · `roles admin,member` · nothing (the settings as they stand)
       params: [{ name: 'change', kind: 'string', required: false }],
-      surfaces: { slash: { command: '/huishouden', body: 'argline' } },
+      // Two changes ask first on a screen (they take something from everyone at once); the rest are shown at once
+      // and undone the same way. The confirm is the surface's: it guards a slip, the waist decides as the admin.
+      surfaces: { slash: { command: '/huishouden', body: 'argline' }, ui: { confirm: { when: ['names none', 'reminders off'], messageKey: 'circle.bot.settings_confirm', message: 'This changes it for everyone. Sure?' } } },
     },
     {
       id:     'assistant-role',

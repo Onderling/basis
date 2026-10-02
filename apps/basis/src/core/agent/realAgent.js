@@ -77,7 +77,7 @@ const CATCHUP_REPLY_SUBTYPES = new Set([
   CHAT_CATCHUP_SUBTYPES.offer,
   KEY_CATCHUP_SUBTYPES.batch,
 ]);
-import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
+import { createSurfaceGrants, compileReadFilter, ownGrantsAllowList } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
 // The grants LANE (V1 closing wave row 1): grant/revoke statements ride the device log between the
 // owner's own devices; the registry above is a projection of this lane.
 import {
@@ -825,16 +825,10 @@ export async function createRealHouseholdAgent(opts = {}) {
           async (tokenId) => (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false),
         ]),
         // A token issued by THIS agent's own key is honoured only while its id is ACTIVE on the grants lane, for the
-        // same subject — statements count there only from this person's enrolled, unrevoked devices. Keyed on the
-        // ISSUER, which a forger cannot choose: never on a field of the token (its `role`, its skill), which whoever
-        // signs it writes. So a token signed off the record with this key (a revoked device keeps it) is refused,
-        // whatever it says it is. Tokens from other issuers are judged as before (they need a trusted issuer).
-        isAllowed: async (token) => {
-          const ownKey = secureAgentRef.current?.agent?.identity?.pubKey ?? null;
-          if (!ownKey || token?.issuer !== ownKey) return true;
-          const entry = surfaceGrants?.activeEntryOf?.(token.id) ?? null;
-          return Boolean(entry && entry.viewPubKey === token.subject);
-        },
+        // same subject — statements count there only from this person's enrolled, unrevoked devices — so a token
+        // signed off the record with this key (a revoked device keeps it) is refused, whatever it says it is. Before
+        // the agent's own key is set, nothing is allowed (the gate cannot tell).
+        isAllowed: ownGrantsAllowList(() => secureAgentRef.current?.agent?.identity?.pubKey ?? null, () => surfaceGrants),
       },
     }),
   });

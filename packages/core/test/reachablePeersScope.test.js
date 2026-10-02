@@ -145,3 +145,16 @@ describe('the answer is scoped PER CALLER', () => {
     await agent.stop();
   });
 });
+
+describe('the per-caller cache is bounded', () => {
+  it('beyond maxCachedCallers the oldest caller\'s claim is dropped (re-signed when it asks again)', async () => {
+    const agent = await makeAgent();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    registerReachablePeersSkill(agent, { maxCachedCallers: 2 });
+    const a1 = await askAs(agent, 'pk-a');
+    expect((await askAs(agent, 'pk-a')).body.s).toBe(a1.body.s);   // cached
+    await askAs(agent, 'pk-b');
+    await askAs(agent, 'pk-c');                                        // pk-a is the oldest: dropped
+    expect((await askAs(agent, 'pk-a')).body.s).not.toBe(a1.body.s);  // re-signed
+  });
+});

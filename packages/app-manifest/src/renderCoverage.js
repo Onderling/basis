@@ -16,6 +16,7 @@
 //   inline — surfaces.ui.control === 'button'  (the inline button/menu affordance)
 
 import { CREATIVE_VERBS } from './renderWeb.js';
+import { gateVerbsOf } from './gateVerbs.js';
 
 const SURFACES = [
   { key: 'chat',   label: 'chat',       detect: (s)     => !!s.chat },
@@ -51,8 +52,7 @@ export function renderCoverage(manifestOrList) {
       if (s.internal === true) continue;
       const row = { app, op: op.id, verb: op.verb ?? '' };
       for (const surf of SURFACES) row[surf.key] = !!surf.detect(s, op);
-      const verbs = s.slash && s.slash.match && Array.isArray(s.slash.match.verbs) ? s.slash.match.verbs : [];
-      row.gateVerbs = verbs.map((v) => (Array.isArray(v) ? v.join(' ') : String(v)));
+      row.gateVerbs = (s.slash && s.slash.match ? gateVerbsOf(m, op) : []).map((v) => v.join(' '));
       rows.push(row);
     }
   }

@@ -16,7 +16,7 @@ import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 
 let lists;
 beforeAll(async () => { await initLocalisation({ lng: 'nl' }); lists = templateLists(t); });
-const all = new Set(['addToList', 'listEntries', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'weekOverview', 'assistant-reminders', 'assistant-overview']);
+const all = new Set(['addToList', 'listEntries', 'removeFromList', 'claimTask', 'completeTask', 'listMine', 'addEvent', 'listEvents', 'weekOverview', 'assistant-reminders', 'assistant-overview']);
 
 describe('the welcome, derived', () => {
   it('a member: the lists by name, chores, the Agenda, the week, and reminders on with the quiet hours and the switches', () => {
@@ -28,13 +28,13 @@ describe('the welcome, derived', () => {
     expect(text).toContain('21:00');
     expect(text).toContain('/herinneringen uit');
     expect(text).toContain('/overzicht aan');
-    expect(text).not.toContain('/instellingen');
+    expect(text).not.toContain('/huishouden');
     expect(text).not.toMatch(/circle\.bot\./);   // every key has its words
   });
 
   it('the admin also hears where the household\'s settings are; reminders off says so', () => {
     const text = welcomeLines({ ops: all, lists, role: 'admin', settings: { reminders: 'off', quiet: '21:00-08:00' }, t }).join('\n');
-    expect(text).toContain('/instellingen');
+    expect(text).toContain('/huishouden');
     expect(text).not.toContain('21:00');
     expect(text).not.toContain('/herinneringen uit');
     // the weekly overview is its own line, offered whether the household's reminders are on or off

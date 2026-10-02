@@ -1,0 +1,100 @@
+{
+  "tasks.addTask": {
+    "doc": "Add a task; the rest of the line is its text.",
+    "verbs": [
+      "voeg",
+      "zet",
+      "maak taak",
+      "nieuwe taak"
+    ],
+    "dropTrailing": [
+      "aan",
+      "op",
+      "toe"
+    ],
+    "examples": [
+      "nieuwe taak hek verven",
+      "zet planten water geven op"
+    ]
+  },
+  "tasks.claimTask": {
+    "doc": "Take on a task (by its id or its words).",
+    "verbs": [
+      "pak",
+      "neem",
+      "ik pak",
+      "ik doe",
+      "ik neem"
+    ],
+    "examples": [
+      "ik doe de afwas",
+      "pak hek"
+    ],
+    "not": [
+      "ik doe"
+    ]
+  },
+  "tasks.confirmClaim": {
+    "doc": "Confirm someone's pending claim on a task.",
+    "verbs": [
+      "bevestig",
+      "keur",
+      "keur goed",
+      "ken toe"
+    ],
+    "examples": [
+      "bevestig hek"
+    ]
+  },
+  "tasks.completeTask": {
+    "doc": "Mark a task done.",
+    "verbs": [
+      "klaar met",
+      "klaar",
+      "voltooid",
+      "gedaan"
+    ],
+    "examples": [
+      "klaar met de afwas",
+      "gedaan hek"
+    ],
+    "not": [
+      "klaar"
+    ]
+  },
+  "tasks.submitTask": {
+    "doc": "Hand in a task you did, for approval.",
+    "verbs": [
+      "indienen",
+      "inleveren",
+      "ter review"
+    ],
+    "examples": [
+      "inleveren hek"
+    ]
+  },
+  "tasks.approveTask": {
+    "doc": "Approve a task that was handed in.",
+    "verbs": [
+      "goedkeuren",
+      "akkoord"
+    ],
+    "examples": [
+      "akkoord hek"
+    ],
+    "not": [
+      "akkoord"
+    ]
+  },
+  "tasks.rejectTask": {
+    "doc": "Send back a task that was handed in.",
+    "verbs": [
+      "afkeuren",
+      "afwijzen",
+      "weiger"
+    ],
+    "examples": [
+      "afkeuren hek"
+    ]
+  }
+}

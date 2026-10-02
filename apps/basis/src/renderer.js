@@ -262,7 +262,8 @@ export function renderReply(reply, opts = {}) {
     // pills: `[{label, slash}, ...]`.  Pure pass-through; DOM + RN
     // adapters render the pill row + tapping dispatches the slash
     // through the same path Enter-submitted text uses.
-    quickReplies: normalizeQuickReplies(reply.quickReplies, { t }),
+    // …or on the op's own answer (a settings menu: one button per value, each its op's own slash)
+    quickReplies: normalizeQuickReplies(reply.quickReplies ?? reply.payload?.quickReplies, { t }),
     // v0.6 — sync-hint suffix from the reply's _sync envelope.
     // Empty string when 'central' or absent; DOM adapter omits the
     // sub-line entirely in that case.

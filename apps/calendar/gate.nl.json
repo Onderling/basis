@@ -1,0 +1,84 @@
+{
+  "calendar.addEvent": {
+    "doc": "Make an appointment; the rest of the line is its title (the form asks for the day and time).",
+    "verbs": [
+      "afspraak",
+      "plan",
+      "zet afspraak",
+      "nieuwe afspraak"
+    ],
+    "examples": [
+      "nieuwe afspraak tandarts",
+      "plan kapper",
+      "nieuwe afspraak tandarts met Bert"
+    ],
+    "not": [
+      "wat staat er in de agenda"
+    ],
+    "dropTrailing": [
+      "op",
+      "met"
+    ]
+  },
+  "calendar.rsvpAccept": {
+    "doc": "Accept an invitation.",
+    "verbs": [
+      "accepteer",
+      "ja"
+    ],
+    "examples": [
+      "accepteer tandarts"
+    ],
+    "not": [
+      "ik kom niet tandarts",
+      "ja",
+      "ja!"
+    ]
+  },
+  "calendar.rsvpDecline": {
+    "doc": "Decline an invitation.",
+    "verbs": [
+      "wijs af",
+      "nee",
+      "ik kom niet"
+    ],
+    "examples": [
+      "ik kom niet tandarts",
+      "wijs af kapper"
+    ],
+    "not": [
+      "accepteer tandarts",
+      "nee",
+      "nee."
+    ]
+  },
+  "calendar.rsvpTentative": {
+    "doc": "Accept an invitation tentatively.",
+    "verbs": [
+      "misschien",
+      "onder voorbehoud"
+    ],
+    "examples": [
+      "misschien tandarts"
+    ],
+    "not": [
+      "accepteer tandarts",
+      "misschien"
+    ]
+  },
+  "calendar.cancelEvent": {
+    "doc": "Cancel an appointment.",
+    "verbs": [
+      "annuleer afspraak",
+      "annuleer",
+      "zeg af"
+    ],
+    "examples": [
+      "annuleer afspraak tandarts",
+      "zeg af kapper"
+    ],
+    "not": [
+      "misschien tandarts"
+    ]
+  }
+}

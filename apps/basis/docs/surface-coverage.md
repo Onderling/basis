@@ -34,9 +34,9 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `test-peer` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `signout` | remove | · | ✅ | · | · | · | · |  |
 | **tasks** | `addTask` | add | ✅ | ✅ | ✅ | ✅ | ✅ | · | add, todo, new task, voeg, zet, maak taak, nieuwe taak |
-|  | `claimTask` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | claim, pak, neem, i'll take, i'll do, ik pak, ik doe, ik neem |
+|  | `claimTask` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | claim, i'll take, i'll do, pak, neem, ik pak, ik doe, ik neem |
 |  | `confirmClaim` | confirm | ✅ | ✅ | ✅ | · | ✅ | ✅ | confirm, bevestig, keur, keur goed, ken toe |
-|  | `completeTask` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | klaar met, done with, done, complete, completed, finished, klaar, voltooid, gedaan |
+|  | `completeTask` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | done with, done, complete, completed, finished, klaar met, klaar, voltooid, gedaan |
 |  | `removeTask` | remove | ✅ | · | · | · | · | · |  |
 |  | `attachTaskGrant` | update | ✅ | · | · | · | ✅ | · |  |
 |  | `reassignTask` | reassign | ✅ | · | · | · | · | · |  |
@@ -87,7 +87,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `removeItem` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | remove, delete, cancel, nope, verwijder, weg |
 |  | `help` | help | ✅ | ✅ | ✅ | · | · | · | help, hulp |
 |  | `addTask` | add | ✅ | ✅ | ✅ | · | ✅ | · | task, taak |
-|  | `listTasks` | list | ✅ | ✅ | ✅ | · | · | · | tasks, tasks |
+|  | `listTasks` | list | ✅ | ✅ | ✅ | · | · | · | tasks, taken |
 |  | `claim` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | grab, oppakken |
 |  | `reassign` | reassign | ✅ | · | · | · | · | · |  |
 |  | `registerName` | register | ✅ | ✅ | ✅ | · | ✅ | · | register, registreer, naam |
@@ -112,8 +112,8 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `respondToItem` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | help with, respond to, offer, ik help, help met, reageer op, bied hulp |
 |  | `cancelRequest` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | withdraw, intrekken, annuleer |
 |  | `assignLend` | reassign | ✅ | ✅ | · | · | · | · |  |
-|  | `markReturned` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | returned, teruggebracht, terug, mark returned |
-|  | `reportPost` | report | ✅ | ✅ | ✅ | · | ✅ | ✅ | report, rapporteer, flag |
+|  | `markReturned` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | returned, mark returned, teruggebracht, terug |
+|  | `reportPost` | report | ✅ | ✅ | ✅ | · | ✅ | ✅ | report, flag, rapporteer |
 |  | `setMyOfferings` | set | ✅ | ✅ | · | · | · | · |  |
 |  | `setPeerReveal` | set | ✅ | ✅ | · | · | · | · |  |
 |  | `leaveGroup` | remove | ✅ | ✅ | · | · | · | · |  |
@@ -212,10 +212,10 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `readNote` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `shareFolder` | add | ✅ | ✅ | ✅ | · | ✅ | · | share, deel |
 |  | `downloadFile` | list | ✅ | · | ✅ | · | ✅ | ✅ | download, haal, haal op, download bestand |
-|  | `saveToMyPod` | add | ✅ | · | ✅ | · | ✅ | ✅ | save, bewaar, save to my pod, opslaan, bewaar in mijn pod |
+|  | `saveToMyPod` | add | ✅ | · | ✅ | · | ✅ | ✅ | save, save to my pod, bewaar, opslaan, bewaar in mijn pod |
 |  | `folioStatus` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `listFiles` | list | ✅ | ✅ | · | · | · | · |  |
-|  | `searchNotes` | list | ✅ | ✅ | ✅ | · | · | · | zoek, zoeken, search, find |
+|  | `searchNotes` | list | ✅ | ✅ | ✅ | · | · | · | search, find, zoek, zoeken |
 | **calendar** | `addEvent` | add | ✅ | ✅ | ✅ | · | ✅ | · | schedule, add event, new event, add appointment, new appointment, afspraak, plan, zet afspraak, nieuwe afspraak |
 |  | `listEvents` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `rsvpAccept` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | accept, accept invite, yes, accepteer, ja |
@@ -278,11 +278,15 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-invite` | invite | · | ✅ | · | · | · | · |  |
 |  | `assistant-rotate` | rotate | · | ✅ | · | · | · | · |  |
 |  | `assistant-revoke` | revoke-user | · | ✅ | · | · | · | · |  |
+|  | `assistant-menu` | show-settings | · | ✅ | · | · | · | · |  |
+|  | `assistant-view` | set-view | · | ✅ | · | · | · | · |  |
+|  | `assistant-screen` | connect-screen | · | ✅ | · | · | · | · |  |
+|  | `assistant-screens` | manage-screens | · | ✅ | · | · | · | · |  |
 |  | `assistant-exports` | list-exports | · | ✅ | · | · | · | · |  |
 |  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
 |  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 277 ops | | 239 | 146 | 33 | 5 | 151 | 72 | |
+| **totals** | 281 ops | | 239 | 150 | 33 | 5 | 151 | 72 | |
 
 ### Flows
 
@@ -297,6 +301,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (244/277): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:revokeTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks …
-- **missing inline** (205/277): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:addTask, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks, tasks:listMyPendingClaims …
-- **missing chat** (38/277): basis:signin, basis:signout, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch, assistant:assistant-apps, assistant:assistant-settings, assistant:assistant-role, assistant:assistant-status, assistant:assistant-users, assistant:assistant-cohort, assistant:assistant-invite, assistant:assistant-rotate, assistant:assistant-revoke, assistant:assistant-exports, assistant:assistant-export, assistant:assistant-import
+- **missing gate** (248/281): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:revokeTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks …
+- **missing inline** (209/281): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, tasks:addTask, tasks:removeTask, tasks:attachTaskGrant, tasks:reassignTask, tasks:listOpen, tasks:listMine, tasks:listClaimable, tasks:listClaimConflicts, tasks:resolveClaim, tasks:listAwaitingApproval, tasks:listMyMasteredTasks, tasks:listMyPendingClaims …
+- **missing chat** (42/281): basis:signin, basis:signout, household:revokeDevice, household:listRecoveryCircles, household:exportRecoveryFile, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch, assistant:assistant-apps, assistant:assistant-settings, assistant:assistant-role, assistant:assistant-status, assistant:assistant-users, assistant:assistant-cohort, assistant:assistant-invite, assistant:assistant-rotate, assistant:assistant-revoke, assistant:assistant-menu, assistant:assistant-view, assistant:assistant-screen, assistant:assistant-screens, assistant:assistant-exports …

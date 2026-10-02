@@ -68,9 +68,15 @@
  * hints + label resolution.
  */
 
+// The words the deterministic gate starts an op with, per language (the manifest declares the match's shape; the
+// words are data beside it — see `gateVerbsOf` in @onderling/app-manifest).
+import gateEn from './gate.en.json' with { type: 'json' };
+import gateNl from './gate.nl.json' with { type: 'json' };
+
 /** @type {import('@onderling/app-manifest').__types__} */
 export const folioManifest = {
   app:       'folio',
+  gateWords:  { en: gateEn, nl: gateNl },
   // The network hosts this app's code reaches. None: whatever it syncs goes through the person's own
   // pod and relay, which they configure — not a fixed host.
   hosts:     [],
@@ -196,7 +202,7 @@ export const folioManifest = {
         // Part C gate — no-arg action (sidecar only; runtime:'node'
         // filters it from the browser bundle).
         slash: { command: '/sync',
-          match: { verbs: ['sync', 'synchroniseer', 'synchroniseren'], body: 'none' } },
+          match: { body: 'none' } },
         chat: { reply: 'text', hint: 'force a one-shot sync (sidecar only)' },
         ui: {
           control:   'button', labelKey: 'circle.button.folio.syncOnce',
@@ -217,7 +223,7 @@ export const folioManifest = {
       surfaces: {
         // Part G merge (2026-06-11): real ui + mock chat-shell slash/gate.
         slash: { command: '/watch',
-          match: { verbs: ['watch', ['watch', 'folder'], ['let', 'op'], 'bewaak', ['bewaak', 'map']], body: 'none' } },
+          match: { body: 'none' } },
         chat: { reply: 'text', hint: 'start the folder watcher (sidecar only)' },
         ui: {
           control:   'button', labelKey: 'circle.button.folio.watchStart',
@@ -294,7 +300,7 @@ export const folioManifest = {
         // Part C gate — owns 'share'/'deel'. PARTIAL: binds `folder` from the body; the required
         // recipient `with` (a webid) is then form-elicited (a one-line command can't carry it).
         slash: { command: '/share', body: 'flags',
-          match: { verbs: ['share', 'deel'], body: 'text-only', arg: 'folder', dropTrailing: ['with', 'to', 'met', 'aan'] } },
+          match: { body: 'text-only', arg: 'folder', dropTrailing: true } },
         chat:  { reply: 'text', hint: 'share a folio folder with a contact' },
       },
     },
@@ -325,7 +331,7 @@ export const folioManifest = {
       runtime: 'browser',
       surfaces: {
         // Part C gate — "download X" → downloadFile{path}.
-        slash: { match: { verbs: ['download', 'haal', ['haal', 'op'], ['download', 'bestand']], body: 'match', arg: 'path' } },
+        slash: { match: { body: 'match', arg: 'path' } },
         ui:   { control: 'button', labelKey: 'circle.button.folio.downloadFile', label: 'Download' },
         // Declare `reply: 'text'` so the chat-shell renders the
         // skill's `{ok, message}` reply as text — without this the
@@ -350,7 +356,7 @@ export const folioManifest = {
       runtime: 'browser',
       surfaces: {
         // Part C gate — "save X [to my pod]" → saveToMyPod{path}.
-        slash: { match: { verbs: ['save', 'bewaar', ['save', 'to', 'my', 'pod'], 'opslaan', ['bewaar', 'in', 'mijn', 'pod']], body: 'match', arg: 'path' } },
+        slash: { match: { body: 'match', arg: 'path' } },
         ui:   { control: 'button', labelKey: 'circle.button.folio.saveToMyPod', label: 'Save to my pod' },
         chat: { hint: 'save a shared file to your own pod' },
       },
@@ -404,7 +410,7 @@ export const folioManifest = {
         // the first required param (`query`). The Part-C gate ALSO matches
         // the bare verbs "zoek/search/find <text>" → searchNotes{query}.
         slash: { command: '/zoek',
-          match: { verbs: ['zoek', 'zoeken', 'search', 'find'], body: 'text-only', arg: 'query' } },
+          match: { body: 'text-only', arg: 'query' } },
         chat:  { reply: 'list', hint: 'search folio notes by meaning (semantic when available)' },
       },
     },

@@ -4059,11 +4059,11 @@
     },
     "settings_list": {
       "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}}.",
-      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+      "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <number> · /instellingen cancel own|admin · /instellingen reminders on|off · /instellingen quiet 21:00-08:00",
-      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00",
+      "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
       "text": "Use: /role <name> coordinator|member|observer",
@@ -4221,6 +4221,22 @@
       "text": "• \"new task: clean the windows\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
     },
+    "basic_remove": {
+      "text": "• \"remove milk from the list\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_claim": {
+      "text": "• \"i'll do the windows\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_mine": {
+      "text": "• \"what do i still have to do\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_appt": {
+      "text": "• \"dentist tomorrow at 10am\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
     "basic_done": {
       "text": "• \"windows is done\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
@@ -4234,7 +4250,7 @@
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
     },
     "welcome_admin": {
-      "text": "You are the admin. With /instellingen you set, for the whole household, who may give chores, who sees names, the reminders and the quiet hours.",
+      "text": "You are the admin. With /huishouden you set, for the whole household, who may give chores, who sees names, the reminders and the quiet hours.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "reminder_done_words": {
@@ -4260,7 +4276,61 @@
     "overview_unheld": {
       "text": "{{n}} chores nobody has taken yet.",
       "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    }
+    },
+    "screen_link": "Open this link within {{minutes}} minutes on the screen you want to connect. It works once:\n{{link}}\nShare it with nobody: whoever has it can connect a screen as you.",
+    "screen_no_app": "Connecting a screen is not possible on this bot yet: no app address is set.",
+    "screen_connected": "You connected a screen. It may do {{n}} things, for {{days}} days. To disconnect: /schermen.",
+    "screens_none": "You have no screens connected. To connect one: /scherm.",
+    "screens_list": "Your screens:\n{{list}}\nTo disconnect: /schermen los <number>.",
+    "screens_row": "{{i}}. {{label}}: {{n}} things",
+    "screen_dropped": "Screen {{i}} is disconnected.",
+    "screen_no_such": "You have no screen {{i}}. Your screens: /schermen.",
+    "revoked_screens": "Their {{n}} connected screens are disconnected too.",
+    "screen_sent_privately": "I sent you the link privately.",
+    "screen_not_reachable": "I cannot write to you privately. Send me a message in a private chat first, then ask /scherm again.",
+    "screen_link_remembered": "I sent you a link to connect a screen.",
+    "menu_head": "Your settings (tap to change):",
+    "menu_household": "For the whole household:",
+    "menu_on_screen": "Your settings are on your connected screen. To connect another screen: /scherm.",
+    "menu_offer_screen": "Your layout is set to 'screen', but no screen is connected yet. Connect one: /scherm. Or bring the buttons back: /weergave buttons.",
+    "menu_in_words": "Say what you want to change, for example \"reminders off\" or \"language nl\".",
+    "menu_row": "{{label}}: {{value}}",
+    "menu_assistant-memory": "Memory",
+    "menu_assistant-reminders": "Reminders",
+    "menu_assistant-overview": "Sunday overview",
+    "menu_assistant-language": "Language",
+    "menu_assistant-view": "Layout",
+    "menu_assign": "Giving chores",
+    "menu_names": "Seeing names",
+    "menu_passed": "Done and passed",
+    "menu_cancel": "Cancelling appointments",
+    "menu_reminders": "Reminders (household)",
+    "view_set": "Your layout is now: {{view}}.",
+    "view_usage": "Use: /weergave buttons, /weergave screen or /weergave chat.",
+    "view_word_inline": "buttons",
+    "view_word_screen": "screen",
+    "view_word_chat": "chat",
+    "value_on": "on",
+    "value_off": "off",
+    "value_short": "short",
+    "value_long": "long",
+    "value_nl": "Dutch",
+    "value_en": "English",
+    "value_auto": "as I write",
+    "value_inline": "buttons",
+    "value_screen": "screen",
+    "value_chat": "in words",
+    "value_roles": "by role",
+    "value_anyone": "anyone",
+    "value_self": "only themselves",
+    "value_members": "everyone in the house",
+    "value_assigners": "whoever may give chores",
+    "value_admin": "only the admin",
+    "value_none": "nobody",
+    "value_keep": "keep",
+    "value_hide": "hide",
+    "value_delete": "delete",
+    "value_own": "their own"
   },
   "op": {
     "not_in_this_circle": {

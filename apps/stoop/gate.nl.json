@@ -1,0 +1,72 @@
+{
+  "stoop.postRequest": {
+    "doc": "Post something to the noticeboard (an ask, an offer, a loan); the rest of the line is the post.",
+    "verbs": [
+      "vraag",
+      "plaats",
+      "leen",
+      "bied aan"
+    ],
+    "dropTrailing": [
+      "aan",
+      "op",
+      "in",
+      "voor"
+    ],
+    "examples": [
+      "leen een ladder",
+      "vraag een boormachine voor"
+    ]
+  },
+  "stoop.listMyRequests": {
+    "doc": "List the posts you put up.",
+    "verbs": [
+      "mijn"
+    ],
+    "examples": [
+      "mijn"
+    ]
+  },
+  "stoop.respondToItem": {
+    "doc": "Answer a post (opens a chat with whoever posted it).",
+    "verbs": [
+      "ik help",
+      "help met",
+      "reageer op",
+      "bied hulp"
+    ],
+    "examples": [
+      "reageer op ladder",
+      "help met de boormachine"
+    ]
+  },
+  "stoop.cancelRequest": {
+    "doc": "Withdraw one of your posts.",
+    "verbs": [
+      "intrekken",
+      "annuleer"
+    ],
+    "examples": [
+      "intrekken ladder"
+    ]
+  },
+  "stoop.markReturned": {
+    "doc": "Mark something you lent out as returned.",
+    "verbs": [
+      "teruggebracht",
+      "terug"
+    ],
+    "examples": [
+      "teruggebracht ladder"
+    ]
+  },
+  "stoop.reportPost": {
+    "doc": "Report a post to the circle's admins.",
+    "verbs": [
+      "rapporteer"
+    ],
+    "examples": [
+      "rapporteer de spam"
+    ]
+  }
+}

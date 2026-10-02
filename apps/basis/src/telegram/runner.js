@@ -74,6 +74,11 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
 
   /** The turn under way (one per chat at a time) — the walk log's record in the making. */
   const turns = new Map();
+  /** The translator for this chat's person: their fixed `/taal` language, else the bot's own. */
+  const tc = (chatId) => {
+    const lang = threads?.langOf?.(turns.get(chatId)?.thread ?? threadFor(chatId)) ?? null;
+    return lang ? (k, p) => t(k, p, lang) : t;
+  };
   const note = (chatId, patch) => { const t0 = turns.get(chatId); if (t0) Object.assign(t0, patch); };
   const say = (chatId, text, buttons) => {
     const t0 = turns.get(chatId); if (t0) (t0.replies ??= []).push({ text, ...(buttons?.length ? { buttons: buttons.map((b) => b.id) } : {}) });
@@ -102,7 +107,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       const items = Array.isArray(rendered.items) ? rendered.items : [];
       // A read of a named list says which list, always — one list or five in a turn.
       const head = rendered.title ? [`${rendered.title}:`] : [];
-      if (!items.length) { await say(chatId, [...head, rendered.text ?? t('circle.telegram.empty_list')].join('\n')); return; }
+      if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n')); return; }
       const lines = [...head, ...items.map((it, i) => `${i + 1}. ${it.label}`)];
       const buttons = [];
       // A button names the ITEM, not its row number ("Done: melk", not "Done 1") — read from a phone, the
@@ -116,7 +121,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       return;
     }
     const text = rendered.text ?? (rendered.error ? rendered.error.message : '');
-    if (text) await say(chatId, text);
+    // a reply's quick replies (a settings menu) are buttons; a tap sends the button's slash line, which the person's
+    // own gate decides like a typed one
+    const quick = (rendered.quickReplies ?? []).map((q) => ({ id: q.slash, label: q.label }));
+    if (text) await say(chatId, text, quick.length ? quick : undefined);
   }
 
   /** Run a ready route and paint its reply. */
@@ -138,13 +146,15 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return runDispatch(coerceEnums(r), callFor(chatId));
   }
 
-  async function run(chatId, ready) {
+  async function run(chatId, ready, { tryRule = false } = {}) {
     let reply;
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
     try { reply = await runDispatch(ready, callFor(chatId)); }
-    catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
-    await paint(chatId, renderReply(reply, { t, appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
+    catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
+    // a rule that may fall back to the model, whose words named nothing: not said — the line goes to the model
+    if (tryRule && (reply?.error?.reason === 'not-found' || (reply?.ok === false && reply?.code === 'not-found'))) { note(chatId, { fellBack: ready.opId }); return { notFound: true }; }
+    await paint(chatId, renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
   }
 
   /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to
@@ -158,8 +168,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       return hint ? `${e.command} — ${hint}` : e.command;
     });
     // How to turn memory off, always; and, when turns are logged, that they are.
-    const disclosure = doorDisclosure(turnLogMode, t);
-    return [...lines, '', t('circle.bot.help_memory'), ...(disclosure ? [disclosure] : [])].join('\n');
+    const disclosure = doorDisclosure(turnLogMode, tc(chatId));
+    return [...lines, '', tc(chatId)('circle.bot.help_memory'), ...(disclosure ? [disclosure] : [])].join('\n');
   }
 
   /**
@@ -205,7 +215,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return { kind: 'slash', opId, args: args ?? {}, threadId, ...(appOrigin ? { appOrigin } : {}) };
   }
 
-  async function route(chatId, threadId, text) {
+  async function route(chatId, threadId, text, { tryRule = false } = {}) {
     if (typeof text === 'string' && /^\/(help|hulp)$/i.test(text.trim())) { note(chatId, { via: 'slash', route: 'help' }); return say(chatId, helpText(chatId, threadId)); }
     let parse = typeof text === 'string'
       ? (tapToParse(text, threadId) ?? parseInput(text, catalogueOf(), { threadId }))
@@ -217,11 +227,11 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     note(chatId, { route: r?.kind });
     switch (r?.kind) {
       case 'ready':
-        return run(chatId, coerceEnums(r));
+        return run(chatId, coerceEnums(r), { tryRule });
       case 'needsForm': {
         const single = beginFollowUp({ dispatch: r, t });
         const p = single ?? beginFormFollowUp({ dispatch: r, t });
-        if (!p) return say(chatId, t('circle.telegram.unknown'));
+        if (!p) return say(chatId, tc(chatId)('circle.telegram.unknown'));
         if (p.kind === 'multi') p.values = {};
         pending.set(threadId, { kind: 'form', p });
         const fields = p.kind === 'single' ? p.missingParam : p.fields.map((f) => f.name).join(', ');
@@ -229,8 +239,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         const op = catalogueOf().opsById?.get?.(r.opId)?.op;
         const askName = p.kind === 'single' ? p.missingParam : p.fields[0].name;
         const enumP = (op?.params ?? []).find((q) => q?.name === askName && q.kind === 'enum' && Array.isArray(q.of));
-        const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: t(`circle.telegram.list_${v}`) })) : undefined;
-        return say(chatId, `${t('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`, buttons);
+        const buttons = enumP ? enumP.of.map((v) => ({ id: v, label: tc(chatId)(`circle.telegram.list_${v}`) })) : undefined;
+        return say(chatId, `${tc(chatId)('circle.telegram.needs_form', { fields })}\n${p.kind === 'single' ? p.promptText : p.fields[0].label}`, buttons);
       }
       case 'needsConfirm': {
         pending.set(threadId, { kind: 'confirm', ready: { ...r, kind: 'ready' } });
@@ -238,17 +248,17 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         const previewed = await confirmPreview({ route: r, catalogue: catalogueOf(), call: callFor(chatId) });
         // the preview refused (the act would be too): say why, and ask nothing
         if (previewed?.refused) { pending.delete(threadId); return say(chatId, previewed.refused); }
-        return say(chatId, t('circle.telegram.confirm', { message: previewed?.message ?? (r.messageKey ? t(r.messageKey, r.args ?? {}) : (r.message ?? '')) }), [
-          { id: CONFIRM_YES, label: t('circle.telegram.confirm_yes') },
-          { id: CONFIRM_NO,  label: t('circle.telegram.confirm_no') },
+        return say(chatId, tc(chatId)('circle.telegram.confirm', { message: previewed?.message ?? (r.messageKey ? tc(chatId)(r.messageKey, r.args ?? {}) : (r.message ?? '')) }), [
+          { id: CONFIRM_YES, label: tc(chatId)('circle.telegram.confirm_yes') },
+          { id: CONFIRM_NO,  label: tc(chatId)('circle.telegram.confirm_no') },
         ]);
       }
       case 'ambiguous':
-        return say(chatId, t('circle.telegram.unknown'), (r.choices ?? []).map((c) => ({ id: typeof c === 'string' ? c : c.command, label: typeof c === 'string' ? c : c.command })));
+        return say(chatId, tc(chatId)('circle.telegram.unknown'), (r.choices ?? []).map((c) => ({ id: typeof c === 'string' ? c : c.command, label: typeof c === 'string' ? c : c.command })));
       case 'error':
-        return say(chatId, t('circle.telegram.error', { message: r.message ?? r.code ?? '' }));
+        return say(chatId, tc(chatId)('circle.telegram.error', { message: r.message ?? r.code ?? '' }));
       default:
-        return say(chatId, t('circle.telegram.unknown'));
+        return say(chatId, tc(chatId)('circle.telegram.unknown'));
     }
   }
 
@@ -270,18 +280,18 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       : {}),
     ...(gate ? { gate } : {}),
     ...(collectMs !== undefined ? { collectMs } : {}),
-    dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input),
+    dispatch: (input, ctx) => route(ctx.chatId, ctx.id, input, { tryRule: Boolean(ctx?.tryRule) }),
     peek: (cmd, ctx) => peekOp(ctx.chatId, ctx.id, cmd),
-    onUnhandled: async (_text, ctx) => { await say(ctx.chatId, t('circle.telegram.unknown')); return 'hint'; },
+    onUnhandled: async (_text, ctx) => { await say(ctx.chatId, tc(ctx.chatId)('circle.telegram.unknown')); return 'hint'; },
     // A model that is slow is SAID: "even geduld" while it retries, and when it does not come back, that it is not
     // reachable now — never "I did not understand" for a model that did not answer.
-    onSlow: (ctx) => say(ctx.chatId, t('circle.bot.slow')),
+    onSlow: (ctx) => say(ctx.chatId, tc(ctx.chatId)('circle.bot.slow')),
     // Without the model (off, or not answering) the person is told what DOES work — the word rules and the commands —
     // when the door can say it; else the old line.
     onLlmUnavailable: async (_text, ctx, info) => {
-      const lines = await basicHelp(ctx.id);
-      if (lines.length) return say(ctx.chatId, [t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.bot.basic_head'), ...(info?.reason === 'unreachable' ? [t('circle.bot.basic_head')] : []), ...lines].join('\n'));
-      return say(ctx.chatId, t(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown'));
+      const lines = await basicHelp(ctx.id, ctx.chatId);
+      if (lines.length) return say(ctx.chatId, [tc(ctx.chatId)(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.bot.basic_head'), ...(info?.reason === 'unreachable' ? [tc(ctx.chatId)('circle.bot.basic_head')] : []), ...lines].join('\n'));
+      return say(ctx.chatId, tc(ctx.chatId)(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown'));
     },
     onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),
     claim: (text, ctx) => (claims(ctx.chatId, ctx.id, text) ? () => doorLine(ctx.chatId, ctx.id, text) : null),
@@ -317,7 +327,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       if (!own) note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
       note(chatId, { error: err?.message ?? String(err) });
-      await say(chatId, t('circle.telegram.error', { message: err?.message ?? String(err) }));
+      await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) }));
     } finally {
       const rec = turns.get(chatId); turns.delete(chatId);
       if (rec && !/^(__confirm:|[A-Za-z][\w-]*:)/.test(text)) engine.remember(threadId, 'you', text);
@@ -338,9 +348,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   }
 
   /** What works without the model, for this person (the door derives it), or nothing. */
-  async function basicHelp(threadId) {
+  async function basicHelp(threadId, chatIdOf = null) {
     if (typeof basicHelpFor !== 'function') return [];
-    try { return (await basicHelpFor({ threadId, ...personOps(threadId) })) ?? []; } catch { return []; }
+    try { return (await basicHelpFor({ threadId, ...personOps(threadId), t: tc(chatIdOf ?? threadId) })) ?? []; } catch { return []; }
   }
 
   /** A person's first turn with this door: who it is and what it keeps — once. */
@@ -348,12 +358,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   const slashless = new Set();
   async function greetOnce(chatId, threadId) {
     if (!threads || !threadId || threads.greeted(threadId)) return;
-    const disclosure = doorDisclosure(turnLogMode, t);
-    const welcome = slashless.has(String(chatId)) ? t('circle.bot.welcome_talk') : t('circle.bot.welcome');
+    const disclosure = doorDisclosure(turnLogMode, tc(chatId));
+    const welcome = slashless.has(String(chatId)) ? tc(chatId)('circle.bot.welcome_talk') : tc(chatId)('circle.bot.welcome');
     // what this bot does for THIS person (their role's tools, the household's settings), when the door derives it
     let derived = [];
     if (typeof welcomeFor === 'function') {
-      try { derived = (await welcomeFor({ threadId, ...personOps(threadId) })) ?? []; } catch { derived = []; }
+      try { derived = (await welcomeFor({ threadId, ...personOps(threadId), t: tc(chatId) })) ?? []; } catch { derived = []; }
     }
     await say(chatId, [welcome, ...derived, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);
@@ -392,7 +402,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const text = String(msg?.text ?? '').trim();
     if (!chatId || !text) return;
     // A door that admits people decides who may talk (a code, its bootstrap ids); without one, the chat allow-list.
-    if (typeof admit !== 'function' && !open && !allowed.has(chatId)) { await say(chatId, t('circle.telegram.not_paired', { chatId })); return; }
+    if (typeof admit !== 'function' && !open && !allowed.has(chatId)) { await say(chatId, tc(chatId)('circle.telegram.not_paired', { chatId })); return; }
     // Who is asking: the person, not the chat (a group chat holds several). No admission, no turn.
     let caller = null;
     if (typeof admit === 'function') {
@@ -412,14 +422,14 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
           if (threads.refused(r.id)) return;
           threads.markRefused(r.id);
         }
-        await say(chatId, t(`circle.bot.admission_${String(r.refused).replace(/-/g, "_")}`));
+        await say(chatId, tc(chatId)(`circle.bot.admission_${String(r.refused).replace(/-/g, "_")}`));
         return;
       }
       caller = typeof r === 'string' ? r : (r && typeof r === 'object' ? r.id : null);
-      if (!caller) { await say(chatId, t('circle.telegram.unknown')); return; }
+      if (!caller) { await say(chatId, tc(chatId)('circle.telegram.unknown')); return; }
       // The line was the code that admitted them: the welcome, and nothing to dispatch.
       if (r && typeof r === 'object' && r.consumed) {
-        if (threads) await greetOnce(chatId, caller); else await say(chatId, t('circle.bot.welcome'));
+        if (threads) await greetOnce(chatId, caller); else await say(chatId, tc(chatId)('circle.bot.welcome'));
         return;
       }
     }

@@ -1,0 +1,86 @@
+{
+  "tasks.addTask": {
+    "doc": "Add a task; the rest of the line is its text.",
+    "verbs": [
+      "add",
+      "todo",
+      "new task"
+    ],
+    "dropTrailing": [
+      "to"
+    ],
+    "examples": [
+      "new task paint the fence",
+      "add water the plants to"
+    ]
+  },
+  "tasks.claimTask": {
+    "doc": "Take on a task (by its id or its words).",
+    "verbs": [
+      "claim",
+      "i'll take",
+      "i'll do"
+    ],
+    "examples": [
+      "claim fence",
+      "i'll do the dishes"
+    ],
+    "not": [
+      "claim"
+    ]
+  },
+  "tasks.confirmClaim": {
+    "doc": "Confirm someone's pending claim on a task.",
+    "verbs": [
+      "confirm"
+    ],
+    "examples": [
+      "confirm fence"
+    ]
+  },
+  "tasks.completeTask": {
+    "doc": "Mark a task done.",
+    "verbs": [
+      "done with",
+      "done",
+      "complete",
+      "completed",
+      "finished"
+    ],
+    "examples": [
+      "done with the dishes",
+      "finished fence"
+    ],
+    "not": [
+      "done"
+    ]
+  },
+  "tasks.submitTask": {
+    "doc": "Hand in a task you did, for approval.",
+    "verbs": [
+      "submit",
+      "hand in"
+    ],
+    "examples": [
+      "submit fence"
+    ]
+  },
+  "tasks.approveTask": {
+    "doc": "Approve a task that was handed in.",
+    "verbs": [
+      "approve"
+    ],
+    "examples": [
+      "approve fence"
+    ]
+  },
+  "tasks.rejectTask": {
+    "doc": "Send back a task that was handed in.",
+    "verbs": [
+      "reject"
+    ],
+    "examples": [
+      "reject fence"
+    ]
+  }
+}

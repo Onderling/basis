@@ -4059,11 +4059,11 @@
     },
     "settings_list": {
       "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}}.",
-      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+      "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /instellingen assign roles|anyone|self · /instellingen names members|assigners|admin|none · /instellingen passed keep|hide|delete · /instellingen days <aantal> · /instellingen cancel own|admin · /instellingen reminders on|off · /instellingen quiet 21:00-08:00",
-      "doc": "The household bot admin's /instellingen: the bot's settings as they stand, and how to change them."
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00",
+      "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "role_usage": {
       "text": "Gebruik: /role <naam> coordinator|member|observer",
@@ -4221,6 +4221,22 @@
       "text": "• \"nieuwe taak: ramen lappen\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
     },
+    "basic_remove": {
+      "text": "• \"haal melk van de lijst\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_claim": {
+      "text": "• \"ik doe de ramen\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_mine": {
+      "text": "• \"wat moet ik nog doen\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
+    "basic_appt": {
+      "text": "• \"tandarts morgen om 10 uur\"",
+      "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
+    },
     "basic_done": {
       "text": "• \"ramen is klaar\"",
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
@@ -4234,7 +4250,7 @@
       "doc": "The household bot when its model is off or not answering: what the person can type that works without it."
     },
     "welcome_admin": {
-      "text": "Je bent beheerder. Met /instellingen regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
+      "text": "Je bent beheerder. Met /huishouden regel je voor het hele huishouden wie klusjes mag toewijzen, wie namen ziet, de herinneringen en de stille uren.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "reminder_done_words": {
@@ -4260,7 +4276,61 @@
     "overview_unheld": {
       "text": "{{n}} klusjes waar nog niemand voor staat.",
       "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    }
+    },
+    "screen_link": "Open deze link binnen {{minutes}} minuten op het scherm dat je wilt koppelen. Hij werkt één keer:\n{{link}}\nDeel hem met niemand: wie hem heeft, kan een scherm als jou koppelen.",
+    "screen_no_app": "Een scherm koppelen kan op deze bot nog niet: er is geen app-adres ingesteld.",
+    "screen_connected": "Je hebt een scherm gekoppeld. Het mag {{n}} dingen doen, {{days}} dagen lang. Loskoppelen: /schermen.",
+    "screens_none": "Je hebt geen schermen gekoppeld. Een scherm koppelen: /scherm.",
+    "screens_list": "Je schermen:\n{{list}}\nLoskoppelen: /schermen los <nummer>.",
+    "screens_row": "{{i}}. {{label}}: {{n}} dingen",
+    "screen_dropped": "Scherm {{i}} is losgekoppeld.",
+    "screen_no_such": "Je hebt geen scherm {{i}}. Je schermen: /schermen.",
+    "revoked_screens": "Ook {{n}} gekoppelde schermen zijn losgekoppeld.",
+    "screen_sent_privately": "Ik heb je de link privé gestuurd.",
+    "screen_not_reachable": "Ik kan je niet privé schrijven. Stuur me eerst zelf een bericht in een privégesprek, en vraag dan opnieuw /scherm.",
+    "screen_link_remembered": "Ik heb je een link gestuurd om een scherm te koppelen.",
+    "menu_head": "Je instellingen (tik om te wijzigen):",
+    "menu_household": "Voor het hele huishouden:",
+    "menu_on_screen": "Je instellingen staan op je gekoppelde scherm. Een ander scherm koppelen: /scherm.",
+    "menu_offer_screen": "Je hebt je weergave op 'scherm' staan, maar nog geen scherm gekoppeld. Koppel er een: /scherm. Of zet de knoppen terug: /weergave knoppen.",
+    "menu_in_words": "Zeg wat je wilt veranderen, bijvoorbeeld \"herinneringen uit\" of \"taal en\".",
+    "menu_row": "{{label}}: {{value}}",
+    "menu_assistant-memory": "Geheugen",
+    "menu_assistant-reminders": "Herinneringen",
+    "menu_assistant-overview": "Zondagsoverzicht",
+    "menu_assistant-language": "Taal",
+    "menu_assistant-view": "Weergave",
+    "menu_assign": "Klusjes toewijzen",
+    "menu_names": "Namen zien",
+    "menu_passed": "Afgerond en voorbij",
+    "menu_cancel": "Afspraken afzeggen",
+    "menu_reminders": "Herinneringen (huishouden)",
+    "view_set": "Je weergave is nu: {{view}}.",
+    "view_usage": "Gebruik: /weergave knoppen, /weergave scherm of /weergave chat.",
+    "view_word_inline": "knoppen",
+    "view_word_screen": "scherm",
+    "view_word_chat": "chat",
+    "value_on": "aan",
+    "value_off": "uit",
+    "value_short": "kort",
+    "value_long": "lang",
+    "value_nl": "Nederlands",
+    "value_en": "Engels",
+    "value_auto": "zoals ik schrijf",
+    "value_inline": "knoppen",
+    "value_screen": "scherm",
+    "value_chat": "in woorden",
+    "value_roles": "volgens de rol",
+    "value_anyone": "iedereen",
+    "value_self": "alleen zichzelf",
+    "value_members": "iedereen in huis",
+    "value_assigners": "wie mag toewijzen",
+    "value_admin": "alleen de beheerder",
+    "value_none": "niemand",
+    "value_keep": "bewaren",
+    "value_hide": "verbergen",
+    "value_delete": "weggooien",
+    "value_own": "je eigen"
   },
   "op": {
     "not_in_this_circle": {

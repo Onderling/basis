@@ -7,6 +7,8 @@ import { createCircleDispatch } from '../../src/v2/circleDispatch.js';
 // not a hand-written rule set. These assert the projected rules behave as the device-run needs.
 const gate = () => createTokenGate({ rules: circleGateRules() });
 const route = (text) => gate().evaluate(text, {});
+// a gate takes its own language's words: a Dutch line goes to a Dutch circle's gate
+const routeNl = (text) => createTokenGate({ rules: circleGateRules('nl') }).evaluate(text, {});
 
 describe('circle gate (manifest-derived) — deterministic routing', () => {
   it('"add X to the list" → addItem{text:X} with NO type — the shell asks which list (L90, 2026-09-05)', async () => {
@@ -85,13 +87,13 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
   });
 
   it('multiword "klaar met X" beats bare "klaar" → completeTask{id:X}', async () => {
-    expect((await route('klaar met afwas')).command).toEqual({ opId: 'completeTask', args: { id: 'afwas' } });
+    expect((await routeNl('klaar met afwas')).command).toEqual({ opId: 'completeTask', args: { id: 'afwas' } });
   });
 
   it('"claim X" / "I\'ll take X" / "ik pak X" → claimTask{id:X}', async () => {
     expect((await route('claim the dishes')).command).toEqual({ opId: 'claimTask', args: { id: 'the dishes' } });
     expect((await route("I'll take the trash")).command).toEqual({ opId: 'claimTask', args: { id: 'the trash' } });
-    expect((await route('ik pak de afwas')).command).toEqual({ opId: 'claimTask', args: { id: 'de afwas' } });
+    expect((await routeNl('ik pak de afwas')).command).toEqual({ opId: 'claimTask', args: { id: 'de afwas' } });
   });
 
   it('unmatched free text falls through to the LLM', async () => {
@@ -101,6 +103,7 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
 
 describe('circle gate — Part C: multi-app verbs, collisions, removed declarations', () => {
   const op = async (text) => (await route(text)).command?.opId ?? null;
+  const opNl = async (text) => (await routeNl(text)).command?.opId ?? null;
 
   it('routes each app\'s user-action verbs to the right op', async () => {
     expect(await op('submit the report')).toBe('submitTask');
@@ -115,7 +118,7 @@ describe('circle gate — Part C: multi-app verbs, collisions, removed declarati
 
   it('resolves each cross-app collision to its single owner', async () => {
     expect(await op('share the deck')).toBe('shareFolder');      // not stoop.postRequest
-    expect(await op('deel de fotos')).toBe('shareFolder');
+    expect(await opNl('deel de fotos')).toBe('shareFolder');
     expect(await op('accept the invite')).toBe('rsvpAccept');    // not tasks.approveTask
     expect(await op('reject the draft')).toBe('rejectTask');     // not calendar.rsvpDecline
     expect(await op('decline the invite')).toBe('rsvpDecline');  // calendar keeps 'decline'
@@ -125,7 +128,7 @@ describe('circle gate — Part C: multi-app verbs, collisions, removed declarati
 
   it('honours multiword-before-bare precedence', async () => {
     expect(await op('cancel appointment Lunch')).toBe('cancelEvent');
-    expect(await op('klaar met afwas')).toBe('completeTask');
+    expect(await opNl('klaar met afwas')).toBe('completeTask');
   });
 
   it('removed/invalid declarations do NOT route (fall to the LLM)', async () => {

@@ -15,8 +15,14 @@
  * Phase v0.7 per `/Project Files/basis/coding-plan.md`.
  */
 
+// The words the deterministic gate starts an op with, per language (the manifest declares the match's shape; the
+// words are data beside it — see `gateVerbsOf` in @onderling/app-manifest).
+import gateNl from './gate.nl.json' with { type: 'json' };
+import gateEn from './gate.en.json' with { type: 'json' };
+
 export const calendarManifest = {
   app:        'calendar',
+  gateWords:  { en: gateEn, nl: gateNl },
   // The network hosts this app's code reaches. None: whatever it syncs goes through the person's own
   // pod and relay, which they configure — not a fixed host.
   hosts:      [],
@@ -68,7 +74,7 @@ export const calendarManifest = {
         // Part C gate — "schedule X" / "afspraak X" → addEvent{title}. PARTIAL: binds title; the
         // required `when` (a date) is form-elicited.
         slash: { command: '/addappt', body: 'flags',
-          match: { verbs: ['schedule', ['add', 'event'], ['new', 'event'], ['add', 'appointment'], ['new', 'appointment'], 'afspraak', 'plan', ['zet', 'afspraak'], ['nieuwe', 'afspraak']], body: 'text-only', arg: 'title', dropTrailing: ['to', 'with', 'op', 'met'] } },
+          match: { body: 'text-only', arg: 'title', dropTrailing: true } },
         chat:  { reply: 'text', hint: 'create an appointment' },
       },
     },
@@ -119,7 +125,7 @@ export const calendarManifest = {
         // Part C gate — owns 'accept' (collision vs tasks.approveTask, which keeps approve/goedkeuren).
         slash: { command: '/accept',
           // 'ik kom' dropped — it's a prefix of rsvpDecline's 'ik kom niet' (would eat the decline).
-          match: { verbs: ['accept', ['accept', 'invite'], 'yes', 'accepteer', 'ja'], body: 'match', arg: 'id' } },
+          match: { body: 'match', arg: 'id' } },
         ui:    { control: 'button', labelKey: 'circle.button.calendar.rsvpAccept', label: 'Accept' },
         chat:  { hint: 'accept an invitation' },
       },
@@ -138,7 +144,7 @@ export const calendarManifest = {
       surfaces: {
         // Part C gate — keeps 'decline' (bare 'reject'/'afwijzen' belong to tasks.rejectTask).
         slash: { command: '/decline',
-          match: { verbs: ['decline', ['decline', 'invite'], 'no', ['wijs', 'af'], 'nee', ['ik', 'kom', 'niet']], body: 'match', arg: 'id' } },
+          match: { body: 'match', arg: 'id' } },
         ui:    { control: 'button', labelKey: 'circle.button.calendar.rsvpDecline', label: 'Decline' },
         chat:  { hint: 'decline an invitation' },
       },
@@ -157,7 +163,7 @@ export const calendarManifest = {
       surfaces: {
         // Part C gate — "tentative/maybe X" → rsvpTentative{id}.
         slash: { command: '/tentative',
-          match: { verbs: ['tentative', 'maybe', 'misschien', ['onder', 'voorbehoud']], body: 'match', arg: 'id' } },
+          match: { body: 'match', arg: 'id' } },
         ui:    { control: 'button', labelKey: 'circle.button.calendar.rsvpTentative', label: 'Tentative' },
         chat:  { hint: 'mark as tentative' },
       },
@@ -176,7 +182,7 @@ export const calendarManifest = {
       surfaces: {
         // Part C gate — owns 'cancel' (multiword 'cancel event' before bare 'cancel'; vs household.removeChore).
         slash: { command: '/cancelappt',
-          match: { verbs: [['cancel', 'event'], ['cancel', 'appointment'], 'cancel', ['annuleer', 'afspraak'], 'annuleer', ['zeg', 'af']], body: 'match', arg: 'id' } },
+          match: { body: 'match', arg: 'id' } },
         ui:    {
           control: 'button', labelKey: 'circle.button.calendar.cancelEvent',
           label:   'Cancel event',

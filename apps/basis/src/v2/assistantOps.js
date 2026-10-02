@@ -6,6 +6,7 @@ import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
+import { SURFACE_PREFS } from './surfacePref.js';
 
 /**
  * The door's callSkill, with its own ops handled here, and nothing else changed.
@@ -33,6 +34,21 @@ const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()]
 
 export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {} }) {
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
+  /** What a settings op's buttons can set, and the value it has now, for this person. */
+  const PERSON_SETTINGS = {
+    'assistant-memory':    { values: ['off', 'short', 'long'], now: (id) => threads.modeOf(id) },
+    'assistant-reminders': { values: ['on', 'off'], now: (id) => (threads.remindersOn(id) ? 'on' : 'off') },
+    'assistant-overview':  { values: ['on', 'off'], now: (id) => (threads.overviewOn(id) ? 'on' : 'off') },
+    'assistant-language':  { values: ['nl', 'en', 'auto'], now: (id) => threads.langOf(id) ?? 'auto' },
+    'assistant-view':      { values: [...SURFACE_PREFS], now: (id) => threads.viewOf(id) },
+  };
+  /** The household's settings (`/huishouden <key> <value>`), each a row. */
+  const HOUSEHOLD_SETTINGS = [
+    ['assign', ASSIGN_POLICY_KEY, ASSIGN_POLICIES, assignPolicyFrom], ['names', NAMES_KEY, NAMES_POLICIES, namesPolicyFrom],
+    ['passed', PASSED_KEY, PASSED_POLICIES, passedPolicyFrom], ['cancel', CANCEL_KEY, CANCEL_POLICIES, cancelPolicyFrom],
+    ['reminders', REMINDERS_KEY, REMINDERS_MODES, remindersModeFrom],
+  ];
+  const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
   return async (app, op, args = {}, ctx = {}) => {
     if (app !== 'assistant') return callSkill(app, op, args, ctx);
     const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
@@ -52,32 +68,45 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-invite') return inviteOp();
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
+      if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller);
+      if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
+      if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId);
+      if (op === 'assistant-screens') return screensOp(caller ?? ctx?.threadId, args?.change ?? args?._match);
       if (op === 'assistant-exports') return exportsOp();
       if (op === 'assistant-export') return exportNowOp();
       if (op === 'assistant-import') return importOp(args?.file ?? args?._match, { preview: args?.preview === true });
       const threadId = typeof ctx?.threadId === 'string' && ctx.threadId ? ctx.threadId : null;
       if (!threadId) return { ok: false, error: 'no-thread' };
+      // a person's own op answers in their language (`/taal`, set after this call for the language op itself)
+      const tp = personT(threadId);
       if (op === 'assistant-memory') {
         threads.setMode(threadId, args?.mode);
-        return { ok: true, message: t(`circle.bot.memory_${args.mode}`) };
+        return { ok: true, message: tp(`circle.bot.memory_${args.mode}`) };
       }
-      if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx) };
+      if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx, tp) };
       if (op === 'assistant-reminders' || op === 'assistant-overview') {
         const mode = switchOf(args?.mode);
-        if (!mode) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
+        if (!mode) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
         const which = op === 'assistant-reminders' ? 'reminders' : 'overview';
         if (which === 'reminders') threads.setReminders(threadId, mode === 'on'); else threads.setOverview(threadId, mode === 'on');
-        return { ok: true, message: t(`circle.bot.${which}_${mode}`) };
+        return { ok: true, message: tp(`circle.bot.${which}_${mode}`) };
       }
       if (op === 'assistant-language') {
         threads.setLang(threadId, args?.lang);
-        return { ok: true, message: args.lang === 'auto' ? t('circle.bot.lang_auto') : t('circle.bot.lang_set', { lang: args.lang }) };
+        const tn = personT(threadId);
+        return { ok: true, message: args.lang === 'auto' ? tn('circle.bot.lang_auto') : tn('circle.bot.lang_set', { lang: args.lang }) };
       }
     } catch (err) {
       return { ok: false, error: { code: 'invalid-argument', message: err?.message ?? String(err) } };
     }
     return { ok: false, error: 'unknown-op', app, op };
   };
+
+  /** The translator for a person: their fixed `/taal` language, else the door's. */
+  function personT(threadId) {
+    const lang = threads?.langOf?.(threadId) ?? null;
+    return lang ? (k, p) => t(k, p, lang) : t;
+  }
 
   async function appsOp(change) {
     const cat = admin.catalogue;
@@ -192,29 +221,29 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * A person's week, asked AS them: their open chores (with a date) and the coming appointments go through the gate as
    * that person; the two counts (open on the shopping list, chores nobody holds) are the household's, and name nobody.
    */
-  async function weekOverviewText(ctx) {
+  async function weekOverviewText(ctx, tp = t) {
     const pad = (n) => String(n).padStart(2, '0');
     const localDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso).slice(0, 10) : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
     const asThem = (a, o, x) => callSkill(a, o, x, ctx);
     const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
     const mine = itemsOf(await asThem('tasks', 'listMine', {}).catch(() => null));
     const events = itemsOf(await asThem('calendar', 'listEvents', { days: 7 }).catch(() => null));
-    const shopping = itemsOf(await callSkill('lists', 'listEntries', { list: t('circle.lists.template.shopping') }).catch(() => null));
+    const shopping = itemsOf(await callSkill('lists', 'listEntries', { list: tp('circle.lists.template.shopping') }).catch(() => null));
     const open = itemsOf(await callSkill('tasks', 'listOpen', {}).catch(() => null));
     const unheld = open.filter((it) => ![...(Array.isArray(it.assignees) ? it.assignees : []), it.assignee].some(Boolean)).length;
     const lines = [];
     if (mine.length) {
-      lines.push(t('circle.bot.overview_mine'));
+      lines.push(tp('circle.bot.overview_mine'));
       // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
       for (const c of mine) lines.push(`• ${c.text ?? c.title ?? c.label ?? ''}${c.dueAt ? ` (${localDay(c.dueAt)})` : ''}`);
     }
     if (events.length) {
-      lines.push(t('circle.bot.overview_events'));
+      lines.push(tp('circle.bot.overview_events'));
       for (const e of events) lines.push(`• ${e.label ?? e.title ?? ''}`);
     }
-    if (shopping.length) lines.push(t('circle.bot.overview_shopping', { n: shopping.length, list: t('circle.lists.template.shopping') }));
-    if (unheld) lines.push(t('circle.bot.overview_unheld', { n: unheld }));
-    return [t('circle.bot.overview_head'), ...(lines.length ? lines : [t('circle.bot.overview_none')])].join('\n');
+    if (shopping.length) lines.push(tp('circle.bot.overview_shopping', { n: shopping.length, list: tp('circle.lists.template.shopping') }));
+    if (unheld) lines.push(tp('circle.bot.overview_unheld', { n: unheld }));
+    return [tp('circle.bot.overview_head'), ...(lines.length ? lines : [tp('circle.bot.overview_none')])].join('\n');
   }
 
   async function statusText() {
@@ -255,7 +284,91 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (typeof admin.revoke !== 'function') return { ok: false, error: 'unwired' };
     const row = await admin.revoke(who);
     if (!row) return { ok: false, error: { code: 'unknown-user', message: t('circle.bot.revoke_unknown', { who: String(who ?? '') }) } };
-    return { ok: true, message: t('circle.bot.revoked', { who: row.displayName ?? row.id }) };
+    // a person who is no longer admitted keeps no screen
+    const dropped = typeof admin.screens?.dropAll === 'function' ? await admin.screens.dropAll(row.id) : 0;
+    const said = t('circle.bot.revoked', { who: row.displayName ?? row.id });
+    return { ok: true, message: dropped ? `${said} ${t('circle.bot.revoked_screens', { n: dropped })}` : said };
+  }
+
+
+  /**
+   * `/instellingen`: one row per settings op this person's role reaches — the gate decides, as for the op itself — with
+   * its value now and a button per value that calls the op. Painted per the person's view: buttons in the chat
+   * (`inline`), a pointer to their connected screen (`screen`), or words (`chat`; the inbox door is always chat).
+   */
+  async function menuOp(person, caller) {
+    if (!person) return { ok: false, error: 'no-thread' };
+    const tp = personT(person);
+    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(opId, caller, levelOf(opId)));
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const view = row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person);
+    if (view === 'screen') {
+      const mine = typeof admin.screens?.list === 'function' ? await admin.screens.list(person) : [];
+      return { ok: true, message: tp(mine.length ? 'circle.bot.menu_on_screen' : 'circle.bot.menu_offer_screen') };
+    }
+    const lines = [tp('circle.bot.menu_head')];
+    const buttons = [];
+    const valueLabel = (v) => tp(`circle.bot.value_${v}`);
+    const settingsOps = assistantManifest.operations.filter((o) => o.group === 'settings' && o.id !== 'assistant-settings');
+    for (const o of settingsOps) {
+      const spec = PERSON_SETTINGS[o.id];
+      if (!spec || !(await reaches(o.id))) continue;
+      const now = spec.now(person);
+      lines.push(tp('circle.bot.menu_row', { label: tp(`circle.bot.menu_${o.id}`), value: valueLabel(now) }));
+      for (const v of spec.values) buttons.push({ label: `${tp(`circle.bot.menu_${o.id}`)}: ${valueLabel(v)}${v === now ? ' ✓' : ''}`, slash: `${slashOf(o.id)} ${v}` });
+    }
+    if (await reaches('assistant-settings')) {
+      const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+      const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
+      lines.push('', tp('circle.bot.menu_household'));
+      for (const [key, paramKey, values, from] of HOUSEHOLD_SETTINGS) {
+        const now = from(of(paramKey));
+        lines.push(tp('circle.bot.menu_row', { label: tp(`circle.bot.menu_${key}`), value: valueLabel(now) }));
+        for (const v of values) buttons.push({ label: `${tp(`circle.bot.menu_${key}`)}: ${valueLabel(v)}${v === now ? ' ✓' : ''}`, slash: `${slashOf('assistant-settings')} ${key} ${v}` });
+      }
+    }
+    if (view === 'chat') return { ok: true, message: [...lines, '', tp('circle.bot.menu_in_words')].join('\n') };
+    return { ok: true, message: lines.join('\n'), quickReplies: buttons };
+  }
+
+  /** `/weergave knoppen|scherm|chat` (the words of either language, or the values themselves). */
+  function viewOp(person, word) {
+    if (!person) return { ok: false, error: 'no-thread' };
+    const tp = personT(person);
+    const w = String(word ?? '').trim().toLowerCase();
+    const view = SURFACE_PREFS.find((v) => v === w || ['nl', 'en'].some((lng) => String(t(`circle.bot.view_word_${v}`, undefined, lng)).toLowerCase() === w));
+    if (!view) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.view_usage') } };
+    threads.setView(person, view);
+    return { ok: true, message: tp('circle.bot.view_set', { view: tp(`circle.bot.view_word_${view}`) }) };
+  }
+
+  /** `/scherm`: a one-time link for this person's screen. */
+  async function screenOp(person) {
+    if (!person || !admin.screens) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    // the link goes to the person's PRIVATE door only; the chat it was asked in (maybe a group) hears where it went
+    const r = await admin.screens.start(person, (link, minutes) => tp('circle.bot.screen_link', { link, minutes }), tp('circle.bot.screen_link_remembered'));
+    if (!r.ok) {
+      const key = r.reason === 'no-app-url' ? 'circle.bot.screen_no_app' : 'circle.bot.screen_not_reachable';
+      return { ok: false, error: { code: r.reason, message: tp(key) } };
+    }
+    return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+  }
+
+  /** `/schermen` (the person's screens) · `/schermen los <n>` (drop one). */
+  async function screensOp(person, change) {
+    if (!person || !admin.screens) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const m = /^\s*(?:los|drop|remove)\s+(\d+)\s*$/i.exec(String(change ?? ''));
+    if (m) {
+      const r = await admin.screens.drop(person, Number(m[1]));
+      return r.ok ? { ok: true, message: tp('circle.bot.screen_dropped', { i: m[1] }) }
+        : { ok: false, error: { code: r.reason ?? 'no-such-screen', message: tp('circle.bot.screen_no_such', { i: m[1] }) } };
+    }
+    const list = await admin.screens.list(person);
+    if (!list.length) return { ok: true, message: tp('circle.bot.screens_none') };
+    const rows = list.map((g, i) => tp('circle.bot.screens_row', { i: i + 1, label: g.label ?? 'scherm', n: (g.ops ?? []).length }));
+    return { ok: true, message: tp('circle.bot.screens_list', { list: rows.join('\n') }) };
   }
 
   async function usersText() {

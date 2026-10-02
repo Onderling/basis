@@ -717,6 +717,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   const primaryDeviceRef = { current: null };
   const sa = await createSecureMeshAgent({
     bus,
+    // Other agents' kernel task requests over the relay (a connected screen calling the door's ops): only where the
+    // composition asks — a household bot. A person's agent takes none until its door allows only lane-active tokens.
+    ...(opts.acceptPeerSkillCalls ? { acceptPeerSkillCalls: opts.acceptPeerSkillCalls } : {}),
     vault:               chatVault,
     primaryDevice:       () => primaryDeviceRef.current?.isMine() === true,
     identityVaultPrefix: 'cc-chat-id:',   // no effect when `vault` is supplied; documents the prefix
@@ -828,6 +831,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+  // A token this agent mints (a screen's grant) is checked at its own door, which wants the issuer at `trusted` in
+  // this registry — the kernel's documented enablement step. Only where the composition asks (`trustOwnGrants`: a
+  // household bot, whose chat key lives on one box). NOT on a person's agent yet: their chat key is on every device,
+  // a revoked device keeps it, and the door's revocation check is a deny-list — so a revoked device could sign a
+  // token the lane never saw. That needs the door to ALLOW only tokens active on the grants lane first.
+  if (opts.trustOwnGrants === true) {
+    try { await sa.trust?.setTier?.(chatId.pubKey, 'trusted'); } catch (err) { console.warn(`[realAgent] own issuer tier not set: ${err?.message ?? err}`); }
+  }
 
   // The agent-activity trail — the record of an AGENT acting on this device (one-log step E).
   // The kernel's dispatch membrane (`runGatedSkill`) reports every gate-passed skill exercise
@@ -2339,6 +2350,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         reads: d.reads ?? null,
         label: typeof d.label === 'string' && d.label.trim() ? d.label.trim() : null,
         ...(expiresIn ? { expiresIn } : {}),
+        // the person the screen acts as, when this agent answers for several (a household bot); else its own
+        ...(typeof d.actingAs === 'string' && d.actingAs ? { actingAs: d.actingAs } : {}),
       });
       // The lane reconciler runs on the grant hook; surface its honest state: a read grant with
       // the mirror OFF (or no backend) yields no lane until the mirror runs.
@@ -4042,7 +4055,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       const refusal = await doorRefusal(opId, ctx.caller);
       if (refusal) return { ok: false, error: refusalText(refusal, typeof opts.t === 'function' ? opts.t : null), refusal };
-      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...(args ?? {}), actor: ctx.caller };
+      // ...and runs in the door's circle: a circle named in the args (a typed `--circleId=`, a model's pick, a
+      // screen's data) is not followed — the person's role and the token do not look at the circle, so it is pinned
+      // here, for every door alike. The bot's own calls (no caller) still name any circle.
+      const { circleId: _circle, groupId: _group, ...pinned } = args ?? {};
+      args = pinned;
+      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...args, actor: ctx.caller };
     }
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
     // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no
@@ -4061,7 +4079,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         const words = (it) => it?.text ?? it?.title;
         const { entry: task, among } = matchEntry(open, args.id, words);
         const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
-        if (!task) return { ok: false, error: among.length ? tr('circle.lists.which_one', { options: choicesOf(among, words) }) : tr('circle.tasks.no_such_task', { item: args.id }) };
+        // `code: 'not-found'` when the words name nothing (a rule that may fall back to the model reads it); two that
+        // match ask which, and that is an answer
+        if (!task) return among.length ? { ok: false, error: tr('circle.lists.which_one', { options: choicesOf(among, words) }) } : { ok: false, code: 'not-found', error: tr('circle.tasks.no_such_task', { item: args.id }) };
         args = { ...args, id: task.id };
         namedTask = words(task) || null;
       }
@@ -5804,6 +5824,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),
       });
     },
+    /** The live grants-lane entry a surface token belongs to, or null (an allow-list answer; see `surfaceGrants`). */
+    surfaceTokenEntry: async (tokenId) => { await surfaceGrantsReady; return surfaceGrants.activeEntryOf(tokenId); },
     /** Resolves once the durable surface registry has loaded (grants are refused until then). */
     surfaceGrantsReady: () => surfaceGrantsReady,
     llmProviders,
@@ -6258,6 +6280,21 @@ export async function createRealHouseholdAgent(opts = {}) {
      * settings, the bot admin's app list): a refusal code, or null. `visibility` is the op's declared level.
      */
     doorRefusal: (opId, caller, visibility) => doorRefusal(opId, caller, visibility),
+    /**
+     * Expose skill definitions to peers (from `renderA2A`) after boot: a door that answers as a PERSON builds them over
+     * its own call, which exists only once the door does. Token-gated like the boot-time ones. It never REPLACES a
+     * skill (the registry is last-write-wins): an id already registered — a kernel skill, an op withheld with
+     * `policy: 'never'` — throws, before any of the defs is registered.
+     * @param {Array<{id: string, handler: Function}>} defs
+     * @returns {number} how many were registered
+     */
+    exposeToPeers: (defs) => {
+      const list = (Array.isArray(defs) ? defs : []).filter((def) => def?.id && typeof def.handler === 'function');
+      const taken = list.filter((def) => chatAgent.skills.has(def.id)).map((def) => def.id);
+      if (taken.length) throw new Error(`exposeToPeers: already registered, not replaced: ${taken.join(', ')}`);
+      for (const def of list) chatAgent.skills.register(def.id, def.handler, def);
+      return list.length;
+    },
     /** Every item of the household's circle store, as stored (the export writes its public fields from these). */
     householdItems: async () => (await householdService.stores.getStore(resolveCircleId({})).list()) ?? [],
     /** A household bot's reminders read the household circle's chores and appointments, whole (dates, who comes). */

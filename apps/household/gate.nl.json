@@ -1,0 +1,91 @@
+{
+  "household.addItem": {
+    "doc": "Add something to a household list (shopping, errands, repairs, the schedule); the rest of the line is the list and the item.",
+    "verbs": [
+      "toevoegen",
+      "noteer",
+      "voeg toe"
+    ],
+    "examples": [
+      "noteer melk"
+    ]
+  },
+  "household.listOpen": {
+    "doc": "Show what is open on a household list.",
+    "verbs": [
+      "lijst",
+      "toon"
+    ],
+    "examples": [
+      "toon boodschappen"
+    ]
+  },
+  "household.markComplete": {
+    "doc": "Tick something off a household list (bought, done).",
+    "verbs": [
+      "klaar",
+      "gedaan",
+      "gekocht"
+    ],
+    "examples": [
+      "gekocht melk"
+    ]
+  },
+  "household.removeItem": {
+    "doc": "Remove something from a household list.",
+    "verbs": [
+      "verwijder",
+      "weg"
+    ],
+    "examples": [
+      "verwijder melk"
+    ]
+  },
+  "household.help": {
+    "doc": "Show the commands.",
+    "verbs": [
+      "help",
+      "hulp"
+    ],
+    "examples": [
+      "hulp"
+    ]
+  },
+  "household.addTask": {
+    "doc": "Add a chore (it can be given to someone, and have a day); the rest of the line is the chore.",
+    "verbs": [
+      "taak"
+    ],
+    "examples": [
+      "taak ramen lappen"
+    ]
+  },
+  "household.listTasks": {
+    "doc": "Show the open chores.",
+    "verbs": [
+      "taken"
+    ],
+    "examples": [
+      "taken"
+    ]
+  },
+  "household.claim": {
+    "doc": "Take on a chore.",
+    "verbs": [
+      "oppakken"
+    ],
+    "examples": [
+      "oppakken ramen"
+    ]
+  },
+  "household.registerName": {
+    "doc": "Tell the household your name.",
+    "verbs": [
+      "registreer",
+      "naam"
+    ],
+    "examples": [
+      "naam Ann"
+    ]
+  }
+}

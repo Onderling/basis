@@ -54,6 +54,8 @@ import {
   RoutingStrategy,
   TRANSPORT_PRIORITY,
   firstContactRateGate,
+  invokeAgentSkill,
+  Parts,
 } from '@onderling/core';
 import {
   NknTransport,
@@ -72,6 +74,7 @@ import {
 } from '@onderling/core';
 import { migrateVaultToPod as migrateVaultToPodFn } from '@onderling/pod-client';
 import { createRateLimiter } from './rateLimit.js';
+import { makePeerSkillCalls } from './peerSkillCalls.js';
 import { loadPFSChain }      from './pfs.js';
 
 import { makeBrowserVault, restoreOrGenerate } from './vault.js';
@@ -277,6 +280,11 @@ export async function createSecureAgent(opts = {}) {
     peerGraph:  opts.peerGraph ?? null,
   });
   const agent = new Agent({ identity, transport, routing });
+  // Other agents' kernel task requests over this factory's transports (`acceptPeerSkillCalls`): OFF unless the
+  // composition asks — `true`, or `{maxPartsBytes, perPeer}` to tune the caps. See `peerSkillCalls.js`.
+  const peerSkillCalls = opts.acceptPeerSkillCalls
+    ? makePeerSkillCalls({ agent, ...(typeof opts.acceptPeerSkillCalls === 'object' ? opts.acceptPeerSkillCalls : {}) })
+    : null;
   await agent.start();
 
   // ─── persistent mute set (A.1) ───────────────────────────────
@@ -1429,6 +1437,9 @@ export async function createSecureAgent(opts = {}) {
       // gate above (mute, circle-block, rate limit) as an ordinary envelope — and on the final chunk
       // the ORIGINAL payload is handed to the app as if it had arrived whole. Apps never see chunks.
       if (reassembleChunk(env)) return;
+      // A kernel task request (another agent's `invoke`), when this composition takes them: to the kernel's own
+      // gated dispatch, answered on this transport. Otherwise it stays an ordinary peer message, as before.
+      if (peerSkillCalls && env?.payload?.type === 'task') { await peerSkillCalls(env, tx); return; }
       if (typeof onPeerMessageFn === 'function') {
         try {
           onPeerMessageFn({
@@ -2224,7 +2235,12 @@ export async function createSecureAgent(opts = {}) {
    * wait) then the one-way send.  Extracted from the old `_sendToPeerOnce`
    * so the failover loop can drive it once per candidate transport.
    */
-  async function _sendOverRoute(addr, payload, sel, opts = {}) {
+  /**
+   * The first-contact HI handshake over ONE resolved route (the bilateral HI and the peer-key wait), shared by a
+   * one-way send and a kernel task call: either needs the peer to hold our key before the first sealed envelope.
+   * @returns {Promise<{tx: object, wireAddr: string, speakAs: string|null}>}
+   */
+  async function _handshakeOverRoute(addr, sel, opts = {}) {
     const tx      = sel.transport;
     const wireAddr = sel.address ?? addr;   // per-transport address (Phase-1 map); === addr today
     // Decision 4 — WHICH of our identities this traffic belongs to. The caller passes an ADDRESS of
@@ -2365,6 +2381,28 @@ export async function createSecureAgent(opts = {}) {
         }).catch(() => { /* population must never break a send */ });
       }
     }
+    return { tx, wireAddr, speakAs };
+  }
+
+  /**
+   * Call a skill on another agent over this factory's transports — the kernel's own task exchange
+   * (`invokeAgentSkill`: the request, its `taskId` and ttl, the capability token — `opts.token`, else
+   * `agent.tokenRegistry`'s — and the answer), on the route `route()` picks, after the same first-contact
+   * handshake a send makes. The receiver takes it only if its composition accepts peer skill calls.
+   * @returns {Promise<import('@onderling/core').Part[]>} the result parts; throws when the call failed
+   */
+  async function invokePeer(addr, skillId, input = [], opts = {}) {
+    const sel = await route(addr);
+    if (!sel?.transport) throw new Error(`secure-agent: no route to ${String(addr).slice(0, 16)}…`);
+    await _handshakeOverRoute(addr, sel, opts);
+    const task = invokeAgentSkill(agent, addr, skillId, Parts.wrap(input), { ...opts, _overrideTransport: sel.transport });
+    const result = await task.done();
+    if (result.state === 'failed') throw new Error(result.error ?? `Skill "${skillId}" failed`);
+    return result.parts;
+  }
+
+  async function _sendOverRoute(addr, payload, sel, opts = {}) {
+    const { tx, wireAddr, speakAs } = await _handshakeOverRoute(addr, sel, opts);
     // v0.7.cc — record outbound for /debug-dump diagnostic.
     recordTraffic({
       dir:     'send',
@@ -2621,6 +2659,9 @@ export async function createSecureAgent(opts = {}) {
     peer: {
       connect: connectPeer,
       sendTo:  sendToPeer,
+      invoke:  invokePeer,
+      /** The skills other agents' task requests reach here (`acceptPeerSkillCalls`); [] when the route is off. */
+      callableSkills: () => (peerSkillCalls ? peerSkillCalls.reachableSkills() : []),
       get status()  { return peerState.status;  },
       get address() { return peerState.address; },
       get error()   { return peerState.error;   },

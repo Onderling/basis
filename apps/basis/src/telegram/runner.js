@@ -413,7 +413,15 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
           displayName: msg?.sender?.displayName ?? null, text,
           ...(typeof msg?.admission === 'string' ? { admission: msg.admission } : {}),
         });
-      } catch { r = null; }
+      } catch (err) {
+        // A failing admission is SAID, never passed off as "I only understand commands": the reason on the console and
+        // in the walk log (never the person's id), and the person hears that letting them in went wrong.
+        const reason = err?.message ?? String(err);
+        console.warn(`telegram runner: admission failed (${reason})`);
+        if (typeof walkLog === 'function') { try { walkLog({ kind: 'admission-error', error: reason }); } catch { /* a log must never break a turn */ } }
+        await say(chatId, tc(chatId)('circle.bot.admission_failed'));
+        return;
+      }
       // Refused: the reason, and nothing else — never the chat's id.
       if (r && typeof r === 'object' && r.refused) {
         // A door that tells a stranger once (the bot's inbox): "you need a code" the first time, kept on their row, then

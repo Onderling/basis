@@ -7,6 +7,8 @@
  * someone later deletes or renames is not made again: the template is a start, not a rule.
  */
 
+import { reminderPromptLines } from './botReminders.js';
+
 /**
  * The household TEMPLATE, as data: a composition of the plugins that exist (lists · tasks · calendar), not an app.
  * "Household" is the bot's name and this start — a "Tennisclub" template composes the same plugins with other lists
@@ -115,6 +117,14 @@ function listLine({ name, defaultChild }) {
  * @param {object} [template]
  * @returns {string[]}
  */
+/**
+ * Everything a household bot tells its model about its household, in ONE place: the template's lines and the reminder
+ * lines. The box reads it, and so does the eval — "the eval composes the bot as it ships" stays true by construction.
+ */
+export function botPromptLines(t, template = HOUSEHOLD_TEMPLATE) {
+  return [...promptLinesFor(t, template), ...reminderPromptLines()];
+}
+
 export function promptLinesFor(t, template = HOUSEHOLD_TEMPLATE) {
   const lists = templateLists(t, template);
   const byKind = Object.fromEntries(lists.map((l) => [l.kind, l.name]));

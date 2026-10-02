@@ -3761,7 +3761,11 @@
     "list_removed": {
       "text": "The list \"{{name}}\" is gone.",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
-    }
+    },
+    "chore_held": "{{text}} — {{who}}",
+    "chore_taken": "{{text}} — taken",
+    "chore_open": "{{text}} — nobody yet",
+    "chore_you": "you"
   },
   "share": {
     "error": {
@@ -4370,7 +4374,9 @@
           "listMine": "your own chores",
           "claimTask": "take on a chore (or say: I'll do the windows)",
           "completeTask": "report a chore done (or say: windows are done)",
-          "editTask": "change a chore"
+          "editTask": "change a chore",
+          "removeTask": "remove a chore",
+          "reassignTask": "give a chore to someone else"
         },
         "calendar": {
           "addEvent": "make an appointment (or say: dentist tomorrow at 10)",

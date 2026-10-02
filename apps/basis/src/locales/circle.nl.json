@@ -3761,7 +3761,11 @@
     "list_removed": {
       "text": "De lijst \"{{name}}\" is weg.",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
-    }
+    },
+    "chore_held": "{{text}} — {{who}}",
+    "chore_taken": "{{text}} — opgepakt",
+    "chore_open": "{{text}} — nog niemand",
+    "chore_you": "jij"
   },
   "share": {
     "error": {
@@ -4370,7 +4374,9 @@
           "listMine": "je eigen klusjes",
           "claimTask": "een klusje oppakken (of zeg: ik doe de ramen)",
           "completeTask": "een klusje afmelden (of zeg: ramen is klaar)",
-          "editTask": "een klusje aanpassen"
+          "editTask": "een klusje aanpassen",
+          "removeTask": "een klusje weghalen",
+          "reassignTask": "een klusje aan een ander geven"
         },
         "calendar": {
           "addEvent": "een afspraak zetten (of zeg: tandarts morgen om 10 uur)",

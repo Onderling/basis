@@ -4370,7 +4370,9 @@
           "listMine": "je eigen klusjes",
           "claimTask": "een klusje oppakken (of zeg: ik doe de ramen)",
           "completeTask": "een klusje afmelden (of zeg: ramen is klaar)",
-          "editTask": "een klusje aanpassen"
+          "editTask": "een klusje aanpassen",
+          "removeTask": "een klusje weghalen",
+          "reassignTask": "een klusje aan een ander geven"
         },
         "calendar": {
           "addEvent": "een afspraak zetten (of zeg: tandarts morgen om 10 uur)",

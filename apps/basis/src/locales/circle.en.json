@@ -4330,7 +4330,19 @@
     "value_keep": "keep",
     "value_hide": "hide",
     "value_delete": "delete",
-    "value_own": "their own"
+    "value_own": "their own",
+    "screen_confirm_question": "A screen wants to connect as you — code {{code}}. Does that match the code on that screen? Only if you just did this yourself: tap Yes (or answer /koppelen ja).",
+    "screen_confirm_replaced": "An earlier request to connect has lapsed.",
+    "screen_confirm_yes": "Yes, connect",
+    "screen_confirm_no": "No",
+    "screen_confirm_remembered": "I asked you whether a screen may connect.",
+    "screen_confirmed": "Connected.",
+    "screen_declined": "Not connected.",
+    "screen_confirm_not_private": "Confirm this in your own chat with me, not in a group.",
+    "screen_confirm_expired": "This request has lapsed. Ask for a new link: /scherm.",
+    "screen_confirm_nothing": "No request to connect is waiting.",
+    "screen_confirm_failed": "Connecting did not work. Ask for a new link: /scherm.",
+    "screen_confirm_usage": "Answer with /koppelen ja or /koppelen nee."
   },
   "op": {
     "not_in_this_circle": {

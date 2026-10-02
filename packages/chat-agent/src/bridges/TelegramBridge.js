@@ -270,9 +270,11 @@ export class TelegramBridge {
    * @param {import('./MessagingBridge.js').SendReplyArgs} args
    * @returns {Promise<void>}
    */
-  async sendReply({ chatId, replyTo, text, buttons } = /** @type {any} */ ({})) {
+  async sendReply({ chatId, replyTo, text, buttons, noPreview = false } = /** @type {any} */ ({})) {
     /** @type {Record<string, any>} */
     const extra = {};
+    // A message carrying a one-time link must not be fetched for a preview (a preview service may run the page).
+    if (noPreview) extra.link_preview_options = { is_disabled: true };
     if (replyTo != null) {
       extra.reply_to_message_id = replyTo;
     }

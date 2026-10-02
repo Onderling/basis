@@ -3,7 +3,7 @@
  * admitted through the bot's inbox (the first, so its admin), and a screen on its own agent — over a real relay.
  *
  * The person asks for `/scherm` and gets a one-time link; the screen sends its offer (its key, the link's nonce) to
- * the bot's address; the bot grants that key the person's role column, each token signed by the bot and acting as the
+ * the bot's address; the person is asked, privately, with the code the screen shows, and says yes; the bot grants that key the person's role column, each token signed by the bot and acting as the
  * person, delivers it to the screen, and tells the person in their own chat. The same nonce a second time is not
  * granted again. Then the screen ACTS: a second screen, a full agent as a browser view is, calls the bot's ops with the tokens it was
  * granted (the kernel's own task exchange, carried on both secure channels): as the person, only the declared
@@ -19,11 +19,18 @@ import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
 import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from '../src/v2/connectionPairing.js';
-import { parseScreenLink } from '../src/v2/botScreens.js';
+import { parseScreenLink, screenCode } from '../src/v2/botScreens.js';
 import { DataPart } from '@onderling/core';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
+/** Ann answers the bot's "a screen wants to connect — code X" with yes, in her own door (the inbox is private). */
+const answerYes = async (ann, peerAddr, code, said) => {
+  const asked = await until(async () => ((await said()).some((t) => t.includes(code)) ? true : null), { timeout: 30_000, step: 500 });
+  if (!asked) return false;
+  await ann.contactThreadChannel.sendTurn({ peerAddr, threadId: peerAddr, text: '/koppelen ja' }).sent;
+  return true;
+};
 const botSaid = async (node) => (await node.contactThreadChannel.rehydrateAll()).filter((t) => t.origin === 'bot').map((t) => t.text);
 
 describe('a person connects a screen to the bot over the relay', () => {
@@ -76,6 +83,8 @@ describe('a person connects a screen to the bot over the relay', () => {
     // the screen: its own key, the link's nonce, its offer to the bot's address over the relay
     const viewPubKey = screen.pubKey;
     await screen.agent.sendPeerMessage(link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey, relayUrl: relay.url, nonce: link.nonce, label: 'laptop' }) });
+    // nothing is granted until Ann says yes, privately, to the code the screen shows
+    expect(await answerYes(ann, card.peerAddr, await screenCode(viewPubKey, link.nonce), () => botSaid(ann)), `no question with the code:\n${out.slice(-1500)}`).toBe(true);
     const grant = await until(async () => screen.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
     expect(grant, `no grant reached the screen:\n${out.slice(-1500)}`).toBeTruthy();
     const accepted = acceptConnectionGrant(grant, { nonce: link.nonce, viewPubKey });
@@ -117,6 +126,7 @@ describe('a person connects a screen to the bot over the relay', () => {
     await connectNodesOverRelay([view, thief], { relayUrl: relay.url });
     try {
       await view.agent.sendPeerMessage(link.botAddress, { subtype: 'screen-offer', offer: encodePairingOffer({ viewPubKey: view.pubKey, relayUrl: relay.url, nonce: link.nonce }) });
+      expect(await answerYes(ann, card.peerAddr, await screenCode(view.pubKey, link.nonce), () => botSaid(ann))).toBe(true);
       const grant = await until(async () => view.received.find((m) => m.payload?.subtype === CONNECTION_GRANT_SUBTYPE)?.payload ?? null, { timeout: 30_000, step: 500 });
       expect(grant, `no grant reached the screen:\n${out.slice(-1500)}`).toBeTruthy();
       const accepted = acceptConnectionGrant(grant, { nonce: link.nonce, viewPubKey: view.pubKey });

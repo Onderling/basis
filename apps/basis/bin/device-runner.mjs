@@ -802,7 +802,18 @@ if (tgToken || inboxDoor.bridge) {
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
-    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs }),
+    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs, noPreview: true }),
+    // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
+    // `/koppelen`, which counts only from this private door
+    ask: (person, { code, replaced }) => {
+      const lang = threads.langOf(person) ?? undefined;
+      const tp = (k, p) => t(k, p, lang);
+      const text = [tp('circle.bot.screen_confirm_question', { code }), ...(replaced ? [tp('circle.bot.screen_confirm_replaced')] : [])].join('\n');
+      return reach.sendToPerson(person, {
+        text, rememberAs: tp('circle.bot.screen_confirm_remembered'),
+        buttons: [{ id: '/koppelen ja', label: tp('circle.bot.screen_confirm_yes') }, { id: '/koppelen nee', label: tp('circle.bot.screen_confirm_no') }],
+      });
+    },
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
     grant: (g) => agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce }),
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,

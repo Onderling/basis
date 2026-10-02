@@ -4330,7 +4330,19 @@
     "value_keep": "bewaren",
     "value_hide": "verbergen",
     "value_delete": "weggooien",
-    "value_own": "je eigen"
+    "value_own": "je eigen",
+    "screen_confirm_question": "Een scherm wil koppelen als jou — code {{code}}. Klopt dat met de code op dat scherm? Alleen als je dit net zelf deed: tik Ja (of antwoord /koppelen ja).",
+    "screen_confirm_replaced": "Een eerder koppelverzoek is daarmee vervallen.",
+    "screen_confirm_yes": "Ja, koppelen",
+    "screen_confirm_no": "Nee",
+    "screen_confirm_remembered": "Ik vroeg je of een scherm mocht koppelen.",
+    "screen_confirmed": "Gekoppeld.",
+    "screen_declined": "Niet gekoppeld.",
+    "screen_confirm_not_private": "Bevestig dit in je eigen gesprek met mij, niet in een groep.",
+    "screen_confirm_expired": "Dit koppelverzoek is verlopen. Vraag een nieuwe link: /scherm.",
+    "screen_confirm_nothing": "Er wacht geen koppelverzoek.",
+    "screen_confirm_failed": "Koppelen lukte niet. Vraag een nieuwe link: /scherm.",
+    "screen_confirm_usage": "Antwoord met /koppelen ja of /koppelen nee."
   },
   "op": {
     "not_in_this_circle": {

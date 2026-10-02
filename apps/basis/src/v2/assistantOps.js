@@ -71,6 +71,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller);
       if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
       if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId);
+      if (op === 'assistant-screen-confirm') return screenConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-screens') return screensOp(caller ?? ctx?.threadId, args?.change ?? args?._match);
       if (op === 'assistant-exports') return exportsOp();
       if (op === 'assistant-export') return exportNowOp();
@@ -353,6 +354,24 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return { ok: false, error: { code: r.reason, message: tp(key) } };
     }
     return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+  }
+
+  /**
+   * `/koppelen ja|nee`: the answer to a screen's offer. It counts only from the person's PRIVATE door: on Telegram the
+   * chat whose id is their own (a group's is not), the inbox always.
+   */
+  async function screenConfirmOp(person, word, ctx) {
+    if (!person || !admin.screens?.confirm) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const w = String(word ?? '').trim().toLowerCase();
+    const answer = ['ja', 'yes', 'j', 'y'].includes(w) ? 'yes' : (['nee', 'no', 'n'].includes(w) ? 'no' : null);
+    if (!answer) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.screen_confirm_usage') } };
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const isPrivate = Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+    const r = await admin.screens.confirm(person, answer, { isPrivate });
+    if (r.ok) return { ok: true, message: tp(r.declined ? 'circle.bot.screen_declined' : 'circle.bot.screen_confirmed') };
+    const key = { 'not-private': 'screen_confirm_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'screen_confirm_nothing' }[r.reason] ?? 'screen_confirm_failed';
+    return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
   }
 
   /** `/schermen` (the person's screens) · `/schermen los <n>` (drop one). */

@@ -4393,7 +4393,8 @@
           "assistant-import": "restore an export"
         }
       }
-    }
+    },
+    "admission_failed": "Letting you in went wrong on the bot's side. Try again in a few minutes; if it still fails, ask the admin."
   },
   "op": {
     "not_in_this_circle": {

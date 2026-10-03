@@ -634,8 +634,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       const key = { 'not-private': 'kring_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'kring_nothing', replaced: 'stepup_replaced', 'admin-unreachable': 'kring_admin_offline' }[r.reason] ?? 'kring_join_failed';
       return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`, { name: r.name ?? '' }) } };
     }
-    const question = ({ name, rules, id }) => ({
-      text: tp('circle.bot.kring_question', { name, rules: rules || tp('circle.bot.kring_no_rules'), id }),
+    const question = ({ name, rules, id, handle }) => ({
+      text: tp('circle.bot.kring_question', { name, rules: rules || tp('circle.bot.kring_no_rules'), id, handle }),
       buttons: [{ id: `/kring ja ${id}`, label: tp('circle.bot.stepup_yes') }, { id: `/kring nee ${id}`, label: tp('circle.bot.stepup_no') }],
     });
     const r = await circles.offered(person, words.join(' '), question, { isPrivate });

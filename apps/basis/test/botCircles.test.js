@@ -24,7 +24,7 @@ function make({ joinResult = { ok: true, circleId: 'circle-1' } } = {}) {
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
     handle: () => 'huisbot-van-frits',
   });
-  const question = ({ name, rules, id }) => ({ text: `Q ${name} | ${rules}`, buttons: [{ id: `/kring ja ${id}` }, { id: `/kring nee ${id}` }] });
+  const question = ({ name, rules, id, handle }) => ({ text: `Q ${name} | ${rules} | @${handle}`, buttons: [{ id: `/kring ja ${id}` }, { id: `/kring nee ${id}` }] });
   return { circles, asked, joins, left, forgot, question };
 }
 
@@ -35,6 +35,7 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(r).toMatchObject({ ok: true, pending: true });
     expect(d.asked[0].text).toContain('Huize Rood');
     expect(d.asked[0].text).toContain('samen boodschappen');
+    expect(d.asked[0].text).toContain('@huisbot-van-frits');   // the admin's name going to the circle, said first
     expect(d.joins).toEqual([]);
     expect(await d.circles.list()).toEqual([]);
   });

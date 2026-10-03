@@ -82,6 +82,7 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(question, `no question came back. The bot said: ${JSON.stringify((await botTurns(ann)).map((t) => [t.text, t.buttons]))}\nRunner:\n${out.split('\n').filter((l) => /device-runner|kring|join|redeem|warn|error/i.test(l)).slice(-30).join('\n')}`).toBeTruthy();
     expect(question.text).toContain('Huize Rood');
     expect(question.text).toMatch(/op dit apparaat/);
+    expect(question.text).toMatch(/@huisbot/);
     // nothing joined before the yes
     expect(botOnRoster(await readRoster(ann, CIRCLE))).toBe(false);
 

@@ -4461,7 +4461,7 @@
     "link_not_private": "That only counts in your own chat with the bot.",
     "link_question": "A Basis app wants to link to you: messages from that app then count as you, and the bot knows your Basis identity. Pick the code your app shows.",
     "kring_usage": "Paste a circle's invite after /kring. Out of a circle: /kring los <name>.",
-    "kring_question": "The bot joins the circle “{{name}}”.\nRules: {{rules}}\n\nThe bot then keeps that circle's data on this device, and members of that circle can ask it things. The circle sees it is your bot. Go ahead? (/kring ja {{id}} or /kring nee {{id}})",
+    "kring_question": "The bot joins the circle “{{name}}”.\nRules: {{rules}}\n\nThe bot then keeps that circle's data on this device, and members of that circle can ask it things. The circle sees it is your bot: it is @{{handle}} there. Go ahead? (/kring ja {{id}} or /kring nee {{id}})",
     "kring_no_rules": "no rules set",
     "kring_asked": "I asked you in this private chat whether the bot may join the circle.",
     "kring_already": "The bot is in “{{name}}” already.",

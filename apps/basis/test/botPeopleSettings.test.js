@@ -17,6 +17,7 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows } from '../src/v2/botOpMap.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, vars) => NAMES[k] ?? (vars ? `${k} ${JSON.stringify(vars)}` : k);
 const FRITS = 'telegram:111';
@@ -41,7 +42,7 @@ describe('the bot\'s people', () => {
       chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') },
       seedDemoData: false, seedHousehold: false,
-      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, t,
+      ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, t,
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });

@@ -38,10 +38,12 @@ describe('the bot\'s slim map', () => {
 
   it('a member\'s command menu (their /help) holds no admin command; the admin\'s does', () => {
     const menu = (role) => (scopeCatalogueToRole(catalogue, role).commandMenu ?? []).map((e) => e.opId);
-    for (const op of ['assistant-apps', 'assistant-cohort', 'assistant-revoke', 'assistant-role', 'assistant-settings']) {
+    for (const op of ['assistant-cohort', 'assistant-revoke', 'assistant-role', 'assistant-settings']) {
       expect(menu('member'), op).not.toContain(op);
       expect(menu('admin'), op).toContain(op);
     }
+    // and the app switch is no one's: a household bot's plugins are its template's
+    expect(menu('admin')).not.toContain('assistant-apps');
     expect(menu('member')).toContain('assistant-reminders');
   });
 

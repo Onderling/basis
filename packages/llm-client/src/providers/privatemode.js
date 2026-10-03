@@ -122,5 +122,7 @@ export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DE
     // The route PROMISES confidentiality — attested and end-to-end encrypted by the SDK itself (routeSafety).
     confidential: true,
     attested: true,
+    /** The models the provider serves now (its own list) — what a box watches its model against. */
+    async listModels() { const r = await c.models.list(); return (r?.data ?? []).map((m) => m?.id).filter(Boolean); },
   };
 }

@@ -31,7 +31,7 @@ const isGone = (err) => Number(err?.status) === 404 || /\bmodel\b[^\n]*\bnot fou
  * provider is made on first need. `onFallback` hears of it (the box writes it to its walk log), and so does a slow
  * turn: a request's own `onSlow` (the door tells the person to wait).
  */
-function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback }) {
+function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback, onProviderError = null }) {
   let second = null;
   let primaryGone = false;
   return {
@@ -40,6 +40,7 @@ function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback 
       if (primaryGone && second) return second.invoke(req);
       try { return await primary.invoke(req); }
       catch (err) {
+        try { onProviderError?.(err); } catch { /* a listener never breaks a turn */ }
         const gone = isGone(err);
         if ((!gone && !isTimeout(err)) || !fallbackModel || fallbackModel === primary.model) throw err;
         second ??= await makeFallback();
@@ -76,14 +77,19 @@ export async function buildAssistantLlm({
   warn = (m) => console.warn(m),
   fallbackModel = ASSISTANT_FALLBACK_MODEL,
   onFallback = null,
+  onProviderError = null,
 } = {}) {
   if (!hasKey()) return null;
   try {
     const primary = await makeProvider({ model: model || undefined, timeoutMs });
     const provider = withTimeoutFallback(primary, {
-      fallbackModel, onFallback, makeFallback: () => makeProvider({ model: fallbackModel, timeoutMs }),
+      fallbackModel, onFallback, onProviderError, makeFallback: () => makeProvider({ model: fallbackModel, timeoutMs }),
     });
-    return { llm: new LlmClient({ provider }), model: primary?.model ?? null };
+    return {
+      llm: new LlmClient({ provider }), model: primary?.model ?? null, fallbackModel,
+      // the provider's own list of served models, when it has one (a box watches its model against it)
+      listModels: typeof primary?.listModels === 'function' ? () => primary.listModels() : null,
+    };
   } catch (err) {
     warn(`device-runner: the confidential LLM route did not load (${err?.message ?? err}) — Telegram answers without a model; the device runs on.`);
     return null;

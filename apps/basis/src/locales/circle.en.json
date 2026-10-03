@@ -4436,7 +4436,9 @@
     "stepup_declined": "Not done.",
     "stepup_unwired": "That can only be done in the chat here.",
     "stepup_replaced": "That request was replaced by a newer one; nothing was done with it.",
-    "stepup_what_op": "do {{op}} ({{arg}})"
+    "stepup_what_op": "do {{op}} ({{arg}})",
+    "model_not_served": "Note: the language model {{model}} is no longer offered by the provider. I now use {{using}}.",
+    "model_over_limit": "Note: the language model provider's account has reached its monthly limit. Until that is sorted, I answer commands and buttons only."
   },
   "op": {
     "not_in_this_circle": {

@@ -54,6 +54,8 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
     const dialogs = [];
     page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
     await page.goto(/https?:\/\/\S+/.exec(linkLine)[0]);
+    // the first load of a fresh dev server is slow: wait for the page as the connect walk does
+    await expect(page.locator('[data-screen="connect"]')).toBeVisible({ timeout: 60_000 });
     await page.locator('[data-screen="connect"]').click();
     const code = await page.locator('[data-code]').getAttribute('data-code', { timeout: 30_000 });
     expect(await until(async () => ((await said()).some((x) => /koppelen|connect/i.test(x)) ? true : null), { timeout: 30_000, step: 500 })).toBe(true);

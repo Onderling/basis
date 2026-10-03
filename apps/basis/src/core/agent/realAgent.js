@@ -1111,9 +1111,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         // unsigned mirror carry is deleted. The valve is built per publish call so it sees the task
         // emitter even though this wiring can run at boot, before the rails are handed the device log;
         // on a device-log composition a pre-emitter write REFUSES loudly instead of silently not-fanning.
+        // …and the composition hears that the circle's content changed (`opts.onCircleWrite`: a bot nudges its screens)
+        const wrote = () => { try { opts.onCircleWrite?.(id); } catch { /* a listener never breaks a write */ } };
         wireStoreMirror(circleStore, {
-          publishItem:        (item)          => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item),
-          publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed),
+          publishItem:        (item)          => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(); return r; },
+          publishItemRemoved: (rid, removed)  => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(); return r; },
         });
         reFanOwedChat(id);   // what a restart still owes this circle goes out again (idempotent)
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the

@@ -4,7 +4,7 @@
  * equivocators are discounted, founders are the root of authority. These tests ARE the spec for decision 4.
  */
 import { describe, it, expect } from 'vitest';
-import { foldRoster } from '../src/security/rosterFold.js';
+import { foldRoster, MEMBER_PROPS_FIELDS, MEMBER_KINDS } from '../src/security/rosterFold.js';
 import { signSpine } from '../src/security/spineStatement.js';
 import { AgentIdentity } from '../src/identity/AgentIdentity.js';
 import { VaultMemory } from '@onderling/vault';
@@ -595,6 +595,22 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r3.handles[bob.pubKey]).toBe('bobby');
     expect(r3.props[bob.pubKey].handle, 'a handle from the member\'s own statement is in props too (a projection tells it from the join\'s)').toBe('bobby');
     expect(r.props[bob.pubKey].handle, 'the join\'s handle is not').toBeUndefined();
+  });
+
+  // What KIND of member this is, said by the member itself (2026-10-04): a household bot says `function`, so the circle
+  // paints it a bot and a person's local assistant stays quiet for its name. Self-said, not an authority.
+  it('kind: a member says what it is (person | function) on its own row; another word refuses the WHOLE statement', async () => {
+    const { founder, bob } = await ids();
+    expect(MEMBER_PROPS_FIELDS).toContain('kind');
+    expect(MEMBER_KINDS).toEqual(['person', 'function']);
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'huisbot' } });
+    const said = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, handle: 'huisbot-van-frits', kind: 'function' }, parent: join.hash });
+    const r = foldRoster([join, said], { founders: [founder.pubKey] });
+    expect(r.props[bob.pubKey]).toMatchObject({ kind: 'function', handle: 'huisbot-van-frits' });
+    const odd = body(bob, 'member-props', bob, { payload: { authorRef: bob.pubKey, displayName: 'Admin', kind: 'admin' }, parent: said.hash });
+    const r2 = foldRoster([join, said, odd], { founders: [founder.pubKey] });
+    expect(r2.props[bob.pubKey].kind).toBe('function');
+    expect(r2.props[bob.pubKey].displayName, 'refused whole: the name did not land with it').toBeUndefined();
   });
 
   // ── THE FACE'S CAP (2026-09-23) ─────────────────────────────────────────────────────────────────────

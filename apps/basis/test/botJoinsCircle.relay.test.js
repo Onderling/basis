@@ -93,6 +93,11 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(onAnn, 'the bot is not on Ann\'s roster').toBe(true);
     const onBob = await until(async () => (botOnRoster(await readRoster(bob, CIRCLE)) ? true : null), { timeout: 30_000, step: 500 });
     expect(onBob, 'the bot is not on Bob\'s roster').toBe(true);
+    // …and says what it is on its row: a function (a bot), on Ann's and Bob's roster alike
+    for (const [who, node] of [['Ann', ann], ['Bob', bob]]) {
+      const kind = await until(async () => (await readRoster(node, CIRCLE)).find((m) => /^huisbot/.test(String(m.handle ?? '')))?.kind ?? null, { timeout: 30_000, step: 500 });
+      expect(kind, `${who}'s row for the bot does not say what it is: ${JSON.stringify((await readRoster(node, CIRCLE)).map((m) => [m.handle, m.kind]))}`).toBe('function');
+    }
 
     await send('/kringen');
     expect(await until(async () => ((await botTurns(ann)).some((t) => /De bot zit in:\n• Huize Rood/.test(t.text ?? '')) ? true : null), { timeout: 30_000, step: 500 })).toBe(true);

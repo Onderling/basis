@@ -544,12 +544,21 @@ if (relayUrl) {
 
   // A circle the household bot joins on its admin's word: the same join chain as the wizard and the pair roster, with
   // the rules accepted (the admin said yes to them), a fresh per-circle key, and a handle for that roster alone.
-  circleSeams.join = ({ inviteUri, handle, rulesAccepted }) => joinCircleFromInvite({
-    inviteUri, callSkill, sendPeerRedeem: pairSeams.sendPeerRedeem, handle, rulesAccepted, profileHandle: false,
-    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
-    onJoined: (a) => pairSeams.onJoined?.(a),
-  });
+  circleSeams.join = async ({ inviteUri, handle, rulesAccepted }) => {
+    const r = await joinCircleFromInvite({
+      inviteUri, callSkill, sendPeerRedeem: pairSeams.sendPeerRedeem, handle, rulesAccepted, profileHandle: false,
+      circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+      signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+      onJoined: (a) => pairSeams.onJoined?.(a),
+    });
+    // …and the bot says what it is, on its own row, in the same statement as its handle: the circle paints it a bot,
+    // and a member's local assistant stays quiet for its name
+    if (r?.ok && r.circleId) {
+      const said = await agent.emitMemberProps?.({ circleIds: [r.circleId], props: { handle, kind: 'function' } }).catch(() => null);
+      walkLog({ kind: 'circle-said-kind', circleId: String(r.circleId).slice(0, 12), ok: (said?.emitted ?? []).length > 0 || (said?.unchanged ?? []).length > 0 });
+    }
+    return r;
+  };
   // …and leaves one: the leave statement, the members' keys unbound, the authorize snapshot dropped, the address off the relay
   circleSeams.leave = (circleId) => leaveCircleLocally({
     agent, callSkill, circleId,

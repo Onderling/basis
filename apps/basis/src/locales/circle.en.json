@@ -368,6 +368,10 @@
     }
   },
   "members_tab": {
+    "bot": {
+      "text": "bot",
+      "doc": "MEMBERS tab — the badge on a member that says it is a function (a household bot)."
+    },
     "loading": {
       "text": "Loading members…",
       "doc": "MEMBERS tab — while the roster (listGroupMembers) loads."

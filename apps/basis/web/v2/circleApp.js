@@ -258,7 +258,7 @@ import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../s
 import { createOnboardingFlags, localStorageOnboardingIo } from '../../src/v2/onboardingFlags.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
-import { botIsAddressed } from '../../src/v2/botAddress.js';
+import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
 import { stripBotTag } from '../../src/v2/circleDispatch.js';
 import { routeHelpMessage, helpTopicChips, resolveHelpTopic, parseHelpAction, helpConsentAction, helpLlmLabelKeys } from '../../src/v2/helpChat.js';
 // #38 — the DEDICATED help-answer LLM path: a freeform layer-2 ask is ANSWERED (grounded in the kaartjes),
@@ -7013,10 +7013,13 @@ function showCircle(id, circle, policy) {
         // and the assistant's lane hands it to the ask (`followUpClaim`) when its turn comes — also when the turn that
         // asks was still running as it was typed. So nothing else may take the line first while an ask is pending.
         const answering = circlePendingFollowUp != null;
+        // A line naming a bot MEMBER of this circle (a household bot that says it is a function) is that member's:
+        // the local assistant stays quiet for it — one line, one answer (shared rule: `namesAFunctionMember`).
+        const forAnotherBot = namesAFunctionMember(line, circleMembers);
         // Conversational follow-up: the bot just asked a free-text question. Route THIS line back to it —
         // force-addressed so it's interpreted (the prior Q&A threaded as `history`) — instead of fanning
         // out to the circle. So "which list?" → "shopping" continues the conversation, no @assistant needed.
-        if (!answering && circleAwaitingBotReply && !line.startsWith('/')) {
+        if (!answering && circleAwaitingBotReply && !line.startsWith('/') && !forAnotherBot) {
           const prev = circleAwaitingBotReply;
           circleAwaitingBotReply = null;
           const aMsgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
@@ -7054,7 +7057,7 @@ function showCircle(id, circle, policy) {
           return;
         }
         if (circleBot) {
-          noteCircleBotTurn(await circleBot.handle(line, { id, msgId, ts }), line);
+          noteCircleBotTurn(await circleBot.handle(line, { id, msgId, ts, ...(forAnotherBot ? { forAnotherBot: true } : {}) }), line);
           // A `/addtask` (or any task-touching) turn ran through the bot — refresh the Taken
           // tab so a newly-created task appears there without a manual reload.
           if (activeTab === 'tasks') loadTasks();

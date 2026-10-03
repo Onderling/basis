@@ -21,6 +21,7 @@ export const CIRCLE_ANSWER_WITHIN_MS = param({ key: 'assistant.circleAnswerWithi
 
 const WINDOW_MS = 60_000;
 const DOOR_ROLES = new Set(['admin', 'coordinator', 'member', 'observer']);
+const CALLER_PREFIX = 'circle:';
 const escape = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
@@ -55,9 +56,25 @@ export function withoutBotName(text, names) {
   return t.replace(/\s{2,}/g, ' ').trim();
 }
 
-/** A circle roster's role as the door's role: core's four, anything else a member. */
+/**
+ * A circle roster's role as the door's role: core's four as they are; `external` (below an observer) is not a member
+ * here — null, not fed; a word the door does not know reads, never more (`observer`).
+ */
 export function doorRoleForRosterRole(role) {
-  return DOOR_ROLES.has(role) ? role : 'member';
+  if (role === 'external') return null;
+  if (role == null) return 'member';   // a roster row without a role is a member (the join's default)
+  return DOOR_ROLES.has(role) ? role : 'observer';
+}
+
+/**
+ * The host gate's id for a member at a circle's door: scoped to the circle, so one person in two circles with two roles
+ * is two callers. The member acts as their own ref (`circleCallerActor`) in the circle's data.
+ */
+export const circleCallerId = (circleId, ref) => `${CALLER_PREFIX}${circleId}:${ref}`;
+/** The member's ref inside a circle caller id, or null for any other caller. */
+export function circleCallerActor(callerId, circleId) {
+  const head = `${CALLER_PREFIX}${circleId}:`;
+  return typeof callerId === 'string' && callerId.startsWith(head) ? callerId.slice(head.length) || null : null;
 }
 
 /**
@@ -111,6 +128,7 @@ function createCircleDoorBridge({ circleId, post, cap, onCapped = null }) {
  * @param {(circleId: string) => string|null} a.botRef      the bot's own author ref in that circle (its lines are skipped)
  * @param {(circleId: string) => string|null|Promise<string|null>} a.botHandle   the bot's handle on that roster (its names)
  * @param {(callerId: string, role: string) => Promise<void>} a.setDoorCaller  the host gate's tier for a caller
+ * @param {(callerId: string) => Promise<void>} [a.clearDoorCaller]  …and its removal (the circle left, the member gone)
  * @param {(circleId: string, text: string) => Promise<unknown>} a.post   the bot's line onto the circle's chat
  * @param {(a: {circleId: string, bridge: object, roleOf: (callerId: string) => string|null}) => Promise<{start: Function, stop: Function, idle: Function}>|{start: Function, stop: Function, idle: Function}} a.makeRunner
  *        the host's runner for one circle (its catalogue, its lists' lines, its call pinned to the circle)
@@ -119,12 +137,13 @@ function createCircleDoorBridge({ circleId, post, cap, onCapped = null }) {
  * @param {() => number} [a.now]
  * @param {(e: object) => void} [a.log]  what happened, never what was said
  */
-export function createCircleDoors({ roster, botRef, botHandle, setDoorCaller, post, makeRunner, perMinute = CIRCLE_REPLIES_PER_MINUTE, answerWithinMs = CIRCLE_ANSWER_WITHIN_MS, now = Date.now, log = null }) {
+export function createCircleDoors({ roster, botRef, botHandle, setDoorCaller, clearDoorCaller = null, post, makeRunner, perMinute = CIRCLE_REPLIES_PER_MINUTE, answerWithinMs = CIRCLE_ANSWER_WITHIN_MS, now = Date.now, log = null }) {
   const cap = createReplyCap({ perMinute });
   const doors = new Map();   // circleId → { bridge, runner, roles }
   const seen = new Set();
   const SEEN_MAX = 1000;
   const say = (e) => { try { log?.(e); } catch { /* a log never breaks a turn */ } };
+  const clearCaller = async (caller) => { try { await clearDoorCaller?.(caller); } catch { /* the next turn tiers afresh */ } };
 
   async function doorFor(circleId) {
     let d = doors.get(circleId);
@@ -159,17 +178,36 @@ export function createCircleDoors({ roster, botRef, botHandle, setDoorCaller, po
       const member = ((await roster(circleId)) ?? []).find((m) => m?.webid === authorRef);
       if (!member) return false;
       const role = doorRoleForRosterRole(member.role);
-      await setDoorCaller(authorRef, role);
+      if (!role) return false;
+      const caller = circleCallerId(circleId, authorRef);
+      await setDoorCaller(caller, role);
       const d = await doorFor(circleId);
-      d.roles.set(authorRef, role);
+      d.roles.set(caller, role);
       say({ kind: 'circle-turn', circleId: String(circleId).slice(0, 12) });
-      return d.bridge.feed({ authorRef, text: withoutBotName(text, names), msgId, displayName: displayName ?? member.handle ?? null });
+      return d.bridge.feed({ authorRef: caller, text: withoutBotName(text, names), msgId, displayName: displayName ?? member.handle ?? null });
     },
-    /** The circle's door goes (the bot left it, or was removed). */
+    /** The circle's door goes (the bot left it, or was removed) — and every caller it tiered leaves the host gate. */
     async forget(circleId) {
       const d = doors.get(circleId);
       doors.delete(circleId);
       try { await d?.runner?.stop?.(); } catch { /* gone either way */ }
+      for (const caller of d?.roles?.keys?.() ?? []) await clearCaller(caller);
+    },
+    /** A circle's roster changed: a member the door tiered who is no longer on it (or no longer a member here) leaves the gate. */
+    async rosterChanged(circleId) {
+      const d = doors.get(circleId);
+      if (!d || !d.roles.size) return 0;
+      const rows = (await roster(circleId)) ?? [];
+      let cleared = 0;
+      for (const caller of [...d.roles.keys()]) {
+        const ref = circleCallerActor(caller, circleId);
+        const row = rows.find((m) => m?.webid === ref);
+        if (row && doorRoleForRosterRole(row.role)) continue;
+        d.roles.delete(caller);
+        await clearCaller(caller);
+        cleared += 1;
+      }
+      return cleared;
     },
     /** The circles with a door open now. */
     open: () => [...doors.keys()],

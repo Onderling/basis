@@ -11,6 +11,7 @@ import { EventLog } from '../eventLog.js';
 import { loadListItems, promptLinesForLists } from '../v2/householdTemplate.js';
 import { listsGateRules } from '../v2/circleGate.js';
 import { scopeCatalogueToRole, roleHintsFor } from '../v2/botOpMap.js';
+import { circleCallerActor } from '../v2/circleDoor.js';
 
 /** What the model is told about a circle beside its lists. LLM-facing. */
 const CIRCLE_LINES = Object.freeze([
@@ -33,7 +34,8 @@ export async function circleLists(hostCall) {
  * @param {string} a.circleId
  * @param {object} a.bridge      the circle's door bridge (`circleDoor.js`)
  * @param {(callerId: string) => string|null} a.roleOf  the member's role in this circle
- * @param {(app: string, op: string, args: object, ctx?: object) => Promise<any>} a.agentCall  the agent's callSkill
+ * @param {(app: string, op: string, args: object, ctx?: object) => Promise<any>} a.agentCall  the door's call (on the box
+ *        `withAssistantOps` over the agent: the assistant's own ops are refused there for a circle's call)
  * @param {{catalogue: () => object, manifestsByOrigin: () => object}} a.catalogue  the circle catalogue (no door ops)
  * @param {Function} a.t
  * @param {string} [a.lang]
@@ -53,10 +55,9 @@ export async function composeCircleRunner({ circleId, bridge, roleOf, agentCall,
     catalogue: catalogue.catalogue,
     manifestsByOrigin: catalogue.manifestsByOrigin,
     t, lang,
-    // a person's call runs in this circle, as that person, through the agent's door gate (their circle role's tier)
-    callSkill: (app, op, args, ctx) => (app === 'assistant'
-      ? { ok: false, error: { code: 'not-in-a-circle', message: t('circle.bot.kring_not_here') } }
-      : agentCall(app, op, args, { ...ctx, doorCircleId: circleId })),
+    // a person's call runs in this circle (the gate's circle-scoped caller, acting as their own ref), through the door's
+    // call — which refuses the assistant's own ops for a circle — and the agent's door gate (their circle role's tier)
+    callSkill: (app, op, args, ctx) => agentCall(app, op, args, { ...ctx, doorCircleId: circleId, doorActor: circleCallerActor(ctx?.caller, circleId) }),
     // the circle door only feeds its members (it read the roster): the sender is the caller
     admit: async ({ uid }) => (roleOf(uid) ? uid : { refused: 'not-a-member' }),
     threads,

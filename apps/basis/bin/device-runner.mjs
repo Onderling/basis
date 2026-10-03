@@ -360,7 +360,7 @@ let inboxDoor = { bridge: null, feed: () => false };
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 // A household bot's circles (`/kring`): the join, the leave and "am I still in it" need the wire, composed below; the
 // door that answers `/kring` comes after. A removal the membership lane folds reaches the bot's record through `removed`.
-const circleSeams = { join: null, leave: null, stillIn: null, removed: null, landed: null };
+const circleSeams = { join: null, leave: null, stillIn: null, removed: null, landed: null, rosterChanged: null };
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
   // constructor both shells use; only the backing differs, which is the whole of what a shell decides.
@@ -480,7 +480,7 @@ if (relayUrl) {
       // …and a catch-up that brought statements in (the pull at connect, the enrol consume's content pull).
       chatChange: (circleId) => walkLog({ kind: 'chat-change', circleId }),
       // A circle's roster changed: a household bot removed from a circle it joined lets go of that circle's content.
-      membershipChange: (circleId) => { circleSeams.removed?.(circleId); },
+      membershipChange: (circleId) => { circleSeams.removed?.(circleId); circleSeams.rosterChanged?.(circleId); },
       // …and one it could NOT take: a pulled statement refused at the rail is dropped, and only a later
       // pull brings it back — said in the log with its reason, so "behind" is never a mystery.
       chatRefused: async ({ circleId, fromPeerAddr, reason, statement }) => {
@@ -919,15 +919,19 @@ if (tgToken || inboxDoor.bridge) {
   // that circle, in that circle's lists — one runner per circle (its own lists' lines and memory), no door ops at all.
   const circleCatalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps(), withoutDoorOps: true });
   const botCircleRef = () => agent.identity?.chat?.pubKey ?? null;
+  const doorCallRef = { fn: null };
   const circleDoors = isFunctionProfile && circleSeams.join ? createCircleDoors({
     roster: async (circleId) => (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [],
     botRef: () => botCircleRef(),
     botHandle: (circleId) => botCirclesRef.ref?.handleIn(circleId) ?? null,
     setDoorCaller: (id, role) => agent.setDoorCaller(id, role),
+    clearDoorCaller: (id) => agent.clearDoorCaller(id),
     // the bot's line onto the circle's chat: signed with its per-circle key and fanned, as any member's
     post: (circleId, text) => agent.chatEmit(circleId, { msgId: `bot-${randomBytes(9).toString('hex')}`, ts: Date.now(), text, actor: botCircleRef() }),
     makeRunner: ({ circleId, bridge, roleOf }) => composeCircleRunner({
-      circleId, bridge, roleOf, agentCall: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), catalogue: circleCatalogue,
+      // through the door's call (composed below; a runner is built on a circle's first line): it refuses the assistant's
+      // own ops for a circle's call, and hands the rest to the agent's door gate
+      circleId, bridge, roleOf, agentCall: (a, o, x, ctx) => doorCallRef.fn(a, o, x, ctx), catalogue: circleCatalogue,
       t, lang: values.lang, ...(llm ? { llm, interpret: interpretToCommand } : {}), expand: expandAdds({ t }),
     }),
     // what happened, never what was said
@@ -951,6 +955,8 @@ if (tgToken || inboxDoor.bridge) {
   }) : null;
   botCirclesRef.ref = botCircles;
   if (botCircles && circleDoors) {
+    // a member gone from a circle's roster leaves the host gate (the circle door tiered them)
+    circleSeams.rosterChanged = (circleId) => circleDoors.rosterChanged(circleId).catch(() => {});
     // a circle message landed: read from the log (the rail verified its author), fed when it is a joined circle's
     circleSeams.landed = async ({ msgId, circleId }) => {
       try {
@@ -1005,6 +1011,7 @@ if (tgToken || inboxDoor.bridge) {
       }),
     },
   });
+  doorCallRef.fn = doorCall;
   if (screens) {
     // A household change reaches the connected screens as a nudge that names nothing; each reads again as its person.
     const nudge = createScreenNudge({

@@ -4003,6 +4003,19 @@ export async function createRealHouseholdAgent(opts = {}) {
    * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
    * entry the person (and their model) reads.
    */
+  /**
+   * A door call's circle and actor. The circle door (`ctx.doorCircleId`, host-set) gates a circle-scoped caller id and
+   * acts as the member's own ref (`ctx.doorActor`, host-set), so the chores and appointments they touch carry their ref
+   * in the circle's own data; every other door acts as its caller.
+   */
+  const doorCircleOf = (ctx) => (typeof ctx?.doorCircleId === 'string' && ctx.doorCircleId ? ctx.doorCircleId : null);
+  const actorOf = (ctx) => (doorCircleOf(ctx) && typeof ctx?.doorActor === 'string' && ctx.doorActor ? ctx.doorActor : (typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null));
+  /** A circle's people as the chore rules read them: its folded roster, by ref, with their handle and role. */
+  async function circlePeople(circleId) {
+    const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
+    return (Array.isArray(r?.members) ? r.members : []).filter((m) => m?.webid).map((m) => ({ webid: m.webid, displayName: m.handle ?? m.displayName ?? null, role: m.role ?? null, channel: 'circle' }));
+  }
+
   async function withChoreHolders(items, caller, inCircle = null) {
     if (!items.some((i) => Array.isArray(i?.holders))) return items;
     const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
@@ -4030,11 +4043,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   async function addChoreFor(args, ctx) {
     const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
     const { assignee, due, ...rest } = args;
-    const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
+    const caller = actorOf(ctx);
+    // in a circle: its roster is who may be named, and assigning follows the standard role table (no household setting)
+    const inCircle = doorCircleOf(ctx);
     let who = null;
     let whoName = null;
     if (typeof assignee === 'string' && assignee.trim()) {
-      const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+      const people = inCircle ? await circlePeople(inCircle) : await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
       const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
       const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
       const policy = buildStandardRolePolicy(roles);
@@ -4042,7 +4057,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       const roleMayAssign = caller ? policy.canReassign(caller) : true;
       // Whether this person may SEE the others' names is the household's ceiling (`assistant.names`); naming someone
       // is seeing them, so where names are hidden a chore is given by name only by those who may see them.
-      const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
+      // (in a circle the roster's handles are every member's to see)
+      const mayName = inCircle ? true : mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
       if (isSelfWord(assignee)) who = caller ?? 'me';
       else {
         if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
@@ -4056,12 +4072,12 @@ export async function createRealHouseholdAgent(opts = {}) {
         whoName = hit[0].displayName ?? null;
       }
       const allowed = assignAllowed({
-        policy: paramsService.register.valueOf(ASSIGN_POLICY_KEY),
+        policy: inCircle ? 'roles' : paramsService.register.valueOf(ASSIGN_POLICY_KEY),
         roleMayAssign, callerId: caller, assigneeId: who,
       });
       if (!allowed) {
         // under `roles` the op's own rule said no (the tasks app's reassign rule); otherwise the household's setting did
-        const byRole = assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
+        const byRole = inCircle || assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
         return { ok: false, error: tr('circle.tasks.assign_refused'), refusal: byRole ? refuse('op-rule', 'cannot-reassign') : refuse('door-settings', 'setting:assign') };
       }
       // …and the one who gets it must be someone their OWN role lets claim (an observer looks, and holds no chore).
@@ -4083,7 +4099,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     if (who) {
       // the claim path, the host vouching for the person the chore is for
-      const claimed = await callSkill('tasks', 'claimTask', { id: made.itemId, actor: who });
+      const claimed = await callSkill('tasks', 'claimTask', { id: made.itemId, actor: who, ...(rest.circleId ? { circleId: rest.circleId } : {}) });
       if (claimed?.ok === false) return claimed;
       // the reply names the one who got it only where names may be seen; to someone else it says it was given
       if (who !== caller && who !== 'me') {
@@ -4107,7 +4123,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // which (`ctx.doorCircleId`, never from a person's words) — its person's call lands there, never the household.
       const { circleId: _circle, groupId: _group, ...pinned } = args ?? {};
       args = typeof ctx.doorCircleId === 'string' && ctx.doorCircleId ? { ...pinned, circleId: ctx.doorCircleId } : pinned;
-      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...args, actor: ctx.caller };
+      if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...args, actor: actorOf(ctx) };
     }
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
     // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no
@@ -4741,11 +4757,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (appOrigin === 'calendar' && opId === 'cancelEvent' && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
         && doorRoles.get(ctx.caller) !== 'admin') {
       const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
-      if (cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {
+      // (in a circle the standard rule only: the one who added it, or the circle's admin — no household setting)
+      if (!doorCircleOf(ctx) && cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {
         return { ok: false, error: tr('circle.calendar.cancel_admin_only'), refusal: refuse('door-settings', 'setting:cancel') };
       }
-      const snap = await callSkill('calendar', 'getEventSnapshot', { id: args?.id });
-      if (snap?.ok && snap.event && snap.event.createdBy !== ctx.caller) {
+      const snap = await callSkill('calendar', 'getEventSnapshot', { id: args?.id, ...(args?.circleId ? { circleId: args.circleId } : {}) });
+      if (snap?.ok && snap.event && snap.event.createdBy !== actorOf(ctx)) {
         return { ok: false, error: tr('circle.calendar.not_yours', { title: snap.event.title ?? '' }), refusal: refuse('op-rule', 'not-yours') };
       }
     }
@@ -4842,7 +4859,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const result = await handler(args ?? {}, ctx);
       // A door's read of a chores list says who holds each chore — as far as the names setting lets the asker see names
       if (appOrigin === 'lists' && opId === 'listEntries' && typeof ctx?.caller === 'string' && ctx.caller && Array.isArray(result?.items)) {
-        return { ...result, items: await withChoreHolders(result.items, ctx.caller, typeof ctx.doorCircleId === 'string' && ctx.doorCircleId ? ctx.doorCircleId : null) };
+        return { ...result, items: await withChoreHolders(result.items, actorOf(ctx), doorCircleOf(ctx)) };
       }
       return result;
     }

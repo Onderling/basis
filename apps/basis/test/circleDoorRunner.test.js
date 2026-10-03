@@ -19,6 +19,7 @@ import { householdBotApps } from '../src/v2/householdTemplate.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
 import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { initLocalisation, t } from '../src/localisation.js';
+import { withAssistantOps } from '../src/v2/assistantOps.js';
 
 const CIRCLE = 'joined-circle-r';
 
@@ -41,13 +42,19 @@ describe('the circle door, with the real runner', () => {
     await own('lists', 'createList', { text: 'Kringlijst', circleId: CIRCLE });
     const householdBefore = JSON.stringify(await agent.householdItems());
     const catalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps(), withoutDoorOps: true });
+    // the door's call as the box composes it: the assistant's own ops answered here, the rest on to the agent
+    const doorCall = withAssistantOps({
+      callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), t, refusal: agent.doorRefusal, threads: { langOf: () => null },
+      admin: { users: async () => [{ id: 'telegram:1', displayName: 'Huisgenoot', role: 'admin' }] },
+    });
     const posted = [];
     const roster = [{ webid: 'ann', role: 'member', handle: 'ann' }, { webid: 'zoe', role: 'admin', handle: 'zoe' }];
     const doors = createCircleDoors({
       roster: async () => roster, botRef: () => 'BOT', botHandle: () => 'huisbot-van-frits',
       setDoorCaller: (id, role) => agent.setDoorCaller(id, role),
+      clearDoorCaller: (id) => agent.clearDoorCaller(id),
       post: async (circleId, text) => { posted.push({ circleId, text }); },
-      makeRunner: ({ circleId, bridge, roleOf }) => composeCircleRunner({ circleId, bridge, roleOf, agentCall: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), catalogue, t, lang: 'nl' }),
+            makeRunner: ({ circleId, bridge, roleOf }) => composeCircleRunner({ circleId, bridge, roleOf, agentCall: doorCall, catalogue, t, lang: 'nl' }),
       perMinute: 100,
     });
     let n = 0;
@@ -78,6 +85,14 @@ describe('the circle door, with the real runner', () => {
     expect(adminDelete).toMatch(/ja of nee/i);
     await say('zoe', '@huisbot ja');
     expect(JSON.stringify(await own('lists', 'listLists', { circleId: CIRCLE }))).not.toContain('Kringlijst');
+
+    // the circle's admin is `trusted` in the host gate — and still never reaches the door's own ops from a circle
+    const zoe = `circle:${CIRCLE}:zoe`;
+    const refused = await doorCall('assistant', 'assistant-users', {}, { caller: zoe, threadId: zoe, doorCircleId: CIRCLE, doorActor: 'zoe' });
+    expect(refused).toMatchObject({ ok: false, error: { code: 'not-in-this-circle' } });
+    // (the same trusted caller without a circle WOULD be let through by the gate: the refusal is the circle's)
+    const outside = await doorCall('assistant', 'assistant-users', {}, { caller: zoe, threadId: zoe });
+    expect(outside.ok).toBe(true);
 
     expect(posted.every((p) => p.circleId === CIRCLE)).toBe(true);
     expect(JSON.stringify(await agent.householdItems())).toBe(householdBefore);

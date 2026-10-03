@@ -5,7 +5,7 @@
  * lines, nor a non-member's, is fed.
  */
 import { describe, it, expect } from 'vitest';
-import { botNamesFor, namesTheBotMember, withoutBotName, doorRoleForRosterRole, createReplyCap, createCircleDoors } from '../src/v2/circleDoor.js';
+import { botNamesFor, namesTheBotMember, withoutBotName, doorRoleForRosterRole, createReplyCap, createCircleDoors, circleCallerId, circleCallerActor } from '../src/v2/circleDoor.js';
 
 describe('addressing by name', () => {
   const names = botNamesFor('huisbot-van-frits');
@@ -34,13 +34,20 @@ describe('addressing by name', () => {
 });
 
 describe('the circle role is the door role', () => {
-  it('core\'s four, and anything else a member', () => {
+  it('core\'s four as they are; external is no member here; an unknown word reads, never more', () => {
     expect(doorRoleForRosterRole('admin')).toBe('admin');
     expect(doorRoleForRosterRole('coordinator')).toBe('coordinator');
     expect(doorRoleForRosterRole('observer')).toBe('observer');
     expect(doorRoleForRosterRole('member')).toBe('member');
-    expect(doorRoleForRosterRole('founder')).toBe('member');
+    expect(doorRoleForRosterRole('external')).toBe(null);
+    expect(doorRoleForRosterRole('founder')).toBe('observer');
     expect(doorRoleForRosterRole(undefined)).toBe('member');
+  });
+  it('the gate\'s caller is circle-scoped; the member acts as their own ref', () => {
+    expect(circleCallerId('c1', 'ann')).toBe('circle:c1:ann');
+    expect(circleCallerActor('circle:c1:ann', 'c1')).toBe('ann');
+    expect(circleCallerActor('circle:c2:ann', 'c1')).toBe(null);
+    expect(circleCallerActor('telegram:42', 'c1')).toBe(null);
   });
 });
 
@@ -56,13 +63,15 @@ describe('the reply cap', () => {
 });
 
 describe('the circle doors', () => {
-  function make({ roster = [{ webid: 'ann', role: 'member', handle: 'ann' }, { webid: 'zoe', role: 'admin', handle: 'zoe' }, { webid: 'BOT', role: 'member', handle: 'huisbot-van-frits' }] } = {}) {
-    const fed = []; const posted = []; const tiers = [];
+  function make({ roster: rosterIn = [{ webid: 'ann', role: 'member', handle: 'ann' }, { webid: 'zoe', role: 'admin', handle: 'zoe' }, { webid: 'eve', role: 'external', handle: 'eve' }, { webid: 'BOT', role: 'member', handle: 'huisbot-van-frits' }] } = {}) {
+    const fed = []; const posted = []; const tiers = []; const cleared = [];
+    let roster = rosterIn;
     const doors = createCircleDoors({
       roster: async () => roster,
       botRef: () => 'BOT',
       botHandle: () => 'huisbot-van-frits',
       setDoorCaller: async (id, role) => { tiers.push([id, role]); },
+      clearDoorCaller: async (id) => { cleared.push(id); },
       post: async (circleId, text) => { posted.push({ circleId, text }); },
       makeRunner: ({ circleId, bridge, roleOf }) => {
         bridge.onMessage(async (msg) => { fed.push({ circleId, msg, role: roleOf(msg.sender.bridgeUid) }); await bridge.sendReply({ chatId: msg.chatId, text: `antwoord op ${msg.text}` }); });
@@ -70,15 +79,15 @@ describe('the circle doors', () => {
       },
       perMinute: 2,
     });
-    return { doors, fed, posted, tiers };
+    return { doors, fed, posted, tiers, cleared, setRoster: (r) => { roster = r; } };
   }
 
   it('a member\'s line naming the bot: fed without the name, as that member with their circle role; the reply goes onto the circle', async () => {
     const d = make();
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'm1', authorRef: 'ann', text: '@huisbot zet melk erop' })).toBe(true);
     await d.doors.idle();
-    expect(d.fed).toEqual([{ circleId: 'c1', msg: expect.objectContaining({ chatId: 'c1', text: 'zet melk erop', sender: expect.objectContaining({ bridgeUid: 'ann' }) }), role: 'member' }]);
-    expect(d.tiers).toEqual([['ann', 'member']]);
+    expect(d.fed).toEqual([{ circleId: 'c1', msg: expect.objectContaining({ chatId: 'c1', text: 'zet melk erop', sender: expect.objectContaining({ bridgeUid: 'circle:c1:ann' }) }), role: 'member' }]);
+    expect(d.tiers).toEqual([['circle:c1:ann', 'member']]);
     expect(d.posted).toEqual([{ circleId: 'c1', text: 'antwoord op zet melk erop' }]);
   });
 
@@ -86,7 +95,7 @@ describe('the circle doors', () => {
     const d = make();
     await d.doors.landed({ circleId: 'c1', msgId: 'm1', authorRef: 'zoe', text: '@huisbot verwijder de lijst' });
     await d.doors.idle();
-    expect(d.tiers).toEqual([['zoe', 'admin']]);
+    expect(d.tiers).toEqual([['circle:c1:zoe', 'admin']]);
     expect(d.fed[0].role).toBe('admin');
   });
 
@@ -95,6 +104,7 @@ describe('the circle doors', () => {
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'm1', authorRef: 'ann', text: '@assistent zet melk erop' })).toBe(false);
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'm2', authorRef: 'BOT', text: '@huisbot ik zeg iets' })).toBe(false);
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'm3', authorRef: 'stranger', text: '@huisbot hoi' })).toBe(false);
+    expect(await d.doors.landed({ circleId: 'c1', msgId: 'm3e', authorRef: 'eve', text: '@huisbot hoi' })).toBe(false);   // external
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'm4', authorRef: 'ann', text: '@huisbot hoi' })).toBe(true);
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'm4', authorRef: 'ann', text: '@huisbot hoi' })).toBe(false);
     await d.doors.idle();
@@ -113,6 +123,17 @@ describe('the circle doors', () => {
     const d = make();
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'old', authorRef: 'ann', text: '@huisbot hoi', ts: Date.now() - 60 * 60_000 })).toBe(false);
     expect(await d.doors.landed({ circleId: 'c1', msgId: 'new', authorRef: 'ann', text: '@huisbot hoi', ts: Date.now() - 1000 })).toBe(true);
+  });
+
+  it('the gate lets go: forget clears every caller the door tiered; a member gone from the roster is cleared', async () => {
+    const d = make();
+    await d.doors.landed({ circleId: 'c1', msgId: 'm1', authorRef: 'ann', text: '@huisbot hoi' });
+    await d.doors.landed({ circleId: 'c1', msgId: 'm2', authorRef: 'zoe', text: '@huisbot hoi' });
+    d.setRoster([{ webid: 'zoe', role: 'admin', handle: 'zoe' }]);   // Ann removed
+    expect(await d.doors.rosterChanged('c1')).toBe(1);
+    expect(d.cleared).toEqual(['circle:c1:ann']);
+    await d.doors.forget('c1');
+    expect(d.cleared).toEqual(['circle:c1:ann', 'circle:c1:zoe']);
   });
 
   it('forget: the circle\'s door goes; a later line builds it again', async () => {

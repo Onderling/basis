@@ -17,7 +17,9 @@ import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, vars) => NAMES[k] ?? (vars ? `${k} ${JSON.stringify(vars)}` : k);
 const CIRCLE = 'joined-circle-x';
+// the gate's id is circle-scoped; the member acts as their own ref in the circle's data
 const ANN = `circle:${CIRCLE}:ann-ref`;
+const BERT = `circle:${CIRCLE}:bert-ref`;
 
 describe('the circle door pins its circle', () => {
   let dir; let agent;
@@ -39,7 +41,8 @@ describe('the circle door pins its circle', () => {
     await own('lists', 'createList', { text: 'Klusjes', defaultChild: 'task', circleId: CIRCLE });
     await own('lists', 'createList', { text: 'Agenda', defaultChild: 'calendar-event', circleId: CIRCLE });
     await agent.setDoorCaller(ANN, 'member');
-    const asAnn = (a, o, x) => agent.callSkill(a, o, x, { caller: ANN, threadId: ANN, doorCircleId: CIRCLE });
+    const asAnn = (a, o, x) => agent.callSkill(a, o, x, { caller: ANN, threadId: ANN, doorCircleId: CIRCLE, doorActor: 'ann-ref' });
+    const asBert = (a, o, x) => agent.callSkill(a, o, x, { caller: BERT, threadId: BERT, doorCircleId: CIRCLE, doorActor: 'bert-ref' });
     const householdBefore = JSON.stringify(await agent.householdItems());
 
     expect((await asAnn('lists', 'addToList', { list: 'Kringlijst', text: 'melk', circleId: 'household' })).ok).not.toBe(false);
@@ -55,19 +58,35 @@ describe('the circle door pins its circle', () => {
     // a chore another member holds, read in the circle: the household's book does not name them, and under the circle's
     // default reveal policy nobody is named — only "you" for the reader's own
     // Bert is ALSO in the household's book (a linked key), with a household name: it does not reach the circle
-    await own('stoop', 'addContact', { webid: `circle:${CIRCLE}:bert-ref`, displayName: 'Bert Huisnaam', channel: 'web', role: 'member' });
-    await agent.setDoorCaller(`circle:${CIRCLE}:bert-ref`, 'member');
-    await agent.callSkill('lists', 'addToList', { list: 'Klusjes', text: 'vuilnis' }, { caller: `circle:${CIRCLE}:bert-ref`, threadId: 'b', doorCircleId: CIRCLE });
-    await agent.callSkill('tasks', 'claimTask', { id: 'vuilnis' }, { caller: `circle:${CIRCLE}:bert-ref`, threadId: 'b', doorCircleId: CIRCLE });
+    await own('stoop', 'addContact', { webid: 'bert-ref', displayName: 'Bert Huisnaam', channel: 'web', role: 'member' });
+    await agent.setDoorCaller(BERT, 'member');
+    await asBert('lists', 'addToList', { list: 'Klusjes', text: 'vuilnis' });
+    await asBert('tasks', 'claimTask', { id: 'vuilnis' });
     const chores = JSON.stringify(await asAnn('lists', 'listEntries', { list: 'Klusjes' }));
     expect(chores).toContain('circle.lists.chore_taken');
     expect(chores).not.toContain('bert-ref');
     expect(chores).not.toContain('Bert Huisnaam');
     expect(chores).toContain('circle.lists.chore_you');
 
+    // the chore's holder is the member's own ref, in the circle's data
+    const ramen = (await agent.callSkill('lists', 'listEntries', { list: 'Klusjes', circleId: CIRCLE }))?.items?.find((i) => /ramen/.test(i.label ?? ''));
+    expect(JSON.stringify(ramen)).toContain('ann-ref');
+    expect(JSON.stringify(ramen)).not.toContain(ANN);
+    // a chore for "mij" is the member's; naming a household person in a circle names nobody there
+    const mine = await asAnn('lists', 'addToList', { list: 'Klusjes', text: 'stofzuigen', assignee: 'mij' }); expect(mine.ok, JSON.stringify(mine)).not.toBe(false);
+    expect(JSON.stringify(await asAnn('tasks', 'listMine', {}))).toContain('stofzuigen');
+    const byHouseName = await asAnn('lists', 'addToList', { list: 'Klusjes', text: 'afwas', assignee: 'Bert Huisnaam' });
+    expect(byHouseName.ok).toBe(false);
+    expect(String(byHouseName.error)).toContain('circle.tasks.no_such_person');
+
     const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
     expect((await asAnn('calendar', 'addEvent', { title: 'kringetentje', when: `${tomorrow}T18:00:00.000Z` })).ok).not.toBe(false);
     expect(JSON.stringify(await asAnn('calendar', 'listEvents', { days: 7 }))).toContain('kringetentje');
+    // cancelling in a circle: the standard rule — not Bert (he did not add it), whatever the household's setting
+    const ev = (await asAnn('calendar', 'listEvents', { days: 7 }))?.items?.find((e) => /kringetentje/.test(e.label ?? e.title ?? ''));
+    expect((await asBert('calendar', 'cancelEvent', { id: ev.id })).ok).toBe(false);
+    await own('params', 'set-param', { key: 'assistant.cancelPolicy', value: 'admin' });
+    expect((await asAnn('calendar', 'cancelEvent', { id: ev.id })).ok, 'the one who added it cancels in a circle, the household setting aside').not.toBe(false);
 
     expect(JSON.stringify(await agent.householdItems())).toBe(householdBefore);
     // the household door's call (no door circle) is the household's, as before

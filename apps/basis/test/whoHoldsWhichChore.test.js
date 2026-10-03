@@ -37,5 +37,14 @@ describe('who holds which chore', () => {
     expect(hidden.find((l) => l.includes('ramen'))).not.toContain('Ann');
     expect(hidden.find((l) => l.includes('ramen'))).toContain('circle.lists.chore_taken');
     expect((await read('telegram:9')).find((l) => l.includes('ramen'))).toContain('Ann');
+
+    // the chore's state stays on the entry (a screen offers "I'll do it" on an open one, "Done" on a held one) — still
+    // without anyone's id; and whether it is the reader's own
+    const rows = async (who) => (await own('lists', 'listEntries', { list: 'Klusjes' }, { caller: who })).items;
+    const forBert = await rows('telegram:2');
+    expect(forBert.find((i) => i.label.includes('ramen'))).toMatchObject({ state: 'claimed' });
+    expect(forBert.find((i) => i.label.includes('vuilnis'))).toMatchObject({ state: 'open' });
+    expect(JSON.stringify(forBert)).not.toContain('telegram:1');
+    expect((await rows('telegram:1')).find((i) => i.label.includes('ramen'))).toMatchObject({ yours: true });
   }, 120_000);
 });

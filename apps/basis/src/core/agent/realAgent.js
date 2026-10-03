@@ -4011,7 +4011,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     const nameOf = (id) => (id === caller ? tr('circle.lists.chore_you') : (known.find((c) => c.webid === id)?.displayName ?? null));
     return items.map((i) => {
       if (!Array.isArray(i?.holders)) return i;
-      const { holders, ...rest } = i;
+      const { holders, ...base } = i;
+      // the chore's state stays (a screen offers "I'll do it" on an open one, "Done" on a held one), and whether it is
+      // the reader's own — never anyone's id
+      const rest = { ...base, state: holders.length ? 'claimed' : 'open', ...(holders.includes(caller) ? { yours: true } : {}) };
       if (!holders.length) return { ...rest, label: tr('circle.lists.chore_open', { text: i.label }) };
       const names = holders.map((h) => (h === caller || mayName ? nameOf(h) : null)).filter(Boolean);
       return { ...rest, label: names.length ? tr('circle.lists.chore_held', { text: i.label, who: names.join(', ') }) : tr('circle.lists.chore_taken', { text: i.label }) };

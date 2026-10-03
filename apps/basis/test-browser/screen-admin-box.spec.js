@@ -67,7 +67,10 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
       await expect(page.locator(`[data-op="${never}"]`)).toHaveCount(0);
     }
     const resultOf = (skill) => page.locator('.screen-op', { has: page.locator(`[data-op="${skill}"]`) }).locator('.screen-result');
-    const run = async (skill) => { await page.locator(`[data-op="${skill}"]`).click(); await expect(resultOf(skill)).not.toHaveText(/^(…)?$/, { timeout: 30_000 }); return resultOf(skill).textContent(); };
+    // a person's pace between taps: one screen gets a burst of 30 calls, then one a second, and the household on the
+    // screen is read again after each change (one read per list)
+    const pace = () => page.waitForTimeout(1_200);
+    const run = async (skill) => { await pace(); await page.locator(`[data-op="${skill}"]`).click(); await expect(resultOf(skill)).not.toHaveText(/^(…)?$/, { timeout: 30_000 }); return resultOf(skill).textContent(); };
 
     // ── the reads ──
     const status = await run('assistant.assistant-status');
@@ -88,6 +91,7 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
     await expect(namesNone).toBeVisible({ timeout: 30_000 });
     await expect(menuOp.locator('[data-reply="assistant.assistant-screen"]')).toHaveCount(0);
     const asksBefore = dialogs.length;
+    await pace();
     await namesNone.click();
     await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: none/, { timeout: 30_000 });
     expect(dialogs.slice(asksBefore).join(' '), 'the screen asked first').toMatch(/Weet je het zeker/);
@@ -96,12 +100,10 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
     const namesAll = menuOp.locator('[data-reply="assistant.assistant-settings"]', { hasText: /Namen zien: iedereen/ });
     await expect(namesAll).toBeVisible({ timeout: 30_000 });
     const asksBack = dialogs.length;
+    await pace();
     await namesAll.click();
     await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: members/, { timeout: 30_000 });
     expect(dialogs.length).toBe(asksBack);
-
-    // a person's pace: the door takes ten calls at once from one screen, then one every two seconds
-    await page.waitForTimeout(15_000);
 
     // ── a step-up said yes to: held, asked in her chat with the request's id, the screen told "Gedaan." ──
     const asked = (await said()).length;

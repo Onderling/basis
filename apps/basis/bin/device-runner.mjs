@@ -61,6 +61,7 @@ import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
+import { createScreenNudge } from '../src/v2/screenNudge.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE } from '../src/v2/screenView.js';
@@ -216,8 +217,11 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // lists is the engine's — one store per circle. A person's node keeps its tasks where they are. (The profile record is
 // only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
+const circleWrite = { fn: null };
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
+  // the household's store changed: a bot nudges its connected screens (bound below, once the screens exist)
+  onCircleWrite: (circleId) => circleWrite.fn?.(circleId),
   ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: true } : {}),
   ownerRootVault: vault,
   chatVault,
@@ -889,6 +893,12 @@ if (tgToken || inboxDoor.bridge) {
     },
   });
   if (screens) {
+    // A household change reaches the connected screens as a nudge that names nothing; each reads again as its person.
+    const nudge = createScreenNudge({
+      listScreens: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
+      send: (viewPubKey, payload) => agent.sendPeerMessage(viewPubKey, payload),
+    });
+    circleWrite.fn = () => nudge.touched();
     // The door's ops, to a connected screen: each call runs as the person its token names, through this door's own
     // call — the same gate as their typed line — and what a screen never gets is withheld at the kernel's door.
     const exposed = exposeDoorToScreens({ agent, catalogue: doorCatalogue.catalogue(), manifests: Object.values(doorCatalogue.manifestsByOrigin()), doorCall, users: botUsers });

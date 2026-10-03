@@ -153,6 +153,11 @@ describe('a person connects a screen to the bot over the relay', () => {
       // an op the token does not name, with another op's token: refused
       await expect(call(view, 'lists.removeList', { list: 'Reparaties' }, tokenFor('lists.listEntries'))).rejects.toThrow();
 
+      // a household change reaches the connected screen as a nudge that names nothing
+      await send('/add-to-list --list Boodschappen --text voor-de-nudge');
+      const nudged = await until(async () => view.received.find((m) => m.payload?.subtype === 'screen-nudge')?.payload ?? null, { timeout: 30_000, step: 500 });
+      expect(nudged, `no nudge reached the screen:\n${walkTail()}`).toEqual({ subtype: 'screen-nudge' });
+
       // what changes who is in waits for a yes in Ann's own chat: the screen's /rotate is held, asked, said yes to, done
       const asking = (await botSaid(ann)).length;
       const held = await call(view, 'assistant.assistant-rotate', {});

@@ -19,6 +19,7 @@ import { DataPart } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
 import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
 import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERED } from './screenStepUp.js';
+import { SCREEN_NUDGE_SUBTYPE } from './screenNudge.js';
 
 /** The peer-message subtype a screen's offer travels as (the bot's router takes it). */
 export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
@@ -76,7 +77,13 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
   // a call the bot holds for the person's yes: the screen waits its own ten minutes, then says "no answer" itself
   let waiting = null;
   const stopWaiting = () => { if (waiting) { clearTimer(waiting); waiting = null; } };
+  // the bot's nudge: something in the household changed (it names nothing; the screen reads again)
+  const nudges = new Set();
   const noticeOf = ({ from, payload } = {}) => {
+    if (from === parsed.botAddress && payload?.subtype === SCREEN_NUDGE_SUBTYPE) {
+      for (const fn of nudges) { try { fn(); } catch { /* a listener's fault is its own */ } }
+      return true;
+    }
     if (from !== parsed.botAddress || payload?.subtype !== SCREEN_STEP_UP_SUBTYPE) return false;
     stopWaiting();
     emit({ outcome: String(payload.outcome ?? ''), op: typeof payload.op === 'string' ? payload.op : null });
@@ -154,6 +161,9 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
      * done · declined · expired · replaced · failed. Returns the unsubscribe.
      */
     onNotice(fn) { notices.add(fn); return () => notices.delete(fn); },
+
+    /** Hear the bot's nudge (something in the household changed; it names nothing). Returns the unsubscribe. */
+    onNudge(fn) { nudges.add(fn); return () => nudges.delete(fn); },
 
     /** The ops this screen may call (`app.op`), from the grant. */
     ops: () => (granted?.tokens ?? []).map((t) => t.skill),

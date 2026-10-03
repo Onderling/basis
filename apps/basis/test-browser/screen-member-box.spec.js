@@ -70,6 +70,8 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     const ctx = await browser.newContext({ locale: 'nl-NL' });
     const page = await ctx.newPage();
     await page.goto(/https?:\/\/\S+/.exec(linkLine)[0]);
+    // the first load of a fresh dev server is slow: wait for the page as the connect walk does
+    await expect(page.locator('[data-screen="connect"]')).toBeVisible({ timeout: 60_000 });
     await page.locator('[data-screen="connect"]').click();
     const screenCode = await page.locator('[data-code]').getAttribute('data-code', { timeout: 30_000 });
     expect(await next(bertSaid, seen, /koppelen|connect/i)).toBeTruthy();
@@ -104,11 +106,11 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     await expect(household.locator('[data-list="Boodschappen"]')).toContainText('van-berts-scherm', { timeout: 30_000 });
     await expect(household.locator('[data-list="Klusjes"]')).toBeVisible();
 
-    // Ann puts a chore on Klusjes in her chat; Bert's refresh shows it, open, with "Ik doe het"; he takes it; then "Klaar"
+    // Ann puts a chore on Klusjes in her chat; Bert's screen shows it by itself, open, with "Ik doe het"; he takes it; then "Klaar"
     seen = (await annSaid()).length;
     await annSend('/add-to-list --list Klusjes --text ramen-lappen');
     expect(await next(annSaid, seen, /ramen-lappen/)).toBeTruthy();
-    await household.locator('[data-screen="refresh"]').click();
+    // no refresh: the bot's nudge brings it (it names nothing; the screen reads again as Bert)
     const chore = household.locator('[data-list="Klusjes"] li', { hasText: 'ramen-lappen' });
     await expect(chore).toBeVisible({ timeout: 30_000 });
     await chore.locator('[data-action="tasks.claimTask"]').click();

@@ -127,6 +127,8 @@ export async function startScreenShell(win = window) {
     say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), household, ...sections);
     paintHousehold();
   };
+  // the bot's nudge: something in the household changed — read it again (as this person, through the gate)
+  view.onNudge(() => { if (household.isConnected) paintHousehold(); });
   // what became of a request that waited for a yes in the person's own chat: said on that op's own line
   view.onNotice(({ outcome, op }) => {
     if (!SCREEN_STEP_UP_OUTCOMES.includes(outcome) && outcome !== SCREEN_STEP_UP_UNANSWERED) return;

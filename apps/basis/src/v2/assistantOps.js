@@ -519,6 +519,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!key) return { ok: false, error: { code: 'unwired', message: tp('circle.bot.stepup_unwired') } };
     const pass = args?.passphrase;
     if (typeof pass !== 'string' || pass.length < MIN_PASSPHRASE) return { ok: false, error: { code: 'too-short', message: tp('circle.bot.export_key_too_short', { n: MIN_PASSPHRASE }) } };
+    if (op === 'assistant-export-key-set' && args?.passphraseAgain !== pass) return { ok: false, error: { code: 'mismatch', message: tp('circle.bot.export_key_mismatch') } };
     if (op === 'assistant-export-key-unlock' && !key.exists()) return { ok: false, error: { code: 'no-key', message: tp('circle.bot.export_key_none') } };
     const note = op === 'assistant-export-key-set' && key.exists() ? tp('circle.bot.stepup_export_key_replaces') : null;
     return { ok: true, args: { passphrase: pass }, shown: '—', ...(note ? { note } : {}) };

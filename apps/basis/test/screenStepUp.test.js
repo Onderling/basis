@@ -199,7 +199,7 @@ describe('the admin\'s step-up ops from a screen', () => {
     for (const e of declared) {
       const ran = [];
       const d = door({ catalogue, callSkill: async (app, op) => { ran.push(`${app}.${op}`); return { ok: true }; } });
-      const r = await d.call(e.appOrigin, e.op.id, { who: 'Bert', spec: 'Bert observer', passphrase: 'een lange genoeg zin' }, d.fromScreen);
+      const r = await d.call(e.appOrigin, e.op.id, { who: 'Bert', spec: 'Bert observer', passphrase: 'een lange genoeg zin', passphraseAgain: 'een lange genoeg zin' }, d.fromScreen);
       expect(r, `${e.appOrigin}.${e.op.id} from a screen`).toMatchObject({ ok: true, pending: true });
       expect(ran, `${e.appOrigin}.${e.op.id} ran before the yes`).not.toContain(`${e.appOrigin}.${e.op.id}`);
       expect(d.revoked.length + d.roles.length).toBe(0);

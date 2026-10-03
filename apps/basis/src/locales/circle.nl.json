@@ -4448,7 +4448,8 @@
     "export_key_replaced": "Nieuwe exportsleutel gezet. Oudere bestanden gaan alleen open met het oude wachtwoord.",
     "export_key_unlocked": "De exportsleutel is een uur open: typ nu /import met de bestandsnaam in de chat.",
     "export_key_wrong": "Dat wachtwoord opent deze sleutel niet. De sleutel blijft dicht.",
-    "export_key_screen_only": "Dit gaat alleen via je scherm."
+    "export_key_screen_only": "Dit gaat alleen via je scherm.",
+    "export_key_mismatch": "De twee wachtwoorden zijn niet gelijk. Niets gevraagd, niets veranderd."
   },
   "op": {
     "not_in_this_circle": {

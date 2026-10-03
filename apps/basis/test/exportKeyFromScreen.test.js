@@ -49,7 +49,10 @@ describe('the export key from the admin\'s screen', () => {
       const op = assistantManifest.operations.find((o) => o.id === id);
       expect(op?.surfaces, id).toEqual({});
       expect(op.stepUp).toBe('private-door');
-      expect(op.params).toEqual([{ name: 'passphrase', kind: 'secret', required: true }]);
+      // set takes the passphrase twice (two fields on the screen); unlock once
+      expect(op.params).toEqual(id === 'assistant-export-key-set'
+        ? [{ name: 'passphrase', kind: 'secret', required: true }, { name: 'passphraseAgain', kind: 'secret', required: true }]
+        : [{ name: 'passphrase', kind: 'secret', required: true }]);
       expect(SCREEN_ADMIN_OPS).toContain(`assistant.${id}`);
     }
     const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
@@ -61,7 +64,7 @@ describe('the export key from the admin\'s screen', () => {
 
   it('set from a screen writes no key file until the yes; the passphrase appears nowhere', async () => {
     const b = box();
-    const held = await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS }, b.fromScreen());
+    const held = await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: PASS }, b.fromScreen());
     expect(held).toMatchObject({ ok: true, pending: true });
     expect(b.m.get(EXPORT_KEY_FILE)).toBeUndefined();
     expect(b.asked[0].text).toContain('WHAT:assistant-export-key-set');
@@ -74,7 +77,7 @@ describe('the export key from the admin\'s screen', () => {
 
   it('after the yes the next export is sealed to the new key; unlock from the screen opens it for the /import', async () => {
     const b = box();
-    await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS }, b.fromScreen());
+    await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: PASS }, b.fromScreen());
     await b.yes();
     const sealed = sealExport({ exportedAt: 'x', things: [1] }, JSON.parse(b.m.get(EXPORT_KEY_FILE)));
     await b.call('assistant', 'assistant-export-key-unlock', { passphrase: PASS }, b.fromScreen());
@@ -87,24 +90,34 @@ describe('the export key from the admin\'s screen', () => {
 
   it('a key already set: the question says files sealed with the old one open only with the old passphrase', async () => {
     const b = box();
-    await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS }, b.fromScreen());
+    await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: PASS }, b.fromScreen());
     await b.yes();
-    await b.call('assistant', 'assistant-export-key-set', { passphrase: 'een nieuwe lange zin' }, b.fromScreen());
+    await b.call('assistant', 'assistant-export-key-set', { passphrase: 'een nieuwe lange zin', passphraseAgain: 'een nieuwe lange zin' }, b.fromScreen());
     expect(b.asked.at(-1).text).toContain('circle.bot.stepup_export_key_replaces');
   });
 
   it('checked before the question: too short, a member\'s screen, an unlock with no key — refused, nothing asked', async () => {
     const b = box();
-    expect((await b.call('assistant', 'assistant-export-key-set', { passphrase: 'kort' }, b.fromScreen())).ok).toBe(false);
-    expect((await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS }, b.fromScreen('telegram:7'))).ok).toBe(false);
+    expect((await b.call('assistant', 'assistant-export-key-set', { passphrase: 'kort', passphraseAgain: 'kort' }, b.fromScreen())).ok).toBe(false);
+    expect((await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: PASS }, b.fromScreen('telegram:7'))).ok).toBe(false);
     expect((await b.call('assistant', 'assistant-export-key-unlock', { passphrase: PASS }, b.fromScreen())).ok).toBe(false);
     expect(b.asked).toEqual([]);
     expect(b.m.size).toBe(0);
   });
 
+  it('set: the two passphrases differ — refused at the op, nothing asked, nothing written', async () => {
+    const b = box();
+    const r = await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: `${PASS}!` }, b.fromScreen());
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r)).toContain('circle.bot.export_key_mismatch');
+    expect(JSON.stringify(r)).not.toContain(PASS);
+    expect(b.asked).toEqual([]);
+    expect(b.m.get(EXPORT_KEY_FILE)).toBeUndefined();
+  });
+
   it('a wrong passphrase on unlock: said so after the yes, and the key stays locked', async () => {
     const b = box();
-    await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS }, b.fromScreen());
+    await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: PASS }, b.fromScreen());
     await b.yes();
     await b.call('assistant', 'assistant-export-key-unlock', { passphrase: 'niet de goede zin hoor' }, b.fromScreen());
     const r = await b.yes();
@@ -115,7 +128,7 @@ describe('the export key from the admin\'s screen', () => {
 
   it('not from the chat: the ops run only after a screen\'s request was said yes to', async () => {
     const b = box();
-    const r = await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS }, b.PRIVATE);
+    const r = await b.call('assistant', 'assistant-export-key-set', { passphrase: PASS, passphraseAgain: PASS }, b.PRIVATE);
     expect(r.ok).toBe(false);
     expect(b.m.get(EXPORT_KEY_FILE)).toBeUndefined();
   });

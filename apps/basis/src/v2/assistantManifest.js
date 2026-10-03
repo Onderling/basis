@@ -243,7 +243,8 @@ export const assistantManifest = {
       visibility: 'trusted',
       writes: { scope: 'device' },
       stepUp: 'private-door',
-      params: [{ name: 'passphrase', kind: 'secret', required: true }],
+      // twice, as the box's script asks it: compared at the op, before any question
+      params: [{ name: 'passphrase', kind: 'secret', required: true }, { name: 'passphraseAgain', kind: 'secret', required: true }],
       surfaces: {},
     },
     {

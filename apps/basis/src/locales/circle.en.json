@@ -4448,7 +4448,8 @@
     "export_key_replaced": "A new export key is set. Older files open only with the old passphrase.",
     "export_key_unlocked": "The export key is open for an hour: now type /import with the file name in the chat.",
     "export_key_wrong": "That passphrase does not open this key. The key stays locked.",
-    "export_key_screen_only": "This goes through your screen only."
+    "export_key_screen_only": "This goes through your screen only.",
+    "export_key_mismatch": "The two passphrases do not match. Nothing asked, nothing changed."
   },
   "op": {
     "not_in_this_circle": {

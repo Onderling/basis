@@ -72,6 +72,9 @@ test('the export key from the screen: set and unlocked after a yes in her chat; 
       const field = opOf(skill).locator('input[name="passphrase"]');
       await expect(field).toHaveAttribute('type', 'password');
       await field.fill(passphrase);
+      // the set asks it twice (both secret fields); the unlock once
+      const again = opOf(skill).locator('input[name="passphraseAgain"]');
+      if (await again.count()) { await expect(again).toHaveAttribute('type', 'password'); await again.fill(passphrase); }
       await opOf(skill).locator('.cc-form-submit').first().click();
       await expect(opOf(skill).locator('.screen-result')).toContainText(/eigen chat/, { timeout: 30_000 });
       const q = await next(from, re);

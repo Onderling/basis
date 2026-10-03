@@ -77,7 +77,9 @@ export function createCircleDispatch({ catalogue, policy, userDefault, llmProvid
       //    (only when "smart chat" is available) → dispatch.
       const circlePolicy = await getPolicy(ctx);
       const llm = resolveCircleLlm({ circlePolicy, userDefault: getUserDefault(), providers: llmProviders });
-      if (typeof interpret === 'function' && addressesBot(trimmed, botName)) {
+      // A line that names a bot MEMBER of the circle (`ctx.forAnotherBot`, the shell read the roster) is that member's:
+      // the local assistant leaves it to the circle, whatever generic tag it also carries — one line, one answer.
+      if (typeof interpret === 'function' && addressesBot(trimmed, botName) && ctx?.forAnotherBot !== true) {
         const stripped = stripBotTag(trimmed, botName);
         // Token gate (optional) — a cheap LOCAL pass that routes deterministic verbs ("add X", "done X")
         // WITHOUT the LLM. It runs whether or not smart chat is configured, so commands keep working in

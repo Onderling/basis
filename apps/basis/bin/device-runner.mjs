@@ -62,6 +62,8 @@ import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
 import { createIdentityLink } from '../src/v2/botIdentityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
+import { createCircleDoors } from '../src/v2/circleDoor.js';
+import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { joinCircleFromInvite } from '../src/v2/circleInvite.js';
 import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
@@ -358,7 +360,7 @@ let inboxDoor = { bridge: null, feed: () => false };
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 // A household bot's circles (`/kring`): the join, the leave and "am I still in it" need the wire, composed below; the
 // door that answers `/kring` comes after. A removal the membership lane folds reaches the bot's record through `removed`.
-const circleSeams = { join: null, leave: null, stillIn: null, removed: null };
+const circleSeams = { join: null, leave: null, stillIn: null, removed: null, landed: null, rosterChanged: null };
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
   // constructor both shells use; only the backing differs, which is the whole of what a shell decides.
@@ -470,11 +472,15 @@ if (relayUrl) {
       ownDeviceTurn: (wire) => contactChannel.applyOwnDeviceTurn(wire).catch(() => {}),
       // A circle message landed. Nothing to paint — but said in the log, because "did the circle reach
       // this device" is the one question an operator (and the walk) has.
-      chatLanded: ({ msgId, circleId, source }) => walkLog({ kind: 'chat-landed', msgId, circleId, source: source ?? null }),
+      chatLanded: ({ msgId, circleId, source }) => {
+        walkLog({ kind: 'chat-landed', msgId, circleId, source: source ?? null });
+        // …and a household bot answers in a circle it joined, when a member names it
+        circleSeams.landed?.({ msgId, circleId });
+      },
       // …and a catch-up that brought statements in (the pull at connect, the enrol consume's content pull).
       chatChange: (circleId) => walkLog({ kind: 'chat-change', circleId }),
       // A circle's roster changed: a household bot removed from a circle it joined lets go of that circle's content.
-      membershipChange: (circleId) => { circleSeams.removed?.(circleId); },
+      membershipChange: (circleId) => { circleSeams.removed?.(circleId); circleSeams.rosterChanged?.(circleId); },
       // …and one it could NOT take: a pulled statement refused at the rail is dropped, and only a later
       // pull brings it back — said in the log with its reason, so "behind" is never a mystery.
       chatRefused: async ({ circleId, fromPeerAddr, reason, statement }) => {
@@ -538,12 +544,21 @@ if (relayUrl) {
 
   // A circle the household bot joins on its admin's word: the same join chain as the wizard and the pair roster, with
   // the rules accepted (the admin said yes to them), a fresh per-circle key, and a handle for that roster alone.
-  circleSeams.join = ({ inviteUri, handle, rulesAccepted }) => joinCircleFromInvite({
-    inviteUri, callSkill, sendPeerRedeem: pairSeams.sendPeerRedeem, handle, rulesAccepted, profileHandle: false,
-    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
-    onJoined: (a) => pairSeams.onJoined?.(a),
-  });
+  circleSeams.join = async ({ inviteUri, handle, rulesAccepted }) => {
+    const r = await joinCircleFromInvite({
+      inviteUri, callSkill, sendPeerRedeem: pairSeams.sendPeerRedeem, handle, rulesAccepted, profileHandle: false,
+      circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+      signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+      onJoined: (a) => pairSeams.onJoined?.(a),
+    });
+    // …and the bot says what it is, on its own row, in the same statement as its handle: the circle paints it a bot,
+    // and a member's local assistant stays quiet for its name
+    if (r?.ok && r.circleId) {
+      const said = await agent.emitMemberProps?.({ circleIds: [r.circleId], props: { handle, kind: 'function' } }).catch(() => null);
+      walkLog({ kind: 'circle-said-kind', circleId: String(r.circleId).slice(0, 12), ok: (said?.emitted ?? []).length > 0 || (said?.unchanged ?? []).length > 0 });
+    }
+    return r;
+  };
   // …and leaves one: the leave statement, the members' keys unbound, the authorize snapshot dropped, the address off the relay
   circleSeams.leave = (circleId) => leaveCircleLocally({
     agent, callSkill, circleId,
@@ -909,6 +924,29 @@ if (tgToken || inboxDoor.bridge) {
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
     where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
   }) : null;
+  // The bot's door in each circle it joined: a member who names it is answered there, as that member with their role in
+  // that circle, in that circle's lists — one runner per circle (its own lists' lines and memory), no door ops at all.
+  const circleCatalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps(), withoutDoorOps: true });
+  const botCircleRef = () => agent.identity?.chat?.pubKey ?? null;
+  const doorCallRef = { fn: null };
+  const circleDoors = isFunctionProfile && circleSeams.join ? createCircleDoors({
+    roster: async (circleId) => (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [],
+    botRef: () => botCircleRef(),
+    botHandle: (circleId) => botCirclesRef.ref?.handleIn(circleId) ?? null,
+    setDoorCaller: (id, role) => agent.setDoorCaller(id, role),
+    clearDoorCaller: (id) => agent.clearDoorCaller(id),
+    // the bot's line onto the circle's chat: signed with its per-circle key and fanned, as any member's
+    post: (circleId, text) => agent.chatEmit(circleId, { msgId: `bot-${randomBytes(9).toString('hex')}`, ts: Date.now(), text, actor: botCircleRef() }),
+    makeRunner: ({ circleId, bridge, roleOf }) => composeCircleRunner({
+      // through the door's call (composed below; a runner is built on a circle's first line): it refuses the assistant's
+      // own ops for a circle's call, and hands the rest to the agent's door gate
+      circleId, bridge, roleOf, agentCall: (a, o, x, ctx) => doorCallRef.fn(a, o, x, ctx), catalogue: circleCatalogue,
+      t, lang: values.lang, ...(llm ? { llm, interpret: interpretToCommand } : {}), expand: expandAdds({ t }),
+    }),
+    // what happened, never what was said
+    log: walkLog,
+  }) : null;
+  const botCirclesRef = { ref: null };
   // The circles a household bot joins on its admin's word (`/kring`), and lets go of: what it left or was removed from is
   // forgotten on this box. Its roster handle names the bot and its operator, so the circle knows whose bot it admits.
   const botCircles = isFunctionProfile && circleSeams.join ? createBotCircles({
@@ -916,6 +954,7 @@ if (tgToken || inboxDoor.bridge) {
     join: circleSeams.join,
     leave: circleSeams.leave,
     forget: async (circleId) => {
+      await circleDoors?.forget(circleId);
       const r = await agent.forgetCircleContent(circleId);
       walkLog({ kind: 'circle-forgotten', circleId: String(circleId).slice(0, 12), ok: r?.ok === true, rows: r?.rows ?? 0, entries: r?.entries ?? 0 });
       return r;
@@ -923,6 +962,20 @@ if (tgToken || inboxDoor.bridge) {
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     handle: async () => botCircleHandle(tgBridge?.botUsername ?? null, (await botUsers.list()).find((u) => u.role === 'admin')?.displayName ?? null),
   }) : null;
+  botCirclesRef.ref = botCircles;
+  if (botCircles && circleDoors) {
+    // a member gone from a circle's roster leaves the host gate (the circle door tiered them)
+    circleSeams.rosterChanged = (circleId) => circleDoors.rosterChanged(circleId).catch(() => {});
+    // a circle message landed: read from the log (the rail verified its author), fed when it is a joined circle's
+    circleSeams.landed = async ({ msgId, circleId }) => {
+      try {
+        if (!(await botCircles.isJoined(circleId))) return;
+        const e = deviceLog.query({}).find((x) => x?.id === msgId && x?.type === 'chat-message');
+        if (!e) return;
+        await circleDoors.landed({ circleId, msgId, authorRef: e.actor, text: e.payload?.text, ts: e.ts });
+      } catch (err) { console.warn(`device-runner: a circle line was not handled: ${err?.message ?? err}`); }
+    };
+  }
   if (botCircles) {
     circleSeams.removed = async (circleId) => {
       try {
@@ -967,6 +1020,7 @@ if (tgToken || inboxDoor.bridge) {
       }),
     },
   });
+  doorCallRef.fn = doorCall;
   if (screens) {
     // A household change reaches the connected screens as a nudge that names nothing; each reads again as its person.
     const nudge = createScreenNudge({

@@ -68,7 +68,15 @@ const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accep
  * writer in `@onderling/circles` imports it rather than keeping its own: it had a second frozen copy that
  * called itself "one place, shared with the fold's allowlist", and it went stale the moment a field landed.
  */
-export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties', 'kind']);
+
+/**
+ * What kind of member this is, as the member says it (`member-props.kind`, 2026-10-04): a person, or a FUNCTION — a
+ * household bot on its own node says so on its row, the circle paints it a bot and a person's local assistant stays
+ * quiet for its name. Self-said, not an authority: a person who says `function` only silences their own name. The same
+ * two words a profile record holds (`PROFILE_KINDS` in agent-registry is this list).
+ */
+export const MEMBER_KINDS = Object.freeze(['person', 'function']);
 
 /**
  * The most an inline face thumbnail may be. See the note at its use: the picture itself lives behind the blob
@@ -398,6 +406,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       const keys = Object.keys(p).filter((k) => k !== 'authorRef');
       if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELD_SET.has(k))) continue;   // the allowlist: refused whole
       if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
+      if ('kind' in p && !MEMBER_KINDS.includes(p.kind)) continue;                         // one of the two words — refused whole
       // THE FACE'S CAP. A released `profilePicture` carries an inline thumbnail in its sealing line, and this
       // lane is EXEMPT FROM COMPACTION (`entryKinds.js`: "the roster refolds from these — never drops"), so
       // anything said here is kept by every device for ever — except what THIS fold names in `superseded`, which the
@@ -416,7 +425,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       {   // record what this ACCEPTED statement set, for supersession (see `propSetters` above)
         const setFields = [];
         if (typeof p.handle === 'string' && p.handle) setFields.push('handle');
-        for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) setFields.push(k);
+        for (const k of ['displayName', 'avatarRef', 'kind']) if (typeof p[k] === 'string' && p[k]) setFields.push(k);
         if (isPlainMap(p.personaProperties)) setFields.push('personaProperties');
         const mineSetters = propSetters.get(s.subject) ?? new Map();
         for (const f of setFields) mineSetters.set(f, s.hash);
@@ -426,7 +435,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // the handle goes to `handles` (one map with the join's) AND to `props` — a projection needs to know a handle
       // came from the member's own later statement, which beats a cached rename, not from the join, which does not
       if (typeof p.handle === 'string' && p.handle) { handles[s.subject] = p.handle; mine.handle = p.handle; }
-      for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
+      for (const k of ['displayName', 'avatarRef', 'kind']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
       if (isPlainMap(p.personaProperties)) mine.personaProperties = { ...p.personaProperties };   // whole map, newest wins
     }
 

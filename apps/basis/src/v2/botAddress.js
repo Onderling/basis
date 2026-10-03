@@ -16,6 +16,7 @@
 
 import { oneToOneBotLabel } from './botChat.js';
 import { addressesBot } from './circleDispatch.js';
+import { botNamesFor, namesTheBotMember } from './circleDoor.js';
 
 /** The bot's display handle from its member row (for the group @-mention test). */
 function botHandle(botMember) {
@@ -44,4 +45,21 @@ export function botIsAddressed({ text, circleMembers = [], selfWebid = null, bot
   if (solo != null) return true;
   // Group → only when the line @-tags/names the bot.
   return addressesBot(text, botHandle(botMember));
+}
+
+/**
+ * Does this line name a member that says it is a FUNCTION (a household bot on the roster, `kind: 'function'`)? Then the
+ * line is that bot member's, and the sender's own local assistant stays quiet — one line, one answer, even when the line
+ * also says `@assistent`. The names are the ones the bot's own door answers to (`circleDoor.botNamesFor`).
+ *
+ * @param {string} text
+ * @param {Array<{handle?: string, kind?: string}>|null} members  the circle's roster rows
+ * @returns {boolean}
+ */
+export function namesAFunctionMember(text, members) {
+  for (const m of Array.isArray(members) ? members : []) {
+    if (m?.kind !== 'function' || !m.handle) continue;
+    if (namesTheBotMember(text, botNamesFor(m.handle))) return true;
+  }
+  return false;
 }

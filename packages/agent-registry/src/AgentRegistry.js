@@ -9,6 +9,7 @@
  * Standardisation Phase 52.10.
  */
 
+import { MEMBER_KINDS } from '@onderling/core';
 import {
   registryResourceUri,
   normaliseResource,
@@ -43,7 +44,8 @@ import { normalizeExposure } from './skillExposure.js';
  * Whose a profile is: a PERSON's, or a FUNCTION's (a household bot on its own node — "a hosted function is a profile
  * whose runners are its devices"). The bot's inbox door follows it; absent means a person.
  */
-export const PROFILE_KINDS = Object.freeze(['person', 'function']);
+// whose a profile is: the member kinds a roster row can say (one list, the kernel's)
+export const PROFILE_KINDS = MEMBER_KINDS;
 
 export function createAgentRegistry({
   pseudoPod,

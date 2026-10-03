@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { botIsAddressed } from '../../src/v2/botAddress.js';
+import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
 
 const SELF = 'https://me.example/profile#me';
 const BOT = { webid: 'urn:onderling:bot', name: 'Onderling', relation: 'agent', isBot: true };
@@ -40,5 +40,20 @@ describe('botAddress · botIsAddressed', () => {
   it('no bot member / empty roster → false', () => {
     expect(botIsAddressed({ text: 'hi', circleMembers: [{ webid: SELF }, HUMAN], selfWebid: SELF, botMember: null })).toBe(false);
     expect(botIsAddressed({ text: 'hi', circleMembers: [], selfWebid: SELF, botMember: BOT })).toBe(false);
+  });
+});
+
+describe('botAddress · namesAFunctionMember — the local assistant stays quiet for a bot member\'s name', () => {
+  const members = [{ webid: 'me' }, { webid: 'ann', handle: 'ann' }, { webid: 'B', handle: 'huisbot-van-frits', kind: 'function' }];
+  it('a line naming the bot member by name (its handle, or its short name)', () => {
+    expect(namesAFunctionMember('@huisbot zet melk erop', members)).toBe(true);
+    expect(namesAFunctionMember('@huisbot-van-frits hoi', members)).toBe(true);
+    expect(namesAFunctionMember('@assistent @huisbot zet melk erop', members)).toBe(true);   // both named: the bot's
+  });
+  it('not: the generic forms, a person\'s name, a member that does not say it is a function', () => {
+    expect(namesAFunctionMember('@assistent zet melk erop', members)).toBe(false);
+    expect(namesAFunctionMember('@ann zet melk erop', members)).toBe(false);
+    expect(namesAFunctionMember('@huisbot hoi', [{ webid: 'B', handle: 'huisbot-van-frits' }])).toBe(false);
+    expect(namesAFunctionMember('@huisbot hoi', null)).toBe(false);
   });
 });

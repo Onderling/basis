@@ -154,7 +154,7 @@ import { chatComposerVisible } from '../../../../basis/src/v2/circleTabs.js';
 import { buildOnboardingTemplate } from '../../../../basis/src/v2/onboardingTemplate.js';
 import { startGuidedSetup } from '../../../../basis/src/v2/guidedSetup.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../../../basis/src/v2/onboardingChat.js';
-import { botIsAddressed } from '../../../../basis/src/v2/botAddress.js';
+import { botIsAddressed, namesAFunctionMember } from '../../../../basis/src/v2/botAddress.js';
 import {
   routeHelpMessage, helpTopicChips, resolveHelpTopic, parseHelpAction, helpConsentAction, helpLlmLabelKeys,
 } from '../../../../basis/src/v2/helpChat.js';
@@ -3869,10 +3869,13 @@ function CircleDetail({
     // and the assistant's lane hands it to the ask (`followUpClaim`) when its turn comes — also when the turn that
     // asks was still running as it was typed. So nothing else may take the line first while an ask is pending.
     const answering = pendingFollowUpRef.current != null;
+    // A line naming a bot MEMBER of this circle (a household bot that says it is a function) is that member's: the
+    // local assistant stays quiet for it — one line, one answer (web parity, the shared `namesAFunctionMember`).
+    const forAnotherBot = namesAFunctionMember(text, circleMembersRef.current);
     // Conversational follow-up: the bot just asked a free-text question (llm-reply '?'). Route THIS line
     // back to it — force-addressed so handle() interprets it (recent turns give it the context) — instead
     // of broadcasting it to the circle. So "which list?" → "shopping" continues the conversation, no tag.
-    if (!answering && awaitingBotReply && !text.startsWith('/')) {
+    if (!answering && awaitingBotReply && !text.startsWith('/') && !forAnotherBot) {
       const prev = awaitingBotReply;
       setAwaitingBotReply(null);
       const appended = appendCircleMessage({ actor: 'me', text });
@@ -3907,7 +3910,7 @@ function CircleDetail({
     // Fire-and-forget: the bot posts its own reply bubble; swallow rejections so a failed turn can't
     // surface as an unhandled promise rejection. noteBotTurn arms the conversational follow-up if the
     // bot replied with a question.
-    Promise.resolve(circleBot.handle(text, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts })).then((r) => {
+    Promise.resolve(circleBot.handle(text, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts, ...(forAnotherBot ? { forAnotherBot: true } : {}) })).then((r) => {
       noteBotTurn(r, text);
       // An /addtask (or any task-touching) turn ran through the bot — refresh the Taken tab
       // so a newly-created task appears there without a manual reload.
@@ -4161,6 +4164,8 @@ function CircleDetail({
                         Both ride the normalised member (m.role, m.admin), computed in shared
                         code; an admin the projection cannot explain shows the badge alone,
                         never a borrowed reason. web≡mobile. */}
+                    {/* A BOT on the roster (a member that says it is a function) — said on its row. web≡mobile. */}
+                    {m.bot ? <Text style={styles.memberRole} testID="member-bot" numberOfLines={1}>{t('circle.members_tab.bot')}</Text> : null}
                     {m.role && m.role !== 'member' ? (
                       <View style={styles.memberRoleLine}>
                         <Text style={styles.memberRole} numberOfLines={1}>{t(`circle.admin.role.${m.role}`)}</Text>

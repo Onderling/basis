@@ -368,6 +368,10 @@
     }
   },
   "members_tab": {
+    "bot": {
+      "text": "bot",
+      "doc": "MEMBERS tab — the badge on a member that says it is a function (a household bot)."
+    },
     "loading": {
       "text": "Loading members…",
       "doc": "MEMBERS tab — while the roster (listGroupMembers) loads."
@@ -4477,6 +4481,7 @@
     "kring_leave_failed": "The bot could not leave “{{name}}”.",
     "kringen_none": "The bot is in no circle.",
     "kringen_list": "The bot is in:\n{{list}}",
+    "kring_not_here": "Not in a circle: reminders, the week's overview and your settings are in your own chat with the bot.",
     "link_already": "This Basis app is already linked to you.",
     "link_asked": "Pick the code your app shows below.",
     "link_another_bot": "That link line is for another bot. Nothing asked.",
@@ -7248,6 +7253,10 @@
     "confirm": {
       "text": "{{message}} Tap to confirm.",
       "doc": "Telegram runner: a command that asks to confirm before it runs; {{message}} is the op's own warning."
+    },
+    "confirm_in_words": {
+      "text": "{{message}} Reply yes or no.",
+      "doc": "Telegram runner: the confirm on a door without buttons (the inbox, a circle); {{message}} is the op's own warning."
     },
     "confirm_yes": {
       "text": "Yes, do it",

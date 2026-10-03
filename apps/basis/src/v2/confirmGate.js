@@ -122,8 +122,9 @@ export async function confirmPreview({ route, catalogue, call } = {}) {
   let r;
   try { r = await call(route.appOrigin ?? null, route.opId, { ...(route.args ?? {}), preview: true }); } catch { return null; }
   if (r?.ok && typeof r.message === 'string' && r.message) return { message: r.message };
-  // only a sentence the op localised (`error.message`); a bare code is not words for a person — ask as declared
-  const why = r?.error?.message;
+  // only a sentence the op localised (`error.message`), or the host gate's refusal (its words in `error`, the refusal
+  // beside them); a bare code is not words for a person — ask as declared
+  const why = r?.error?.message ?? (r?.refusal && typeof r.error === 'string' ? r.error : undefined);
   return r?.ok === false && typeof why === 'string' && why ? { refused: why } : null;
 }
 

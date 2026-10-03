@@ -62,6 +62,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   };
   const door = async (app, op, args = {}, ctx = {}) => {
     const caller = typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null;
+    // A call from a circle the bot joined never reaches the door's own ops — a person's settings, the overview, the
+    // admin's book, exports, screens are the household's. A circle's admin is `trusted` in the host gate (their circle's
+    // admin column needs it), which is also the level the bot's admin ops ask for: so refused here, before any op.
+    if (app === 'assistant' && typeof ctx?.doorCircleId === 'string' && ctx.doorCircleId) {
+      return { ok: false, error: { code: 'not-in-this-circle', message: t('circle.bot.kring_not_here') } };
+    }
     // A screen's call to an op that declares a step-up (any app's) runs only after a yes in the private chat: held here,
     // before any app is handed the call, so a screen that skips its own confirm changes nothing. The host gate first: a
     // screen whose person may not do it is refused, not asked about.

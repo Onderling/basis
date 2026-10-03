@@ -50,6 +50,11 @@ export function createBotCircles({ store, join, leave, forget, ask, handle, now 
       return (await rows()).sort((a, b) => (a.joinedAt ?? 0) - (b.joinedAt ?? 0));
     },
 
+    /** The handle the bot joined a circle under (its names there), or null. */
+    async handleIn(circleId) {
+      return (circleId ? (await store.get(circleId))?.handle : null) ?? null;
+    },
+
     /** Is this one of the circles the bot joined by `/kring`? */
     async isJoined(circleId) {
       return Boolean(circleId) && Boolean(await store.get(circleId));
@@ -88,9 +93,11 @@ export function createBotCircles({ store, join, leave, forget, ask, handle, now 
       if (p.until < now()) return { ok: false, reason: 'expired' };
       if (!yes) return { ok: true, declined: true, name: p.name };
       // the handle the question named
-      const r = await join({ inviteUri: p.inviteUri, handle: p.handle, rulesAccepted: true });
+      const h = p.handle;
+      const r = await join({ inviteUri: p.inviteUri, handle: h, rulesAccepted: true });
       if (!r?.ok || !r.circleId) return { ok: false, reason: r?.reason ?? r?.error ?? 'join-failed', name: p.name };
-      await store.put({ id: r.circleId, name: p.name, joinedAt: now(), by: person });
+      // the handle it joined under: the names that address it there
+      await store.put({ id: r.circleId, name: p.name, handle: h, joinedAt: now(), by: person });
       return { ok: true, joined: true, name: p.name, circleId: r.circleId };
     },
 

@@ -23,6 +23,18 @@ function harness({ policy = { llmTool: 'off' }, providers = {}, interpret, botNa
   return { cd, dispatched, posted, unavailable, noMatched };
 }
 
+describe('createCircleDispatch — a line for a bot MEMBER of the circle', () => {
+  it('is not the local assistant\'s, even with @bot in it: it goes to the circle, interpret never runs', async () => {
+    const interpret = vi.fn();
+    const { cd, dispatched, posted } = harness({ policy: { llmTool: 'local' }, providers: { local: { invoke: async () => '' } }, interpret });
+    const r = await cd.handle('@bot @huisbot zet melk erop', { forAnotherBot: true });
+    expect(r.via).toBe('circle');
+    expect(interpret).not.toHaveBeenCalled();
+    expect(dispatched).toEqual([]);
+    expect(posted).toEqual(['@bot @huisbot zet melk erop']);
+  });
+});
+
 describe('createCircleDispatch — routing', () => {
   it('dispatches an explicit slash command verbatim', async () => {
     const { cd, dispatched, posted } = harness();

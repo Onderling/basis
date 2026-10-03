@@ -254,3 +254,13 @@ describe('the face rides the member-list projection', () => {
     expect('profilePicture' in m).toBe(false);
   });
 });
+
+describe('a member that says it is a function (a household bot)', () => {
+  it('the row says bot; a person\'s row stays as it was', async () => {
+    const { normalizeCircleMembers } = await import('../src/circleMembers.js');
+    const rows = normalizeCircleMembers({ members: [{ webid: 'b', handle: 'huisbot-van-frits', kind: 'function' }, { webid: 'a', handle: 'ann', kind: 'person' }, { webid: 'c', handle: 'cas' }] });
+    expect(rows.find((r) => r.id === 'b').bot).toBe(true);
+    expect('bot' in rows.find((r) => r.id === 'a')).toBe(false);
+    expect('bot' in rows.find((r) => r.id === 'c')).toBe(false);
+  });
+});

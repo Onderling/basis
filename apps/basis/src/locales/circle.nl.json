@@ -4441,6 +4441,8 @@
     "stepup_unwired": "Dat kan hier alleen in de chat.",
     "stepup_replaced": "Dat verzoek is vervangen door een nieuwer; daar is niets mee gedaan.",
     "stepup_what_op": "{{op}} doen ({{arg}})",
+    "model_not_served": "Let op: het taalmodel {{model}} wordt niet meer aangeboden door de aanbieder. Ik gebruik nu {{using}}.",
+    "model_over_limit": "Let op: het account bij de aanbieder van het taalmodel heeft zijn maandlimiet bereikt. Tot dat is opgelost, antwoord ik alleen op opdrachten en knoppen.",
     "stepup_export_key_replaces": "Er is al een sleutel: bestanden die daarmee zijn verzegeld, gaan alleen open met het oude wachtwoord.",
     "export_key_too_short": "Het wachtwoord moet minstens {{n}} tekens hebben. Niets gevraagd, niets veranderd.",
     "export_key_none": "Er staat nog geen exportsleutel op de box.",

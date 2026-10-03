@@ -4441,6 +4441,8 @@
     "stepup_unwired": "That can only be done in the chat here.",
     "stepup_replaced": "That request was replaced by a newer one; nothing was done with it.",
     "stepup_what_op": "do {{op}} ({{arg}})",
+    "model_not_served": "Note: the language model {{model}} is no longer offered by the provider. I now use {{using}}.",
+    "model_over_limit": "Note: the language model provider's account has reached its monthly limit. Until that is sorted, I answer commands and buttons only.",
     "stepup_export_key_replaces": "A key is set already: files sealed with it open only with the old passphrase.",
     "export_key_too_short": "The passphrase needs at least {{n}} characters. Nothing asked, nothing changed.",
     "export_key_none": "No export key is set on the box yet.",

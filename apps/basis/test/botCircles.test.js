@@ -78,6 +78,7 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(d.joins[0]).toMatchObject({ rulesAccepted: true, handle: 'huisbot-van-frits' });
     expect(await d.circles.list()).toEqual([expect.objectContaining({ id: 'circle-1', name: 'Huize Rood' })]);
     expect(await d.circles.isJoined('circle-1')).toBe(true);
+    expect(await d.circles.handleIn('circle-1')).toBe('huisbot-van-frits');
   });
 
   it('a join that fails says why and records nothing', async () => {

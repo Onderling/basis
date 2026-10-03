@@ -122,13 +122,23 @@ export function botPromptLines(t, template = HOUSEHOLD_TEMPLATE) {
   return [...promptLinesFor(t, template), ...reminderPromptLines()];
 }
 
+/**
+ * The model's lines for lists as they ARE (a circle's own, which no template made): their names, and one line per list
+ * from what it holds. LLM-facing.
+ * @param {Array<{name: string, defaultChild?: string|null}>} lists
+ * @returns {string[]}
+ */
+export function promptLinesForLists(lists) {
+  const named = (lists ?? []).filter((l) => l?.name);
+  if (!named.length) return ['Er zijn hier nog geen lijsten.'];
+  return [`Hier staat alles op LIJSTEN: ${named.map((l) => l.name).join(', ')}.`, ...named.map(listLine)];
+}
+
 export function promptLinesFor(t, template = HOUSEHOLD_TEMPLATE) {
   const lists = templateLists(t, template);
   const byKind = Object.fromEntries(lists.map((l) => [l.kind, l.name]));
   const all = lists.map((l) => l.name).join(', ');
-  if (!Array.isArray(template.promptLines) || !template.promptLines.length) {
-    return [`Hier staat alles op LIJSTEN: ${all}.`, ...lists.map(listLine)];
-  }
+  if (!Array.isArray(template.promptLines) || !template.promptLines.length) return promptLinesForLists(lists);
   return template.promptLines.map((line) => line
     .replace(/\{lists\}/g, all)
     .replace(/\{([a-z-]+)\}/g, (m, kind) => byKind[kind] ?? m));

@@ -29,6 +29,9 @@ import { householdListType, coerceListArgs } from '../v2/circleGate.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
+/** A door without buttons (the bot's inbox, a circle) answers a confirm in words. */
+const YES_WORDS = new Set(['ja', 'j', 'yes', 'y', 'ok', 'oké', 'oke', 'doe maar', 'ja, doe maar']);
+const NO_WORDS = new Set(['nee', 'n', 'no', 'laat maar', 'nee, laat maar']);
 
 /**
  * @param {object} a
@@ -252,6 +255,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         const previewed = await confirmPreview({ route: r, catalogue: catalogueOf(), call: callFor(chatId) });
         // the preview refused (the act would be too): say why, and ask nothing
         if (previewed?.refused) { pending.delete(threadId); return say(chatId, previewed.refused); }
+        const confirmMessage = previewed?.message ?? (r.messageKey ? tc(chatId)(r.messageKey, r.args ?? {}) : (r.message ?? ''));
+        // a door without buttons asks for the word
+        if (buttonless.has(String(chatId))) return say(chatId, tc(chatId)('circle.telegram.confirm_in_words', { message: confirmMessage }));
         return say(chatId, tc(chatId)('circle.telegram.confirm', { message: previewed?.message ?? (r.messageKey ? tc(chatId)(r.messageKey, r.args ?? {}) : (r.message ?? '')) }), [
           { id: CONFIRM_YES, label: tc(chatId)('circle.telegram.confirm_yes') },
           { id: CONFIRM_NO,  label: tc(chatId)('circle.telegram.confirm_no') },
@@ -305,7 +311,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   /** Does this shell take the line itself? Asked when the line's turn comes, so an ask the turn before made counts. */
   function claims(chatId, threadId, text) {
     const pend = pending.get(threadId);
-    if (pend && (pend.kind === 'form' || text === CONFIRM_YES || text === CONFIRM_NO)) return true;
+    const said = confirmWord(chatId, text);
+    if (pend && (pend.kind === 'form' || said === CONFIRM_YES || said === CONFIRM_NO)) return true;
     return text.startsWith('/') || Boolean(tapToParse(text, threadId));
   }
   /** A line this shell takes: the answer to its pending ask, else a command or a tap. */
@@ -360,6 +367,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   /** A person's first turn with this door: who it is and what it keeps — once. */
   // The chats that came in on a door without commands (the bot's contact inbox): their welcome does not say "typ /help".
   const slashless = new Set();
+  // …and the chats whose door shows no buttons: a question with set answers is asked, and answered, in words
+  const buttonless = new Set();
   async function greetOnce(chatId, threadId) {
     if (!threads || !threadId || threads.greeted(threadId)) return;
     const disclosure = doorDisclosure(turnLogMode, tc(chatId));
@@ -397,10 +406,18 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return param.of.includes(coerced);
   }
 
+  /** A confirm's answer: the button's id, or — on a door without buttons — the word for it. */
+  function confirmWord(chatId, text) {
+    if (!buttonless.has(String(chatId))) return text;
+    const w = String(text ?? '').trim().toLowerCase().replace(/[.!]+$/, '');
+    return YES_WORDS.has(w) ? CONFIRM_YES : NO_WORDS.has(w) ? CONFIRM_NO : text;
+  }
+
   /** Continue a pending follow-up or confirmation with this line; false when nothing was pending. */
-  async function continuePending(chatId, threadId, text) {
+  async function continuePending(chatId, threadId, textIn) {
     const pend = pending.get(threadId);
     if (!pend) return false;
+    const text = pend.kind === 'confirm' ? confirmWord(chatId, textIn) : textIn;
     if (pend.kind === 'confirm') {
       if (text !== CONFIRM_YES && text !== CONFIRM_NO) return false;   // something else — leave the confirm standing
       pending.delete(threadId); note(chatId, { via: 'confirm', confirmed: text === CONFIRM_YES });
@@ -486,6 +503,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   const admitting = new Set();
   bridge.onMessage((msg) => {
     if (msg?.slash === false && msg?.chatId) slashless.add(String(msg.chatId));
+    if (msg?.buttons === false && msg?.chatId) buttonless.add(String(msg.chatId));
     const p = handle(msg).catch(() => { /* a turn's error was already told to the chat */ });
     admitting.add(p);
     p.finally(() => admitting.delete(p));

@@ -62,6 +62,8 @@ import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
 import { createIdentityLink } from '../src/v2/botIdentityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
+import { createCircleDoors } from '../src/v2/circleDoor.js';
+import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { joinCircleFromInvite } from '../src/v2/circleInvite.js';
 import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
@@ -358,7 +360,7 @@ let inboxDoor = { bridge: null, feed: () => false };
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 // A household bot's circles (`/kring`): the join, the leave and "am I still in it" need the wire, composed below; the
 // door that answers `/kring` comes after. A removal the membership lane folds reaches the bot's record through `removed`.
-const circleSeams = { join: null, leave: null, stillIn: null, removed: null };
+const circleSeams = { join: null, leave: null, stillIn: null, removed: null, landed: null };
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
   // constructor both shells use; only the backing differs, which is the whole of what a shell decides.
@@ -470,7 +472,11 @@ if (relayUrl) {
       ownDeviceTurn: (wire) => contactChannel.applyOwnDeviceTurn(wire).catch(() => {}),
       // A circle message landed. Nothing to paint — but said in the log, because "did the circle reach
       // this device" is the one question an operator (and the walk) has.
-      chatLanded: ({ msgId, circleId, source }) => walkLog({ kind: 'chat-landed', msgId, circleId, source: source ?? null }),
+      chatLanded: ({ msgId, circleId, source }) => {
+        walkLog({ kind: 'chat-landed', msgId, circleId, source: source ?? null });
+        // …and a household bot answers in a circle it joined, when a member names it
+        circleSeams.landed?.({ msgId, circleId });
+      },
       // …and a catch-up that brought statements in (the pull at connect, the enrol consume's content pull).
       chatChange: (circleId) => walkLog({ kind: 'chat-change', circleId }),
       // A circle's roster changed: a household bot removed from a circle it joined lets go of that circle's content.
@@ -909,6 +915,25 @@ if (tgToken || inboxDoor.bridge) {
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
     where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
   }) : null;
+  // The bot's door in each circle it joined: a member who names it is answered there, as that member with their role in
+  // that circle, in that circle's lists — one runner per circle (its own lists' lines and memory), no door ops at all.
+  const circleCatalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps(), withoutDoorOps: true });
+  const botCircleRef = () => agent.identity?.chat?.pubKey ?? null;
+  const circleDoors = isFunctionProfile && circleSeams.join ? createCircleDoors({
+    roster: async (circleId) => (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [],
+    botRef: () => botCircleRef(),
+    botHandle: (circleId) => botCirclesRef.ref?.handleIn(circleId) ?? null,
+    setDoorCaller: (id, role) => agent.setDoorCaller(id, role),
+    // the bot's line onto the circle's chat: signed with its per-circle key and fanned, as any member's
+    post: (circleId, text) => agent.chatEmit(circleId, { msgId: `bot-${randomBytes(9).toString('hex')}`, ts: Date.now(), text, actor: botCircleRef() }),
+    makeRunner: ({ circleId, bridge, roleOf }) => composeCircleRunner({
+      circleId, bridge, roleOf, agentCall: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), catalogue: circleCatalogue,
+      t, lang: values.lang, ...(llm ? { llm, interpret: interpretToCommand } : {}), expand: expandAdds({ t }),
+    }),
+    // what happened, never what was said
+    log: walkLog,
+  }) : null;
+  const botCirclesRef = { ref: null };
   // The circles a household bot joins on its admin's word (`/kring`), and lets go of: what it left or was removed from is
   // forgotten on this box. Its roster handle names the bot and its operator, so the circle knows whose bot it admits.
   const botCircles = isFunctionProfile && circleSeams.join ? createBotCircles({
@@ -916,6 +941,7 @@ if (tgToken || inboxDoor.bridge) {
     join: circleSeams.join,
     leave: circleSeams.leave,
     forget: async (circleId) => {
+      await circleDoors?.forget(circleId);
       const r = await agent.forgetCircleContent(circleId);
       walkLog({ kind: 'circle-forgotten', circleId: String(circleId).slice(0, 12), ok: r?.ok === true, rows: r?.rows ?? 0, entries: r?.entries ?? 0 });
       return r;
@@ -923,6 +949,18 @@ if (tgToken || inboxDoor.bridge) {
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     handle: async () => botCircleHandle(tgBridge?.botUsername ?? null, (await botUsers.list()).find((u) => u.role === 'admin')?.displayName ?? null),
   }) : null;
+  botCirclesRef.ref = botCircles;
+  if (botCircles && circleDoors) {
+    // a circle message landed: read from the log (the rail verified its author), fed when it is a joined circle's
+    circleSeams.landed = async ({ msgId, circleId }) => {
+      try {
+        if (!(await botCircles.isJoined(circleId))) return;
+        const e = deviceLog.query({}).find((x) => x?.id === msgId && x?.type === 'chat-message');
+        if (!e) return;
+        await circleDoors.landed({ circleId, msgId, authorRef: e.actor, text: e.payload?.text, ts: e.ts });
+      } catch (err) { console.warn(`device-runner: a circle line was not handled: ${err?.message ?? err}`); }
+    };
+  }
   if (botCircles) {
     circleSeams.removed = async (circleId) => {
       try {

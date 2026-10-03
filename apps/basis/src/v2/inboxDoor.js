@@ -65,6 +65,7 @@ export function createContactDoorBridge({ sendTurn }) {
         ...(typeof admission === 'string' && admission ? { admission } : {}),
         refuseOnce: true,
         slash: false,   // a contact turn is words: this door has no commands to point at
+        buttons: false, // …and no buttons: a confirm is asked and answered in words
         sender: { bridgeUid: contactId, displayName },
       });
       return true;

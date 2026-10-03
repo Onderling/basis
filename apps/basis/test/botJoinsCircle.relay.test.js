@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown, createCircle, joinExistingCircle, readRoster, bindCircleAddresses } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, until, teardown, createCircle, joinExistingCircle, readRoster, bindCircleAddresses, sendCircleChat } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { buildCircleInviteUri } from '../src/v2/circleInvite.js';
 import { removeCircleMember } from '../src/v2/circleMembershipHygiene.js';
@@ -133,4 +133,56 @@ describe('the bot joins a circle on its admin\'s word', () => {
     await send('/kringen');
     expect(await until(async () => ((await botTurns(ann)).slice(n).some((t) => /in geen enkele kring/.test(t.text ?? '')) ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
   }, 240_000);
+
+  it('the circle door: a member who names it is answered in the circle, in its list; Bob sees the bot\'s signed reply; no door ops; silent after it left', async () => {
+    const GREEN = 'huize-groen';
+    await createCircle(ann, { groupId: GREEN, name: 'Huize Groen', purpose: 'de derde kring' });
+    const bj = await joinExistingCircle(ann, bob, { groupId: GREEN, handle: 'bob' });
+    expect(bj.joined?.ok).toBe(true);
+    await bindCircleAddresses([ann, bob], GREEN);
+    await Promise.all([ann, bob].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: GREEN })));
+    const invite = await buildCircleInviteUri({ callSkill: (a, o, x) => ann.agent.callSkill(a, o, x), circleId: GREEN, adminPeerAddr: ann.pubKey });
+    const before = (await botTurns(ann)).length;
+    await send(`/kring ${invite.uri}`);
+    const question = await until(async () => (await botTurns(ann)).slice(before).find((t) => /\/kring ja \S+/.test(t.text ?? '')) ?? null, { timeout: 30_000, step: 500 });
+    await send(/\/kring ja \S+/.exec(question.text)[0].replace(/\)$/, ''));
+    const row = await until(async () => (await readRoster(ann, GREEN)).find((m) => /^huisbot/.test(String(m.handle ?? ''))) ?? null, { timeout: 60_000, step: 500 });
+    expect(row, 'the bot did not join the third circle').toBeTruthy();
+    await Promise.all([ann, bob].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: GREEN })));
+    // the circle's own list, made by Ann: it reaches every member, the bot too
+    const made = await ann.agent.callSkill('lists', 'createList', { text: 'Groenlijst', circleId: GREEN });
+    expect(made?.ok, JSON.stringify(made)).not.toBe(false);
+
+    const botLines = (node) => node.chatEvents.filter((e) => e.payload?.circleId === GREEN && e.actor !== node.pubKey && e.actor !== ann.pubKey && e.actor !== bob.pubKey);
+    let n = 0;
+    const annSays = (text) => sendCircleChat(ann, { groupId: GREEN, msgId: `ann-${n += 1}`, text });
+    // the list may take a moment to reach the box: ask until the bot has put it on
+    const melk = await until(async () => {
+      const entries = JSON.stringify(await ann.agent.callSkill('lists', 'listEntries', { list: 'Groenlijst', circleId: GREEN }));
+      if (entries.includes('melk')) return true;
+      await annSays('@huisbot zet melk op de groenlijst');
+      return null;
+    }, { timeout: 60_000, step: 5000 });
+    expect(melk, `melk is not on the circle's list. The bot said: ${JSON.stringify(botLines(ann).map((e) => e.payload?.text))}\nRunner:\n${out.split('\n').filter((l) => /circle|warn|error/i.test(l)).slice(-20).join('\n')}`).toBe(true);
+    // Bob sees the bot's reply in the circle — a line by the bot's own ref, not Ann's or his
+    const onBob = await until(async () => (botLines(bob).some((e) => /melk/.test(e.payload?.text ?? '')) ? true : null), { timeout: 30_000, step: 500 });
+    expect(onBob, `Bob did not see the bot's reply: ${JSON.stringify(bob.chatEvents.filter((e) => e.payload?.circleId === GREEN).map((e) => [String(e.actor).slice(0, 6), e.payload?.text]))}`).toBe(true);
+    // a member's /users in a circle is not the bot's book
+    const k = botLines(ann).length;
+    await sendCircleChat(bob, { groupId: GREEN, msgId: 'bob-users', text: '@huisbot /users' });
+    const usersReply = await until(async () => botLines(ann).slice(k).find((e) => e.payload?.text) ?? null, { timeout: 30_000, step: 500 });
+    expect(usersReply?.payload?.text).not.toMatch(/beheerder|admin —|Ann/);
+    // the walk log says a turn happened, never what was said
+    const log = JSON.stringify(walkLog(dataDir));
+    expect(walkLog(dataDir).some((e) => e.kind === 'circle-turn')).toBe(true);
+    expect(log).not.toContain('zet melk op de groenlijst');
+
+    // the bot leaves: a line naming it gets no answer
+    await send('/kring los Huize Groen');
+    await until(async () => ((await botTurns(ann)).some((t) => /is uit “Huize Groen”/.test(t.text ?? '')) ? true : null), { timeout: 60_000, step: 500 });
+    const m = botLines(ann).length;
+    await annSays('@huisbot zet kaas op de groenlijst');
+    await new Promise((r) => setTimeout(r, 6000));
+    expect(botLines(ann).length).toBe(m);
+  }, 300_000);
 });

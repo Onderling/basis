@@ -4003,14 +4003,16 @@ export async function createRealHouseholdAgent(opts = {}) {
    * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
    * entry the person (and their model) reads.
    */
-  async function withChoreHolders(items, caller) {
+  async function withChoreHolders(items, caller, inCircle = null) {
     if (!items.some((i) => Array.isArray(i?.holders))) return items;
     const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
-    const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+    // In a circle the bot joined, the household's book and its names setting are not the circle's: nobody is named but
+    // the reader ("you") — the household's names never reach a circle, whoever is in both.
+    const people = inCircle ? [] : await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
     const known = people.filter((c) => c && !c.hidden && c.webid);
     const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
     const policy = buildStandardRolePolicy(roles);
-    const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole: roles[caller] ?? null, roleMayAssign: policy.canReassign(caller) });
+    const mayName = !inCircle && mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole: roles[caller] ?? null, roleMayAssign: policy.canReassign(caller) });
     const nameOf = (id) => (id === caller ? tr('circle.lists.chore_you') : (known.find((c) => c.webid === id)?.displayName ?? null));
     return items.map((i) => {
       if (!Array.isArray(i?.holders)) return i;
@@ -4101,8 +4103,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ...and runs in the door's circle: a circle named in the args (a typed `--circleId=`, a model's pick, a
       // screen's data) is not followed — the person's role and the token do not look at the circle, so it is pinned
       // here, for every door alike. The bot's own calls (no caller) still name any circle.
+      // The circle door is the one door with a circle of its own: the host composes it per joined circle and says
+      // which (`ctx.doorCircleId`, never from a person's words) — its person's call lands there, never the household.
       const { circleId: _circle, groupId: _group, ...pinned } = args ?? {};
-      args = pinned;
+      args = typeof ctx.doorCircleId === 'string' && ctx.doorCircleId ? { ...pinned, circleId: ctx.doorCircleId } : pinned;
       if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...args, actor: ctx.caller };
     }
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
@@ -4838,7 +4842,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const result = await handler(args ?? {}, ctx);
       // A door's read of a chores list says who holds each chore — as far as the names setting lets the asker see names
       if (appOrigin === 'lists' && opId === 'listEntries' && typeof ctx?.caller === 'string' && ctx.caller && Array.isArray(result?.items)) {
-        return { ...result, items: await withChoreHolders(result.items, ctx.caller) };
+        return { ...result, items: await withChoreHolders(result.items, ctx.caller, typeof ctx.doorCircleId === 'string' && ctx.doorCircleId ? ctx.doorCircleId : null) };
       }
       return result;
     }

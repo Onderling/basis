@@ -4477,6 +4477,7 @@
     "kring_leave_failed": "De bot kon “{{name}}” niet verlaten.",
     "kringen_none": "De bot zit in geen enkele kring.",
     "kringen_list": "De bot zit in:\n{{list}}",
+    "kring_not_here": "Dat kan niet in een kring: herinneringen, het weekoverzicht en je instellingen regel je in je eigen gesprek met de bot.",
     "link_already": "Deze Basis-app is al aan jou gekoppeld.",
     "link_asked": "Kies hieronder de code die je app toont.",
     "link_another_bot": "Die koppelregel is voor een andere bot. Niets gevraagd.",
@@ -7248,6 +7249,10 @@
     "confirm": {
       "text": "{{message}} Tik om te bevestigen.",
       "doc": "Telegram runner: a command that asks to confirm before it runs; {{message}} is the op's own warning."
+    },
+    "confirm_in_words": {
+      "text": "{{message}} Antwoord ja of nee.",
+      "doc": "Telegram runner: the confirm on a door without buttons (the inbox, a circle); {{message}} is the op's own warning."
     },
     "confirm_yes": {
       "text": "Ja, doe maar",

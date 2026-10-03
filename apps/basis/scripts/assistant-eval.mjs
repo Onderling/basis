@@ -16,7 +16,7 @@
  *   node scripts/assistant-eval.mjs --apps lists   # the bot's app list (default: the household template's — lists, tasks)
  *   node scripts/assistant-eval.mjs --from-log ~/.basis-telegram/walk-log-*.jsonl   # print fixture stubs from a walk
  *
- * Exit code 1 when the pass rate is under --min (default 0.85). Fixtures: scripts/assistant-eval.fixtures.mjs.
+ * Exit code 1 when the pass rate is under --min (default 0.95: the baseline is 70/72, see the fixtures file). Fixtures: scripts/assistant-eval.fixtures.mjs.
  */
 import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
@@ -30,7 +30,7 @@ import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';
 
 const { values } = parseArgs({ options: {
-  model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.85' },
+  model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.95' },
   mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' }, 'door-lang': { type: 'string' },
   apps: { type: 'string' }, thinking: { type: 'string', default: 'off' },
 } });

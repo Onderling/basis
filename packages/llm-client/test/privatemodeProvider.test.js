@@ -25,7 +25,7 @@ describe('privatemodeProvider', () => {
     const body = client.calls[0].body;
     expect(body.model).toBe(PRIVATEMODE_DEFAULT_MODEL);
     expect(body.stream).toBeUndefined();
-    expect(body.reasoning_effort).toBe('low');   // the default's family switch: gpt-oss reasons low
+    expect(body.reasoning_effort).toBe('low');   // the default's family switch: GLM reasons low (it cannot switch off)
     expect(body.messages[0]).toEqual({ role: 'system', content: 'sys' });
     expect(body.tools?.[0]?.function?.name).toBe('addItem');
     expect(r.toolCall).toMatchObject({ id: 'addItem', args: { type: 'shopping', text: 'kaas' } });

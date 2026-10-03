@@ -7416,6 +7416,21 @@
     "stepup_replaced": "Niet gedaan: een nieuwer verzoek kwam ervoor in de plaats.",
     "stepup_failed": "Het lukte niet; kijk in je chat.",
     "stepup_unanswered": "Geen antwoord: er kwam binnen tien minuten geen ja. Niets veranderd.",
-    "rate_limited": "Even rustig: dit scherm vroeg te veel in korte tijd. Probeer het over een paar seconden opnieuw."
+    "rate_limited": "Even rustig: dit scherm vroeg te veel in korte tijd. Probeer het over een paar seconden opnieuw.",
+    "action": {
+      "claimTask": "Ik doe het",
+      "completeTask": "Klaar",
+      "removeTask": "Weg",
+      "rsvpAccept": "Ik kom",
+      "rsvpDecline": "Ik kom niet",
+      "rsvpTentative": "Misschien",
+      "cancelEvent": "Afzeggen",
+      "markListItemDone": "Gedaan",
+      "removeFromList": "Weg"
+    },
+    "household": "Het huishouden",
+    "people": "Wie er in huis zijn",
+    "refresh": "Ververs",
+    "list_empty": "Niets."
   }
 }

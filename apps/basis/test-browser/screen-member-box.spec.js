@@ -99,6 +99,23 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     const annReads = await next(annSaid, seen, /van-berts-scherm/);
     expect(annReads, `Ann does not see Bert's add:\n${(await annSaid()).slice(seen).join('\n')}`).toBeTruthy();
 
+    // ── the household itself on his screen: the lists, his own add among them, read again after the add ──
+    const household = page.locator('section[data-section="household"]');
+    await expect(household.locator('[data-list="Boodschappen"]')).toContainText('van-berts-scherm', { timeout: 30_000 });
+    await expect(household.locator('[data-list="Klusjes"]')).toBeVisible();
+
+    // Ann puts a chore on Klusjes in her chat; Bert's refresh shows it, open, with "Ik doe het"; he takes it; then "Klaar"
+    seen = (await annSaid()).length;
+    await annSend('/add-to-list --list Klusjes --text ramen-lappen');
+    expect(await next(annSaid, seen, /ramen-lappen/)).toBeTruthy();
+    await household.locator('[data-screen="refresh"]').click();
+    const chore = household.locator('[data-list="Klusjes"] li', { hasText: 'ramen-lappen' });
+    await expect(chore).toBeVisible({ timeout: 30_000 });
+    await chore.locator('[data-action="tasks.claimTask"]').click();
+    await expect(chore.locator('[data-action="tasks.completeTask"]'), `after the claim the screen said: ${await household.locator('[data-household="said"]').textContent()}`).toBeVisible({ timeout: 30_000 });
+    await chore.locator('[data-action="tasks.completeTask"]').click();
+    await expect(household.locator('[data-list="Klusjes"] li:not(.done)', { hasText: 'ramen-lappen' })).toHaveCount(0, { timeout: 30_000 });
+
     await page.screenshot({ path: testInfo.outputPath('member-screen.png'), fullPage: true });
     await ctx.close();
   } finally {

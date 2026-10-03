@@ -4,6 +4,12 @@
  * matches), `{ reply: 'asks' | 'declines' }`, or null (must do nothing). `before`: memory lines.
  * `items`: what retrieval may see (and what a read shows, with ids `i0`, `i1`, …). `exact`: exactly `count` calls (1 by default). `lines` (instead of `text`): lines sent at once, which the collect window makes one
  * turn — one model call.
+ *
+ * BASELINE (2026-10-03, real route, reasoning low): glm-5.3 70/72, glm-5.3-flash 70/72, gpt-oss-120b 57/72. A run under
+ * the baseline is a regression to explain before a model or a prompt change ships. The known misses, watched not
+ * fixed: glm-5.3 turned "add milk to the list" into "melk" (`gate-add-untyped-en`: an argument translated — args are
+ * word for word); glm-5.3-flash added "sokken" instead of declining (`decline-socks-nl`); each had one 60 s timeout.
+ * A full run is ~200k tokens on the real route: check the account's quota first (2026-10-03 used it up).
  */
 export const FIXTURES = [
   // ── the deterministic gate (no model should be needed; via=rule) ──

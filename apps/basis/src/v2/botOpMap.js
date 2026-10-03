@@ -64,6 +64,9 @@ export const onBotMap = (opId) => botOpLevel(opId) !== null;
  * @param {object} catalogue  a merged catalogue (`opsById`, `commandMenu`)
  * @param {'member'|'admin'|null} role  null (the owner, no door caller) → everything on the map
  */
+/** The door's own ops a household bot does not have: its plugins are its template's, so there is no app switch. */
+const NOT_ON_A_BOT = new Set(['assistant-apps']);
+
 /**
  * Does the bot offer this op to this role (`null`: the bot's whole map, any role)? One rule for narrowing a merged
  * catalogue and for narrowing an app's manifest before it is merged.
@@ -76,6 +79,7 @@ export function botOffers(appOrigin, op, role) {
   // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too, and
   // the admin's own (`trusted`) are not offered to anyone else — their /help does not list what they cannot do
   if (appOrigin === 'assistant') {
+    if (NOT_ON_A_BOT.has(id)) return false;
     if (role === 'observer') return botRoleAllows(role, id);
     return op?.visibility !== 'trusted' || role == null || role === 'admin';
   }
@@ -90,10 +94,40 @@ export function scopeCatalogueToRole(catalogue, role) {
   if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function') return catalogue;
   const opsById = new Map();
   for (const [k, entry] of catalogue.opsById) if (botOffers(entry?.appOrigin, { ...(entry?.op ?? {}), id: entry?.op?.id ?? k }, role)) opsById.set(k, entry);
-  const commandMenu = Array.isArray(catalogue.commandMenu)
-    ? catalogue.commandMenu.filter((e) => opsById.has(e?.opId))
-    : catalogue.commandMenu;
+  const commandMenu = Array.isArray(catalogue.commandMenu) ? narrowMenu(catalogue.commandMenu, opsById) : catalogue.commandMenu;
   return { ...catalogue, opsById, commandMenu };
+}
+
+/**
+ * The command menu, narrowed to the ops kept. A command two apps declared is ambiguous in the merge (a bare entry with
+ * choices, and a qualified `/app:command` per declarer); when the narrowing leaves ONE of them, the bare command is that
+ * op again and its qualified form goes — the household's generated `/complete-task` beside the tasks one made the bare
+ * command answer nothing on the bot. Left two or more, it stays ambiguous between those.
+ */
+function narrowMenu(menu, opsById) {
+  const kept = menu.filter((e) => opsById.has(e?.opId));
+  const settled = new Map();   // bare command → the one entry left
+  const out = [];
+  for (const e of menu) {
+    if (!e?.ambiguous) continue;
+    const live = (e.choices ?? []).map((c) => kept.find((k) => k.command === c.command)).filter(Boolean);
+    if (live.length === 1) settled.set(e.command, live[0]);
+  }
+  const qualifiedOf = new Set([...settled.values()].map((k) => k.command));
+  for (const e of menu) {
+    if (e?.ambiguous) {
+      const one = settled.get(e.command);
+      if (one) out.push({ command: e.command, opId: one.opId, appOrigin: one.appOrigin, ...(one.body ? { body: one.body } : {}) });
+      else {
+        const live = (e.choices ?? []).filter((c) => kept.some((k) => k.command === c.command));
+        if (live.length > 1) out.push({ ...e, choices: live });
+      }
+      continue;
+    }
+    if (!opsById.has(e?.opId) || qualifiedOf.has(e.command)) continue;
+    out.push(e);
+  }
+  return out;
 }
 
 /**

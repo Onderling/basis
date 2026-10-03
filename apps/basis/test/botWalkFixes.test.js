@@ -15,6 +15,7 @@ import { VaultNodeFs } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, vars) => NAMES[k] ?? (vars ? `${k} ${JSON.stringify(vars)}` : k);
 
@@ -35,7 +36,7 @@ describe('the household bot, as a walk found it', () => {
       chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') },
       seedDemoData: false, seedHousehold: false,
-      tasksCircleId: 'household', calendarInCircle: true, t,
+      ...HOUSEHOLD_BOT_STORE_OPTS, t,
     });
     const call = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: call, t });

@@ -242,6 +242,7 @@ import { createLocalBuiltins }             from '../localBuiltins.js';          
 import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
+import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
@@ -1110,9 +1111,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         // unsigned mirror carry is deleted. The valve is built per publish call so it sees the task
         // emitter even though this wiring can run at boot, before the rails are handed the device log;
         // on a device-log composition a pre-emitter write REFUSES loudly instead of silently not-fanning.
+        // …and the composition hears that the circle's content changed (`opts.onCircleWrite`: a bot nudges its screens)
+        const wrote = () => { try { opts.onCircleWrite?.(id); } catch { /* a listener never breaks a write */ } };
         wireStoreMirror(circleStore, {
-          publishItem:        (item)          => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item),
-          publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed),
+          publishItem:        (item)          => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(); return r; },
+          publishItemRemoved: (rid, removed)  => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(); return r; },
         });
         reFanOwedChat(id);   // what a restart still owes this circle goes out again (idempotent)
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
@@ -3993,6 +3996,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
   let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  let circleTasks = null;      // the bot's chores over the circle store, made on first use
   /**
    * A chores read for a door's person: each chore's holder, named when the household's names setting lets this person
    * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
@@ -4009,7 +4013,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     const nameOf = (id) => (id === caller ? tr('circle.lists.chore_you') : (known.find((c) => c.webid === id)?.displayName ?? null));
     return items.map((i) => {
       if (!Array.isArray(i?.holders)) return i;
-      const { holders, ...rest } = i;
+      const { holders, ...base } = i;
+      // the chore's state stays (a screen offers "I'll do it" on an open one, "Done" on a held one), and whether it is
+      // the reader's own — never anyone's id
+      const rest = { ...base, state: holders.length ? 'claimed' : 'open', ...(holders.includes(caller) ? { yours: true } : {}) };
       if (!holders.length) return { ...rest, label: tr('circle.lists.chore_open', { text: i.label }) };
       const names = holders.map((h) => (h === caller || mayName ? nameOf(h) : null)).filter(Boolean);
       return { ...rest, label: names.length ? tr('circle.lists.chore_held', { text: i.label, who: names.join(', ') }) : tr('circle.lists.chore_taken', { text: i.label }) };
@@ -4273,6 +4280,20 @@ export async function createRealHouseholdAgent(opts = {}) {
         return {
           items: hits.map((t) => ({ id: t.id, label: t.text ?? t.title, type: 'task' })),
         };
+      }
+      // A household bot (`opts.tasksInCircle`): the chores are the task noun's verbs over the circle's ONE store, beside
+      // the lists and the calendar — not the separate tasks agent, its op aliases and arg shims. The bot's key is the
+      // authority (the door's role gate ran first); the person a call is for is who the chore records.
+      if (opts.tasksInCircle && TASKS_IN_CIRCLE_OPS.includes(opId)) {
+        const ops = (circleTasks ??= makeTasksOps({
+          storeFor: (circleId) => householdService.stores.getStore(circleId),
+          activeCircle: () => resolveCircleId({}),
+          hostActor: chatId.pubKey,
+          rolePolicy: buildStandardRolePolicy({ [chatId.pubKey]: 'admin' }),
+        }));
+        await ensureCircleSync(resolveCircleId(args ?? {}));
+        const data = await ops[opId](args ?? {});
+        return adaptTasksReply(opId, data, { actor: args?.actor ?? null, named: namedTask, args: args ?? {} });
       }
       const realOpId = TASKS_OP_ALIAS[opId] ?? opId;
       // Per-op arg normalisation between the chat-shell vocabulary

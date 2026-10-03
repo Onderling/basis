@@ -8,6 +8,7 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { botOpLevel, botRoleAllows } from '../src/v2/botOpMap.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, p) => NAMES[k] ?? (p ? `${k} ${JSON.stringify(p)}` : k);
 
@@ -16,7 +17,7 @@ describe('who holds which chore', () => {
   afterAll(async () => { await agent?.stop?.().catch(() => {}); });
 
   it('the chores read names the holder, within the names setting', async () => {
-    agent = await createRealHouseholdAgent({ seedDemoData: false, seedHousehold: false, t, tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows });
+    agent = await createRealHouseholdAgent({ seedDemoData: false, seedHousehold: false, t, ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows });
     const own = (a, o, x, c) => agent.callSkill(a, o, x, c);
     await ensureHouseholdLists({ callSkill: (a, o, x) => own(a, o, x), t });
     for (const [w, n, r] of [['telegram:1', 'Ann', 'member'], ['telegram:2', 'Bert', 'member'], ['telegram:9', 'Frits', 'admin']]) {
@@ -36,5 +37,14 @@ describe('who holds which chore', () => {
     expect(hidden.find((l) => l.includes('ramen'))).not.toContain('Ann');
     expect(hidden.find((l) => l.includes('ramen'))).toContain('circle.lists.chore_taken');
     expect((await read('telegram:9')).find((l) => l.includes('ramen'))).toContain('Ann');
+
+    // the chore's state stays on the entry (a screen offers "I'll do it" on an open one, "Done" on a held one) — still
+    // without anyone's id; and whether it is the reader's own
+    const rows = async (who) => (await own('lists', 'listEntries', { list: 'Klusjes' }, { caller: who })).items;
+    const forBert = await rows('telegram:2');
+    expect(forBert.find((i) => i.label.includes('ramen'))).toMatchObject({ state: 'claimed' });
+    expect(forBert.find((i) => i.label.includes('vuilnis'))).toMatchObject({ state: 'open' });
+    expect(JSON.stringify(forBert)).not.toContain('telegram:1');
+    expect((await rows('telegram:1')).find((i) => i.label.includes('ramen'))).toMatchObject({ yours: true });
   }, 120_000);
 });

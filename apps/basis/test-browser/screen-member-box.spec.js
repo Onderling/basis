@@ -70,6 +70,8 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     const ctx = await browser.newContext({ locale: 'nl-NL' });
     const page = await ctx.newPage();
     await page.goto(/https?:\/\/\S+/.exec(linkLine)[0]);
+    // the first load of a fresh dev server is slow: wait for the page as the connect walk does
+    await expect(page.locator('[data-screen="connect"]')).toBeVisible({ timeout: 60_000 });
     await page.locator('[data-screen="connect"]').click();
     const screenCode = await page.locator('[data-code]').getAttribute('data-code', { timeout: 30_000 });
     expect(await next(bertSaid, seen, /koppelen|connect/i)).toBeTruthy();
@@ -98,6 +100,23 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     await annSend('/list-entries Boodschappen');
     const annReads = await next(annSaid, seen, /van-berts-scherm/);
     expect(annReads, `Ann does not see Bert's add:\n${(await annSaid()).slice(seen).join('\n')}`).toBeTruthy();
+
+    // ── the household itself on his screen: the lists, his own add among them, read again after the add ──
+    const household = page.locator('section[data-section="household"]');
+    await expect(household.locator('[data-list="Boodschappen"]')).toContainText('van-berts-scherm', { timeout: 30_000 });
+    await expect(household.locator('[data-list="Klusjes"]')).toBeVisible();
+
+    // Ann puts a chore on Klusjes in her chat; Bert's screen shows it by itself, open, with "Ik doe het"; he takes it; then "Klaar"
+    seen = (await annSaid()).length;
+    await annSend('/add-to-list --list Klusjes --text ramen-lappen');
+    expect(await next(annSaid, seen, /ramen-lappen/)).toBeTruthy();
+    // no refresh: the bot's nudge brings it (it names nothing; the screen reads again as Bert)
+    const chore = household.locator('[data-list="Klusjes"] li', { hasText: 'ramen-lappen' });
+    await expect(chore).toBeVisible({ timeout: 30_000 });
+    await chore.locator('[data-action="tasks.claimTask"]').click();
+    await expect(chore.locator('[data-action="tasks.completeTask"]'), `after the claim the screen said: ${await household.locator('[data-household="said"]').textContent()}`).toBeVisible({ timeout: 30_000 });
+    await chore.locator('[data-action="tasks.completeTask"]').click();
+    await expect(household.locator('[data-list="Klusjes"] li:not(.done)', { hasText: 'ramen-lappen' })).toHaveCount(0, { timeout: 30_000 });
 
     await page.screenshot({ path: testInfo.outputPath('member-screen.png'), fullPage: true });
     await ctx.close();

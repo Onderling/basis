@@ -16,6 +16,7 @@ import { AgentIdentity, CapabilityToken } from '@onderling/core';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { botOpLevel, botRoleAllows } from '../src/v2/botOpMap.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const t = (k) => k;
 
 describe('the bot\'s own screen tokens verify at its door', () => {
@@ -34,7 +35,7 @@ describe('the bot\'s own screen tokens verify at its door', () => {
 
   it('minted by grantSurface, checked by the kernel door; no setTier in the test', async () => {
     dir = await mkdtemp(path.join(tmpdir(), 'bot-own-tokens-'));
-    agent = await boot('bot', { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true });
+    agent = await boot('bot', { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true });
     await agent.surfaceGrantsReady();
     const bot = agent.sa.agent;
     bot.skills.register('lists.addToList', async () => ({ ok: true }), { visibility: 'authenticated', policy: 'requires-token' });

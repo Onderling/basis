@@ -14,6 +14,7 @@ import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
 import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
 import { screenPanelsForGrant, screenReplies } from '../../src/v2/screenPaint.js';
+import { readHousehold } from '../../src/v2/screenHousehold.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
 import { renderForm } from '../../src/web/domForm.js';
 import { confirmApplies } from '../../src/confirmApplies.js';
@@ -59,6 +60,42 @@ export async function startScreenShell(win = window) {
     return '✓';
   };
 
+  // The household itself: its lists with their lines and each line's actions, read again after an action (or a nudge)
+  const household = el('section', { 'data-section': 'household' });
+  const householdSaid = el('p', { class: 'screen-result', role: 'status', 'data-household': 'said' });
+  // one read at a time: a paint asked for while one runs is done once, after it (a quick series of taps is one read)
+  let painting = null;
+  let again = false;
+  const paintHousehold = () => {
+    if (painting) { again = true; return painting; }
+    painting = readAndPaint().finally(() => { painting = null; if (again) { again = false; paintHousehold(); } });
+    return painting;
+  };
+  const readAndPaint = async () => {
+    let h;
+    try { h = await readHousehold({ call: (skill, args) => view.call(skill, args), ops: view.ops(), t }); } catch (e) { householdSaid.textContent = inWords(e?.message ?? e); return; }
+    if (!h.lists.length && !h.people) { household.replaceChildren(); return; }
+    const act = async (a) => {
+      if (confirmApplies(a.confirm, a.args) && !win.confirm(t(a.confirm.messageKey ?? '') || a.confirm.message || t('circle.connectScreen.sure'))) return;
+      householdSaid.textContent = '…';
+      try { householdSaid.textContent = answerOf(await view.call(a.skill, a.args)); } catch (e) { householdSaid.textContent = inWords(e?.message ?? e); }
+      await paintHousehold();
+    };
+    household.replaceChildren(
+      el('h2', {}, t('circle.connectScreen.household')),
+      el('button', { type: 'button', 'data-screen': 'refresh', onclick: () => paintHousehold() }, t('circle.connectScreen.refresh')),
+      householdSaid,
+      ...h.lists.map((l) => el('div', { class: 'screen-list', 'data-list': l.title },
+        el('h3', {}, l.title),
+        l.items.length
+          ? el('ul', {}, ...l.items.map((i) => el('li', { 'data-line': i.id, ...(i.done ? { class: 'done' } : {}) },
+            el('span', {}, i.label), ' ',
+            ...i.actions.map((a) => el('button', { type: 'button', 'data-action': a.skill, onclick: () => act(a) }, a.label)))))
+          : el('p', {}, t('circle.connectScreen.list_empty')))),
+      ...(h.people ? [el('h3', {}, t('circle.connectScreen.people')), el('pre', { 'data-household': 'people' }, h.people)] : []),
+    );
+  };
+
   const showOps = () => {
     keepBotAddress();   // connected: a reload finds the kept grant
     const panels = screenPanelsForGrant(view.ops(), t);
@@ -69,14 +106,15 @@ export async function startScreenShell(win = window) {
         const area = el('div', { class: 'screen-form' });
         const replies = el('div', { class: 'screen-replies' });
         // one call of the screen's: the op's own confirm (the surface asks; the waist does not), then its token
-        const call = async (skill, args, confirm) => {
+        const call = async (skill, args, confirm, writes = item.writes) => {
           if (confirmApplies(confirm, args) && !win.confirm(t(confirm.messageKey ?? '') || confirm.message || t('circle.connectScreen.sure'))) return;
           out.textContent = '…';
           replies.replaceChildren();
           let r;
           try { r = await view.call(skill, args); out.textContent = answerOf(r); } catch (e) { out.textContent = inWords(e?.message ?? e); return; }
+          if (writes) paintHousehold();
           // the answer's own buttons (a menu): only those the screen resolves to an op it holds a token for
-          replies.replaceChildren(...screenReplies(r, view.ops()).map((b) => el('button', { type: 'button', 'data-reply': b.skill, onclick: () => call(b.skill, b.args, b.confirm) }, b.label)));
+          replies.replaceChildren(...screenReplies(r, view.ops()).map((b) => el('button', { type: 'button', 'data-reply': b.skill, onclick: () => call(b.skill, b.args, b.confirm, true) }, b.label)));
         };
         const run = (args) => call(item.skill, args, item.confirm);
         const open = el('button', { type: 'button', 'data-op': item.skill, onclick: () => {
@@ -86,8 +124,11 @@ export async function startScreenShell(win = window) {
         } }, item.label);
         return el('div', { class: 'screen-op' }, open, area, out, replies);
       })));
-    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), ...sections);
+    say(el('p', { 'data-screen': 'connected' }, t('circle.connectScreen.connected', { bot })), household, ...sections);
+    paintHousehold();
   };
+  // the bot's nudge: something in the household changed — read it again (as this person, through the gate)
+  view.onNudge(() => { if (household.isConnected) paintHousehold(); });
   // what became of a request that waited for a yes in the person's own chat: said on that op's own line
   view.onNotice(({ outcome, op }) => {
     if (!SCREEN_STEP_UP_OUTCOMES.includes(outcome) && outcome !== SCREEN_STEP_UP_UNANSWERED) return;

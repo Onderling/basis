@@ -4403,7 +4403,6 @@
           "assistant-invite": "a code for one person",
           "assistant-revoke": "take someone out",
           "assistant-rotate": "replace the codes",
-          "assistant-apps": "which apps the bot uses",
           "assistant-status": "how the bot is doing",
           "assistant-exports": "the nightly exports",
           "assistant-export": "make an export now",
@@ -7417,6 +7416,21 @@
     "stepup_replaced": "Not done: a newer request took its place.",
     "stepup_failed": "That did not work; see your chat.",
     "stepup_unanswered": "No answer: no yes came within ten minutes. Nothing changed.",
-    "rate_limited": "Slow down a little: this screen asked too much at once. Try again in a few seconds."
+    "rate_limited": "Slow down a little: this screen asked too much at once. Try again in a few seconds.",
+    "action": {
+      "claimTask": "I'll do it",
+      "completeTask": "Done",
+      "removeTask": "Remove",
+      "rsvpAccept": "I'm coming",
+      "rsvpDecline": "I'm not coming",
+      "rsvpTentative": "Maybe",
+      "cancelEvent": "Cancel",
+      "markListItemDone": "Done",
+      "removeFromList": "Remove"
+    },
+    "household": "The household",
+    "people": "Who is in the household",
+    "refresh": "Refresh",
+    "list_empty": "Nothing."
   }
 }

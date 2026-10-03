@@ -41,6 +41,8 @@ export function screenPanels({ ops, catalogue, isAdmin = () => false, t }) {
       params,
       needsForm: params.some((p) => p?.required),
       confirm: op.surfaces?.ui?.confirm ?? null,
+      // it changes something: the household on the screen is read again after it
+      writes: Boolean(op.writes),
     });
   }
   return ORDER.filter((s) => groups.get(s).length).map((s) => ({ section: s, title: t(`circle.bot.help.sections.${s}`), items: groups.get(s) }));

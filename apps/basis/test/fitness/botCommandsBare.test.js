@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
 import { resolveDispatch } from '../../src/router.js';
 import { parseInput } from '../../src/parser.js';
+import { createRealHouseholdAgent } from '../../src/core/agent/realAgent.js';
 
 const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
 const resolve = (line) => resolveDispatch(parseInput(line, catalogue, {}), catalogue);
@@ -27,4 +28,20 @@ describe('FITNESS: the bot\'s commands are bare', () => {
       expect(resolve(e.command.split(' ')[0]), e.command).not.toMatchObject({ kind: 'unknown' });
     }
   });
+
+  it('as the box composes it (the household app and the agent\'s own manifest): /complete-task resolves, and a bare command is ambiguous only between offered ops', async () => {
+    const agent = await createRealHouseholdAgent({ seedDemoData: false, seedHousehold: false });
+    try {
+      const box = composeAssistantCatalogue({ apps: ['household', 'lists', 'tasks', 'calendar'], householdManifest: agent.manifest, slim: true }).catalogue;
+      const r = resolveDispatch(parseInput('/complete-task ramen', box, {}), box);
+      expect(r).toMatchObject({ kind: 'ready', opId: 'completeTask' });
+      const menu = box.commandMenu ?? [];
+      for (const e of menu.filter((x) => x.ambiguous)) {
+        const live = (e.choices ?? []).filter((c) => menu.some((m) => m.command === c.command && m.opId));
+        expect(live.length, `${e.command} is ambiguous between ${live.length} offered op(s)`).toBeGreaterThan(1);
+      }
+      const prefixed = menu.filter((x) => String(x.command).includes(':') && !menu.some((m) => m.ambiguous && (m.choices ?? []).some((c) => c.command === x.command)));
+      expect(prefixed.map((x) => x.command), 'a prefixed command with nothing left to be ambiguous with').toEqual([]);
+    } finally { await agent.close?.()?.catch?.(() => {}); }
+  }, 60_000);
 });

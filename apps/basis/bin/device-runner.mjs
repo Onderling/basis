@@ -60,6 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { createIdentityLink } from '../src/v2/botIdentityLink.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { createScreenNudge } from '../src/v2/screenNudge.js';
@@ -863,10 +864,23 @@ if (tgToken || inboxDoor.bridge) {
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     tell: (viewPubKey, o) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_STEP_UP_SUBTYPE, ...o }),
   }) : null;
+  // A Telegram person links their Basis identity (`/koppel`): their app offers, their private chat confirms by the code.
+  // Identity only: a turn signed by that key is their row. The bot's statement goes to the app's key.
+  const identityLink = isFunctionProfile ? createIdentityLink({
+    users: botUsers,
+    botAddress: () => agent.identity?.chat?.pubKey ?? null,
+    ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
+    sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
+    tellApp: (key, payload) => agent.sendPeerMessage(key, payload),
+    listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
+    revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
+    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
+  }) : null;
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     admin: {
       screens,
+      identityLink,
       stepUp,
       catalogue: doorCatalogue,
       users: () => botUsers.list(),

@@ -46,6 +46,11 @@ const KNOWN_DIFFERENCES = {
   'circle-peer-intro':    'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
   'help-with-accepted':   'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
   'help-with-response':   'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
+  // Web-first (B1, 2026-10-03): the household bot's identity-link statement is taken by the web app's `#koppel-bot=`
+  // sheet. The link is to the PERSON's key — the same on every device of theirs — so linking from the web app links
+  // the phone too; the phone has no link sheet yet, so it would never hold a pending offer for this to complete. Owed:
+  // the phone's sheet, and then its handler here.
+  IDENTITY_LINK_SUBTYPE:  'web-first (identity link; the person key covers the phone; the phone sheet is owed) — 2026-10-03',
 };
 
 /** The handler-map region of each composition: from the router/builder start to `defaultHandler`. */

@@ -24,7 +24,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write',
   },
   operations: [
     {
@@ -256,6 +256,34 @@ export const assistantManifest = {
       stepUp: 'private-door',
       params: [{ name: 'passphrase', kind: 'secret', required: true }],
       surfaces: {},
+    },
+    {
+      // A person's Basis identity, linked to their row (`/koppel`): alone, the link their app opens; with the app's
+      // offer, the question in the private chat. Identity only: a turn signed by that key is this person.
+      id:     'assistant-link',
+      verb:   'link-identity',
+      visibility: 'authenticated',
+      writes: { scope: 'person' },
+      params: [{ name: 'offer', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/koppel', body: 'argline' } },
+    },
+    {
+      // The code the person's app shows, picked from three — from the private chat only (`/koppel-code`).
+      id:     'assistant-link-confirm',
+      verb:   'confirm-link',
+      visibility: 'authenticated',
+      writes: { scope: 'person' },
+      params: [{ name: 'answer', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/koppel-code', body: 'argline' } },
+    },
+    {
+      // Undo the link (`/ontkoppel`): the key goes, and every screen grant minted to it.
+      id:     'assistant-unlink',
+      verb:   'unlink-identity',
+      visibility: 'authenticated',
+      writes: { scope: 'person' },
+      params: [],
+      surfaces: { slash: { command: '/ontkoppel', body: 'none' } },
     },
     {
       // The admin's yes (or no) to what a screen asked: counts from the private chat only (`/bevestig ja|nee`).

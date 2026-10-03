@@ -4411,7 +4411,10 @@
           "assistant-screen-confirm": "de code van een scherm kiezen dat wil koppelen",
           "assistant-screen-approve": "je ja of nee op wat een scherm vroeg",
           "assistant-export-key-set": "de exportsleutel zetten (je wachtwoord, alleen op je scherm)",
-          "assistant-export-key-unlock": "de exportsleutel een uur openen, voor /import"
+          "assistant-export-key-unlock": "de exportsleutel een uur openen, voor /import",
+          "assistant-link": "je Basis-app aan jezelf koppelen",
+          "assistant-link-confirm": "de code van je Basis-app kiezen",
+          "assistant-unlink": "je Basis-app ontkoppelen"
         }
       }
     },
@@ -4451,7 +4454,23 @@
     "export_key_unlocked": "De exportsleutel is een uur open: typ nu /import met de bestandsnaam in de chat.",
     "export_key_wrong": "Dat wachtwoord opent deze sleutel niet. De sleutel blijft dicht.",
     "export_key_screen_only": "Dit gaat alleen via je scherm.",
-    "export_key_mismatch": "De twee wachtwoorden zijn niet gelijk. Niets gevraagd, niets veranderd."
+    "export_key_mismatch": "De twee wachtwoorden zijn niet gelijk. Niets gevraagd, niets veranderd.",
+    "link_open_app": "Open deze link in je Basis-app om je identiteit aan deze bot te koppelen: {{link}}\nJe app toont daarna een regel om hier te plakken.",
+    "link_not_private": "Dat telt alleen in je eigen chat met de bot.",
+    "link_question": "Een Basis-app wil zich aan jou koppelen: berichten van die app tellen dan als jou, en de bot kent je Basis-identiteit. Kies de code die je app toont.",
+    "link_already": "Deze Basis-app is al aan jou gekoppeld.",
+    "link_asked": "Kies hieronder de code die je app toont.",
+    "link_another_bot": "Die koppelregel is voor een andere bot. Niets gevraagd.",
+    "link_key_taken": "Die Basis-identiteit hoort al bij iemand anders hier. Niets gevraagd.",
+    "link_row_has_key": "Je bent al aan een andere Basis-app gekoppeld. Gebruik eerst /ontkoppel.",
+    "link_not_an_offer": "Dat is geen koppelregel uit je Basis-app.",
+    "link_done": "Gekoppeld: berichten van je Basis-app tellen nu als jou. /ontkoppel maakt het ongedaan.",
+    "link_declined": "Niet gekoppeld.",
+    "link_nothing": "Er wacht geen koppeling op een code.",
+    "link_failed": "Koppelen lukte niet.",
+    "unlink_done": "Ontkoppeld: berichten van die Basis-app tellen niet meer als jou, en zijn schermen zijn los.",
+    "unlink_nothing": "Er is geen Basis-app aan je gekoppeld.",
+    "users_linked": "gekoppelde app: ja"
   },
   "op": {
     "not_in_this_circle": {
@@ -7447,5 +7466,17 @@
     "people": "Wie er in huis zijn",
     "refresh": "Ververs",
     "list_empty": "Niets."
+  },
+  "identityLink": {
+    "title": "Koppel je Basis aan een bot",
+    "which_bot": "Deze link komt van de bot {{bot}}.",
+    "means": "Na het koppelen tellen berichten van deze app als jij bij die bot, en kent de bot je Basis-identiteit. Er wordt niets anders gedeeld.",
+    "make": "Maak de koppelregel",
+    "paste_this": "Plak deze regel in je eigen chat met {{bot}}:",
+    "copy": "Kopieer",
+    "code": "De bot vraagt daarna welke code je app toont. Kies deze:",
+    "waiting": "Wachten op de bot…",
+    "linked": "Gekoppeld aan {{bot}}. In de chat zegt /ontkoppel het weer op.",
+    "close": "Sluiten"
   }
 }

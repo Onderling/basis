@@ -78,6 +78,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     try {
       if (op === 'assistant-screen-approve') return approveOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
+      if (op === 'assistant-link') return linkOp(caller ?? ctx?.threadId, args?.offer ?? args?._match, ctx);
+      if (op === 'assistant-link-confirm') return linkConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
+      if (op === 'assistant-unlink') return unlinkOp(caller ?? ctx?.threadId, ctx);
       // the export key's set and unlock exist for a screen alone: they run only as the yes to a screen's request
       if (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock') {
         if (ctx?.steppedUp !== true) return { ok: false, error: { code: 'screen-only', message: t('circle.bot.export_key_screen_only') } };
@@ -551,6 +554,58 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return typeof out === 'string' && out && !out.startsWith(key) ? out : null;
   }
 
+  /** Is this turn from the person's PRIVATE door (on Telegram the chat whose id is their own; the inbox always)? */
+  async function fromPrivateDoor(person, ctx) {
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    return ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+  }
+
+  /**
+   * `/koppel` — a person's Basis identity linked to their row. Alone: the link their app opens (to their private door).
+   * With the app's offer (pasted in their private chat): checked, then the question that says what linking means.
+   */
+  async function linkOp(person, offer, ctx) {
+    const link = admin.identityLink;
+    if (!person || !link) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    if (!String(offer ?? '').trim()) {
+      const r = await link.start(person, (url) => tp('circle.bot.link_open_app', { link: url }));
+      return r?.ok ? { ok: true, message: tp('circle.bot.screen_sent_privately') } : { ok: false, error: { code: r?.reason ?? 'failed', message: tp('circle.bot.screen_no_app') } };
+    }
+    if (!(await fromPrivateDoor(person, ctx))) return { ok: false, error: { code: 'not-private', message: tp('circle.bot.link_not_private') } };
+    const question = (codes) => ({
+      text: tp('circle.bot.link_question'),
+      buttons: [...codes.map((c) => ({ id: `/koppel-code ${c}`, label: c })), { id: '/koppel-code geen', label: tp('circle.bot.screen_confirm_none') }],
+    });
+    const r = await link.pasted(person, offer, question);
+    if (r.ok && r.already) return { ok: true, message: tp('circle.bot.link_already') };
+    if (r.ok) return { ok: true, message: tp('circle.bot.link_asked') };
+    const key = { 'another-bot': 'link_another_bot', 'key-on-another-row': 'link_key_taken', 'row-has-a-key': 'link_row_has_key' }[r.reason] ?? 'link_not_an_offer';
+    return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`) } };
+  }
+
+  /** `/koppel-code <code>` — from the private door only. */
+  async function linkConfirmOp(person, answer, ctx) {
+    const link = admin.identityLink;
+    if (!person || !link) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const r = await link.confirm(person, answer, { isPrivate: await fromPrivateDoor(person, ctx) });
+    if (r.ok && r.linked) return { ok: true, message: tp('circle.bot.link_done') };
+    if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.link_declined') };
+    const key = { 'not-private': 'link_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'link_nothing' }[r.reason] ?? 'link_failed';
+    return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
+  }
+
+  /** `/ontkoppel` — from the private door only: the key goes, and its screen grants. */
+  async function unlinkOp(person, ctx) {
+    const link = admin.identityLink;
+    if (!person || !link) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const r = await link.unlink(person, { isPrivate: await fromPrivateDoor(person, ctx) });
+    if (r.ok) return { ok: true, message: tp('circle.bot.unlink_done') };
+    return { ok: false, error: { code: r.reason, message: tp(r.reason === 'not-private' ? 'circle.bot.link_not_private' : 'circle.bot.unlink_nothing') } };
+  }
+
   /** `/koppel-scherm <code>`: a screen's own connect code, pasted; the same question follows. */
   async function screenPasteOp(person, text) {
     if (!person || !admin.screens?.pasted) return { ok: false, error: 'unwired' };
@@ -583,6 +638,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!rows.length) return t('circle.bot.users_none');
     // Under `assistant.names: none` the rows by their id.
     const hideNames = await namesHidden();
-    return rows.map((u) => `${hideNames ? u.id : (u.displayName ?? u.id)} — ${u.role ?? '?'}`).join('\n');
+    // a linked Basis app is said, never its key
+    return rows.map((u) => `${hideNames ? u.id : (u.displayName ?? u.id)} — ${u.role ?? '?'}${u.pubKey ? ` · ${t('circle.bot.users_linked')}` : ''}`).join('\n');
   }
 }

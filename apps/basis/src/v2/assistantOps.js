@@ -5,6 +5,7 @@
 import { parsePairingOffer } from './connectionPairing.js';
 import { screenLabel } from './botScreens.js';
 import { personNamed } from './botUsers.js';
+import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
@@ -77,6 +78,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     try {
       if (op === 'assistant-screen-approve') return approveOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
+      if (op === 'assistant-link') return linkOp(caller ?? ctx?.threadId, args?.offer ?? args?._match, ctx);
+      if (op === 'assistant-link-confirm') return linkConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
+      if (op === 'assistant-unlink') return unlinkOp(caller ?? ctx?.threadId, ctx);
+      // the export key's set and unlock exist for a screen alone: they run only as the yes to a screen's request
+      if (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock') {
+        if (ctx?.steppedUp !== true) return { ok: false, error: { code: 'screen-only', message: t('circle.bot.export_key_screen_only') } };
+        return exportKeyOp(op, args?.passphrase, personT(caller ?? ctx?.threadId));
+      }
       // `/apps on tasks`: with no required param the router keeps the line as `_match` for the op to split.
       if (op === 'assistant-apps') return appsOp(args?.change ?? args?._match);
       if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match);
@@ -450,7 +459,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const what = said(tp, `circle.bot.stepup_what.${op}`, { arg: plan.shown }) ?? tp('circle.bot.stepup_what_op', { op: slashOf(op) ?? op, arg: plan.shown });
     // the request's id is in the words too: a door with no buttons (the inbox) answers by typing it
     const screen = screenLabel(ctx.screenLabel) ?? tp('circle.connectScreen.label');
-    const question = (id) => ({ text: tp('circle.bot.stepup_question', { screen, what, id }), buttons: [{ id: `/bevestig ja ${id}`, label: tp('circle.bot.stepup_yes') }, { id: `/bevestig nee ${id}`, label: tp('circle.bot.stepup_no') }] });
+    const extra = plan.note ? ` ${plan.note}` : '';
+    const question = (id) => ({ text: `${tp('circle.bot.stepup_question', { screen, what, id })}${extra}`, buttons: [{ id: `/bevestig ja ${id}`, label: tp('circle.bot.stepup_yes') }, { id: `/bevestig nee ${id}`, label: tp('circle.bot.stepup_no') }] });
     const r = await admin.stepUp.hold(person, { app, op, args: plan.args, viewPubKey: ctx.viewPubKey }, question);
     if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.screen_not_reachable') } };
     return { ok: true, pending: true, message: tp('circle.bot.stepup_asked') };
@@ -458,6 +468,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
 
   /** The args a held request runs with, and how the question shows them: `{ok, args, shown}` or a refusal. */
   async function stepUpPlan(app, op, args, tp) {
+    if (app === 'assistant' && (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock')) return exportKeyPlan(op, args, tp);
     const typed = screenLabel(args?.who ?? args?.spec ?? args?._match) ?? '—';
     if (app !== 'assistant' || (op !== 'assistant-revoke' && op !== 'assistant-role')) return { ok: true, args, shown: typed };
     const rows = typeof admin.users === 'function' ? ((await admin.users()) ?? []) : [];
@@ -495,9 +506,40 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return { ok: false, error: { code: r.reason, message: tp(`circle.bot.stepup_${key}`) } };
     }
     if (r.declined) return { ok: true, message: tp('circle.bot.stepup_declined') };
-    const out = await door(r.req.app, r.req.op, r.req.args, { caller: person, threadId: person, ...(ctx?.chatId != null ? { chatId: ctx.chatId } : {}) });
+    let out;
+    try { out = await door(r.req.app, r.req.op, r.req.args, { caller: person, threadId: person, steppedUp: true, ...(ctx?.chatId != null ? { chatId: ctx.chatId } : {}) }); }
+    finally { r.req.args = null; }   // a held secret (a passphrase) does not outlive its yes
     await admin.stepUp.done(r.req, out?.ok !== false);
     return out;
+  }
+
+  /**
+   * The export key's set or unlock, checked BEFORE the question: wired, a passphrase long enough, a key to unlock. The
+   * passphrase is never shown (`—`); when a key is set already, the question says what replacing it means.
+   */
+  async function exportKeyPlan(op, args, tp) {
+    const key = admin.exportKey;
+    if (!key) return { ok: false, error: { code: 'unwired', message: tp('circle.bot.stepup_unwired') } };
+    const pass = args?.passphrase;
+    if (typeof pass !== 'string' || pass.length < MIN_PASSPHRASE) return { ok: false, error: { code: 'too-short', message: tp('circle.bot.export_key_too_short', { n: MIN_PASSPHRASE }) } };
+    if (op === 'assistant-export-key-set' && args?.passphraseAgain !== pass) return { ok: false, error: { code: 'mismatch', message: tp('circle.bot.export_key_mismatch') } };
+    if (op === 'assistant-export-key-unlock' && !key.exists()) return { ok: false, error: { code: 'no-key', message: tp('circle.bot.export_key_none') } };
+    const note = op === 'assistant-export-key-set' && key.exists() ? tp('circle.bot.stepup_export_key_replaces') : null;
+    return { ok: true, args: { passphrase: pass }, shown: '—', ...(note ? { note } : {}) };
+  }
+
+  /** The export key's set or unlock, after the yes — the box's own core; the answer names the act, never the secret. */
+  async function exportKeyOp(op, passphrase, tp) {
+    const key = admin.exportKey;
+    if (!key) return { ok: false, error: 'unwired' };
+    if (op === 'assistant-export-key-set') {
+      const r = await key.set(passphrase);
+      if (!r.ok) return { ok: false, error: { code: r.reason, message: tp('circle.bot.export_key_too_short', { n: MIN_PASSPHRASE }) } };
+      return { ok: true, message: tp(r.replaced ? 'circle.bot.export_key_replaced' : 'circle.bot.export_key_set') };
+    }
+    const r = await key.unlock(passphrase);
+    if (!r.ok) return { ok: false, error: { code: r.reason, message: tp(r.reason === 'wrong-passphrase' ? 'circle.bot.export_key_wrong' : 'circle.bot.export_key_none') } };
+    return { ok: true, message: tp('circle.bot.export_key_unlocked') };
   }
 
   /** Under `assistant.names: none` no name leaves the bot — not even to the admin's door. */
@@ -510,6 +552,58 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   function said(tr, key, params) {
     const out = tr(key, params);
     return typeof out === 'string' && out && !out.startsWith(key) ? out : null;
+  }
+
+  /** Is this turn from the person's PRIVATE door (on Telegram the chat whose id is their own; the inbox always)? */
+  async function fromPrivateDoor(person, ctx) {
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    return ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+  }
+
+  /**
+   * `/koppel` — a person's Basis identity linked to their row. Alone: the link their app opens (to their private door).
+   * With the app's offer (pasted in their private chat): checked, then the question that says what linking means.
+   */
+  async function linkOp(person, offer, ctx) {
+    const link = admin.identityLink;
+    if (!person || !link) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    if (!String(offer ?? '').trim()) {
+      const r = await link.start(person, (url) => tp('circle.bot.link_open_app', { link: url }));
+      return r?.ok ? { ok: true, message: tp('circle.bot.screen_sent_privately') } : { ok: false, error: { code: r?.reason ?? 'failed', message: tp('circle.bot.screen_no_app') } };
+    }
+    if (!(await fromPrivateDoor(person, ctx))) return { ok: false, error: { code: 'not-private', message: tp('circle.bot.link_not_private') } };
+    const question = (codes) => ({
+      text: tp('circle.bot.link_question'),
+      buttons: [...codes.map((c) => ({ id: `/koppel-code ${c}`, label: c })), { id: '/koppel-code geen', label: tp('circle.bot.screen_confirm_none') }],
+    });
+    const r = await link.pasted(person, offer, question);
+    if (r.ok && r.already) return { ok: true, message: tp('circle.bot.link_already') };
+    if (r.ok) return { ok: true, message: tp('circle.bot.link_asked') };
+    const key = { 'another-bot': 'link_another_bot', 'key-on-another-row': 'link_key_taken', 'row-has-a-key': 'link_row_has_key' }[r.reason] ?? 'link_not_an_offer';
+    return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`) } };
+  }
+
+  /** `/koppel-code <code>` — from the private door only. */
+  async function linkConfirmOp(person, answer, ctx) {
+    const link = admin.identityLink;
+    if (!person || !link) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const r = await link.confirm(person, answer, { isPrivate: await fromPrivateDoor(person, ctx) });
+    if (r.ok && r.linked) return { ok: true, message: tp('circle.bot.link_done') };
+    if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.link_declined') };
+    const key = { 'not-private': 'link_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'link_nothing' }[r.reason] ?? 'link_failed';
+    return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
+  }
+
+  /** `/ontkoppel` — from the private door only: the key goes, and its screen grants. */
+  async function unlinkOp(person, ctx) {
+    const link = admin.identityLink;
+    if (!person || !link) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const r = await link.unlink(person, { isPrivate: await fromPrivateDoor(person, ctx) });
+    if (r.ok) return { ok: true, message: tp('circle.bot.unlink_done') };
+    return { ok: false, error: { code: r.reason, message: tp(r.reason === 'not-private' ? 'circle.bot.link_not_private' : 'circle.bot.unlink_nothing') } };
   }
 
   /** `/koppel-scherm <code>`: a screen's own connect code, pasted; the same question follows. */
@@ -544,6 +638,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!rows.length) return t('circle.bot.users_none');
     // Under `assistant.names: none` the rows by their id.
     const hideNames = await namesHidden();
-    return rows.map((u) => `${hideNames ? u.id : (u.displayName ?? u.id)} — ${u.role ?? '?'}`).join('\n');
+    // a linked Basis app is said, never its key
+    return rows.map((u) => `${hideNames ? u.id : (u.displayName ?? u.id)} — ${u.role ?? '?'}${u.pubKey ? ` · ${t('circle.bot.users_linked')}` : ''}`).join('\n');
   }
 }

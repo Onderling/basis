@@ -243,6 +243,7 @@ import { mergeManifests }                  from '../../manifestMerge.js';       
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
+import { linkOfferMessage } from '../../v2/identityLink.js';                    // the one message signLinkOffer signs
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
@@ -5965,6 +5966,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       host: { pubKey: hostId.pubKey, stableId: hostId.stableId },
       chat: { pubKey: chatId.pubKey, stableId: chatId.stableId },
     },
+    /**
+     * Sign a household bot's identity-link offer with this person's chat key — ONLY that message (domain-separated by
+     * `linkOfferMessage`, built here, never handed in), so this cannot sign anything else. The bot verifies it with the
+     * key the offer names: proof that this app holds the key it offers.
+     */
+    signLinkOffer: ({ botAddress, nonce }) => b64encode(chatId.sign(linkOfferMessage({ k: chatId.pubKey, b: botAddress, n: nonce }))),
     /** Whether this install is an ENROLLED device (a delegation under the owner root) — read by a
      *  headless operator command that must refuse to enrol an install twice. */
     // ENROLLED means "by a ceremony" — the delegation the first device mints for itself at first boot (2026-09-16) does

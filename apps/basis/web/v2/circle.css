@@ -1425,3 +1425,11 @@
   .screen-shell { padding: .75rem .75rem 2rem; }
   .screen-shell .screen-code { font-size: 2rem; }
 }
+
+/* The identity-link sheet (`web/v2/identityLinkSheet.js`): a bot's `/koppel` link opened in the person's own app. */
+.cc-identity-link { max-width: 32rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); color: var(--ink); font-family: var(--font-sans); padding: 1rem 1.2rem; }
+.cc-identity-link h2 { font-family: var(--font-serif); font-size: 1.2rem; margin: 0 0 .6rem; }
+.cc-identity-link textarea { width: 100%; font-family: var(--font-mono); font-size: .8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper-2); color: var(--ink); padding: .4rem; }
+.cc-identity-link button { font: inherit; font-size: .9rem; margin: .4rem .4rem 0 0; padding: .35rem .75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper-2); color: var(--ink); cursor: pointer; }
+.cc-identity-link [data-identity-link="make"] { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+.cc-identity-link__code { font-family: var(--font-mono); font-size: 2.2rem; letter-spacing: .3em; margin: .4rem 0; }

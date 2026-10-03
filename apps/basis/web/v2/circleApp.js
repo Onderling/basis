@@ -19,6 +19,9 @@
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { startScreenShell } from './screenShell.js';
+import { openIdentityLinkSheet } from './identityLinkSheet.js';
+import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
+import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
@@ -8566,8 +8569,13 @@ async function boot() {
           ? agent.sendPeerMessage(addr, env)
           : Promise.reject(new Error('agent.sendPeerMessage unavailable'));
 
+      // A bot's `/koppel` link (the identity link): the sheet it opens, told when the bot's statement lands
+      let identityLinkSheet = null;
+      const identityLinkViewFor = (link) => createIdentityLinkView({ link, personKey: agent.identity?.chat?.pubKey ?? agent.pubKey, signOffer: (o) => agent.signLinkOffer(o), storage: window.localStorage });
       const peerMessageRouter = makePeerRouter({
         handlers: {
+          // the household bot's statement that this person's Basis identity is linked to their row there (or unlinked)
+          [IDENTITY_LINK_SUBTYPE]: (from, payload) => { if (identityLinkViewFor('').received(from, payload) && !payload?.unlinked) identityLinkSheet?.linked(); },
           // The five signed lanes and the personal ones, from the ONE table every shell builds
           // (`buildCircleLanes`). What stays below is what only THIS shell can answer: bubbles,
           // wizard stashes, the nearby room, and the threads it paints.
@@ -8744,6 +8752,18 @@ async function boot() {
         };
         takeContactFromHash();
         window.addEventListener('hashchange', takeContactFromHash);
+        // AN ARRIVING BOT LINK (`…#koppel-bot=` — a household bot's `/koppel`): link this person's Basis identity to their
+        // row there. The fragment names the bot (no secret); it leaves the address bar, and the sheet opens.
+        const takeBotLinkFromHash = () => {
+          try {
+            const view = identityLinkViewFor(window.location.hash);
+            if (!view.bot.ok) return;
+            try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
+            identityLinkSheet = openIdentityLinkSheet(view);
+          } catch { /* a malformed hash is not an error state */ }
+        };
+        takeBotLinkFromHash();
+        window.addEventListener('hashchange', takeBotLinkFromHash);
         // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
         // offer, scrub it from the address bar, and open the enroll flow so the person lands one
         // step from typing the phrase. Runs before the consume below on purpose: a link opened on

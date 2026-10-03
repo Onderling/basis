@@ -20,6 +20,10 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-screen-confirm',
   'assistant.assistant-screen-paste',
   'assistant.assistant-screen-approve',   // the yes to a screen's request is said in the private chat, never by a screen
+  // who a person is (their Basis identity) is linked from their private chat, never by a screen
+  'assistant.assistant-link',
+  'assistant.assistant-link-confirm',
+  'assistant.assistant-unlink',
 ]);
 
 /**
@@ -33,6 +37,9 @@ export const SCREEN_ADMIN_OPS = Object.freeze([
   'assistant.assistant-exports',
   'assistant.assistant-settings',
   'assistant.assistant-export',
+  // the export key's set and unlock: ops that exist for a screen alone (each after the chat's yes)
+  'assistant.assistant-export-key-set',
+  'assistant.assistant-export-key-unlock',
 ]);
 
 /**

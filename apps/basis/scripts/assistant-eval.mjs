@@ -11,11 +11,12 @@
  *
  *   node scripts/assistant-eval.mjs                 # real route (needs ~/.privatemode-apikey)
  *   node scripts/assistant-eval.mjs --model gpt-oss-120b
+ *   node scripts/assistant-eval.mjs --model glm-5.3 --thinking on   # the model's reasoning: off (its lowest) · low · on
  *   node scripts/assistant-eval.mjs --only add        # fixtures whose id contains "add"
  *   node scripts/assistant-eval.mjs --apps lists   # the bot's app list (default: the household template's — lists, tasks)
  *   node scripts/assistant-eval.mjs --from-log ~/.basis-telegram/walk-log-*.jsonl   # print fixture stubs from a walk
  *
- * Exit code 1 when the pass rate is under --min (default 0.85). Fixtures: scripts/assistant-eval.fixtures.mjs.
+ * Exit code 1 when the pass rate is under --min (default 0.95: the baseline is 70/72, see the fixtures file). Fixtures: scripts/assistant-eval.fixtures.mjs.
  */
 import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
@@ -29,9 +30,9 @@ import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';
 
 const { values } = parseArgs({ options: {
-  model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.85' },
+  model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.95' },
   mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' }, 'door-lang': { type: 'string' },
-  apps: { type: 'string' },
+  apps: { type: 'string' }, thinking: { type: 'string', default: 'off' },
 } });
 
 if (values['from-log']) {
@@ -63,7 +64,7 @@ if (!values.mock) {
   const { privatemodeProvider, readPrivatemodeKey } = await import('@onderling/llm-client/providers/privatemode');
   const { LlmClient } = await import('@onderling/llm-client');
   if (!readPrivatemodeKey()) { console.error('assistant-eval: no Privatemode key — pass --mock or add ~/.privatemode-apikey'); process.exit(2); }
-  llm = new LlmClient({ provider: await privatemodeProvider({ model: values.model || undefined, timeoutMs: 60_000 }) });
+  llm = new LlmClient({ provider: await privatemodeProvider({ model: values.model || undefined, thinking: values.thinking, timeoutMs: 60_000 }) });
 } else {
   // the same stand-in the browser specs use (llm-client's mockProvider), behind the real client
   const { LlmClient, mockProvider } = await import('@onderling/llm-client');

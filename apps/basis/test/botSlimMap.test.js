@@ -31,7 +31,7 @@ describe('the bot\'s slim map', () => {
     // a coordinator's thread is a member's (the admin's column is the admin's alone); an observer's is the reads
     expect(tools('coordinator')).toEqual([...MEMBER].sort());
     // the screen ops are on the observer's column (a read screen) but slash only: never a tool the model holds
-    const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view'];
+    const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink'];
     expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].filter((op) => !SLASH_ONLY.includes(op)).sort());
     expect(BOT_OP_MAP.member).toEqual(MEMBER);
   });

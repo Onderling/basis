@@ -60,6 +60,9 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { createIdentityLink } from '../src/v2/botIdentityLink.js';
+import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
+import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { createScreenNudge } from '../src/v2/screenNudge.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
@@ -217,6 +220,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const circleWrite = { fn: null };
+const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // the household's store changed: a bot nudges its connected screens (bound below, once the screens exist)
@@ -722,6 +726,8 @@ if (tgToken || inboxDoor.bridge) {
     model: process.env.PRIVATEMODE_MODEL,
     // One retry on the fallback model after a timeout — said in the walk log, so a slow route is visible.
     onFallback: (e) => walkLog({ kind: 'llm-fallback', ...e }),
+    // a provider error reaches the model watch (an account over its limit is told to the admin)
+    onProviderError: (err) => modelWatch.ref?.providerError(err),
   });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
@@ -858,10 +864,23 @@ if (tgToken || inboxDoor.bridge) {
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     tell: (viewPubKey, o) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_STEP_UP_SUBTYPE, ...o }),
   }) : null;
+  // A Telegram person links their Basis identity (`/koppel`): their app offers, their private chat confirms by the code.
+  // Identity only: a turn signed by that key is their row. The bot's statement goes to the app's key.
+  const identityLink = isFunctionProfile ? createIdentityLink({
+    users: botUsers,
+    botAddress: () => agent.identity?.chat?.pubKey ?? null,
+    ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
+    sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
+    tellApp: (key, payload) => agent.sendPeerMessage(key, payload),
+    listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
+    revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
+    where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
+  }) : null;
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     admin: {
       screens,
+      identityLink,
       stepUp,
       catalogue: doorCatalogue,
       users: () => botUsers.list(),
@@ -869,6 +888,14 @@ if (tgToken || inboxDoor.bridge) {
       revoke: (who) => botUsers.revoke(who),
       setRole: (who, role) => botUsers.setRole(who, role),
       exports: exportShelf,
+      // the export key's set and unlock from the admin's screen: the same core as `bin/export-key.mjs`, over this box's files
+      exportKey: createExportKeyFile({
+        files: {
+          read: (name) => { try { return readFileSync(path.join(dataDir, name), 'utf8'); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; } },
+          write: (name, text) => writeFileSync(path.join(dataDir, name), text, { mode: 0o600 }),
+          remove: (name) => rmSync(path.join(dataDir, name), { force: true }),
+        },
+      }),
       // a sealed file opens with the key the admin unlocked on the box (`bin/export-key.mjs unlock`); the import closes it
       unlockedKey: async () => { sweepUnlocked(); try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
       lockKey: async () => rmSync(path.join(dataDir, UNLOCKED_KEY_FILE), { force: true }),
@@ -952,6 +979,19 @@ if (tgToken || inboxDoor.bridge) {
       overviewFor: async (id) => (await doorCall('assistant', 'weekOverview', {}, { caller: id, threadId: id }))?.message ?? null,
     });
     reminderTick.start();
+    // The model route, watched: a model the provider stopped serving, or an account over its limit, reaches the admin
+    if (built?.listModels) {
+      modelWatch.ref = createModelWatch({
+        listModels: built.listModels, model: built.model, fallback: built.fallbackModel, t,
+        tellAdmin: async (text) => {
+          const admin = (await botUsers.list()).find((u) => u.role === 'admin');
+          if (admin) await reach.sendToPerson(admin.id, { text });
+        },
+        log: walkLog,
+      });
+      modelWatch.ref.check();
+      setInterval(() => modelWatch.ref.check(), MODEL_WATCH_EVERY_MS).unref?.();
+    }
     exportShelf.start();
     walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });
   }

@@ -24,8 +24,9 @@ import { createRateLimiter } from './rateLimit.js';
 const PEER_SKILL_CALL_DEFAULTS = Object.freeze({
   /** The largest `parts` a call may carry (serialised), in bytes. */
   maxPartsBytes: 64 * 1024,
-  /** Calls per sender: a burst, then this many per second (30 a minute). */
-  perPeer: Object.freeze({ burst: 10, refillPerSec: 0.5 }),
+  /** Calls per sender: a burst, then this many per second — a person tapping through their screen (a refresh of the
+   *  household is one read per list) stays well inside it; a flood does not. */
+  perPeer: Object.freeze({ burst: 30, refillPerSec: 1 }),
   /** Calls from every sender together (300 a minute): a flood from many keys passes the per-sender cap. */
   global: Object.freeze({ burst: 50, refillPerSec: 5 }),
 });

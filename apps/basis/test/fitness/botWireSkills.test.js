@@ -19,6 +19,7 @@ import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js'
 import { EventLog } from '../../src/eventLog.js';
 import { exposeDoorToScreens, screenColumnFor } from '../../src/v2/screenActing.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../../src/v2/householdBotStore.js';
 const t = (k) => k;
 
 describe('FITNESS: the kernel skills the wire reaches on a bot', () => {
@@ -32,7 +33,7 @@ describe('FITNESS: the kernel skills the wire reaches on a bot', () => {
     agent = await createRealHouseholdAgent({
       ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass), chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') }, seedDemoData: false, seedHousehold: false, t,
-      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: true,
+      ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: true,
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     const { catalogue, manifestsByOrigin } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], householdManifest: agent.manifest, slim: true });

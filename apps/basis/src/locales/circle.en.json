@@ -4403,7 +4403,6 @@
           "assistant-invite": "a code for one person",
           "assistant-revoke": "take someone out",
           "assistant-rotate": "replace the codes",
-          "assistant-apps": "which apps the bot uses",
           "assistant-status": "how the bot is doing",
           "assistant-exports": "the nightly exports",
           "assistant-export": "make an export now",

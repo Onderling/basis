@@ -27,6 +27,7 @@ import { assistantManifest } from '../src/v2/assistantManifest.js';
 import { EventLog } from '../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, vars) => NAMES[k] ?? (vars ? `${k} ${JSON.stringify(vars)}` : k);
 const MEMBER = 'telegram:1';
@@ -61,7 +62,7 @@ describe('a screen acts as its person, and no further', () => {
     agent = await createRealHouseholdAgent({
       ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass), chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       householdPersistDb: { path: path.join(dir, 'household-items.json') }, seedDemoData: false, seedHousehold: false,
-      tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, t,
+      ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, t,
     });
     own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });

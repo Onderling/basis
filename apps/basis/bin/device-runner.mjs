@@ -60,6 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
@@ -71,7 +72,7 @@ import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, REMINDER_LEAD_KEY, reminderLeadFrom } from '../src/v2/botSettings.js';
-import { ensureHouseholdLists, HOUSEHOLD_TEMPLATE, withTemplateApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, householdBotApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -216,7 +217,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  ...(botInstall ? { tasksCircleId: 'household', calendarInCircle: true, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: true } : {}),
+  ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: true } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -706,8 +707,9 @@ if (tgToken || inboxDoor.bridge) {
     householdManifest: agent.manifest,
     // A household bot composes exactly its map (`botOpMap.js`); a person's box its app list, as before.
     slim: isFunctionProfile,
-    getApps: () => agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY),
-    setApps: (list) => callSkill('params', 'set-param', { key: ASSISTANT_APPS_PARAM_KEY, value: list }),
+    // a household bot composes its template's plugins, fixed (no app switch); a person's box its app list
+    getApps: () => (isFunctionProfile ? householdBotApps() : agent.getParamValue?.(ASSISTANT_APPS_PARAM_KEY)),
+    ...(isFunctionProfile ? {} : { setApps: (list) => callSkill('params', 'set-param', { key: ASSISTANT_APPS_PARAM_KEY, value: list }) }),
   });
   const apps = doorCatalogue.apps();
   // The model is the optional half of this optional half: a key without its SDK is a warning and a
@@ -939,11 +941,7 @@ if (tgToken || inboxDoor.bridge) {
   if (isFunctionProfile) {
     ensureHouseholdLists({ callSkill, t })
       .then(async (made) => {
-        // Every start: the template's plugins are in the bot's app list (lists hold, tasks move, the calendar keeps the
-        // Agenda) — also on a bot whose list was set before the template grew; the owner's own apps stay.
-        const next = withTemplateApps(doorCatalogue.apps());
-        if (next) await doorCatalogue.setApps(next).catch(() => {});
-        if (made.length || next) walkLog({ kind: 'household-template', lists: made.length, apps: next ?? doorCatalogue.apps() });
+        if (made.length) walkLog({ kind: 'household-template', lists: made.length, apps: doorCatalogue.apps() });
       })
       .catch((err) => console.warn(`device-runner: the household lists were not made (${err?.message ?? err})`));
   }

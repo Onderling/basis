@@ -35,6 +35,8 @@ services:
       # Conversation turns in the walk log: off (default) · redacted (a fixture-collecting week) · full (tests only).
       ONDERLING_WALK_LOG_TURNS: "${ONDERLING_WALK_LOG_TURNS:-off}"
       PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
+      # the model, when the operator picks one (the code's default otherwise)
+      PRIVATEMODE_MODEL: "${PRIVATEMODE_MODEL:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"
       # The household's clock: "morgen om 10 uur" is read and shown in this zone (the container's own is UTC).
       TZ: "${TZ:-Europe/Amsterdam}"

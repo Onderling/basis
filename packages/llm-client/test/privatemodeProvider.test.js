@@ -30,14 +30,17 @@ describe('privatemodeProvider', () => {
     expect(body.tools?.[0]?.function?.name).toBe('addItem');
     expect(r.toolCall).toMatchObject({ id: 'addItem', args: { type: 'shopping', text: 'kaas' } });
   });
-  it('each family gets its own switch (gpt-oss low, GLM nothing, thinking on sends nothing); an SDK error surfaces with its status', async () => {
+  it('each family gets its own switch (gpt-oss low, GLM low — it cannot switch reasoning off —, thinking on sends nothing); an SDK error surfaces with its status', async () => {
     expect(reasoningBodyFor('gpt-oss-120b')).toEqual({ reasoning_effort: 'low' });
-    expect(reasoningBodyFor('glm-5.3')).toBeNull();
+    // GLM cannot switch reasoning off; nothing sent means max
+    expect(reasoningBodyFor('glm-5.3')).toEqual({ reasoning_effort: 'low' });
+    expect(reasoningBodyFor('glm-5.3-flash', 'low')).toEqual({ reasoning_effort: 'low' });
+    expect(reasoningBodyFor('glm-5.3', 'on')).toBeNull();
     expect(reasoningBodyFor('kimi-k2.6', 'on')).toBeNull();
     const client = fakeClient({ choices: [{ message: { role: 'assistant', content: 'ok' } }] });
     const p = await privatemodeProvider({ client, model: 'glm-5.3' });
     await p.invoke({ system: 's', messages: [{ role: 'user', content: 'hoi' }] });
-    expect(client.calls[0].body.reasoning_effort).toBeUndefined();
+    expect(client.calls[0].body.reasoning_effort).toBe('low');   // nothing sent would be max
     expect(client.calls[0].body.chat_template_kwargs).toBeUndefined();
     const bad = await privatemodeProvider({ client: fakeClient(Object.assign(new Error('unauthorized'), { status: 401 })) });
     await expect(bad.invoke({ system: 's', messages: [{ role: 'user', content: 'hoi' }] })).rejects.toMatchObject({ code: 'PROVIDER_ERROR', status: 401 });

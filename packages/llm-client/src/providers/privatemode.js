@@ -32,7 +32,9 @@ export const PRIVATEMODE_DEFAULT_MODEL = 'gpt-oss-120b';
 
 /**
  * Privatemode has no unified reasoning switch — it is per model family (`chat_template_kwargs` for
- * Kimi and Gemma, `reasoning_effort` for gpt-oss, nothing for GLM). A tool pick is a clear task:
+ * Kimi and Gemma, `reasoning_effort` for gpt-oss and GLM). GLM's reasoning cannot be switched off: its
+ * `reasoning_effort` takes low | high | max, and with nothing sent it reasons at max (Privatemode's models page,
+ * 2026-10-03) — which is why GLM "returned nothing in 5.5 s" in September. A tool pick is a clear task:
  * reasoning off/low keeps latency and tokens down.
  * @param {string} model
  * @param {'off'|'low'|'on'} [thinking='off']
@@ -43,6 +45,7 @@ export function reasoningBodyFor(model, thinking = 'off') {
   if (/kimi/.test(m))   return { chat_template_kwargs: { thinking: false } };
   if (/gemma/.test(m))  return { chat_template_kwargs: { enable_thinking: false } };
   if (/gpt-oss/.test(m)) return { reasoning_effort: thinking === 'off' ? 'low' : thinking };
+  if (/glm/.test(m))     return { reasoning_effort: 'low' };   // off and low are both its lowest
   return null;
 }
 

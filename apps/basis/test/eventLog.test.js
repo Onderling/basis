@@ -2,6 +2,7 @@
  * basis — EventLog substrate tests.  v0.7.1.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { toEventLogItem } from '@onderling/item-store';
 
 import {
   EventLog, RETENTION_MS, SYSTEM_APP,
@@ -351,6 +352,17 @@ describe('EventLog — per-kind retention', () => {
     expect(log.query().map((e) => e.id).sort()).toEqual(['b-msg', 'none']);
     expect(log.forgetCircle('')).toBe(0);
     expect(log.forgetCircle(null)).toBe(0);
+  });
+
+  it('a chat message keeps its circle in the payload (the real entry shape): forgetCircle and the scoped purge both reach it', () => {
+    const log = new EventLog({ now: () => 10_000 });
+    log.append(toEventLogItem({ msgId: 'real-a', ts: 0, circleId: 'cA', actor: 'x', text: 'in A' }));
+    log.append(toEventLogItem({ msgId: 'real-b', ts: 0, circleId: 'cB', actor: 'x', text: 'in B' }));
+    expect(log.purgeConversation({ olderThanMs: 100, circleId: 'cA' })).toBe(1);
+    expect(log.query().map((e) => e.id)).toEqual(['real-b']);
+    log.append(toEventLogItem({ msgId: 'real-a2', ts: 0, circleId: 'cA', actor: 'x', text: 'in A again' }));
+    expect(log.forgetCircle('cA')).toBe(1);
+    expect(log.query().map((e) => e.id)).toEqual(['real-b']);
   });
 
   it('chat messages are the RECORD — no window, however small, ever drops them', () => {

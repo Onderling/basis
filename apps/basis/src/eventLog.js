@@ -144,6 +144,16 @@ export function shouldWakeForEntry(entry) {
 }
 
 /**
+ * The circle an entry belongs to: the first-class `circleId` (silent entries, the rails), else the payload's — a chat
+ * message keeps its circle in the payload (`toEventLogItem`), so a filter on the top-level field alone misses every one.
+ * @param {object} e
+ * @returns {string|null}
+ */
+export function circleOfEntry(e) {
+  return e?.circleId ?? e?.payload?.circleId ?? null;
+}
+
+/**
  * Build a SILENT system entry (pure — no append). Typed entry carrying a
  * first-class `circleId`, the `silent:true` marker, `app:'system'`, and
  * `type:kind`. Exported so callers/tests can shape one without a live log.
@@ -359,7 +369,7 @@ export class EventLog {
     this.#events = this.#events.filter((e) => !(
       e.type === 'chat-message'
       && e.ts < cutoff
-      && (circleId == null || e.circleId === circleId)
+      && (circleId == null || circleOfEntry(e) === circleId)
     ));
     const deleted = before - this.#events.length;
     if (deleted) this.#persist(this.#events.slice()).catch(() => {});
@@ -378,7 +388,7 @@ export class EventLog {
   forgetCircle(circleId) {
     if (typeof circleId !== 'string' || !circleId) return 0;
     const before = this.#events.length;
-    this.#events = this.#events.filter((e) => e.circleId !== circleId);
+    this.#events = this.#events.filter((e) => circleOfEntry(e) !== circleId);
     const dropped = before - this.#events.length;
     if (dropped) this.#persist(this.#events.slice()).catch(() => {});
     return dropped;

@@ -64,6 +64,21 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
       return store;
     },
     has: (circleId) => stores.has(circleId),
+    /**
+     * Forget ONE circle on this device: its rows go from the backing it lives on and its cached store with them. The
+     * rows are deleted at the DataSource, beneath the store, so no removal hook fires — this is a device letting go
+     * of what it held (a member that left), never a removal the circle's other members hear of. Returns the number
+     * of rows deleted.
+     */
+    async forget(circleId) {
+      if (typeof circleId !== 'string' || !circleId) throw new Error('createCircleStores.forget: a non-empty circleId is required');
+      const backing = (typeof dataSourceFor === 'function' && dataSourceFor(circleId)) || dataSource;
+      stores.get(circleId)?.setSyncHook?.(null);
+      stores.delete(circleId);
+      const keys = (await backing.list(rootFor(circleId))) ?? [];
+      for (const k of keys) await backing.delete(k);
+      return keys.length;
+    },
     rootFor,
   };
 }

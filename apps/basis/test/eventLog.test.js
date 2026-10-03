@@ -340,6 +340,19 @@ describe('EventLog — per-kind retention', () => {
     expect(ids).toContain('b1');
   });
 
+  it('forgetCircle drops EVERY entry of one circle — record kinds too — and leaves the rest', () => {
+    const log = new EventLog({ now: () => 1000 });
+    log.append(ev({ id: 'a-msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'cA', payload: {} }));
+    log.append(ev({ id: 'a-mem', ts: 0, app: 'system', type: 'membership', circleId: 'cA', payload: {} }));
+    log.append(ev({ id: 'a-gov', ts: 0, app: 'system', type: 'governance', circleId: 'cA', payload: { event: 'propose' } }));
+    log.append(ev({ id: 'b-msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'cB', payload: {} }));
+    log.append(ev({ id: 'none', ts: 0, app: 'system', type: 'governance', payload: { event: 'propose' } }));
+    expect(log.forgetCircle('cA')).toBe(3);
+    expect(log.query().map((e) => e.id).sort()).toEqual(['b-msg', 'none']);
+    expect(log.forgetCircle('')).toBe(0);
+    expect(log.forgetCircle(null)).toBe(0);
+  });
+
   it('chat messages are the RECORD — no window, however small, ever drops them', () => {
     let clock = 0;
     const log = new EventLog({ now: () => clock, retention: { short: 1, chat: 1, audit: 1 } });

@@ -367,6 +367,24 @@ export class EventLog {
   }
 
   /**
+   * FORGET one circle on this device: every entry it carries — the record kinds included (the conversation, the roster's
+   * statements, the trail). Not retention and not a user's purge: this is a device letting go of a circle it is no
+   * longer in and has no reason to keep (a household bot that left, or was removed from, a circle it joined). Nothing is
+   * said to anyone; the circle's other members keep their own record. Persists the shrunk log; returns how many entries went.
+   *
+   * @param {string} circleId
+   * @returns {number}
+   */
+  forgetCircle(circleId) {
+    if (typeof circleId !== 'string' || !circleId) return 0;
+    const before = this.#events.length;
+    this.#events = this.#events.filter((e) => e.circleId !== circleId);
+    const dropped = before - this.#events.length;
+    if (dropped) this.#persist(this.#events.slice()).catch(() => {});
+    return dropped;
+  }
+
+  /**
    * COMPACT named entries in place — the ONE way a RECORD-class entry ever changes after it was written, and
    * only for a set the FOLD computed (L121: `member-props` statements every device agrees are dead —
    * `rosterFold.superseded`). The entry is not dropped: dropping it would shorten the author's chain and move

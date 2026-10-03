@@ -6363,11 +6363,36 @@ export async function createRealHouseholdAgent(opts = {}) {
       for (const def of list) chatAgent.skills.register(def.id, def.handler, def);
       return list.length;
     },
-    /** Every item of the household's circle store, as stored (the export writes its public fields from these). */
-    householdItems: async () => (await householdService.stores.getStore(resolveCircleId({})).list()) ?? [],
-    /** A household bot's reminders read the household circle's chores and appointments, whole (dates, who comes). */
+    /**
+     * Let go of ONE circle's content on this device: its store's rows (beneath the store, so no member hears of a
+     * removal) and every entry of it on the device log. For a device that left, or was removed from, a circle and keeps
+     * nothing of it — a household bot (a person's device keeps its history: leaving says "your local data stays").
+     * The household itself is never forgotten here.
+     * @param {string} circleId
+     * @returns {Promise<{ok: boolean, rows?: number, entries?: number, reason?: string}>}
+     */
+    forgetCircleContent: async (circleId) => {
+      if (typeof circleId !== 'string' || !circleId || circleId === 'household') return { ok: false, reason: 'not-a-joined-circle' };
+      let rows = await householdService.stores.forget(circleId);
+      // …and the legacy per-circle bucket the peer mirror kept, if it ever held this circle
+      if (householdDataSource) {
+        const legacy = (await householdDataSource.list(`mem://household/circles/${circleId}/`).catch(() => [])) ?? [];
+        for (const k of legacy) await householdDataSource.delete(k);
+        rows += legacy.length;
+      }
+      householdStores.delete(circleId);
+      circleSyncWired.delete(circleId);
+      const entries = opts.deviceLog?.forgetCircle?.(circleId) ?? 0;
+      return { ok: true, rows, entries };
+    },
+    /**
+     * Every item of the household's store, as stored (the export writes its public fields from these). The household,
+     * by name: a circle the bot joined is never in its export, whatever circle a shell calls active.
+     */
+    householdItems: async () => (await householdService.stores.getStore('household').list()) ?? [],
+    /** A household bot's reminders read the household's chores and appointments, whole (dates, who comes) — never a joined circle's. */
     reminderSources: async () => {
-      const store = householdService.stores.getStore(resolveCircleId({}));
+      const store = householdService.stores.getStore('household');
       const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
       return { chores: chores ?? [], events: events ?? [] };
     },

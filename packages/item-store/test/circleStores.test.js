@@ -37,6 +37,28 @@ describe('createCircleStores (L1 integration)', () => {
     expect([...ds._map.keys()].some((k) => k.includes('/circles/B/'))).toBe(true);
   });
 
+  it('forget drops ONE circle\'s rows from its backing and its cached store, with no removal hook fired', async () => {
+    const ds = memoryDataSource();
+    const f = createCircleStores({ dataSource: ds, registry });
+    const removed = [];
+    await f.getStore('A').put({ type: 'task', text: 'in A' });
+    await f.getStore('A').put({ type: 'note', text: 'also A' });
+    await f.getStore('B').put({ type: 'task', text: 'in B' });
+    f.getStore('A').setSyncHook({ publishItemRemoved: (id) => removed.push(id) });
+    expect(await f.forget('A')).toBe(2);
+    expect(f.has('A')).toBe(false);
+    expect([...ds._map.keys()].some((k) => k.includes('/circles/A/'))).toBe(false);
+    expect((await f.getStore('B').list()).map((i) => i.text)).toEqual(['in B']);
+    expect(await f.getStore('A').list()).toEqual([]);   // a later ask starts empty
+    expect(removed).toEqual([]);                         // a local forget is not a removal any member hears of
+  });
+
+  it('forget refuses an empty id and is 0 for a circle never opened', async () => {
+    const f = createCircleStores({ dataSource: memoryDataSource(), registry });
+    await expect(f.forget('')).rejects.toThrow();
+    expect(await f.forget('never')).toBe(0);
+  });
+
   it('validates via the injected registry, shared across circles', async () => {
     const f = createCircleStores({ dataSource: memoryDataSource(), registry });
     await expect(f.getStore('c').put({ type: 'bogus' })).rejects.toThrow(/invalid "bogus"/);

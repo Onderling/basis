@@ -12,8 +12,8 @@ import { LlmClient } from '@onderling/llm-client';
 import { privatemodeProvider, readPrivatemodeKey } from '@onderling/llm-client/providers/privatemode';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-/** The model a turn is retried on ONCE when the primary times out. */
-export const ASSISTANT_FALLBACK_MODEL = param({ key: 'assistant.fallbackModel', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 'gpt-oss-120b' });
+/** The model a turn is retried on ONCE when the primary times out, and moved to when the primary is gone. */
+export const ASSISTANT_FALLBACK_MODEL = param({ key: 'assistant.fallbackModel', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 'glm-5.3' });
 /**
  * How long the model may take before the turn says it is slow and tries the fallback once. Well under a minute: a
  * person waiting 60 s for "even geduld" has given up (measured 2026-09-30: a normal model turn is about 2 s).
@@ -21,21 +21,33 @@ export const ASSISTANT_FALLBACK_MODEL = param({ key: 'assistant.fallbackModel', 
 export const ASSISTANT_MODEL_TIMEOUT_MS = param({ key: 'assistant.modelTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20_000 });
 
 const isTimeout = (err) => err?.name === 'AbortError' || /\babort|timed? ?out\b/i.test(String(err?.message ?? ''));
+// the provider no longer serves the model (Privatemode retired kimi-k2.6 on 2026-10-03: "404 model … not found")
+const isGone = (err) => Number(err?.status) === 404 || /\bmodel\b[^\n]*\bnot found\b/i.test(String(err?.message ?? ''));
 
 /**
- * A provider that retries a turn ONCE on another model when the first times out — any other error goes on as it
- * is. The second provider is made on first need. `onFallback` hears of it (the box writes it to its walk log), and so
- * does the turn: a request's own `onSlow` (the door tells the person to wait).
+ * A provider that retries a turn ONCE on another model when the first times out — and moves to it for good when the
+ * first is GONE (the provider says the model is not found: every later turn would fail the same way, and the bot would
+ * answer every free-text line with "the assistant is not answering"). Any other error goes on as it is. The second
+ * provider is made on first need. `onFallback` hears of it (the box writes it to its walk log), and so does a slow
+ * turn: a request's own `onSlow` (the door tells the person to wait).
  */
 function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback }) {
   let second = null;
+  let primaryGone = false;
   return {
     id: primary.id, endpoint: primary.endpoint, model: primary.model,
     async invoke(req) {
+      if (primaryGone && second) return second.invoke(req);
       try { return await primary.invoke(req); }
       catch (err) {
-        if (!isTimeout(err) || !fallbackModel || fallbackModel === primary.model) throw err;
+        const gone = isGone(err);
+        if ((!gone && !isTimeout(err)) || !fallbackModel || fallbackModel === primary.model) throw err;
         second ??= await makeFallback();
+        if (gone) {
+          primaryGone = true;
+          try { onFallback?.({ from: primary.model ?? null, to: fallbackModel, reason: 'not-found' }); } catch { /* a listener never breaks a turn */ }
+          return second.invoke(req);
+        }
         try { onFallback?.({ from: primary.model ?? null, to: fallbackModel, reason: 'timeout' }); } catch { /* a listener never breaks a turn */ }
         // …and the turn itself hears it is slow, so the person is told before the second wait (`req.onSlow`, per turn)
         try { req?.onSlow?.(); } catch { /* a listener never breaks a turn */ }

@@ -71,10 +71,40 @@ export function createBotUsers({ store, adminUid = null } = {}) {
     },
     /** Every admitted person (a revoked one is not), in the order they were admitted. */
     async list() { return (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden); },
-    /** The admitted person behind a door's uid, or null (never admitted, or revoked). */
+    /**
+     * The admitted person behind a door's uid, or null (never admitted, or revoked). At the inbox door a uid is a key:
+     * the row of that key, or the Telegram person's row that LINKED it (their Basis identity, `/koppel`) — one person.
+     */
     async find(channel, uid) {
-      const row = await store.get(idOf(channel, String(uid ?? '').trim()));
-      return row && !row.hidden ? row : null;
+      const u = String(uid ?? '').trim();
+      const row = await store.get(idOf(channel, u));
+      if (row && !row.hidden) return row;
+      if (channel !== 'web' || !u) return null;
+      return (await store.list()).find((r) => r && !r.hidden && r.pubKey === u) ?? null;
+    },
+    /**
+     * Link a person's Basis key to their row (the keyless row gains its key). One key per row, one row per key: a key
+     * already on another row (or an inbox-door person's own) is refused; the same key on the same row is a no-op.
+     * @returns {Promise<{ok: true, already?: true}|{ok: false, reason: 'no-row'|'key-on-another-row'|'row-has-a-key'}>}
+     */
+    async linkKey(id, key) {
+      const k = String(key ?? '').trim();
+      const rows = (await store.list()).filter((r) => r && !r.hidden);
+      const row = rows.find((r) => r.id === id);
+      if (!row || !k) return { ok: false, reason: 'no-row' };
+      if (row.pubKey === k) return { ok: true, already: true };
+      if (rows.some((r) => r.id !== id && (r.id === k || r.pubKey === k))) return { ok: false, reason: 'key-on-another-row' };
+      if (row.pubKey) return { ok: false, reason: 'row-has-a-key' };
+      await store.put({ ...row, pubKey: k });
+      return { ok: true };
+    },
+    /** Drop a row's linked key (`/ontkoppel`): a turn from it is a stranger's again. */
+    async unlinkKey(id) {
+      const row = await store.get(id);
+      if (!row?.pubKey) return { ok: false, reason: 'no-key' };
+      const { pubKey: key, ...rest } = row;
+      await store.put({ ...rest, pubKey: null });
+      return { ok: true, key };
     },
     /**
      * Drop a person: they are no longer admitted and need a new code. Named by display name or contact id.
@@ -122,6 +152,8 @@ export function contactBookStore(callSkill) {
     id: c.webid, type: 'contact', channel: c.channel, uid: c.channel === 'web' ? c.webid : String(c.webid).slice(c.channel.length + 1), role: c.role ?? null,
     ...(c.displayName ? { displayName: c.displayName } : {}),
     ...(c.hidden ? { hidden: true } : {}),
+    // a door row that linked its person's Basis key (`/koppel`); an inbox-door row's key is its id
+    ...(c.channel !== 'web' && typeof c.pubKey === 'string' && c.pubKey ? { pubKey: c.pubKey } : {}),
   });
   return {
     async get(id) { return (await rows()).find((u) => u.id === id) ?? null; },
@@ -132,6 +164,7 @@ export function contactBookStore(callSkill) {
     async put(user) {
       const r = await callSkill('stoop', 'addContact', {
         webid: user.id, channel: user.channel, role: user.role, ...(user.displayName ? { displayName: user.displayName } : {}),
+        ...('pubKey' in user ? { pubKey: user.pubKey ?? null } : {}),
       });
       if (r?.ok === false || r?.error) throw new Error(`botUsers: the contact book refused ${user.id} (${r.error ?? 'refused'})`);
       return user;
@@ -173,7 +206,9 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     if (!admission) return tier(await users.admit(who));
     const uid = String(who?.uid ?? '').trim();
     const known = typeof users.find === 'function' ? await users.find(who.channel, uid) : null;
-    if (known) return tier(known.displayName || !who.displayName ? known : await users.admit(who));
+    // a row found through ANOTHER door (a Telegram person's row that linked this key) is never re-admitted here: that
+    // would make the key a second row, a second person
+    if (known) return tier(known.channel !== who.channel || known.displayName || !who.displayName ? known : await users.admit(who));
     // Not admitted (never, or revoked): the gate forgets any tier they had.
     const id = typeof users.idOf === 'function' ? users.idOf(who.channel, uid) : `${who.channel}:${uid}`;
     if (tiered.has(id)) { tiered.delete(id); if (typeof clearDoorCaller === 'function') await clearDoorCaller(id); }

@@ -4411,7 +4411,10 @@
           "assistant-screen-confirm": "pick the code of a screen that wants to connect",
           "assistant-screen-approve": "your yes or no to what a screen asked",
           "assistant-export-key-set": "set the export key (your passphrase, on your screen only)",
-          "assistant-export-key-unlock": "open the export key for an hour, for /import"
+          "assistant-export-key-unlock": "open the export key for an hour, for /import",
+          "assistant-link": "link your Basis app to yourself",
+          "assistant-link-confirm": "pick the code your Basis app shows",
+          "assistant-unlink": "unlink your Basis app"
         }
       }
     },
@@ -4449,7 +4452,23 @@
     "export_key_unlocked": "The export key is open for an hour: now type /import with the file name in the chat.",
     "export_key_wrong": "That passphrase does not open this key. The key stays locked.",
     "export_key_screen_only": "This goes through your screen only.",
-    "export_key_mismatch": "The two passphrases do not match. Nothing asked, nothing changed."
+    "export_key_mismatch": "The two passphrases do not match. Nothing asked, nothing changed.",
+    "link_open_app": "Open this link in your Basis app to link your identity to this bot: {{link}}\nYour app then shows a line to paste here.",
+    "link_not_private": "That only counts in your own chat with the bot.",
+    "link_question": "A Basis app wants to link to you: messages from that app then count as you, and the bot knows your Basis identity. Pick the code your app shows.",
+    "link_already": "This Basis app is already linked to you.",
+    "link_asked": "Pick the code your app shows below.",
+    "link_another_bot": "That link line is for another bot. Nothing asked.",
+    "link_key_taken": "That Basis identity already belongs to someone else here. Nothing asked.",
+    "link_row_has_key": "You are already linked to another Basis app. Use /ontkoppel first.",
+    "link_not_an_offer": "That is not a link line from your Basis app.",
+    "link_done": "Linked: messages from your Basis app now count as you. /ontkoppel undoes it.",
+    "link_declined": "Not linked.",
+    "link_nothing": "No link is waiting for a code.",
+    "link_failed": "Linking did not work.",
+    "unlink_done": "Unlinked: messages from that Basis app no longer count as you, and its screens are disconnected.",
+    "unlink_nothing": "No Basis app is linked to you.",
+    "users_linked": "linked app: yes"
   },
   "op": {
     "not_in_this_circle": {
@@ -7445,5 +7464,17 @@
     "people": "Who is in the household",
     "refresh": "Refresh",
     "list_empty": "Nothing."
+  },
+  "identityLink": {
+    "title": "Link your Basis to a bot",
+    "which_bot": "This link comes from the bot {{bot}}.",
+    "means": "Once linked, messages from this app count as you with that bot, and the bot knows your Basis identity. Nothing else is shared.",
+    "make": "Make the link line",
+    "paste_this": "Paste this line into your own chat with {{bot}}:",
+    "copy": "Copy",
+    "code": "The bot then asks which code your app shows. Pick this one:",
+    "waiting": "Waiting for the bot…",
+    "linked": "Linked to {{bot}}. In the chat, /ontkoppel undoes it.",
+    "close": "Close"
   }
 }

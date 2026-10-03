@@ -721,7 +721,16 @@ if (tgToken || inboxDoor.bridge) {
   });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
-  const tgBridge = tgToken ? new TelegramBridge({ botToken: tgToken, mode: 'long-polling' }) : null;
+  // A long-poll that stopped or stalled (a sleep, a network change, an error Telegraf does not retry) leaves the bot
+  // running and deaf: the box says so and exits, and the container's restart policy starts it fresh.
+  const tgBridge = tgToken ? new TelegramBridge({
+    botToken: tgToken, mode: 'long-polling',
+    onPollingDown: ({ reason, error }) => {
+      console.error(`device-runner: Telegram's long-poll ${reason}${error ? ` (${error?.message ?? error})` : ''} — exiting so the box restarts it`);
+      try { walkLog({ kind: 'telegram-down', reason }); } catch { /* the exit below is what matters */ }
+      setTimeout(() => process.exit(1), 500).unref?.();
+    },
+  }) : null;
   // the household's reminder settings as the admin set them (the welcome says them; the tick obeys them)
   const reminderSettings = () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)), lead: reminderLeadFrom(agent.getParamValue?.(REMINDER_LEAD_KEY)) });
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);

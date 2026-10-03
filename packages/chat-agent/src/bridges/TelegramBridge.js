@@ -98,6 +98,12 @@ export class TelegramBridge {
   #bot;
   /** @type {boolean} */                                                    #started = false;
   /** @type {NodeJS.Timeout|null} */                                        #stopTimer = null;
+  /** the host hears when the long-poll stopped or stalled (`{reason}`), once */                  #onPollingDown = null;
+  /** `{stallMs, everyMs, now, setInterval}` — the watchdog's clock (tests set it) */             #watchdog = null;
+  /** when a getUpdates last completed (or the loop started) */                                    #lastPollAt = 0;
+  /** said already: the host is told once */                                                       #downSaid = false;
+  /** the watchdog's interval handle */                                                            #watchTimer = null;
+  /** a stop we asked for is not a loop that died */                                               #stopping = false;
   /** @type {((msg: import('../types.js').IncomingMessage) =>
               Promise<import('../types.js').Reply>) | null} */              #handler = null;
 
@@ -119,6 +125,10 @@ export class TelegramBridge {
    *   of N messages would take N × 100s to process.  Long-polling and
    *   webhook modes both honour this.
    * @param {(token: string) => any} [args.telegrafFactory]
+   * @param {(e: {reason: 'stopped'|'stalled', error?: unknown}) => void} [args.onPollingDown]  the long-poll ended
+   *   (Telegraf's loop gave up on an error it does not retry) or stalled (no poll completed for `stallMs`; a fetch
+   *   without a socket timeout can hang for ever after a sleep or a network change) — said once; the host restarts
+   * @param {{stallMs?: number, everyMs?: number, now?: () => number, setInterval?: Function}} [args.watchdog]
    */
   constructor({
     botToken,
@@ -129,6 +139,8 @@ export class TelegramBridge {
     handlerTimeoutMs,
     dropPendingUpdates = false,
     telegrafFactory,
+    onPollingDown = null,
+    watchdog = {},
   } = /** @type {any} */ ({})) {
     if (!botToken || typeof botToken !== 'string') {
       throw new Error('TelegramBridge: botToken (string) is required');
@@ -150,6 +162,9 @@ export class TelegramBridge {
     this.#port        = port;
     this.#botUsername = botUsername ?? null;
     this.#dropPendingUpdates = !!dropPendingUpdates;
+    this.#onPollingDown = typeof onPollingDown === 'function' ? onPollingDown : null;
+    // a long poll waits 50 s for news; three of them with nothing back is not a quiet chat, it is a dead socket
+    this.#watchdog = { stallMs: 3 * 60 * 1000, everyMs: 30 * 1000, now: () => Date.now(), setInterval: (fn, ms) => { const h = setInterval(fn, ms); h?.unref?.(); return h; }, ...(watchdog ?? {}) };
 
     // handlerTimeout controls how long telegraf waits for our async
     // middleware to resolve before throwing TimeoutError.  Default is
@@ -208,9 +223,13 @@ export class TelegramBridge {
       // as the loop is up.  Telegraf's API matches both shapes
       // (returns a Promise that resolves on shutdown).  Tests use
       // the seam to make this synchronous-ish.
-      this.#bot.launch(
+      this.#watchPolling();
+      const run = this.#bot.launch(
         this.#dropPendingUpdates ? { dropPendingUpdates: true } : undefined,
       );
+      // the loop ends only when it is stopped, or on an error it does not retry (a 409 conflict, a 401, a DNS error
+      // that is not a FetchError): without this the bot runs on and hears nothing
+      Promise.resolve(run).catch((error) => this.#pollingDown('stopped', error));
     } else {
       // webhook: telegraf's launch with a `webhook` config calls
       // setWebhook internally and starts an HTTP server on `port`.
@@ -227,6 +246,30 @@ export class TelegramBridge {
     this.#started = true;
   }
 
+  /** Note every completed getUpdates, and look every `everyMs` whether one completed within `stallMs`. */
+  #watchPolling() {
+    const tg = this.#bot.telegram;
+    const { now, stallMs, everyMs } = this.#watchdog;
+    this.#lastPollAt = now();
+    if (tg && typeof tg.callApi === 'function') {
+      const callApi = tg.callApi.bind(tg);
+      tg.callApi = (method, ...rest) => {
+        const p = callApi(method, ...rest);
+        if (method === 'getUpdates') Promise.resolve(p).then(() => { this.#lastPollAt = now(); }, () => { this.#lastPollAt = now(); });
+        return p;
+      };
+    }
+    this.#watchTimer = this.#watchdog.setInterval(() => {
+      if (now() - this.#lastPollAt > stallMs) this.#pollingDown('stalled');
+    }, everyMs);
+  }
+
+  #pollingDown(reason, error) {
+    if (this.#downSaid || this.#stopping) return;
+    this.#downSaid = true;
+    try { this.#onPollingDown?.({ reason, ...(error !== undefined ? { error } : {}) }); } catch { /* the host's hook never throws into the bridge */ }
+  }
+
   /**
    * Graceful shutdown.  Idempotent.
    *
@@ -241,6 +284,8 @@ export class TelegramBridge {
   async stop() {
     if (!this.#started) return;
     this.#started = false;
+    this.#stopping = true;
+    if (this.#watchTimer) { clearInterval(this.#watchTimer); this.#watchTimer = null; }
 
     try {
       this.#bot.stop('shutdown');

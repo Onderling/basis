@@ -24,7 +24,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
   operations: [
     {
@@ -171,6 +171,26 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       params: [],
       surfaces: { slash: { command: '/rotate', body: 'none' } },
+    },
+    {
+      // The bot joins a circle on its admin's word: the invite pasted in the admin's private chat, the circle's name and
+      // rules asked about there (`/kring ja|nee <id>`); `/kring los <naam>` leaves one and forgets its content on the box.
+      id:     'assistant-circle',
+      verb:   'join-circle',
+      visibility: 'trusted',
+      // from a screen: only after a yes in the admin's own private chat (what the bot holds, and whom it answers)
+      stepUp: 'private-door',
+      writes: { scope: 'device' },
+      params: [{ name: 'spec', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/kring', body: 'argline' } },
+    },
+    {
+      // The circles the bot joined (its record; its pair circles with contacts are not among them).
+      id:     'assistant-circles',
+      verb:   'list-circles',
+      visibility: 'trusted',
+      params: [],
+      surfaces: { slash: { command: '/kringen', body: 'none' } },
     },
     {
       id:     'assistant-revoke',

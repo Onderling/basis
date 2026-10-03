@@ -144,6 +144,16 @@ export function shouldWakeForEntry(entry) {
 }
 
 /**
+ * The circle an entry belongs to: the first-class `circleId` (silent entries, the rails), else the payload's — a chat
+ * message keeps its circle in the payload (`toEventLogItem`), so a filter on the top-level field alone misses every one.
+ * @param {object} e
+ * @returns {string|null}
+ */
+export function circleOfEntry(e) {
+  return e?.circleId ?? e?.payload?.circleId ?? null;
+}
+
+/**
  * Build a SILENT system entry (pure — no append). Typed entry carrying a
  * first-class `circleId`, the `silent:true` marker, `app:'system'`, and
  * `type:kind`. Exported so callers/tests can shape one without a live log.
@@ -359,11 +369,29 @@ export class EventLog {
     this.#events = this.#events.filter((e) => !(
       e.type === 'chat-message'
       && e.ts < cutoff
-      && (circleId == null || e.circleId === circleId)
+      && (circleId == null || circleOfEntry(e) === circleId)
     ));
     const deleted = before - this.#events.length;
     if (deleted) this.#persist(this.#events.slice()).catch(() => {});
     return deleted;
+  }
+
+  /**
+   * FORGET one circle on this device: every entry it carries — the record kinds included (the conversation, the roster's
+   * statements, the trail). Not retention and not a user's purge: this is a device letting go of a circle it is no
+   * longer in and has no reason to keep (a household bot that left, or was removed from, a circle it joined). Nothing is
+   * said to anyone; the circle's other members keep their own record. Persists the shrunk log; returns how many entries went.
+   *
+   * @param {string} circleId
+   * @returns {number}
+   */
+  forgetCircle(circleId) {
+    if (typeof circleId !== 'string' || !circleId) return 0;
+    const before = this.#events.length;
+    this.#events = this.#events.filter((e) => circleOfEntry(e) !== circleId);
+    const dropped = before - this.#events.length;
+    if (dropped) this.#persist(this.#events.slice()).catch(() => {});
+    return dropped;
   }
 
   /**

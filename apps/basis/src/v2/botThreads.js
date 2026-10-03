@@ -42,6 +42,7 @@ export function dataSourceRowStore(ds, prefix = 'mem://basis/bot-threads/') {
   return {
     async get(id) { return parse(await ds.read(pathOf(id))); },
     async put(row) { await ds.write(pathOf(row.id), JSON.stringify(row)); return row; },
+    async remove(id) { await ds.delete(pathOf(id)); },
     async list() {
       const rows = [];
       for (const p of await ds.list(prefix)) { const r = parse(await ds.read(p)); if (r?.id) rows.push(r); }
@@ -56,6 +57,7 @@ export function memoryThreadStore() {
   return {
     async get(id) { return m.get(id) ?? null; },
     async put(row) { m.set(row.id, row); return row; },
+    async remove(id) { m.delete(id); },
     async list() { return [...m.values()]; },
   };
 }

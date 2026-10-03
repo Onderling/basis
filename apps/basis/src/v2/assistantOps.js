@@ -81,6 +81,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-link') return linkOp(caller ?? ctx?.threadId, args?.offer ?? args?._match, ctx);
       if (op === 'assistant-link-confirm') return linkConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-unlink') return unlinkOp(caller ?? ctx?.threadId, ctx);
+      if (op === 'assistant-circle') return circleOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
+      if (op === 'assistant-circles') return circlesOp(caller ?? ctx?.threadId);
       // the export key's set and unlock exist for a screen alone: they run only as the yes to a screen's request
       if (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock') {
         if (ctx?.steppedUp !== true) return { ok: false, error: { code: 'screen-only', message: t('circle.bot.export_key_screen_only') } };
@@ -604,6 +606,53 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const r = await link.unlink(person, { isPrivate: await fromPrivateDoor(person, ctx) });
     if (r.ok) return { ok: true, message: tp('circle.bot.unlink_done') };
     return { ok: false, error: { code: r.reason, message: tp(r.reason === 'not-private' ? 'circle.bot.link_not_private' : 'circle.bot.unlink_nothing') } };
+  }
+
+  /**
+   * `/kring <invite>` · `/kring ja|nee <id>` · `/kring los <naam>` — the bot's circles, from the admin's private chat. The
+   * invite is checked, then asked about there: the circle's name, its rules, and that the bot keeps its data on this box.
+   */
+  async function circleOp(person, spec, ctx) {
+    const circles = admin.circles;
+    if (!person || !circles) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const isPrivate = await fromPrivateDoor(person, ctx);
+    const words = String(spec ?? '').trim().split(/\s+/).filter(Boolean);
+    const first = String(words[0] ?? '').toLowerCase();
+    if (!words.length) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.kring_usage') } };
+    if (first === 'los' || first === 'leave') {
+      const r = await circles.leaveNamed(words.slice(1).join(' '), { isPrivate });
+      if (r.ok) return { ok: true, message: tp('circle.bot.kring_left', { name: r.name }) };
+      const key = { 'not-private': 'kring_not_private', 'unknown-circle': 'kring_unknown' }[r.reason] ?? 'kring_leave_failed';
+      return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`, { name: words.slice(1).join(' ') }) } };
+    }
+    const yes = switchOf(first);
+    if (yes && words.length <= 2) {
+      const r = await circles.answer(person, yes === 'on', words[1], { isPrivate });
+      if (r.ok && r.joined) return { ok: true, message: tp('circle.bot.kring_joined', { name: r.name }) };
+      if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.kring_declined', { name: r.name }) };
+      const key = { 'not-private': 'kring_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'kring_nothing', replaced: 'stepup_replaced', 'admin-unreachable': 'kring_admin_offline' }[r.reason] ?? 'kring_join_failed';
+      return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`, { name: r.name ?? '' }) } };
+    }
+    const question = ({ name, rules, id, handle }) => ({
+      text: tp('circle.bot.kring_question', { name, rules: rules || tp('circle.bot.kring_no_rules'), id, handle }),
+      buttons: [{ id: `/kring ja ${id}`, label: tp('circle.bot.stepup_yes') }, { id: `/kring nee ${id}`, label: tp('circle.bot.stepup_no') }],
+    });
+    const r = await circles.offered(person, words.join(' '), question, { isPrivate });
+    if (r.ok && r.already) return { ok: true, message: tp('circle.bot.kring_already', { name: r.name ?? '' }) };
+    if (r.ok) return { ok: true, message: tp('circle.bot.kring_asked') };
+    const key = { 'not-private': 'kring_not_private', 'not-an-invite': 'kring_not_an_invite' }[r.reason] ?? 'screen_not_reachable';
+    return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`) } };
+  }
+
+  /** `/kringen` — the circles the bot joined. */
+  async function circlesOp(person) {
+    const circles = admin.circles;
+    if (!circles) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const list = await circles.list();
+    if (!list.length) return { ok: true, message: tp('circle.bot.kringen_none') };
+    return { ok: true, message: tp('circle.bot.kringen_list', { list: list.map((c) => `• ${c.name}`).join('\n') }) };
   }
 
   /** `/koppel-scherm <code>`: a screen's own connect code, pasted; the same question follows. */

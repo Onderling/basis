@@ -2,6 +2,7 @@
  * basis — EventLog substrate tests.  v0.7.1.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { toEventLogItem } from '@onderling/item-store';
 
 import {
   EventLog, RETENTION_MS, SYSTEM_APP,
@@ -338,6 +339,30 @@ describe('EventLog — per-kind retention', () => {
     const ids = log.query().map((e) => e.id);
     expect(ids).not.toContain('a1');
     expect(ids).toContain('b1');
+  });
+
+  it('forgetCircle drops EVERY entry of one circle — record kinds too — and leaves the rest', () => {
+    const log = new EventLog({ now: () => 1000 });
+    log.append(ev({ id: 'a-msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'cA', payload: {} }));
+    log.append(ev({ id: 'a-mem', ts: 0, app: 'system', type: 'membership', circleId: 'cA', payload: {} }));
+    log.append(ev({ id: 'a-gov', ts: 0, app: 'system', type: 'governance', circleId: 'cA', payload: { event: 'propose' } }));
+    log.append(ev({ id: 'b-msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'cB', payload: {} }));
+    log.append(ev({ id: 'none', ts: 0, app: 'system', type: 'governance', payload: { event: 'propose' } }));
+    expect(log.forgetCircle('cA')).toBe(3);
+    expect(log.query().map((e) => e.id).sort()).toEqual(['b-msg', 'none']);
+    expect(log.forgetCircle('')).toBe(0);
+    expect(log.forgetCircle(null)).toBe(0);
+  });
+
+  it('a chat message keeps its circle in the payload (the real entry shape): forgetCircle and the scoped purge both reach it', () => {
+    const log = new EventLog({ now: () => 10_000 });
+    log.append(toEventLogItem({ msgId: 'real-a', ts: 0, circleId: 'cA', actor: 'x', text: 'in A' }));
+    log.append(toEventLogItem({ msgId: 'real-b', ts: 0, circleId: 'cB', actor: 'x', text: 'in B' }));
+    expect(log.purgeConversation({ olderThanMs: 100, circleId: 'cA' })).toBe(1);
+    expect(log.query().map((e) => e.id)).toEqual(['real-b']);
+    log.append(toEventLogItem({ msgId: 'real-a2', ts: 0, circleId: 'cA', actor: 'x', text: 'in A again' }));
+    expect(log.forgetCircle('cA')).toBe(1);
+    expect(log.query().map((e) => e.id)).toEqual(['real-b']);
   });
 
   it('chat messages are the RECORD — no window, however small, ever drops them', () => {

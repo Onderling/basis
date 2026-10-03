@@ -16,7 +16,7 @@ import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js
 const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
 const ADMIN = 'telegram:9';
 const BERT = 'telegram:7';
-const STEP_UP = ['assistant-invite', 'assistant-cohort', 'assistant-role', 'assistant-revoke', 'assistant-rotate'];
+const STEP_UP = ['assistant-invite', 'assistant-cohort', 'assistant-role', 'assistant-revoke', 'assistant-rotate', 'assistant-circle'];
 // …and the export key's set and unlock: screen-only ops, held the same way
 const SCREEN_ONLY_STEP_UP = ['assistant-export-key-set', 'assistant-export-key-unlock'];
 const PRIVATE = { caller: ADMIN, threadId: ADMIN, chatId: '9' };
@@ -50,7 +50,7 @@ function door({ catalogue = null, callSkill = async () => ({ ok: true }) } = {})
 }
 
 describe('the admin\'s step-up ops from a screen', () => {
-  it('the five ops (and the export key\'s two, screen-only) declare the private-door step-up', () => {
+  it('the six ops (and the export key\'s two, screen-only) declare the private-door step-up', () => {
     const declared = assistantManifest.operations.filter((o) => o.stepUp === 'private-door').map((o) => o.id).sort();
     expect(declared).toEqual([...STEP_UP, ...SCREEN_ONLY_STEP_UP].sort());
   });

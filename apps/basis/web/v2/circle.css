@@ -1388,3 +1388,40 @@
    person wherever they appear. Sized a touch smaller in the thread header, where the name is the subject. */
 .cc-admin__member-face { margin-right: .5rem; vertical-align: middle; }
 .cc-cthread__face { width: 1.6rem; height: 1.6rem; font-size: 16px; margin-right: .4rem; }
+
+/* ── The connected screen (`web/v2/screenShell.js`): the web app as a household bot's screen. One column, the theme's
+   paper and ink; the household as cards of lists, each line with its actions; the ops as rows of buttons below. ── */
+.screen-shell { max-width: 46rem; margin: 0 auto; padding: 1rem 1rem 3rem; font-family: var(--font-sans); color: var(--ink); background: var(--paper); line-height: 1.45; }
+.screen-shell h1 { font-family: var(--font-serif); font-size: 1.6rem; margin: .5rem 0 1rem; }
+.screen-shell h2 { font-family: var(--font-serif); font-size: 1.15rem; margin: 0 0 .6rem; }
+.screen-shell h3 { font-size: .95rem; margin: .9rem 0 .4rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+.screen-shell p { margin: .4rem 0; }
+.screen-shell section { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: .9rem 1rem; margin: 0 0 1rem; }
+.screen-shell button { font: inherit; font-size: .9rem; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); padding: .35rem .75rem; cursor: pointer; }
+.screen-shell button:hover { border-color: var(--accent); }
+.screen-shell button:disabled { opacity: .5; cursor: default; }
+.screen-shell [data-screen="connect"] { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); padding: .6rem 1.2rem; font-size: 1rem; }
+.screen-shell .screen-code { font-family: var(--font-mono); font-size: 2.4rem; letter-spacing: .3em; margin: .6rem 0; }
+.screen-shell .screen-offer { width: 100%; font-family: var(--font-mono); font-size: .8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .4rem; background: var(--paper-2); color: var(--ink); }
+.screen-shell .screen-op { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem .6rem; padding: .35rem 0; border-top: 1px solid var(--line); }
+.screen-shell .screen-op:first-of-type { border-top: 0; }
+.screen-shell .screen-form { flex-basis: 100%; }
+.screen-shell .screen-result { flex-basis: 100%; white-space: pre-wrap; color: var(--ink-soft); font-size: .9rem; }
+.screen-shell .screen-result:empty { display: none; }
+.screen-shell .screen-replies { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: .3rem; }
+.screen-shell .screen-result[data-outcome="done"] { color: var(--green); }
+.screen-shell .screen-result[data-outcome="declined"], .screen-shell .screen-result[data-outcome="expired"], .screen-shell .screen-result[data-outcome="unanswered"] { color: var(--amber); }
+.screen-shell .screen-result[data-outcome="failed"] { color: var(--danger); }
+/* the household: a list per card section, a line per row, its actions at the end of the row */
+.screen-shell [data-section="household"] [data-screen="refresh"] { float: right; margin-top: -2.1rem; font-size: .8rem; }
+.screen-shell .screen-list ul { list-style: none; margin: 0; padding: 0; }
+.screen-shell .screen-list li { display: flex; align-items: center; gap: .5rem; padding: .35rem 0; border-top: 1px solid var(--line); }
+.screen-shell .screen-list li:first-child { border-top: 0; }
+.screen-shell .screen-list li > span { flex: 1 1 auto; }
+.screen-shell .screen-list li button { font-size: .8rem; padding: .2rem .6rem; }
+.screen-shell .screen-list li.done > span { text-decoration: line-through; color: var(--ink-soft); }
+.screen-shell [data-household="people"] { font-family: var(--font-sans); white-space: pre-wrap; margin: 0; }
+@media (max-width: 30rem) {
+  .screen-shell { padding: .75rem .75rem 2rem; }
+  .screen-shell .screen-code { font-size: 2rem; }
+}

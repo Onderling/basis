@@ -75,8 +75,10 @@ export function createBotCircles({ store, join, leave, forget, ask, handle, now 
       const id = newId();
       const name = typeof inv.name === 'string' && inv.name.trim() ? inv.name.trim() : inv.groupId.slice(0, 8);
       const rules = inv.rules && typeof inv.rules === 'object' ? summariseEmbeddedRules(inv.rules) : '';
-      pending.set(person, { id, inviteUri: String(inviteText).trim(), circleId: inv.groupId, name, until: now() + OFFER_FOR_MS });
-      const asked = await ask(person, question({ name, rules, id }));
+      // the handle it will carry there is said in the question: it is the admin's name going to the circle
+      const h = await handle();
+      pending.set(person, { id, inviteUri: String(inviteText).trim(), circleId: inv.groupId, name, handle: h, until: now() + OFFER_FOR_MS });
+      const asked = await ask(person, question({ name, rules, id, handle: h }));
       if (!asked?.ok) { pending.delete(person); return { ok: false, reason: asked?.reason ?? 'not-reachable' }; }
       return { ok: true, pending: true, name };
     },
@@ -90,7 +92,8 @@ export function createBotCircles({ store, join, leave, forget, ask, handle, now 
       pending.delete(person);
       if (p.until < now()) return { ok: false, reason: 'expired' };
       if (!yes) return { ok: true, declined: true, name: p.name };
-      const h = await handle();
+      // the handle the question named
+      const h = p.handle;
       const r = await join({ inviteUri: p.inviteUri, handle: h, rulesAccepted: true });
       if (!r?.ok || !r.circleId) return { ok: false, reason: r?.reason ?? r?.error ?? 'join-failed', name: p.name };
       // the handle it joined under: the names that address it there

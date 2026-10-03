@@ -148,3 +148,16 @@ describe('renderForm — input validation', () => {
     expect(() => renderForm({}, { doc: document })).toThrow(/onSubmit required/);
   });
 });
+
+describe('renderForm — a secret param', () => {
+  it('is a password field the browser does not offer back', () => {
+    const spec = buildFormSpec({
+      opParams: [{ name: 'passphrase', kind: 'secret', required: true }],
+      missing: ['passphrase'], prefilledArgs: {},
+      opId: 'assistant-export-key-set', appOrigin: 'assistant',
+    });
+    const input = renderForm(spec, ctx()).querySelector('input[name="passphrase"]');
+    expect(input?.type).toBe('password');
+    expect(input?.autocomplete).toBe('new-password');
+  });
+});

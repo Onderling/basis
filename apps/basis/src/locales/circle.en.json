@@ -4409,7 +4409,9 @@
           "assistant-import": "restore an export",
           "assistant-screen-paste": "connect a screen with its own connect code",
           "assistant-screen-confirm": "pick the code of a screen that wants to connect",
-          "assistant-screen-approve": "your yes or no to what a screen asked"
+          "assistant-screen-approve": "your yes or no to what a screen asked",
+          "assistant-export-key-set": "set the export key (your passphrase, on your screen only)",
+          "assistant-export-key-unlock": "open the export key for an hour, for /import"
         }
       }
     },
@@ -4424,7 +4426,9 @@
       "assistant-invite": "make an invite",
       "assistant-cohort": "open a group of invites ({{arg}})",
       "assistant-role": "change a role ({{arg}})",
-      "assistant-rotate": "replace the invite code"
+      "assistant-rotate": "replace the invite code",
+      "assistant-export-key-set": "set the export key",
+      "assistant-export-key-unlock": "open the export key for an hour, for /import in the chat"
     },
     "stepup_yes": "Yes",
     "stepup_no": "No",
@@ -4438,7 +4442,16 @@
     "stepup_replaced": "That request was replaced by a newer one; nothing was done with it.",
     "stepup_what_op": "do {{op}} ({{arg}})",
     "model_not_served": "Note: the language model {{model}} is no longer offered by the provider. I now use {{using}}.",
-    "model_over_limit": "Note: the language model provider's account has reached its monthly limit. Until that is sorted, I answer commands and buttons only."
+    "model_over_limit": "Note: the language model provider's account has reached its monthly limit. Until that is sorted, I answer commands and buttons only.",
+    "stepup_export_key_replaces": "A key is set already: files sealed with it open only with the old passphrase.",
+    "export_key_too_short": "The passphrase needs at least {{n}} characters. Nothing asked, nothing changed.",
+    "export_key_none": "No export key is set on the box yet.",
+    "export_key_set": "The export key is set: each night the export is sealed with it. Keep the passphrase off the box.",
+    "export_key_replaced": "A new export key is set. Older files open only with the old passphrase.",
+    "export_key_unlocked": "The export key is open for an hour: now type /import with the file name in the chat.",
+    "export_key_wrong": "That passphrase does not open this key. The key stays locked.",
+    "export_key_screen_only": "This goes through your screen only.",
+    "export_key_mismatch": "The two passphrases do not match. Nothing asked, nothing changed."
   },
   "op": {
     "not_in_this_circle": {

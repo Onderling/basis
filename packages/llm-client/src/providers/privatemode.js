@@ -22,17 +22,18 @@ import { ollamaProvider } from './ollama.js';
 
 export const PRIVATEMODE_ENDPOINT = 'https://api.privatemode.ai';
 /**
- * Measured 2026-09-05 on a Dutch two-item request with native tool calling: kimi-k2.6 with thinking
- * OFF answered in 2.1 s with both items; gpt-oss-120b (low reasoning) in 0.8 s but dropped one item;
- * glm-5.3 returned nothing in 5.5 s. Kimi was the default until Privatemode retired it (2026-10-03: "404 model
- * kimi-k2.6 not found"; the chat models served then: glm-5.3, glm-5.2, glm-5.3-flash, gpt-oss-120b). So the default
- * is gpt-oss-120b, the one measured to answer — until the models served now are measured again.
+ * Measured 2026-10-03 with the assistant eval (72 Dutch/English fixtures through the bot's own door, reasoning low):
+ * glm-5.3 70/72, glm-5.3-flash 70/72, gpt-oss-120b 57/72 (it adds only the first of several items, answers English in
+ * Dutch, and promised a reminder the bot cannot send). Kimi, the earlier default, was retired by Privatemode
+ * (v1.58.0, 2026-10). So the default is glm-5.3, with glm-5.3-flash as the fallback (`assistant.fallbackModel`).
  */
-export const PRIVATEMODE_DEFAULT_MODEL = 'gpt-oss-120b';
+export const PRIVATEMODE_DEFAULT_MODEL = 'glm-5.3';
 
 /**
  * Privatemode has no unified reasoning switch — it is per model family (`chat_template_kwargs` for
- * Kimi and Gemma, `reasoning_effort` for gpt-oss, nothing for GLM). A tool pick is a clear task:
+ * Kimi and Gemma, `reasoning_effort` for gpt-oss and GLM). GLM's reasoning cannot be switched off: its
+ * `reasoning_effort` takes low | high | max, and with nothing sent it reasons at max (Privatemode's models page,
+ * 2026-10-03) — which is why GLM "returned nothing in 5.5 s" in September. A tool pick is a clear task:
  * reasoning off/low keeps latency and tokens down.
  * @param {string} model
  * @param {'off'|'low'|'on'} [thinking='off']
@@ -43,6 +44,7 @@ export function reasoningBodyFor(model, thinking = 'off') {
   if (/kimi/.test(m))   return { chat_template_kwargs: { thinking: false } };
   if (/gemma/.test(m))  return { chat_template_kwargs: { enable_thinking: false } };
   if (/gpt-oss/.test(m)) return { reasoning_effort: thinking === 'off' ? 'low' : thinking };
+  if (/glm/.test(m))     return { reasoning_effort: 'low' };   // off and low are both its lowest
   return null;
 }
 

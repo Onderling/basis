@@ -62,8 +62,8 @@ describe('one fallback on a timeout', () => {
     });
     const r = await built.llm.invoke({ system: 's', messages: [{ role: 'user', content: 'x' }] });
     expect(r.text).toBe('from the fallback');
-    expect(calls).toEqual(['primary-model', 'glm-5.3']);
-    expect(fell).toEqual([{ from: 'primary-model', to: 'glm-5.3', reason: 'timeout' }]);
+    expect(calls).toEqual(['primary-model', 'glm-5.3-flash']);
+    expect(fell).toEqual([{ from: 'primary-model', to: 'glm-5.3-flash', reason: 'timeout' }]);
   });
 
   it('the model is gone (404 "model not found", as Privatemode said of kimi-k2.6 on 2026-10-03): the fallback answers, and every later turn goes there', async () => {
@@ -80,8 +80,8 @@ describe('one fallback on a timeout', () => {
     });
     expect((await built.llm.invoke({ system: 's', messages: [] })).text).toBe('from the fallback');
     expect((await built.llm.invoke({ system: 's', messages: [] })).text).toBe('from the fallback');
-    expect(calls).toEqual(['kimi-k2.6', 'glm-5.3', 'glm-5.3']);
-    expect(fell).toEqual([{ from: 'kimi-k2.6', to: 'glm-5.3', reason: 'not-found' }]);
+    expect(calls).toEqual(['kimi-k2.6', 'glm-5.3-flash', 'glm-5.3-flash']);
+    expect(fell).toEqual([{ from: 'kimi-k2.6', to: 'glm-5.3-flash', reason: 'not-found' }]);
   });
 
   it('any other error is not retried', async () => {

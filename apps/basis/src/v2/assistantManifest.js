@@ -24,7 +24,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write',
   },
   operations: [
     {
@@ -233,6 +233,28 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       params: [{ name: 'answer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/koppelen', body: 'argline' } },
+    },
+    {
+      // The household export's key, from the admin's SCREEN alone: no slash, no chat, no model tool — a passphrase typed
+      // into a chat is what this route exists to avoid. Each after a yes in the admin's private chat; the same core as the
+      // box's `bin/export-key.mjs` (`exportKeyFile.js`). The passphrase is a secret: it appears nowhere.
+      id:     'assistant-export-key-set',
+      verb:   'set-export-key',
+      visibility: 'trusted',
+      writes: { scope: 'device' },
+      stepUp: 'private-door',
+      params: [{ name: 'passphrase', kind: 'secret', required: true }],
+      surfaces: {},
+    },
+    {
+      // …and opened for an hour, for the `/import` typed in the chat (import stays off screens).
+      id:     'assistant-export-key-unlock',
+      verb:   'unlock-export-key',
+      visibility: 'trusted',
+      writes: { scope: 'device' },
+      stepUp: 'private-door',
+      params: [{ name: 'passphrase', kind: 'secret', required: true }],
+      surfaces: {},
     },
     {
       // The admin's yes (or no) to what a screen asked: counts from the private chat only (`/bevestig ja|nee`).

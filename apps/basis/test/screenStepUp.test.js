@@ -17,6 +17,8 @@ const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
 const ADMIN = 'telegram:9';
 const BERT = 'telegram:7';
 const STEP_UP = ['assistant-invite', 'assistant-cohort', 'assistant-role', 'assistant-revoke', 'assistant-rotate'];
+// …and the export key's set and unlock: screen-only ops, held the same way
+const SCREEN_ONLY_STEP_UP = ['assistant-export-key-set', 'assistant-export-key-unlock'];
 const PRIVATE = { caller: ADMIN, threadId: ADMIN, chatId: '9' };
 
 function door({ catalogue = null, callSkill = async () => ({ ok: true }) } = {}) {
@@ -35,7 +37,8 @@ function door({ catalogue = null, callSkill = async () => ({ ok: true }) } = {})
     callSkill, t, refusal: async () => null,
     threads: { langOf: () => null },
     admin: {
-      users: async () => users, stepUp, ...(catalogue ? { catalogue: { catalogue: () => catalogue } } : {}),
+      users: async () => users, stepUp,
+      exportKey: { exists: () => true, set: async () => ({ ok: true, replaced: false }), unlock: async () => ({ ok: true, until: 0 }) }, ...(catalogue ? { catalogue: { catalogue: () => catalogue } } : {}),
       revoke: async (who) => { revoked.push(who); return users.find((u) => u.id === who) ?? null; },
       setRole: async (who, role) => { roles.push([who, role]); return users.find((u) => u.id === who) ?? null; },
     },
@@ -47,9 +50,9 @@ function door({ catalogue = null, callSkill = async () => ({ ok: true }) } = {})
 }
 
 describe('the admin\'s step-up ops from a screen', () => {
-  it('the five ops declare the private-door step-up', () => {
+  it('the five ops (and the export key\'s two, screen-only) declare the private-door step-up', () => {
     const declared = assistantManifest.operations.filter((o) => o.stepUp === 'private-door').map((o) => o.id).sort();
-    expect(declared).toEqual([...STEP_UP].sort());
+    expect(declared).toEqual([...STEP_UP, ...SCREEN_ONLY_STEP_UP].sort());
   });
 
   it('a screen\'s revoke changes nothing until the yes; the question, in the book\'s name, carries the request\'s id', async () => {
@@ -196,7 +199,7 @@ describe('the admin\'s step-up ops from a screen', () => {
     for (const e of declared) {
       const ran = [];
       const d = door({ catalogue, callSkill: async (app, op) => { ran.push(`${app}.${op}`); return { ok: true }; } });
-      const r = await d.call(e.appOrigin, e.op.id, { who: 'Bert', spec: 'Bert observer' }, d.fromScreen);
+      const r = await d.call(e.appOrigin, e.op.id, { who: 'Bert', spec: 'Bert observer', passphrase: 'een lange genoeg zin' }, d.fromScreen);
       expect(r, `${e.appOrigin}.${e.op.id} from a screen`).toMatchObject({ ok: true, pending: true });
       expect(ran, `${e.appOrigin}.${e.op.id} ran before the yes`).not.toContain(`${e.appOrigin}.${e.op.id}`);
       expect(d.revoked.length + d.roles.length).toBe(0);

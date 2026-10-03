@@ -60,6 +60,7 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens } from '../src/v2/botScreens.js';
+import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE } from '../src/v2/screenView.js';
@@ -865,6 +866,14 @@ if (tgToken || inboxDoor.bridge) {
       revoke: (who) => botUsers.revoke(who),
       setRole: (who, role) => botUsers.setRole(who, role),
       exports: exportShelf,
+      // the export key's set and unlock from the admin's screen: the same core as `bin/export-key.mjs`, over this box's files
+      exportKey: createExportKeyFile({
+        files: {
+          read: (name) => { try { return readFileSync(path.join(dataDir, name), 'utf8'); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; } },
+          write: (name, text) => writeFileSync(path.join(dataDir, name), text, { mode: 0o600 }),
+          remove: (name) => rmSync(path.join(dataDir, name), { force: true }),
+        },
+      }),
       // a sealed file opens with the key the admin unlocked on the box (`bin/export-key.mjs unlock`); the import closes it
       unlockedKey: async () => { sweepUnlocked(); try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
       lockKey: async () => rmSync(path.join(dataDir, UNLOCKED_KEY_FILE), { force: true }),

@@ -33,6 +33,9 @@ export const SCREEN_ADMIN_OPS = Object.freeze([
   'assistant.assistant-exports',
   'assistant.assistant-settings',
   'assistant.assistant-export',
+  // the export key's set and unlock: ops that exist for a screen alone (each after the chat's yes)
+  'assistant.assistant-export-key-set',
+  'assistant.assistant-export-key-unlock',
 ]);
 
 /**

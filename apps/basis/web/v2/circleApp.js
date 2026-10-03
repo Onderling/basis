@@ -8571,7 +8571,7 @@ async function boot() {
 
       // A bot's `/koppel` link (the identity link): the sheet it opens, told when the bot's statement lands
       let identityLinkSheet = null;
-      const identityLinkViewFor = (link) => createIdentityLinkView({ link, personKey: agent.identity?.chat?.pubKey ?? agent.pubKey, storage: window.localStorage });
+      const identityLinkViewFor = (link) => createIdentityLinkView({ link, personKey: agent.identity?.chat?.pubKey ?? agent.pubKey, signOffer: (o) => agent.signLinkOffer(o), storage: window.localStorage });
       const peerMessageRouter = makePeerRouter({
         handlers: {
           // the household bot's statement that this person's Basis identity is linked to their row there (or unlinked)

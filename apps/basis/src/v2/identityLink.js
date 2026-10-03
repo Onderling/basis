@@ -9,6 +9,7 @@
  *
  * Shared by the bot (it reads an offer, words the start link) and the app (it writes the offer, reads the start link).
  */
+import { AgentIdentity } from '@onderling/core';
 import { screenCode } from './botScreens.js';
 
 /** The peer-message subtype of the bot's signed statement to the linked app. */
@@ -23,20 +24,40 @@ const randomNonce = () => { const b = new Uint8Array(16); globalThis.crypto.getR
 /** The code the app shows and the bot asks for: the fingerprint of the key and the nonce (the screen's derivation). */
 export const linkCode = (personKey, nonce) => screenCode(personKey, nonce);
 
-/** The app's offer: its person key, the bot it is for, a fresh nonce. */
-export function encodeLinkOffer({ personKey, botAddress, nonce = randomNonce() } = {}) {
+/**
+ * The text an offer's signature covers: the version, the key, the bot and the nonce — domain-separated, so a signature
+ * made here cannot stand for anything else. The app signs it with the person key it names; the bot verifies it with
+ * that key before any other check. Without it an offer proves nothing about the key: anyone can paste an offer naming
+ * someone else's (public) key, and the code, computed from the offer itself, would not tell.
+ */
+export const linkOfferMessage = ({ k, b, n }) => `onderling-identity-link:v1:${k}:${b}:${n}`;
+
+/**
+ * The app's offer: its person key, the bot it is for, a fresh nonce — signed by that person key.
+ * @param {{personKey: string, botAddress: string, nonce?: string, sign: (message: string) => string}} a  `sign` returns the
+ *   signature (base64url) by the person key over `linkOfferMessage`
+ */
+export function encodeLinkOffer({ personKey, botAddress, nonce = randomNonce(), sign } = {}) {
   if (typeof personKey !== 'string' || !personKey) throw new Error('encodeLinkOffer: personKey required');
   if (typeof botAddress !== 'string' || !botAddress) throw new Error('encodeLinkOffer: botAddress required');
-  return { offer: LINK_OFFER_SCHEME + b64url(JSON.stringify({ v: 1, k: personKey, b: botAddress, n: nonce })), nonce };
+  if (typeof sign !== 'function') throw new Error('encodeLinkOffer: sign (by the person key) required');
+  const body = { v: 1, k: personKey, b: botAddress, n: nonce };
+  return { offer: LINK_OFFER_SCHEME + b64url(JSON.stringify({ ...body, s: sign(linkOfferMessage(body)) })), nonce };
 }
 
-/** Read an offer (deny-safe: a reason, never half an offer). */
-export function parseLinkOffer(text) {
+/**
+ * Read an offer (deny-safe: a reason, never half an offer). The signature is checked FIRST, with the key the offer
+ * names: an unsigned offer, or one signed by another key, is not an offer.
+ */
+export function parseLinkOffer(text, { verify = (message, sig, key) => AgentIdentity.verify(message, sig, key) } = {}) {
   const t = String(text ?? '').trim();
   if (!t.startsWith(LINK_OFFER_SCHEME)) return { ok: false, reason: 'not-an-offer' };
   let d; try { d = JSON.parse(unb64url(t.slice(LINK_OFFER_SCHEME.length))); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1) return { ok: false, reason: 'wrong-version' };
   if (typeof d.k !== 'string' || !d.k || typeof d.b !== 'string' || !d.b || typeof d.n !== 'string' || !d.n) return { ok: false, reason: 'incomplete' };
+  let signed = false;
+  try { signed = typeof d.s === 'string' && d.s.length > 0 && verify(linkOfferMessage(d), d.s, d.k) === true; } catch { signed = false; }
+  if (!signed) return { ok: false, reason: 'not-signed' };
   return { ok: true, personKey: d.k, botAddress: d.b, nonce: d.n };
 }
 

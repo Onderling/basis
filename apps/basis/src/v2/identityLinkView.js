@@ -12,6 +12,7 @@
 import { parseLinkStartLink, encodeLinkOffer, linkCode, IDENTITY_LINK_SUBTYPE } from './identityLink.js';
 
 const PENDING = 'onderling.identityLink.pending';
+const randomNonce = () => { const b = new Uint8Array(16); globalThis.crypto.getRandomValues(b); return [...b].map((x) => x.toString(16).padStart(2, '0')).join(''); };
 const LINKED = 'onderling.identityLink.linked';
 const read = (storage, k, d) => { try { return JSON.parse(storage.getItem(k) ?? 'null') ?? d; } catch { return d; } };
 const write = (storage, k, v) => { try { storage.setItem(k, JSON.stringify(v)); } catch { /* kept for this visit only */ } };
@@ -20,9 +21,10 @@ const write = (storage, k, v) => { try { storage.setItem(k, JSON.stringify(v)); 
  * @param {object} a
  * @param {string} a.link  the address the app was opened at (its `#koppel-bot=` fragment), or '' (no link)
  * @param {string} a.personKey  this person's chat identity key
+ * @param {(o: {botAddress: string, nonce: string}) => string} a.signOffer  the agent's link-offer signer (by the person key)
  * @param {{getItem: Function, setItem: Function}} a.storage
  */
-export function createIdentityLinkView({ link, personKey, storage }) {
+export function createIdentityLinkView({ link, personKey, signOffer, storage }) {
   const bot = parseLinkStartLink(link);
   return {
     /** Which bot the link names: `{ok, botAddress, relayUrl, botName}` or `{ok: false, reason}`. */
@@ -31,7 +33,10 @@ export function createIdentityLinkView({ link, personKey, storage }) {
     /** The line to paste into the private chat (`/koppel <offer>`) and the code the bot will ask for. */
     async offer() {
       if (!bot.ok) throw new Error('identityLinkView: not a link');
-      const { offer, nonce } = encodeLinkOffer({ personKey, botAddress: bot.botAddress });
+      if (typeof signOffer !== 'function') throw new Error('identityLinkView: an offer is signed by the person key');
+      const nonce = randomNonce();
+      // signed by the person key it names: the bot checks that before anything else
+      const { offer } = encodeLinkOffer({ personKey, botAddress: bot.botAddress, nonce, sign: () => signOffer({ botAddress: bot.botAddress, nonce }) });
       write(storage, PENDING, { bot: bot.botAddress, botName: bot.botName ?? null });
       return { line: `/koppel ${offer}`, code: await linkCode(personKey, nonce) };
     },

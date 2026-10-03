@@ -4409,7 +4409,9 @@
           "assistant-import": "een export terugzetten",
           "assistant-screen-paste": "een scherm koppelen met zijn eigen koppelcode",
           "assistant-screen-confirm": "de code van een scherm kiezen dat wil koppelen",
-          "assistant-screen-approve": "je ja of nee op wat een scherm vroeg"
+          "assistant-screen-approve": "je ja of nee op wat een scherm vroeg",
+          "assistant-export-key-set": "de exportsleutel zetten (je wachtwoord, alleen op je scherm)",
+          "assistant-export-key-unlock": "de exportsleutel een uur openen, voor /import"
         }
       }
     },
@@ -4424,7 +4426,9 @@
       "assistant-invite": "een uitnodiging maken",
       "assistant-cohort": "een groep uitnodigingen openen ({{arg}})",
       "assistant-role": "een rol veranderen ({{arg}})",
-      "assistant-rotate": "de uitnodigingscode vervangen"
+      "assistant-rotate": "de uitnodigingscode vervangen",
+      "assistant-export-key-set": "de exportsleutel zetten",
+      "assistant-export-key-unlock": "de exportsleutel een uur openen, voor /import in de chat"
     },
     "stepup_yes": "Ja",
     "stepup_no": "Nee",
@@ -4436,7 +4440,16 @@
     "stepup_declined": "Niet gedaan.",
     "stepup_unwired": "Dat kan hier alleen in de chat.",
     "stepup_replaced": "Dat verzoek is vervangen door een nieuwer; daar is niets mee gedaan.",
-    "stepup_what_op": "{{op}} doen ({{arg}})"
+    "stepup_what_op": "{{op}} doen ({{arg}})",
+    "stepup_export_key_replaces": "Er is al een sleutel: bestanden die daarmee zijn verzegeld, gaan alleen open met het oude wachtwoord.",
+    "export_key_too_short": "Het wachtwoord moet minstens {{n}} tekens hebben. Niets gevraagd, niets veranderd.",
+    "export_key_none": "Er staat nog geen exportsleutel op de box.",
+    "export_key_set": "De exportsleutel staat erop: elke nacht wordt de export ermee verzegeld. Bewaar het wachtwoord buiten de box.",
+    "export_key_replaced": "Nieuwe exportsleutel gezet. Oudere bestanden gaan alleen open met het oude wachtwoord.",
+    "export_key_unlocked": "De exportsleutel is een uur open: typ nu /import met de bestandsnaam in de chat.",
+    "export_key_wrong": "Dat wachtwoord opent deze sleutel niet. De sleutel blijft dicht.",
+    "export_key_screen_only": "Dit gaat alleen via je scherm.",
+    "export_key_mismatch": "De twee wachtwoorden zijn niet gelijk. Niets gevraagd, niets veranderd."
   },
   "op": {
     "not_in_this_circle": {

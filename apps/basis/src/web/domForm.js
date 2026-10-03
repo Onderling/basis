@@ -254,6 +254,13 @@ function makeInput(field, doc) {
       i.placeholder = 'webid:...';
       return i;
     }
+    case 'secret': {
+      // a secret (a passphrase): typed hidden, never offered back by the browser's form memory
+      const i = doc.createElement('input');
+      i.type = 'password';
+      i.autocomplete = 'new-password';
+      return i;
+    }
     default: {
       const i = doc.createElement('input');
       i.type = 'text';

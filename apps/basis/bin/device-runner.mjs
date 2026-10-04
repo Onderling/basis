@@ -26,7 +26,8 @@
  *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
  *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
- *   BASIS_APP_URL            optional — the web app, so a printed enrolment offer is also a link
+ *   BASIS_APP_URL            the web app: a household bot's screen and identity links go into it (the role defaults it to
+ *                            the public app); without it a screen cannot be connected and an offer prints without a link
  *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
  *                            §12): it registers the profile and person addresses as primary on every relay, and
  *                            its per-circle addresses take the primary slot on the roster, so a direct message

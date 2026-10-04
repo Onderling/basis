@@ -366,8 +366,10 @@ export function bindMatchArg(args, op) {
   const last = required[required.length - 1];
   if (last && last !== target && last.kind === 'enum' && Array.isArray(last.of) && rest[last.name] === undefined) {
     const words = String(_match).trim().split(/\s+/);
+    // the word as a person types it ("Coordinator"): any case names the declared value
     const tail = words[words.length - 1];
-    if (words.length > 1 && last.of.includes(tail)) return { ...rest, [target.name]: words.slice(0, -1).join(' '), [last.name]: tail };
+    const value = last.of.find((v) => String(v).toLowerCase() === tail.toLowerCase());
+    if (words.length > 1 && value !== undefined) return { ...rest, [target.name]: words.slice(0, -1).join(' '), [last.name]: value };
   }
   return { ...rest, [target.name]: _match };
 }

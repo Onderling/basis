@@ -61,6 +61,8 @@ describe('/users and the screen read the same rows', () => {
     const fromSlash = bindMatchArg({ _match: 'Bert coordinator' }, op);
     expect(fromSlash).toEqual({ who: 'Bert', role: 'coordinator' });
     expect(bindMatchArg({ _match: 'Frits de Roos observer' }, op)).toEqual({ who: 'Frits de Roos', role: 'observer' });
+    // the role word as a person types it: any case binds to the declared value
+    expect(bindMatchArg({ _match: 'Bert Coordinator' }, op)).toEqual({ who: 'Bert', role: 'coordinator' });
     const fromScreen = { who: 'Bert', role: 'coordinator' };
     const a = await door()('assistant', 'assistant-role', fromSlash, ADMIN);
     const b = await door()('assistant', 'assistant-role', fromScreen, ADMIN);

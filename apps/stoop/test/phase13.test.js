@@ -68,7 +68,10 @@ describe('Stoop V1 Phase 13.6 — encrypted backup', () => {
 
   it('fails on tampered ciphertext', async () => {
     const blob = await encryptBackup({ data: { x: 1 }, passphrase: 'p' });
-    blob.ciphertext = blob.ciphertext.slice(0, -2) + 'xx';
+    // always a CHANGE: two fixed characters were the same as the ones they replaced about once in 4096 runs
+    const last = blob.ciphertext.slice(-2);
+    blob.ciphertext = blob.ciphertext.slice(0, -2) + (last === 'xx' ? 'yy' : 'xx');
+    expect(blob.ciphertext.slice(-2)).not.toBe(last);
     await expect(decryptBackup({ blob, passphrase: 'p' })).rejects.toThrow();
   });
 

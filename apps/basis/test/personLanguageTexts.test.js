@@ -57,7 +57,7 @@ describe('the assistant\'s own replies to a person', () => {
     const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     await threads.load();
     const call = withAssistantOps({ callSkill: async () => ({ ok: false }), threads, t, admin: {} });
-    expect((await call('assistant', 'assistant-language', { lang: 'en' }, { threadId: 'tg:31' })).message).toBe(t('circle.bot.lang_set', { lang: 'en' }, 'en'));
+    expect((await call('assistant', 'assistant-language', { lang: 'en' }, { threadId: 'tg:31' })).message).toBe(t('circle.bot.lang_set', { lang: t('circle.bot.value_en', {}, 'en') }, 'en'));
     expect((await call('assistant', 'assistant-reminders', { mode: 'off' }, { threadId: 'tg:31' })).message).toBe(t('circle.bot.reminders_off', {}, 'en'));
     expect((await call('assistant', 'assistant-reminders', { mode: 'off' }, { threadId: 'tg:32' })).message).toBe(t('circle.bot.reminders_off', {}, 'nl'));
   });

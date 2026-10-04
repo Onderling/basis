@@ -95,7 +95,7 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
     const asksBefore = dialogs.length;
     await pace();
     await namesNone.click();
-    await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: none/, { timeout: 30_000 });
+    await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: niemand/, { timeout: 30_000 });
     expect(dialogs.slice(asksBefore).join(' '), 'the screen asked first').toMatch(/Weet je het zeker/);
     // and back, without a question (it takes nothing away)
     await page.locator('[data-op="assistant.assistant-menu"]').click();
@@ -104,7 +104,7 @@ test('the admin\'s screen: the reads, an export, and a step-up said yes and no t
     const asksBack = dialogs.length;
     await pace();
     await namesAll.click();
-    await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: members/, { timeout: 30_000 });
+    await expect(menuOp.locator('.screen-result')).toContainText(/Namen zien: iedereen/, { timeout: 30_000 });
     expect(dialogs.length).toBe(asksBack);
 
     // ── a step-up said yes to: held, asked in her chat with the request's id, the screen told "Gedaan." ──

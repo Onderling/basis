@@ -144,6 +144,10 @@ export async function startScreenShell(win = window) {
     return;
   }
 
+  // a phone puts the browser away while the person is in Telegram: back in front, the waiting page says it is there
+  // (that releases a grant the bot held for it)
+  win.document.addEventListener('visibilitychange', () => { if (win.document.visibilityState === 'visible') view.stillHere(); });
+
   const tap = el('button', { type: 'button', 'data-screen': 'connect', onclick: async () => {
     tap.disabled = true;
     try {

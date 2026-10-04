@@ -72,7 +72,7 @@ import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { createScreenNudge } from '../src/v2/screenNudge.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
-import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE } from '../src/v2/screenView.js';
+import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE, SCREEN_WAITING_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
@@ -602,6 +602,8 @@ if (relayUrl) {
       // A reply to one of this device's noticeboard posts lands in that replier's thread, as on both shells.
       // A screen a person asked to connect (`/scherm`) sends its offer; the door, once up, grants it.
       [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
+      // a screen waiting for its grant says it is there: nothing to do — its message alone releases what was held for it
+      [SCREEN_WAITING_SUBTYPE]: () => {},
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -898,7 +900,12 @@ if (tgToken || inboxDoor.bridge) {
     // a screen whose offer was not taken is told, so it says so instead of waiting
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
     columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
-    grant: (g) => agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce }),
+    grant: async (g) => {
+      const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
+      // whether the grant reached the screen, or is held until it next speaks (the screen's address, its first characters)
+      walkLog({ kind: 'screen-grant', screen: String(g.viewPubKey).slice(0, 8), ok: r?.ok !== false, delivery: r?.delivery ?? null });
+      return r;
+    },
     revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
     listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
     notify: async (person, key, params) => {

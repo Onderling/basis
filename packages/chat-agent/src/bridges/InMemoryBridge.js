@@ -11,6 +11,8 @@ export class InMemoryBridge {
 
   /** @type {Array<import('../types.js').SendReplyArgs>} */
   outbox = [];
+  /** @type {Array<{commands: Array<{command: string, description: string}>, chatId?: string, languageCode?: string, clear?: boolean}>} */
+  commandSets = [];
 
   constructor({ id = 'memory' } = {}) {
     this.id = id;
@@ -25,6 +27,11 @@ export class InMemoryBridge {
 
   async sendReply(args) {
     this.outbox.push(args);
+  }
+
+  /** The command lists handed over (as `TelegramBridge.setCommands`), kept for a test to read. */
+  async setCommands(commands, opts = {}) {
+    this.commandSets.push({ commands, ...opts });
   }
 
   /**

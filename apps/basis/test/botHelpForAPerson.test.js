@@ -4,13 +4,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js';
-import { scopeCatalogueToRole, botOpLevel } from '../src/v2/botOpMap.js';
-import { botHelpLines } from '../src/v2/botHelp.js';
+import { scopeCatalogueToRole } from '../src/v2/botOpMap.js';
+import { botHelpLines, isAdminOp as isAdmin } from '../src/v2/botHelp.js';
 import nl from '../src/locales/circle.nl.json' with { type: 'json' };
 
 const t = (k) => { const v = k.split('.').slice(1).reduce((o, x) => o?.[x], nl); return typeof v === 'string' ? v : k; };
 const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
-const isAdmin = (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibility === 'trusted' : botOpLevel(entry.op?.id) === 'trusted');
 const helpFor = (role) => botHelpLines({ commandMenu: scopeCatalogueToRole(catalogue, role).commandMenu, opsById: catalogue.opsById, isAdmin, t }).join('\n');
 
 describe('/help for a person', () => {

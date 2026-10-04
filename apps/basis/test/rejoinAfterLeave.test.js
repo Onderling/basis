@@ -10,13 +10,13 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { bootRealAgentNode, connectNodesOverBus, until, teardown, createCircle, joinExistingCircle, readRoster, bindCircleAddresses } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor, makeCircleReachable } from '../src/v2/householdRosterPairing.js';
 import { primeCircleSecurity } from '../src/v2/circleSecurityPriming.js';
-import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
+import { leaveCircleLocally, removeCircleMember } from '../src/v2/circleMembershipHygiene.js';
 
 const CIRCLE = 'rejoin-circle';
 
 describe('a member who left joins again', () => {
-  let ann; let bob;
-  afterAll(async () => { await teardown(ann, bob); });
+  let ann; let bob; let cas;
+  afterAll(async () => { await teardown(ann, bob, cas); });
 
   it('back on the admin\'s roster after a leave and a second join with the same invite', async () => {
     ann = await bootRealAgentNode('ann', { taskLane: true });
@@ -52,5 +52,23 @@ describe('a member who left joins again', () => {
     const stmts = (bob.deviceLog?.query?.({}) ?? []).filter((e) => e.circleId === CIRCLE).map((e) => [e.payload?.body?.kind, String(e.payload?.body?.subject ?? '').slice(0, 6), String(e.payload?.body?.author ?? '').slice(0, 6)]);
     const red = ((await bob.agent.callSkill('stoop', 'listOpen', { type: 'membership-redemption' }))?.items ?? []).filter((i) => i.source?.groupId === CIRCLE).map((i) => [String(i.source?.redeemedBy).slice(0, 6), i.source?.redeemedAt]);
     expect(bobBack, `Bob does not see himself back. bob=${String(bob.pubKey).slice(0, 6)} circles=${JSON.stringify(mine?.circles)} left=${JSON.stringify(mine?.left)} log=${JSON.stringify(stmts)} redemptions=${JSON.stringify(red)} again=${JSON.stringify(again.joined)}`).toBe(true);
+  }, 120_000);
+
+  it('one the admin REMOVED does not walk back in on the old invite: refused, not on the roster', async () => {
+    cas = await bootRealAgentNode('cas', { taskLane: true });
+    await connectNodesOverBus([ann, bob, cas]);
+    const first = await joinExistingCircle(ann, cas, { groupId: CIRCLE, handle: 'cas' });
+    expect(first.joined?.ok).toBe(true);
+    await bindCircleAddresses([ann, cas], CIRCLE);
+    await Promise.all([ann, cas].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: CIRCLE })));
+    const casRow = await until(async () => (await readRoster(ann, CIRCLE)).find((m) => m.handle === 'cas') ?? null, { timeout: 10_000, step: 100 });
+    expect(casRow).toBeTruthy();
+    const removed = await removeCircleMember({ agent: ann.agent, circleId: CIRCLE, memberWebid: casRow.webid });
+    expect(removed.ok, JSON.stringify(removed)).toBe(true);
+    // the same invite (the admin's code did not change): refused, said as a removal
+    const again = await joinExistingCircle(ann, cas, { groupId: CIRCLE, handle: 'cas' });
+    expect(again.joined?.ok, JSON.stringify(again.joined)).not.toBe(true);
+    expect(JSON.stringify(again.joined)).toContain('removed-from-circle');
+    expect((await readRoster(ann, CIRCLE)).some((m) => m.handle === 'cas')).toBe(false);
   }, 120_000);
 });

@@ -395,14 +395,18 @@ const CODE_SKEW_MS = param({ key: 'stoop.codeSkewMs', scope: PARAM_SCOPE.DEVICE,
  *   • `{ allow: false }`              — a NEW identity beyond what this invite permits. Refused here,
  *     on the device that would otherwise write the membership.
  *
- * A repeat by someone who has since LEFT (or been removed) is not a repeat: it is a JOIN again. `isMember` (the
- * folded roster, the same read `listGroupMembers` answers from) says so, and the answer is `{ allow: true, rejoin }`
- * — a new redemption and a new join statement, without a new slot (they were counted). Without it the leave stood:
- * the joiner was told "joined" and nobody's roster showed them (ledger L193).
+ * A repeat by someone the circle no longer holds is not a repeat. `memberStatus` (the folded roster, the same read
+ * `listGroupMembers` answers from, and the circle's removals) says which:
+ *   • they LEFT → a JOIN again: `{ allow: true, rejoin }` — a new redemption and a new join statement, without a new
+ *     slot (they were counted). Without it the leave stood: the joiner was told "joined" and nobody's roster showed
+ *     them (ledger L193).
+ *   • they were REMOVED → refused (`removed-from-circle`): an invite they kept does not undo an admin's removal; a
+ *     new invite from an admin (a new code) is the way back.
+ *   • a member, or a roster that cannot say → the idempotent answer, as before.
  *
- * @returns {Promise<{allow: boolean, already?: object, rejoin?: boolean, used: number, max: number}>}
+ * @returns {Promise<{allow: boolean, already?: object, rejoin?: boolean, error?: string, used: number, max: number}>}
  */
-async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebid, isMember = null }) {
+async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebid, memberStatus = null }) {
   const rulesItem = await _findLatestGroupRules(store, groupId);
   const ceiling = circleInviteCeiling(rulesItem?.source?.rules);
   const max = inviteMaxRedemptionsOf(codeItem, ceiling);
@@ -413,10 +417,10 @@ async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebi
   });
   const already = requesterWebid ? redeemers.get(requesterWebid) ?? null : null;
   if (already) {
-    let stillIn = null;
-    if (typeof isMember === 'function') { try { stillIn = await isMember(groupId, requesterWebid); } catch { stillIn = null; } }
-    // only a roster that SAYS they are out makes it a rejoin; a read that failed keeps the idempotent answer
-    if (stillIn === false) return { allow: true, rejoin: true, used: redeemers.size, max };
+    let status = null;
+    if (typeof memberStatus === 'function') { try { status = await memberStatus(groupId, requesterWebid); } catch { status = null; } }
+    if (status === 'left') return { allow: true, rejoin: true, used: redeemers.size, max };
+    if (status === 'removed') return { allow: false, error: 'removed-from-circle', used: redeemers.size, max };
     return { allow: true, already, used: redeemers.size, max };
   }
   if (redeemers.size >= max) return { allow: false, used: redeemers.size, max };
@@ -1374,14 +1378,22 @@ export function buildSkills({
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
     selfSigner,
   });
-  // The invite verdict with the roster's word (both redeem paths): a repeat of an invite by someone the folded roster no
-  // longer holds — they left, or were removed — is a JOIN again, not an idempotent repeat. Null when the roster cannot say.
+  // The invite verdict with the roster's word (both redeem paths): is the requester a member, did they leave, or were
+  // they removed (a removal this device recorded, or an evict on the circle's membership lane naming them — ever: an
+  // order of exits and joins is the fold's, and the safe reading is that a removal needs a NEW invite). Null when the
+  // roster cannot say.
   const verdictWithRoster = (from) => (args) => inviteRedemptionVerdict({
     ...args,
-    isMember: async (gid, webid) => {
+    memberStatus: async (gid, webid) => {
       const r = await listGroupMembersCore(scope, { groupId: gid }, { from });
       if (!Array.isArray(r?.members)) return null;
-      return r.members.some((m) => (m?.webid ?? m?.id) === webid);
+      if (r.members.some((m) => (m?.webid ?? m?.id) === webid)) return 'member';
+      const removals = (await scope.store.listOpen({ type: 'group-removal' }).catch(() => [])) ?? [];
+      if (removals.some((it) => it?.source?.groupId === gid && it?.source?.memberWebid === webid)) return 'removed';
+      let bodies = [];
+      if (typeof scope.membershipRead === 'function') { try { bodies = (await scope.membershipRead(gid))?.bodies ?? []; } catch { bodies = []; } }
+      if (bodies.some((b) => b?.kind === 'evict' && b?.subject === webid)) return 'removed';
+      return 'left';
     },
   });
   const storeFor = () => scope;

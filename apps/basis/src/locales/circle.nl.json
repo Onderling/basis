@@ -276,6 +276,10 @@
       "text": "{{used}} van {{max}} plekken op deze uitnodiging gebruikt",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
     },
+    "removed_from_circle": {
+      "text": "Je bent uit deze kring gehaald. Met deze uitnodiging kom je er niet weer in; vraag een beheerder om een nieuwe.",
+      "doc": "Joining with an invite the person kept after an admin removed them: refused; a new invite is the way back."
+    },
     "limit_reached": {
       "text": "Deze uitnodiging heeft iedereen toegelaten die mocht. Vraag de beheerder van de kring om een nieuwe.",
       "doc": "B5 — the joiner-facing message when the ISSUER refuses an over-ceiling redemption. No count: the joiner is not told the circle’s limit, only that this invite is spent."

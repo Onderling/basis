@@ -359,6 +359,16 @@ export function bindMatchArg(args, op) {
   const { _match, ...rest } = args;
   // Don't clobber an explicit `--key=value` for the same name.
   if (rest[target.name] !== undefined) return rest;
+  // By position, for a second field that is a CHOICE: when the op's last required param is an enum (and not the
+  // target) and the line's last word is one of its values, that word is it and the rest the target —
+  // `/role Frits de Roos coordinator` → who "Frits de Roos", role "coordinator". Anything else binds whole, as before.
+  const required = (op.params ?? []).filter((p) => p?.required);
+  const last = required[required.length - 1];
+  if (last && last !== target && last.kind === 'enum' && Array.isArray(last.of) && rest[last.name] === undefined) {
+    const words = String(_match).trim().split(/\s+/);
+    const tail = words[words.length - 1];
+    if (words.length > 1 && last.of.includes(tail)) return { ...rest, [target.name]: words.slice(0, -1).join(' '), [last.name]: tail };
+  }
   return { ...rest, [target.name]: _match };
 }
 

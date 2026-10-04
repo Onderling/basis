@@ -4,7 +4,7 @@
  * not). An op the grant does not name is not painted, nor one the screen's code does not know.
  */
 import { describe, it, expect } from 'vitest';
-import { screenPanels, screenPanelsForGrant, screenPickerFetcher } from '../../src/v2/screenPaint.js';
+import { screenPanels, screenPanelsForGrant, screenPickerFetcher, screenActionForm } from '../../src/v2/screenPaint.js';
 import { composeAssistantCatalogue } from '../../src/telegram/assistantCatalogue.js';
 import { botOpLevel } from '../../src/v2/botOpMap.js';
 import nl from '../../src/locales/circle.nl.json' with { type: 'json' };
@@ -51,5 +51,16 @@ describe('a field the screen can fill in: its source, read through the screen\'s
     const before = calls.length;
     expect(await fetcher({ listOp: 'listEvents', appOrigin: 'calendar' })).toEqual([]);
     expect(calls.length).toBe(before);
+  });
+});
+
+describe('an action on a row with more to fill in: its form, with what the row knows filled in', () => {
+  it('role on a person\'s row: a form for the role only; revoke: nothing to ask', () => {
+    const role = screenActionForm('assistant.assistant-role', { who: 'telegram:7' });
+    expect(role.missing).toEqual(['role']);
+    expect(role.prefilled).toEqual({ who: 'telegram:7' });
+    expect(role.params.find((p) => p.name === 'role').of).toEqual(['coordinator', 'member', 'observer']);
+    expect(screenActionForm('assistant.assistant-revoke', { who: 'telegram:7' })).toBe(null);
+    expect(screenActionForm('nope.nothing', {})).toBe(null);
   });
 });

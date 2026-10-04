@@ -7494,6 +7494,8 @@
       "rsvpTentative": "Maybe",
       "cancelEvent": "Cancel",
       "markListItemDone": "Done",
+      "assistant-role": "Role",
+      "assistant-revoke": "Remove",
       "removeFromList": "Remove"
     },
     "household": "The household",

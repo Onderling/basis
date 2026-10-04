@@ -79,6 +79,24 @@ export function screenPickerFetcher({ call, ops, appOrigin }) {
   };
 }
 
+/**
+ * An action on a row (a person's role, a chore's new holder) whose op asks more than the row knows: the form for the
+ * rest, with what the row knows filled in — the dependent pick answered by context (Fable, the screen-fields brief).
+ * Null when nothing is missing (the action runs as it is), or when the screen's code does not know the op.
+ * @param {string} skill  `app.op`
+ * @param {object} args   what the row fills in
+ * @returns {{opId: string, appOrigin: string, params: object[], missing: string[], prefilled: object}|null}
+ */
+export function screenActionForm(skill, args = {}) {
+  const [appOrigin, opId] = String(skill ?? '').split('.');
+  let entry = null;
+  for (const [, e] of catalogueForScreen().opsById ?? []) { if (e?.appOrigin === appOrigin && e?.op?.id === opId) { entry = e; break; } }
+  if (!entry) return null;
+  const params = Array.isArray(entry.op.params) ? entry.op.params : [];
+  const missing = params.filter((p) => p?.required && (args?.[p.name] === undefined || args[p.name] === '')).map((p) => p.name);
+  return missing.length ? { opId, appOrigin, params, missing, prefilled: { ...args } } : null;
+}
+
 /** The bot's catalogue as the screen's code knows it (its own manifests), composed once. */
 let screenCatalogue = null;
 const catalogueForScreen = () => (screenCatalogue ??= composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true }).catalogue);

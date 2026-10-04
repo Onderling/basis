@@ -12,7 +12,7 @@ const reads = {
   'lists.listEntries:Boodschappen': { ok: true, title: 'Boodschappen', items: [{ id: 'e1', label: 'melk', type: 'list-item' }] },
   'lists.listEntries:Klusjes': { ok: true, title: 'Klusjes', items: [{ id: 't1', label: 'ramen — open', type: 'task', state: 'open' }, { id: 't2', label: 'vuilnis — Ann', type: 'task', state: 'claimed' }] },
   'lists.listEntries:Agenda': { ok: true, title: 'Agenda', items: [{ id: 'c1', label: 'tandarts do 10:00', type: 'calendar-event' }] },
-  'assistant.assistant-users': { ok: true, message: 'Ann — admin\nBert — member' },
+  'assistant.assistant-users': { ok: true, message: 'Ann — admin\nBert — member', items: [{ id: 'telegram:1', label: 'Ann', role: 'admin', linked: false }, { id: 'telegram:7', label: 'Bert', role: 'member', linked: false }] },
 };
 const call = async (skill, args) => reads[skill === 'lists.listEntries' ? `${skill}:${args.list}` : skill] ?? { ok: false };
 const MEMBER = ['lists.listLists', 'lists.listEntries', 'lists.markListItemDone', 'lists.removeFromList', 'tasks.claimTask', 'tasks.completeTask', 'calendar.rsvpAccept', 'calendar.rsvpDecline', 'calendar.cancelEvent'];
@@ -46,7 +46,8 @@ describe('readHousehold — the household on a screen', () => {
 
   it('the people only when the screen holds the users read', async () => {
     expect((await readHousehold({ call, ops: MEMBER, t })).people).toBeNull();
-    expect((await readHousehold({ call, ops: [...MEMBER, 'assistant.assistant-users'], t })).people).toBe('Ann — admin\nBert — member');
+    // the rows of the one read (painted as rows on the screen, each with the actions the screen holds — none here)
+    expect((await readHousehold({ call, ops: [...MEMBER, 'assistant.assistant-users'], t })).people.map((p) => [p.label, p.role, p.actions.length])).toEqual([['Ann', 'admin', 0], ['Bert', 'member', 0]]);
   });
 
   it('no lists read: nothing to show', async () => {

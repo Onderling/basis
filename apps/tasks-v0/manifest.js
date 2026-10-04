@@ -319,7 +319,7 @@ export const tasksManifest = {
       appliesTo: { type: 'task' },
       params: [
         { name: 'id',          kind: 'string', required: true, ...ID_NONEMPTY  },
-        { name: 'newAssignee', kind: 'string', required: true, ...STR_NONEMPTY },
+        { name: 'newAssignee', kind: 'string', required: true, ...STR_NONEMPTY, pickerSource: { listOp: 'assistant-users', appOrigin: 'assistant' } },
       ],
       surfaces: {
         chat: { hint: 'Reassign a task — admin/coordinator only via item-store role policy.' },

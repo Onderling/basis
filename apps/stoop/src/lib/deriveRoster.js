@@ -379,6 +379,8 @@ export function deriveRoster({
       ...(typeof said.handle === 'string' && said.handle ? { handle: said.handle } : {}),
       ...(typeof said.displayName === 'string' && said.displayName ? { displayName: said.displayName } : {}),
       ...(typeof said.avatarRef === 'string' && said.avatarRef ? { avatarRef: said.avatarRef } : {}),
+      // what kind of member this is, as it says itself (`function`: a household bot)
+      ...(typeof said.kind === 'string' && said.kind ? { kind: said.kind } : {}),
       // the persona properties the member released to THIS circle, said on the lane (step two, 2026-09-22): the map
       // replaces the cached/join-time one whole — a key withdrawn from the release is gone from the row
       ...(said.personaProperties && typeof said.personaProperties === 'object' ? { personaProperties: { ...said.personaProperties } } : {}),

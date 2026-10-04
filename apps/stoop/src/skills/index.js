@@ -395,9 +395,18 @@ const CODE_SKEW_MS = param({ key: 'stoop.codeSkewMs', scope: PARAM_SCOPE.DEVICE,
  *   • `{ allow: false }`              — a NEW identity beyond what this invite permits. Refused here,
  *     on the device that would otherwise write the membership.
  *
- * @returns {Promise<{allow: boolean, already?: object, used: number, max: number}>}
+ * A repeat by someone the circle no longer holds is not a repeat. `memberStatus` (the folded roster, the same read
+ * `listGroupMembers` answers from, and the circle's removals) says which:
+ *   • they LEFT → a JOIN again: `{ allow: true, rejoin }` — a new redemption and a new join statement, without a new
+ *     slot (they were counted). Without it the leave stood: the joiner was told "joined" and nobody's roster showed
+ *     them (ledger L193).
+ *   • they were REMOVED → refused (`removed-from-circle`): an invite they kept does not undo an admin's removal; a
+ *     new invite from an admin (a new code) is the way back.
+ *   • a member, or a roster that cannot say → the idempotent answer, as before.
+ *
+ * @returns {Promise<{allow: boolean, already?: object, rejoin?: boolean, error?: string, used: number, max: number}>}
  */
-async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebid }) {
+async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebid, memberStatus = null }) {
   const rulesItem = await _findLatestGroupRules(store, groupId);
   const ceiling = circleInviteCeiling(rulesItem?.source?.rules);
   const max = inviteMaxRedemptionsOf(codeItem, ceiling);
@@ -407,7 +416,13 @@ async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebi
     redemptions, groupId, codeId: codeItem?.id ?? null, code: codeItem?.source?.code ?? null,
   });
   const already = requesterWebid ? redeemers.get(requesterWebid) ?? null : null;
-  if (already) return { allow: true, already, used: redeemers.size, max };
+  if (already) {
+    let status = null;
+    if (typeof memberStatus === 'function') { try { status = await memberStatus(groupId, requesterWebid); } catch { status = null; } }
+    if (status === 'left') return { allow: true, rejoin: true, used: redeemers.size, max };
+    if (status === 'removed') return { allow: false, error: 'removed-from-circle', used: redeemers.size, max };
+    return { allow: true, already, used: redeemers.size, max };
+  }
   if (redeemers.size >= max) return { allow: false, used: redeemers.size, max };
   return { allow: true, used: redeemers.size, max };
 }
@@ -836,7 +851,7 @@ async function listGroupMembersCore(scope, a, ctx) {
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, selfSigner = null, skipSpine = false } = {}) {
+export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
   const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
@@ -1123,9 +1138,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     spineStatements,
     // The fold's compaction verdict goes back to the rail (L121): only on the rail path, only when the fold names
     // something, fire-and-forget — a read never waits on a write.
-    onFolded: (typeof membershipRead?.compact === 'function')
-      ? (folded) => { if (Array.isArray(folded?.superseded) && folded.superseded.length) membershipRead.compact(groupId, folded.superseded).catch(() => {}); }
-      : null,
+    onFolded: (folded) => {
+      if (typeof membershipRead?.compact === 'function' && Array.isArray(folded?.superseded) && folded.superseded.length) membershipRead.compact(groupId, folded.superseded).catch(() => {});
+      // a caller that needs more of the fold than the rows (the invite verdict: each subject's last exit)
+      if (typeof observeFold === 'function') { try { observeFold(folded); } catch { /* a reader never breaks the read */ } }
+    },
   });
 }
 
@@ -1362,6 +1379,27 @@ export function buildSkills({
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
     selfSigner,
+  });
+  // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
+  // a member; else the membership lane's last exit for them, in the fold's own order (`lastExit`: their leave, or an
+  // admin's evict); else, for a circle from before the lane, the exit items' latest (`exits.kinds`). Left → may join
+  // again on an invite they hold; removed → needs a new one. Null when nothing can say.
+  const verdictWithRoster = () => (args) => inviteRedemptionVerdict({
+    ...args,
+    memberStatus: async (gid, webid) => {
+      let folded = null;
+      const rows = await projectCircleRoster({
+        store: scope.store, groupId: gid, memberMapList: [], circleSignerFor: scope.circleSignerFor,
+        membershipRead: scope.membershipRead, selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
+      });
+      if (!Array.isArray(rows)) return null;
+      if (rows.some((m) => (m?.webid ?? m?.id) === webid)) return 'member';
+      const onLane = folded?.lastExit?.[webid];
+      const last = onLane ?? (await readCircleExits({ store: scope.store, groupId: gid })).kinds?.get(webid) ?? null;
+      if (last === 'evict') return 'removed';
+      if (last === 'leave') return 'left';
+      return null;
+    },
   });
   const storeFor = () => scope;
   const op = (id) => {
@@ -2641,7 +2679,7 @@ export function buildSkills({
         store, members, metrics, simulateSync, emitSpine, currentPersonKey,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
-        codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
+        codeRedeemableNow, inviteRedemptionVerdict: verdictWithRoster(), INVITE_LIMIT_REACHED, verifyCircleLink,
       }, { a: dataArgs(parts), from });
     }, {
       description: 'Present a membership code obtained out-of-band; records redemption.',
@@ -2674,7 +2712,7 @@ export function buildSkills({
         store, members, metrics, simulateSync, emitSpine,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
-        codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
+        codeRedeemableNow, inviteRedemptionVerdict: verdictWithRoster(), INVITE_LIMIT_REACHED, verifyCircleLink,
         withHandleClaim, collectCircleHandles, findHandleCollision,
       }, { a: dataArgs(parts), from });
     }, {

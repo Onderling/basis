@@ -90,6 +90,8 @@ export function memberFrom(entry) {
       ? m.personaProperties : null,
   };
   if (m.circleAddress != null) out.circleAddress = m.circleAddress;
+  // what kind of member this is, as it says itself on its row (`function`: a household bot)
+  if (m.kind === 'function') out.kind = 'function';
   // Rules acceptance (visibility): which rules version this member accepted (their signed join /
   // re-accept, folded) and the circle's CURRENT version, both stamped by `deriveRoster` on gated
   // circles only. Carried so `memberRulesStatus` can compute the display state from the Member alone.
@@ -234,6 +236,8 @@ export function memberToViewAs(member) {
     // admins were at all — the one governance fact a member looks at a member list to find. It rides
     // only when it is not the default 'member', so every plain row stays byte-identical.
     ...(m.role && m.role !== 'member' ? { role: m.role } : {}),
+    // A BOT — a member that says it is a function (a household bot); only then, so a person's row stays byte-identical.
+    ...(m.kind === 'function' ? { bot: true } : {}),
     // THE FACE — the picture this member released to this circle (a sealed media ref; the shell opens it with the
     // circle's opener). Only when released, so a row without one stays byte-identical.
     ...(m.personaProperties?.profilePicture && typeof m.personaProperties.profilePicture === 'object'

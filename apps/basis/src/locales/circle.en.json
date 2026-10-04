@@ -276,6 +276,10 @@
       "text": "{{used}} of {{max}} places on this invite used",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
     },
+    "removed_from_circle": {
+      "text": "You were removed from this circle. This invite does not let you back in; ask an admin for a new one.",
+      "doc": "Joining with an invite the person kept after an admin removed them: refused; a new invite is the way back."
+    },
     "limit_reached": {
       "text": "This invite has admitted everyone it may. Ask whoever runs the circle for a new one.",
       "doc": "B5 — the joiner-facing message when the ISSUER refuses an over-ceiling redemption. No count: the joiner is not told the circle’s limit, only that this invite is spent."
@@ -368,6 +372,10 @@
     }
   },
   "members_tab": {
+    "bot": {
+      "text": "bot",
+      "doc": "MEMBERS tab — the badge on a member that says it is a function (a household bot)."
+    },
     "loading": {
       "text": "Loading members…",
       "doc": "MEMBERS tab — while the roster (listGroupMembers) loads."
@@ -4414,7 +4422,9 @@
           "assistant-export-key-unlock": "open the export key for an hour, for /import",
           "assistant-link": "link your Basis app to yourself",
           "assistant-link-confirm": "pick the code your Basis app shows",
-          "assistant-unlink": "unlink your Basis app"
+          "assistant-unlink": "unlink your Basis app",
+          "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",
+          "assistant-circles": "the circles the bot is in"
         }
       }
     },
@@ -4458,6 +4468,24 @@
     "link_open_app": "Open this link in your Basis app to link your identity to this bot: {{link}}\nYour app then shows a line to paste here.",
     "link_not_private": "That only counts in your own chat with the bot.",
     "link_question": "A Basis app wants to link to you: messages from that app then count as you, and the bot knows your Basis identity. Pick the code your app shows.",
+    "kring_usage": "Paste a circle's invite after /kring. Out of a circle: /kring los <name>.",
+    "kring_question": "The bot joins the circle “{{name}}”.\nRules: {{rules}}\n\nThe bot then keeps that circle's data on this device, and members of that circle can ask it things. The circle sees it is your bot: it is @{{handle}} there. Go ahead? (/kring ja {{id}} or /kring nee {{id}})",
+    "kring_no_rules": "no rules set",
+    "kring_asked": "I asked you in this private chat whether the bot may join the circle.",
+    "kring_already": "The bot is in “{{name}}” already.",
+    "kring_joined": "The bot is in “{{name}}” now. Members can address it there by its name.",
+    "kring_declined": "The bot does not join “{{name}}”.",
+    "kring_nothing": "No circle is waiting for your answer. Paste the invite after /kring again.",
+    "kring_not_private": "That only works in your private chat with the bot.",
+    "kring_not_an_invite": "That is not an invite to a circle.",
+    "kring_admin_offline": "The admin of “{{name}}” cannot be reached now. Try again later, when they are online.",
+    "kring_join_failed": "The bot could not join “{{name}}”. Ask for a new invite.",
+    "kring_left": "The bot left “{{name}}” and took that circle's data off this device.",
+    "kring_unknown": "The bot is in no circle called “{{name}}”. /kringen shows where it is.",
+    "kring_leave_failed": "The bot could not leave “{{name}}”.",
+    "kringen_none": "The bot is in no circle.",
+    "kringen_list": "The bot is in:\n{{list}}",
+    "kring_not_here": "Not in a circle: reminders, the week's overview and your settings are in your own chat with the bot.",
     "link_already": "This Basis app is already linked to you.",
     "link_asked": "Pick the code your app shows below.",
     "link_another_bot": "That link line is for another bot. Nothing asked.",
@@ -7229,6 +7257,10 @@
     "confirm": {
       "text": "{{message}} Tap to confirm.",
       "doc": "Telegram runner: a command that asks to confirm before it runs; {{message}} is the op's own warning."
+    },
+    "confirm_in_words": {
+      "text": "{{message}} Reply yes or no.",
+      "doc": "Telegram runner: the confirm on a door without buttons (the inbox, a circle); {{message}} is the op's own warning."
     },
     "confirm_yes": {
       "text": "Yes, do it",

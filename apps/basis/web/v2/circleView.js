@@ -767,6 +767,15 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
       row.appendChild(secondary);
     }
 
+    // A BOT on the roster (a member that says it is a function): said on its row, so nobody takes it for a person.
+    if (m.bot) {
+      const botEl = document.createElement('span');
+      botEl.className = 'circle-view__member-bot';
+      botEl.dataset.memberBot = 'true';
+      botEl.textContent = tr('circle.members_tab.bot');
+      row.appendChild(botEl);
+    }
+
     // WHO RUNS THE CIRCLE, and how they came to. The role badge is the same rule the admin panel
     // uses (anything but a plain member), and next to it the provenance clause: they made the
     // circle, an admin appointed them, or — the one nobody chose — the circle was left without an

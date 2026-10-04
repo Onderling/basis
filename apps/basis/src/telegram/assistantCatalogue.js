@@ -28,20 +28,23 @@ import { scopeCatalogueToRole, botOffers } from '../v2/botOpMap.js';
  * @param {unknown} [a.apps]               the app list (the parameter's value); unset or empty → the default
  * @param {object}  [a.householdManifest]  the household manifest the door's agent carries (`agent.manifest`)
  * @param {boolean} [a.slim]               a household bot: only the ops on the bot's map (`botOpMap.js`)
+ * @param {boolean} [a.withoutDoorOps]     a circle the bot joined: the door's own ops (a person's settings, the admin's
+ *                                         ops) are not composed — they belong to a person's own door, never a circle
  * @returns {{catalogue: object, manifestsByOrigin: Object<string, object>, apps: string[]}}
  */
-export function composeAssistantCatalogue({ apps, householdManifest, slim = false } = {}) {
+export function composeAssistantCatalogue({ apps, householdManifest, slim = false, withoutDoorOps = false } = {}) {
   const list = assistantAppsFrom(apps);
   const all = catalogueManifests({ householdManifest });
   const ordered = [...all.filter((m) => m.app === 'household'), ...all.filter((m) => m.app !== 'household')];
   // The door's own ops (the person's memory mode, their language) come whatever the app list says: they are about
   // the conversation, not an app.
-  const inScope = [...ordered.filter((m) => list.includes(m.app)), ...DOOR_MANIFESTS];
+  const doorOwn = withoutDoorOps ? [] : DOOR_MANIFESTS;
+  const inScope = [...ordered.filter((m) => list.includes(m.app)), ...doorOwn];
   // A household bot (`slim`) narrows each app to the bot's map BEFORE the merge: a command is prefixed only when two
   // ops the bot offers share it, never for an op it drops (the tasks app's own `/invite` beside the door's).
   const merged = (slim ? inScope.map((m) => ({ ...m, operations: (m.operations ?? []).filter((op) => botOffers(m.app, op, null)) })) : inScope)
     .map((manifest) => ({ manifest }));
-  const scoped = scopeCatalogueToApps(mergeManifests(merged), [...list, ...DOOR_MANIFESTS.map((m) => m.app)]);
+  const scoped = scopeCatalogueToApps(mergeManifests(merged), [...list, ...doorOwn.map((m) => m.app)]);
   // A household bot (`slim`): exactly the bot's map (`botOpMap.js`) — nothing else of the apps is composed.
   const catalogue = slim ? scopeCatalogueToRole(scoped, null) : scoped;
   const manifestsByOrigin = Object.fromEntries(inScope.map((m) => [m.app, m]));
@@ -56,10 +59,10 @@ export function composeAssistantCatalogue({ apps, householdManifest, slim = fals
  * @param {(list: string[]) => Promise<unknown>} a.setApps  writes the parameter (never the model: slash only, admin only)
  * @param {object} [a.householdManifest]
  */
-export function createDoorCatalogue({ getApps, setApps, householdManifest, slim = false } = {}) {
+export function createDoorCatalogue({ getApps, setApps, householdManifest, slim = false, withoutDoorOps = false } = {}) {
   if (typeof getApps !== 'function') throw new TypeError('createDoorCatalogue: getApps is required');
   // no `setApps`: a door whose apps are fixed (a household bot composes its template's) — there is no switch
-  let current = composeAssistantCatalogue({ apps: getApps(), householdManifest, slim });
+  let current = composeAssistantCatalogue({ apps: getApps(), householdManifest, slim, withoutDoorOps });
   // The apps a door can offer: every app manifest the shells compose, but the shell's own.
   const available = catalogueManifests({ householdManifest }).map((m) => m.app).filter((a) => a && a !== 'basis');
   return {
@@ -71,7 +74,7 @@ export function createDoorCatalogue({ getApps, setApps, householdManifest, slim 
     async setApps(list) {
       if (typeof setApps !== 'function') throw new Error('createDoorCatalogue: this door\'s apps are fixed');
       await setApps(list);
-      current = composeAssistantCatalogue({ apps: list, householdManifest, slim });
+      current = composeAssistantCatalogue({ apps: list, householdManifest, slim, withoutDoorOps });
       return current.apps;
     },
   };

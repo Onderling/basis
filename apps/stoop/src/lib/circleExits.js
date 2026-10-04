@@ -57,13 +57,13 @@ export function exitFromItem(item) {
     const webid = typeof src.memberWebid === 'string' && src.memberWebid ? src.memberWebid : null;
     if (!webid) return null;
     const at = typeof src.removedAt === 'number' ? src.removedAt : 0;
-    return { webid, at };
+    return { webid, at, kind: 'evict' };
   }
   if (item?.type === 'group-leave') {
     const webid = typeof src.leftBy === 'string' && src.leftBy ? src.leftBy : null;
     if (!webid) return null;
     const at = typeof src.leftAt === 'number' ? src.leftAt : 0;
-    return { webid, at };
+    return { webid, at, kind: 'leave' };
   }
   return null;
 }
@@ -78,13 +78,16 @@ export function exitFromItem(item) {
  */
 export function collectCircleExits({ items = [], groupId } = {}) {
   const exits = new Map();
+  // …and HOW each one last went, in the fold's words (`leave` | `evict`), beside the times: `exits.kinds` — a rejoin on
+  // an invite they hold is decided by it (the circles from before the membership lane; the lane's own is the fold's)
+  exits.kinds = new Map();
   if (!groupId) return exits;
   for (const it of Array.isArray(items) ? items : []) {
     if (it?.source?.groupId !== groupId) continue;
     const e = exitFromItem(it);
     if (!e) continue;
     const prev = exits.get(e.webid);
-    if (prev === undefined || e.at > prev) exits.set(e.webid, e.at);
+    if (prev === undefined || e.at > prev) { exits.set(e.webid, e.at); exits.kinds.set(e.webid, e.kind); }
   }
   return exits;
 }

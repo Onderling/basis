@@ -208,7 +208,8 @@ export function createAssistantEngine({
       const raw = String(text ?? '').trim();
       // A line for the circle, not the bot, is never gathered and never waits for a window — but it does take its
       // place in the lane: typed while a bot turn runs, it may be the answer to what that turn asks (`claim`).
-      const forBot = raw.startsWith('/') || addressesBot(raw, botName);
+      // a line naming a bot member of the circle is that member's (`ctx.forAnotherBot`), never gathered as the local one's
+      const forBot = ctx?.forAnotherBot !== true && (raw.startsWith('/') || addressesBot(raw, botName));
       const line = forBot && !raw.startsWith('/') ? stripBotTag(raw, botName) : raw;
       return lanes.push(ctx?.id ?? DEFAULT_THREAD, { threadId: ctx?.id, text, solo: text, line, collect: forBot, ctx });
     },

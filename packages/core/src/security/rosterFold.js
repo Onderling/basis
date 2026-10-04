@@ -68,7 +68,15 @@ const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accep
  * writer in `@onderling/circles` imports it rather than keeping its own: it had a second frozen copy that
  * called itself "one place, shared with the fold's allowlist", and it went stale the moment a field landed.
  */
-export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties']);
+export const MEMBER_PROPS_FIELDS = Object.freeze(['handle', 'displayName', 'avatarRef', 'personaProperties', 'kind']);
+
+/**
+ * What kind of member this is, as the member says it (`member-props.kind`, 2026-10-04): a person, or a FUNCTION — a
+ * household bot on its own node says so on its row, the circle paints it a bot and a person's local assistant stays
+ * quiet for its name. Self-said, not an authority: a person who says `function` only silences their own name. The same
+ * two words a profile record holds (`PROFILE_KINDS` in agent-registry is this list).
+ */
+export const MEMBER_KINDS = Object.freeze(['person', 'function']);
 
 /**
  * The most an inline face thumbnail may be. See the note at its use: the picture itself lives behind the blob
@@ -213,6 +221,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   // reaches only the device that admitted them; the join reaches every device, so this is where the others
   // learn what to call a member (walked 2026-09-14: everyone but the admin saw `peer-…`).
   const handles = Object.create(null);
+  // subject → the kind of their LATEST exit, in the fold's own order: `leave` (their own) or `evict` (an admin's, or a
+  // fork's removal). Kept when they are back — membership answers "in or out"; this answers "how did they last go",
+  // which a rejoin on an invite they hold is decided by (left → may; removed → needs a new invite).
+  const lastExit = Object.create(null);
   // subject → { displayName?, avatarRef? } — what a member has said about themselves (`member-props`, 2026-09-21).
   // The handle lives in `handles` (one map for the join's and the later change); these are the rest.
   const props = Object.create(null);
@@ -338,14 +350,15 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
 
     const removed = new Set();
     const removedBy = new Map();   // subject → the hash of the statement that removed them (the seed)
+    const removedHow = new Map();  // subject → 'leave' | 'evict' (a fork's removal is an eviction)
     // A key that forks at this depth is removed here, founder or not: it loses its place and its rank, deny-wins
     // over anything concurrent. If that empties the admin set, the caretaker rule below hands over as for a departure.
     for (const [author, at] of forkAt) {
-      if (at === d) { removed.add(author); removedBy.set(author, forkSeed.get(author)); }
+      if (at === d) { removed.add(author); removedBy.set(author, forkSeed.get(author)); removedHow.set(author, 'evict'); }
     }
     for (const s of batch) {
-      if (s.kind === 'leave' && s.author === s.subject) { removed.add(s.subject); removedBy.set(s.subject, s.hash); }
-      else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject)) { removed.add(s.subject); removedBy.set(s.subject, s.hash); }
+      if (s.kind === 'leave' && s.author === s.subject) { removed.add(s.subject); removedBy.set(s.subject, s.hash); if (!removedHow.has(s.subject)) removedHow.set(s.subject, 'leave'); }
+      else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject)) { removed.add(s.subject); removedBy.set(s.subject, s.hash); removedHow.set(s.subject, 'evict'); }
     }
     const joined = new Set();
     for (const s of batch) {
@@ -364,7 +377,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     }
 
     // Apply: removals win over same-depth joins/promotes (deny-wins).
-    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; delete props[x]; }
+    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; delete props[x]; lastExit[x] = removedHow.get(x) ?? 'evict'; }
     for (const x of joined)   if (!removed.has(x)) members.add(x);
     for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); adminVia.set(x, 'role'); }
     for (const x of demoted)  { admins.delete(x); adminVia.delete(x); }
@@ -398,6 +411,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       const keys = Object.keys(p).filter((k) => k !== 'authorRef');
       if (keys.length === 0 || keys.some((k) => !MEMBER_PROPS_FIELD_SET.has(k))) continue;   // the allowlist: refused whole
       if ('personaProperties' in p && !isPlainMap(p.personaProperties)) continue;          // a map or nothing — refused whole
+      if ('kind' in p && !MEMBER_KINDS.includes(p.kind)) continue;                         // one of the two words — refused whole
       // THE FACE'S CAP. A released `profilePicture` carries an inline thumbnail in its sealing line, and this
       // lane is EXEMPT FROM COMPACTION (`entryKinds.js`: "the roster refolds from these — never drops"), so
       // anything said here is kept by every device for ever — except what THIS fold names in `superseded`, which the
@@ -416,7 +430,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       {   // record what this ACCEPTED statement set, for supersession (see `propSetters` above)
         const setFields = [];
         if (typeof p.handle === 'string' && p.handle) setFields.push('handle');
-        for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) setFields.push(k);
+        for (const k of ['displayName', 'avatarRef', 'kind']) if (typeof p[k] === 'string' && p[k]) setFields.push(k);
         if (isPlainMap(p.personaProperties)) setFields.push('personaProperties');
         const mineSetters = propSetters.get(s.subject) ?? new Map();
         for (const f of setFields) mineSetters.set(f, s.hash);
@@ -426,7 +440,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       // the handle goes to `handles` (one map with the join's) AND to `props` — a projection needs to know a handle
       // came from the member's own later statement, which beats a cached rename, not from the join, which does not
       if (typeof p.handle === 'string' && p.handle) { handles[s.subject] = p.handle; mine.handle = p.handle; }
-      for (const k of ['displayName', 'avatarRef']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
+      for (const k of ['displayName', 'avatarRef', 'kind']) if (typeof p[k] === 'string' && p[k]) mine[k] = p[k];
       if (isPlainMap(p.personaProperties)) mine.personaProperties = { ...p.personaProperties };   // whole map, newest wins
     }
 
@@ -497,7 +511,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   const superseded = propStatements
     .filter((st) => !st.setsHandle && st.fields.length > 0 && st.fields.every((f) => propSetters.get(st.subject)?.get(f) !== st.hash))
     .map((st) => st.hash).sort();
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded };
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded, lastExit };
 }
 
 export default foldRoster;

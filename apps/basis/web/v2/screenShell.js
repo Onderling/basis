@@ -13,7 +13,7 @@
 import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
 import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
-import { screenPanelsForGrant, screenReplies } from '../../src/v2/screenPaint.js';
+import { screenPanelsForGrant, screenReplies, screenPickerFetcher } from '../../src/v2/screenPaint.js';
 import { readHousehold } from '../../src/v2/screenHousehold.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
 import { renderForm } from '../../src/web/domForm.js';
@@ -120,7 +120,9 @@ export async function startScreenShell(win = window) {
         const open = el('button', { type: 'button', 'data-op': item.skill, onclick: () => {
           if (!item.needsForm) { run({}); return; }
           const spec = buildFormSpec({ opParams: item.params, missing: item.params.filter((q) => q?.required).map((q) => q.name), prefilledArgs: {}, opId: item.opId, appOrigin: item.appOrigin });
-          area.replaceChildren(renderForm(spec, { doc: document, t, onSubmit: (values) => { area.replaceChildren(); run(values); }, onCancel: () => area.replaceChildren() }));
+          // a field with a declared source is picked from what this screen may read, not typed as an id
+          const pickerFetcher = screenPickerFetcher({ call: (skill, args) => view.call(skill, args), ops: () => view.ops(), appOrigin: item.appOrigin });
+          area.replaceChildren(renderForm(spec, { doc: document, t, pickerFetcher, onSubmit: (values) => { area.replaceChildren(); run(values); }, onCancel: () => area.replaceChildren() }));
         } }, item.label);
         return el('div', { class: 'screen-op' }, open, area, out, replies);
       })));

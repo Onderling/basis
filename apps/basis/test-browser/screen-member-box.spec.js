@@ -92,9 +92,9 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     const add = page.locator('[data-op="lists.addToList"]');
     await add.click();
     const form = page.locator('.screen-op', { has: add }).locator('form, .cc-form');
-    await form.locator('[name="list"]').first().fill('Boodschappen');
+    // the list is PICKED from the lists this screen may read (not typed); picking it sends the form
     await form.locator('[name="text"]').first().fill('van-berts-scherm');
-    await form.locator('.cc-form-submit').first().click();
+    await form.locator('.cc-picker-row', { hasText: 'Boodschappen' }).first().click({ timeout: 30_000 });
     await expect(page.locator('.screen-op', { has: add }).locator('.screen-result')).toContainText(/van-berts-scherm/, { timeout: 30_000 });
     seen = (await annSaid()).length;
     await annSend('/list-entries Boodschappen');

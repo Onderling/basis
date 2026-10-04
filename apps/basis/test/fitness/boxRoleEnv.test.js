@@ -19,7 +19,6 @@ const role = readFileSync(path.join(REPO, 'deploy/roles/assistant.yml'), 'utf8')
 // Read by the runner, not passed by the role — on purpose.
 const NOT_PASSED = {
   BASIS_VAULT_PASSPHRASE: 'generated once beside the vault on the data volume; never in the .env',
-  BASIS_APP_URL: 'optional: makes a printed enrolment offer a link; the box prints the offer without it',
   PRIVATEMODE_MODEL: 'optional override of the default model; the default is what a box runs',
 };
 // Passed by the role, read elsewhere than the runner.

@@ -279,6 +279,10 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (!spend(v.hash)) return refuse('used');
       const person = await personOfTelegram(v.telegramId);
       if (!person) return refuse('stranger');
+      // one use per person across a restart too: a launch not newer than the last one taken is refused
+      const last = threads.lastLaunchOf(person);
+      if (last != null && v.authDate <= last) return refuse('used');
+      threads.setLastLaunch(person, v.authDate);
       const previous = threads.telegramScreenOf(person);
       if (previous && previous !== viewPubKey) {
         await revokeView(previous);

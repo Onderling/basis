@@ -168,6 +168,9 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { telegramScreen: _s, ...rest } = rowOf(id);
       return save(viewPubKey ? { ...rest, telegramScreen: viewPubKey } : rest);
     },
+    /** When the person's last Telegram launch that was taken was opened (Telegram's `auth_date`, seconds), or null. */
+    lastLaunchOf: (id) => rows.get(id)?.lastLaunch ?? null,
+    setLastLaunch(id, authDate) { return save({ ...rowOf(id), lastLaunch: authDate }); },
     /** Whose pending screen nonce has this hash (one pending per person), or null. */
     screenNonceOwner(hash) {
       for (const [id, r] of rows) if (r?.screenNonce?.hash === hash) return id;

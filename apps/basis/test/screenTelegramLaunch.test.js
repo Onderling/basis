@@ -29,7 +29,7 @@ function bot({ admitted = ['telegram:42'] } = {}) {
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
   const grants = []; const revoked = []; const told = []; const refused = [];
   const asked = [];
-  const screens = createBotScreens({
+  const deps = {
     threads,
     isAdmitted: async (p) => admitted.includes(p),
     columnOf: async () => ['lists.addToList', 'assistant.assistant-menu'],
@@ -45,8 +45,9 @@ function bot({ admitted = ['telegram:42'] } = {}) {
     personOfTelegram: async (id) => (admitted.includes(`telegram:${id}`) ? `telegram:${id}` : null),
     launchLabel: () => 'Telegram-scherm',
     now: () => NOW,
-  });
-  return { screens, threads, grants, revoked, told, refused, asked };
+  };
+  const screens = createBotScreens(deps);
+  return { screens, deps, threads, grants, revoked, told, refused, asked };
 }
 
 describe('the launch data', () => {
@@ -99,6 +100,17 @@ describe('a screen launched inside Telegram', () => {
     expect(b.refused).toEqual(['K2']);
   });
 
+  it('one use per person survives a restart: a launch not newer than the last taken one is refused', async () => {
+    const b = bot();
+    const d = await launchData({ ageS: 10 });
+    expect((await b.screens.launched({ from: 'K1', viewPubKey: 'K1', nonce: 'n1', initData: d })).ok).toBe(true);
+    // the box restarts: the in-memory record is gone, the thread rows stay
+    const again = createBotScreens({ ...b.deps, now: () => NOW });
+    expect(await again.launched({ from: 'K2', viewPubKey: 'K2', nonce: 'n2', initData: d })).toMatchObject({ ok: false, reason: 'used' });
+    expect(await again.launched({ from: 'K2', viewPubKey: 'K2', nonce: 'n2', initData: await launchData({ ageS: 20, queryId: 'older' }) })).toMatchObject({ ok: false, reason: 'used' });
+    expect((await again.launched({ from: 'K2', viewPubKey: 'K2', nonce: 'n3', initData: await launchData({ ageS: 2, queryId: 'newer' }) })).ok).toBe(true);
+  });
+
   it('a Telegram id not in the book: refused, no grant (a launch admits nobody)', async () => {
     const b = bot({ admitted: [] });
     expect(await b.screens.launched({ from: 'K1', viewPubKey: 'K1', nonce: 'n', initData: await launchData() })).toMatchObject({ ok: false, reason: 'stranger' });
@@ -107,10 +119,10 @@ describe('a screen launched inside Telegram', () => {
 
   it('a second launch replaces the first: that key revoked, the person told; the same key again is the same screen', async () => {
     const b = bot();
-    await b.screens.launched({ from: 'K1', viewPubKey: 'K1', nonce: 'n1', initData: await launchData({ queryId: 'a' }) });
-    await b.screens.launched({ from: 'K1', viewPubKey: 'K1', nonce: 'n2', initData: await launchData({ queryId: 'b' }) });
+    await b.screens.launched({ from: 'K1', viewPubKey: 'K1', nonce: 'n1', initData: await launchData({ queryId: 'a', ageS: 9 }) });
+    await b.screens.launched({ from: 'K1', viewPubKey: 'K1', nonce: 'n2', initData: await launchData({ queryId: 'b', ageS: 6 }) });
     expect(b.revoked).toEqual([]);
-    await b.screens.launched({ from: 'K2', viewPubKey: 'K2', nonce: 'n3', initData: await launchData({ queryId: 'c' }) });
+    await b.screens.launched({ from: 'K2', viewPubKey: 'K2', nonce: 'n3', initData: await launchData({ queryId: 'c', ageS: 3 }) });
     expect(b.revoked).toEqual(['K1']);
     expect(b.told).toContainEqual(['telegram:42', 'circle.bot.screen_launch_replaced']);
     expect(b.threads.telegramScreenOf('telegram:42')).toBe('K2');

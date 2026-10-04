@@ -7,6 +7,19 @@
  */
 const SEP = '::';
 
+/**
+ * Is this chat a person's OWN Telegram chat? On Telegram a private chat's id is the person's own id; through the
+ * multiplexer it arrives prefixed with its door (`telegram::42`). Their own id, bare or behind the Telegram door — never a
+ * group's id, never another door's chat with the same digits.
+ * @param {string|number|null} chatId  as the door's runner has it
+ * @param {string|number|null} uid     the person's Telegram id
+ */
+export function isOwnTelegramChat(chatId, uid) {
+  const chat = String(chatId ?? '');
+  const own = String(uid ?? '').trim();
+  return Boolean(own) && (chat === own || chat === `telegram${SEP}${own}`);
+}
+
 /** @param {Array<object|null>} bridges */
 export function multiplexBridges(bridges) {
   const doors = bridges.filter(Boolean);

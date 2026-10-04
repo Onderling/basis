@@ -10,6 +10,7 @@ import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
+import { isOwnTelegramChat } from './doorBridges.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 
 /**
@@ -447,7 +448,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const answer = String(word ?? '').trim();
     if (!answer) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.screen_confirm_usage') } };
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
-    const isPrivate = Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+    const isPrivate = Boolean(row) && (row.channel !== 'telegram' || isOwnTelegramChat(ctx?.chatId, row.uid));
     const r = await admin.screens.confirm(person, answer, { isPrivate });
     if (r.ok) return { ok: true, message: tp(r.declined ? 'circle.bot.screen_declined' : 'circle.bot.screen_confirmed') };
     const key = { 'not-private': 'screen_confirm_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'screen_confirm_nothing' }[r.reason] ?? 'screen_confirm_failed';
@@ -507,7 +508,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const yes = switchOf(answer);
     if (!yes) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.stepup_usage') } };
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
-    const isPrivate = ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+    const isPrivate = ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || isOwnTelegramChat(ctx?.chatId, row.uid));
     const r = await admin.stepUp.answer(person, yes === 'on', id, { isPrivate });
     if (!r.ok) {
       const key = { 'not-private': 'not_private', expired: 'expired', replaced: 'replaced', 'no-id': 'usage' }[r.reason] ?? 'nothing';
@@ -565,7 +566,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   /** Is this turn from the person's PRIVATE door (on Telegram the chat whose id is their own; the inbox always)? */
   async function fromPrivateDoor(person, ctx) {
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
-    return ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || String(ctx?.chatId ?? '') === String(row.uid ?? ''));
+    return ctx?.via !== 'screen' && Boolean(row) && (row.channel !== 'telegram' || isOwnTelegramChat(ctx?.chatId, row.uid));
   }
 
   /**

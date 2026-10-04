@@ -13,7 +13,7 @@
 import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
 import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
-import { screenPanelsForGrant, screenReplies, screenPickerFetcher } from '../../src/v2/screenPaint.js';
+import { screenPanelsForGrant, screenReplies, screenPickerFetcher, screenActionForm } from '../../src/v2/screenPaint.js';
 import { readHousehold } from '../../src/v2/screenHousehold.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
 import { renderForm } from '../../src/web/domForm.js';
@@ -75,11 +75,19 @@ export async function startScreenShell(win = window) {
     let h;
     try { h = await readHousehold({ call: (skill, args) => view.call(skill, args), ops: view.ops(), t }); } catch (e) { householdSaid.textContent = inWords(e?.message ?? e); return; }
     if (!h.lists.length && !h.people) { household.replaceChildren(); return; }
-    const act = async (a) => {
-      if (confirmApplies(a.confirm, a.args) && !win.confirm(t(a.confirm.messageKey ?? '') || a.confirm.message || t('circle.connectScreen.sure'))) return;
+    const run = async (skill, args, confirm) => {
+      if (confirmApplies(confirm, args) && !win.confirm(t(confirm.messageKey ?? '') || confirm.message || t('circle.connectScreen.sure'))) return;
       householdSaid.textContent = '…';
-      try { householdSaid.textContent = answerOf(await view.call(a.skill, a.args)); } catch (e) { householdSaid.textContent = inWords(e?.message ?? e); }
+      try { householdSaid.textContent = answerOf(await view.call(skill, args)); } catch (e) { householdSaid.textContent = inWords(e?.message ?? e); }
       await paintHousehold();
+    };
+    // a row's action: run it — or, when its op asks more than the row knows, its form with the row filled in
+    const act = (a, area) => {
+      const more = screenActionForm(a.skill, a.args);
+      if (!more || !area) return run(a.skill, a.args, a.confirm);
+      const spec = buildFormSpec({ opParams: more.params, missing: more.missing, prefilledArgs: more.prefilled, opId: more.opId, appOrigin: more.appOrigin });
+      const pickerFetcher = screenPickerFetcher({ call: (skill, args) => view.call(skill, args), ops: () => view.ops(), appOrigin: more.appOrigin });
+      area.replaceChildren(renderForm(spec, { doc: document, t, pickerFetcher, onSubmit: (values) => { area.replaceChildren(); run(a.skill, { ...more.prefilled, ...values }, a.confirm); }, onCancel: () => area.replaceChildren() }));
     };
     household.replaceChildren(
       el('h2', {}, t('circle.connectScreen.household')),
@@ -88,11 +96,20 @@ export async function startScreenShell(win = window) {
       ...h.lists.map((l) => el('div', { class: 'screen-list', 'data-list': l.title },
         el('h3', {}, l.title),
         l.items.length
-          ? el('ul', {}, ...l.items.map((i) => el('li', { 'data-line': i.id, ...(i.done ? { class: 'done' } : {}) },
-            el('span', {}, i.label), ' ',
-            ...i.actions.map((a) => el('button', { type: 'button', 'data-action': a.skill, onclick: () => act(a) }, a.label)))))
+          ? el('ul', {}, ...l.items.map((i) => {
+            const form = el('div', { class: 'screen-form' });
+            return el('li', { 'data-line': i.id, ...(i.done ? { class: 'done' } : {}) },
+              el('span', {}, i.label), ' ',
+              ...i.actions.map((a) => el('button', { type: 'button', 'data-action': a.skill, onclick: () => act(a, form) }, a.label)), form);
+          }))
           : el('p', {}, t('circle.connectScreen.list_empty')))),
-      ...(h.people ? [el('h3', {}, t('circle.connectScreen.people')), el('pre', { 'data-household': 'people' }, h.people)] : []),
+      // the people: the one read's rows, each with its own actions (a role asks which, a removal asks the yes in the chat)
+      ...(h.people ? [el('h3', {}, t('circle.connectScreen.people')), el('ul', { 'data-household': 'people' }, ...h.people.map((p) => {
+        const form = el('div', { class: 'screen-form' });
+        return el('li', { 'data-person': p.id },
+          el('span', {}, `${p.label} — ${p.role ?? '?'}`), ' ',
+          ...p.actions.map((a) => el('button', { type: 'button', 'data-action': a.skill, onclick: () => act(a, form) }, a.label)), form);
+      }))] : []),
     );
   };
 

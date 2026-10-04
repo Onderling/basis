@@ -7494,6 +7494,8 @@
       "rsvpTentative": "Misschien",
       "cancelEvent": "Afzeggen",
       "markListItemDone": "Gedaan",
+      "assistant-role": "Rol",
+      "assistant-revoke": "Eruit",
       "removeFromList": "Weg"
     },
     "household": "Het huishouden",

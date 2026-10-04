@@ -10,6 +10,7 @@ import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
+import { peopleRows } from './botPeople.js';
 import { isOwnTelegramChat } from './doorBridges.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 
@@ -98,9 +99,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       // `/apps on tasks`: with no required param the router keeps the line as `_match` for the op to split.
       if (op === 'assistant-apps') return appsOp(args?.change ?? args?._match);
       if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match);
-      if (op === 'assistant-role') return roleOp(args?.spec ?? args?._match);
+      if (op === 'assistant-role') return roleOp(args?.who, args?.role);
       if (op === 'assistant-status') return { ok: true, message: await statusText() };
-      if (op === 'assistant-users') return { ok: true, message: await usersText() };
+      if (op === 'assistant-users') { const items = await peopleFor(caller); return { ok: true, items, message: usersText(items) }; }
       if (op === 'assistant-cohort') return cohortOp(args?.spec ?? args?._match);
       if (op === 'assistant-invite') return inviteOp();
       if (op === 'assistant-rotate') return rotateOp();
@@ -254,17 +255,16 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
 
-  /** `/role <naam> coordinator|member|observer`: a person's role on the bot — the same words a circle's roster uses. */
-  async function roleOp(spec) {
-    const words = String(spec ?? '').trim().split(/\s+/).filter(Boolean);
-    const role = words.pop();
-    const name = words.join(' ');
+  /** `/role <who> <role>` (or the screen's two fields): a person's role on the bot — the same words a circle's roster uses. */
+  async function roleOp(who, role) {
+    const name = String(who ?? '').trim();
     if (!name || !BOT_ROLES.includes(role)) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.role_usage') } };
     if (typeof admin.setRole !== 'function') return { ok: false, error: 'unwired' };
     const row = await admin.setRole(name, role);
     if (!row) return { ok: false, error: t('circle.bot.role_nobody', { name }) };
     return { ok: true, message: t('circle.bot.role_set', { name: row.displayName ?? name, role }) };
   }
+
 
 
   /**
@@ -480,7 +480,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   /** The args a held request runs with, and how the question shows them: `{ok, args, shown}` or a refusal. */
   async function stepUpPlan(app, op, args, tp) {
     if (app === 'assistant' && (op === 'assistant-export-key-set' || op === 'assistant-export-key-unlock')) return exportKeyPlan(op, args, tp);
-    const typed = screenLabel(args?.who ?? args?.spec ?? args?._match) ?? '—';
+    const typed = screenLabel(args?.who ?? args?._match) ?? '—';
     if (app !== 'assistant' || (op !== 'assistant-revoke' && op !== 'assistant-role')) return { ok: true, args, shown: typed };
     const rows = typeof admin.users === 'function' ? ((await admin.users()) ?? []) : [];
     const nameOf = async (row) => ((await namesHidden()) ? row.id : (row.displayName ?? row.id));
@@ -489,12 +489,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!row) return { ok: false, error: { code: 'unknown-user', message: tp('circle.bot.revoke_unknown', { who: typed }) } };
       return { ok: true, args: { who: row.id }, shown: await nameOf(row) };
     }
-    const words = String(args?.spec ?? args?._match ?? '').trim().split(/\s+/).filter(Boolean);
-    const role = words.pop();
-    if (!words.length || !BOT_ROLES.includes(role)) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.role_usage') } };
-    const row = personNamed(rows, words.join(' '));
-    if (!row || row.role === 'admin') return { ok: false, error: { code: 'unknown-user', message: tp('circle.bot.role_nobody', { name: screenLabel(words.join(' ')) ?? '—' }) } };
-    return { ok: true, args: { spec: `${row.id} ${role}` }, shown: `${await nameOf(row)} → ${role}` };
+    const role = args?.role;
+    if (!String(args?.who ?? '').trim() || !BOT_ROLES.includes(role)) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.role_usage') } };
+    const row = personNamed(rows, args.who);
+    if (!row || row.role === 'admin') return { ok: false, error: { code: 'unknown-user', message: tp('circle.bot.role_nobody', { name: typed }) } };
+    return { ok: true, args: { who: row.id, role }, shown: `${await nameOf(row)} → ${role}` };
   }
 
   /**
@@ -692,12 +691,17 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: [tp('circle.bot.screens_list', { list: rows.join('\n') }), ...(reopen ? [tp('circle.bot.screens_open', { link: reopen })] : [])].join('\n') };
   }
 
-  async function usersText() {
-    const rows = typeof admin.users === 'function' ? await admin.users() : [];
-    if (!rows.length) return t('circle.bot.users_none');
-    // Under `assistant.names: none` the rows by their id.
-    const hideNames = await namesHidden();
-    // a linked Basis app is said, never its key
-    return rows.map((u) => `${hideNames ? u.id : (u.displayName ?? u.id)} — ${u.role ?? '?'}${u.pubKey ? ` · ${t('circle.bot.users_linked')}` : ''}`).join('\n');
+  /** The bot's people as rows, under the names ceiling, for the person who asks (the one read; `botPeople.js`). */
+  async function peopleFor(caller) {
+    const rows = typeof admin.users === 'function' ? ((await admin.users()) ?? []) : [];
+    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+    return peopleRows({ rows, setting: (r?.params ?? []).find((p) => p.key === NAMES_KEY)?.value, callerId: caller ?? null });
   }
+
+  /** `/users` in words: the rows, painted (a linked Basis app is said, never its key). */
+  function usersText(items) {
+    if (!items.length) return t('circle.bot.users_none');
+    return items.map((u) => `${u.label} — ${u.role ?? '?'}${u.linked ? ` · ${t('circle.bot.users_linked')}` : ''}`).join('\n');
+  }
+
 }

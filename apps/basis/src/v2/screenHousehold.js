@@ -47,7 +47,7 @@ function actionsFor(item, list, held, t) {
  * @param {(skill: string, args?: object) => Promise<object|null>} a.call  the screen's call (its token, the bot's gate)
  * @param {string[]} a.ops  the skills this screen holds tokens for
  * @param {(key: string, params?: object) => string} a.t
- * @returns {Promise<{lists: Array<{title: string, items: Array<{id: string, label: string, type: string, done: boolean, actions: object[]}>}>, people: string|null}>}
+ * @returns {Promise<{lists: Array<{title: string, items: Array<{id: string, label: string, type: string, done: boolean, actions: object[]}>}>, people: Array<{id: string, label: string, role: string|null, linked: boolean, actions: object[]}>|null}>}
  */
 export async function readHousehold({ call, ops, t }) {
   const held = new Set(ops ?? []);
@@ -64,13 +64,24 @@ export async function readHousehold({ call, ops, t }) {
       lists.push(list);
     }
   }
+  // the people: the one read's rows (under the names ceiling), each with the actions this screen holds for a person
   let people = null;
   if (held.has('assistant.assistant-users')) {
     const r = await call('assistant.assistant-users', {}).catch(() => null);
-    if (r?.ok !== false && typeof r?.message === 'string') people = r.message;
+    if (r?.ok !== false && Array.isArray(r?.items)) {
+      people = r.items.map((p) => ({
+        id: p.id, label: p.label, role: p.role ?? null, linked: Boolean(p.linked),
+        actions: PERSON_ACTIONS.filter((skill) => held.has(skill)).map((skill) => ({
+          skill, args: { who: p.id }, label: t(`circle.connectScreen.action.${skill.split('.').pop()}`),
+        })),
+      }));
+    }
   }
   return { lists, people };
 }
+
+/** What a person's row carries on a screen (each the admin's; the rest of its params asked in a form). */
+const PERSON_ACTIONS = Object.freeze(['assistant.assistant-role', 'assistant.assistant-revoke']);
 
 /** The ops a line can carry as an action on a screen (each needs a short word: `circle.connectScreen.action.<op>`). */
 export function lineActionOps() {

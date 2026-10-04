@@ -4140,7 +4140,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (store && typeof store.listByType === 'function') {
         const open = ((await store.listByType('task')) ?? []).filter((it) => !it?.completedAt);
         const words = (it) => it?.text ?? it?.title;
-        const { entry: task, among } = matchEntry(open, args.id, words);
+        // the words look first among the chores the op is about — claim: those nobody holds; complete: those the
+        // person holds — so "de ramen" is one chore where the open ones hold two; nothing there: all the open ones
+        const heldBy = (it) => [...(Array.isArray(it?.assignees) ? it.assignees : []), it?.assignee].filter(Boolean);
+        const who = actorOf(ctx);
+        const narrow = opId === 'claimTask' ? open.filter((it) => heldBy(it).length === 0)
+          : (opId === 'completeTask' && who ? open.filter((it) => heldBy(it).includes(who)) : null);
+        const first = narrow ? matchEntry(narrow, args.id, words) : null;
+        const { entry: task, among } = (first?.entry || first?.among?.length) ? first : matchEntry(open, args.id, words);
         const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
         // `code: 'not-found'` when the words name nothing (a rule that may fall back to the model reads it); two that
         // match ask which, and that is an answer

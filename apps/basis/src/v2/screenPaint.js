@@ -9,6 +9,7 @@ import { composeAssistantCatalogue } from '../telegram/assistantCatalogue.js';
 import { botOpLevel } from './botOpMap.js';
 import { parseInput } from '../parser.js';
 import { resolveDispatch } from '../router.js';
+import { isLineOp } from './screenHousehold.js';
 
 const SECTION_OF = { lists: 'lists', tasks: 'chores', calendar: 'agenda', assistant: 'you' };
 const ORDER = ['lists', 'chores', 'agenda', 'you', 'admin'];
@@ -33,6 +34,7 @@ export function screenPanels({ ops, catalogue, isAdmin = () => false, t, order =
   for (const skill of ops ?? []) {
     const entry = byKey.get(skill);
     if (!entry) continue;   // an op the screen's code does not know: not painted (a received manifest is a later step)
+    if (isLineOp(entry.op)) continue;   // it lives on its line (the household section), never as a standalone form
     const { appOrigin, op } = entry;
     const key = `circle.bot.help.ops.${appOrigin}.${op.id}`;
     const line = t(key);

@@ -7494,6 +7494,9 @@
       "rsvpTentative": "Misschien",
       "cancelEvent": "Afzeggen",
       "markListItemDone": "Gedaan",
+      "reassignTask": "Aan iemand anders",
+      "editTask": "Wijzig",
+      "editEntry": "Wijzig",
       "assistant-role": "Rol",
       "assistant-revoke": "Eruit",
       "removeFromList": "Weg"

@@ -93,7 +93,7 @@ export class TelegramBridge {
   /** @type {boolean} */                                                    #dropPendingUpdates;
   /** @type {{ on: Function, launch: Function, stop: Function,
               telegram: { sendMessage: Function, setWebhook: Function,
-                          getMe: Function },
+                          getMe: Function, setMyCommands?: Function, deleteMyCommands?: Function },
               botInfo?: any }} */
   #bot;
   /** @type {boolean} */                                                    #started = false;
@@ -125,6 +125,7 @@ export class TelegramBridge {
    *   of N messages would take N × 100s to process.  Long-polling and
    *   webhook modes both honour this.
    * @param {(token: string) => any} [args.telegrafFactory]
+   * @param {string} [args.apiRoot]  a Bot API server of one's own (Telegram's self-hosted one); default api.telegram.org
    * @param {(e: {reason: 'stopped'|'stalled', error?: unknown}) => void} [args.onPollingDown]  the long-poll ended
    *   (Telegraf's loop gave up on an error it does not retry) or stalled (no poll completed for `stallMs`; a fetch
    *   without a socket timeout can hang for ever after a sleep or a network change) — said once; the host restarts
@@ -139,6 +140,7 @@ export class TelegramBridge {
     handlerTimeoutMs,
     dropPendingUpdates = false,
     telegrafFactory,
+    apiRoot,
     onPollingDown = null,
     watchdog = {},
   } = /** @type {any} */ ({})) {
@@ -173,7 +175,7 @@ export class TelegramBridge {
     // `handlerTimeoutMs` constructor option.
     const handlerTimeout = handlerTimeoutMs ?? 5 * 60 * 1000;
     const factory = telegrafFactory ?? ((/** @type {string} */ token) =>
-      new Telegraf(token, { handlerTimeout }));
+      new Telegraf(token, { handlerTimeout, ...(apiRoot ? { telegram: { apiRoot } } : {}) }));
     this.#bot = factory(botToken);
 
     // Wire the message + callback_query listeners eagerly — order
@@ -327,6 +329,23 @@ export class TelegramBridge {
       extra.reply_markup = { inline_keyboard: layoutButtons(buttons) };
     }
     await this.#bot.telegram.sendMessage(chatId, text, extra);
+  }
+
+  /**
+   * The bot's command list — what Telegram's "Menu" button beside the typing box shows. Without `chatId`: every private
+   * chat (for one app language when `languageCode` is named, else the default); with it: that chat alone. `clear` takes
+   * a chat's own list away, so the default shows there again.
+   *
+   * @param {Array<{command: string, description: string}>} commands
+   * @param {{chatId?: string|number, languageCode?: string, clear?: boolean}} [opts]
+   * @returns {Promise<void>}
+   */
+  async setCommands(commands, { chatId, languageCode, clear = false } = {}) {
+    /** @type {Record<string, any>} */
+    const extra = { scope: chatId != null ? { type: 'chat', chat_id: chatId } : { type: 'all_private_chats' } };
+    if (languageCode) extra.language_code = languageCode;
+    if (clear) { await this.#bot.telegram.deleteMyCommands(extra); return; }
+    await this.#bot.telegram.setMyCommands(commands, extra);
   }
 
   /**

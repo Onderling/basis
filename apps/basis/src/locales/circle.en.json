@@ -4077,6 +4077,10 @@
       "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|15|30|60",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
+    "settings_failed": {
+      "text": "That setting was not saved; nothing changed. Try again, or tell whoever runs the bot.",
+      "doc": "The household bot's /huishouden when a setting's write was refused."
+    },
     "role_usage": {
       "text": "Use: /role <name> coordinator|member|observer",
       "doc": "The household bot admin's role and settings commands, and a chore naming a person."

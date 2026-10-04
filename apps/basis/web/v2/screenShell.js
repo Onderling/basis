@@ -12,7 +12,7 @@
  */
 import { makeBrowserScreenAgent } from '../../src/web/screenAgent.js';
 import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
-import { createScreenView, screenAddressFor } from '../../src/v2/screenView.js';
+import { createScreenView, screenAddressFor, HOUSEHOLD_SETTLE_MS } from '../../src/v2/screenView.js';
 import { screenPanelsForGrant, screenReplies, screenPickerFetcher, screenActionForm } from '../../src/v2/screenPaint.js';
 import { readHousehold } from '../../src/v2/screenHousehold.js';
 import { buildFormSpec } from '../../src/forms/buildFormSpec.js';
@@ -71,6 +71,10 @@ export async function startScreenShell(win = window) {
     painting = readAndPaint().finally(() => { painting = null; if (again) { again = false; paintHousehold(); } });
     return painting;
   };
+  // after a menu's tap or a nudge, wait a moment: a series of taps (the settings, one after another) is one read after
+  // the last, inside the bot's per-screen call budget — a read of the household costs a call per list
+  let soon = null;
+  const paintSoon = () => { win.clearTimeout(soon); soon = win.setTimeout(() => { soon = null; paintHousehold(); }, HOUSEHOLD_SETTLE_MS); };
   const readAndPaint = async () => {
     let h;
     try { h = await readHousehold({ call: (skill, args) => view.call(skill, args), ops: view.ops(), t }); } catch (e) { householdSaid.textContent = inWords(e?.message ?? e); return; }
@@ -129,7 +133,7 @@ export async function startScreenShell(win = window) {
           replies.replaceChildren();
           let r;
           try { r = await view.call(skill, args); out.textContent = answerOf(r); } catch (e) { out.textContent = inWords(e?.message ?? e); return; }
-          if (writes) paintHousehold();
+          if (writes) paintSoon();
           // the answer's own buttons (a menu): only those the screen resolves to an op it holds a token for
           replies.replaceChildren(...screenReplies(r, view.ops()).map((b) => el('button', { type: 'button', 'data-reply': b.skill, onclick: () => call(b.skill, b.args, b.confirm, true) }, b.label)));
         };
@@ -147,7 +151,7 @@ export async function startScreenShell(win = window) {
     paintHousehold();
   };
   // the bot's nudge: something in the household changed — read it again (as this person, through the gate)
-  view.onNudge(() => { if (household.isConnected) paintHousehold(); });
+  view.onNudge(() => { if (household.isConnected) paintSoon(); });
   // what became of a request that waited for a yes in the person's own chat: said on that op's own line
   view.onNotice(({ outcome, op }) => {
     if (!SCREEN_STEP_UP_OUTCOMES.includes(outcome) && outcome !== SCREEN_STEP_UP_UNANSWERED) return;

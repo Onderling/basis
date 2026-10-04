@@ -9,6 +9,8 @@ import * as botSettings from '../src/v2/botSettings.js';
 import { basisParamRegistry } from '../src/v2/paramsService.js';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
+import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
+import { EventLog } from '../src/eventLog.js';
 
 const settingKeys = Object.entries(botSettings).filter(([name]) => name.endsWith('_KEY')).map(([, key]) => key);
 
@@ -21,10 +23,11 @@ describe('the household settings are registered params', () => {
 
   it('/huishouden lead 15 through the real params service: the menu shows 15', async () => {
     const a = await createRealHouseholdAgent({ seedHousehold: false });
-    const door = withAssistantOps({ callSkill: a.callSkill, t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), threads: { langOf: () => null } });
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    const door = withAssistantOps({ callSkill: a.callSkill, t: (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k), threads });
     const r = await door('assistant', 'assistant-settings', { change: 'lead 15' }, { caller: 'telegram:1', threadId: 'telegram:1', chatId: '1' });
     expect(r.ok).toBe(true);
-    expect(r.message).toContain('"lead":15');
+    expect(r.quickReplies.map((b) => b.label)).toContain('circle.bot.menu_lead: circle.bot.value_lead_min {"n":15} ✓');
   });
 
   it('a refused write is said, not answered with the unchanged list', async () => {

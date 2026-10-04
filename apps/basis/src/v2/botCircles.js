@@ -42,8 +42,8 @@ export function botCircleHandle(botName, operatorName) {
  */
 export function createBotCircles({ store, join, leave, forget, ask, handle, now = Date.now, newId = () => Math.random().toString(36).slice(2, 8) }) {
   const pending = new Map();   // person → { id, inviteUri, circleId, name, until }
-  // circles being left right now: the bot's own leave folds back on the membership lane while `/kring los` runs, and
-  // that is not a removal (it would forget the circle twice)
+  // circles being let go of right now — left (the bot's own leave folds back on the membership lane while `/kring los`
+  // runs, and that is not a removal) or removed (one removal can be noticed twice): never forgotten twice
   const leaving = new Set();
   const rows = async () => ((await store.list()) ?? []).filter((r) => r?.id);
 
@@ -122,12 +122,16 @@ export function createBotCircles({ store, join, leave, forget, ask, handle, now 
 
     /** The bot was removed from a circle: if it is one it joined, its content is forgotten and the record goes. */
     async removed(circleId) {
+      // one at a time per circle: a leave in progress, or this same removal noticed twice (two membership changes)
       if (leaving.has(circleId)) return { ok: false, reason: 'leaving' };
-      const row = circleId ? await store.get(circleId) : null;
-      if (!row) return { ok: false, reason: 'not-joined' };
-      await forget(row.id);
-      await store.remove(row.id);
-      return { ok: true, name: row.name };
+      leaving.add(circleId);
+      try {
+        const row = circleId ? await store.get(circleId) : null;
+        if (!row) return { ok: false, reason: 'not-joined' };
+        await forget(row.id);
+        await store.remove(row.id);
+        return { ok: true, name: row.name };
+      } finally { leaving.delete(circleId); }
     },
   };
 }

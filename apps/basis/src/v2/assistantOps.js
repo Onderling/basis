@@ -231,27 +231,28 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
     const usage = { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.settings_usage') } };
+    // the write's own answer decides: a refused set is said, never answered with the list as it was
+    const set = async (key, val) => {
+      const r = await callSkill('params', 'set-param', { key, value: val }).catch(() => null);
+      return r?.ok ? { ok: true, message: await current() } : { ok: false, error: { code: 'not-saved', message: t('circle.bot.settings_failed') } };
+    };
     if (what === 'days') {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 0) return usage;
-      await callSkill('params', 'set-param', { key: PASSED_DAYS_KEY, value: n });
-      return { ok: true, message: await current() };
+      return set(PASSED_DAYS_KEY, n);
     }
     if (what === 'lead') {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 0 || n > 240) return usage;
-      await callSkill('params', 'set-param', { key: REMINDER_LEAD_KEY, value: n });
-      return { ok: true, message: await current() };
+      return set(REMINDER_LEAD_KEY, n);
     }
     if (what === 'quiet') {
       if (!isQuietHours(value)) return usage;
-      await callSkill('params', 'set-param', { key: QUIET_KEY, value });
-      return { ok: true, message: await current() };
+      return set(QUIET_KEY, value);
     }
     const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES] }[what];
     if (!setting || !setting[1].includes(value)) return usage;
-    await callSkill('params', 'set-param', { key: setting[0], value });
-    return { ok: true, message: await current() };
+    return set(setting[0], value);
   }
 
 

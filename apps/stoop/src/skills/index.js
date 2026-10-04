@@ -395,9 +395,14 @@ const CODE_SKEW_MS = param({ key: 'stoop.codeSkewMs', scope: PARAM_SCOPE.DEVICE,
  *   • `{ allow: false }`              — a NEW identity beyond what this invite permits. Refused here,
  *     on the device that would otherwise write the membership.
  *
- * @returns {Promise<{allow: boolean, already?: object, used: number, max: number}>}
+ * A repeat by someone who has since LEFT (or been removed) is not a repeat: it is a JOIN again. `isMember` (the
+ * folded roster, the same read `listGroupMembers` answers from) says so, and the answer is `{ allow: true, rejoin }`
+ * — a new redemption and a new join statement, without a new slot (they were counted). Without it the leave stood:
+ * the joiner was told "joined" and nobody's roster showed them (ledger L193).
+ *
+ * @returns {Promise<{allow: boolean, already?: object, rejoin?: boolean, used: number, max: number}>}
  */
-async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebid }) {
+async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebid, isMember = null }) {
   const rulesItem = await _findLatestGroupRules(store, groupId);
   const ceiling = circleInviteCeiling(rulesItem?.source?.rules);
   const max = inviteMaxRedemptionsOf(codeItem, ceiling);
@@ -407,7 +412,13 @@ async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebi
     redemptions, groupId, codeId: codeItem?.id ?? null, code: codeItem?.source?.code ?? null,
   });
   const already = requesterWebid ? redeemers.get(requesterWebid) ?? null : null;
-  if (already) return { allow: true, already, used: redeemers.size, max };
+  if (already) {
+    let stillIn = null;
+    if (typeof isMember === 'function') { try { stillIn = await isMember(groupId, requesterWebid); } catch { stillIn = null; } }
+    // only a roster that SAYS they are out makes it a rejoin; a read that failed keeps the idempotent answer
+    if (stillIn === false) return { allow: true, rejoin: true, used: redeemers.size, max };
+    return { allow: true, already, used: redeemers.size, max };
+  }
   if (redeemers.size >= max) return { allow: false, used: redeemers.size, max };
   return { allow: true, used: redeemers.size, max };
 }
@@ -1362,6 +1373,16 @@ export function buildSkills({
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
     selfSigner,
+  });
+  // The invite verdict with the roster's word (both redeem paths): a repeat of an invite by someone the folded roster no
+  // longer holds — they left, or were removed — is a JOIN again, not an idempotent repeat. Null when the roster cannot say.
+  const verdictWithRoster = (from) => (args) => inviteRedemptionVerdict({
+    ...args,
+    isMember: async (gid, webid) => {
+      const r = await listGroupMembersCore(scope, { groupId: gid }, { from });
+      if (!Array.isArray(r?.members)) return null;
+      return r.members.some((m) => (m?.webid ?? m?.id) === webid);
+    },
   });
   const storeFor = () => scope;
   const op = (id) => {
@@ -2641,7 +2662,7 @@ export function buildSkills({
         store, members, metrics, simulateSync, emitSpine, currentPersonKey,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
-        codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
+        codeRedeemableNow, inviteRedemptionVerdict: verdictWithRoster(from), INVITE_LIMIT_REACHED, verifyCircleLink,
       }, { a: dataArgs(parts), from });
     }, {
       description: 'Present a membership code obtained out-of-band; records redemption.',
@@ -2674,7 +2695,7 @@ export function buildSkills({
         store, members, metrics, simulateSync, emitSpine,
         grantKey: (opts) => grantPodAccess(controlAgent, opts),
         deriveSealingKey: deriveSealingKeyFromAddress,
-        codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
+        codeRedeemableNow, inviteRedemptionVerdict: verdictWithRoster(from), INVITE_LIMIT_REACHED, verifyCircleLink,
         withHandleClaim, collectCircleHandles, findHandleCollision,
       }, { a: dataArgs(parts), from });
     }, {

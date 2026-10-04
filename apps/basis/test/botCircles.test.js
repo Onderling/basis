@@ -14,12 +14,12 @@ function memRows() {
   return { get: async (id) => m.get(id) ?? null, put: async (row) => { m.set(row.id, { ...row }); return row; }, list: async () => [...m.values()], remove: async (id) => { m.delete(id); } };
 }
 
-function make({ joinResult = { ok: true, circleId: 'circle-1' } } = {}) {
+function make({ joinResult = { ok: true, circleId: 'circle-1' }, onLeave = null } = {}) {
   const asked = []; const joins = []; const left = []; const forgot = [];
   const circles = createBotCircles({
     store: memRows(),
     join: async (a) => { joins.push(a); return joinResult; },
-    leave: async (circleId) => { left.push(circleId); return { ok: true }; },
+    leave: async (circleId) => { left.push(circleId); if (onLeave) await onLeave(circles); return { ok: true }; },
     forget: async (circleId) => { forgot.push(circleId); return { ok: true, rows: 3, entries: 5 }; },
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
     handle: () => 'huisbot-van-frits',
@@ -116,6 +116,16 @@ describe('leaving, and being removed', () => {
     expect(d.forgot).toEqual(['circle-1']);
     expect(await d.circles.list()).toEqual([]);
     expect(await d.circles.isJoined('circle-1')).toBe(false);
+  });
+
+  it('a removal noticed WHILE it leaves (its own leave folding back) is not a second forget', async () => {
+    const d = make({ onLeave: async (circles) => { d.during = await circles.removed('circle-1'); } });
+    await d.circles.offered('admin', invite(), d.question, { isPrivate: true });
+    await d.circles.answer('admin', true, d.asked[0].buttons[0].id.split(' ').pop(), { isPrivate: true });
+    const r = await d.circles.leaveNamed('huize rood', { isPrivate: true });
+    expect(r.ok).toBe(true);
+    expect(d.during).toMatchObject({ ok: false });
+    expect(d.forgot).toEqual(['circle-1']);
   });
 
   it('an unknown name: said, nothing left', async () => {

@@ -128,6 +128,13 @@ describe('leaving, and being removed', () => {
     expect(d.forgot).toEqual(['circle-1']);
   });
 
+  it('one removal noticed twice at once (two membership changes): forgotten once', async () => {
+    const d = await joined();
+    const [a, b] = await Promise.all([d.circles.removed('circle-1'), d.circles.removed('circle-1')]);
+    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
+    expect(d.forgot).toEqual(['circle-1']);
+  });
+
   it('an unknown name: said, nothing left', async () => {
     const d = await joined();
     expect(await d.circles.leaveNamed('nergens', { isPrivate: true })).toMatchObject({ ok: false, reason: 'unknown-circle' });

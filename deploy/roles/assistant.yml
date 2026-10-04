@@ -38,6 +38,10 @@ services:
       # the model, when the operator picks one (the code's default otherwise)
       PRIVATEMODE_MODEL: "${PRIVATEMODE_MODEL:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"
+      # The web app a person opens: a household bot's screens (`/scherm`) and identity links (`/koppel`) send links
+      # into it, and an enrolment offer prints as one. Without it the bot refuses to connect a screen. The public app
+      # by default; a test box points at its own.
+      BASIS_APP_URL: "${BASIS_APP_URL:-https://onderling.org/basis}"
       # The household's clock: "morgen om 10 uur" is read and shown in this zone (the container's own is UTC).
       TZ: "${TZ:-Europe/Amsterdam}"
     volumes:

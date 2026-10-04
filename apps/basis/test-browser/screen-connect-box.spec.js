@@ -85,9 +85,9 @@ test('the screen in a browser: the link read and hidden, the tap, the code, the 
     await add.click();
     const form = page.locator('.screen-op', { has: add }).locator('form, .cc-form');
     await expect(form.first()).toBeVisible();
-    await form.locator('[name="list"]').first().fill('Boodschappen');
+    // the list is PICKED from the lists this screen may read (not typed); picking it sends the form
     await form.locator('[name="text"]').first().fill('vanuit-het-formulier');
-    await form.locator('.cc-form-submit').first().click();
+    await form.locator('.cc-picker-row', { hasText: 'Boodschappen' }).first().click({ timeout: 30_000 });
     await expect(page.locator('.screen-op', { has: add }).locator('.screen-result')).toContainText(/vanuit-het-formulier/, { timeout: 30_000 });
 
     // ── a reload: the same browser's key and kept grant act again, no pairing ──

@@ -15,9 +15,18 @@ import { composeAssistantCatalogue } from '../telegram/assistantCatalogue.js';
 let catalogue = null;
 const catalogueForScreen = () => (catalogue ??= composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true }).catalogue);
 
-// What a line can fill by itself: the id the read gave it (as `id` for a chore or an appointment, `item` on a list,
-// with the list's name beside it). An op that takes any other word (an edit's text, a reassign's person) is a form.
-const FROM_A_LINE = new Set(['id', 'item', 'list']);
+/**
+ * Is this op one that acts ON a line (Fable, the screen-fields brief)? It changes something, it names the type it applies to
+ * (`appliesTo`), and it takes the line itself (`id` for a chore or an appointment, `item` on a list). Such an op lives on
+ * the line — the screen paints it as the line's action, never as a standalone form; what else it takes (an edit's words,
+ * a reassign's person) is asked in its form with the line filled in. An add (a list's new line, a new appointment) is not
+ * one: it takes no line. ONE predicate, for the line's actions and for the screen's panels, so the two cannot disagree.
+ * @param {object} op  a manifest op
+ */
+export function isLineOp(op) {
+  const params = Array.isArray(op?.params) ? op.params : [];
+  return Boolean(op?.appliesTo) && Boolean(op?.writes) && params.some((p) => p?.name === 'id' || p?.name === 'item');
+}
 
 /** A line's state as `appliesTo.state` names it: the read's own (a chore says open or claimed), else from who holds it. */
 const stateOf = (item) => item?.state ?? (Array.isArray(item?.holders) && item.holders.length ? 'claimed' : 'open');
@@ -30,12 +39,10 @@ function actionsFor(item, list, held, t) {
     const op = entry?.op;
     const skill = `${entry?.appOrigin}.${op?.id}`;
     const applies = op?.appliesTo;
-    if (!applies || applies.type !== item?.type || !held.has(skill)) continue;
-    if (!op.writes) continue;   // a read is not a line's action
+    if (!isLineOp(op) || applies.type !== item?.type || !held.has(skill)) continue;
     if (Array.isArray(applies.state) && !applies.state.includes(stateOf(item))) continue;
-    const params = Array.isArray(op.params) ? op.params : [];
-    if (params.some((p) => !FROM_A_LINE.has(p?.name))) continue;   // every word it takes comes from the line
-    const names = new Set(params.map((p) => p?.name));
+    // the line fills what it can (its id, or its item and list); the rest is asked in the op's form on the screen
+    const names = new Set((op.params ?? []).map((p) => p?.name));
     const args = names.has('item') ? { item: item.id, ...(names.has('list') ? { list: list.title } : {}) } : { id: item.id };
     out.push({ skill, args, label: t(`circle.connectScreen.action.${op.id}`), confirm: op.surfaces?.ui?.confirm ?? null });
   }
@@ -47,7 +54,7 @@ function actionsFor(item, list, held, t) {
  * @param {(skill: string, args?: object) => Promise<object|null>} a.call  the screen's call (its token, the bot's gate)
  * @param {string[]} a.ops  the skills this screen holds tokens for
  * @param {(key: string, params?: object) => string} a.t
- * @returns {Promise<{lists: Array<{title: string, items: Array<{id: string, label: string, type: string, done: boolean, actions: object[]}>}>, people: string|null}>}
+ * @returns {Promise<{lists: Array<{title: string, items: Array<{id: string, label: string, type: string, done: boolean, actions: object[]}>}>, people: Array<{id: string, label: string, role: string|null, linked: boolean, actions: object[]}>|null}>}
  */
 export async function readHousehold({ call, ops, t }) {
   const held = new Set(ops ?? []);
@@ -64,23 +71,30 @@ export async function readHousehold({ call, ops, t }) {
       lists.push(list);
     }
   }
+  // the people: the one read's rows (under the names ceiling), each with the actions this screen holds for a person
   let people = null;
   if (held.has('assistant.assistant-users')) {
     const r = await call('assistant.assistant-users', {}).catch(() => null);
-    if (r?.ok !== false && typeof r?.message === 'string') people = r.message;
+    if (r?.ok !== false && Array.isArray(r?.items)) {
+      people = r.items.map((p) => ({
+        id: p.id, label: p.label, role: p.role ?? null, linked: Boolean(p.linked),
+        actions: PERSON_ACTIONS.filter((skill) => held.has(skill)).map((skill) => ({
+          skill, args: { who: p.id }, label: t(`circle.connectScreen.action.${skill.split('.').pop()}`),
+        })),
+      }));
+    }
   }
   return { lists, people };
 }
+
+/** What a person's row carries on a screen (each the admin's; the rest of its params asked in a form). */
+const PERSON_ACTIONS = Object.freeze(['assistant.assistant-role', 'assistant.assistant-revoke']);
 
 /** The ops a line can carry as an action on a screen (each needs a short word: `circle.connectScreen.action.<op>`). */
 export function lineActionOps() {
   const out = [];
   for (const [, entry] of catalogueForScreen().opsById ?? []) {
-    const op = entry?.op;
-    if (!op?.appliesTo || !op.writes) continue;
-    const params = Array.isArray(op.params) ? op.params : [];
-    if (params.some((p) => !FROM_A_LINE.has(p?.name))) continue;   // every word it takes comes from the line
-    out.push(op.id);
+    if (isLineOp(entry?.op)) out.push(entry.op.id);
   }
   return out;
 }

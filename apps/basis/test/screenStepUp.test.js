@@ -75,7 +75,7 @@ describe('the admin\'s step-up ops from a screen', () => {
     const r = await d.call('assistant', 'assistant-revoke', { who: 'Nobody' }, d.fromScreen);
     expect(r.ok).toBe(false);
     expect(d.asked).toEqual([]);
-    const role = await d.call('assistant', 'assistant-role', { spec: 'Nobody observer' }, d.fromScreen);
+    const role = await d.call('assistant', 'assistant-role', { who: 'Nobody', role: 'observer' }, d.fromScreen);
     expect(role.ok).toBe(false);
     expect(d.asked).toEqual([]);
   });
@@ -85,7 +85,7 @@ describe('the admin\'s step-up ops from a screen', () => {
     await d.call('assistant', 'assistant-revoke', { who: 'BERT' }, d.fromScreen);
     await d.call('assistant', 'assistant-screen-approve', { answer: `ja ${d.idOf()}` }, PRIVATE);
     expect(d.revoked).toEqual([BERT]);
-    await d.call('assistant', 'assistant-role', { spec: 'bert observer' }, d.fromScreen);
+    await d.call('assistant', 'assistant-role', { who: 'bert', role: 'observer' }, d.fromScreen);
     expect(d.asked.at(-1).text).toContain('Bert');
     await d.call('assistant', 'assistant-screen-approve', { answer: `ja ${d.idOf()}` }, PRIVATE);
     expect(d.roles).toEqual([[BERT, 'observer']]);
@@ -199,7 +199,7 @@ describe('the admin\'s step-up ops from a screen', () => {
     for (const e of declared) {
       const ran = [];
       const d = door({ catalogue, callSkill: async (app, op) => { ran.push(`${app}.${op}`); return { ok: true }; } });
-      const r = await d.call(e.appOrigin, e.op.id, { who: 'Bert', spec: 'Bert observer', passphrase: 'een lange genoeg zin', passphraseAgain: 'een lange genoeg zin' }, d.fromScreen);
+      const r = await d.call(e.appOrigin, e.op.id, { who: 'Bert', role: 'observer', spec: '5 7', passphrase: 'een lange genoeg zin', passphraseAgain: 'een lange genoeg zin' }, d.fromScreen);
       expect(r, `${e.appOrigin}.${e.op.id} from a screen`).toMatchObject({ ok: true, pending: true });
       expect(ran, `${e.appOrigin}.${e.op.id} ran before the yes`).not.toContain(`${e.appOrigin}.${e.op.id}`);
       expect(d.revoked.length + d.roles.length).toBe(0);

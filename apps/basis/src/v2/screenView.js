@@ -15,7 +15,7 @@
  * Pure composition: the secure agent is made by the shell (`makeAgent`, a persistent key for this browser), the
  * tokens are kept in the shell's storage. Nothing here touches a page.
  */
-import { DataPart } from '@onderling/core';
+import { DataPart, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
 import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS, screenAddressFor } from './botScreens.js';
 import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERED } from './screenStepUp.js';
@@ -25,6 +25,14 @@ import { SCREEN_NUDGE_SUBTYPE } from './screenNudge.js';
 export const SCREEN_OFFER_SUBTYPE = 'screen-offer';
 /** What the bot tells a screen whose offer was not taken (a wrong code, "none of these", too late, replaced). */
 export const SCREEN_REFUSED_SUBTYPE = 'screen-offer-refused';
+/**
+ * A screen waiting for its grant says it is there (it names nothing). The bot sends the grant hold-forward: when the
+ * screen cannot answer at that moment — a phone put the browser away while the person was in Telegram — the grant is
+ * held until the screen next speaks, and a screen on the paste route never spoke. Any message from it releases the hold.
+ */
+export const SCREEN_WAITING_SUBTYPE = 'screen-waiting';
+/** How often a waiting screen says it is there. */
+export const SCREEN_WAITING_EVERY_MS = param({ key: 'screen.waitingEveryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_000 });
 
 const storeKey = (botAddress) => `onderling.screen.${botAddress}`;
 const randomNonce = () => { const b = new Uint8Array(16); globalThis.crypto.getRandomValues(b); return [...b].map((x) => x.toString(16).padStart(2, '0')).join(''); };
@@ -77,6 +85,11 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
   // a call the bot holds for the person's yes: the screen waits its own ten minutes, then says "no answer" itself
   let waiting = null;
   const stopWaiting = () => { if (waiting) { clearTimer(waiting); waiting = null; } };
+  // while it waits for its grant, the screen says now and then that it is there (see SCREEN_WAITING_SUBTYPE)
+  let greeting = null;
+  const greet = () => { if (granted || !sa || !parsed.ok) return Promise.resolve(); return Promise.resolve(sa.peer.sendTo(parsed.botAddress, { subtype: SCREEN_WAITING_SUBTYPE })).catch(() => { /* the next one may reach */ }); };
+  const keepGreeting = () => { greeting = setTimer(() => { greeting = null; if (granted) return; greet(); keepGreeting(); }, SCREEN_WAITING_EVERY_MS); };
+  const stopGreeting = () => { if (greeting) { clearTimer(greeting); greeting = null; } };
   // the bot's nudge: something in the household changed (it names nothing; the screen reads again)
   const nudges = new Set();
   const noticeOf = ({ from, payload } = {}) => {
@@ -120,15 +133,17 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
           // not this pairing's (its tokens would fail at the door — confusion, not access — but it would look connected)
           if (from !== parsed.botAddress) return;
           if (noticeOf({ from, payload })) return;
-          if (payload?.subtype === SCREEN_REFUSED_SUBTYPE) { rejectGrant(new Error('refused')); return; }
+          if (payload?.subtype === SCREEN_REFUSED_SUBTYPE) { stopGreeting(); rejectGrant(new Error('refused')); return; }
           if (payload?.subtype !== CONNECTION_GRANT_SUBTYPE) return;
           const r = acceptConnectionGrant(payload, { nonce: parsed.nonce, viewPubKey });
           if (!r.ok) return;
           granted = { botAddress: parsed.botAddress, relayUrl: parsed.relayUrl, botName: parsed.botName ?? null, tokens: r.tokens, label: r.label ?? null };
           try { storage.setItem(storeKey(parsed.botAddress), JSON.stringify(granted)); } catch { /* kept for this visit only */ }
+          stopGreeting();
           resolveGrant(granted);
         },
       });
+      keepGreeting();
       const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label });
       const code = await screenCode(viewPubKey, parsed.nonce);
       if (parsed.pasteMode) return { code, offer };   // nothing sent: the person carries the offer to their own chat
@@ -164,6 +179,9 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
 
     /** Hear the bot's nudge (something in the household changed; it names nothing). Returns the unsubscribe. */
     onNudge(fn) { nudges.add(fn); return () => nudges.delete(fn); },
+
+    /** The page came back to the front while waiting: say it is there now (releases a grant held for it). */
+    stillHere: () => greet(),
 
     /** The ops this screen may call (`app.op`), from the grant. */
     ops: () => (granted?.tokens ?? []).map((t) => t.skill),

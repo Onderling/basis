@@ -14,6 +14,7 @@
  * gate about the caller's level.
  */
 import { MEMORY_MODES, THREAD_LANGS } from './botThreads.js';
+import { BOT_ROLES } from './botSettings.js';
 
 /** @type {import('@onderling/app-manifest').__types__} */
 export const assistantManifest = {
@@ -121,8 +122,11 @@ export const assistantManifest = {
       stepUp: 'private-door',
       // A person's role on the bot is on their contact row (the bot's people), the same words as a circle's roster.
       writes: { scope: 'device' },
-      // `<naam> coordinator|member|observer`
-      params: [{ name: 'spec', kind: 'string', required: true }],
+      // `/role <who> coordinator|member|observer` — who from the bot's people (the one read), the role a choice
+      params: [
+        { name: 'who', kind: 'string', required: true, pickerSource: { listOp: 'assistant-users', appOrigin: 'assistant' } },
+        { name: 'role', kind: 'enum', of: [...BOT_ROLES], required: true },
+      ],
       surfaces: { slash: { command: '/role', body: 'argline' } },
     },
     {
@@ -200,7 +204,7 @@ export const assistantManifest = {
       stepUp: 'private-door',
       // the person's contact row is hidden, which the book carries to the person's other devices
       writes: { scope: 'person' },
-      params: [{ name: 'who', kind: 'string', required: true }],
+      params: [{ name: 'who', kind: 'string', required: true, pickerSource: { listOp: 'assistant-users', appOrigin: 'assistant' } }],
       surfaces: { slash: { command: '/revoke', body: 'argline' } },
     },
     {

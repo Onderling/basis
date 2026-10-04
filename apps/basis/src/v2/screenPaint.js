@@ -9,9 +9,12 @@ import { composeAssistantCatalogue } from '../telegram/assistantCatalogue.js';
 import { botOpLevel } from './botOpMap.js';
 import { parseInput } from '../parser.js';
 import { resolveDispatch } from '../router.js';
+import { isLineOp } from './screenHousehold.js';
 
 const SECTION_OF = { lists: 'lists', tasks: 'chores', calendar: 'agenda', assistant: 'you' };
 const ORDER = ['lists', 'chores', 'agenda', 'you', 'admin'];
+/** On a management screen the admin's things come first (Frits, 2026-10-04); `/help` keeps the admin's last. */
+const SCREEN_ORDER = ['admin', 'lists', 'chores', 'agenda', 'you'];
 
 /**
  * @param {object} a
@@ -22,15 +25,16 @@ const ORDER = ['lists', 'chores', 'agenda', 'you', 'admin'];
  * @returns {Array<{section: string, title: string, items: Array<{skill: string, appOrigin: string, opId: string, label: string,
  *   params: object[], needsForm: boolean, confirm: object|null}>}>}
  */
-export function screenPanels({ ops, catalogue, isAdmin = () => false, t }) {
+export function screenPanels({ ops, catalogue, isAdmin = () => false, t, order = ORDER }) {
   const byKey = new Map();
   for (const [, entry] of catalogue?.opsById ?? []) {
     if (entry?.appOrigin && entry?.op?.id) byKey.set(`${entry.appOrigin}.${entry.op.id}`, entry);
   }
-  const groups = new Map(ORDER.map((s) => [s, []]));
+  const groups = new Map(order.map((s) => [s, []]));
   for (const skill of ops ?? []) {
     const entry = byKey.get(skill);
     if (!entry) continue;   // an op the screen's code does not know: not painted (a received manifest is a later step)
+    if (isLineOp(entry.op)) continue;   // it lives on its line (the household section), never as a standalone form
     const { appOrigin, op } = entry;
     const key = `circle.bot.help.ops.${appOrigin}.${op.id}`;
     const line = t(key);
@@ -45,7 +49,7 @@ export function screenPanels({ ops, catalogue, isAdmin = () => false, t }) {
       writes: Boolean(op.writes),
     });
   }
-  return ORDER.filter((s) => groups.get(s).length).map((s) => ({ section: s, title: t(`circle.bot.help.sections.${s}`), items: groups.get(s) }));
+  return order.filter((s) => groups.get(s).length).map((s) => ({ section: s, title: t(`circle.bot.help.sections.${s}`), items: groups.get(s) }));
 }
 
 
@@ -53,7 +57,46 @@ export function screenPanels({ ops, catalogue, isAdmin = () => false, t }) {
 export function screenPanelsForGrant(ops, t) {
   const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
   const isAdmin = (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibility === 'trusted' : botOpLevel(entry.op?.id) === 'trusted');
-  return screenPanels({ ops, catalogue, isAdmin, t });
+  return screenPanels({ ops, catalogue, isAdmin, t, order: SCREEN_ORDER });
+}
+
+/**
+ * What fills in a field on the screen: the field's declared source (`pickerSource: {listOp, appOrigin}` on the op's
+ * param — the read that lists its values) called through the screen's OWN grant, so it offers only what this person may
+ * read. A read the screen holds no token for offers nothing (it is not asked). Each item: its id the value, its words
+ * the label.
+ * @param {{call: (skill: string, args: object) => Promise<any>, ops: () => string[], appOrigin: string}} a
+ *   `appOrigin` — the field's own app, for a source that names none
+ * @returns {(decl: {listOp: string, appOrigin?: string, filter?: object}) => Promise<Array<{id: string, label: string}>>}
+ */
+export function screenPickerFetcher({ call, ops, appOrigin }) {
+  return async (decl) => {
+    const skill = `${decl?.appOrigin ?? appOrigin}.${decl?.listOp}`;
+    if (!decl?.listOp || !(ops() ?? []).includes(skill)) return [];
+    const r = await call(skill, decl.filter && typeof decl.filter === 'object' ? { ...decl.filter } : {});
+    const items = Array.isArray(r?.items) ? r.items : (Array.isArray(r?.entries) ? r.entries : (Array.isArray(r) ? r : []));
+    return items
+      .filter((i) => i && (i.id ?? i.webid) != null)
+      .map((i) => ({ id: String(i.id ?? i.webid), label: String(i.label ?? i.text ?? i.title ?? i.name ?? i.id ?? i.webid) }));
+  };
+}
+
+/**
+ * An action on a row (a person's role, a chore's new holder) whose op asks more than the row knows: the form for the
+ * rest, with what the row knows filled in — the dependent pick answered by context (Fable, the screen-fields brief).
+ * Null when nothing is missing (the action runs as it is), or when the screen's code does not know the op.
+ * @param {string} skill  `app.op`
+ * @param {object} args   what the row fills in
+ * @returns {{opId: string, appOrigin: string, params: object[], missing: string[], prefilled: object}|null}
+ */
+export function screenActionForm(skill, args = {}) {
+  const [appOrigin, opId] = String(skill ?? '').split('.');
+  let entry = null;
+  for (const [, e] of catalogueForScreen().opsById ?? []) { if (e?.appOrigin === appOrigin && e?.op?.id === opId) { entry = e; break; } }
+  if (!entry) return null;
+  const params = Array.isArray(entry.op.params) ? entry.op.params : [];
+  const missing = params.filter((p) => p?.required && (args?.[p.name] === undefined || args[p.name] === '')).map((p) => p.name);
+  return missing.length ? { opId, appOrigin, params, missing, prefilled: { ...args } } : null;
 }
 
 /** The bot's catalogue as the screen's code knows it (its own manifests), composed once. */

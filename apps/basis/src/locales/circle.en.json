@@ -7494,6 +7494,11 @@
       "rsvpTentative": "Maybe",
       "cancelEvent": "Cancel",
       "markListItemDone": "Done",
+      "reassignTask": "Give to someone else",
+      "editTask": "Edit",
+      "editEntry": "Edit",
+      "assistant-role": "Role",
+      "assistant-revoke": "Remove",
       "removeFromList": "Remove"
     },
     "household": "The household",

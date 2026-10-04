@@ -126,12 +126,12 @@ describe('a chore that says who and when', () => {
     const set = await call('assistant', 'assistant-settings', { change: 'assign anyone' });
     expect(set.message).toContain('"assign":"anyone"');
     expect((await call('assistant', 'assistant-settings', { change: 'assign everybody' })).ok).toBe(false);
-    // /role <naam> coordinator|member|observer — the admin gives a role; never admin, never an unknown word
+    // /role <who> <role> — the admin gives a role; never admin, never an unknown word
     const given = [];
     const withRole = withAssistantOps({ callSkill: inner, threads: null, t, admin: { setRole: async (who, role) => { given.push([who, role]); return { displayName: who, role }; } } });
-    expect((await withRole('assistant', 'assistant-role', { spec: 'Bert coordinator' })).message).toContain('circle.bot.role_set');
+    expect((await withRole('assistant', 'assistant-role', { who: 'Bert', role: 'coordinator' })).message).toContain('circle.bot.role_set');
     expect(given).toEqual([['Bert', 'coordinator']]);
-    expect((await withRole('assistant', 'assistant-role', { spec: 'Bert admin' })).ok).toBe(false);
+    expect((await withRole('assistant', 'assistant-role', { who: 'Bert', role: 'admin' })).ok).toBe(false);
   });
 
   it('a person with no name is named by the id the bot shows for them (/users)', async () => {

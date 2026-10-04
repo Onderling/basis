@@ -24,6 +24,7 @@
  *   TG_ALLOWED_CHAT_IDS      Telegram ids let in without a code (a bootstrap); everyone else needs an admin's code
  *   ONDERLING_PROFILE_KIND   `function` on a household bot's own node: its profile is the bot's, its inbox a door
  *   TG_ADMIN_UID             optional — the Telegram user id of the bot's admin; unset → the first person admitted
+ *   ONDERLING_TELEGRAM_API_ROOT optional — a Bot API server of one's own (Telegram's self-hosted one); default Telegram's
  *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            the web app: a household bot's screen and identity links go into it (the role defaults it to
@@ -78,6 +79,7 @@ import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js'
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
+import { createCommandMenus } from '../src/v2/botCommandMenu.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
@@ -786,6 +788,7 @@ if (tgToken || inboxDoor.bridge) {
   // running and deaf: the box says so and exits, and the container's restart policy starts it fresh.
   const tgBridge = tgToken ? new TelegramBridge({
     botToken: tgToken, mode: 'long-polling',
+    apiRoot: String(process.env.ONDERLING_TELEGRAM_API_ROOT ?? '').trim() || undefined,
     onPollingDown: ({ reason, error }) => {
       console.error(`device-runner: Telegram's long-poll ${reason}${error ? ` (${error?.message ?? error})` : ''} — exiting so the box restarts it`);
       try { walkLog({ kind: 'telegram-down', reason }); } catch { /* the exit below is what matters */ }
@@ -796,7 +799,12 @@ if (tgToken || inboxDoor.bridge) {
   const reminderSettings = () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)), lead: reminderLeadFrom(agent.getParamValue?.(REMINDER_LEAD_KEY)) });
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Every person is a contact with a role, and their calls carry them to the host gate.
-  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid });
+  // Telegram's menu lists, made once the door runs; a publish that fails is logged, never fatal (the commands still work typed)
+  const commandMenus = {
+    ref: null,
+    publish() { this.ref?.publish().then(() => walkLog({ kind: 'command-menu', ok: true }), (e) => walkLog({ kind: 'command-menu', ok: false, reason: String(e?.message ?? e).slice(0, 120) })); },
+  };
+  const botUsers = createBotUsers({ store: contactBookStore(callSkill), adminUid, onChange: () => commandMenus.publish() });
   // Admission by code: the signing secret in the bot's sealed vault, the cohort and spent codes in a sealed store.
   const admission = createBotAdmission({
     secretVault: chatVault,
@@ -1003,6 +1011,7 @@ if (tgToken || inboxDoor.bridge) {
       catalogue: doorCatalogue,
       users: () => botUsers.list(),
       admission,
+      // a role changed (or a person left): Telegram's menu lists what each role has again
       revoke: (who) => botUsers.revoke(who),
       setRole: (who, role) => botUsers.setRole(who, role),
       exports: exportShelf,
@@ -1078,13 +1087,19 @@ if (tgToken || inboxDoor.bridge) {
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
       basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
       // `/help` for a person: their language, grouped, the admin's commands last (their level on the bot's map)
-      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({
-        commandMenu, opsById, t: tp,
-        isAdmin: (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibility === 'trusted' : botOpLevel(entry.op?.id) === 'trusted'),
-      }),
+      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp }),
     } : {}),
   });
   await tgRunner.start();
+  // Telegram's "Menu" button beside the typing box: the commands of each person's role (what `/help` lists)
+  if (isFunctionProfile && tgBridge) {
+    commandMenus.ref = createCommandMenus({
+      setCommands: (commands, opts) => tgBridge.setCommands(commands, opts),
+      catalogue: doorCatalogue.catalogue, scopeToRole: scopeCatalogueToRole,
+      users: () => botUsers.list(), langOf: (id) => threads.langOf(id), t, lang: values.lang,
+    });
+    commandMenus.publish();
+  }
   // A household bot writes first, too: reminders of what people dated, on each person's own door (the tick asks the
   // projection every few minutes; the household's switch and quiet hours are the admin's settings).
   if (isFunctionProfile) {

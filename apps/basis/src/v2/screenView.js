@@ -33,6 +33,9 @@ export const SCREEN_REFUSED_SUBTYPE = 'screen-offer-refused';
 export const SCREEN_WAITING_SUBTYPE = 'screen-waiting';
 /** How often a waiting screen says it is there. */
 export const SCREEN_WAITING_EVERY_MS = param({ key: 'screen.waitingEveryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_000 });
+/** How long a screen waits after a menu's tap or a nudge before it reads the household again: a series of taps is one
+ *  read after the last, inside the bot's per-screen call budget (a read costs a call per list). */
+export const HOUSEHOLD_SETTLE_MS = param({ key: 'screen.householdSettleMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_500 });
 
 const storeKey = (botAddress) => `onderling.screen.${botAddress}`;
 const randomNonce = () => { const b = new Uint8Array(16); globalThis.crypto.getRandomValues(b); return [...b].map((x) => x.toString(16).padStart(2, '0')).join(''); };

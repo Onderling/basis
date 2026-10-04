@@ -34,14 +34,16 @@ export function personNamed(rows, nameOrId) {
  * @param {object} a
  * @param {{get: (id: string) => Promise<object|null>, put: (row: object) => Promise<object>, list: () => Promise<object[]>}} a.store
  * @param {string|null} [a.adminUid]  the uid (on any channel) the bot was started naming as its admin
+ * @param {() => void} [a.onChange]  told when someone comes, goes or gets another role (Telegram's menus follow it)
  */
-export function createBotUsers({ store, adminUid = null } = {}) {
+export function createBotUsers({ store, adminUid = null, onChange = null } = {}) {
   if (!store || typeof store.get !== 'function' || typeof store.put !== 'function' || typeof store.list !== 'function') {
     throw new TypeError('createBotUsers: a store with get/put/list is required');
   }
   // A door-shaped id for a keyless person (`telegram:<uid>`); a web person's id IS their webid (the contact row the
   // card made), so both doors reach the gate with the row's own id.
   const idOf = (channel, uid) => (channel === 'web' ? uid : `${channel}:${uid}`);
+  const changed = (out) => { try { onChange?.(); } catch { /* a listener must not undo the change */ } return out; };
 
   return {
     idOf,
@@ -61,13 +63,14 @@ export function createBotUsers({ store, adminUid = null } = {}) {
         // Admitted again after a revoke (a new code): the row comes back, with the role it had.
         const back = known.hidden ? { ...known, hidden: false } : known;
         if (known.hidden && typeof store.unhide === 'function') await store.unhide(id);
-        if ((name && name !== back.displayName) || back !== known) return store.put({ ...back, ...(name ? { displayName: name } : {}) });
+        if (back !== known) return changed(await store.put({ ...back, ...(name ? { displayName: name } : {}) }));
+        if (name && name !== back.displayName) return store.put({ ...back, displayName: name });
         return known;
       }
       const named = adminUid != null && String(adminUid) === u;
       const anyAdmin = (await store.list()).some((r) => r?.role === ROLES.ADMIN);
       const role = named || (adminUid == null && !anyAdmin) ? ROLES.ADMIN : ROLES.MEMBER;
-      return store.put({ id, type: 'contact', channel, uid: u, role, ...(name ? { displayName: name } : {}) });
+      return changed(await store.put({ id, type: 'contact', channel, uid: u, role, ...(name ? { displayName: name } : {}) }));
     },
     /** Every admitted person (a revoked one is not), in the order they were admitted. */
     async list() { return (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden); },
@@ -119,7 +122,7 @@ export function createBotUsers({ store, adminUid = null } = {}) {
       if (!want || !['coordinator', 'member', 'observer'].includes(role)) return null;
       const row = personNamed((await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden), want);
       if (!row || row.role === ROLES.ADMIN) return null;
-      return store.put({ ...row, role });
+      return changed(await store.put({ ...row, role }));
     },
     async revoke(nameOrId) {
       const want = String(nameOrId ?? '').trim();
@@ -128,7 +131,7 @@ export function createBotUsers({ store, adminUid = null } = {}) {
       if (!row) return null;
       if (typeof store.hide === 'function') await store.hide(row.id);
       else await store.put({ ...row, hidden: true });
-      return row;
+      return changed(row);
     },
     /** @param {string} contactId */
     async roleOf(contactId) { return (await store.get(contactId))?.role ?? null; },

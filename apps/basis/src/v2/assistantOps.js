@@ -98,7 +98,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       }
       // `/apps on tasks`: with no required param the router keeps the line as `_match` for the op to split.
       if (op === 'assistant-apps') return appsOp(args?.change ?? args?._match);
-      if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match);
+      if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match, caller ?? ctx?.threadId, caller, ctx);
       if (op === 'assistant-role') return roleOp(args?.who, args?.role);
       if (op === 'assistant-status') return { ok: true, message: await statusText() };
       if (op === 'assistant-users') { const items = await peopleFor(caller); return { ok: true, items, message: usersText(items) }; }
@@ -138,7 +138,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         const lang = args?.lang ?? args?._match;
         threads.setLang(threadId, lang);
         const tn = personT(threadId);
-        return { ok: true, message: lang === 'auto' ? tn('circle.bot.lang_auto') : tn('circle.bot.lang_set', { lang }) };
+        return { ok: true, message: lang === 'auto' ? tn('circle.bot.lang_auto') : tn('circle.bot.lang_set', { lang: tn(`circle.bot.value_${lang}`) }) };
       }
     } catch (err) {
       return { ok: false, error: { code: 'invalid-argument', message: err?.message ?? String(err) } };
@@ -222,7 +222,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: t('circle.bot.import_done', { ...r.done }) + (missed ? `\n${t('circle.bot.import_missed', { count: missed })}` : '') };
   }
 
-  async function settingsOp(change) {
+  async function settingsOp(change, person, caller, ctx) {
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
@@ -231,27 +231,32 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
     const usage = { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.settings_usage') } };
+    // the write's own answer decides: a refused set is said, never answered with the list as it was
+    const set = async (key, val) => {
+      const r = await callSkill('params', 'set-param', { key, value: val }).catch(() => null);
+      if (!r?.ok) return { ok: false, error: { code: 'not-saved', message: t('circle.bot.settings_failed') } };
+      // saved: the menu as it now stands (the new value ticked), as the person's view paints it
+      const menu = person ? await menuOp(person, caller, ctx) : null;
+      if (!menu?.ok) return { ok: true, message: await current() };
+      return { ...menu, message: `${personT(person)('circle.bot.settings_saved')}\n\n${menu.message}` };
+    };
     if (what === 'days') {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 0) return usage;
-      await callSkill('params', 'set-param', { key: PASSED_DAYS_KEY, value: n });
-      return { ok: true, message: await current() };
+      return set(PASSED_DAYS_KEY, n);
     }
     if (what === 'lead') {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 0 || n > 240) return usage;
-      await callSkill('params', 'set-param', { key: REMINDER_LEAD_KEY, value: n });
-      return { ok: true, message: await current() };
+      return set(REMINDER_LEAD_KEY, n);
     }
     if (what === 'quiet') {
       if (!isQuietHours(value)) return usage;
-      await callSkill('params', 'set-param', { key: QUIET_KEY, value });
-      return { ok: true, message: await current() };
+      return set(QUIET_KEY, value);
     }
     const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES] }[what];
     if (!setting || !setting[1].includes(value)) return usage;
-    await callSkill('params', 'set-param', { key: setting[0], value });
-    return { ok: true, message: await current() };
+    return set(setting[0], value);
   }
 
 

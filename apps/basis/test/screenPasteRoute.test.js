@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
-import { createBotScreens } from '../src/v2/botScreens.js';
+import { createBotScreens, screenCode } from '../src/v2/botScreens.js';
 import { encodePairingOffer } from '../src/v2/connectionPairing.js';
 import { EventLog } from '../src/eventLog.js';
 
@@ -15,9 +15,9 @@ const users = [{ id: 'telegram:9', channel: 'telegram', uid: '9', role: 'admin' 
 
 function door() {
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
-  const privately = []; const asked = [];
+  const privately = []; const asked = []; const grants = [];
   const screens = createBotScreens({
-    threads, isAdmitted: async () => true, columnOf: async () => ['lists.addToList'], grant: async () => ({ ok: true }), revokeView: async () => true, listGrants: async () => [],
+    threads, isAdmitted: async () => true, columnOf: async () => ['lists.addToList'], grant: async (g) => { grants.push(g); return { ok: true }; }, revokeView: async () => true, listGrants: async () => grants,
     sendPrivately: async (person, text) => { privately.push({ person, text }); return { ok: true }; },
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: 'wss://r', botName: '@b' }),
@@ -47,5 +47,16 @@ describe('the paste route at the door', () => {
     expect(ok.message).toContain('screen_paste_asked');
     expect(d.asked).toHaveLength(1);
     expect(d.asked[0].codes).toHaveLength(3);
+  });
+
+  it('connected: the yes says where the screen is from now on (its own link); /schermen says it again', async () => {
+    const d = door();
+    await d.as('telegram:9', 'assistant-screen-paste', { offer: encodePairingOffer({ viewPubKey: 'VIEWKEY', nonce: 'abc', label: 'laptop' }) });
+    const code = await screenCode('VIEWKEY', 'abc');
+    const done = await d.as('telegram:9', 'assistant-screen-confirm', { answer: code });
+    expect(done.ok, JSON.stringify(done)).toBe(true);
+    expect(done.message).toContain('https://basis.example/app/#scherm-bot=BOT');
+    const list = await d.as('telegram:9', 'assistant-screens');
+    expect(list.message).toContain('https://basis.example/app/#scherm-bot=BOT');
   });
 });

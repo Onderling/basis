@@ -17,7 +17,7 @@
  */
 import { DataPart } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
-import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS } from './botScreens.js';
+import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS, screenAddressFor } from './botScreens.js';
 import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERED } from './screenStepUp.js';
 import { SCREEN_NUDGE_SUBTYPE } from './screenNudge.js';
 
@@ -37,7 +37,7 @@ export function isScreenAddress(hash) {
   return /#scherm(?:-bot|-nieuw)?=/.test(String(hash ?? ''));
 }
 /** The address a screen keeps in its address bar once the link is read: the bot's, no secret. */
-export const screenAddressFor = (botAddress) => `#scherm-bot=${encodeURIComponent(botAddress)}`;
+export { screenAddressFor };
 
 /**
  * @param {object} a

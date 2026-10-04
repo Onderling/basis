@@ -8883,6 +8883,6 @@ async function boot() {
   showLauncher();
 }
 
-// A `/scherm` link opens the web app as a SCREEN for a household bot (no account, no person's agent): the screen shell
-// instead of the app.
-if (isScreenAddress(window.location.hash)) startScreenShell(window); else boot();
+// A `/scherm` link (or the bot's "Open het scherm" button inside Telegram) opens the web app as a SCREEN for a household
+// bot (no account, no person's agent): the screen shell instead of the app.
+if (isScreenAddress(window.location.hash, window.location.search)) startScreenShell(window); else boot();

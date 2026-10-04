@@ -48,15 +48,19 @@ import { Telegraf } from 'telegraf';
  * many buttons onto a single line and labels truncate.  Callers can
  * override by passing a 2D array, or by setting `row` on each button.
  *
- * @param {Array<{label: string, id: string, row?: number}> |
- *         Array<Array<{label: string, id: string}>>} buttons
- * @returns {Array<Array<{text: string, callback_data: string}>>}
+ * A button with `webApp` (a URL) opens that page inside Telegram (a Mini App) instead of sending a line back; Telegram
+ * allows that only in a private chat with the bot.
+ *
+ * @param {Array<{label: string, id?: string, webApp?: string, row?: number}> |
+ *         Array<Array<{label: string, id?: string, webApp?: string}>>} buttons
+ * @returns {Array<Array<{text: string, callback_data?: string, web_app?: {url: string}}>>}
  */
 export function layoutButtons(buttons) {
+  const one = (b) => (typeof b?.webApp === 'string' && b.webApp ? { text: b.label, web_app: { url: b.webApp } } : { text: b.label, callback_data: b.id });
   // 2D shape: caller specified explicit rows.
   if (buttons.length > 0 && Array.isArray(buttons[0])) {
     return /** @type {any} */ (buttons).map((row) =>
-      row.map((b) => ({ text: b.label, callback_data: b.id })));
+      row.map(one));
   }
   // `row` field present on any button → group by row index.
   const flat = /** @type {any} */ (buttons);
@@ -66,12 +70,12 @@ export function layoutButtons(buttons) {
     flat.forEach((b, idx) => {
       const r = typeof b.row === 'number' ? b.row : idx;
       if (!byRow.has(r)) byRow.set(r, []);
-      byRow.get(r).push({ text: b.label, callback_data: b.id });
+      byRow.get(r).push(one(b));
     });
     return [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r));
   }
   // Default: each button on its own row.
-  return flat.map((b) => [{ text: b.label, callback_data: b.id }]);
+  return flat.map((b) => [one(b)]);
 }
 
 /**

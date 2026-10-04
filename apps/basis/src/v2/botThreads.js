@@ -162,6 +162,12 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { screenOffer: _o, ...rest } = rowOf(id);
       return save(offer ? { ...rest, screenOffer: { viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label ?? null, until: offer.until } } : rest);
     },
+    /** The key of the person's screen opened inside Telegram (one per person: a new launch replaces it), or null. */
+    telegramScreenOf: (id) => rows.get(id)?.telegramScreen ?? null,
+    setTelegramScreen(id, viewPubKey) {
+      const { telegramScreen: _s, ...rest } = rowOf(id);
+      return save(viewPubKey ? { ...rest, telegramScreen: viewPubKey } : rest);
+    },
     /** Whose pending screen nonce has this hash (one pending per person), or null. */
     screenNonceOwner(hash) {
       for (const [id, r] of rows) if (r?.screenNonce?.hash === hash) return id;

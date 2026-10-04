@@ -12,12 +12,17 @@
  *   4. the screen acts by calling the bot's ops with those tokens (`sa.peer.invoke`) — the bot's door decides each call
  *      as the person, the same gate as their typed line.
  *
+ * Opened INSIDE Telegram (the "Open het scherm" button: `?scherm-tg=` with Telegram's `#tgWebAppData=`), there is no code:
+ * the offer carries the launch data Telegram signed (sealed to the bot, from this browser's key) and the grant follows.
+ * A webview that kept its grant resumes it.
+ *
  * Pure composition: the secure agent is made by the shell (`makeAgent`, a persistent key for this browser), the
  * tokens are kept in the shell's storage. Nothing here touches a page.
  */
 import { DataPart, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from './connectionPairing.js';
-import { parseScreenLink, parseScreenStartLink, screenCode, SCREEN_LINK_TTL_MS, screenAddressFor } from './botScreens.js';
+import { parseScreenLink, parseScreenStartLink, parseScreenLaunchLink, screenCode, SCREEN_LINK_TTL_MS, screenAddressFor } from './botScreens.js';
+import { launchDataFrom } from './telegramLaunch.js';
 import { SCREEN_STEP_UP_SUBTYPE, SCREEN_STEP_UP_TTL_MS, SCREEN_STEP_UP_UNANSWERED } from './screenStepUp.js';
 import { SCREEN_NUDGE_SUBTYPE } from './screenNudge.js';
 
@@ -44,8 +49,8 @@ const randomNonce = () => { const b = new Uint8Array(16); globalThis.crypto.getR
  * Is this address a screen's? `#scherm=<link>` (pairing: the one-time link) or `#scherm-bot=<address>` (a later visit:
  * the address bar keeps only the bot's address — the link's secret is removed as soon as it is read).
  */
-export function isScreenAddress(hash) {
-  return /#scherm(?:-bot|-nieuw)?=/.test(String(hash ?? ''));
+export function isScreenAddress(hash, search = '') {
+  return /#scherm(?:-bot|-nieuw)?=/.test(String(hash ?? '')) || /[?&]scherm-tg=/.test(String(search ?? ''));
 }
 /** The address a screen keeps in its address bar once the link is read: the bot's, no secret. */
 export { screenAddressFor };
@@ -64,6 +69,14 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
   // a later visit (`#scherm-bot=`): the bot's address, and the relay from the grant this browser kept
   const resolve = () => {
     const kept = /#scherm-bot=([^&]+)/.exec(String(link ?? ''));
+    // opened inside Telegram: the bot from the query, the person from Telegram's launch data
+    const launch = kept ? { ok: false } : parseScreenLaunchLink(link);
+    if (launch.ok) {
+      const rec = load(launch.botAddress);
+      if (rec) return { ok: true, botAddress: launch.botAddress, relayUrl: rec.relayUrl ?? launch.relayUrl, botName: launch.botName, nonce: null, resumeOnly: true };
+      const initData = launchDataFrom(String(link).replace(/^[^#]*/, ''));
+      return initData ? { ...launch, nonce: null, launchMode: true, initData } : { ok: false, reason: 'no-launch-data' };
+    }
     if (!kept) {
       // the paste route: the screen makes its own connect code (the person pastes it into their chat)
       const start = parseScreenStartLink(link);
@@ -108,7 +121,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
 
   return {
     /** What the link says (bot address, relay): `{ok, botAddress, relayUrl}` or `{ok: false, reason}`. No secret in it. */
-    get link() { return parsed.ok ? { ok: true, botAddress: parsed.botAddress, relayUrl: parsed.relayUrl, botName: parsed.botName ?? kept()?.botName ?? null, resumeOnly: Boolean(parsed.resumeOnly), pasteMode: Boolean(parsed.pasteMode) } : parsed; },
+    get link() { return parsed.ok ? { ok: true, botAddress: parsed.botAddress, relayUrl: parsed.relayUrl, botName: parsed.botName ?? kept()?.botName ?? null, resumeOnly: Boolean(parsed.resumeOnly), pasteMode: Boolean(parsed.pasteMode), launchMode: Boolean(parsed.launchMode) } : parsed; },
 
     /** A grant this browser already holds for this bot (a later visit), or null. */
     stored: () => (parsed.ok ? load(parsed.botAddress) : null),
@@ -126,7 +139,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
      */
     async connect({ label = null } = {}) {
       if (!parsed.ok || parsed.resumeOnly) throw new Error(`screenView: not a screen link (${parsed.reason ?? 'a kept grant resumes, it does not pair'})`);
-      if (parsed.pasteMode) parsed.nonce = randomNonce();
+      if (parsed.pasteMode || parsed.launchMode) parsed.nonce = randomNonce();
       sa = await makeAgent();
       const viewPubKey = sa.agent.pubKey;
       await sa.relay.connect({
@@ -147,6 +160,11 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
         },
       });
       keepGreeting();
+      // inside Telegram: the launch data Telegram signed is the proof — no code to pick
+      if (parsed.launchMode) {
+        await sa.peer.sendTo(parsed.botAddress, { subtype: SCREEN_OFFER_SUBTYPE, launch: { initData: parsed.initData, k: viewPubKey, n: parsed.nonce } });
+        return { code: null, launched: true };
+      }
       const offer = encodePairingOffer({ viewPubKey, relayUrl: parsed.relayUrl, nonce: parsed.nonce, label });
       const code = await screenCode(viewPubKey, parsed.nonce);
       if (parsed.pasteMode) return { code, offer };   // nothing sent: the person carries the offer to their own chat

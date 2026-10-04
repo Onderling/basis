@@ -58,6 +58,18 @@ export async function screenCode(viewPubKey, nonce) {
   return out;
 }
 
+/** A connected screen's own address, for a later visit (`#scherm-bot=<address>`): the browser resumes the grant it kept. */
+export const screenAddressFor = (botAddress) => `#scherm-bot=${encodeURIComponent(botAddress)}`;
+
+/**
+ * Where a person finds their screen again once it is connected: the app with the bot's address (no secret — only the
+ * browser that holds the grant opens it). Null without an app address.
+ */
+export function screenReopenLink(appUrl, botAddress) {
+  if (!appUrl || !botAddress) return null;
+  return `${String(appUrl).replace(/[#?].*$/, '').replace(/\/+$/, '')}/${screenAddressFor(botAddress)}`;
+}
+
 /** The `/scherm` link's fragment: the bot's address, its relay and the nonce. No authority — a screen still needs the grant. */
 export function encodeScreenLink(appUrl, { botAddress, relayUrl = null, nonce, botName = null }) {
   const body = b64url(JSON.stringify({ v: 1, b: botAddress, ...(relayUrl ? { r: relayUrl } : {}), n: nonce, ...(botName ? { m: botName } : {}) }));
@@ -204,7 +216,13 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       const r = await grant({ viewPubKey: offer.viewPubKey, ops, actingAs: person, label: offer.label, nonce: offer.nonce });
       if (r?.ok === false) return { ok: false, reason: r.error ?? 'grant-failed' };
       try { await notify?.(person, 'circle.bot.screen_connected', { n: ops.length }); } catch { /* the grant stands; /schermen shows it */ }
-      return { ok: true, person, ops };
+      return { ok: true, person, ops, reopen: this.reopenLink() };
+    },
+
+    /** Where the person's screens are, from now on: the app at this bot's address (null without an app address). */
+    reopenLink() {
+      const { appUrl, botAddress } = where() ?? {};
+      return screenReopenLink(appUrl, botAddress);
     },
 
     /** `/schermen`: this person's screens, numbered as `/schermen los <n>` names them. */

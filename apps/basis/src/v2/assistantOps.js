@@ -450,7 +450,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     const isPrivate = Boolean(row) && (row.channel !== 'telegram' || isOwnTelegramChat(ctx?.chatId, row.uid));
     const r = await admin.screens.confirm(person, answer, { isPrivate });
-    if (r.ok) return { ok: true, message: tp(r.declined ? 'circle.bot.screen_declined' : 'circle.bot.screen_confirmed') };
+    if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.screen_declined') };
+    // connected: and where the screen is from now on (the page itself became it; this link brings it back)
+    if (r.ok) return { ok: true, message: r.reopen ? tp('circle.bot.screen_confirmed_open', { link: r.reopen }) : tp('circle.bot.screen_confirmed') };
     const key = { 'not-private': 'screen_confirm_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'screen_confirm_nothing' }[r.reason] ?? 'screen_confirm_failed';
     return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
   }
@@ -686,7 +688,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const list = await admin.screens.list(person);
     if (!list.length) return { ok: true, message: tp('circle.bot.screens_none') };
     const rows = list.map((g, i) => tp('circle.bot.screens_row', { i: i + 1, label: g.label ?? 'scherm', n: (g.ops ?? []).length }));
-    return { ok: true, message: tp('circle.bot.screens_list', { list: rows.join('\n') }) };
+    const reopen = typeof admin.screens.reopenLink === 'function' ? admin.screens.reopenLink() : null;
+    return { ok: true, message: [tp('circle.bot.screens_list', { list: rows.join('\n') }), ...(reopen ? [tp('circle.bot.screens_open', { link: reopen })] : [])].join('\n') };
   }
 
   async function usersText() {

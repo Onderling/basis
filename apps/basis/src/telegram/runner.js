@@ -18,6 +18,7 @@
  * production, the in-memory one in tests), any `callSkill`.
  */
 import { parseInput }      from '../parser.js';
+import { commandForBareOffer } from '../v2/doorOffers.js';
 import { resolveDispatch } from '../router.js';
 import { runDispatch }     from '../dispatch.js';
 import { doorDisclosure } from '../v2/turnLog.js';
@@ -447,7 +448,10 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
   /** One incoming line: pairing, then the chat's lane. Resolves when the line's turn is done. */
   async function handle(msg) {
     const chatId = String(msg?.chatId ?? '');
-    const text = String(msg?.text ?? '').trim();
+    // an offer pasted alone (a screen's code, an app's link offer) is its command — the command word is not a second
+    // thing a person must copy right
+    const raw = String(msg?.text ?? '').trim();
+    const text = commandForBareOffer(raw) ?? raw;
     if (!chatId || !text) return;
     // A door that admits people decides who may talk (a code, its bootstrap ids); without one, the chat allow-list.
     if (typeof admit !== 'function' && !open && !allowed.has(chatId)) { await say(chatId, tc(chatId)('circle.telegram.not_paired', { chatId })); return; }

@@ -597,6 +597,23 @@ describe('member-props — a member\'s own display fields, folded onto their row
     expect(r.props[bob.pubKey].handle, 'the join\'s handle is not').toBeUndefined();
   });
 
+  // The LAST exit of each subject, in the fold's own order (2026-10-04): a rejoin is decided by it — left last, they
+  // may join again on an invite they hold; removed last, they need a new one.
+  it('lastExit: the kind of each subject\'s latest exit at the fold\'s depth — an evict, then a re-admission and a leave, is a leave', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { peerDisplay: 'bob' } });
+    const evict = body(founder, 'evict', bob, { deps: [join.hash] });
+    const r1 = foldRoster([join, evict], { founders: [founder.pubKey] });
+    expect(r1.lastExit[bob.pubKey]).toBe('evict');
+    const rejoin = body(founder, 'join', bob, { payload: { peerDisplay: 'bob' }, parent: evict.hash });
+    const leave = body(bob, 'leave', bob, { parent: join.hash, deps: [rejoin.hash] });
+    const r2 = foldRoster([join, evict, rejoin, leave], { founders: [founder.pubKey] });
+    expect(r2.members).not.toContain(bob.pubKey);
+    expect(r2.lastExit[bob.pubKey]).toBe('leave');
+    const r0 = foldRoster([join], { founders: [founder.pubKey] });
+    expect(r0.lastExit[bob.pubKey]).toBeUndefined();
+  });
+
   // What KIND of member this is, said by the member itself (2026-10-04): a household bot says `function`, so the circle
   // paints it a bot and a person's local assistant stays quiet for its name. Self-said, not an authority.
   it('kind: a member says what it is (person | function) on its own row; another word refuses the WHOLE statement', async () => {

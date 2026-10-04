@@ -101,7 +101,7 @@ export async function redeemMembershipCode({
   const limit = await inviteRedemptionVerdict({
     store, groupId: a.groupId, codeItem: valid, requesterWebid: from,
   });
-  if (!limit.allow) return { error: INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
+  if (!limit.allow) return { error: limit.error ?? INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
   if (limit.already) {
     return {
       redemptionId: limit.already.id,
@@ -267,7 +267,7 @@ export async function verifyMembershipCodeForPeer({
   });
   if (!limit.allow) {
     metrics?.record?.('group-code-redeem-refused-limit');
-    return { error: INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
+    return { error: limit.error ?? INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
   }
 
   // Wave B (SENSITIVE) — the peer path's copy of the cross-circle link proof check

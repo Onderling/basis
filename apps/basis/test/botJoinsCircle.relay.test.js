@@ -111,6 +111,20 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(JSON.stringify(walkLog(dataDir))).not.toContain('samen het huis');
     const offAnn = await until(async () => (!botOnRoster(await readRoster(ann, CIRCLE)) ? true : null), { timeout: 30_000, step: 500 });
     expect(offAnn, `the bot is still on Ann's roster after it left: ${JSON.stringify((await readRoster(ann, CIRCLE)).map((m) => m.handle))} · bot walk log: ${JSON.stringify(walkLog(dataDir).slice(-12).map((e) => e.kind + (e.type ? ':' + e.type : '')))} · Ann's log: ${JSON.stringify(ann.deviceLog?.query?.({}).filter((e) => e.circleId === CIRCLE).map((e) => e.type + ':' + (e.payload?.body?.kind ?? e.payload?.kind ?? '')))}`).toBe(true);
+
+    // …and invited again to the SAME circle: it is back on the roster (a member who left joins again — ledger L193)
+    const again = await buildCircleInviteUri({ callSkill: (a, o, x) => ann.agent.callSkill(a, o, x), circleId: CIRCLE, adminPeerAddr: ann.pubKey });
+    const n2 = (await botTurns(ann)).length;
+    await send(`/kring ${again.uri}`);
+    const q2 = await until(async () => (await botTurns(ann)).slice(n2).find((t) => /\/kring ja \S+/.test(t.text ?? '')) ?? null, { timeout: 30_000, step: 500 });
+    expect(q2, 'no question for the rejoin').toBeTruthy();
+    await send(/\/kring ja \S+/.exec(q2.text)[0].replace(/\)$/, ''));
+    const backOnAnn = await until(async () => (botOnRoster(await readRoster(ann, CIRCLE)) ? true : null), { timeout: 60_000, step: 500 });
+    expect(backOnAnn, `the bot did not come back on Ann's roster. The bot said: ${JSON.stringify((await botTurns(ann)).slice(n2).map((t) => t.text))}`).toBe(true);
+    const n3 = (await botTurns(ann)).length;
+    await send('/kring los Huize Rood');
+    // the bot says it left only after it forgot the circle: the next case counts forgets from here
+    await until(async () => ((await botTurns(ann)).slice(n3).some((t) => /is uit “Huize Rood”/.test(t.text ?? '')) ? true : null), { timeout: 60_000, step: 500 });
   }, 240_000);
 
   it('removed by the circle\'s admin: the box forgets the circle and its record of it goes', async () => {
@@ -132,9 +146,9 @@ describe('the bot joins a circle on its admin\'s word', () => {
 
     const removed = await removeCircleMember({ agent: ann.agent, circleId: BLUE, memberWebid: row.webid });
     expect(removed.ok, JSON.stringify(removed)).toBe(true);
-    const gone = await until(async () => (walkLog(dataDir).some((e) => e.kind === 'circle-removed' && e.ok) ? true : null), { timeout: 60_000, step: 500 });
+    const gone = await until(async () => (walkLog(dataDir).some((e) => e.kind === 'circle-removed' && e.ok && e.circleId === BLUE.slice(0, 12)) ? true : null), { timeout: 60_000, step: 500 });
     expect(gone, `the box did not notice its removal. Walk log: ${JSON.stringify(walkLog(dataDir).filter((e) => /circle/.test(e.kind)))}`).toBe(true);
-    expect(walkLog(dataDir).filter((e) => e.kind === 'circle-forgotten').length).toBe(forgotBefore + 1);
+    expect(walkLog(dataDir).filter((e) => e.kind === "circle-forgotten").length, JSON.stringify(walkLog(dataDir).filter((e) => /circle-(forgotten|removed|said)/.test(e.kind)))).toBe(forgotBefore + 1);
     const n = (await botTurns(ann)).length;
     await send('/kringen');
     expect(await until(async () => ((await botTurns(ann)).slice(n).some((t) => /in geen enkele kring/.test(t.text ?? '')) ? true : null), { timeout: 30_000, step: 500 })).toBe(true);

@@ -857,6 +857,12 @@ export async function finalSubmit({
       state.submitError = err?.message ?? String(err);
       state.submitErrorKey = 'circle.invite.limit_reached';
       state.submitErrorReason = 'invite-redemption-limit-reached';
+    } else if (/removed-from-circle/.test(String(err?.message ?? ''))) {
+      // The admin removed this person from the circle; the invite they kept does not undo that. A new invite from an
+      // admin is the way back — said, never "joined".
+      state.submitError = err?.message ?? String(err);
+      state.submitErrorKey = 'circle.invite.removed_from_circle';
+      state.submitErrorReason = 'removed-from-circle';
     } else if (err?.reason === 'admin-unreachable') {
       // J-NP2 — a notice, not a failure verdict: no admin was online, the invitation stays valid, try
       // again later. The state keeps the decoded invite, so retrying is the same wizard, same step.

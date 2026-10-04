@@ -70,5 +70,39 @@ describe('a member who left joins again', () => {
     expect(again.joined?.ok, JSON.stringify(again.joined)).not.toBe(true);
     expect(JSON.stringify(again.joined)).toContain('removed-from-circle');
     expect((await readRoster(ann, CIRCLE)).some((m) => m.handle === 'cas')).toBe(false);
+
+    // …the way back is a NEW invite: Cas joins on it, leaves, and joins again on that same invite — the LATEST exit is
+    // the leave, so the earlier removal does not count against them any more
+    const rotated = await ann.agent.callSkill('stoop', 'rotateMyGroupCode', { groupId: CIRCLE });
+    expect(rotated?.code, JSON.stringify(rotated)).toBeTruthy();
+    const back = await joinExistingCircle(ann, cas, { groupId: CIRCLE, handle: 'cas' });
+    expect(back.joined?.ok, JSON.stringify(back.joined)).toBe(true);
+    await makeCircleReachable({
+      agent: cas.agent, circleId: CIRCLE,
+      registerCirclePresence: async () => { await primeCircleSecurity({ agent: cas.agent, circleIds: [CIRCLE] }); await bindCircleAddresses([cas], CIRCLE); },
+      pullLanes: (cid) => cas.membershipCatchUp?.requestCircle(cid, { callSkill: (a, o, x) => cas.agent.callSkill(a, o, x) }),
+    });
+    await bindCircleAddressKeysFor({ agent: ann.agent, circleId: CIRCLE });
+    const casOn = async () => (await readRoster(ann, CIRCLE)).some((m) => m.handle === 'cas');
+    expect(await until(async () => ((await casOn()) ? true : null), { timeout: 10_000, step: 100 }), 'Cas is not back on the new invite').toBe(true);
+    const left = await leaveCircleLocally({ agent: cas.agent, circleId: CIRCLE });
+    expect(left.ok).toBe(true);
+    expect(await until(async () => (!(await casOn()) ? true : null), { timeout: 10_000, step: 100 }), 'Cas\'s leave never reached Ann').toBe(true);
+    const rejoined = await joinExistingCircle(ann, cas, { groupId: CIRCLE, handle: 'cas' });
+    expect(rejoined.joined?.ok, JSON.stringify(rejoined.joined)).toBe(true);
+    expect(await until(async () => ((await casOn()) ? true : null), { timeout: 10_000, step: 100 }), `Cas is not back after leaving: ${JSON.stringify((await readRoster(ann, CIRCLE)).map((m) => m.handle))}`).toBe(true);
   }, 120_000);
+
+  it('a CURRENT member redeeming again: the idempotent answer, and no new statement', async () => {
+    const joinsOnAnn = () => (ann.deviceLog?.query?.({}) ?? []).filter((e) => e.circleId === CIRCLE && e.payload?.body?.kind === 'join').length;
+    // (the invite was renewed above: Bob redeems the current one once — a new invite is a new redemption — then again)
+    await joinExistingCircle(ann, bob, { groupId: CIRCLE, handle: 'bob' });
+    await new Promise((r) => setTimeout(r, 500));
+    const before = joinsOnAnn();
+    const again = await joinExistingCircle(ann, bob, { groupId: CIRCLE, handle: 'bob' });
+    expect(again.joined?.ok, JSON.stringify(again.joined)).toBe(true);
+    await new Promise((r) => setTimeout(r, 500));
+    expect(joinsOnAnn()).toBe(before);
+    expect((await readRoster(ann, CIRCLE)).some((m) => m.handle === 'bob')).toBe(true);
+  }, 60_000);
 });

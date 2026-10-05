@@ -317,8 +317,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The active circle (shell-supplied) scopes a household call when the chat args don't carry one
   // (read verbs like listOpen aren't auto-scoped by the dispatch). circleId in args still wins.
   const getActiveHouseholdCircleId = typeof opts.getActiveCircleId === 'function' ? opts.getActiveCircleId : () => null;
+  // The circle a call means when it names none: a household bot's own circle (its id is derived from the bot's key once
+  // the identity is up, below), else the legacy bucket.
+  let homeCircleId = 'household';
   function resolveCircleId(args) {
-    return (args?.circleId ?? args?.circleId ?? args?.groupId ?? getActiveHouseholdCircleId()) || 'household';
+    return (args?.circleId ?? args?.circleId ?? args?.groupId ?? getActiveHouseholdCircleId()) || homeCircleId;
   }
   // cluster L · L3 — household is now the UNIFORM wired path by DEFAULT (the legacy agent is retired).
   // Household ops route to the dissolved pure cores (`v2/householdApp.js`) over the per-circle
@@ -838,6 +841,19 @@ export async function createRealHouseholdAgent(opts = {}) {
   registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+  // A household bot's circle id is its own, derived from its key (`tasksCircleId` is then a function of it). Its rows
+  // from before (under the bare `household` id) move there ONCE, beneath the store: item ids unchanged, nothing fanned;
+  // a second boot finds the circle holding rows and moves nothing.
+  const botHouseholdId = typeof opts.tasksCircleId === 'function' ? opts.tasksCircleId(chatId.pubKey) : null;
+  let householdCircleMove = null;
+  if (botHouseholdId) {
+    homeCircleId = botHouseholdId;
+    const rows = await householdService.stores.rename('household', botHouseholdId);
+    // rows still under `household` once the circle holds rows (an older version wrote there again): never merged
+    // over the circle's own; counted, so the box says so
+    const leftover = rows ? 0 : await householdService.stores.count('household');
+    if (rows || leftover) householdCircleMove = { from: 'household', to: botHouseholdId, rows, ...(leftover ? { leftover } : {}) };
+  }
   // A token this agent mints (a screen's grant) is checked at its own door, which wants the issuer at `trusted` in
   // this registry — the kernel's documented enablement step. On every agent now that the door ALLOWS only surface
   // tokens active on the grants lane (`isAllowed` below): a token signed off the record with this key — a revoked
@@ -1760,7 +1776,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       return [DataPart({ ok: false, error: 'name required' })];
     }
     try {
-      await householdService.stores.getStore('household').put(
+      await householdService.stores.getStore(homeCircleId).put(
         { type: 'contact', text: name, addedBy: from ?? 'webid:local-demo-user' },
         { by: from ?? 'webid:local-demo-user' },
       );
@@ -1777,7 +1793,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // id-prefix / keyword) from the store and shapes it as an ItemSnapshot.
   hostAgent.register('getChoreSnapshot', async ({ parts }) => {
     const id = String(parts?.[0]?.data?.choreId ?? '').trim();
-    const open = await householdApp.listOpen(householdService.stores.getStore('household'), {});
+    const open = await householdApp.listOpen(householdService.stores.getStore(homeCircleId), {});
     const target = open.find((it) => it.id === id)
       ?? (id.length >= 4 ? open.find((it) => it.id.startsWith(id.toUpperCase())) : null)
       ?? open.find((it) => it.text.toLowerCase().includes(id.toLowerCase()));
@@ -3096,7 +3112,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // out of the box.  Deterministic order (added oldest-first); skip via
   // opts.seedHousehold:false (clean-slate fixtures).
   if (opts.seedHousehold !== false) {
-    const seedStore = householdService.stores.getStore('household');
+    const seedStore = householdService.stores.getStore(homeCircleId);
     for (const seed of SEED_HOUSEHOLD_ITEMS) {
       try {
         await householdApp.addItem(seedStore, { type: seed.type, text: seed.text }, { by: 'webid:local-demo-user' });
@@ -3131,7 +3147,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // WHICH CIRCLE the tasks engine runs in when the shell names none. An engine is verbs over the circle's ONE store,
   // not a store of its own: on the bot (`tasksCircleId`, the box) its tasks are the household circle's, so a task
   // on a list (Klusjes) is the engine's to list, claim and complete. The painting shells keep their own default.
-  const tasksDefaultCircleId = (typeof opts.tasksCircleId === 'string' && opts.tasksCircleId) ? opts.tasksCircleId : 'cc-default';
+  const tasksDefaultCircleId = botHouseholdId ?? ((typeof opts.tasksCircleId === 'string' && opts.tasksCircleId) ? opts.tasksCircleId : 'cc-default');
   const tasksCircle = await createBrowserMultiCircleTasksAgent({
     bus,
     // the host that may vouch for a door's person (`actor`): its caller here is the owner's chat agent
@@ -5941,7 +5957,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // L3 — reset/state operate on the wired per-circle CircleItemStore (the live household data).
     // `reset()` wipes every open item + reseeds the demo items; `state()` returns the current open items.
     async reset() {
-      const store = householdService.stores.getStore('household');
+      const store = householdService.stores.getStore(homeCircleId);
       const open = await householdApp.listOpen(store, {});
       for (const it of open) {
         try { await store.delete(it.id); } catch { /* defensive */ }
@@ -5954,7 +5970,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
     },
     async state() {
-      try { return await householdApp.listOpen(householdService.stores.getStore('household'), {}); }
+      try { return await householdApp.listOpen(householdService.stores.getStore(homeCircleId), {}); }
       catch { return []; }
     },
     meta: {
@@ -6415,7 +6431,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * @returns {Promise<{ok: boolean, rows?: number, entries?: number, reason?: string}>}
      */
     forgetCircleContent: async (circleId) => {
-      if (typeof circleId !== 'string' || !circleId || circleId === 'household') return { ok: false, reason: 'not-a-joined-circle' };
+      if (typeof circleId !== 'string' || !circleId || circleId === 'household' || circleId === homeCircleId) return { ok: false, reason: 'not-a-joined-circle' };
       let rows = await householdService.stores.forget(circleId);
       // …and the legacy per-circle bucket the peer mirror kept, if it ever held this circle
       if (householdDataSource) {
@@ -6432,10 +6448,13 @@ export async function createRealHouseholdAgent(opts = {}) {
      * Every item of the household's store, as stored (the export writes its public fields from these). The household,
      * by name: a circle the bot joined is never in its export, whatever circle a shell calls active.
      */
-    householdItems: async () => (await householdService.stores.getStore('household').list()) ?? [],
+    /** A household bot's circle id (derived from its key), and what its first boot of this version moved there. */
+    householdCircleId: botHouseholdId,
+    householdCircleMove,
+    householdItems: async () => (await householdService.stores.getStore(homeCircleId).list()) ?? [],
     /** A household bot's reminders read the household's chores and appointments, whole (dates, who comes) — never a joined circle's. */
     reminderSources: async () => {
-      const store = householdService.stores.getStore('household');
+      const store = householdService.stores.getStore(homeCircleId);
       const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
       return { chores: chores ?? [], events: events ?? [] };
     },

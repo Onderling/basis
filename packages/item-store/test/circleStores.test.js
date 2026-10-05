@@ -53,6 +53,32 @@ describe('createCircleStores (L1 integration)', () => {
     expect(removed).toEqual([]);                         // a local forget is not a removal any member hears of
   });
 
+  it('rename moves ONE circle\'s rows to a new id, item ids unchanged, no hook fired; never onto a circle that holds rows', async () => {
+    const ds = memoryDataSource();
+    const f = createCircleStores({ dataSource: ds, registry });
+    const fired = [];
+    const a = await f.getStore('A').put({ type: 'task', text: 'in A' });
+    await f.getStore('A').put({ type: 'note', text: 'also A' });
+    await f.getStore('C').put({ type: 'task', text: 'in C' });
+    f.getStore('A').setSyncHook({ publishItemRemoved: (id) => fired.push(id), publishItem: (id) => fired.push(id) });
+    expect(await f.rename('A', 'B')).toBe(2);
+    expect(f.has('A')).toBe(false);
+    expect([...ds._map.keys()].some((k) => k.includes('/circles/A/'))).toBe(false);
+    const moved = await f.getStore('B').list();
+    expect(moved.map((i) => i.text).sort()).toEqual(['also A', 'in A']);
+    expect(moved.map((i) => i.id)).toContain(a.id ?? a.item?.id ?? a);
+    expect(fired).toEqual([]);
+    // nothing to move, or a target that already holds rows: 0, nothing touched
+    expect(await f.rename('A', 'B')).toBe(0);
+    expect(await f.rename('C', 'B')).toBe(0);
+    expect((await f.getStore('C').list()).map((i) => i.text)).toEqual(['in C']);
+    // what a refused rename leaves behind is countable (the box logs it)
+    expect(await f.count('C')).toBe(1);
+    expect(await f.count('A')).toBe(0);
+    await expect(f.rename('', 'B')).rejects.toThrow();
+    await expect(f.rename('C', 'C')).rejects.toThrow();
+  });
+
   it('forget refuses an empty id and is 0 for a circle never opened', async () => {
     const f = createCircleStores({ dataSource: memoryDataSource(), registry });
     await expect(f.forget('')).rejects.toThrow();

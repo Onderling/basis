@@ -3767,8 +3767,28 @@
       "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
     },
     "list_removed": {
-      "text": "De lijst \"{{name}}\" is weg.",
+      "text": "De lijst \"{{name}}\" is weg. Terugzetten kan nog {{days}} dagen: /list-restore {{name}}",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "restore_none": {
+      "text": "Er is geen weggehaalde lijst om terug te zetten.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "restore_offer": {
+      "text": "Deze lijsten kunnen terug (tik er een aan):",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "restore_not_found": {
+      "text": "Ik vind geen weggehaalde lijst \"{{name}}\" (meer). Zeg /list-restore om te zien welke terug kunnen.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "restore_name_taken": {
+      "text": "Er is al een lijst \"{{name}}\". Geef die eerst een andere naam, dan zet ik de oude terug.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "list_restored": {
+      "text": "De lijst \"{{name}}\" is terug, met {{count}} dingen erop.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
     },
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — opgepakt",
@@ -4392,6 +4412,7 @@
           "removeFromList": "iets van een lijst halen",
           "editEntry": "de woorden van een regel veranderen",
           "createList": "een nieuwe lijst",
+          "restoreList": "een weggehaalde lijst terugzetten (binnen 30 dagen)",
           "removeList": "een hele lijst weggooien"
         },
         "tasks": {

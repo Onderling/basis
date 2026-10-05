@@ -21,6 +21,7 @@ import { NEIGHBOURHOOD_JOB_SCHEMA } from './types/neighbourhood-job.js';
 import { VIEW_SCHEMA }              from './types/view.js';
 import { CIRCLE_SCHEMA }            from './types/circle.js';
 import { SHARED_REF_SCHEMA }        from './types/shared-ref.js';
+import { REMOVED_LIST_SCHEMA }      from './types/removed-list.js';
 import { MEDIA_SCHEMA }             from './types/media.js';
 import { INBOX_ITEM_SCHEMA }        from './types/inbox-item.js';
 
@@ -78,6 +79,7 @@ export const CANONICAL_TYPES = Object.freeze({
   'circle':             CIRCLE_SCHEMA,
   // cross-circle per-item share reference.
   'shared-ref':         SHARED_REF_SCHEMA,
+  'removed-list':       REMOVED_LIST_SCHEMA,
   // Media Phase 1 (2026-07-09): canonical media noun — points at a
   // blob-gateway manifest line (or any embeds-shaped ref); no bytes.
   'media':              MEDIA_SCHEMA,

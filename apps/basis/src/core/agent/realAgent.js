@@ -248,7 +248,7 @@ import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
 import { botDoorChecks } from '../../v2/botRungs.js';                                            // the bot door's checks, declared once
-import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
+import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
@@ -3989,7 +3989,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     const checks = botDoorChecks({
       checkCaller: (q) => engine.checkCaller(q),
       opLevel: typeof opts.doorOpLevel === 'function' ? opts.doorOpLevel : null,
-      roleAllows: typeof opts.doorRoleAllows === 'function' ? opts.doorRoleAllows : null,
+      // what a role reaches follows the bot's one roles preset (`assistant.roles`), the same the menus read
+      roleAllows: typeof opts.doorRoleAllows === 'function' ? (role, op) => opts.doorRoleAllows(role, op, rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY))) : null,
       roleOf: (c) => doorRoles.get(c) ?? null,
     });
     return firstRefusal(checks, { opId, caller, visibility });
@@ -4762,7 +4763,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A household bot's appointment is cancelled by the one who added it, or the admin — unless the admin keeps that
     // to themselves (`assistant.cancelPolicy`). The op's rule and the door's setting refuse in the one shape.
     if (appOrigin === 'calendar' && opId === 'cancelEvent' && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
-        && doorRoles.get(ctx.caller) !== 'admin') {
+        && doorRoles.get(ctx.caller) !== 'admin'
+        // under the `flat` roles preset, members and coordinators cancel anyone's appointment, as the admin does
+        && !(rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY)) === 'flat' && ['member', 'coordinator'].includes(doorRoles.get(ctx.caller)))) {
       const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
       // (in a circle the standard rule only: the one who added it, or the circle's admin — no household setting)
       if (!doorCircleOf(ctx) && cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {

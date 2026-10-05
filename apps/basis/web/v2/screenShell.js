@@ -116,7 +116,7 @@ export async function startScreenShell(win = window) {
       ...(h.people ? [el('h3', {}, t('circle.connectScreen.people')), el('ul', { 'data-household': 'people' }, ...h.people.map((p) => {
         const form = el('div', { class: 'screen-form' });
         return el('li', { 'data-person': p.id },
-          el('span', {}, `${p.label} — ${p.role ?? '?'}`), ' ',
+          el('span', {}, `${p.label} — ${p.roleWord ?? p.role ?? '?'}`), ' ',
           ...p.actions.map((a) => el('button', { type: 'button', 'data-action': a.skill, onclick: () => act(a, form) }, a.label)), form);
       }))] : []),
     );

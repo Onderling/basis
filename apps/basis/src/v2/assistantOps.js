@@ -8,7 +8,7 @@ import { personNamed } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
-import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 import { peopleRows } from './botPeople.js';
 import { isOwnTelegramChat } from './doorBridges.js';
@@ -55,6 +55,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     ['passed', PASSED_KEY, PASSED_POLICIES, passedPolicyFrom], ['cancel', CANCEL_KEY, CANCEL_POLICIES, cancelPolicyFrom],
     ['reminders', REMINDERS_KEY, REMINDERS_MODES, remindersModeFrom],
     ['usage', USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom],
+    ['roles', ROLES_KEY, ROLES_PRESETS, rolesPresetFrom],
   ];
   const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
   /** An op's declared step-up, from the door's catalogue (any app), else the door's own manifest. */
@@ -103,9 +104,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-settings') return settingsOp(args?.change ?? args?._match, caller ?? ctx?.threadId, caller, ctx);
       if (op === 'assistant-role') return roleOp(args?.who, args?.role);
       if (op === 'assistant-status') return { ok: true, message: await statusText() };
-      if (op === 'assistant-users') { const items = await peopleFor(caller); return { ok: true, items, message: usersText(items) }; }
+      if (op === 'assistant-users') {
+        const preset = rolesPresetFrom(await userParam(ROLES_KEY));
+        // each row also carries the word a person reads for its role (under flat: "lid" for a member and a coordinator)
+        const items = (await peopleFor(caller)).map((it) => ({ ...it, roleWord: roleWordFor(it.role, preset) }));
+        return { ok: true, items, message: usersText(items, preset) };
+      }
       if (op === 'assistant-cohort') return cohortOp(args?.spec ?? args?._match);
-      if (op === 'assistant-invite') return inviteOp();
+      if (op === 'assistant-invite') return inviteOp(args?.role ?? args?._match);
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
       if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller, ctx);
@@ -229,7 +235,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: reminderLeadFrom(of(REMINDER_LEAD_KEY)), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)) });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: reminderLeadFrom(of(REMINDER_LEAD_KEY)), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)) });
     };
     const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
@@ -238,10 +244,13 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const set = async (key, val) => {
       const r = await callSkill('params', 'set-param', { key, value: val }).catch(() => null);
       if (!r?.ok) return { ok: false, error: { code: 'not-saved', message: t('circle.bot.settings_failed') } };
+      // a setting others follow (the Telegram menus follow the roles) is told; the roles' answer says the screens' part
+      try { admin.onSettingChanged?.(key); } catch { /* the setting stands */ }
+      const extra = key === ROLES_KEY ? `\n${personT(person)('circle.bot.roles_changed')}` : '';
       // saved: the menu as it now stands (the new value ticked), as the person's view paints it
       const menu = person ? await menuOp(person, caller, ctx) : null;
-      if (!menu?.ok) return { ok: true, message: await current() };
-      return { ...menu, message: `${personT(person)('circle.bot.settings_saved')}\n\n${menu.message}` };
+      if (!menu?.ok) return { ok: true, message: `${await current()}${extra}` };
+      return { ...menu, message: `${personT(person)('circle.bot.settings_saved')}${extra}\n\n${menu.message}` };
     };
     if (what === 'days') {
       const n = Number(value);
@@ -257,7 +266,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!isQuietHours(value)) return usage;
       return set(QUIET_KEY, value);
     }
-    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES], usage: [USAGE_VISIBLE_KEY, USAGE_VISIBILITY] }[what];
+    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES], roles: [ROLES_KEY, ROLES_PRESETS], usage: [USAGE_VISIBLE_KEY, USAGE_VISIBILITY] }[what];
     if (!setting || !setting[1].includes(value)) return usage;
     return set(setting[0], value);
   }
@@ -267,6 +276,10 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function roleOp(who, role) {
     const name = String(who ?? '').trim();
     if (!name || !BOT_ROLES.includes(role)) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.role_usage') } };
+    // under the flat preset a member and a coordinator are the same: two words, member and observer
+    if (role === 'coordinator' && rolesPresetFrom(await userParam(ROLES_KEY)) === 'flat') {
+      return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.role_flat_two_words') } };
+    }
     if (typeof admin.setRole !== 'function') return { ok: false, error: 'unwired' };
     const row = await admin.setRole(name, role);
     if (!row) return { ok: false, error: t('circle.bot.role_nobody', { name }) };
@@ -345,15 +358,23 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
 
   async function cohortOp(spec) {
     if (!admin.admission) return { ok: false, error: 'unwired' };
-    const [people, days] = String(spec ?? '').trim().split(/\s+/).map(Number);
-    if (!(people >= 1) || !(days > 0)) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.cohort_usage') } };
-    const c = await admin.admission.openCohort({ ceiling: people, days });
+    const [p, d, w] = String(spec ?? '').trim().split(/\s+/);
+    const people = Number(p); const days = Number(d);
+    const role = roleWord(w);
+    if (!(people >= 1) || !(days > 0) || !role) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.cohort_usage') } };
+    const c = await admin.admission.openCohort({ ceiling: people, days, ...(role === 'none' ? {} : { role }) });
     return { ok: true, message: t('circle.bot.cohort_open', { people: c.ceiling, until: new Date(c.expiresAt).toISOString().slice(0, 10) }) };
   }
 
-  async function inviteOp() {
+  /** A role word an admin types (`lid` is a member): one of the bot's roles, or null. */
+  function roleWord(w) { const v = String(w ?? '').trim().toLowerCase(); if (!v) return 'none'; if (v === 'lid') return 'member'; return BOT_ROLES.includes(v) ? v : null; }
+
+  async function inviteOp(word) {
     if (!admin.admission) return { ok: false, error: 'unwired' };
-    const code = await admin.admission.code();
+    // the role the person gets is inside the code (a changed word makes it invalid)
+    const role = roleWord(word);
+    if (!role) return { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.invite_usage') } };
+    const code = await admin.admission.code(role === 'none' ? {} : { role });
     if (!code) return { ok: false, error: { code: 'no-cohort', message: t('circle.bot.cohort_none') } };
     // On a door with a link form (Telegram's `t.me/<bot>?start=<code>`), the link too: tapping it sends the code.
     const link = typeof admin.inviteLink === 'function' ? admin.inviteLink(code) : null;
@@ -735,9 +756,16 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
   /** `/users` in words: the rows, painted (a linked Basis app is said, never its key). */
-  function usersText(items) {
+  /** The word a person reads for a role: under flat a member and a coordinator are one word, "lid". */
+  function roleWordFor(role, preset) {
+    return preset === 'flat' && (role === 'member' || role === 'coordinator') ? t('circle.bot.role_word_lid') : (role ?? '?');
+  }
+
+  function usersText(items, preset = 'standard') {
     if (!items.length) return t('circle.bot.users_none');
-    return items.map((u) => `${u.label} — ${u.role ?? '?'}${u.linked ? ` · ${t('circle.bot.users_linked')}` : ''}`).join('\n');
+    // under flat a member and a coordinator are one word: "lid"
+    const word = (role) => roleWordFor(role, preset);
+    return items.map((u) => `${u.label} — ${word(u.role)}${u.linked ? ` · ${t('circle.bot.users_linked')}` : ''}`).join('\n');
   }
 
 }

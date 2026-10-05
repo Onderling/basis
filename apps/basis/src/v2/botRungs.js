@@ -25,7 +25,9 @@ export function botDoorChecks({ checkCaller, opLevel = null, roleAllows = null, 
   const byLayer = {
     tier: async ({ opId, caller, visibility }) => {
       const mapped = levelOf(opId);
-      const level = visibility ?? mapped ?? 'authenticated';
+      // an op whose ROLE decides (the admin's data column, under the roles preset): any admitted person passes the tier,
+      // the role check below says who may
+      const level = visibility ?? (mapped === 'by-role' ? 'authenticated' : mapped) ?? 'authenticated';
       try {
         await checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility: level, enabled: true }, unknownAs: 'public' });
         return null;
@@ -33,7 +35,11 @@ export function botDoorChecks({ checkCaller, opLevel = null, roleAllows = null, 
     },
     // an op off the door's map is refused however it is asked for (an op declaring its own level is on the map)
     'door-map': async ({ opId, visibility }) => (levelOf(opId) === null && visibility === undefined ? refuse('door-map', 'not-on-this-door') : null),
-    'door-role': async ({ opId, caller }) => (typeof roleAllows === 'function' && !roleAllows(roleOf(caller), opId) ? refuse('door-role', 'role') : null),
+    'door-role': async ({ opId, caller }) => {
+      if (typeof roleAllows === 'function') return roleAllows(roleOf(caller), opId) ? null : refuse('door-role', 'role');
+      // no role rule handed in: an op the role decides is the admin's alone (fail closed — never wider than the default)
+      return levelOf(opId) === 'by-role' && roleOf(caller) !== 'admin' ? refuse('door-role', 'role') : null;
+    },
   };
   return BOT_DOOR_RUNGS.map((layer) => byLayer[layer]);
 }

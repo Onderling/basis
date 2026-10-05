@@ -12,7 +12,8 @@ import { wallClockInTz } from '@onderling/notifier';
 import { dueReminders, inQuiet, QUIET_HOURS } from './botReminders.js';
 
 /** How often the box asks what is due. Reminders are for the evening and the morning; minutes are close enough. */
-export const REMINDER_TICK_MS = param({ key: 'assistant.reminderTickMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60_000 });
+// every minute: a reminder 5 minutes before an appointment lands 5–4 minutes before, not anywhere in the last five
+export const REMINDER_TICK_MS = param({ key: 'assistant.reminderTickMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 
 const pad = (n) => String(n).padStart(2, '0');
 

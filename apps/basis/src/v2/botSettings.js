@@ -103,11 +103,11 @@ export const quietHoursFrom = (v) => (isQuietHours(v) ? v : QUIET_DEFAULT);
 
 /**
  * How many minutes before an appointment the short-notice reminder comes (on top of the evening before); 0 = none.
- * The household's (`/huishouden lead 30`), the admin's; the tick runs every five minutes, so 30 means 30–25.
+ * The household's (`/huishouden lead 5`), the admin's; the tick runs every minute, so 5 means 5–4 minutes before.
  */
 export const REMINDER_LEAD_KEY = 'assistant.reminderLeadMin';
-export const REMINDER_LEAD_CHOICES = Object.freeze([0, 15, 30, 60]);
-export const REMINDER_LEAD_DEFAULT = param({ key: REMINDER_LEAD_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 30 });
+export const REMINDER_LEAD_CHOICES = Object.freeze([0, 5, 15, 30, 60]);
+export const REMINDER_LEAD_DEFAULT = param({ key: REMINDER_LEAD_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 5 });   // Frits 2026-10-05
 export const reminderLeadFrom = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 && n <= 240 ? n : REMINDER_LEAD_DEFAULT; };
 
 /**

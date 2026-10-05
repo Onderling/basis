@@ -995,6 +995,8 @@ if (tgToken || inboxDoor.bridge) {
     callSkill, circleId: agent.householdCircleId, selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey,
     name: () => t('circle.bot.household_circle_name'), relayUrl: () => relayUrl || null,
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    // the invite as a link that opens the app (where it is served) with it
+    appUrl: () => appUrl || null,
     onCreated: async ({ circleId }) => {
       await circleSeams.reachable?.(circleId);
       const handle = tgBridge?.botUsername ?? t('circle.bot.household_circle_name');

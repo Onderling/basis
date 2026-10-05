@@ -2,7 +2,7 @@
  * THE HOUSEHOLD IN YOUR OWN APP, IN A REAL BROWSER — the real box runner as a household bot; Ann (its first person, so
  * its admin, a headless node) puts melk on Boodschappen, turns the setting on and makes Bert a code. Bert is the WEB
  * APP in Chromium: it adds the bot by its card, comes in on the code through the bot's inbox, says `/in-app ja`, and
- * pastes the invite into its own join screen.
+ * taps the link the bot sends — the app opens with the invite (`?join=`) and runs its own join.
  *
  * What it proves: the joined app holds the household's EXISTING lines — melk, put there before Bert ever joined — in its
  * own store for the household's circle, without a reload (the content lanes are pulled at the join); a later line
@@ -18,7 +18,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../test/support/pairRealAgents.js';
 import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
-import { joinFromInvite } from './peerHarness.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
@@ -78,9 +77,26 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
     const invite = /onderling-invite:\/\/\S+/.exec(yes ?? '')?.[0];
     expect(invite, `no invite; the bot said: ${yes}`).toBeTruthy();
 
-    // ── the join, through the app's own join screen ──
-    const joined = await joinFromInvite(page, invite, { handle: 'bert', tag: 'household-app' });
-    expect(joined.joined, joined.outcome).toBe(true);
+    // ── the join: Bert taps the link the bot sent — the app opens with the invite and runs its own join ──
+    const link = /https?:\/\/\S+\?join=\S+/.exec(yes ?? '')?.[0];
+    expect(link, `no link in: ${yes}`).toBeTruthy();
+    await page.goto(link);
+    const wizard = page.locator('.cc-mydata-modal__card');
+    // This machine's local dev server sometimes serves a blank first load (ERR_NETWORK_CHANGED on every module — the
+    // host's network flapping, not the app): one reload, the link still in the address bar, so the join still runs.
+    const opened = await wizard.waitFor({ state: 'visible', timeout: 60_000 }).then(() => true).catch(() => false);
+    if (!opened) await page.reload();
+    await expect(wizard, 'the app opened its join screen from the link').toBeVisible({ timeout: 120_000 });
+    for (let step = 0; step < 2; step += 1) {
+      const tick = wizard.locator('.cc-wizard-check input[type="checkbox"]').first();
+      if (await tick.count()) await tick.check().catch(() => {});
+      await wizard.locator('.cc-wizard-btn-primary').first().click().catch(() => {});
+      await page.waitForTimeout(1200);
+    }
+    const handleInput = wizard.locator('.cc-wizard-handle-input');
+    if (await handleInput.count()) await handleInput.fill('bert');
+    await wizard.locator('.cc-wizard-submit').first().click();
+    await expect(page.locator('.cc-mydata-modal__card'), 'the join completed (the wizard closed)').toHaveCount(0, { timeout: 90_000 });
 
     // ── the existing line is in the app's own store for the household's circle — no reload ──
     const circleId = JSON.parse(Buffer.from(invite.replace('onderling-invite://', ''), 'base64url').toString('utf8')).groupId;

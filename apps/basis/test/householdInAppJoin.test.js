@@ -57,3 +57,24 @@ describe('the household circle and the bound invite', () => {
     expect((await inApp.evict(bob.pubKey)).removed).toBe(0);   // nobody left to remove
   }, 120_000);
 });
+
+describe('the invite as a link that opens the app', () => {
+  it('with the app\'s address: a link that opens it with ?join= and the relay; without: the invite alone', async () => {
+    const calls = [];
+    const callSkill = async (app, op, args) => {
+      calls.push(op);
+      if (op === 'listMyCircles') return { circles: ['household:00'] };
+      if (op === 'rotateMyGroupCode') return { code: 'C0DE', expiresAt: Date.now() + 1, maxRedemptions: 1 };
+      return {};
+    };
+    const withApp = createHouseholdInApp({ callSkill, circleId: 'household:00', selfWebid: 'BOT', name: () => 'Thuis', appUrl: () => 'https://onderling.org/basis/', relayUrl: () => 'wss://relay.example' });
+    const r = await withApp.inviteFor('BOB-KEY');
+    expect(r.ok).toBe(true);
+    expect(r.link).toMatch(/^https:\/\/onderling\.org\/basis\/\?join=onderling-invite%3A%2F%2F/);
+    expect(r.link).toContain('&relay=wss%3A%2F%2Frelay.example');
+    const { parseInviteDeepLink } = await import('../src/v2/inviteDeepLink.js');
+    expect(parseInviteDeepLink(r.link)?.inviteUri).toBe(r.uri);
+    const without = createHouseholdInApp({ callSkill, circleId: 'household:00', selfWebid: 'BOT', name: () => 'Thuis' });
+    expect((await without.inviteFor('BOB-KEY')).link ?? null).toBeNull();
+  });
+});

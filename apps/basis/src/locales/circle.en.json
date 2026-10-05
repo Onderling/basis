@@ -4351,6 +4351,7 @@
     "menu_app": "In your own app",
     "household_circle_name": "Household",
     "revoked_circle": "Removed from the household in the app.",
+    "inapp_invite_link": "Your invite to the household in your own app. Only you can use it, once, within 24 hours. Tap this link on your phone; the app opens with the invite:\n{{link}}\n\nIf it does not open, paste this in the app under Circles → Join:\n{{invite}}",
     "menu_roles": "Roles",
     "value_standard": "standard (the admin decides more)",
     "value_flat": "flat (everyone does what the admin does, except people and settings)",

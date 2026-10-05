@@ -79,6 +79,26 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
       for (const k of keys) await backing.delete(k);
       return keys.length;
     },
+    /**
+     * Move ONE circle's rows to a new id on this device: every row under the old root is written under the new one, the
+     * same path below it (item ids unchanged), then deleted from the old. Beneath the store, like `forget`: no hook fires,
+     * nothing is fanned. Refused onto a circle that already holds rows (0, nothing touched), so a second run is a no-op.
+     * Both circles must live on the shared local backing. Returns the number of rows moved.
+     */
+    async rename(fromId, toId) {
+      if (typeof fromId !== 'string' || !fromId || typeof toId !== 'string' || !toId) throw new Error('createCircleStores.rename: two non-empty circleIds are required');
+      if (fromId === toId) throw new Error('createCircleStores.rename: the new id must differ');
+      const from = rootFor(fromId);
+      const to = rootFor(toId);
+      const keys = (await dataSource.list(from)) ?? [];
+      if (!keys.length || ((await dataSource.list(to)) ?? []).length) return 0;
+      stores.get(fromId)?.setSyncHook?.(null);
+      stores.delete(fromId);
+      stores.delete(toId);
+      for (const k of keys) await dataSource.write(`${to}${k.slice(from.length)}`, await dataSource.read(k));
+      for (const k of keys) await dataSource.delete(k);
+      return keys.length;
+    },
     rootFor,
   };
 }

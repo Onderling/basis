@@ -61,6 +61,8 @@ export function extractTokenCounts(raw) {
     return {
       promptTokens:     Number(u.prompt_tokens)     || 0,
       completionTokens: Number(u.completion_tokens) || 0,
+      // the part of the prompt a prefix cache served (OpenAI's shape; Privatemode's vLLM reports it so)
+      cachedPromptTokens: Number(u.prompt_tokens_details?.cached_tokens) || 0,
     };
   }
 
@@ -68,6 +70,7 @@ export function extractTokenCounts(raw) {
     return {
       promptTokens:     Number(raw.prompt_eval_count) || 0,
       completionTokens: Number(raw.eval_count)        || 0,
+      cachedPromptTokens: 0,
     };
   }
 
@@ -103,6 +106,7 @@ export function usageForCompletion(req, result) {
   return {
     promptTokens:     estTokens(promptChars),
     completionTokens: estTokens(replyChars + toolChars),
+    cachedPromptTokens: 0,
     estimated:        true,
   };
 }

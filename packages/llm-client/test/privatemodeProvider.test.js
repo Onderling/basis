@@ -74,3 +74,35 @@ describe('privatemodeProvider — LIVE (skipped without a key)', () => {
     expect(r.toolCall?.args?.type).toBe('shopping');
   }, 90_000);
 });
+
+describe('prompt caching: one secret per box, a salt per person', () => {
+  const SECRET = 'box-secret-0123456789abcdef0123456789abcdef';
+  const req = (cacheKey) => ({ system: 'sys', messages: [{ role: 'user', content: 'hoi' }], ...(cacheKey ? { cacheKey } : {}) });
+
+  it('with a secret: every request carries a cache_salt derived per key — same person same salt, another person another', async () => {
+    const client = fakeClient(toolReply);
+    const p = await privatemodeProvider({ client, cacheSalt: SECRET });
+    await p.invoke(req('telegram:1'));
+    await p.invoke(req('telegram:1'));
+    await p.invoke(req('telegram:2'));
+    await p.invoke(req());
+    const salts = client.calls.map((c) => c.body.cache_salt);
+    expect(salts[0]).toBe(salts[1]);
+    expect(salts[0]).not.toBe(salts[2]);
+    expect(salts[3]).toBeTruthy();
+    for (const s of salts) {
+      expect(s).not.toContain(SECRET);
+      expect(Buffer.from(s, 'base64').length).toBeGreaterThanOrEqual(32);   // ≥256 bits, as Privatemode asks
+    }
+    // the key never travels as the salt (the salt reveals neither the secret nor whose it is)
+    expect(salts[0]).not.toContain('telegram');
+  });
+
+  it('without a secret: no cache_salt — caching stays off', async () => {
+    const client = fakeClient(toolReply);
+    const p = await privatemodeProvider({ client });
+    await p.invoke(req('telegram:1'));
+    expect(client.calls[0].body.cache_salt).toBeUndefined();
+    expect(client.calls[0].body.cacheKey).toBeUndefined();
+  });
+});

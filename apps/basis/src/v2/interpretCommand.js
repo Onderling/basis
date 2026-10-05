@@ -114,12 +114,13 @@ export function buildToolDescriptors(catalogue, { lang = null, hintFor = null } 
  *        `context` = RAG items (e.g. from the token gate's `retrieve`) woven into the system prompt.
  *        `toolLang` / `hintFor` = the language the tools are described in first, and the lookup for it (`chatHints.js`).
  *        `onSlow` = told when the model route is slow and retries (a door says "even geduld").
+ *        `cacheKey` = whose turn (the person's thread): the provider's prompt cache is kept per person.
  *        `history` = prior conversation turns threaded as real messages — so a clarifying follow-up
  *        ("which list?" → "shopping") resolves against what the bot just asked, not a stateless guess.
  * @returns {Promise<{opId:string, args:object, more?:Array<{opId:string,args:object}>}|{reply:string}|null>}
  *   `more` carries the SECOND and later tool calls of the same turn (a member naming three items).
  */
-export async function interpretToCommand(text, { catalogue, llm, system, hints, options, context, history, now, toolLang = null, hintFor = null, onSlow = null } = {}) {
+export async function interpretToCommand(text, { catalogue, llm, system, hints, options, context, history, now, toolLang = null, hintFor = null, onSlow = null, cacheKey = null } = {}) {
   const q = String(text ?? '').trim();
   if (!q || !llm || typeof llm.invoke !== 'function') return null;
   const tools = buildToolDescriptors(catalogue, { lang: toolLang, hintFor });
@@ -135,6 +136,8 @@ export async function interpretToCommand(text, { catalogue, llm, system, hints, 
     ...(options ? { options } : {}),
     // the turn's own "this is slow" hook: a provider that retries on a timeout calls it (the door tells the person)
     ...(typeof onSlow === 'function' ? { onSlow } : {}),
+    // whose turn: a provider with a prompt cache keeps one per person (never shared across the household)
+    ...(cacheKey ? { cacheKey } : {}),
   });
 
   // Every call the model made this turn, whole ones only, up to the per-turn cap. A call the output cut off, or one

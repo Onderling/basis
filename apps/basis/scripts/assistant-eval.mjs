@@ -32,7 +32,7 @@ import { detectLang } from '../src/v2/assistantLanguage.js';
 const { values } = parseArgs({ options: {
   model: { type: 'string' }, only: { type: 'string' }, min: { type: 'string', default: '0.95' },
   mock: { type: 'boolean', default: false }, 'from-log': { type: 'string' }, lang: { type: 'string', default: 'nl' }, 'door-lang': { type: 'string' },
-  apps: { type: 'string' }, thinking: { type: 'string', default: 'off' },
+  apps: { type: 'string' }, thinking: { type: 'string', default: 'off' }, cache: { type: 'boolean', default: false },
 } });
 
 if (values['from-log']) {
@@ -60,11 +60,17 @@ const { catalogue: botCatalogue } = composeAssistantCatalogue({ apps: values.app
 const catalogue = scopeCatalogueToRole(botCatalogue, 'member');
 const gateRulesFor = (lang) => listsGateRules(lang, templateLists(tNl));
 let llm = null;
+// what the run cost: every call's prompt tokens (of them, served from the prompt cache) and completion tokens
+const tokens = { prompt: 0, cached: 0, completion: 0 };
+const countTokens = (u) => { tokens.prompt += u.promptTokens ?? 0; tokens.cached += u.cachedPromptTokens ?? 0; tokens.completion += u.completionTokens ?? 0; };
 if (!values.mock) {
   const { privatemodeProvider, readPrivatemodeKey } = await import('@onderling/llm-client/providers/privatemode');
   const { LlmClient } = await import('@onderling/llm-client');
   if (!readPrivatemodeKey()) { console.error('assistant-eval: no Privatemode key — pass --mock or add ~/.privatemode-apikey'); process.exit(2); }
-  llm = new LlmClient({ provider: await privatemodeProvider({ model: values.model || undefined, thinking: values.thinking, timeoutMs: 60_000 }) });
+  // --cache: the prompt cache on (a fresh secret per run, so a run measures its own cache, never an earlier one's)
+  const { randomBytes } = await import('node:crypto');
+  const cacheSalt = values.cache ? randomBytes(32).toString('base64') : null;
+  llm = new LlmClient({ meter: countTokens, provider: await privatemodeProvider({ model: values.model || undefined, thinking: values.thinking, timeoutMs: 60_000, ...(cacheSalt ? { cacheSalt } : {}) }) });
 } else {
   // the same stand-in the browser specs use (llm-client's mockProvider), behind the real client
   const { LlmClient, mockProvider } = await import('@onderling/llm-client');
@@ -116,6 +122,7 @@ for (const f of fixtures) {
 const pass = results.filter((r) => r.ok).length;
 const rate = results.length ? pass / results.length : 0;
 console.log(`\n${pass}/${results.length} passed (${Math.round(rate * 100)}%) · model ${values.mock ? 'mock' : (values.model || 'default')} · median ${median(results.map((r) => r.ms))} ms`);
+if (!values.mock) console.log(`tokens: prompt ${tokens.prompt}${tokens.prompt ? ` (cached ${tokens.cached}, ${Math.round((tokens.cached / tokens.prompt) * 100)}%)` : ''} · completion ${tokens.completion}${values.cache ? ' · prompt cache on' : ''}`);
 // What the read-before-act step costs: the turns whose first pick was a read (one more model call each).
 const readFirst = results.filter((r) => r.readFirst);
 console.log(`read-first turns: ${readFirst.length}/${results.length}${readFirst.length ? ` (${readFirst.map((r) => r.id).join(', ')})` : ''}`);

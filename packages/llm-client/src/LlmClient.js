@@ -115,7 +115,7 @@ export class LlmClient {
       toolCalls: Array.isArray(result?.toolCalls)
         ? result.toolCalls.length
         : (result?.toolCall ? 1 : 0),
-      ...(tok ? { promptTokens: tok.promptTokens, completionTokens: tok.completionTokens, estimated: tok.estimated } : {}),
+      ...(tok ? { promptTokens: tok.promptTokens, cachedPromptTokens: tok.cachedPromptTokens, completionTokens: tok.completionTokens, estimated: tok.estimated } : {}),
     });
     if (this.#meter) {
       try {
@@ -125,6 +125,7 @@ export class LlmClient {
           endpoint:         ctx.endpoint   ?? this.#endpoint,
           model:            ctx.model      ?? this.#model,
           promptTokens:     usage.promptTokens,
+          cachedPromptTokens: usage.cachedPromptTokens ?? 0,
           completionTokens: usage.completionTokens,
           requests:         1,
           estimated:        usage.estimated,

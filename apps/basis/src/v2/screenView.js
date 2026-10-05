@@ -90,6 +90,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
   const parsed = resolve();
   const kept = () => (parsed.ok ? load(parsed.botAddress) : null);
   let sa = null;
+  let stopped = false;         // another tab is the screen now (`stop`)
   let granted = null;          // { tokens, label, botAddress }
   let resolveGrant = null;
   let rejectGrant = null;
@@ -177,7 +178,18 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
       const kept = parsed.ok ? load(parsed.botAddress) : null;
       if (!kept) return false;
       sa = await makeAgent();
-      await sa.relay.connect({ relayUrl: parsed.relayUrl, onPeerMessage: noticeOf });
+      // a new grant for this page's own key, from its own bot, replaces the kept one: the bot supersedes a key's earlier
+      // grant whenever the key is paired again (another tab, the webview opened anew), and a page still calling with
+      // the superseded tokens is refused as revoked. The bot's door checks every token as before.
+      const takeRegrant = ({ from, payload } = {}) => {
+        if (from !== parsed.botAddress || payload?.subtype !== CONNECTION_GRANT_SUBTYPE) return false;
+        const tokens = Array.isArray(payload.tokens) ? payload.tokens : [];
+        if (!tokens.length || !tokens.every((t) => t && t.subject === sa.agent.pubKey)) return true;
+        granted = { ...granted, tokens, label: payload.label ?? granted?.label ?? null };
+        try { storage.setItem(storeKey(parsed.botAddress), JSON.stringify(granted)); } catch { /* kept for this visit only */ }
+        return true;
+      };
+      await sa.relay.connect({ relayUrl: parsed.relayUrl, onPeerMessage: (m) => { if (!takeRegrant(m)) noticeOf(m); } });
       granted = kept;
       resolveGrant(granted);
       return true;
@@ -201,6 +213,17 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
     /** Hear the bot's nudge (something in the household changed; it names nothing). Returns the unsubscribe. */
     onNudge(fn) { nudges.add(fn); return () => nudges.delete(fn); },
 
+    /**
+     * This page is no longer the screen (another tab of the same browser took it: the same key, one relay connection —
+     * two would answer each other's handshakes): stop waiting and greeting, and let go of the relay. Calls refuse.
+     */
+    async stop() {
+      stopped = true;
+      stopGreeting();
+      stopWaiting();
+      try { await sa?.relay?.disconnect?.(); } catch { /* gone already */ }
+    },
+
     /** The page came back to the front while waiting: say it is there now (releases a grant held for it). */
     stillHere: () => greet(),
 
@@ -213,6 +236,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
      * @param {object} [args]
      */
     async call(skill, args = {}) {
+      if (stopped) throw new Error('screenView: open in another window');
       if (!granted) throw new Error('screenView: not connected');
       const token = granted.tokens.find((t) => t.skill === skill);
       if (!token) throw new Error(`screenView: no grant for ${skill}`);

@@ -7502,6 +7502,9 @@
     "stepup_failed": "Het lukte niet; kijk in je chat.",
     "stepup_unanswered": "Geen antwoord: er kwam binnen tien minuten geen ja. Niets veranderd.",
     "rate_limited": "Even rustig: dit scherm vroeg te veel in korte tijd. Probeer het over een paar seconden opnieuw.",
+    "revoked": "Dit scherm doet het niet meer: het is ergens anders opnieuw gekoppeld, of losgekoppeld. Open het opnieuw met /scherm in je gesprek met de bot.",
+    "elsewhere": "Dit scherm is open in een ander venster. Werk daar verder, of neem het hier terug.",
+    "take_back": "Hier verder",
     "action": {
       "claimTask": "Ik doe het",
       "completeTask": "Klaar",

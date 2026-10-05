@@ -124,6 +124,8 @@ export function createAssistantEngine({
       options: o.options ?? { temperature: ASSISTANT_TEMPERATURE },
       toolLang: o.toolLang ?? toolLang,
       hintFor: o.hintFor ?? chatHintFor,
+      // the thread is whose prompt cache this call uses (one per person, never the household's)
+      ...(threadId ? { cacheKey: o.cacheKey ?? threadId } : {}),
     });
   };
   const retrieve = typeof loadItems === 'function'

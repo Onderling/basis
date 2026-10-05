@@ -67,6 +67,8 @@ function withTimeoutFallback(primary, { makeFallback, fallbackModel, onFallback,
  * @param {(msg: string) => void} [a.warn]
  * @param {string} [a.fallbackModel]    retried once on a timeout (`assistant.fallbackModel`)
  * @param {(e: {from: string|null, to: string, reason: string}) => void} [a.onFallback]
+ * @param {string} [a.cacheSalt]   the box's prompt-cache secret (the provider keeps a cache per person from it)
+ * @param {(u: object) => void} [a.meter]  every call's token counts (prompt, of it cached, completion) — never words
  * @returns {Promise<{ llm: LlmClient, model: string|null } | null>}
  */
 export async function buildAssistantLlm({
@@ -78,15 +80,17 @@ export async function buildAssistantLlm({
   fallbackModel = ASSISTANT_FALLBACK_MODEL,
   onFallback = null,
   onProviderError = null,
+  cacheSalt = null,
+  meter = null,
 } = {}) {
   if (!hasKey()) return null;
   try {
-    const primary = await makeProvider({ model: model || undefined, timeoutMs });
+    const primary = await makeProvider({ model: model || undefined, timeoutMs, ...(cacheSalt ? { cacheSalt } : {}) });
     const provider = withTimeoutFallback(primary, {
-      fallbackModel, onFallback, onProviderError, makeFallback: () => makeProvider({ model: fallbackModel, timeoutMs }),
+      fallbackModel, onFallback, onProviderError, makeFallback: () => makeProvider({ model: fallbackModel, timeoutMs, ...(cacheSalt ? { cacheSalt } : {}) }),
     });
     return {
-      llm: new LlmClient({ provider }), model: primary?.model ?? null, fallbackModel,
+      llm: new LlmClient({ provider, ...(typeof meter === 'function' ? { meter, model: primary?.model ?? undefined } : {}) }), model: primary?.model ?? null, fallbackModel,
       // the provider's own list of served models, when it has one (a box watches its model against it)
       listModels: typeof primary?.listModels === 'function' ? () => primary.listModels() : null,
     };

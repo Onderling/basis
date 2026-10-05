@@ -146,6 +146,14 @@ function vaultPassphrase() {
   return readFileSync(f, 'utf8').trim();
 }
 
+/** The prompt-cache secret, made once beside the vault: the model provider derives each person's own cache salt from it,
+ *  so the household's calls reuse their prompt's head without anyone sharing a cache with anyone else. */
+function promptCacheSecret() {
+  const f = path.join(dataDir, 'prompt-cache.secret');
+  if (!existsSync(f)) writeFileSync(f, randomBytes(32).toString('base64'), { mode: 0o600 });
+  return readFileSync(f, 'utf8').trim();
+}
+
 const vault = new VaultNodeFs(path.join(dataDir, 'vault.json'), vaultPassphrase());
 // The CHAT-side vault, durable, because on a box there is no browser storage to fall back to.
 //
@@ -782,6 +790,10 @@ if (tgToken || inboxDoor.bridge) {
     onFallback: (e) => walkLog({ kind: 'llm-fallback', ...e }),
     // a provider error reaches the model watch (an account over its limit is told to the admin)
     onProviderError: (err) => modelWatch.ref?.providerError(err),
+    // the prompt cache (a cache per person), and every call's counts in the walk log: how much of the prompt came
+    // from the cache is what the monthly token limit is measured against — counts only, never words
+    cacheSalt: promptCacheSecret(),
+    meter: (u) => walkLog({ kind: 'llm-usage', model: u.model ?? null, prompt: u.promptTokens, cached: u.cachedPromptTokens ?? 0, completion: u.completionTokens, ...(u.estimated ? { estimated: true } : {}) }),
   });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).

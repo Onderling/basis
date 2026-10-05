@@ -16,6 +16,7 @@
  * not for a phone; a browser needs the SDK's explicit opt-in and a token-vending route first.
  */
 import { readFileSync } from 'node:fs';
+import { createHmac } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { ollamaProvider } from './ollama.js';
@@ -89,6 +90,19 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
 }
 
 /**
+ * Privatemode's prompt cache is off unless a request carries a `cache_salt` (≥256 bits, kept private); requests with the
+ * same salt share a cache. One cache per PERSON, not per box: a cache shared by the household would let one person learn,
+ * by how fast an answer comes, whether another sent the same words. So the salt is derived from the box's secret and the
+ * request's `cacheKey` (the person's thread) — HMAC-SHA256, base64: neither the secret nor whose it is can be read off it.
+ * A request without a key gets the box's own salt.
+ * @param {string} secret
+ * @param {string|null} [cacheKey]
+ */
+export function cacheSaltFor(secret, cacheKey = null) {
+  return createHmac('sha256', String(secret)).update(`prompt-cache:${cacheKey ?? ''}`).digest('base64');
+}
+
+/**
  * Build the provider.
  * @param {object} [a]
  * @param {string} [a.apiKey]         explicit key (else env/file via `readPrivatemodeKey`)
@@ -99,9 +113,10 @@ export function privatemodeFetch(client, { extraBody = null } = {}) {
  * @param {object} [a.sdk]            an injected SDK module `{ PrivatemodeAI }` (tests / lazy load)
  * @param {number} [a.timeoutMs]
  * @param {object} [a.defaultOptions]
+ * @param {string} [a.cacheSalt]      the box's prompt-cache secret: set → caching on, a salt per person (`cacheSaltFor`)
  * @returns {Promise<import('../types.js').LlmProvider>}
  */
-export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DEFAULT_MODEL, thinking = 'off', client = null, sdk = null, timeoutMs, defaultOptions } = {}) {
+export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DEFAULT_MODEL, thinking = 'off', client = null, sdk = null, timeoutMs, defaultOptions, cacheSalt = null } = {}) {
   let c = client;
   if (!c) {
     const key = apiKey ?? (auth ? null : readPrivatemodeKey());
@@ -115,6 +130,7 @@ export async function privatemodeProvider({ apiKey, auth, model = PRIVATEMODE_DE
   const base = ollamaProvider({
     baseUrl: PRIVATEMODE_ENDPOINT, model, timeoutMs, defaultOptions,
     fetchFn: privatemodeFetch(c, { extraBody }),
+    ...(cacheSalt ? { bodyFor: ({ cacheKey }) => ({ cache_salt: cacheSaltFor(cacheSalt, cacheKey) }) } : {}),
   });
   return {
     ...base,

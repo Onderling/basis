@@ -238,8 +238,11 @@ jobs:
       # suite. A retry is a measurement of that flakiness, not a cure for it; the report names every test
       # that needed one. (The walks that ride the public NKN network are skipped under CI in their own
       # files — a retry did not help them; they pass alone and are run by hand.)
+      # The files of this shard, balanced by MEASURED time (`scripts/browser-shard.mjs`, weights in
+      # `test-browser/shard-durations.json`): Playwright's own --shard splits by test count, and two shards drew
+      # the slow walks (30–37 min beside 2–16) — the release waited for them.
       - name: Browser suite, shard ${{ matrix.shard }} of 8 (serial inside; two dev servers + two relays)
-        run: npx playwright test --shard=${{ matrix.shard }}/8 --workers=1 --retries=1
+        run: npx playwright test $(node scripts/browser-shard.mjs ${{ matrix.shard }}/8) --workers=1 --retries=1
         working-directory: apps/basis
         env:
           CI: 'true'

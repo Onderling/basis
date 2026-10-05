@@ -40,6 +40,7 @@ const _warnedToolless = new Set();
  * @param {string} [args.baseUrl]
  * @param {string} [args.model]
  * @param {(input, init?) => Promise<Response>} [args.fetchFn]   Test seam.
+ * @param {(req: object) => object|null} [args.bodyFor]  per-request body fields (a provider's own switches)
  * @param {object} [args.defaultOptions]
  *   Per-provider sampling defaults.  Merged shallowly with each
  *   `invoke` call's `options`; per-call values win.  Useful for
@@ -52,6 +53,9 @@ export function ollamaProvider({
   model          = DEFAULT_MODEL,
   fetchFn        = globalThis.fetch,
   defaultOptions = null,
+  // Optional per-request body fields, from the request (`{system, messages, tools, options, cacheKey}`): a provider's
+  // own switches that depend on the call — Privatemode's per-person cache salt. Unset → the body as before.
+  bodyFor        = null,
   // Optional Bearer key. Local Ollama needs none; a key is required for an
   // OpenAI-compatible gateway behind the same `/v1/chat/completions` protocol —
   // notably the Privatemode (confidential-enclave) loopback proxy, which expects
@@ -74,7 +78,7 @@ export function ollamaProvider({
     // handy for debugging. Additive fields; nothing existing reads them.
     endpoint: baseUrl.replace(/\/$/, ''),
     model,
-    async invoke({ system, messages, tools, options }) {
+    async invoke({ system, messages, tools, options, cacheKey = null }) {
       const opts = { ...(defaultOptions ?? {}), ...(options ?? {}) };
       const baseBody = {
         model,
@@ -86,6 +90,8 @@ export function ollamaProvider({
         ...(opts.maxTokens   !== undefined ? { max_tokens: opts.maxTokens   } : {}),
         ...(opts.topP        !== undefined ? { top_p:      opts.topP        } : {}),
         ...(opts.stop        !== undefined ? { stop:        opts.stop       } : {}),
+        // a provider's own fields for this request (Privatemode: the cache salt for this request's person)
+        ...(typeof bodyFor === 'function' ? (bodyFor({ system, messages, tools, options, cacheKey }) ?? {}) : {}),
         stream: false,
       };
       const hasTools = Array.isArray(tools) && tools.length > 0;

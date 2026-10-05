@@ -84,9 +84,11 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     for (const never of ['status', 'users', 'settings', 'export', 'exports', 'invite', 'cohort', 'role', 'revoke', 'rotate', 'apps', 'import']) {
       await expect(page.locator(`[data-op="assistant.assistant-${never}"]`)).toHaveCount(0);
     }
-    for (const adminOp of ['lists.removeList', 'lists.createList', 'tasks.removeTask', 'tasks.reassignTask']) {
+    for (const adminOp of ['lists.removeList', 'tasks.removeTask', 'tasks.reassignTask']) {
       await expect(page.locator(`[data-op="${adminOp}"]`)).toHaveCount(0);
     }
+    // making a list is everyone's (Frits 2026-10-05)
+    await expect(page.locator('[data-op="lists.createList"]')).toHaveCount(1);
 
     // ── an add from his screen lands on the household's list, and Ann reads it ──
     const add = page.locator('[data-op="lists.addToList"]');

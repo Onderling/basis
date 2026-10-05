@@ -14,12 +14,12 @@ const req = { system: 'sys', messages: [{ role: 'user', content: 'hoi' }] };
 describe('metering — token extraction', () => {
   it('reads OpenAI-style usage block', () => {
     expect(extractTokenCounts({ usage: { prompt_tokens: 11, completion_tokens: 7 } }))
-      .toEqual({ promptTokens: 11, completionTokens: 7 });
+      .toEqual({ promptTokens: 11, completionTokens: 7, cachedPromptTokens: 0 });
   });
 
   it('reads Ollama native prompt_eval_count / eval_count', () => {
     expect(extractTokenCounts({ prompt_eval_count: 42, eval_count: 13 }))
-      .toEqual({ promptTokens: 42, completionTokens: 13 });
+      .toEqual({ promptTokens: 42, completionTokens: 13, cachedPromptTokens: 0 });
   });
 
   it('returns null when no counts present (→ estimate path)', () => {
@@ -29,7 +29,7 @@ describe('metering — token extraction', () => {
 
   it('usageForCompletion prefers real counts (estimated:false)', () => {
     const u = usageForCompletion(req, { raw: { eval_count: 5, prompt_eval_count: 9 } });
-    expect(u).toEqual({ promptTokens: 9, completionTokens: 5, estimated: false });
+    expect(u).toEqual({ promptTokens: 9, completionTokens: 5, cachedPromptTokens: 0, estimated: false });
   });
 
   it('usageForCompletion falls back to a char/4 estimate', () => {
@@ -184,3 +184,12 @@ describe('createUsageAggregator', () => {
 });
 
 function mockProviderAgg() { return createUsageAggregator(); }
+
+describe('cached prompt tokens', () => {
+  it('read from usage.prompt_tokens_details.cached_tokens; zero when the provider does not say', async () => {
+    const { usageForCompletion } = await import('../src/metering.js');
+    const r = usageForCompletion({}, { raw: { usage: { prompt_tokens: 3000, completion_tokens: 40, prompt_tokens_details: { cached_tokens: 2800 } } } });
+    expect(r).toMatchObject({ promptTokens: 3000, completionTokens: 40, cachedPromptTokens: 2800, estimated: false });
+    expect(usageForCompletion({}, { raw: { usage: { prompt_tokens: 10, completion_tokens: 1 } } }).cachedPromptTokens).toBe(0);
+  });
+});

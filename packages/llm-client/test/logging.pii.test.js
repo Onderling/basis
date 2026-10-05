@@ -16,7 +16,7 @@ const SECRET_REPLY  = 'the-model-said-something-CONFIDENTIAL';
 
 const ALLOWED_KEYS = new Set([
   'provider', 'model', 'endpoint', 'msgs', 'tools',
-  'ms', 'replyChars', 'toolCalls', 'promptTokens', 'completionTokens', 'estimated', 'err',
+  'ms', 'replyChars', 'toolCalls', 'promptTokens', 'cachedPromptTokens', 'completionTokens', 'estimated', 'err',
 ]);
 const FORBIDDEN = ['SECRET', 'CONFIDENTIAL', 'social-security', 'my-', 'the-model-said'];
 

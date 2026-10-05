@@ -8,10 +8,11 @@ import { personNamed } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
-import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 import { peopleRows } from './botPeople.js';
 import { isOwnTelegramChat } from './doorBridges.js';
+import { cachedShare } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 
 /**
@@ -38,7 +39,7 @@ import { SURFACE_PREFS } from './surfacePref.js';
 const SWITCH_WORDS = Object.freeze({ on: 'on', aan: 'on', ja: 'on', yes: 'on', off: 'off', uit: 'off', nee: 'off', no: 'off' });
 const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()] ?? null;
 
-export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {} }) {
+export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now }) {
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
   /** What a settings op's buttons can set, and the value it has now, for this person. */
   const PERSON_SETTINGS = {
@@ -53,6 +54,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     ['assign', ASSIGN_POLICY_KEY, ASSIGN_POLICIES, assignPolicyFrom], ['names', NAMES_KEY, NAMES_POLICIES, namesPolicyFrom],
     ['passed', PASSED_KEY, PASSED_POLICIES, passedPolicyFrom], ['cancel', CANCEL_KEY, CANCEL_POLICIES, cancelPolicyFrom],
     ['reminders', REMINDERS_KEY, REMINDERS_MODES, remindersModeFrom],
+    ['usage', USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom],
   ];
   const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
   /** An op's declared step-up, from the door's catalogue (any app), else the door's own manifest. */
@@ -107,6 +109,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-rotate') return rotateOp();
       if (op === 'assistant-revoke') return revokeOp(args?.who);
       if (op === 'assistant-menu') return menuOp(caller ?? ctx?.threadId, caller, ctx);
+      if (op === 'assistant-usage') return usageOp(caller ?? ctx?.threadId);
       if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
       if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId, args?.how ?? args?._match);
       if (op === 'assistant-screen-paste') return screenPasteOp(caller ?? ctx?.threadId, args?.offer ?? args?._match);
@@ -226,7 +229,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: reminderLeadFrom(of(REMINDER_LEAD_KEY)) });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: reminderLeadFrom(of(REMINDER_LEAD_KEY)), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)) });
     };
     const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
@@ -254,7 +257,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!isQuietHours(value)) return usage;
       return set(QUIET_KEY, value);
     }
-    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES] }[what];
+    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES], usage: [USAGE_VISIBLE_KEY, USAGE_VISIBILITY] }[what];
     if (!setting || !setting[1].includes(value)) return usage;
     return set(setting[0], value);
   }
@@ -301,6 +304,33 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return [tp('circle.bot.overview_head'), ...(lines.length ? lines : [tp('circle.bot.overview_none')])].join('\n');
   }
 
+  /** A number in the person's language ("3.000" in Dutch, "3,000" in English). */
+  function countIn(lang) { return (n) => new Intl.NumberFormat(lang === 'en' ? 'en-GB' : 'nl-NL').format(n); }
+  async function userParam(key) { return ((await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? []).find((p) => p.key === key)?.value; }
+
+  /** The household's model use this month, against the monthly limit (counts only). */
+  async function householdUsageLine(tp, lang = null) {
+    const c = threads.householdUsage(now());
+    const limit = monthlyTokenLimitFrom(await userParam(MONTHLY_TOKEN_LIMIT_KEY));
+    const fmt = countIn(lang);
+    return tp('circle.bot.usage_household', { calls: c.calls, tokens: fmt(c.prompt), cached: cachedShare(c), limit: fmt(limit), share: Math.round((c.prompt / limit) * 100) });
+  }
+
+  /**
+   * `/verbruik`: what the model cost this month for this person — their own count, always; the household's total for the
+   * admin, and for everyone when the admin set it so (`/huishouden usage members`). Never another person's count.
+   */
+  async function usageOp(person) {
+    if (!person || typeof threads?.usageOf !== 'function') return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    const lang = threads.langOf?.(person) ?? null;
+    const own = threads.usageOf(person, now());
+    const lines = [tp('circle.bot.usage_you', { calls: own.calls, tokens: countIn(lang)(own.prompt), cached: cachedShare(own) })];
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    if (row?.role === 'admin' || usageVisibleFrom(await userParam(USAGE_VISIBLE_KEY)) === 'members') lines.push(await householdUsageLine(tp, lang));
+    return { ok: true, message: lines.join('\n') };
+  }
+
   async function statusText() {
     const s = typeof admin.status === 'function' ? ((await admin.status()) ?? {}) : {};
     const apps = admin.catalogue ? admin.catalogue.apps().join(', ') : '';
@@ -308,8 +338,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       apps, model: s.model ?? '—', door: s.door ?? '—', turns: s.turns ?? 'off',
       memory: s.memory ?? '—', users: s.users ?? '—',
     });
+    const month = typeof threads?.householdUsage === 'function' ? `\n${await householdUsageLine(t)}` : '';
     // people the bot cannot write to first (no private chat): the admin hears how many
-    return Number(s.unreachable) > 0 ? `${status}\n${t('circle.bot.unreachable', { count: s.unreachable })}` : status;
+    return Number(s.unreachable) > 0 ? `${status}${month}\n${t('circle.bot.unreachable', { count: s.unreachable })}` : `${status}${month}`;
   }
 
   async function cohortOp(spec) {

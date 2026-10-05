@@ -110,3 +110,15 @@ export const REMINDER_LEAD_CHOICES = Object.freeze([0, 15, 30, 60]);
 export const REMINDER_LEAD_DEFAULT = param({ key: REMINDER_LEAD_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 30 });
 export const reminderLeadFrom = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 && n <= 240 ? n : REMINDER_LEAD_DEFAULT; };
 
+/**
+ * Who sees the household's model use (the month's calls and tokens): the admin only, or everyone in the household. A
+ * person always sees their own count; one person's count is never shown to another.
+ */
+export const USAGE_VISIBLE_KEY = 'assistant.usageVisible';
+export const USAGE_VISIBILITY = Object.freeze(['admin', 'members']);
+export const USAGE_VISIBLE = param({ key: USAGE_VISIBLE_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'admin' });
+export const usageVisibleFrom = (v) => (USAGE_VISIBILITY.includes(v) ? v : USAGE_VISIBLE);
+/** The provider's monthly prompt-token limit, what the household's use is shown against (Privatemode's plan: 1M). */
+export const MONTHLY_TOKEN_LIMIT_KEY = 'assistant.monthlyTokenLimit';
+export const MONTHLY_TOKEN_LIMIT = param({ key: MONTHLY_TOKEN_LIMIT_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 1_000_000 });
+export const monthlyTokenLimitFrom = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : MONTHLY_TOKEN_LIMIT; };

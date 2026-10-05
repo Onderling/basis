@@ -90,6 +90,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
   const parsed = resolve();
   const kept = () => (parsed.ok ? load(parsed.botAddress) : null);
   let sa = null;
+  let stopped = false;         // another tab is the screen now (`stop`)
   let granted = null;          // { tokens, label, botAddress }
   let resolveGrant = null;
   let rejectGrant = null;
@@ -212,6 +213,17 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
     /** Hear the bot's nudge (something in the household changed; it names nothing). Returns the unsubscribe. */
     onNudge(fn) { nudges.add(fn); return () => nudges.delete(fn); },
 
+    /**
+     * This page is no longer the screen (another tab of the same browser took it: the same key, one relay connection —
+     * two would answer each other's handshakes): stop waiting and greeting, and let go of the relay. Calls refuse.
+     */
+    async stop() {
+      stopped = true;
+      stopGreeting();
+      stopWaiting();
+      try { await sa?.relay?.disconnect?.(); } catch { /* gone already */ }
+    },
+
     /** The page came back to the front while waiting: say it is there now (releases a grant held for it). */
     stillHere: () => greet(),
 
@@ -224,6 +236,7 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
      * @param {object} [args]
      */
     async call(skill, args = {}) {
+      if (stopped) throw new Error('screenView: open in another window');
       if (!granted) throw new Error('screenView: not connected');
       const token = granted.tokens.find((t) => t.skill === skill);
       if (!token) throw new Error(`screenView: no grant for ${skill}`);

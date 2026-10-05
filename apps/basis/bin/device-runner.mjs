@@ -101,7 +101,7 @@ import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src
 import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
-import { buildCircleLanes } from '../src/v2/circleLanes.js';
+import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
@@ -551,7 +551,7 @@ if (relayUrl) {
   pairSeams.onJoined = ({ circleId } = {}) => makeCircleReachable({
     agent, circleId,
     registerCirclePresence: () => registerCirclePresence([circleId]),
-    pullLanes: (cid) => Promise.allSettled(['membership', 'gov', 'key'].map((k) => lanes.catchUps[k]?.requestCircle?.(cid, { callSkill }))),
+    pullLanes: (cid) => pullCircleLanes(lanes.catchUps, cid, { callSkill }),
   });
 
   // A circle the household bot joins on its admin's word: the same join chain as the wizard and the pair roster, with
@@ -599,6 +599,8 @@ if (relayUrl) {
         callSkill, sendPeer,
         publishEvent: (e) => walkLog({ kind: 'redeem', ...(e?.type ? { type: e.type } : {}), circleId: e?.circleId ?? e?.groupId ?? null }),
         onAdmitted: (a) => pairRoster?.onAdmitted?.(a),
+        // a code bound to one person is theirs from any of their addresses (the canonical chat key)
+        identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
         signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
         propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),

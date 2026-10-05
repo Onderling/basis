@@ -342,6 +342,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     'group-redeem-request': makeHandleGroupRedeemRequest({
       callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
       onAdmitted: (a) => pairRoster.onAdmitted(a),
+      // a code bound to one person is theirs from any of their addresses (the canonical chat key), as the shells pass it
+      identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
       // The ADMIN half of per-circle addressing (web ≡ mobile ≡ harness): the reply carries OUR proven
       // per-circle address, so the joiner records it instead of knowing us only by our global key.
       circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,

@@ -4341,6 +4341,8 @@
     "invite_usage": "Use: /invite (a member), or /invite coordinator, or /invite observer.",
     "role_flat_two_words": "Under \"flat\" all members are equal: choose member or observer.",
     "role_word_lid": "member",
+    "people_head": "In this household:",
+    "people_you": "you",
     "menu_roles": "Roles",
     "value_standard": "standard (the admin decides more)",
     "value_flat": "flat (everyone does what the admin does, except people and settings)",
@@ -4464,6 +4466,7 @@
           "cancelEvent": "cancel an appointment"
         },
         "assistant": {
+          "assistant-people": "who is in this household",
           "weekOverview": "your week: chores, appointments, shopping",
           "assistant-menu": "your settings, with buttons",
           "assistant-reminders": "reminders on or off",

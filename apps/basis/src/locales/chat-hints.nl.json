@@ -84,6 +84,10 @@
     }
   },
   "assistant": {
+    "assistant-people": {
+      "text": "Wie er in dit huishouden zitten (namen zoals het huishouden toestaat, met hun rol). Gebruik dit voor \"wie zitten er in huis\" en \"wie is de beheerder\".",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
     "assistant-memory": {
       "text": "Hoeveel de assistent van dit gesprek onthoudt: off (niets), short (de laatste berichten), long.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."

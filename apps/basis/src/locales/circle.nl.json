@@ -4341,6 +4341,8 @@
     "invite_usage": "Gebruik: /invite (een lid) of /invite coordinator of /invite observer.",
     "role_flat_two_words": "Onder \"plat\" zijn alle leden gelijk: kies lid (member) of observer.",
     "role_word_lid": "lid",
+    "people_head": "In dit huishouden:",
+    "people_you": "jij",
     "menu_roles": "Rollen",
     "value_standard": "standaard (de beheerder beslist meer)",
     "value_flat": "plat (iedereen doet wat de beheerder doet, behalve mensen en instellingen)",
@@ -4464,6 +4466,7 @@
           "cancelEvent": "een afspraak afzeggen"
         },
         "assistant": {
+          "assistant-people": "wie er in dit huishouden zitten",
           "weekOverview": "jouw week: klusjes, afspraken, boodschappen",
           "assistant-menu": "je instellingen, met knoppen",
           "assistant-reminders": "herinneringen aan of uit",

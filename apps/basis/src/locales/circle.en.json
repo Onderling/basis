@@ -7503,6 +7503,8 @@
     "stepup_unanswered": "No answer: no yes came within ten minutes. Nothing changed.",
     "rate_limited": "Slow down a little: this screen asked too much at once. Try again in a few seconds.",
     "revoked": "This screen no longer works: it was connected again somewhere else, or disconnected. Open it again with /scherm in your chat with the bot.",
+    "elsewhere": "This screen is open in another window. Carry on there, or take it back here.",
+    "take_back": "Continue here",
     "action": {
       "claimTask": "I'll do it",
       "completeTask": "Done",

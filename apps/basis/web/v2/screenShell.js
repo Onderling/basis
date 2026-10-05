@@ -122,8 +122,24 @@ export async function startScreenShell(win = window) {
     );
   };
 
+  // ONE live tab per screen: every tab of this browser holds the same key, and two relay connections under one key
+  // answer each other's handshakes (and the newest pairing supersedes the older tab's grant). The newest tab claims the
+  // screen; an older one lets go and says so, with a way to take it back (a reload resumes the newest kept grant).
+  const tabId = Math.random().toString(36).slice(2);
+  const tabs = typeof win.BroadcastChannel === 'function' ? new win.BroadcastChannel(`onderling-screen-${link.botAddress ?? ''}`) : null;
+  const claimScreen = () => { try { tabs?.postMessage({ claim: tabId }); } catch { /* one tab only */ } };
+  if (tabs) {
+    tabs.onmessage = async (e) => {
+      if (!e?.data?.claim || e.data.claim === tabId) return;
+      await view.stop();
+      const back = el('button', { type: 'button', 'data-screen': 'take-back', onclick: () => win.location.reload() }, t('circle.connectScreen.take_back'));
+      say(el('p', { 'data-screen': 'elsewhere' }, t('circle.connectScreen.elsewhere')), back);
+    };
+  }
+
   const showOps = () => {
     keepBotAddress();   // connected: a reload finds the kept grant
+    claimScreen();
     const panels = screenPanelsForGrant(view.ops(), t);
     const sections = panels.map((panel) => el('section', { 'data-section': panel.section },
       el('h2', {}, panel.title),

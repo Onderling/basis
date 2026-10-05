@@ -48,11 +48,19 @@ import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkCho
  *           capabilities?:object|null, apps?:string[]|null, offeringsMatching?:boolean|null }} a
  * @returns {Promise<{uri:string, expiresAt?:number} | {error:string}>}
  */
-export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null, podUrl = null, relayUrl = null } = {}) {
+export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null, podUrl = null, relayUrl = null, boundTo = null, boundForHours = 24 } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return { error: 'missing-args' };
   let res;
-  try { res = await callSkill('stoop', 'getCurrentMembershipCode', { groupId: circleId }); }
-  catch (err) { res = { error: err?.message || 'code-fetch-failed' }; }
+  // An invite for ONE person: a fresh code bound to their key, for one use (never the circle's shared code).
+  if (typeof boundTo === 'string' && boundTo) {
+    try { res = await callSkill('stoop', 'rotateMyGroupCode', { groupId: circleId, boundTo, inviteExpiresInHours: boundForHours }); }
+    catch (err) { res = { error: err?.message || 'rotate-failed' }; }
+    if (!res?.code) return { error: res?.error || 'no-code' };
+    res = { ...res, redemptionsUsed: 0 };
+  } else {
+    try { res = await callSkill('stoop', 'getCurrentMembershipCode', { groupId: circleId }); }
+    catch (err) { res = { error: err?.message || 'code-fetch-failed' }; }
+  }
   let code = res?.code;
   let expiresAt = res?.expiresAt;
   // B5 — how much of this invite is already spent. An invite surface that cannot say "3 of 6 places

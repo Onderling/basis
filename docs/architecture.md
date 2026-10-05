@@ -424,6 +424,11 @@ The order matters. A projector asks the manifest whether the op appears on its s
 `opAvailability` whether it may happen; the authorisation layer applies at the door, to a caller, and
 never to the local person's own affordances.
 
+A household bot's things live in ONE circle store under the bot's own circle id, `household:<16 hex of its chat key>` —
+derived, never a fixed name, because a circle id is the scope key on every device and two households under one name
+would merge on the phone of someone in both. The circle's rules exist once someone takes the household into their own
+app (`/in-app`, behind the admin's setting): the bot founds it, and the invite is bound to the person's chat key.
+
 A door that acts for people (a household bot) adds checks of its own, and so will grants and the realm's
 remit. Each stays where it binds — folding them into one function would move enforcement away from the place a
 different client cannot skip — but the ORDER and the REASON are one thing, written here once:

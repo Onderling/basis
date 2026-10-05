@@ -4112,11 +4112,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}} · {{lead}} minutes beforehand (0: none). Who sees the use: {{usage}} (admin: the admin only · members: everyone). Roles: {{roles}} (standard: the admin decides more · flat: everyone equal).",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}} · {{lead}} minutes beforehand (0: none). Who sees the use: {{usage}} (admin: the admin only · members: everyone). Roles: {{roles}} (standard: the admin decides more · flat: everyone equal). In your own app: {{app}} (off: not asked · on: asked after /koppel).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat",
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_saved": {
@@ -4341,6 +4341,16 @@
     "invite_usage": "Use: /invite (a member), or /invite coordinator, or /invite observer.",
     "role_flat_two_words": "Under \"flat\" all members are equal: choose member or observer.",
     "role_word_lid": "member",
+    "inapp_question": "Would you like the household in your own app too? Then lists, chores and the agenda are on your phone. The bot's rules (names, roles) no longer apply there. You can leave it again later from your app.",
+    "inapp_invite": "Your invite to the household in your own app. Only you can use it, once, within 24 hours. Paste it in the app under Circles → Join:\n{{invite}}",
+    "inapp_declined": "Fine, it stays with the chat.",
+    "inapp_off": "The household in your own app is not switched on; the admin can switch it on.",
+    "inapp_link_first": "Link your app first (/koppel); then I can invite you.",
+    "inapp_usage": "Usage: /in-app yes or /in-app no.",
+    "inapp_failed": "That did not work; please try again later.",
+    "menu_app": "In your own app",
+    "household_circle_name": "Household",
+    "revoked_circle": "Removed from the household in the app.",
     "menu_roles": "Roles",
     "value_standard": "standard (the admin decides more)",
     "value_flat": "flat (everyone does what the admin does, except people and settings)",
@@ -4492,6 +4502,7 @@
           "assistant-export-key-set": "set the export key (your passphrase, on your screen only)",
           "assistant-export-key-unlock": "open the export key for an hour, for /import",
           "assistant-link": "link your Basis app to yourself",
+          "assistant-inapp": "the household in your own app too (after /koppel, where the admin switched it on)",
           "assistant-link-confirm": "pick the code your Basis app shows",
           "assistant-unlink": "unlink your Basis app",
           "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",

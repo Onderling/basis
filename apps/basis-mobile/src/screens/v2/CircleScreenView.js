@@ -111,6 +111,12 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'noticeboard':  body = renderNoticeboard(block, styles); break;
     case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
     case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
+    // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
+    case 'items':
+      if (block.content?.noun === 'task') body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles);
+      else if (block.content?.noun === 'calendar-event') body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles);
+      else body = renderItems(block, styles);
+      break;
     case 'rules':        body = renderRules(block, styles); break;
     default:
       body = <Text style={styles.blockEmptyText}>{t('circle.screen.block_unknown', { type: block.type })}</Text>;
@@ -216,10 +222,25 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
             onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
             style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
           >
-            <Text style={labelStyle}>{ev.label ?? ''}</Text>
+            <Text style={labelStyle}>{ev.circleName ? `${ev.circleName} · ` : ''}{ev.label ?? ''}</Text>
           </View>
         );
       })}
+    </View>
+  );
+}
+
+/** Rows of any item type across circles: the presenter's label, and which circle it is in. */
+function renderItems(block, styles) {
+  const items = block.content?.items ?? [];
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t(`circle.screen.items_title.${block.content?.noun ?? ''}`)}</Text>
+      {items.map((it) => (
+        <View key={it.id ?? Math.random().toString(36)} style={styles.agendaRow}>
+          <Text style={styles.agendaLabel}>{it.circleName ? `${it.circleName} · ` : ''}{it.label ?? ''}</Text>
+        </View>
+      ))}
     </View>
   );
 }

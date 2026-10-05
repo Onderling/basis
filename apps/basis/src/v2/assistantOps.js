@@ -48,6 +48,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     'assistant-overview':  { values: ['on', 'off'], now: (id) => (threads.overviewOn(id) ? 'on' : 'off') },
     'assistant-language':  { values: ['nl', 'en', 'auto'], now: (id) => threads.langOf(id) ?? 'auto' },
     'assistant-view':      { values: [...SURFACE_PREFS], now: (id) => threads.viewOf(id) },
+    // the person's own quiet hours: the household's (`huis`), or one of a few common ones (any other: `/stil 22:30-07:30`)
+    'assistant-quiet':     { values: ['huis', '22:00-07:00', '23:00-08:00', '23:00-09:00'], now: (id) => threads.quietOf?.(id) ?? 'huis' },
   };
   /** The household's settings (`/huishouden <key> <value>`), each a row. */
   const HOUSEHOLD_SETTINGS = [
@@ -123,13 +125,20 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       // a person's own op answers in their language (`/taal`, set after this call for the language op itself)
       const tp = personT(threadId);
       // a switch asked without its value: how it stands now, with a button per value (as `/instellingen` paints it)
-      if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?._match)) return oneSettingOp(threadId, op);
+      if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?.hours ?? args?._match)) return oneSettingOp(threadId, op);
       if (op === 'assistant-memory') {
         const mode = args?.mode ?? args?._match;
         threads.setMode(threadId, mode);
         return { ok: true, message: tp(`circle.bot.memory_${mode}`) };
       }
       if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx, tp) };
+      if (op === 'assistant-quiet') {
+        const w = String(args?.hours ?? args?._match ?? '').trim().toLowerCase();
+        if (w === 'huis' || w === 'house') { threads.setQuiet(threadId, null); return { ok: true, message: tp('circle.bot.quiet_house') }; }
+        if (!isQuietHours(w)) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.quiet_usage') } };
+        threads.setQuiet(threadId, w);
+        return { ok: true, message: tp('circle.bot.quiet_set', { hours: w }) };
+      }
       if (op === 'assistant-reminders' || op === 'assistant-overview') {
         const mode = switchOf(args?.mode ?? args?._match);
         if (!mode) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
@@ -395,7 +404,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     const lines = [tp('circle.bot.menu_head')];
     const buttons = [];
-    const valueLabel = (v) => tp(`circle.bot.value_${v}`);
+    const valueLabel = (v) => (isQuietHours(v) ? v : tp(`circle.bot.value_${v}`));
     const settingsOps = assistantManifest.operations.filter((o) => o.group === 'settings' && o.id !== 'assistant-settings');
     for (const o of settingsOps) {
       const spec = PERSON_SETTINGS[o.id];

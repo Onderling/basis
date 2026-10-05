@@ -25,7 +25,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
   operations: [
     {
@@ -63,6 +63,15 @@ export const assistantManifest = {
         slash: { command: '/herinneringen', body: 'argline' },
         chat:  { reply: 'text', hint: 'Reminders on or off for this person (mode = on or off).' },
       },
+    },
+    {
+      // a person's own quiet hours ("23:00-09:00"), or `huis`: the household's; their reminders follow theirs
+      id:     'assistant-quiet',
+      group:  'settings',
+      verb:   'set-quiet',
+      writes: { scope: 'device' },
+      params: [{ name: 'hours', kind: 'string', required: false }],
+      surfaces: { slash: { command: '/stil', body: 'argline' } },
     },
     {
       id:     'assistant-overview',

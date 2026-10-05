@@ -52,7 +52,7 @@ export function inQuiet(w, quiet) {
  * @param {object} a
  * @param {Array<{id:string, text?:string, dueAt?:string, completedAt?:any, assignees?:string[], assignee?:string}>} [a.chores]
  * @param {Array<{id:string, title?:string, startsAt?:string, createdBy?:string, rsvp?:object, state?:string, completedAt?:any}>} [a.events]
- * @param {Array<{id:string, role?:string, revoked?:boolean, remindersOff?:boolean}>} [a.people]
+ * @param {Array<{id:string, role?:string, revoked?:boolean, remindersOff?:boolean, quiet?:string|null}>} [a.people]  `quiet`: the person's own quiet hours (else the household's)
  * @param {Record<string, Record<string, string>>} [a.said]  per person: item id → the slot it was said for
  * @param {number} [a.now]
  * @param {string} a.tz  the household's zone
@@ -62,7 +62,6 @@ export function inQuiet(w, quiet) {
  */
 export function dueReminders({ chores = [], events = [], people = [], said = {}, now = Date.now(), tz, quiet = QUIET_HOURS, lead = 0 } = {}) {
   const w = wallClockInTz(now, tz);
-  if (inQuiet(w, quiet)) return [];
   const today = ymd(w);
   const atToday = (hhmm) => { const [hour, minute] = hhmm.split(':').map(Number); return utcInstantForWallClock({ year: w.year, month: w.month, day: w.day, hour, minute, tz }); };
   const tomorrow = ymd(wallClockInTz(atToday('12:00') + 86_400_000, tz));
@@ -71,7 +70,8 @@ export function dueReminders({ chores = [], events = [], people = [], said = {},
   const slotNow = `${today}:${eveningOpen ? 'evening' : 'morning'}`;
 
   const byId = new Map(people.map((p) => [p.id, p]));
-  const reachable = (id) => { const p = byId.get(id); return Boolean(p && !p.revoked && !p.remindersOff && p.role !== 'observer'); };
+  // quiet hours are each recipient's: their own (`/stil`), else the household's — one person's quiet holds back no one else
+  const reachable = (id) => { const p = byId.get(id); return Boolean(p && !p.revoked && !p.remindersOff && p.role !== 'observer' && !inQuiet(w, p.quiet || quiet)); };
   const out = new Map();   // personId → items
   const add = (personId, item) => {
     if (!reachable(personId)) return;

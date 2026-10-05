@@ -43,6 +43,6 @@ describe('the box\'s secret and its meter', () => {
     });
     await built.llm.invoke({ system: 's', messages: [{ role: 'user', content: 'x' }], cacheKey: 'telegram:1' });
     expect(made[0].cacheSalt).toBe('box-secret');
-    expect(metered[0]).toMatchObject({ promptTokens: 3000, cachedPromptTokens: 2700, completionTokens: 20 });
+    expect(metered[0]).toMatchObject({ promptTokens: 3000, cachedPromptTokens: 2700, completionTokens: 20, subject: 'telegram:1' });
   });
 });

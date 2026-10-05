@@ -128,6 +128,8 @@ export class LlmClient {
           cachedPromptTokens: usage.cachedPromptTokens ?? 0,
           completionTokens: usage.completionTokens,
           requests:         1,
+          // whose call (the request's cacheKey, a person's thread) — a host counts each person's own use
+          subject:          req?.cacheKey ?? null,
           estimated:        usage.estimated,
           kind:             'completion',
         });

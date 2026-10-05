@@ -61,7 +61,7 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
-import { createBotScreens } from '../src/v2/botScreens.js';
+import { createBotScreens, encodeScreenLaunchLink } from '../src/v2/botScreens.js';
 import { createIdentityLink } from '../src/v2/botIdentityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
@@ -80,6 +80,7 @@ import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { createCommandMenus } from '../src/v2/botCommandMenu.js';
+import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
@@ -892,7 +893,18 @@ if (tgToken || inboxDoor.bridge) {
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
-    sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs, noPreview: true }),
+    sendPrivately: (person, text, rememberAs, buttons) => reach.sendToPerson(person, { text, rememberAs, noPreview: true, ...(buttons ? { buttons } : {}) }),
+    // Opened inside Telegram: the launch data Telegram signs under this bot's token says who opened the screen
+    verifyLaunch: tgToken ? (initData) => verifyTelegramLaunch(initData, { botToken: tgToken }) : null,
+    personOfTelegram: async (telegramId) => (await botUsers.find('telegram', telegramId))?.id ?? null,
+    // the "Open het scherm" button, in a Telegram person's own chat (Telegram opens only an https page)
+    launchButton: (person) => {
+      const botAddress = agent.identity?.chat?.pubKey ?? null;
+      if (!tgToken || !/^https:\/\//.test(appUrl) || !botAddress || !String(person).startsWith('telegram:')) return null;
+      const webApp = encodeScreenLaunchLink(appUrl, { botAddress, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null });
+      return { label: t('circle.bot.screen_open', {}, threads.langOf(person) ?? undefined), webApp };
+    },
+    launchLabel: (person) => t('circle.bot.screen_label_telegram', {}, threads.langOf(person) ?? undefined),
     // the offer's question, in the person's own language, with the code their screen shows; Ja / Nee buttons send
     // `/koppelen`, which counts only from this private door
     ask: (person, { codes, replaced }) => {
@@ -1049,6 +1061,13 @@ if (tgToken || inboxDoor.bridge) {
     // call — the same gate as their typed line — and what a screen never gets is withheld at the kernel's door.
     const exposed = exposeDoorToScreens({ agent, catalogue: doorCatalogue.catalogue(), manifests: Object.values(doorCatalogue.manifestsByOrigin()), doorCall, users: botUsers });
     screenOffer.handle = async (from, payload) => {
+      // a screen opened inside Telegram: its launch data instead of a link's nonce (the walk log never keeps the data)
+      if (payload?.launch && typeof payload.launch === 'object') {
+        const l = payload.launch;
+        const r = await screens.launched({ from, viewPubKey: l.k, nonce: l.n, initData: l.initData });
+        walkLog({ kind: 'screen-launch', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });
+        return;
+      }
       const offer = parsePairingOffer(payload?.offer);
       const r = offer.ok ? await screens.offer({ from, viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label }) : { ok: false, reason: offer.reason };
       walkLog({ kind: 'screen-offer', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });

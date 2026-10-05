@@ -14,11 +14,17 @@
  * the offer; a second offer drops the first, and the person is told. A stolen or planted link yields a question the
  * person did not expect, with a code they cannot see on any screen of theirs.
  *
+ * Opened INSIDE Telegram (the "Open het scherm" button in the person's own chat, a Mini App), a screen proves who opened it
+ * with Telegram's signed launch data instead (`telegramLaunch.js`): no link exists to steal, so there is no code to pick.
+ * Checked, used once, for an admitted person only, it gets the same grant the pick gives. One Telegram-launched screen
+ * per person: a new launch replaces the earlier one (its key revoked, the person told); the same key again is the same.
+ *
  * The nonce is kept as its HASH on the person's thread row (as admission codes are), one pending per person.
  * Pure composition: the grants, the role column and the notice are handed in.
  */
 import { sha256Hex } from './botAdmission.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { TELEGRAM_LAUNCH_MAX_AGE_S } from './telegramLaunch.js';
 
 /** How long a `/scherm` link may be used (once). */
 export const SCREEN_LINK_TTL_MS = param({ key: 'assistant.screenLinkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60 * 1000 });
@@ -104,12 +110,29 @@ export function parseScreenStartLink(link) {
 }
 
 /**
+ * The address Telegram opens for the "Open het scherm" button: the bot's address, relay and name in the QUERY (Telegram
+ * puts its launch data in the fragment). No secret: what connects is the launch data Telegram signs.
+ */
+export function encodeScreenLaunchLink(appUrl, { botAddress, relayUrl = null, botName = null }) {
+  const body = b64url(JSON.stringify({ v: 1, b: botAddress, ...(relayUrl ? { r: relayUrl } : {}), ...(botName ? { m: botName } : {}) }));
+  return `${String(appUrl).replace(/[#?].*$/, '').replace(/\/+$/, '')}/?scherm-tg=${body}`;
+}
+/** @returns {{ok: true, botAddress: string, relayUrl: string|null, botName: string|null}|{ok: false, reason: string}} */
+export function parseScreenLaunchLink(link) {
+  const m = /[?&]scherm-tg=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
+  if (!m) return { ok: false, reason: 'not-a-launch-link' };
+  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  if (d?.v !== 1 || typeof d.b !== 'string' || !d.b) return { ok: false, reason: 'incomplete' };
+  return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, botName: typeof d.m === 'string' && d.m ? d.m : null };
+}
+
+/**
  * @param {object} a
  * @param {object} a.threads  the bot's thread rows (`screenNonceOf` / `setScreenNonce` / `screenNonceOwner`)
  * @param {(person: string) => Promise<boolean>} a.isAdmitted  the person is in the book (not revoked)
  * @param {(person: string) => Promise<string[]>} a.columnOf  the op ids (`app.op`) this person's role reaches, minus
  *   what a screen never gets (the shell decides; the admin's own ops are not minted)
- * @param {(person: string, text: string, rememberAs: string|null) => Promise<{ok: boolean, reason?: string}>} a.sendPrivately
+ * @param {(person: string, text: string, rememberAs: string|null, buttons?: object[]|null) => Promise<{ok: boolean, reason?: string}>} a.sendPrivately
  *   the person's PRIVATE door (their own chat, their inbox) — never the chat `/scherm` was typed in, which may be a
  *   group; `rememberAs` is what their thread keeps instead of the link (a secret does not belong in memory)
  * @param {(g: {viewPubKey: string, ops: string[], actingAs: string, label: string, nonce: string}) => Promise<object>} a.grant
@@ -120,10 +143,36 @@ export function parseScreenStartLink(link) {
  *   the person's PRIVATE door: three codes (the real one and two others) to pick from, and "none of these"
  * @param {(viewPubKey: string) => Promise<void>|void} [a.tellRefused]  tells the screen its offer was not taken
  * @param {() => {appUrl: string|null, botAddress: string|null, relayUrl: string|null}} a.where
+ * @param {(initData: string) => Promise<{ok: boolean, telegramId?: string, hash?: string, reason?: string}>} [a.verifyLaunch]
+ *   checks Telegram's launch data (the bot's token is in it; `verifyTelegramLaunch`)
+ * @param {(telegramId: string) => Promise<string|null>} [a.personOfTelegram]  the ADMITTED person with this Telegram id
+ * @param {(person: string) => {label: string, webApp: string}|null} [a.launchButton]  the "Open het scherm" button for
+ *   this person's private chat (a Telegram person, an app address Telegram opens), or null
+ * @param {(person: string) => string} [a.launchLabel]  what `/schermen` calls a Telegram-launched screen
  * @param {() => number} [a.now]
  */
-export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, now = Date.now, rand = Math.random }) {
+export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
+  // a launch's hash, used: kept until no launch that old is taken anyway
+  const usedLaunches = new Map();
+  const spend = (hash) => {
+    const t = now();
+    for (const [h, until] of usedLaunches) if (until < t) usedLaunches.delete(h);
+    if (usedLaunches.has(hash)) return false;
+    usedLaunches.set(hash, t + 2 * TELEGRAM_LAUNCH_MAX_AGE_S * 1000);
+    return true;
+  };
+  const buttonsFor = (person) => { const b = typeof launchButton === 'function' ? launchButton(person) : null; return b ? [b] : null; };
+
+  /** The grant, for an offer the person vouched for (the code they picked, or a launch Telegram signed): their role's column, as them. */
+  async function grantTo(person, { viewPubKey, label, nonce }) {
+    const ops = await columnOf(person);
+    if (!ops.length) return { ok: false, reason: 'nothing-to-grant' };
+    const r = await grant({ viewPubKey, ops, actingAs: person, label, nonce });
+    if (r?.ok === false) return { ok: false, reason: r.error ?? 'grant-failed' };
+    try { await notify?.(person, 'circle.bot.screen_connected', { n: ops.length }); } catch { /* the grant stands; /schermen shows it */ }
+    return { ok: true, person, ops };
+  }
 
   /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
   async function askAbout(person, { viewPubKey, nonce, label }) {
@@ -151,7 +200,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       const until = now() + SCREEN_LINK_TTL_MS;
       threads.setScreenNonce(person, { hash: await sha256Hex(nonce), until });
       const link = encodeScreenLink(appUrl, { botAddress, relayUrl, nonce, botName });
-      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_LINK_TTL_MS / 60000)), remembered ?? '');
+      const sent = await sendPrivately(person, text(link, Math.round(SCREEN_LINK_TTL_MS / 60000)), remembered ?? '', buttonsFor(person));
       if (!sent?.ok) { threads.setScreenNonce(person, null); return { ok: false, reason: sent?.reason ?? 'not-reachable' }; }
       return { ok: true, until };
     },
@@ -164,7 +213,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       const { appUrl, botAddress, relayUrl, botName = null } = where() ?? {};
       if (!appUrl || !botAddress) return { ok: false, reason: 'no-app-url' };
       if (typeof sendPrivately !== 'function') return { ok: false, reason: 'no-private-door' };
-      const sent = await sendPrivately(person, text(encodeScreenStartLink(appUrl, { botAddress, relayUrl, botName })), null);
+      const sent = await sendPrivately(person, text(encodeScreenStartLink(appUrl, { botAddress, relayUrl, botName })), null, buttonsFor(person));
       return sent?.ok ? { ok: true } : { ok: false, reason: sent?.reason ?? 'not-reachable' };
     },
 
@@ -211,12 +260,37 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       const real = await screenCode(offer.viewPubKey, offer.nonce);
       if (String(answer ?? '').trim().toUpperCase() !== real) { await refuse(); return { ok: true, declined: true }; }
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
-      const ops = await columnOf(person);
-      if (!ops.length) return { ok: false, reason: 'nothing-to-grant' };
-      const r = await grant({ viewPubKey: offer.viewPubKey, ops, actingAs: person, label: offer.label, nonce: offer.nonce });
-      if (r?.ok === false) return { ok: false, reason: r.error ?? 'grant-failed' };
-      try { await notify?.(person, 'circle.bot.screen_connected', { n: ops.length }); } catch { /* the grant stands; /schermen shows it */ }
-      return { ok: true, person, ops, reopen: this.reopenLink() };
+      const r = await grantTo(person, { viewPubKey: offer.viewPubKey, label: offer.label, nonce: offer.nonce });
+      return r.ok ? { ...r, reopen: this.reopenLink() } : r;
+    },
+
+    /**
+     * A screen opened inside Telegram offers with the launch data Telegram signed (sealed to this bot, from the key it
+     * names). Taken once, fresh, from a private chat, for an admitted person — then the grant, as the pick gives it. A
+     * stranger is refused (a launch admits nobody); a second launched screen replaces the first.
+     */
+    async launched({ from, viewPubKey, nonce, initData }) {
+      if (typeof viewPubKey !== 'string' || !viewPubKey || viewPubKey !== from) return { ok: false, reason: 'wrong-sender' };
+      if (typeof nonce !== 'string' || !nonce) return { ok: false, reason: 'no-nonce' };
+      if (typeof verifyLaunch !== 'function' || typeof personOfTelegram !== 'function') return { ok: false, reason: 'no-launch-route' };
+      const refuse = async (reason) => { try { await tellRefused?.(viewPubKey); } catch { /* the screen times out on its own */ } return { ok: false, reason }; };
+      const v = await verifyLaunch(initData);
+      if (!v?.ok) return refuse(v?.reason ?? 'bad-launch');
+      if (!spend(v.hash)) return refuse('used');
+      const person = await personOfTelegram(v.telegramId);
+      if (!person) return refuse('stranger');
+      // one use per person across a restart too: a launch not newer than the last one taken is refused
+      const last = threads.lastLaunchOf(person);
+      if (last != null && v.authDate <= last) return refuse('used');
+      threads.setLastLaunch(person, v.authDate);
+      const previous = threads.telegramScreenOf(person);
+      if (previous && previous !== viewPubKey) {
+        await revokeView(previous);
+        try { await notify?.(person, 'circle.bot.screen_launch_replaced', {}); } catch { /* the new grant still goes */ }
+      }
+      const r = await grantTo(person, { viewPubKey, label: launchLabel(person), nonce });
+      if (r.ok) threads.setTelegramScreen(person, viewPubKey);
+      return r;
     },
 
     /** Where the person's screens are, from now on: the app at this bot's address (null without an app address). */
@@ -240,6 +314,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
     async dropAll(person) {
       threads.setScreenNonce(person, null);
       threads.setScreenOffer(person, null);
+      threads.setTelegramScreen(person, null);
       let n = 0;
       for (const g of await mine(person)) if (await revokeView(g.viewPubKey)) n += 1;
       return n;

@@ -171,6 +171,21 @@ export async function startScreenShell(win = window) {
   // (that releases a grant the bot held for it)
   win.document.addEventListener('visibilitychange', () => { if (win.document.visibilityState === 'visible') view.stillHere(); });
 
+  // opened inside Telegram: the button there was the tap — connect at once, with what Telegram signed
+  if (link.launchMode) {
+    say(el('p', { 'data-screen': 'launching' }, t('circle.connectScreen.launching', { bot })));
+    try {
+      await view.connect({ label: t('circle.connectScreen.label') });
+      await view.granted();
+      showOps();
+    } catch (e) {
+      const why = e?.message === 'refused' ? 'launch_refused' : (e?.message === 'timed-out' ? 'timed_out' : null);
+      say(why ? el('p', { 'data-screen': why }, t(`circle.connectScreen.${why}`))
+        : el('p', { 'data-screen': 'failed' }, t('circle.connectScreen.failed', { reason: String(e?.message ?? e) })));
+    }
+    return;
+  }
+
   const tap = el('button', { type: 'button', 'data-screen': 'connect', onclick: async () => {
     tap.disabled = true;
     try {

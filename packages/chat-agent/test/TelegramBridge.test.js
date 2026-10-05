@@ -78,3 +78,12 @@ describe('layoutButtons', () => {
     ]);
   });
 });
+
+describe('layoutButtons — a web-app button', () => {
+  it('a button with `webApp` opens that page inside Telegram, beside ordinary ones', () => {
+    expect(layoutButtons([{ label: 'Open het scherm', webApp: 'https://onderling.org/basis/?scherm-tg=x' }, { label: 'Ja', id: '/ja' }])).toEqual([
+      [{ text: 'Open het scherm', web_app: { url: 'https://onderling.org/basis/?scherm-tg=x' } }],
+      [{ text: 'Ja', callback_data: '/ja' }],
+    ]);
+  });
+});

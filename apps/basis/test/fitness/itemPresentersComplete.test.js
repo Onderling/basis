@@ -1,18 +1,18 @@
 /**
  * Every canonical item type is shown in a cross-circle view by a presenter, or is named with its reason: messages are
- * the log's projection (their entry is the render), and the rest wait in `NOT_YET`, which only shrinks — a noun that
+ * the log's projection (their entry is the render), a removed list is never merged (`NOT_MERGED`), and the rest wait in `NOT_YET`, which only shrinks — a noun that
  * gains a presenter must leave it in the same change.
  */
 import { describe, it, expect } from 'vitest';
 import { CANONICAL_TYPES } from '@onderling/item-types';
-import { ITEM_PRESENTERS, LOG_PROJECTED, NOT_YET } from '../../src/v2/itemPresenters.js';
+import { ITEM_PRESENTERS, LOG_PROJECTED, NOT_MERGED, NOT_YET } from '../../src/v2/itemPresenters.js';
 import nl from '../../src/locales/circle.nl.json' with { type: 'json' };
 import en from '../../src/locales/circle.en.json' with { type: 'json' };
 
 describe('every canonical noun has a presenter, or a reason', () => {
   const nouns = Object.keys(CANONICAL_TYPES);
   it('none unaccounted for', () => {
-    const missing = nouns.filter((n) => !ITEM_PRESENTERS[n] && !LOG_PROJECTED[n] && !NOT_YET.includes(n));
+    const missing = nouns.filter((n) => !ITEM_PRESENTERS[n] && !LOG_PROJECTED[n] && !NOT_MERGED[n] && !NOT_YET.includes(n));
     expect(missing).toEqual([]);
   });
   it('NOT_YET only shrinks: nothing in it has a presenter, nothing in it is unknown', () => {

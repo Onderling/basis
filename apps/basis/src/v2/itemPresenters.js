@@ -31,5 +31,8 @@ export const ITEM_PRESENTERS = Object.freeze({
 /** Shown from the device log, not merged from stores: a message's entry IS its render event (architecture §3). */
 export const LOG_PROJECTED = Object.freeze({ 'chat-message': 'the event-log projection', 'chat-thread': 'the event-log projection' });
 
+/** Never shown in a merged view, by design: a removed list is kept aside and offered back by `restoreList` only. */
+export const NOT_MERGED = Object.freeze({ 'removed-list': 'kept aside; offered back by /list-restore, never merged into a view' });
+
 /** Canonical nouns without a presenter yet — this list only shrinks. */
 export const NOT_YET = Object.freeze(['claim', 'contact', 'reveal-request', 'neighbourhood-job', 'view', 'circle', 'shared-ref', 'media', 'inbox-item', 'board']);

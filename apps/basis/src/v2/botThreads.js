@@ -18,6 +18,7 @@
  *               the household's and stays; only the conversation is not kept;
  *   - `long`  — short, plus what the bot knows about the household once that exists; until then it reads as short.
  */
+import { isQuietHours } from './botSettings.js';
 import { addUsage as addCounts, emptyUsage, monthOf } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 import { ASSISTANT_MEMORY_TURNS } from './assistantEngine.js';
@@ -185,6 +186,12 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     usageOf: (id, now = Date.now()) => { const month = monthOf(now); const c = rows.get(id)?.usage; return c?.month === month ? { ...c } : emptyUsage(month); },
     /** The household's counts this month (every call, whoever made it). */
     householdUsage: (now = Date.now()) => { const month = monthOf(now); const c = rows.get(HOUSEHOLD_ROW)?.usage; return c?.month === month ? { ...c } : emptyUsage(month); },
+    /** A person's own quiet hours ("23:00-09:00"), or null: they follow the household's. */
+    quietOf: (id) => { const v = rows.get(id)?.quiet; return isQuietHours(v) ? v : null; },
+    setQuiet(id, hours) {
+      const { quiet: _q, ...rest } = rowOf(id);
+      return save(isQuietHours(hours) ? { ...rest, quiet: hours } : rest);
+    },
     /** Whose pending screen nonce has this hash (one pending per person), or null. */
     screenNonceOwner(hash) {
       for (const [id, r] of rows) if (r?.screenNonce?.hash === hash) return id;

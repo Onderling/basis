@@ -48,6 +48,7 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     "{schedule} zijn AFSPRAKEN: \"tandarts morgen om 10 uur\" → addEvent(title, when als lokale tijd zonder zone, bv. 2026-09-30T10:00). \"wat staat er in de agenda\" → listEvents. \"ik kom (naar de tandarts)\" / \"ik ben erbij\" → rsvpAccept(id: de woorden); \"ik kan niet\" → rsvpDecline; \"misschien\" → rsvpTentative.",
     "\"ik ben bij … geweest\" / \"de afspraak is geweest\" is GEEN rsvp: → markListItemDone(item: de woorden van de afspraak).",
     "\"wat staat er deze week\" / \"wat moet er nog gebeuren\" → weekOverview. \"geen herinneringen meer\" → assistant-reminders(mode: off).",
+    "Zegt iemand bij iets op een andere lijst wie het doet of wanneer (\"melk voor Bob\", \"taart voor zaterdag\"): roep addToList aan met assignee en/of due; het wordt een klusje op diezelfde lijst. \"maak van X een klusje (voor Bob)\" → makeChore(item: X, assignee, due).",
     "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
     "Een klusje voor jezelf (\"nieuwe taak voor mij: X\") mag ieder lid: roep addToList aan met assignee: mij. Een klusje voor een ander: roep addToList ook aan; het systeem zegt zelf of het mag. Zeg NOOIT zelf dat iets niet mag als er een tool voor is.",
     "Iedereen mag een lijst maken (createList), weggooien (removeList) en binnen 30 dagen terugzetten (restoreList).",

@@ -3800,6 +3800,18 @@
       "text": "De lijst \"{{name}}\" is terug, met {{count}} dingen erop.",
       "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
     },
+    "chore_made": {
+      "text": "\"{{text}}\" is nu een klusje.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
+    "chore_already": {
+      "text": "\"{{text}}\" is al een klusje.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
+    "not_a_line": {
+      "text": "\"{{text}}\" is geen gewone regel; daar maak ik geen klusje van.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — opgepakt",
     "chore_open": "{{text}} — nog niemand",
@@ -4429,6 +4441,7 @@
           "addToList": "iets op een lijst zetten (of zeg: zet melk op de boodschappen)",
           "markListItemDone": "iets afvinken (of zeg: melk is gekocht)",
           "removeFromList": "iets van een lijst halen",
+          "makeChore": "een regel een klusje maken: wie doet het, of wanneer (of zeg: melk voor Bob)",
           "editEntry": "de woorden van een regel veranderen",
           "createList": "een nieuwe lijst",
           "restoreList": "een weggehaalde lijst terugzetten (binnen 30 dagen)",
@@ -7557,6 +7570,7 @@
       "markListItemDone": "Gedaan",
       "reassignTask": "Aan iemand anders",
       "editTask": "Wijzig",
+      "makeChore": "Klusje",
       "editEntry": "Wijzig",
       "assistant-role": "Rol",
       "assistant-revoke": "Eruit",

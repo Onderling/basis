@@ -4040,8 +4040,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     });
   }
 
-  /** The add of a chore with its person and its day (see the lists branch of `callSkill`). */
-  async function addChoreFor(args, ctx) {
+  /**
+   * The add of a chore with its person and its day (see the lists branch of `callSkill`) — or a line already there made
+   * one (`makeChore`). A who or a when said on a line that is not a chore yet makes it one, in place: the same item.
+   */
+  async function addChoreFor(args, ctx, opId = 'addToList') {
     const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
     const { assignee, due, ...rest } = args;
     const caller = actorOf(ctx);
@@ -4086,8 +4089,15 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? assignee.trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
       }
     }
-    const made = await callSkill('lists', 'addToList', rest, ctx);
-    if (!made?.ok || made.duplicate || made.kind !== 'task' || !made.itemId) return made;
+    let made = await callSkill('lists', opId, rest, ctx);
+    if (!made?.ok || !made.itemId) return made;
+    // the add found or made a line, not a chore: the who or when makes it one (a chore already there is left as it is)
+    if (made.kind !== 'task' || (made.duplicate && opId === 'addToList')) {
+      const chore = await callSkill('lists', 'makeChore', { item: made.itemId, ...(rest.circleId ? { circleId: rest.circleId } : {}) }, ctx);
+      if (!chore?.ok) return chore;
+      if (chore.already && made.duplicate) return made;
+      made = { ...made, kind: 'task', ...(opId === 'makeChore' ? { message: chore.message } : {}) };
+    }
     const circleId = resolveCircleId(rest);
     if (typeof due === 'string' && due.trim()) {
       // the household's local day or time, as an appointment's `when` is read (a bare date is that day, not UTC)
@@ -4132,8 +4142,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A chore that says who and when (a household bot): "nieuwe taak voor Bert: X (maandag)". The add on a list whose
     // entries are chores takes an `assignee` (me, or a person the bot knows by name) and a `due` day; WHO may be named
     // is the bot's setting (`assistant.assignPolicy`), decided here — the model only passes the words on.
-    if (appOrigin === 'lists' && opId === 'addToList' && opts.tasksCircleId && (args?.assignee || args?.due)) {
-      return addChoreFor(args ?? {}, ctx);
+    if (appOrigin === 'lists' && (opId === 'addToList' || opId === 'makeChore') && opts.tasksCircleId && (args?.assignee || args?.due)) {
+      return addChoreFor(args ?? {}, ctx, opId);
     }
     let namedTask = null;   // the task's words, when the door named it by them
     if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {

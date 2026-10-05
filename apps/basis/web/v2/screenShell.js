@@ -51,7 +51,12 @@ export async function startScreenShell(win = window) {
 
   // what an op answered, in words: its message, or the entries it read, or a tick
   // the door's refusal of too many calls at once, in words (the kernel's word for it is a code)
-  const inWords = (msg) => (/rate-limited/.test(String(msg)) ? t('circle.connectScreen.rate_limited') : String(msg));
+  // the bot's refusals in words: too many calls, or this screen's grant replaced or taken away (paired again elsewhere,
+  // or disconnected) — what to do about it, not the token's state
+  const inWords = (msg) => (/rate-limited/.test(String(msg)) ? t('circle.connectScreen.rate_limited')
+    : /revoked|INVALID_TOKEN/i.test(String(msg)) ? t('circle.connectScreen.revoked') : String(msg));
+  // a pick-list's read says the same words when it is refused
+  const pickCall = (skill, args) => view.call(skill, args).catch((e) => { throw new Error(inWords(e?.message ?? e)); });
   const answerOf = (r) => {
     if (r?.ok === false) return inWords(r?.error?.message ?? r?.error ?? '');
     if (typeof r?.message === 'string' && r.message) return r.message;
@@ -90,7 +95,7 @@ export async function startScreenShell(win = window) {
       const more = screenActionForm(a.skill, a.args);
       if (!more || !area) return run(a.skill, a.args, a.confirm);
       const spec = buildFormSpec({ opParams: more.params, missing: more.missing, prefilledArgs: more.prefilled, opId: more.opId, appOrigin: more.appOrigin });
-      const pickerFetcher = screenPickerFetcher({ call: (skill, args) => view.call(skill, args), ops: () => view.ops(), appOrigin: more.appOrigin });
+      const pickerFetcher = screenPickerFetcher({ call: pickCall, ops: () => view.ops(), appOrigin: more.appOrigin });
       area.replaceChildren(renderForm(spec, { doc: document, t, pickerFetcher, onSubmit: (values) => { area.replaceChildren(); run(a.skill, { ...more.prefilled, ...values }, a.confirm); }, onCancel: () => area.replaceChildren() }));
     };
     household.replaceChildren(
@@ -142,7 +147,7 @@ export async function startScreenShell(win = window) {
           if (!item.needsForm) { run({}); return; }
           const spec = buildFormSpec({ opParams: item.params, missing: item.params.filter((q) => q?.required).map((q) => q.name), prefilledArgs: {}, opId: item.opId, appOrigin: item.appOrigin });
           // a field with a declared source is picked from what this screen may read, not typed as an id
-          const pickerFetcher = screenPickerFetcher({ call: (skill, args) => view.call(skill, args), ops: () => view.ops(), appOrigin: item.appOrigin });
+          const pickerFetcher = screenPickerFetcher({ call: pickCall, ops: () => view.ops(), appOrigin: item.appOrigin });
           area.replaceChildren(renderForm(spec, { doc: document, t, pickerFetcher, onSubmit: (values) => { area.replaceChildren(); run(values); }, onCancel: () => area.replaceChildren() }));
         } }, item.label);
         return el('div', { class: 'screen-op' }, open, area, out, replies);

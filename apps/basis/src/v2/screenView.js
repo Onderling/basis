@@ -177,7 +177,18 @@ export function createScreenView({ link, makeAgent, storage, setTimer = (fn, ms)
       const kept = parsed.ok ? load(parsed.botAddress) : null;
       if (!kept) return false;
       sa = await makeAgent();
-      await sa.relay.connect({ relayUrl: parsed.relayUrl, onPeerMessage: noticeOf });
+      // a new grant for this page's own key, from its own bot, replaces the kept one: the bot supersedes a key's earlier
+      // grant whenever the key is paired again (another tab, the webview opened anew), and a page still calling with
+      // the superseded tokens is refused as revoked. The bot's door checks every token as before.
+      const takeRegrant = ({ from, payload } = {}) => {
+        if (from !== parsed.botAddress || payload?.subtype !== CONNECTION_GRANT_SUBTYPE) return false;
+        const tokens = Array.isArray(payload.tokens) ? payload.tokens : [];
+        if (!tokens.length || !tokens.every((t) => t && t.subject === sa.agent.pubKey)) return true;
+        granted = { ...granted, tokens, label: payload.label ?? granted?.label ?? null };
+        try { storage.setItem(storeKey(parsed.botAddress), JSON.stringify(granted)); } catch { /* kept for this visit only */ }
+        return true;
+      };
+      await sa.relay.connect({ relayUrl: parsed.relayUrl, onPeerMessage: (m) => { if (!takeRegrant(m)) noticeOf(m); } });
       granted = kept;
       resolveGrant(granted);
       return true;

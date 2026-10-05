@@ -1,6 +1,6 @@
 /**
  * A list made by mistake can go ("werktaken" on the test bot). `removeList` takes the list and everything on it; it is
- * the admin's on a household bot, and it asks first (a danger confirm, in the household's words).
+ * everyone's on a household bot (it can be put back for 30 days), and it asks first (a danger confirm, in the household's words).
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
@@ -45,8 +45,8 @@ describe('removing a list', () => {
     expect(names).not.toContain('werktaken');
     expect((await call('lists', 'removeList', { list: 'werktaken' })).ok).toBe(false);
 
-    expect(BOT_OP_MAP.admin).toContain('removeList');
-    expect(BOT_OP_MAP.member).not.toContain('removeList');
+    // everyone's since it can come back for 30 days (Frits 2026-10-05; `restoreList.test.js`)
+    expect(BOT_OP_MAP.member).toContain('removeList');
     const r = resolveDispatch({ kind: 'slash', opId: 'removeList', args: { list: 'Boodschappen' } }, mergeManifests([{ manifest: listsManifest }]));
     expect(r.kind).toBe('needsConfirm');
     expect(r.messageKey).toBe('circle.lists.remove_list_confirm');

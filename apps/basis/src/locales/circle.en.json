@@ -3767,8 +3767,28 @@
       "doc": "Removing a whole list (the admin's, asked first): the question names what goes with it."
     },
     "list_removed": {
-      "text": "The list \"{{name}}\" is gone.",
+      "text": "The list \"{{name}}\" is gone. You can put it back for {{days}} more days: /list-restore {{name}}",
       "doc": "Removing a whole list (the admin's, asked first): the question, and the reply."
+    },
+    "restore_none": {
+      "text": "There is no removed list to put back.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "restore_offer": {
+      "text": "These lists can come back (tap one):",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "restore_not_found": {
+      "text": "I cannot find a removed list \"{{name}}\" (any more). Say /list-restore to see which can come back.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "restore_name_taken": {
+      "text": "There is already a list \"{{name}}\". Rename that one first, then I put the old one back.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
+    },
+    "list_restored": {
+      "text": "The list \"{{name}}\" is back, with {{count}} things on it.",
+      "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
     },
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — taken",
@@ -4392,6 +4412,7 @@
           "removeFromList": "take something off a list",
           "editEntry": "change the words of an entry",
           "createList": "a new list",
+          "restoreList": "put a removed list back (within 30 days)",
           "removeList": "throw away a whole list"
         },
         "tasks": {

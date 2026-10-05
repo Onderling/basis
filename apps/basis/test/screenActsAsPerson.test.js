@@ -74,7 +74,7 @@ describe('a screen acts as its person on the bot', () => {
     expect(await act('lists.addToList', { list: 'Klusjes', text: 'x' }, await mint('lists.addToList', { role: 'surface' }))).toMatchObject({ ok: false, error: 'not-bound' });
     expect(await act('lists.addToList', { list: 'Klusjes', text: 'x' }, await mint('lists.addToList', { role: 'surface', actingAs: 'telegram:404' }))).toMatchObject({ ok: false, error: 'not-bound' });
     // the admin's op on a member's screen: the door-role check refuses it (the gate reads the current role)
-    const rm1 = await act('lists.removeList', { list: 'Reparaties' }, await mint('lists.removeList', { role: 'surface', actingAs: MEMBER }));
+    const rm1 = await act('assistant.assistant-users', {}, await mint('assistant.assistant-users', { role: 'surface', actingAs: MEMBER }));
     expect(rm1.ok, JSON.stringify(rm1)).toBe(false);
     // a withheld op, whatever the token
     expect(await act('assistant.assistant-import', { file: 'x' }, await mint('assistant.assistant-import', { role: 'surface', actingAs: ADMIN }))).toMatchObject({ refusedAt: 'token' });

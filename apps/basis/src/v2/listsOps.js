@@ -14,7 +14,7 @@
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
-import { childIdsOf, deleteContainer } from '@onderling/item-store';
+import { childIdsOf, deleteContainer, contain, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * @param {object} a
@@ -28,6 +28,9 @@ import { childIdsOf, deleteContainer } from '@onderling/item-store';
  *        list is ticked: the chore's own verb (a household bot's tasks); absent → a plain tick
  * @returns {Record<string, (args: object, ctx?: object) => Promise<object>>} opId → handler
  */
+/** How long a removed list can be put back (Frits 2026-10-05: 30 days); after that it is dropped. */
+export const REMOVED_LIST_KEEP_DAYS = param({ key: 'lists.removedKeepDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
+
 /** Who holds a chore (contact ids — data; the door words them as far as the names setting lets the asker see). */
 const holdersOf = (c) => {
   if (c?.type !== 'task') return {};
@@ -35,12 +38,18 @@ const holdersOf = (c) => {
   return { holders: ids };
 };
 
-export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null, completeChore = null } = {}) {
+export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null, completeChore = null, now = Date.now } = {}) {
   // What a list may hold beyond its own entries and tasks: appointments (the calendar's `accepts` line).
   const svc = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   // A call names its circle, or means the one the person is looking at. Named wins: an agent or a
   // journey acts on a circle it is not "in", and must be able to say which.
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
+  // the lists removed in this circle that can still come back, and dropping those past the keep window
+  const removedOf = async (circleId) => ((await storeFor(circleId).listByType('removed-list')) ?? []);
+  const dropExpired = async (circleId) => {
+    const keep = REMOVED_LIST_KEEP_DAYS * 86_400_000;
+    for (const r of await removedOf(circleId)) if (now() - (Number(r.removedAt) || 0) >= keep) await storeFor(circleId).delete(r.id);
+  };
 
   /** A person types a list's NAME; an id is what the app uses. Accept either. */
   const findList = async (circleId, ref) => {
@@ -180,7 +189,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, title: target.text ?? ref, items };
     },
 
-    removeList: async (args) => {
+    removeList: async (args, ctx) => {
       const circleId = circleOf(args);
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       const ref = String(args?.list ?? '').trim();
@@ -214,8 +223,44 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         const ask = what.length ? t('circle.lists.remove_list_confirm_counts', { list: vars.list, what: what.join(', ') }) : t('circle.lists.remove_list_confirm', { list: vars.list });
         return { ok: true, vars, message: vars.kept ? `${ask} ${t('circle.lists.remove_count_kept', { count: vars.kept })}` : ask };
       }
+      // kept aside, whole, so it can be put back for a while: the list first, then what went with it
+      const whole = (await Promise.all(removing.map((id) => store.get(id)))).filter(Boolean);
+      await store.put({
+        id: `removed-list-${target.id}`, type: 'removed-list', listId: target.id, name: String(target.text ?? ref),
+        removedAt: now(), removedBy: ctx?.caller ?? null, items: whole, keptIds: [...kept],
+      }, { by: ctx?.caller ?? localActor });
       for (const id of removing) await deleteContainer(store, id);
-      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref }), vars };
+      await dropExpired(circleId);
+      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref, days: REMOVED_LIST_KEEP_DAYS }), vars };
+    },
+
+    /**
+     * Put a removed list back (`/list-restore Feest`): its lines, chores and appointments under their own ids, and an item
+     * that stayed on another list linked to it again. Without a name: what can come back, a button each.
+     */
+    restoreList: async (args, ctx) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
+      await dropExpired(circleId);
+      const removed = (await removedOf(circleId)).sort((a, b) => b.removedAt - a.removedAt);
+      const ref = String(args?.list ?? '').trim();
+      if (!ref) {
+        if (!removed.length) return { ok: true, message: t('circle.lists.restore_none'), quickReplies: [] };
+        return {
+          ok: true,
+          message: [t('circle.lists.restore_offer'), ...removed.map((r) => `· ${r.name}`)].join('\n'),
+          quickReplies: removed.map((r) => ({ label: r.name, slash: `/list-restore ${r.name}` })),
+        };
+      }
+      const want = ref.toLowerCase();
+      const rec = removed.find((r) => r.name.toLowerCase() === want) ?? removed.find((r) => r.name.toLowerCase().includes(want));
+      if (!rec) return { ok: false, error: t('circle.lists.restore_not_found', { name: ref }), code: 'not-found' };
+      if (await findList(circleId, rec.name)) return { ok: false, error: t('circle.lists.restore_name_taken', { name: rec.name }) };
+      const store = svc.storeFor(circleId);
+      for (const item of rec.items) await store.put(item, { by: ctx?.caller ?? localActor });
+      for (const id of rec.keptIds ?? []) if (await store.get(id)) await contain(store, rec.listId, id);
+      await store.delete(rec.id);
+      return { ok: true, message: t('circle.lists.list_restored', { name: rec.name, count: rec.items.length - 1 }) };
     },
 
     removeFromList: async (args) => {

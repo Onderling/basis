@@ -19,8 +19,10 @@ describe('the screen column', () => {
     const adminCol = screenColumnFor(catalogue, 'admin');
     expect(member).toContain('lists.addToList');
     expect(member).toContain('assistant.assistant-overview');
-    expect(member).not.toContain('lists.removeList');
-    expect(adminCol).toContain('lists.removeList');
+    // removing a list is everyone's (it can come back for 30 days); removing a chore stays the admin's
+    expect(member).toContain('lists.removeList');
+    expect(member).not.toContain('tasks.removeTask');
+    expect(adminCol).toContain('tasks.removeTask');
     for (const col of [member, adminCol]) {
       for (const id of BOT_SCREEN_NEVER) expect(col).not.toContain(id);
       // /apps stays in the chat; import never

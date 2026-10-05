@@ -16,13 +16,13 @@
 /** Per role, the ops a thread offers. The admin's column is ADDED to the member's. */
 export const BOT_OP_MAP = Object.freeze({
   member: Object.freeze([
-    // making a list is everyone's (Frits 2026-10-05); removing a whole list stays the admin's
-    'listLists', 'createList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
+    // making, removing and putting back a list are everyone's (Frits 2026-10-05: a removed list can come back 30 days)
+    'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
     'listMine', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
     'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview',
   ]),
-  admin: Object.freeze(['removeList', 'reassignTask', 'removeTask', 'editTask']),
+  admin: Object.freeze(['reassignTask', 'removeTask', 'editTask']),
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
   observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview', 'weekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink']),
 });

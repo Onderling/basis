@@ -131,6 +131,27 @@ export const listsManifest = {
       },
     },
     {
+      // A line becomes a chore in place (the same item, its type now task) — said with who does it or when. List-item
+      // and task stay two types (their verbs differ); this is the one verb between them.
+      id:        'makeChore', group: 'compose',
+      verb:      'update',
+      writes: { scope: 'circle' },
+      appliesTo: { type: 'list-item' },
+      requires:  ['lists'],
+      // the type is the line's content as anything else is: the later write wins (a chore stays one)
+      resolves:  [{ field: 'type', policy: 'content' }],
+      params: [
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+        { name: 'assignee', kind: 'string', required: false },
+        { name: 'due', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/list-chore', body: 'argline' },
+        chat:  { reply: 'text', hint: 'Make a line on a list a chore: who does it, or when.' },
+      },
+    },
+    {
       id:        'listEntries', group: 'data',
       verb:      'list',
       requires:  ['lists'],

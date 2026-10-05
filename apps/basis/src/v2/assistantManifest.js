@@ -134,7 +134,8 @@ export const assistantManifest = {
       // `/role <who> coordinator|member|observer` — who from the bot's people (the one read), the role a choice
       params: [
         { name: 'who', kind: 'string', required: true, pickerSource: { listOp: 'assistant-users', appOrigin: 'assistant' } },
-        { name: 'role', kind: 'enum', of: [...BOT_ROLES], required: true },
+        // a pick, never a preselection: the form preselected the first word, and housemates became coordinators
+        { name: 'role', kind: 'enum', of: [...BOT_ROLES], required: true, pick: true },
       ],
       surfaces: { slash: { command: '/role', body: 'argline' } },
     },
@@ -181,8 +182,9 @@ export const assistantManifest = {
       stepUp: 'private-door',
       // a code is minted, not stored — but the cohort's state is this device's
       writes: { scope: 'device' },
-      params: [],
-      surfaces: { slash: { command: '/invite', body: 'none' } },
+      // the role the invited person gets (inside the code); none: a member
+      params: [{ name: 'role', kind: 'enum', of: [...BOT_ROLES], required: false }],
+      surfaces: { slash: { command: '/invite', body: 'argline' } },
     },
     {
       id:     'assistant-rotate',

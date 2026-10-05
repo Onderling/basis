@@ -248,7 +248,7 @@ import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
 import { botDoorChecks } from '../../v2/botRungs.js';                                            // the bot door's checks, declared once
-import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
+import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
@@ -4005,7 +4005,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     const checks = botDoorChecks({
       checkCaller: (q) => engine.checkCaller(q),
       opLevel: typeof opts.doorOpLevel === 'function' ? opts.doorOpLevel : null,
-      roleAllows: typeof opts.doorRoleAllows === 'function' ? opts.doorRoleAllows : null,
+      // what a role reaches follows the bot's one roles preset (`assistant.roles`), the same the menus read
+      roleAllows: typeof opts.doorRoleAllows === 'function' ? (role, op) => opts.doorRoleAllows(role, op, rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY))) : null,
       roleOf: (c) => doorRoles.get(c) ?? null,
     });
     return firstRefusal(checks, { opId, caller, visibility });
@@ -4055,8 +4056,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     });
   }
 
-  /** The add of a chore with its person and its day (see the lists branch of `callSkill`). */
-  async function addChoreFor(args, ctx) {
+  /**
+   * The add of a chore with its person and its day (see the lists branch of `callSkill`) — or a line already there made
+   * one (`makeChore`). A who or a when said on a line that is not a chore yet makes it one, in place: the same item.
+   */
+  async function addChoreFor(args, ctx, opId = 'addToList') {
     const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
     const { assignee, due, ...rest } = args;
     const caller = actorOf(ctx);
@@ -4101,8 +4105,15 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? assignee.trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
       }
     }
-    const made = await callSkill('lists', 'addToList', rest, ctx);
-    if (!made?.ok || made.duplicate || made.kind !== 'task' || !made.itemId) return made;
+    let made = await callSkill('lists', opId, rest, ctx);
+    if (!made?.ok || !made.itemId) return made;
+    // the add found or made a line, not a chore: the who or when makes it one (a chore already there is left as it is)
+    if (made.kind !== 'task' || (made.duplicate && opId === 'addToList')) {
+      const chore = await callSkill('lists', 'makeChore', { item: made.itemId, ...(rest.circleId ? { circleId: rest.circleId } : {}) }, ctx);
+      if (!chore?.ok) return chore;
+      if (chore.already && made.duplicate) return made;
+      made = { ...made, kind: 'task', ...(opId === 'makeChore' ? { message: chore.message } : {}) };
+    }
     const circleId = resolveCircleId(rest);
     if (typeof due === 'string' && due.trim()) {
       // the household's local day or time, as an appointment's `when` is read (a bare date is that day, not UTC)
@@ -4147,8 +4158,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A chore that says who and when (a household bot): "nieuwe taak voor Bert: X (maandag)". The add on a list whose
     // entries are chores takes an `assignee` (me, or a person the bot knows by name) and a `due` day; WHO may be named
     // is the bot's setting (`assistant.assignPolicy`), decided here — the model only passes the words on.
-    if (appOrigin === 'lists' && opId === 'addToList' && opts.tasksCircleId && (args?.assignee || args?.due)) {
-      return addChoreFor(args ?? {}, ctx);
+    if (appOrigin === 'lists' && (opId === 'addToList' || opId === 'makeChore') && opts.tasksCircleId && (args?.assignee || args?.due)) {
+      return addChoreFor(args ?? {}, ctx, opId);
     }
     let namedTask = null;   // the task's words, when the door named it by them
     if (appOrigin === 'tasks' && opts.tasksCircleId && TASK_BY_ID_OPS.has(opId) && typeof args?.id === 'string' && args.id.trim()) {
@@ -4778,7 +4789,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A household bot's appointment is cancelled by the one who added it, or the admin — unless the admin keeps that
     // to themselves (`assistant.cancelPolicy`). The op's rule and the door's setting refuse in the one shape.
     if (appOrigin === 'calendar' && opId === 'cancelEvent' && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
-        && doorRoles.get(ctx.caller) !== 'admin') {
+        && doorRoles.get(ctx.caller) !== 'admin'
+        // under the `flat` roles preset, members and coordinators cancel anyone's appointment, as the admin does
+        && !(rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY)) === 'flat' && ['member', 'coordinator'].includes(doorRoles.get(ctx.caller)))) {
       const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
       // (in a circle the standard rule only: the one who added it, or the circle's admin — no household setting)
       if (!doorCircleOf(ctx) && cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {

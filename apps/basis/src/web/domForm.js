@@ -227,6 +227,11 @@ function makeInput(field, doc) {
     }
     case 'enum': {
       const sel = doc.createElement('select');
+      if (field.pick && field.value === undefined) {
+        const none = doc.createElement('option');
+        none.value = ''; none.textContent = '—'; none.disabled = true; none.selected = true;
+        sel.appendChild(none);
+      }
       for (const c of field.choices ?? []) {
         const opt = doc.createElement('option');
         opt.value = c;

@@ -14,10 +14,13 @@
  */
 
 /** Per role, the ops a thread offers. The admin's column is ADDED to the member's. */
+import { STANDARD_ROLE_TABLE } from '@onderling-app/tasks';
 export const BOT_OP_MAP = Object.freeze({
   member: Object.freeze([
     // making, removing and putting back a list are everyone's (Frits 2026-10-05: a removed list can come back 30 days)
     'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
+    // a line becomes a chore when someone says who does it or when: anyone who may add may say that
+    'makeChore',
     'listMine', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
     'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview',
@@ -29,17 +32,29 @@ export const BOT_OP_MAP = Object.freeze({
 
 const MEMBER = new Set(BOT_OP_MAP.member);
 const ADMIN = new Set(BOT_OP_MAP.admin);
+/**
+ * A coordinator's ops beyond the member's, READ from the tasks role table (one source: the bot's map and the chores'
+ * own rule held this fact twice and disagreed — a coordinator could not move a chore on the bot, L198): moving a chore
+ * (`reassign`), editing any (`editBody: 'any'`), removing one only where the table says so.
+ */
+const COORDINATOR_EXTRA = new Set([
+  ...(STANDARD_ROLE_TABLE.coordinator?.reassign ? ['reassignTask'] : []),
+  ...(STANDARD_ROLE_TABLE.coordinator?.editBody === 'any' ? ['editTask'] : []),
+  ...(STANDARD_ROLE_TABLE.coordinator?.remove ? ['removeTask'] : []),
+]);
 
 /**
  * An op's level on the bot's door: `authenticated` (a member's), `trusted` (the admin's), or null — not on the map,
  * refused. The door's own admin ops declare their level themselves (`visibility` on the assistant manifest).
  * @param {string} opId
- * @returns {'authenticated'|'trusted'|null}
+ * @returns {'authenticated'|'by-role'|null}  `by-role`: any admitted person passes the tier, the role decides
  */
 export function botOpLevel(opId) {
   const id = String(opId ?? '').replace(/^[a-z-]+\//, '');   // a collision-prefixed id (`tasks/listOpen`) is its op
   if (MEMBER.has(id)) return 'authenticated';
-  if (ADMIN.has(id)) return 'trusted';
+  // the admin's data column: its ROLE decides (`botRoleAllows`, under the bot's roles preset); without a role rule the
+  // door holds it to the admin (fail closed)
+  if (ADMIN.has(id)) return 'by-role';
   return null;
 }
 
@@ -50,10 +65,15 @@ const OBSERVER = new Set(BOT_OP_MAP.observer);
  * the waist, so an observer is refused an add however it is asked for — not only never shown the tool.
  * @param {string|null} role
  * @param {string} opId
+ * @param {'standard'|'flat'} [preset]  the bot's `assistant.roles`
  */
-export function botRoleAllows(role, opId) {
-  if (role !== 'observer') return true;
-  return OBSERVER.has(String(opId ?? '').replace(/^[a-z-]+\//, ''));
+export function botRoleAllows(role, opId, preset = 'standard') {
+  const id = String(opId ?? '').replace(/^[a-z-]+\//, '');
+  if (role === 'observer') return OBSERVER.has(id);
+  if (!ADMIN.has(id) || role == null || role === 'admin') return true;
+  // the admin's data column: everyone's but an observer's under `flat`; a coordinator's own share under `standard`
+  if (preset === 'flat' && (role === 'member' || role === 'coordinator')) return true;
+  return role === 'coordinator' && COORDINATOR_EXTRA.has(id);
 }
 
 /** Is this catalogue entry on the map at all (any role)? */
@@ -75,7 +95,7 @@ const NOT_ON_A_BOT = new Set(['assistant-apps']);
  * @param {{id: string, visibility?: string}} op
  * @param {string|null} role
  */
-export function botOffers(appOrigin, op, role) {
+export function botOffers(appOrigin, op, role, preset = 'standard') {
   const id = op?.id;
   // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too, and
   // the admin's own (`trusted`) are not offered to anyone else — their /help does not list what they cannot do
@@ -84,17 +104,15 @@ export function botOffers(appOrigin, op, role) {
     if (role === 'observer') return botRoleAllows(role, id);
     return op?.visibility !== 'trusted' || role == null || role === 'admin';
   }
-  const level = botOpLevel(id);
-  if (!level) return false;
-  if (!botRoleAllows(role, id)) return false;
-  // the admin's column is the ADMIN's (and the owner's, no door caller) — never a coordinator's or an observer's
-  return level === 'authenticated' || role == null || role === 'admin';
+  if (!botOpLevel(id)) return false;
+  // one rule for what a role reaches — the same the host gate asks
+  return botRoleAllows(role, id, preset);
 }
 
-export function scopeCatalogueToRole(catalogue, role) {
+export function scopeCatalogueToRole(catalogue, role, preset = 'standard') {
   if (!catalogue || !catalogue.opsById || typeof catalogue.opsById.forEach !== 'function') return catalogue;
   const opsById = new Map();
-  for (const [k, entry] of catalogue.opsById) if (botOffers(entry?.appOrigin, { ...(entry?.op ?? {}), id: entry?.op?.id ?? k }, role)) opsById.set(k, entry);
+  for (const [k, entry] of catalogue.opsById) if (botOffers(entry?.appOrigin, { ...(entry?.op ?? {}), id: entry?.op?.id ?? k }, role, preset)) opsById.set(k, entry);
   const commandMenu = Array.isArray(catalogue.commandMenu) ? narrowMenu(catalogue.commandMenu, opsById) : catalogue.commandMenu;
   return { ...catalogue, opsById, commandMenu };
 }
@@ -138,12 +156,14 @@ function narrowMenu(menu, opsById) {
  * @param {(key: string) => string} [t]  the door's translator
  * @returns {string[]}
  */
-export function roleHintsFor(role, t = null) {
+export function roleHintsFor(role, t = null, preset = 'standard') {
   if (role == null || role === 'admin') return [];
+  const notMine = BOT_OP_MAP.admin.filter((id) => !botRoleAllows(role, id, preset));
+  if (!notMine.length) return [];
   // With the door's translator the model is handed the refusal itself, so the words are the locale's, not its own.
   const say = typeof t === 'function'
     ? `call no tool and reply with exactly this sentence, nothing more: "${t('circle.bot.admin_only')}"`
     : 'do not use another tool instead: reply that only the household\'s admin can do that, and stop there';
-  return [`These are the household admin's, not this member's: ${BOT_OP_MAP.admin.join(', ')}. When the member asks for one of them, ${say}.`];
+  return [`These are the household admin's, not this member's: ${notMine.join(', ')}. When the member asks for one of them, ${say}.`];
 }
 

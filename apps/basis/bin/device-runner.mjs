@@ -84,7 +84,7 @@ import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
-import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, REMINDER_LEAD_KEY, reminderLeadFrom } from '../src/v2/botSettings.js';
+import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, REMINDER_LEAD_KEY, reminderLeadFrom, ROLES_KEY, rolesPresetFrom } from '../src/v2/botSettings.js';
 import { ensureHouseholdLists, householdBotApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
@@ -815,6 +815,8 @@ if (tgToken || inboxDoor.bridge) {
     },
   }) : null;
   // the household's reminder settings as the admin set them (the welcome says them; the tick obeys them)
+  // what each role may do on this bot (`/huishouden roles standard|flat`): the menus, the screens and the model read it
+  const rolesPreset = () => rolesPresetFrom(agent.getParamValue?.(ROLES_KEY));
   const reminderSettings = () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)), lead: reminderLeadFrom(agent.getParamValue?.(REMINDER_LEAD_KEY)) });
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Every person is a contact with a role, and their calls carry them to the host gate.
@@ -940,7 +942,7 @@ if (tgToken || inboxDoor.bridge) {
     },
     // a screen whose offer was not taken is told, so it says so instead of waiting
     tellRefused: (viewPubKey) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_REFUSED_SUBTYPE }),
-    columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null),
+    columnOf: async (person) => screenColumnFor(doorCatalogue.catalogue(), (await botUsers.list()).find((u) => u.id === person)?.role ?? null, rolesPreset()),
     grant: async (g) => {
       const r = await agent.callSkill('household', 'grantSurface', { viewPubKey: g.viewPubKey, ops: g.ops, actingAs: g.actingAs, label: g.label, nonce: g.nonce });
       // whether the grant reached the screen, or is held until it next speaks (the screen's address, its first characters)
@@ -1055,6 +1057,8 @@ if (tgToken || inboxDoor.bridge) {
       // a role changed (or a person left): Telegram's menu lists what each role has again
       revoke: (who) => botUsers.revoke(who),
       setRole: (who, role) => botUsers.setRole(who, role),
+      // a changed roles preset changes what each person's Telegram menu lists
+      onSettingChanged: (key) => { if (key === ROLES_KEY) commandMenus.publish(); },
       exports: exportShelf,
       // the export key's set and unlock from the admin's screen: the same core as `bin/export-key.mjs`, over this box's files
       exportKey: createExportKeyFile({
@@ -1131,8 +1135,8 @@ if (tgToken || inboxDoor.bridge) {
       // the model's lines and the gate's rules, generated from the template's lists (their names, their words)
       promptLines: botPromptLines(t),
       roleFor: (threadId) => doorAdmit.roleOf(threadId),
-      scopeToRole: scopeCatalogueToRole,
-      hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t),
+      scopeToRole: (catalogue, role) => scopeCatalogueToRole(catalogue, role, rolesPreset()),
+      hintsFor: (threadId) => roleHintsFor(doorAdmit.roleOf(threadId), t, rolesPreset()),
       // one add per thing named ("melk en kaas" → two), whether the gate or the model chose the add
       expand: expandAdds({ t }),
       gateRules: listsGateRules(values.lang, templateLists(t)),
@@ -1149,7 +1153,7 @@ if (tgToken || inboxDoor.bridge) {
   if (isFunctionProfile && tgBridge) {
     commandMenus.ref = createCommandMenus({
       setCommands: (commands, opts) => tgBridge.setCommands(commands, opts),
-      catalogue: doorCatalogue.catalogue, scopeToRole: scopeCatalogueToRole,
+      catalogue: doorCatalogue.catalogue, scopeToRole: (catalogue, role) => scopeCatalogueToRole(catalogue, role, rolesPreset()),
       users: () => botUsers.list(), langOf: (id) => threads.langOf(id), t, lang: values.lang,
     });
     commandMenus.publish();

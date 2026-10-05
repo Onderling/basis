@@ -17,6 +17,10 @@
  * WebCrypto only (`crypto.subtle`): this runs on the box, and web or a phone never verifies a code.
  */
 
+/** The role a code admits at, as its tag (a member's code has none; the tag is inside the signature). */
+const ROLE_TAGS = Object.freeze({ member: '', coordinator: 'c', observer: 'o' });
+const ROLE_OF_TAG = Object.freeze({ c: 'coordinator', o: 'observer' });
+
 /** Why a code was not accepted — each has a line in the shared bundle (`circle.bot.admission_<reason>`). */
 export const ADMISSION_REFUSALS = Object.freeze(['needs-code', 'invalid-code', 'code-used', 'cohort-expired', 'cohort-full', 'no-cohort']);
 
@@ -69,37 +73,46 @@ export function createBotAdmission({ secretVault, store, now = Date.now } = {}) 
   async function check(code, state) {
     const cohort = state.cohort;
     if (!cohort) return { ok: false, reason: 'no-cohort' };
-    const [nonce, sig] = String(code ?? '').trim().split('-');
-    if (!nonce || !sig) return { ok: false, reason: 'invalid-code' };
-    const expect = (await hmacHex(await secret(), `${cohort.id}:${nonce}`)).slice(0, 12);
-    if (!sameText(sig, expect)) return { ok: false, reason: 'invalid-code' };
+    const [nonce, sig, tag, extra] = String(code ?? '').trim().split('-');
+    if (!nonce || !sig || extra !== undefined) return { ok: false, reason: 'invalid-code' };
+    // the role the code admits at: a member's code has no tag; another role's tag is inside its signature
+    const role = tag === undefined ? 'member' : ROLE_OF_TAG[tag];
+    if (!role) return { ok: false, reason: 'invalid-code' };
+    if (!sameText(sig, await signature(cohort.id, nonce, role))) return { ok: false, reason: 'invalid-code' };
     if (state.spent.includes(await sha256Hex(code))) return { ok: false, reason: 'code-used' };
     if (now() >= cohort.expiresAt) return { ok: false, reason: 'cohort-expired' };
     if (cohort.count >= cohort.ceiling) return { ok: false, reason: 'cohort-full' };
-    return { ok: true };
+    return { ok: true, role };
   }
+  // a member's code signs the cohort and the nonce (its shape unchanged); another role is signed in too
+  const signature = async (cohortId, nonce, role) => (await hmacHex(await secret(), role === 'member' ? `${cohortId}:${nonce}` : `${cohortId}:${nonce}:${role}`)).slice(0, 12);
 
   return {
     /**
      * Open a cohort: up to `ceiling` people, until `days` from now. Replaces the one before — its codes stop working.
      * @param {{ceiling:number, days:number}} spec
      */
-    openCohort({ ceiling, days } = {}) {
+    openCohort({ ceiling, days, role = 'member' } = {}) {
       const c = Math.floor(Number(ceiling));
       const d = Number(days);
       if (!Number.isFinite(c) || c < 1 || !Number.isFinite(d) || d <= 0) return Promise.reject(new TypeError('botAdmission: a cohort needs a ceiling ≥ 1 and a number of days > 0'));
       return oneAtATime(async () => {
-        const cohort = { id: randomHex(8), ceiling: c, expiresAt: now() + d * 24 * 60 * 60 * 1000, count: 0 };
+        const cohort = { id: randomHex(8), ceiling: c, expiresAt: now() + d * 24 * 60 * 60 * 1000, count: 0, role: ROLE_TAGS[role] !== undefined ? role : 'member' };
         await save({ cohort, spent: [] });
         return { ceiling: cohort.ceiling, expiresAt: cohort.expiresAt, count: 0 };
       });
     },
-    /** A fresh single-use code for the open cohort, or null when none is open. */
-    async code() {
+    /**
+     * A fresh single-use code for the open cohort, admitting at `role` (else the cohort's default, else member), or null
+     * when none is open.
+     */
+    async code({ role = null } = {}) {
       const { cohort } = await load();
       if (!cohort) return null;
+      const at = ROLE_TAGS[role] !== undefined ? role : (cohort.role ?? 'member');
       const nonce = randomHex(8);
-      return `${nonce}-${(await hmacHex(await secret(), `${cohort.id}:${nonce}`)).slice(0, 12)}`;
+      const sig = await signature(cohort.id, nonce, at);
+      return at === 'member' ? `${nonce}-${sig}` : `${nonce}-${sig}-${ROLE_TAGS[at]}`;
     },
     /** @returns {Promise<{ok:true}|{ok:false, reason:string}>} */
     async validate(code) { return check(code, await load()); },
@@ -110,7 +123,7 @@ export function createBotAdmission({ secretVault, store, now = Date.now } = {}) 
         const v = await check(code, state);
         if (!v.ok) return v;
         await save({ cohort: { ...state.cohort, count: state.cohort.count + 1 }, spent: [...state.spent, await sha256Hex(code)] });
-        return { ok: true };
+        return { ok: true, role: v.role };
       });
     },
     /** Close the open cohort: no code of it works any more. */

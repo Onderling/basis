@@ -3800,6 +3800,18 @@
       "text": "The list \"{{name}}\" is back, with {{count}} things on it.",
       "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
     },
+    "chore_made": {
+      "text": "\"{{text}}\" is a chore now.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
+    "chore_already": {
+      "text": "\"{{text}}\" is a chore already.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
+    "not_a_line": {
+      "text": "\"{{text}}\" is not a plain line; it does not become a chore.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — taken",
     "chore_open": "{{text}} — nobody yet",
@@ -4075,7 +4087,7 @@
       "text": "Nobody is being admitted right now. Ask the administrator.",
       "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
     },
-    "cohort_usage": "Use: /cohort <number of people> <number of days>, for example /cohort 4 7.",
+    "cohort_usage": "Use: /cohort <number of people> <number of days>, for example /cohort 4 7. With a role after it (member, coordinator or observer) everyone with a code gets that role.",
     "cohort_open": "New group open: up to {{people}} people, until {{until}}. Earlier codes no longer work. Make a code with /invite.",
     "cohort_none": "No group is open. Open one with /cohort <number of people> <number of days>.",
     "cohort_closed": "The group is closed: no code works any more.",
@@ -4100,11 +4112,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}} · {{lead}} minutes beforehand (0: none). Who sees the use: {{usage}} (admin: the admin only · members: everyone).",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}} · {{lead}} minutes beforehand (0: none). Who sees the use: {{usage}} (admin: the admin only · members: everyone). Roles: {{roles}} (standard: the admin decides more · flat: everyone equal).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members",
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_saved": {
@@ -4116,7 +4128,7 @@
       "doc": "The household bot's /huishouden when a setting's write was refused."
     },
     "role_usage": {
-      "text": "Use: /role <name> coordinator|member|observer",
+      "text": "Use: /role <name> member|coordinator|observer",
       "doc": "The household bot admin's role and settings commands, and a chore naming a person."
     },
     "role_nobody": {
@@ -4326,6 +4338,13 @@
     "screen_link": "Open this link within {{minutes}} minutes on the screen you want to connect. It works once:\n{{link}}\nShare it with nobody: whoever has it can connect a screen as you.",
     "screen_no_app": "Connecting a screen is not possible on this bot yet: no app address is set.",
     "screen_connected": "You connected a screen. It may do {{n}} things, for {{days}} days. To disconnect: /schermen.",
+    "invite_usage": "Use: /invite (a member), or /invite coordinator, or /invite observer.",
+    "role_flat_two_words": "Under \"flat\" all members are equal: choose member or observer.",
+    "role_word_lid": "member",
+    "menu_roles": "Roles",
+    "value_standard": "standard (the admin decides more)",
+    "value_flat": "flat (everyone does what the admin does, except people and settings)",
+    "roles_changed": "Whoever already has a screen gets the new buttons after connecting it again (/scherm).",
     "quiet_set": "Your own quiet hours: {{hours}}. I send you nothing then.",
     "quiet_house": "You follow the household's quiet hours again.",
     "quiet_usage": "Use: /stil 23:00-08:00 (your own quiet hours) or /stil huis (the household's).",
@@ -4422,6 +4441,7 @@
           "addToList": "put something on a list (or say: put milk on the shopping)",
           "markListItemDone": "tick something off (or say: milk is bought)",
           "removeFromList": "take something off a list",
+          "makeChore": "make a line a chore: who does it, or when (or say: milk for Bob)",
           "editEntry": "change the words of an entry",
           "createList": "a new list",
           "restoreList": "put a removed list back (within 30 days)",
@@ -7550,6 +7570,7 @@
       "markListItemDone": "Done",
       "reassignTask": "Give to someone else",
       "editTask": "Edit",
+      "makeChore": "Chore",
       "editEntry": "Edit",
       "assistant-role": "Role",
       "assistant-revoke": "Remove",

@@ -445,7 +445,7 @@ async function _findLatestActiveCode(store, groupId) {
   const all = await store.listOpen({ type: 'membership-code' });
   const now = Date.now();
   const forGroup = all
-    .filter(i => i?.source?.groupId === groupId)
+    .filter(i => i?.source?.groupId === groupId && !i.source?.boundTo)   // a bound code is one person's, never passed on
     .filter(i => (i.source.expiresAt ?? 0) > now);
   if (forGroup.length === 0) return null;
   // Latest issuedAt wins; tie-break on the item's ulid (monotonic
@@ -2577,7 +2577,10 @@ export function buildSkills({
 
       // B5 — this invite's own limit, chosen within the circle's ceiling (never above it).
       const inviteCeiling = circleInviteCeiling(rules);
-      const maxRedemptions = clampInviteMaxRedemptions(a.maxRedemptions, inviteCeiling);
+      // A code BOUND to one person's key (the household bot's invite to someone who said yes): only that key
+      // redeems it, once. It closes nobody else's code, and no rotation closes it.
+      const boundTo = typeof a.boundTo === 'string' && a.boundTo ? a.boundTo : null;
+      const maxRedemptions = boundTo ? 1 : clampInviteMaxRedemptions(a.maxRedemptions, inviteCeiling);
 
       const code = _freshMembershipCode();
       // Guarantee the rotated code has a strictly later issuedAt than
@@ -2591,8 +2594,8 @@ export function buildSkills({
       const expiresAt = issuedAt + inviteExpiresInHours * 60 * 60 * 1000;
       // Supersede the codes this one replaces, BEFORE minting the new one — if the mint fails we would
       // rather have closed the old door than leave two open.
-      for (const prev of allCodes.filter((i) => i?.source?.groupId === a.groupId
-        && typeof i.source?.supersededAt !== 'number')) {
+      for (const prev of (boundTo ? [] : allCodes).filter((i) => i?.source?.groupId === a.groupId
+        && typeof i.source?.supersededAt !== 'number' && !i.source?.boundTo)) {
         try {
           await store.update(prev.id, { source: { ...prev.source, supersededAt: issuedAt } }, { actor: from });
         } catch { /* best-effort per row: one un-superseded code must not abort the rotation */ }
@@ -2604,7 +2607,7 @@ export function buildSkills({
           source:     {
             groupId: a.groupId, code, issuedAt, expiresAt,
             issuedBy: from, rotationDays, keyRotationMode, inviteExpiresInHours,
-            maxRedemptions,
+            maxRedemptions, ...(boundTo ? { boundTo } : {}),
           },
           visibility: 'household',
         }],

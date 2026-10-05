@@ -107,4 +107,20 @@ describe('a list entry created on one device reaches another device (the circle 
     expect(Array.isArray(entry?.containedBy) && entry.containedBy.includes(list.id),
       "and the entry's back-reference names the list").toBe(true);
   }, 20_000);
+
+  it('a line made a chore on A reaches B as a chore — the same id, still on its list', async () => {
+    // the type change rides as any snapshot does: the rail applies by id and keeps no list of types
+    const rows = await listItemsOn(B);
+    const entry = rows.find((r) => r.type === 'list-item');
+    const r = await A.agent.callSkill('lists', 'makeChore', { circleId: CIRCLE_ID, item: entry.id });
+    expect(r?.ok, JSON.stringify(r)).toBe(true);
+    const onB = await until(async () => {
+      const row = (await B.agent.circleStoreFor(CIRCLE_ID).list()).find((x) => x.id === entry.id);
+      return row?.type === 'task' ? row : null;
+    }, { timeout: 8000, step: 50 });
+    expect(onB, "B holds the line as a chore").toBeTruthy();
+    expect(onB.text).toBe(entry.text);
+    expect(onB.containedBy).toEqual(entry.containedBy);
+    expect((await B.agent.circleStoreFor(CIRCLE_ID).list()).filter((x) => x.id === entry.id)).toHaveLength(1);
+  }, 20_000);
 });

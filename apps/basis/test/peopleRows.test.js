@@ -43,10 +43,11 @@ describe('/users and the screen read the same rows', () => {
 
   it('assistant-users: the rows, and the chat text painted from them', async () => {
     const r = await door()('assistant', 'assistant-users', {}, ADMIN);
+    // each row also carries the word a person reads for its role (under the standard preset, the role itself)
     expect(r.items).toEqual([
-      { id: 'telegram:1', label: 'Frits', role: 'admin', linked: false },
-      { id: 'telegram:7', label: 'Bert', role: 'member', linked: true },
-      { id: 'telegram:9', label: 'Cas', role: 'observer', linked: false },
+      { id: 'telegram:1', label: 'Frits', role: 'admin', linked: false, roleWord: 'admin' },
+      { id: 'telegram:7', label: 'Bert', role: 'member', linked: true, roleWord: 'member' },
+      { id: 'telegram:9', label: 'Cas', role: 'observer', linked: false, roleWord: 'observer' },
     ]);
     expect(r.message).toContain('Bert — member');
     const hidden = await door('none')('assistant', 'assistant-users', {}, ADMIN);

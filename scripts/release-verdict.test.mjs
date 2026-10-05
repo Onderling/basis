@@ -74,7 +74,8 @@ describe('the tests workflow asks first', async () => {
   const { createRequire } = await import('node:module');
   const yaml = createRequire(import.meta.url)('js-yaml');
   const wf = yaml.load(readFileSync(new URL('../.github/workflows/test.yml', import.meta.url), 'utf8'));
-  const gated = Object.entries(wf.jobs).filter(([k]) => k !== 'same-bytes' && k !== 'release-check');
+  // the summary (`tests passed`) always runs and reads them all: pinned in tests-passed-job.test.mjs
+  const gated = Object.entries(wf.jobs).filter(([k]) => k !== 'same-bytes' && k !== 'release-check' && k !== 'tests-passed');
 
   it('every other job waits for "same bytes?" and is skipped on yes — but runs when that job failed', () => {
     for (const [k, j] of gated) {

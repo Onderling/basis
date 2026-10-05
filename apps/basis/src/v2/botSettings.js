@@ -56,7 +56,7 @@ export function mayNamePeople({ setting, callerId, callerRole, roleMayAssign }) 
 }
 
 /** The roles an admin may give a person on the bot (the admin role is the door's, given at admission). */
-export const BOT_ROLES = Object.freeze(['coordinator', 'member', 'observer']);
+export const BOT_ROLES = Object.freeze(['member', 'coordinator', 'observer']);
 
 /** "mij" / "me" / "ik" / "myself" / "zelf": the person who asks. */
 export const isSelfWord = (w) => /^(mij|me|ik|mezelf|zelf|myself|self)$/i.test(String(w ?? '').trim());
@@ -122,3 +122,14 @@ export const usageVisibleFrom = (v) => (USAGE_VISIBILITY.includes(v) ? v : USAGE
 export const MONTHLY_TOKEN_LIMIT_KEY = 'assistant.monthlyTokenLimit';
 export const MONTHLY_TOKEN_LIMIT = param({ key: MONTHLY_TOKEN_LIMIT_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 1_000_000 });
 export const monthlyTokenLimitFrom = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : MONTHLY_TOKEN_LIMIT; };
+
+/**
+ * What each role may do on the bot (Frits 2026-10-05): `standard` — the member's column, a coordinator adds moving and
+ * editing a chore (the tasks role table), the admin everything; `flat` — members and coordinators also do the admin's
+ * DATA work (give, move, remove, edit a chore; cancel anyone's appointment). The door's own admin ops (people, roles,
+ * invites, settings, export) stay the admin's under both. Read by the gate, the menus and the model's tools alike.
+ */
+export const ROLES_KEY = 'assistant.roles';
+export const ROLES_PRESETS = Object.freeze(['standard', 'flat']);
+export const ROLES_PRESET = param({ key: ROLES_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'standard' });
+export const rolesPresetFrom = (v) => (ROLES_PRESETS.includes(v) ? v : ROLES_PRESET);

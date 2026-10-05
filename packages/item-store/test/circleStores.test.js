@@ -72,6 +72,9 @@ describe('createCircleStores (L1 integration)', () => {
     expect(await f.rename('A', 'B')).toBe(0);
     expect(await f.rename('C', 'B')).toBe(0);
     expect((await f.getStore('C').list()).map((i) => i.text)).toEqual(['in C']);
+    // what a refused rename leaves behind is countable (the box logs it)
+    expect(await f.count('C')).toBe(1);
+    expect(await f.count('A')).toBe(0);
     await expect(f.rename('', 'B')).rejects.toThrow();
     await expect(f.rename('C', 'C')).rejects.toThrow();
   });

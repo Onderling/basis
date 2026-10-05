@@ -130,3 +130,22 @@ describe('the box\'s household moves to its circle id once', () => {
     expect((await fresh.callSkill('lists', 'listEntries', { list: 'Boodschappen' })).items.map((i) => i.label)).toContain('appels');
   }, 120_000);
 });
+
+describe('rows left under `household` when the circle already holds rows', () => {
+  it('are not moved over the circle\'s rows, and the boot says how many were left', async () => {
+    const dir = await boxDir();
+    const old = await boot(dir, BEFORE);
+    await ensureHouseholdLists({ callSkill: (a, o, x) => old.callSkill(a, o, x), t });
+    await saved(dir);
+    const moved = await boot(dir, HOUSEHOLD_BOT_STORE_OPTS);
+    expect(moved.householdCircleMove.rows).toBeGreaterThan(0);
+    // an older version writes under `household` again (a downgrade, then this version once more)
+    await saved(dir);
+    const back = await boot(dir, BEFORE);
+    await back.callSkill('lists', 'createList', { text: 'Tussendoor' });
+    await saved(dir);
+    const again = await boot(dir, HOUSEHOLD_BOT_STORE_OPTS);
+    expect(again.householdCircleMove).toMatchObject({ from: 'household', to: again.householdCircleId, rows: 0, leftover: 1 });
+    expect(await listNames(again)).not.toContain('Tussendoor');   // never merged over the circle's rows
+  }, 120_000);
+});

@@ -837,7 +837,7 @@ if (tgToken || inboxDoor.bridge) {
   const inGate = await doorAdmit.atStart().catch((e) => { console.warn(`device-runner: could not put the bot's people in the gate at start: ${e?.message ?? e}`); return null; });
   walkLog({ kind: 'gate-at-start', people: inGate });
   // The household's rows moved to its own circle id on this boot (once, the first boot of the version that gave it one)
-  if (agent.householdCircleMove) walkLog({ kind: 'household-circle-move', rows: agent.householdCircleMove.rows, to: agent.householdCircleMove.to });
+  if (agent.householdCircleMove) walkLog({ kind: 'household-circle-move', rows: agent.householdCircleMove.rows, to: agent.householdCircleMove.to, ...(agent.householdCircleMove.leftover ? { leftover: agent.householdCircleMove.leftover } : {}) });
   // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
   // console, never a chat or the walk log) — the first person admitted is the bot's admin.
   let bootstrapCode = null;

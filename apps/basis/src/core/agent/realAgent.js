@@ -849,7 +849,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   if (botHouseholdId) {
     homeCircleId = botHouseholdId;
     const rows = await householdService.stores.rename('household', botHouseholdId);
-    if (rows) householdCircleMove = { from: 'household', to: botHouseholdId, rows };
+    // rows still under `household` once the circle holds rows (an older version wrote there again): never merged
+    // over the circle's own; counted, so the box says so
+    const leftover = rows ? 0 : await householdService.stores.count('household');
+    if (rows || leftover) householdCircleMove = { from: 'household', to: botHouseholdId, rows, ...(leftover ? { leftover } : {}) };
   }
   // A token this agent mints (a screen's grant) is checked at its own door, which wants the issuer at `trusted` in
   // this registry — the kernel's documented enablement step. On every agent now that the door ALLOWS only surface

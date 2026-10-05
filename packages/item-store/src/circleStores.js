@@ -79,6 +79,11 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
       for (const k of keys) await backing.delete(k);
       return keys.length;
     },
+    /** How many rows ONE circle holds on the shared local backing (what a refused `rename` left behind). */
+    async count(circleId) {
+      if (typeof circleId !== 'string' || !circleId) throw new Error('createCircleStores.count: a non-empty circleId is required');
+      return ((await dataSource.list(rootFor(circleId))) ?? []).length;
+    },
     /**
      * Move ONE circle's rows to a new id on this device: every row under the old root is written under the new one, the
      * same path below it (item ids unchanged), then deleted from the old. Beneath the store, like `forget`: no hook fires,

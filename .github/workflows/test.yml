@@ -92,6 +92,10 @@ jobs:
         run: node scripts/relink-workspace.mjs
       - name: Guards aggregate
         run: npm run guards
+      # the box's updater, against a real git remote and a fake docker (`deploy/box/test`, node:test — outside
+      # every app suite, so it ran nowhere until 2026-10-05)
+      - name: Box updater
+        run: node --test deploy/box/test/
       - name: Doc organisation lint
         run: npm run lint:docs
 

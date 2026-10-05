@@ -2,7 +2,7 @@
 
 A **box** is one machine that runs one or more *roles* (relay · pod · companion · caddy · backup, and
 the feedback repo's collect/aggregate) from the `live` branch of the repos that provide them, and keeps
-itself current: a timer checks the release branch every five minutes, rebuilds what changed, waits for
+itself current: a timer checks the release branch every minute, rebuilds what changed, waits for
 every role's health check, and rolls back when a role does not come up.
 
 `deploy/` already holds the Dockerfiles, compose files and the runbook. The box is their runner.
@@ -68,10 +68,15 @@ the last update and whether it rolled back, `state.json`, and the last 50 log li
 the updater rewrites on every state change (`data/www/`), served by Caddy — no server code, no login,
 nothing secret on it. Anything interactive (freeze, force an update) stays a command on the box.
 
-## The updater (`update.sh`, every 5 min via `onderling-box.timer`)
+## The updater (`update.sh`, every minute via `onderling-box.timer`)
 
 1. `HOLD` present → exit.
-2. Per repo: fetch the release branch. Same sha as `state.json` → nothing to do.
+2. Per repo: ask the remote for the release branch's sha (`git ls-remote`, one request). Same sha as
+   `state.json` → nothing to do, nothing fetched. A sha this box rolled back or refused (`RESET`) is left
+   alone for `RETRY_AFTER` seconds (300) after that, so a bad release is not rebuilt (or alerted) every
+   minute. Otherwise: fetch it with its tags.
+   *A box installed before 2026-10-05 keeps its five-minute timer until the unit is copied again:*
+   `sudo cp <repo>/deploy/box/systemd/onderling-box.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart onderling-box.timer`.
 3. New sha → check it out (detached), `compose build` the roles of that repo **whose `<role>.paths` the
    release actually touched**, then `compose up -d`. This is what keeps a docs-only release from
    recreating the public relay container — which drops its in-memory hold-and-forward queue and

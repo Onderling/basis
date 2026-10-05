@@ -1,10 +1,10 @@
 [Unit]
-Description=Onderling box — check the release branch every 5 minutes
+Description=Onderling box — check the release branch every minute (an ls-remote; the update only on a new sha)
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=5min
-RandomizedDelaySec=30s
+OnUnitActiveSec=1min
+RandomizedDelaySec=10s
 
 [Install]
 WantedBy=timers.target

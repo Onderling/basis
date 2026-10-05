@@ -107,9 +107,16 @@ test('a red health gate rolls back to the previous sha and says so', () => {
   assert.equal(b.state().rolledBack, true);
   assert.equal(b.state().failedRole, 'thing');
   assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /health gate RED \(role: thing\)/);
-  // the next tick with a green gate goes forward again
+  // a tick inside the retry window leaves the failed release alone: no rebuild, no second alert (the timer runs
+  // every minute; a release that failed is tried again at the old five-minute rhythm, RETRY_AFTER)
+  b.clearCalls();
+  const logBefore = readFileSync(join(b.box, 'box.log'), 'utf8');
+  assert.equal(b.run().status, 0);
+  assert.deepEqual(b.calls(), [], 'no docker call inside the retry window');
+  assert.equal(readFileSync(join(b.box, 'box.log'), 'utf8'), logBefore, 'nothing new in the log');
+  // the next try with a green gate goes forward again
   rmSync(join(b.box, 'RED'));
-  const r2 = b.run();
+  const r2 = b.run({ RETRY_AFTER: '0' });
   assert.equal(r2.status, 0, r2.stderr);
   assert.equal(b.headOfBox(), bad);
   assert.equal(b.state().rolledBack, false);
@@ -131,6 +138,12 @@ test('HOLD freezes the box; a RESET tag is refused without ALLOW_RESET', () => {
   sh('git', ['-C', b.work, 'push', '-q', '--tags', 'origin', 'live']);
   assert.equal(b.run().status, 0);
   assert.notEqual(b.headOfBox(), reset, 'RESET tag held');
+  // the next minute: still held, and not said again (one refusal line per retry window)
+  const said = () => (readFileSync(join(b.box, 'box.log'), 'utf8').match(/tagged RESET/g) ?? []).length;
+  assert.equal(said(), 1);
+  assert.equal(b.run().status, 0);
+  assert.equal(said(), 1, 'not refused again inside the window');
+  assert.notEqual(b.headOfBox(), reset);
   assert.equal(b.run({ ALLOW_RESET: '1' }).status, 0);
   assert.equal(b.headOfBox(), reset, 'ALLOW_RESET applies it');
 });
@@ -356,4 +369,29 @@ test('a health script is told whether THIS update rebuilt its role (so an expens
   b.commit('touch nothing anyone claims', null, 'docs/x.md');
   assert.equal(b.run().status, 0);
   assert.deepEqual(b.health().sort(), ['other rebuilt=0', 'thing rebuilt=0']);
+});
+
+test('the one-minute check: an unchanged release branch is asked with ls-remote only — no fetch, no docker, state untouched', () => {
+  const b = makeBox();
+  assert.equal(b.run({ FORCE: '1' }).status, 0);
+  const before = readFileSync(join(b.box, 'state.json'), 'utf8');
+  b.clearCalls();
+  // a git that says which subcommand it ran, then runs the real one
+  const gitLog = join(b.root, 'git.log');
+  const wrap = join(b.root, 'bin', 'git-logged');
+  writeFileSync(wrap, `#!/usr/bin/env bash\nfor a in "$@"; do case "$a" in -C|-q) ;; /*) ;; *) echo "$a" >> "${gitLog}"; break;; esac; done\nexec git "$@"\n`);
+  chmodSync(wrap, 0o755);
+  const quiet = b.run({ GIT: wrap });
+  assert.equal(quiet.status, 0, quiet.stderr);
+  const used = existsSync(gitLog) ? readFileSync(gitLog, 'utf8').trim().split('\n') : [];
+  assert.ok(used.includes('ls-remote'), `asked the remote: ${used}`);
+  assert.ok(!used.includes('fetch'), `no fetch on an unchanged branch: ${used}`);
+  assert.deepEqual(b.calls(), [], 'no docker call');
+  assert.equal(readFileSync(join(b.box, 'state.json'), 'utf8'), before, 'state.json untouched');
+  // and a new commit is still found and taken
+  const sha = b.commit('v2');
+  rmSync(gitLog, { force: true });
+  assert.equal(b.run({ GIT: wrap }).status, 0);
+  assert.equal(b.state().repos?.mono?.sha ?? b.headOfBox(), sha);
+  assert.ok(readFileSync(gitLog, 'utf8').includes('fetch'), 'fetched once there was something new');
 });

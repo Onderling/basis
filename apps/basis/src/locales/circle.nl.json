@@ -1106,6 +1106,16 @@
     }
   },
   "screen": {
+    "items_title": {
+      "task": "Mijn dingen",
+      "calendar-event": "Agenda",
+      "note": "Notities",
+      "announcement": "Aankondigingen",
+      "offer": "Aanbod",
+      "request": "Vragen",
+      "list": "Lijsten",
+      "list-item": "Op de lijsten"
+    },
     "filter_placeholder": {
       "text": "Filteren…",
       "doc": "B/S3 list-screen search box placeholder."

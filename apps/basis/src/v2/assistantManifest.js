@@ -232,7 +232,7 @@ export const assistantManifest = {
       visibility: 'authenticated',
       group:  'settings',
       writes: { scope: 'device' },
-      params: [{ name: 'mode', kind: 'string', required: true }],
+      params: [{ name: 'mode', kind: 'string', required: false }],
       surfaces: { slash: { command: '/weergave', body: 'argline' } },
     },
     {

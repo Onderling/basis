@@ -34,6 +34,10 @@ export const SEAMS = Object.freeze([
   // (list and calendar defaults, task confirmations, a paused circle) come out as keys or English. The box passed it;
   // web and mobile did not (found 2026-09-29).
   { id: 'agent-translator', pattern: /createRealHouseholdAgent\(\{(?:(?!\n\s*\}\);)[\s\S])*?\n\s+t(?::\s*[\w.]+)?,/, why: 'the agent\'s own lines follow the person\'s language' },
+  // A person's node folds a circle's appointments onto that circle's ONE store (`PERSON_NODE_STORE_OPTS`, beside the box's
+  // `HOUSEHOLD_BOT_STORE_OPTS`): without it a person's app reads only its own calendar and never the appointments its
+  // circles hold — the household bot's included (B3, 2026-10-05).
+  { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).
   { id: 'circle-peek', pattern: /createPeek\(/, shells: ['web', 'mobile'], why: 'a circle bot acts on "haal de melk eraf" instead of showing the list' },

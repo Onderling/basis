@@ -1106,6 +1106,16 @@
     }
   },
   "screen": {
+    "items_title": {
+      "task": "My things",
+      "calendar-event": "Agenda",
+      "note": "Notes",
+      "announcement": "Announcements",
+      "offer": "Offers",
+      "request": "Requests",
+      "list": "Lists",
+      "list-item": "On the lists"
+    },
     "filter_placeholder": {
       "text": "Filter…",
       "doc": "B/S3 list-screen search box placeholder."

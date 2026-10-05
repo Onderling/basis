@@ -111,6 +111,9 @@ export function registerCalendarSkills(agent, store, opts = {}) {
         label: formatEventLabel(e, meActor),
         type:  'calendar-event',
         state: e.state ?? 'open',
+        // the raw title and moment beside the label: a merged agenda sorts by when, whichever store an event is in
+        title: e.title ?? null,
+        startsAt: e.startsAt ?? null,
       })),
       _sync: simulateSync(),
     })];

@@ -33,6 +33,7 @@ import { getCircleVersionStore } from './circleVersioning.js';
 // Shared extension-mapping loader (feedback-extension) — web≡mobile core.
 import { loadVerifyMappings } from '../../../basis/src/v2/mappingsLoader.js';
 import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
+import { PERSON_NODE_STORE_OPTS } from '../../../basis/src/v2/personNodeStore.js';
 // Shared contact/bot exposed-skill registry (feedback-extension) — web≡mobile core.
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
@@ -304,6 +305,8 @@ export async function bootAgentBundle(opts = {}) {
     agent = await createRealHouseholdAgent({
       // the shell's translator (App.js hands it): the agent's own lines follow the person's language
       t: opts.t,
+      // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
+      ...PERSON_NODE_STORE_OPTS,
       chatVault,
       hostVault,
       ownerRootVault,

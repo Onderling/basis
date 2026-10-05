@@ -74,9 +74,58 @@ env:
   STORE_PATH: ~/.pnpm-store
 
 jobs:
+  # ── Rung 0: are these the same bytes as a commit whose tail already passed? ───
+  # The proof belongs to the BYTES, not to the commit id (2026-10-05). A merge-back on a normal release, the
+  # push of a release to live and the release PR all carry a tree that already has a green tail; running
+  # everything again was a repeat, and the next release queued behind it. This job asks
+  # `release-check --same-bytes` (its own run left out); on yes every other job is skipped and the summary
+  # names the run it leaned on. On no — or if this job itself fails — everything runs (`!cancelled()` below:
+  # a broken check must never turn into a green run where nothing ran). A dispatch by hand always runs.
+  same-bytes:
+    name: same bytes?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      same: ${{ steps.verdict.outputs.same }}
+      leaned: ${{ steps.verdict.outputs.leaned }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 30
+      - id: verdict
+        if: github.event_name != 'workflow_dispatch'
+        run: node scripts/release-check.mjs --same-bytes "$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # ── The one check `live` requires: did the tail pass on the bytes this release PR brings? ──
+  # On a pull request into live only. The gate's own jobs are skipped on a normal release (same bytes), and a
+  # skipped job satisfies a required check — so `live` requires THIS instead: release-check for the PR's head,
+  # read where the merge happens.
+  release-check:
+    name: release-check
+    if: github.event_name == 'pull_request' && github.base_ref == 'live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 30
+      - run: node scripts/release-check.mjs "${{ github.event.pull_request.head.sha }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   # ── Rung 2: structural checks. Cheap, deterministic, first to fail. ─────────
   checks:
     name: guards + doc lint
+    needs: same-bytes
+    if: ${{ !cancelled() && needs.same-bytes.outputs.same != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -98,6 +147,8 @@ jobs:
   # ── The unit + integration suites, in parallel so a failure names itself. ───
   suites:
     name: ${{ matrix.suite.label }}
+    needs: same-bytes
+    if: ${{ !cancelled() && needs.same-bytes.outputs.same != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -174,6 +225,8 @@ jobs:
   # suites need, so the only external requirement is network access to the npm registry.
   pod:
     name: live-pod integration
+    needs: same-bytes
+    if: ${{ !cancelled() && needs.same-bytes.outputs.same != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -211,7 +264,8 @@ jobs:
   browser:
     name: browser (shard ${{ matrix.shard }}/8)
     # THE TAIL: after a merge (a push to development or live) and by hand — never on a pull request.
-    if: github.event_name != 'pull_request'
+    needs: same-bytes
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.same-bytes.outputs.same != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -255,6 +309,8 @@ jobs:
 
   journeys:
     name: e2e journeys
+    needs: same-bytes
+    if: ${{ !cancelled() && needs.same-bytes.outputs.same != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

@@ -52,7 +52,7 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
      * role, and takes a new display name when one is given.
      * @param {{channel: string, uid: string|number, displayName?: string|null}} who
      */
-    async admit({ channel, uid, displayName = null } = {}) {
+    async admit({ channel, uid, displayName = null, role: asked = null } = {}) {
       if (!isChannel(channel)) throw new Error(`botUsers: unknown channel "${channel}" (one of ${CHANNELS.join(', ')})`);
       const u = uid == null ? '' : String(uid).trim();
       if (!u) throw new Error('botUsers: a uid is required');
@@ -69,7 +69,8 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
       }
       const named = adminUid != null && String(adminUid) === u;
       const anyAdmin = (await store.list()).some((r) => r?.role === ROLES.ADMIN);
-      const role = named || (adminUid == null && !anyAdmin) ? ROLES.ADMIN : ROLES.MEMBER;
+      // the admin is the named one, or the first; anyone else the role their code carried (an invite's), else a member
+      const role = named || (adminUid == null && !anyAdmin) ? ROLES.ADMIN : (['member', 'coordinator', 'observer'].includes(asked) ? asked : ROLES.MEMBER);
       return changed(await store.put({ id, type: 'contact', channel, uid: u, role, ...(name ? { displayName: name } : {}) }));
     },
     /** Every admitted person (a revoked one is not), in the order they were admitted. */
@@ -222,7 +223,7 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     if (!code) return { refused: 'needs-code', id };
     const r = await admission.redeem(code);
     if (!r.ok) return { refused: r.reason, id };
-    return { id: await tier(await users.admit(who)), consumed: true };
+    return { id: await tier(await users.admit({ ...who, role: r.role ?? null })), consumed: true };
   };
   /** The role this door last gave a person (their thread's tools follow it), or null (not admitted here). */
   admit.roleOf = (id) => tiered.get(id) ?? null;

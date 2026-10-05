@@ -90,6 +90,8 @@ export function buildFormSpec({
     if (p.labelKey) {
       field.labelKey = p.labelKey;
     }
+    // a choice the person must make: no option preselected (a required pick then holds the form until they do)
+    if (p.pick === true) field.pick = true;
     if (typeof p.placeholder === 'string') field.placeholder = p.placeholder;
     if (typeof p.hint        === 'string') field.hint        = p.hint;
 

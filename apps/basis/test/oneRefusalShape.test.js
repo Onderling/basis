@@ -61,7 +61,7 @@ describe('one refusal shape, one order', () => {
       await agent.setDoorCaller(webid, role);
     }
     expect(await agent.doorRefusal('addToList', 'telegram:1')).toBeNull();
-    expect(await agent.doorRefusal('reassignTask', 'telegram:1')).toMatchObject({ layer: 'tier' });
+    expect(await agent.doorRefusal('reassignTask', 'telegram:1')).toMatchObject({ layer: 'door-role' });   // the role decides who moves a chore
     expect(await agent.doorRefusal('addItem', 'telegram:1')).toMatchObject({ layer: 'door-map', code: 'not-on-this-door' });
     expect(await agent.doorRefusal('addToList', 'telegram:2')).toMatchObject({ layer: 'door-role', code: 'role' });
 

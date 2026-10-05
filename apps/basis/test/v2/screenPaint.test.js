@@ -59,7 +59,7 @@ describe('an action on a row with more to fill in: its form, with what the row k
     const role = screenActionForm('assistant.assistant-role', { who: 'telegram:7' });
     expect(role.missing).toEqual(['role']);
     expect(role.prefilled).toEqual({ who: 'telegram:7' });
-    expect(role.params.find((p) => p.name === 'role').of).toEqual(['coordinator', 'member', 'observer']);
+    expect(role.params.find((p) => p.name === 'role').of).toEqual(['member', 'coordinator', 'observer']);
     expect(screenActionForm('assistant.assistant-revoke', { who: 'telegram:7' })).toBe(null);
     expect(screenActionForm('nope.nothing', {})).toBe(null);
   });

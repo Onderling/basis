@@ -35,7 +35,8 @@ export const REMOVED_LIST_KEEP_DAYS = param({ key: 'lists.removedKeepDays', scop
 const holdersOf = (c) => {
   if (c?.type !== 'task') return {};
   const ids = [...new Set([...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter((x) => typeof x === 'string' && x))];
-  return { holders: ids };
+  // its day goes with it: a reader of the list (the week overview, a screen) says when, not only who
+  return { holders: ids, ...(c.dueAt ? { dueAt: c.dueAt } : {}) };
 };
 
 export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null, completeChore = null, now = Date.now } = {}) {

@@ -11,9 +11,13 @@ import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 import { peopleRows } from './botPeople.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isOwnTelegramChat } from './doorBridges.js';
 import { cachedShare } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
+
+/** How many entries of one part the week overview shows before it says how many more there are. */
+export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
 
 /**
  * The door's callSkill, with its own ops handled here, and nothing else changed.
@@ -285,8 +289,10 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
 
 
   /**
-   * A person's week, asked AS them: their open chores (with a date) and the coming appointments go through the gate as
-   * that person; the two counts (open on the shopping list, chores nobody holds) are the household's, and name nobody.
+   * A person's week, asked AS them: the coming appointments, what is on the shopping list, and every open chore with who
+   * holds it and its day — the lists are read through the gate as that person, so a chore's holder is worded as the
+   * household's names setting lets them see ("jij", a name, or "opgepakt"). A long list shows its first entries and
+   * how many more.
    */
   async function weekOverviewText(ctx, tp = t) {
     const pad = (n) => String(n).padStart(2, '0');
@@ -299,23 +305,30 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     };
     const asThem = (a, o, x) => callSkill(a, o, x, ctx);
     const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
-    const mine = itemsOf(await asThem('tasks', 'listMine', {}).catch(() => null));
+    const labelOf = (i) => i?.label ?? i?.text ?? i?.title ?? '';
+    const max = WEEK_OVERVIEW_MAX_ITEMS;
+    const more = (n) => (n > max ? [tp('circle.bot.overview_more', { n: n - max })] : []);
     const events = itemsOf(await asThem('calendar', 'listEvents', { days: 7 }).catch(() => null));
-    const shopping = itemsOf(await callSkill('lists', 'listEntries', { list: tp('circle.lists.template.shopping') }).catch(() => null));
-    const open = itemsOf(await callSkill('tasks', 'listOpen', {}).catch(() => null));
-    const unheld = open.filter((it) => ![...(Array.isArray(it.assignees) ? it.assignees : []), it.assignee].some(Boolean)).length;
+    const shoppingName = tp('circle.lists.template.shopping');
+    const choresName = tp('circle.lists.template.chores');
+    const shopping = itemsOf(await asThem('lists', 'listEntries', { list: shoppingName }).catch(() => null));
+    const chores = itemsOf(await asThem('lists', 'listEntries', { list: choresName }).catch(() => null)).filter((c) => !c?.done);
     const lines = [];
-    if (mine.length) {
-      lines.push(tp('circle.bot.overview_mine'));
-      // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
-      for (const c of mine) lines.push(`• ${c.text ?? c.title ?? c.label ?? ''}${c.dueAt ? ` (${localDay(c.dueAt)})` : ''}`);
-    }
     if (events.length) {
       lines.push(tp('circle.bot.overview_events'));
-      for (const e of events) lines.push(`• ${e.label ?? e.title ?? ''}`);
+      for (const e of events.slice(0, max)) lines.push(`• ${labelOf(e)}`);
+      lines.push(...more(events.length));
     }
-    if (shopping.length) lines.push(tp('circle.bot.overview_shopping', { n: shopping.length, list: tp('circle.lists.template.shopping') }));
-    if (unheld) lines.push(tp('circle.bot.overview_unheld', { n: unheld }));
+    if (shopping.length) {
+      const items = shopping.slice(0, max).map(labelOf).filter(Boolean).join(', ');
+      lines.push([tp('circle.bot.overview_list', { list: shoppingName, items }), ...more(shopping.length)].join(' '));
+    }
+    if (chores.length) {
+      lines.push(tp('circle.bot.overview_list', { list: choresName, items: '' }).trimEnd());
+      // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
+      for (const c of chores.slice(0, max)) { const due = c.dueAt; lines.push(`• ${labelOf(c)}${due ? ` (${localDay(due)})` : ''}`); }
+      lines.push(...more(chores.length));
+    }
     return [tp('circle.bot.overview_head'), ...(lines.length ? lines : [tp('circle.bot.overview_none')])].join('\n');
   }
 

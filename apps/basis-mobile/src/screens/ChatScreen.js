@@ -573,6 +573,8 @@ export default function ChatScreen({
         callSkill, sendPeer, publishEvent,
         // a member admitted into a PAIR circle is its co-admin (the pair roster's rule; web parity)
         onAdmitted: (a) => bundle?.pairRoster?.onAdmitted?.(a),
+        // a code bound to one person is theirs from any of their addresses (the canonical chat key)
+        identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         // …and return OUR per-circle address for the circle being joined, proven the same way the joiner
         // proves theirs, so per-circle addressing works in both directions from the join on (web parity).
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,

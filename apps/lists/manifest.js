@@ -178,6 +178,21 @@ export const listsManifest = {
       },
     },
     {
+      // A removed list comes back (within the keep window: 30 days on a household bot) with everything that went with
+      // it. Without a name: the lists that can come back, a button each.
+      id:        'restoreList', group: 'compose',
+      verb:      'unarchive',
+      writes:    { scope: 'circle' },
+      requires:  ['lists'],
+      params: [
+        { name: 'list', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/list-restore', body: 'argline' },
+        chat:  { reply: 'text', hint: 'Put a removed list back, with everything that was on it (within 30 days).' },
+      },
+    },
+    {
       id:        'editEntry', group: 'compose',
       verb:      'edit',
       writes:    { scope: 'circle' },

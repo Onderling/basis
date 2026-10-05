@@ -71,7 +71,11 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "removeList": {
-      "text": "Verwijder een hele lijst en alles wat erop staat (list = de naam). Alleen voor een lijst die weg moet.",
+      "text": "Verwijder een hele lijst en alles wat erop staat (list = de naam). Alleen voor een lijst die weg moet; hij kan 30 dagen terug.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "restoreList": {
+      "text": "Zet een weggehaalde lijst terug, met alles wat erop stond (list = de naam; zonder naam: welke terug kunnen). Kan tot 30 dagen na het weghalen.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },

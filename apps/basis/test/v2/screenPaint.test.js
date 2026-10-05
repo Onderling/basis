@@ -16,13 +16,13 @@ const isAdmin = (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibili
 describe('the screen\'s panels', () => {
   it('grouped, in the person\'s words, a form where params are required, the declared confirm', () => {
     const panels = screenPanels({ ops: ['lists.addToList', 'lists.listLists', 'lists.removeList', 'assistant.assistant-overview', 'calendar.addEvent', 'nope.nothing'], catalogue, isAdmin, t });
-    expect(panels.map((p) => p.title)).toEqual(['Lijsten', 'Agenda', 'Jij', 'Voor de beheerder']);
+    expect(panels.map((p) => p.title)).toEqual(['Lijsten', 'Agenda', 'Jij']);
     const lists = panels[0].items;
-    expect(lists.map((i) => i.skill)).toEqual(['lists.addToList', 'lists.listLists']);
+    expect(lists.map((i) => i.skill)).toEqual(['lists.addToList', 'lists.listLists', 'lists.removeList']);
     expect(lists[0]).toMatchObject({ label: expect.stringContaining('iets op een lijst zetten'), needsForm: true });
     expect(lists[1]).toMatchObject({ needsForm: false, confirm: null });
-    const admin = panels.at(-1).items;
-    expect(admin[0]).toMatchObject({ skill: 'lists.removeList', confirm: expect.objectContaining({ severity: 'danger' }) });
+    // removing a list is everyone's now (it can come back for 30 days), and still asked first
+    expect(lists[2]).toMatchObject({ skill: 'lists.removeList', confirm: expect.objectContaining({ severity: 'danger' }) });
     expect(JSON.stringify(panels)).not.toContain('nope.nothing');
     // the household's settings: the screen asks only for the two changes that take something from everyone
     const settings = screenPanels({ ops: ['assistant.assistant-settings'], catalogue, isAdmin, t })[0].items[0];

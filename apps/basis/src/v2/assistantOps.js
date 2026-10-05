@@ -290,7 +290,13 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    */
   async function weekOverviewText(ctx, tp = t) {
     const pad = (n) => String(n).padStart(2, '0');
-    const localDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso).slice(0, 10) : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    // a chore's day, and its time when it has one (a due at the day's 00:00 is a day)
+    const localDay = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+      const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      return d.getHours() || d.getMinutes() ? `${day} ${pad(d.getHours())}:${pad(d.getMinutes())}` : day;
+    };
     const asThem = (a, o, x) => callSkill(a, o, x, ctx);
     const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
     const mine = itemsOf(await asThem('tasks', 'listMine', {}).catch(() => null));

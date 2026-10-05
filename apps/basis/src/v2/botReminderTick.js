@@ -41,7 +41,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
   const tFor = (personId) => { const lang = threads?.langOf?.(personId) ?? null; return lang ? (k, p) => t(k, p, lang) : t; };
   const lineOf = (item, tp = t) => (item.kind === 'event'
     ? tp(item.soon ? 'circle.bot.reminder_event_soon' : 'circle.bot.reminder_event', { title: item.text, time: timeOf(item.at) })
-    : tp('circle.bot.reminder_chore', { text: item.text }));
+    : tp(item.soon ? 'circle.bot.reminder_chore_soon' : 'circle.bot.reminder_chore', { text: item.text, time: timeOf(item.at) }));
 
   async function passOnce() {
     const s = typeof settings === 'function' ? (settings() ?? {}) : {};

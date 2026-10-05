@@ -9,7 +9,8 @@
  * Only things a person put a date on, and only for the people they concern:
  *   - an appointment tomorrow → the evening before (19:00), to the one who added it and to everyone who comes or
  *     comes maybe;
- *   - a chore due today → the morning of that day (08:00), to the one(s) who hold it;
+ *   - a chore due today → the morning of that day (08:00), to the one(s) who hold it; a chore with a TIME also `lead`
+ *     minutes before that time, as an appointment is;
  *   - an appointment soon → `lead` minutes before it starts (the household's `assistant.reminderLeadMin`, 0 = off), to
  *     the same people as the evening one — unless it was made less than the lead before its start (they just made it).
  * Nothing in quiet hours (the morning opens when they end). An observer, a revoked person, and one who switched
@@ -26,7 +27,7 @@ export const REMINDER_MOMENTS = Object.freeze({ morning: '08:00', evening: '19:0
  */
 export function reminderPromptLines() {
   return [
-    `REMINDERS — you (this bot) send them yourself, and only these: an appointment is reminded the evening before at ${REMINDER_MOMENTS.evening} and again shortly before it starts (the household's lead time, set by the admin in /huishouden; not when it was made just before), to whoever added it and whoever comes; a chore due today is reminded that morning at ${REMINDER_MOMENTS.morning}, to whoever holds it; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). You send nothing in the household's quiet hours (the admin's /huishouden shows them). Asked whether you send reminders: say yes, and when.`,
+    `REMINDERS — you (this bot) send them yourself, and only these: an appointment is reminded the evening before at ${REMINDER_MOMENTS.evening} and again shortly before it starts (the household's lead time, set by the admin in /huishouden; not when it was made just before), to whoever added it and whoever comes; a chore due today is reminded that morning at ${REMINDER_MOMENTS.morning}, to whoever holds it, and a chore with a time also shortly before that time; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). You send nothing in a person's quiet hours: their own (/stil 23:00-08:00) or else the household's (the admin's /huishouden shows them). Asked whether you send reminders: say yes, and when.`,
     'Each person switches their own reminders on or off (the assistant-reminders tool; /herinneringen aan | uit). You cannot remind at a time a person chooses: say so plainly, never promise one, and offer an appointment (reminded the evening before and shortly before) instead.',
   ];
 }
@@ -103,6 +104,19 @@ export function dueReminders({ chores = [], events = [], people = [], said = {},
       const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${ymd(wallClockInTz(start, tz))}:soon`, soon: true };
       const coming = Object.entries(e.rsvp ?? {}).filter(([, r]) => r === 'accepted' || r === 'tentative').map(([who]) => who);
       for (const who of new Set([e.createdBy, ...coming].filter(Boolean))) add(who, item);
+    }
+    // a chore with a TIME (its due is not the day's 00:00): the same short notice before it, to whoever holds it
+    for (const c of chores) {
+      if (!c || c.completedAt || !c.dueAt) continue;
+      const due = new Date(c.dueAt).getTime();
+      const wall = wallClockInTz(due, tz);
+      if (wall.hour === 0 && wall.minute === 0) continue;   // a day, not a time: the morning reminder only
+      if (!(now >= due - leadMs && now < due)) continue;
+      const made = c.createdAt ? new Date(c.createdAt).getTime() : null;
+      if (made != null && due - made < leadMs) continue;
+      const item = { id: c.id, kind: 'chore', text: c.text ?? c.title ?? '', at: c.dueAt, slot: `${ymd(wall)}:soon`, soon: true };
+      const holders = [...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter(Boolean);
+      for (const who of new Set(holders)) add(who, item);
     }
   }
   if (morningOpen) {

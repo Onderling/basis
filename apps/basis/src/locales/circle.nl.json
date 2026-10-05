@@ -4406,6 +4406,7 @@
     "screen_confirm_usage": "Antwoord met de code van het scherm, bijvoorbeeld /koppelen 4F7K, of /koppelen geen.",
     "screen_confirm_none": "Geen van deze",
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
+    "reminder_chore_soon": "Zo meteen: {{text}}, om {{time}}.",
     "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00), {{lead}} minuten van tevoren, en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
     "value_lead_min": "{{n}} minuten",

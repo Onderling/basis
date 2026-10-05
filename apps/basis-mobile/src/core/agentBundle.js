@@ -65,6 +65,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 import { registerCircleAddressesOnRelays } from '../../../basis/src/v2/circleAddressRegistration.js';
 import { makeCircleReachable } from '../../../basis/src/v2/householdRosterPairing.js';
+import { pullCircleLanes } from '../../../basis/src/v2/circleLanes.js';
 import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, POINT_KIND } from '../../../basis/src/v2/connectionPoints.js';
 // SILENT out-of-circle delivery — the per-user "shared with me" store (TIERED: AsyncStorage canonical + pod
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
@@ -961,9 +962,7 @@ export async function bootAgentBundle(opts = {}) {
     agent, circleId, invite,
     recordPoints: recordPointsFromInvite,
     registerCirclePresence,
-    pullLanes: (cid) => Promise.allSettled(
-      ['membership', 'gov', 'key'].map((k) => laneCatchUpsRef.current?.[k]?.requestCircle?.(cid, { callSkill })),
-    ),
+    pullLanes: (cid) => pullCircleLanes(laneCatchUpsRef.current, cid, { callSkill }),
   });
   return {
     catalogue,
@@ -989,12 +988,10 @@ export async function bootAgentBundle(opts = {}) {
      */
     onCircleJoined: ({ circleId } = {}) => makeCircleReachable({
       agent, circleId, registerCirclePresence,
-      // The joiner pulls the circle's pull-all lanes (membership · governance · keys) from the members it
+      // The joiner pulls the circle's lanes (authority and content, `JOIN_PULL_LANES`) from the members it
       // now knows — the screen that builds the lane table fills `laneCatchUps` (ChatScreen); before it has,
       // the reconnect kick covers it.
-      pullLanes: (cid) => Promise.allSettled(
-        ['membership', 'gov', 'key'].map((k) => laneCatchUpsRef.current?.[k]?.requestCircle?.(cid, { callSkill })),
-      ),
+      pullLanes: (cid) => pullCircleLanes(laneCatchUpsRef.current, cid, { callSkill }),
     }),
     /** The pair roster for contacts (L105): the screen's redeem handler hands it every admission. */
     pairRoster,

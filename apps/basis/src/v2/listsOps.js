@@ -147,6 +147,25 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, items: containers.map((c) => ({ id: c.id, label: c.text ?? c.id, type: c.type })) };
     },
 
+    /**
+     * A line becomes a chore, in place: the same item (id, list, words), its type now `task` — what someone means when
+     * they say who does it or when. A chore stays one (`already`); an appointment is its own type and stays it. Who and
+     * when are the chore's own verbs' to set, after this (the door's add, or the person's call, passes them on).
+     */
+    makeChore: async (args) => {
+      const at = await locate(args);
+      if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
+      const { circleId, entry } = at;
+      if (entry.type === 'task') return { ok: true, itemId: entry.id, kind: 'task', already: true, message: t('circle.lists.chore_already', { text: entry.text ?? '' }) };
+      if (entry.type !== 'list-item') return { ok: false, error: t('circle.lists.not_a_line', { text: entry.text ?? '' }) };
+      // the item as stored (the tree's rows are projections), every field kept, the type changed
+      const store = svc.storeFor(circleId);
+      const stored = await store.get(entry.id);
+      if (!stored) return { ok: false, error: t('circle.lists.not_there', { item: entry.text ?? '' }), code: 'not-found' };
+      await store.put({ ...stored, type: 'task' }, { by: localActor });
+      return { ok: true, itemId: entry.id, kind: 'task', message: t('circle.lists.chore_made', { text: entry.text ?? '' }) };
+    },
+
     markListItemDone: async (args, ctx) => {
       // Never "done" for an entry that is not there: nothing would have been ticked.
       const at = await locate(args);

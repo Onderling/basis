@@ -3800,6 +3800,18 @@
       "text": "The list \"{{name}}\" is back, with {{count}} things on it.",
       "doc": "Putting a removed list back (/list-restore, everyone's; 30 days)."
     },
+    "chore_made": {
+      "text": "\"{{text}}\" is a chore now.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
+    "chore_already": {
+      "text": "\"{{text}}\" is a chore already.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
+    "not_a_line": {
+      "text": "\"{{text}}\" is not a plain line; it does not become a chore.",
+      "doc": "A line on a list made a chore in place (the same item; who and when as said)."
+    },
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — taken",
     "chore_open": "{{text}} — nobody yet",
@@ -4422,6 +4434,7 @@
           "addToList": "put something on a list (or say: put milk on the shopping)",
           "markListItemDone": "tick something off (or say: milk is bought)",
           "removeFromList": "take something off a list",
+          "makeChore": "make a line a chore: who does it, or when (or say: milk for Bob)",
           "editEntry": "change the words of an entry",
           "createList": "a new list",
           "restoreList": "put a removed list back (within 30 days)",
@@ -7550,6 +7563,7 @@
       "markListItemDone": "Done",
       "reassignTask": "Give to someone else",
       "editTask": "Edit",
+      "makeChore": "Chore",
       "editEntry": "Edit",
       "assistant-role": "Role",
       "assistant-revoke": "Remove",

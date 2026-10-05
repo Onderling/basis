@@ -444,6 +444,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!person) return { ok: false, error: 'no-thread' };
     const tp = personT(person);
     const w = String(word ?? '').trim().toLowerCase();
+    // without a word: how it stands, a button per choice (as the other switches answer)
+    if (!w) return oneSettingOp(person, 'assistant-view');
     const view = SURFACE_PREFS.find((v) => v === w || ['nl', 'en'].some((lng) => String(t(`circle.bot.view_word_${v}`, undefined, lng)).toLowerCase() === w));
     if (!view) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.view_usage') } };
     threads.setView(person, view);

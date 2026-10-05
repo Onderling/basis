@@ -1,6 +1,6 @@
 /**
- * The week overview: per person, what is theirs this week — their open chores (with a date), the appointments of the
- * next seven days, how many entries are open on the shopping list, and how many chores nobody holds. It is an op called
+ * The week overview: per person — the appointments of the next seven days, what is on the shopping list, and every open
+ * chore with who holds it and its day. It is an op called
  * AS the person (the gate, the role and the names ceiling apply as to anything they type), asked for any time ("wat staat
  * er deze week"), and sent on Sunday at 18:00 to those who switched it on.
  */
@@ -30,7 +30,7 @@ describe('the week overview', () => {
     if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
   });
 
-  it('my chores, the coming appointments, the shopping count, the unheld chores — asked as me', async () => {
+  it('the coming appointments, what is on the shopping list, every open chore with who and when — asked as me', async () => {
     expect(BOT_OP_MAP.member).toContain('weekOverview');
     expect(BOT_OP_MAP.observer).toContain('weekOverview');
     dir = await mkdtemp(path.join(tmpdir(), 'bot-overview-'));
@@ -64,12 +64,15 @@ describe('the week overview', () => {
     const r = await door('assistant', 'weekOverview', {}, { caller: 'telegram:1', threadId: 'telegram:1' });
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(r.message).toContain('circle.bot.overview_head');
-    expect(r.message).toContain('kleurenwiezen');
-    expect(r.message).toContain(`kleurenwiezen (${tomorrow})`);   // its date on the household's clock, not the UTC day
-    expect(r.message).not.toContain('bladeren');                 // Bert's, not mine
     expect(r.message).toContain('tandarts');
-    expect(r.message).toContain('"n":2');                        // two open on the shopping list
-    expect(r.message).toMatch(/overview_unheld[^\n]*"n":1/);     // one chore nobody holds
+    // what is on the shopping list, on one line (a household member's ask, 2026-10-05: the items, not a count)
+    expect(r.message).toMatch(/overview_list[^\n]*"list":"Boodschappen"[^\n]*"items":"(melk, kaas|kaas, melk)"/);
+    // every open chore with who holds it and its day — worded as the names setting lets the asker see
+    expect(r.message).toMatch(/overview_list[^\n]*"list":"Klusjes"/);
+    expect(r.message).toContain(`circle.lists.chore_held {"text":"kleurenwiezen","who":"circle.lists.chore_you"} (${tomorrow})`);   // the household's clock, not the UTC day
+    expect(r.message).toContain('circle.lists.chore_held {"text":"bladeren","who":"Bert"}');
+    expect(r.message).toContain('circle.lists.chore_open {"text":"ramen lappen"}');
+    expect(r.message).not.toContain('overview_unheld');
   }, 180_000);
 
   it('"wat staat er deze week" is the overview by the gate — the model does not summarise it itself', async () => {
@@ -81,5 +84,16 @@ describe('the week overview', () => {
       expect(route(line), line).toMatchObject({ opId: 'weekOverview', appOrigin: 'assistant' });
     }
   });
-});
 
+  it('a long list shows its first entries and how many more', async () => {
+    const { WEEK_OVERVIEW_MAX_ITEMS } = await import('../src/v2/assistantOps.js');
+    const many = Array.from({ length: WEEK_OVERVIEW_MAX_ITEMS + 2 }, (_, i) => ({ id: `s${i}`, label: `ding${i}` }));
+    const callSkill = async (app, op, args) => (app === 'lists' && op === 'listEntries' && args.list === 'Boodschappen' ? { ok: true, items: many } : { ok: true, items: [] });
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    const door = withAssistantOps({ callSkill, threads, t, refusal: async () => null, admin: {} });
+    const r = await door('assistant', 'weekOverview', {}, { caller: 'telegram:1', threadId: 'telegram:1' });
+    expect(r.message).toContain(`ding${WEEK_OVERVIEW_MAX_ITEMS - 1}`);
+    expect(r.message).not.toContain(`ding${WEEK_OVERVIEW_MAX_ITEMS},`);
+    expect(r.message).toContain('circle.bot.overview_more {"n":2}');
+  });
+});

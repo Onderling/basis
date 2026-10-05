@@ -133,3 +133,12 @@ export const ROLES_KEY = 'assistant.roles';
 export const ROLES_PRESETS = Object.freeze(['standard', 'flat']);
 export const ROLES_PRESET = param({ key: ROLES_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'standard' });
 export const rolesPresetFrom = (v) => (ROLES_PRESETS.includes(v) ? v : ROLES_PRESET);
+
+/**
+ * Whether a person who links their Basis identity (`/koppel`) is asked about the household in their own app — an invite
+ * into the household's circle, bound to their key. The household's, off by default: the admin decides.
+ */
+export const HOUSEHOLD_IN_APP_KEY = 'assistant.householdInApp';
+export const IN_APP_MODES = Object.freeze(['off', 'on']);
+export const IN_APP_MODE = param({ key: HOUSEHOLD_IN_APP_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'off' });
+export const inAppModeFrom = (v) => (IN_APP_MODES.includes(v) ? v : IN_APP_MODE);

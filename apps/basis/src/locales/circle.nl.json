@@ -4070,11 +4070,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen). Verbruik zien: {{usage}} (admin: alleen de beheerder · members: iedereen).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|15|30|60",
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|15|30|60 · /huishouden usage admin|members",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_saved": {
@@ -4300,6 +4300,9 @@
     "screen_link": "Open deze link binnen {{minutes}} minuten op het scherm dat je wilt koppelen. Hij werkt één keer:\n{{link}}\nDeel hem met niemand: wie hem heeft, kan een scherm als jou koppelen.",
     "screen_no_app": "Een scherm koppelen kan op deze bot nog niet: er is geen app-adres ingesteld.",
     "screen_connected": "Je hebt een scherm gekoppeld. Het mag {{n}} dingen doen, {{days}} dagen lang. Loskoppelen: /schermen.",
+    "usage_you": "Jij deze maand: {{calls}} vragen aan het model, {{tokens}} tokens ({{cached}}% uit de cache).",
+    "usage_household": "Het hele huishouden deze maand: {{calls}} vragen, {{tokens}} tokens ({{cached}}% uit de cache) — {{share}}% van de {{limit}} per maand.",
+    "menu_usage": "Verbruik zien",
     "screen_open": "Open het scherm",
     "screen_label_telegram": "Telegram-scherm",
     "screen_launch_replaced": "Je opende het scherm opnieuw in Telegram; het vorige Telegram-scherm is losgekoppeld.",
@@ -4425,6 +4428,7 @@
           "assistant-revoke": "iemand eruit halen",
           "assistant-rotate": "de codes vervangen",
           "assistant-status": "hoe de bot ervoor staat",
+          "assistant-usage": "wat het model deze maand kostte: jouw deel (en dat van het huis, als de beheerder dat deelt)",
           "assistant-exports": "de nachtelijke exports",
           "assistant-export": "nu een export maken",
           "assistant-import": "een export terugzetten",

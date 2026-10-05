@@ -25,7 +25,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
+    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
   operations: [
     {
@@ -135,6 +135,15 @@ export const assistantManifest = {
       visibility: 'trusted',
       params: [],
       surfaces: { slash: { command: '/status', body: 'none' } },
+    },
+    {
+      // What the model cost this month: your own count; the household's total for the admin (and for everyone when the
+      // admin says so). Counts only.
+      id:     'assistant-usage',
+      verb:   'show-usage',
+      visibility: 'authenticated',
+      params: [],
+      surfaces: { slash: { command: '/verbruik', body: 'none' } },
     },
     {
       id:     'assistant-users',

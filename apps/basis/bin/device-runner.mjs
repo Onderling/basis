@@ -784,6 +784,8 @@ if (tgToken || inboxDoor.bridge) {
   const apps = doorCatalogue.apps();
   // The model is the optional half of this optional half: a key without its SDK is a warning and a
   // Telegram that answers without a model, never a device that is not there.
+  // filled once the bot's thread rows exist (below); a call before that is counted in the walk log only
+  const usageCounts = { add: null };
   const built = await buildAssistantLlm({
     model: process.env.PRIVATEMODE_MODEL,
     // One retry on the fallback model after a timeout — said in the walk log, so a slow route is visible.
@@ -793,7 +795,11 @@ if (tgToken || inboxDoor.bridge) {
     // the prompt cache (a cache per person), and every call's counts in the walk log: how much of the prompt came
     // from the cache is what the monthly token limit is measured against — counts only, never words
     cacheSalt: promptCacheSecret(),
-    meter: (u) => walkLog({ kind: 'llm-usage', model: u.model ?? null, prompt: u.promptTokens, cached: u.cachedPromptTokens ?? 0, completion: u.completionTokens, ...(u.estimated ? { estimated: true } : {}) }),
+    meter: (u) => {
+      walkLog({ kind: 'llm-usage', model: u.model ?? null, prompt: u.promptTokens, cached: u.cachedPromptTokens ?? 0, completion: u.completionTokens, ...(u.estimated ? { estimated: true } : {}) });
+      // the month's counts: the person's own on their row (`/verbruik`), every call in the household's total (`/status`)
+      usageCounts.add?.(u.subject ?? null, u);
+    },
   });
   const llm = built?.llm ?? null; const llmModel = built?.model ?? null;
   // The flag wins; the box's .env can set it without touching the container's command (a fixture-collecting week).
@@ -851,6 +857,7 @@ if (tgToken || inboxDoor.bridge) {
     store: dataSourceRowStore(await stores.botThreadsSource()),
     memoryDefault: () => agent.getParamValue?.(ASSISTANT_MEMORY_DEFAULT_KEY),
   });
+  usageCounts.add = (subject, u) => threads.addUsage(subject, u);
   await threads.load();
   // The door's call: the assistant's own ops answered here (each after the host gate), the rest on to the agent — the
   // same call a typed line and a scheduled overview take.

@@ -18,6 +18,7 @@
  *               the household's and stays; only the conversation is not kept;
  *   - `long`  — short, plus what the bot knows about the household once that exists; until then it reads as short.
  */
+import { addUsage as addCounts, emptyUsage, monthOf } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 import { ASSISTANT_MEMORY_TURNS } from './assistantEngine.js';
 
@@ -71,6 +72,9 @@ export function memoryThreadStore() {
  * @param {() => number} [a.now]
  * @param {(msg: string, err?: unknown) => void} [a.onWarn]
  */
+/** The row that holds the household's model-use total (no person's: a thread id never has this shape). */
+const HOUSEHOLD_ROW = '(household)';
+
 export function createBotThreads({ eventLog, store = memoryThreadStore(), memoryDefault = () => DEFAULT_MEMORY_MODE, memoryTurns = ASSISTANT_MEMORY_TURNS, now = Date.now, onWarn = null } = {}) {
   if (!eventLog || typeof eventLog.append !== 'function' || typeof eventLog.query !== 'function') {
     throw new TypeError('createBotThreads: an event log with append + query is required');
@@ -171,6 +175,16 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     /** When the person's last Telegram launch that was taken was opened (Telegram's `auth_date`, seconds), or null. */
     lastLaunchOf: (id) => rows.get(id)?.lastLaunch ?? null,
     setLastLaunch(id, authDate) { return save({ ...rowOf(id), lastLaunch: authDate }); },
+    /** One model call's counts (never its words): on the person's row when there is one, and in the household's total. */
+    addUsage(id, u, now = Date.now()) {
+      const month = monthOf(now);
+      if (id && id !== HOUSEHOLD_ROW) save({ ...rowOf(id), usage: addCounts(rows.get(id)?.usage, u, month) });
+      save({ ...rowOf(HOUSEHOLD_ROW), usage: addCounts(rows.get(HOUSEHOLD_ROW)?.usage, u, month) });
+    },
+    /** A person's own counts this month. */
+    usageOf: (id, now = Date.now()) => { const month = monthOf(now); const c = rows.get(id)?.usage; return c?.month === month ? { ...c } : emptyUsage(month); },
+    /** The household's counts this month (every call, whoever made it). */
+    householdUsage: (now = Date.now()) => { const month = monthOf(now); const c = rows.get(HOUSEHOLD_ROW)?.usage; return c?.month === month ? { ...c } : emptyUsage(month); },
     /** Whose pending screen nonce has this hash (one pending per person), or null. */
     screenNonceOwner(hash) {
       for (const [id, r] of rows) if (r?.screenNonce?.hash === hash) return id;

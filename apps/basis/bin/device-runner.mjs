@@ -938,7 +938,11 @@ if (tgToken || inboxDoor.bridge) {
       walkLog({ kind: 'screen-grant', screen: String(g.viewPubKey).slice(0, 8), ok: r?.ok !== false, delivery: r?.delivery ?? null });
       return r;
     },
-    revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
+    revokeView: async (viewPubKey) => {
+      const revoked = (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true;
+      walkLog({ kind: 'screen-revoke', screen: String(viewPubKey).slice(0, 8), revoked });
+      return revoked;
+    },
     listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
     notify: async (person, key, params) => {
       const lang = threads.langOf(person);
@@ -961,7 +965,11 @@ if (tgToken || inboxDoor.bridge) {
     sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
     tellApp: (key, payload) => agent.sendPeerMessage(key, payload),
     listGrants: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
-    revokeView: async (viewPubKey) => (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true,
+    revokeView: async (viewPubKey) => {
+      const revoked = (await agent.callSkill('household', 'revokeSurface', { viewPubKey }))?.revoked === true;
+      walkLog({ kind: 'screen-revoke', screen: String(viewPubKey).slice(0, 8), revoked });
+      return revoked;
+    },
     where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
   }) : null;
   // The bot's door in each circle it joined: a member who names it is answered there, as that member with their role in
@@ -1085,6 +1093,12 @@ if (tgToken || inboxDoor.bridge) {
       walkLog({ kind: 'screen-offer', ok: r.ok, ...(r.ok ? { to: String(r.person).slice(-4), ops: r.ops.length } : { reason: r.reason }) });
     };
     walkLog({ kind: 'screens', exposed });
+    // whether the grants lane folded after this boot: until it does, every screen token is refused as revoked (fail
+    // closed) — the walk log says so, with how many screens hold a live grant (their keys' first characters)
+    Promise.resolve(agent.surfaceGrantsReady?.()).then(async (ready) => {
+      const live = ((await agent.callSkill('household', 'listSurfaceGrants', {}).catch(() => null))?.surfaces ?? []);
+      walkLog({ kind: 'surface-grants', ready: ready === true, screens: live.map((g) => String(g.viewPubKey).slice(0, 8)) });
+    }, (err) => walkLog({ kind: 'surface-grants', ready: false, error: String(err?.message ?? err).slice(0, 120) }));
   }
   tgRunner = createTelegramRunner({
     bridge: multiplexBridges([tgBridge, inboxDoor.bridge]),

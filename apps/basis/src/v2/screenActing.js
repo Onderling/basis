@@ -48,12 +48,13 @@ export const SCREEN_ADMIN_OPS = Object.freeze([
  * and of the admin's own assistant ops only `SCREEN_ADMIN_OPS`.
  * @param {object} catalogue  the door's merged catalogue
  * @param {string|null} role  the person's role on the bot
+ * @param {'standard'|'flat'} [preset]  the bot's roles preset (`assistant.roles`)
  * @returns {string[]}
  */
-export function screenColumnFor(catalogue, role) {
+export function screenColumnFor(catalogue, role, preset = 'standard') {
   // no role (not in the book, revoked): nothing — never a default column
   if (typeof role !== 'string' || !role) return [];
-  const scoped = scopeCatalogueToRole(catalogue, role);
+  const scoped = scopeCatalogueToRole(catalogue, role, preset);
   const out = [];
   for (const [, entry] of scoped?.opsById ?? []) {
     const id = `${entry?.appOrigin}.${entry?.op?.id}`;

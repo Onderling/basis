@@ -28,8 +28,9 @@ describe('the bot\'s slim map', () => {
   it('a member\'s thread offers exactly the member ops; an admin\'s adds the admin ops', () => {
     expect(tools('member')).toEqual([...MEMBER].sort());
     expect(tools('admin')).toEqual([...MEMBER, ...ADMIN_EXTRA].sort());
-    // a coordinator's thread is a member's (the admin's column is the admin's alone); an observer's is the reads
-    expect(tools('coordinator')).toEqual([...MEMBER].sort());
+    // a coordinator's thread is a member's plus moving and editing a chore (the tasks role table, L198) under the
+    // standard roles preset; an observer's is the reads
+    expect(tools('coordinator')).toEqual([...MEMBER, 'reassignTask', 'editTask'].sort());
     // the screen ops are on the observer's column (a read screen) but slash only: never a tool the model holds
     const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink'];
     expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].filter((op) => !SLASH_ONLY.includes(op)).sort());
@@ -49,7 +50,7 @@ describe('the bot\'s slim map', () => {
 
   it('each op has its level; an op off the map has none', () => {
     expect(botOpLevel('addToList')).toBe('authenticated');
-    expect(botOpLevel('reassignTask')).toBe('trusted');
+    expect(botOpLevel('reassignTask')).toBe('by-role');   // the role decides (the roles preset)
     expect(botOpLevel('addItem')).toBeNull();
     expect(botOpLevel('provisionMyCircle')).toBeNull();
   });
@@ -61,7 +62,8 @@ describe('the bot\'s slim map', () => {
     await agent.setDoorCaller('telegram:1', 'member');
     await agent.setDoorCaller('telegram:2', 'admin');
     expect(await agent.doorRefusal('addToList', 'telegram:1')).toBeNull();
-    expect(await agent.doorRefusal('reassignTask', 'telegram:1')).toBeTruthy();
+    // no role rule handed in: an op the role decides is the admin's alone (fail closed)
+    expect(await agent.doorRefusal('reassignTask', 'telegram:1')).toMatchObject({ layer: 'door-role' });
     expect(await agent.doorRefusal('reassignTask', 'telegram:2')).toBeNull();
     expect(await agent.doorRefusal('addItem', 'telegram:2')).toBeTruthy();
     const r = await agent.callSkill('household', 'addItem', { type: 'shopping', text: 'x' }, { caller: 'telegram:2' });

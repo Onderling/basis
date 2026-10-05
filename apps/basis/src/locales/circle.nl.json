@@ -4075,7 +4075,7 @@
       "text": "Er worden op dit moment geen mensen toegelaten. Vraag de beheerder.",
       "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
     },
-    "cohort_usage": "Gebruik: /cohort <aantal mensen> <aantal dagen>, bijvoorbeeld /cohort 4 7.",
+    "cohort_usage": "Gebruik: /cohort <aantal mensen> <aantal dagen>, bijvoorbeeld /cohort 4 7. Met een rol erachter (lid, coordinator of observer) krijgt iedereen met een code die rol.",
     "cohort_open": "Nieuwe groep open: tot {{people}} mensen, tot {{until}}. Eerdere codes werken niet meer. Een code maak je met /invite.",
     "cohort_none": "Er is geen open groep. Open er een met /cohort <aantal mensen> <aantal dagen>.",
     "cohort_closed": "De groep is gesloten: geen enkele code werkt nog.",
@@ -4100,11 +4100,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen). Verbruik zien: {{usage}} (admin: alleen de beheerder · members: iedereen).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen). Verbruik zien: {{usage}} (admin: alleen de beheerder · members: iedereen). Rollen: {{roles}} (standard: de beheerder beslist meer · flat: iedereen gelijk).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|15|30|60 · /huishouden usage admin|members",
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_saved": {
@@ -4116,7 +4116,7 @@
       "doc": "The household bot's /huishouden when a setting's write was refused."
     },
     "role_usage": {
-      "text": "Gebruik: /role <naam> coordinator|member|observer",
+      "text": "Gebruik: /role <naam> member|coordinator|observer",
       "doc": "The household bot admin's role and settings commands, and a chore naming a person."
     },
     "role_nobody": {
@@ -4311,25 +4311,33 @@
       "text": "Klaar",
       "doc": "The button under a chore's reminder: it is done."
     },
-    "overview_mine": {
-      "text": "Jouw klusjes:",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    "overview_list": {
+      "text": "{{list}}: {{items}}",
+      "doc": "The parts of a person's week overview: a list's name and what is on it (shopping on one line; chores one per line under the name), and how many more when a part is long. A household member asked for the items, not a count (2026-10-05)."
+    },
+    "overview_more": {
+      "text": "en nog {{n}}",
+      "doc": "The parts of a person's week overview: a list's name and what is on it (shopping on one line; chores one per line under the name), and how many more when a part is long. A household member asked for the items, not a count (2026-10-05)."
     },
     "overview_events": {
       "text": "Afspraken:",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    },
-    "overview_shopping": {
-      "text": "{{n}} open op {{list}}.",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    },
-    "overview_unheld": {
-      "text": "{{n}} klusjes waar nog niemand voor staat.",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+      "doc": "The parts of a person's week overview: the appointments, then each list (shopping, chores) with what is on it."
     },
     "screen_link": "Open deze link binnen {{minutes}} minuten op het scherm dat je wilt koppelen. Hij werkt één keer:\n{{link}}\nDeel hem met niemand: wie hem heeft, kan een scherm als jou koppelen.",
     "screen_no_app": "Een scherm koppelen kan op deze bot nog niet: er is geen app-adres ingesteld.",
     "screen_connected": "Je hebt een scherm gekoppeld. Het mag {{n}} dingen doen, {{days}} dagen lang. Loskoppelen: /schermen.",
+    "invite_usage": "Gebruik: /invite (een lid) of /invite coordinator of /invite observer.",
+    "role_flat_two_words": "Onder \"plat\" zijn alle leden gelijk: kies lid (member) of observer.",
+    "role_word_lid": "lid",
+    "menu_roles": "Rollen",
+    "value_standard": "standaard (de beheerder beslist meer)",
+    "value_flat": "plat (iedereen doet wat de beheerder doet, behalve mensen en instellingen)",
+    "roles_changed": "Wie al een scherm heeft, krijgt de nieuwe knoppen na opnieuw koppelen (/scherm).",
+    "quiet_set": "Je eigen stille uren: {{hours}}. Dan stuur ik je niets.",
+    "quiet_house": "Je volgt weer de stille uren van het huis.",
+    "quiet_usage": "Gebruik: /stil 23:00-08:00 (je eigen stille uren) of /stil huis (die van het huis).",
+    "menu_assistant-quiet": "Stille uren",
+    "value_huis": "zoals het huis",
     "usage_you": "Jij deze maand: {{calls}} vragen aan het model, {{tokens}} tokens ({{cached}}% uit de cache).",
     "usage_household": "Het hele huishouden deze maand: {{calls}} vragen, {{tokens}} tokens ({{cached}}% uit de cache) — {{share}}% van de {{limit}} per maand.",
     "menu_usage": "Verbruik zien",
@@ -4401,6 +4409,7 @@
     "screen_confirm_usage": "Antwoord met de code van het scherm, bijvoorbeeld /koppelen 4F7K, of /koppelen geen.",
     "screen_confirm_none": "Geen van deze",
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
+    "reminder_chore_soon": "Zo meteen: {{text}}, om {{time}}.",
     "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00), {{lead}} minuten van tevoren, en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
     "value_lead_min": "{{n}} minuten",
@@ -4458,6 +4467,7 @@
           "assistant-invite": "een code voor één persoon",
           "assistant-revoke": "iemand eruit halen",
           "assistant-rotate": "de codes vervangen",
+          "assistant-quiet": "je eigen stille uren (of die van het huis)",
           "assistant-status": "hoe de bot ervoor staat",
           "assistant-usage": "wat het model deze maand kostte: jouw deel (en dat van het huis, als de beheerder dat deelt)",
           "assistant-exports": "de nachtelijke exports",

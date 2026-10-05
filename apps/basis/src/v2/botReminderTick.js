@@ -12,7 +12,8 @@ import { wallClockInTz } from '@onderling/notifier';
 import { dueReminders, inQuiet, QUIET_HOURS } from './botReminders.js';
 
 /** How often the box asks what is due. Reminders are for the evening and the morning; minutes are close enough. */
-export const REMINDER_TICK_MS = param({ key: 'assistant.reminderTickMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60_000 });
+// every minute: a reminder 5 minutes before an appointment lands 5–4 minutes before, not anywhere in the last five
+export const REMINDER_TICK_MS = param({ key: 'assistant.reminderTickMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -40,7 +41,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
   const tFor = (personId) => { const lang = threads?.langOf?.(personId) ?? null; return lang ? (k, p) => t(k, p, lang) : t; };
   const lineOf = (item, tp = t) => (item.kind === 'event'
     ? tp(item.soon ? 'circle.bot.reminder_event_soon' : 'circle.bot.reminder_event', { title: item.text, time: timeOf(item.at) })
-    : tp('circle.bot.reminder_chore', { text: item.text }));
+    : tp(item.soon ? 'circle.bot.reminder_chore_soon' : 'circle.bot.reminder_chore', { text: item.text, time: timeOf(item.at) }));
 
   async function passOnce() {
     const s = typeof settings === 'function' ? (settings() ?? {}) : {};
@@ -49,7 +50,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     const sentOverviews = await sendOverviews(rows, at, s);
     if (s.reminders === 'off') return { sent: sentOverviews };
     const { chores = [], events = [] } = (await sources()) ?? {};
-    const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id) }));
+    const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id), quiet: threads.quietOf?.(r.id) ?? null }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
     const due = dueReminders({ chores, events, people, said, now: at, tz, ...(s.quiet ? { quiet: s.quiet } : {}), ...(s.lead !== undefined ? { lead: s.lead } : {}) });
     let sent = 0;
@@ -91,11 +92,13 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     if (typeof overviewFor !== 'function') return 0;
     const w = wallClockInTz(at, tz);
     const weekday = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(new Date(at));
-    if (weekday !== 'Sun' || w.hour < 18 || inQuiet(w, s.quiet || QUIET_HOURS)) return 0;
+    if (weekday !== 'Sun' || w.hour < 18) return 0;
     const week = `${w.year}-${pad(w.month)}-${pad(w.day)}:overview`;
     let sent = 0;
     for (const r of rows) {
       if (!r?.id || r.hidden || !threads.overviewOn(r.id)) continue;
+      // each person's own quiet hours, else the household's
+      if (inQuiet(w, threads.quietOf?.(r.id) || s.quiet || QUIET_HOURS)) continue;
       const mine = threads.saidOf(r.id);
       if (mine.overview === week) continue;
       const text = await overviewFor(r.id).catch(() => null);

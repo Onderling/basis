@@ -77,7 +77,7 @@ export async function readHousehold({ call, ops, t }) {
     const r = await call('assistant.assistant-users', {}).catch(() => null);
     if (r?.ok !== false && Array.isArray(r?.items)) {
       people = r.items.map((p) => ({
-        id: p.id, label: p.label, role: p.role ?? null, linked: Boolean(p.linked),
+        id: p.id, label: p.label, role: p.role ?? null, roleWord: p.roleWord ?? p.role ?? null, linked: Boolean(p.linked),
         actions: PERSON_ACTIONS.filter((skill) => held.has(skill)).map((skill) => ({
           skill, args: { who: p.id }, label: t(`circle.connectScreen.action.${skill.split('.').pop()}`),
         })),

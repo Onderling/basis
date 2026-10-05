@@ -136,6 +136,12 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'noticeboard':  renderNoticeboard(section, block, tr);  break;
     case 'calendar':       renderAgenda(section, block, tr, highlightRef);       break;
     case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef); break;
+    // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
+    case 'items':
+      if (block.content?.noun === 'task') renderTasks(section, block, tr, onEmbedOpen, highlightRef);
+      else if (block.content?.noun === 'calendar-event') renderAgenda(section, block, tr, highlightRef);
+      else renderItems(section, block, tr);
+      break;
     case 'rules':        renderRules(section, block, tr);        break;
     default:
       section.textContent = tr('circle.screen.block_unknown', { type: block.type });
@@ -239,6 +245,13 @@ function renderAgenda(section, block, tr, highlightRef) {
     const li = document.createElement('li');
     li.className = 'circle-screen__agenda-row';
     li.dataset.eventId = ev.id ?? '';
+    // merged across circles: which circle it is in (a circle's own agenda has none to say)
+    if (ev.circleName) {
+      const tag = document.createElement('span');
+      tag.className = 'circle-screen__tasks-circle';
+      tag.textContent = ev.circleName;
+      li.appendChild(tag);
+    }
     const lbl = document.createElement('span');
     lbl.className = 'circle-screen__agenda-label';
     lbl.textContent = ev.label ?? '';
@@ -248,6 +261,32 @@ function renderAgenda(section, block, tr, highlightRef) {
       li.classList.add('circle-screen__agenda-row--highlight');
       scrollRowIntoView(li);
     }
+    list.appendChild(li);
+  }
+  section.appendChild(list);
+}
+
+/** Rows of any item type across circles: the presenter's label, and which circle it is in. */
+function renderItems(section, block, tr) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr(`circle.screen.items_title.${block.content?.noun ?? ''}`);
+  section.appendChild(title);
+  const list = document.createElement('ul');
+  list.className = 'circle-screen__items-list';
+  for (const it of block.content?.items ?? []) {
+    const li = document.createElement('li');
+    li.className = 'circle-screen__items-row';
+    li.dataset.itemId = it.id ?? '';
+    if (it.circleName) {
+      const tag = document.createElement('span');
+      tag.className = 'circle-screen__tasks-circle';
+      tag.textContent = it.circleName;
+      li.appendChild(tag);
+    }
+    const text = document.createElement('span');
+    text.textContent = it.label ?? '';
+    li.appendChild(text);
     list.appendChild(li);
   }
   section.appendChild(list);

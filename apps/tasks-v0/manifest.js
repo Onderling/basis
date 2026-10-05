@@ -248,7 +248,7 @@ export const tasksManifest = {
      */
     {
       id:        'getTaskSnapshot',
-      verb:      'list',
+      verb:      'get',   // one task, by id — not a list (the list atom of a task is listOpen)
       appliesTo: { type: 'task' },
       params: [
         { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY },

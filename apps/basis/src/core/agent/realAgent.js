@@ -4773,7 +4773,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: false, error: tr('circle.calendar.not_yours', { title: snap.event.title ?? '' }), refusal: refuse('op-rule', 'not-yours') };
       }
     }
-    if (appOrigin === 'calendar' && opts.calendarInCircle) {
+    // A person's node (`opts.personalCalendar`, web and mobile): a call naming a circle reads and writes that circle's
+    // store; a call without one stays on the person's own calendar below.
+    if (appOrigin === 'calendar' && opts.calendarInCircle && !(opts.personalCalendar && !args?.circleId)) {
       const ops = (circleCalendar ??= makeCircleCalendarOps({
         storeFor: (circleId) => householdService.stores.getStore(circleId),
         activeCircle: () => resolveCircleId({}),

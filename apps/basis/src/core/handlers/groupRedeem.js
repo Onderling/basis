@@ -57,6 +57,9 @@ export function makeHandleGroupRedeemRequest({
   circleAddressFor, signCircleAddress, logger = console,
   // After a member is ADMITTED: the pair roster promotes its co-member to admin (`pairRoster.js`); best-effort.
   onAdmitted = null,
+  // The sender's CANONICAL key (the device-local identity link: a per-circle address → the person's chat key). A code
+  // bound to one person is checked against this, resolved here from the verified sender — never read from the body.
+  identityOf = null,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -72,6 +75,7 @@ export function makeHandleGroupRedeemRequest({
       const result = await callSkill('stoop', 'verifyMembershipCodeForPeer', {
         groupId, code,
         requesterWebid: fromAddr,
+        requesterKey: (typeof identityOf === 'function' ? identityOf(fromAddr) : null) || fromAddr,
         ...(shareCard   ? { shareCard: true } : {}),
         ...(peerDisplay ? { peerDisplay }     : {}),
         // Identity 5B/C — the JOINER's per-circle address + its cross-circle link PROOF,

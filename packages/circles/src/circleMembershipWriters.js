@@ -263,7 +263,8 @@ export async function verifyMembershipCodeForPeer({
   if (!valid) return { error: 'invalid-or-expired-code' };
   // A code bound to one key is that key's alone — before any other check, and the same answer as a wrong code (no
   // oracle for "this code exists but is someone else's"). Fail closed: never the shared rule.
-  if (boundElsewhere(valid, a.requesterWebid)) return { error: 'invalid-or-expired-code' };
+  // checked against the redeemer's canonical key, which the admin's handler resolved from the verified sender
+  if (boundElsewhere(valid, a.requesterKey || a.requesterWebid)) return { error: 'invalid-or-expired-code' };
   // Rules-gated admission (task #80) — refused BEFORE any row, key grant, announce or spine entry exists.
   const rulesRefusal = await rulesAcceptanceRefusal(store, a.groupId, a.rulesAccepted);
   if (rulesRefusal) return rulesRefusal;

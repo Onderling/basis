@@ -544,6 +544,14 @@ from "happened fine". That is the failure mode this architecture is most exposed
 composed of best-effort seams — so **a seam is not done until something crosses it**, and the guard for
 this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival.
 
+**Reading across circles is ONE projection per noun, rows tagged with their circle.** "My things", "my agenda" —
+any item type across the circles a person is in — is `acrossCircles` (`src/v2/acrossCircles.js`): per circle the
+type's own `list` (its bespoke op where the manifest declares one, else the generic store handler, through
+`dispatchCapability`), each row tagged `{circleId, circleName}`, filtered by the type's presenter
+(`itemPresenters.js`: its label, its moment, whether it is mine), merged, sorted, capped. It walks the circles'
+stores; it never merges them. Messages are not read this way: their log entry is the render, so they stay on the
+event-log projection. A person's own calendar (an appointment of no circle) is a source beside the circles'.
+
 ### Tasks, roles, and task-scoped grants
 
 Tasks are the worked example of the algebra above, and their substrate is deliberately thin. The canonical store

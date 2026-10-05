@@ -848,8 +848,8 @@ export const basisManifest = {
    * circle.tab.*), so behaviour is unchanged.
    */
   tabs: [
-    { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },
     { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
+    { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },
     // Nearby — the room this device is in (mDNS / BLE). The screen existed on both shells with no door
     // (found 2026-08-30, story 8); a tab for now, declared here so both shells get it from one line.
     { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },

@@ -88,7 +88,8 @@ export async function startScreenShell(win = window) {
       if (confirmApplies(confirm, args) && !win.confirm(t(confirm.messageKey ?? '') || confirm.message || t('circle.connectScreen.sure'))) return;
       householdSaid.textContent = '…';
       try { householdSaid.textContent = answerOf(await view.call(skill, args)); } catch (e) { householdSaid.textContent = inWords(e?.message ?? e); }
-      await paintHousehold();
+      // ticking off a series (the shopping, in the shop) is one read after the last tick, not one per tick
+      paintSoon();
     };
     // a row's action: run it — or, when its op asks more than the row knows, its form with the row filled in
     const act = (a, area) => {

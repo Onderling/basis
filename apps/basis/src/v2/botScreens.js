@@ -26,6 +26,19 @@ import { sha256Hex } from './botAdmission.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { TELEGRAM_LAUNCH_MAX_AGE_S } from './telegramLaunch.js';
 
+/**
+ * The calls a household bot takes from its connected screens: per screen a burst, then so many a second; and from all
+ * screens together. A person ticking off the shopping on their screen costs a call per tick plus a read of the household
+ * (a call per list): the secure agent's own default (30, then 1 a second) answered "Even rustig" after a handful of ticks
+ * (the every-button walk, 2026-10-05). Still a cap: a flood from one key, or from many, is refused.
+ */
+export const SCREEN_CALLS_PER_SECOND = param({ key: 'assistant.screenCallsPerSecond', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+export const SCREEN_CALL_BURST = param({ key: 'assistant.screenCallBurst', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
+export const SCREEN_CALL_BUDGET = Object.freeze({
+  perPeer: Object.freeze({ burst: SCREEN_CALL_BURST, refillPerSec: SCREEN_CALLS_PER_SECOND }),
+  global: Object.freeze({ burst: SCREEN_CALL_BURST * 2.5, refillPerSec: SCREEN_CALLS_PER_SECOND * 5 }),
+});
+
 /** How long a `/scherm` link may be used (once). */
 export const SCREEN_LINK_TTL_MS = param({ key: 'assistant.screenLinkTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60 * 1000 });
 

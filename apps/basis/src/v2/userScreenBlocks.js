@@ -26,6 +26,12 @@
  *                                  diagnostic in the content
  */
 
+import { acrossCircles } from './acrossCircles.js';
+import { ITEM_PRESENTERS } from './itemPresenters.js';
+import { encodeGenericOpId } from '@onderling/app-manifest';
+import { calendarManifest } from '../../../calendar/manifest.js';
+import { tasksManifest } from '../../../tasks-v0/manifest.js';
+import { householdManifest } from '../../../household/manifest.js';
 import { effectiveCircleIds, isAllCircles } from './userScreens.js';
 import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
@@ -75,11 +81,14 @@ async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAl
       case 'noticeboard':
         return materializeNoticeboard(block, activeCircleIds, hostOps);
 
+      // ONE block for any item type over the one cross-circle projection; a screen that still holds the older
+      // `tasks` / `calendar` block is read as the items block it is (no second path to keep in step)
+      case 'items':
+        return await materializeItems(block, activeCircleIds, hostOps);
       case 'calendar':
-        return await materializeAgenda(block, activeCircleIds, hostOps);
-
+        return await materializeItems({ ...block, config: { noun: 'calendar-event', scope: 'all', ...(block.config ?? {}) } }, activeCircleIds, hostOps);
       case 'tasks':
-        return await materializeTasks(block, activeCircleIds, hostOps);
+        return await materializeItems({ ...block, config: { noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine', limit: block.config?.limit } }, activeCircleIds, hostOps);
 
       case 'rules':
         return await materializeRules(block, activeCircleIds, hostOps, screenIsAll);
@@ -114,73 +123,54 @@ function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = 
   };
 }
 
-async function materializeAgenda(block, activeCircleIds, { callSkill } = {}) {
-  const limit       = clampInt(block.config?.limit,       1, 100, 5);
-  const horizonDays = clampInt(block.config?.horizonDays, 1, 365, 14);
-  if (typeof callSkill !== 'function') {
-    return { blockId: block.id, type: 'calendar', status: 'empty', content: { items: [] } };
-  }
-  // Calendar's listEvents is user-scoped today (no circleId arg).
-  // When the screen narrows to a circle subset, we'd ideally filter
-  // events that carry a circleId in source.  The current calendar
-  // store doesn't expose that, so for V0 we return all upcoming events
-  // when ANY circle is active (covers the common "Stream"/"all" case)
-  // and empty when EVERY circle in the filter is muted.
-  if (activeCircleIds.length === 0) {
-    return { blockId: block.id, type: 'calendar', status: 'empty', content: { items: [] } };
-  }
-  const res = await callSkill('calendar', 'listEvents', { days: horizonDays });
-  const items = Array.isArray(res?.items) ? res.items.slice(0, limit) : [];
-  return {
-    blockId: block.id, type: 'calendar',
-    status: items.length > 0 ? 'ok' : 'empty',
-    content: { items },
-  };
-}
+/** The apps whose `list` a cross-circle items block may resolve (first that answers the noun). */
+const ITEM_MANIFESTS = Object.freeze([
+  { appOrigin: 'calendar', manifest: calendarManifest },
+  { appOrigin: 'tasks', manifest: tasksManifest },
+  { appOrigin: 'household', manifest: householdManifest },
+]);
 
 /**
- * α.4 — tasks block across multiple circles.  Query each active circle's
- * tasks circle, filter by scope, merge + cap.  The "Mijn dingen" screen
- * uses scope:'assigned-to-me' across circleFilter=ALL to aggregate every
- * task assigned to the user across the circles they're in.
+ * An `items` block: `{noun, scope: 'mine'|'all', limit, horizonDays}` across the screen's active circles, through
+ * `acrossCircles` (the type's own list per circle, its presenter for mine / order). Appointments also take the person's
+ * own calendar (no circle) — the fold keeps those on the person's store.
  */
-async function materializeTasks(block, activeCircleIds, { callSkill, myWebid, circles } = {}) {
+async function materializeItems(block, activeCircleIds, { callSkill, myWebid, circles } = {}) {
+  const noun = String(block.config?.noun ?? '');
+  const scope = block.config?.scope === 'mine' ? 'mine' : 'all';
   const limit = clampInt(block.config?.limit, 1, 200, 10);
-  const scope = block.config?.scope === 'all' ? 'all' : 'assigned-to-me';
-  if (typeof callSkill !== 'function' || activeCircleIds.length === 0) {
-    return { blockId: block.id, type: 'tasks', status: 'empty', content: { items: [], scope } };
+  const horizonDays = clampInt(block.config?.horizonDays, 1, 365, 14);
+  const empty = { blockId: block.id, type: 'items', status: 'empty', content: { noun, scope, items: [] } };
+  if (typeof callSkill !== 'function' || activeCircleIds.length === 0) return empty;
+  const presenter = ITEM_PRESENTERS[noun];
+  if (!presenter) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: 'no presenter' };
+  const names = new Map((circles ?? []).map((c) => [c?.id, c?.name ?? '']));
+  const isAgenda = noun === 'calendar-event';
+  const until = Date.now() + horizonDays * 86_400_000;
+  const r = await acrossCircles({
+    circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: myWebid ?? null, limit: 500,
+    manifests: ITEM_MANIFESTS,
+    callSkill: (app, op, args) => callSkill(app, op, isAgenda ? { ...args, days: horizonDays } : args),
+    genericFor: (circleId) => ({ list: async (n) => (await callSkill('household', encodeGenericOpId('household', 'list', n), { circleId }))?.result ?? [] }),
+  });
+  let rows = r.ok ? r.items : [];
+  let ownError = null;
+  if (isAgenda) {
+    // my own appointments (no circle), beside the circles'
+    const own = await callSkill('calendar', 'listEvents', { days: horizonDays }).catch((err) => { ownError = String(err?.message ?? err); return null; });
+    const mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '' }));
+    rows = [...rows, ...mine].filter((e) => !presenter.when(e) || presenter.when(e) <= until)
+      .sort((a, b) => presenter.when(a) - presenter.when(b));
   }
-  const circleNameMap = new Map((circles ?? []).map((c) => [c?.id, c?.name ?? '']));
-  const buckets = await Promise.all(activeCircleIds.map(async (cid) => {
-    try {
-      const res = await callSkill('tasks', 'listOpen', { circleId: cid });
-      const raw = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
-      return raw.map((t) => ({
-        id:         t.id,
-        text:       t.text ?? t.title ?? t.label ?? '',
-        state:      t.state ?? t.status ?? 'open',
-        assignee:   t.assignee ?? null,
-        circleId:   cid,
-        circleName: circleNameMap.get(cid) ?? '',
-        _ts:        t.addedAt ?? t.ts ?? 0,
-      }));
-    } catch { return []; }
+  // nothing answered (every circle, and my own calendar when it is asked): a failure, said as one
+  if (!r.ok && r.reason === 'unreachable' && (!isAgenda || ownError)) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: r.error };
+  const items = rows.slice(0, limit).map((row) => ({
+    id: row.id, label: row.label ?? presenter.label(row), when: presenter.when(row) || null,
+    circleId: row.circleId ?? null, circleName: row.circleName ?? '', mine: presenter.isMine(row, myWebid ?? null),
+    // what a chore row also shows: its words, its state, its "see also" links
+    text: row.text ?? row.label ?? presenter.label(row), ...(row.state ? { state: row.state } : {}), ...(Array.isArray(row.embeds) ? { embeds: row.embeds } : {}),
   }));
-  const merged = buckets.flat();
-  const filtered = scope === 'all'
-    ? merged
-    : merged.filter((t) => {
-        if (!t.assignee) return false;
-        if (myWebid == null) return true;
-        return t.assignee === myWebid;
-      });
-  filtered.sort((a, b) => (b._ts ?? 0) - (a._ts ?? 0));
-  const items = filtered.slice(0, limit);
-  return {
-    blockId: block.id, type: 'tasks',
-    status: items.length > 0 ? 'ok' : 'empty',
-    content: { items, scope },
-  };
+  return { blockId: block.id, type: 'items', status: items.length ? 'ok' : 'empty', content: { noun, scope, items } };
 }
 
 async function materializeRules(block, activeCircleIds, { callSkill } = {}, screenIsAll = false) {

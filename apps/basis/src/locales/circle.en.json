@@ -1106,6 +1106,16 @@
     }
   },
   "screen": {
+    "items_title": {
+      "task": "My things",
+      "calendar-event": "Agenda",
+      "note": "Notes",
+      "announcement": "Announcements",
+      "offer": "Offers",
+      "request": "Requests",
+      "list": "Lists",
+      "list-item": "On the lists"
+    },
     "filter_placeholder": {
       "text": "Filter…",
       "doc": "B/S3 list-screen search box placeholder."
@@ -4094,7 +4104,7 @@
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat",
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_saved": {
@@ -4301,21 +4311,17 @@
       "text": "Done",
       "doc": "The button under a chore's reminder: it is done."
     },
-    "overview_mine": {
-      "text": "Your chores:",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+    "overview_list": {
+      "text": "{{list}}: {{items}}",
+      "doc": "The parts of a person's week overview: a list's name and what is on it (shopping on one line; chores one per line under the name), and how many more when a part is long. A household member asked for the items, not a count (2026-10-05)."
+    },
+    "overview_more": {
+      "text": "and {{n}} more",
+      "doc": "The parts of a person's week overview: a list's name and what is on it (shopping on one line; chores one per line under the name), and how many more when a part is long. A household member asked for the items, not a count (2026-10-05)."
     },
     "overview_events": {
       "text": "Appointments:",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    },
-    "overview_shopping": {
-      "text": "{{n}} open on {{list}}.",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
-    },
-    "overview_unheld": {
-      "text": "{{n}} chores nobody has taken yet.",
-      "doc": "The parts of a person's week overview (their chores, the appointments, the shopping list's count, the chores nobody holds)."
+      "doc": "The parts of a person's week overview: the appointments, then each list (shopping, chores) with what is on it."
     },
     "screen_link": "Open this link within {{minutes}} minutes on the screen you want to connect. It works once:\n{{link}}\nShare it with nobody: whoever has it can connect a screen as you.",
     "screen_no_app": "Connecting a screen is not possible on this bot yet: no app address is set.",
@@ -4327,6 +4333,11 @@
     "value_standard": "standard (the admin decides more)",
     "value_flat": "flat (everyone does what the admin does, except people and settings)",
     "roles_changed": "Whoever already has a screen gets the new buttons after connecting it again (/scherm).",
+    "quiet_set": "Your own quiet hours: {{hours}}. I send you nothing then.",
+    "quiet_house": "You follow the household's quiet hours again.",
+    "quiet_usage": "Use: /stil 23:00-08:00 (your own quiet hours) or /stil huis (the household's).",
+    "menu_assistant-quiet": "Quiet hours",
+    "value_huis": "as the household",
     "usage_you": "You this month: {{calls}} questions to the model, {{tokens}} tokens ({{cached}}% from the cache).",
     "usage_household": "The whole household this month: {{calls}} questions, {{tokens}} tokens ({{cached}}% from the cache) — {{share}}% of the {{limit}} a month.",
     "menu_usage": "Who sees the use",
@@ -4398,6 +4409,7 @@
     "screen_confirm_usage": "Answer with the screen's code, for example /koppelen 4F7K, or /koppelen geen.",
     "screen_confirm_none": "None of these",
     "reminder_event_soon": "Soon: {{title}}, {{time}}.",
+    "reminder_chore_soon": "Coming up: {{text}}, at {{time}}.",
     "welcome_reminders_on_lead": "When something has a date, I remind you: the evening before an appointment (19:00), {{lead}} minutes before it, and the morning a chore is due (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
     "menu_lead": "Reminder beforehand",
     "value_lead_min": "{{n}} minutes",
@@ -4455,6 +4467,7 @@
           "assistant-invite": "a code for one person",
           "assistant-revoke": "take someone out",
           "assistant-rotate": "replace the codes",
+          "assistant-quiet": "your own quiet hours (or the household's)",
           "assistant-status": "how the bot is doing",
           "assistant-usage": "what the model cost this month: your share (and the household's, when the admin shares it)",
           "assistant-exports": "the nightly exports",

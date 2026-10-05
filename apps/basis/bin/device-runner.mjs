@@ -61,7 +61,7 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
-import { createBotScreens, encodeScreenLaunchLink } from '../src/v2/botScreens.js';
+import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
 import { createIdentityLink } from '../src/v2/botIdentityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
@@ -242,7 +242,7 @@ const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // the household's store changed: a bot nudges its connected screens (bound below, once the screens exist)
   onCircleWrite: (circleId) => circleWrite.fn?.(circleId),
-  ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: true } : {}),
+  ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),

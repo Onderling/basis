@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # deploy/box/update.sh — keep a box on the release branch of every repo it runs.
 #
-# Run by the systemd timer every 5 minutes (or by hand). Deterministic and boring:
+# Run by the systemd timer every minute (or by hand). Deterministic and boring:
 #   1. HOLD present → do nothing.
-#   2. per repo: fetch the release branch; same sha as state.json → nothing to do.
+#   2. per repo: ask the remote for the release branch's sha (`ls-remote`, one request); the same sha as
+#      state.json → nothing to do, nothing fetched. Otherwise fetch it (with its tags).
 #   3. otherwise check the new sha out (detached), rebuild + restart the roles from that repo,
 #   4. wait for every enabled role's health script (HEALTH_TIMEOUT, 60 s),
 #   5. green → write state.json; red → check the previous sha back out, restart, write
@@ -13,6 +14,9 @@
 #
 #   BOX_DIR=/opt/onderling deploy/box/update.sh            # the timer runs exactly this
 #   BOX_DIR=… FORCE=1 deploy/box/update.sh                 # rebuild even without a new sha
+#
+# A release this box rolled back or refused (RESET) is tried again after RETRY_AFTER seconds (300, the old
+# timer's rhythm), not on every one-minute tick: `.refused-<repo>` holds its sha and when.
 
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,23 +30,37 @@ cd "$BOX_DIR"
 [ -f "$BOX_DIR/HOLD" ] && { log "HOLD present — not updating"; exit 0; }
 
 changed=()
-declare -A previous
+declare -A previous tried
 for name in $(repo_names); do
   d="$(repo_dir "$name")"; br="$(repo_branch "$name")"
   [ -d "$d/.git" ] || die "repo $name not cloned at $d"
-  $GIT -C "$d" fetch -q origin "$br" --tags 2>>"$BOX_DIR/box.log" || { log "fetch failed for $name — keeping $(state_sha "$name")"; continue; }
-  new="$($GIT -C "$d" rev-parse "origin/$br")"
   cur="$(state_sha "$name")"
   [ -z "$cur" ] && cur="$($GIT -C "$d" rev-parse HEAD)"
   previous[$name]="$cur"
+  # ask first, fetch only on news: one small request a minute, nothing written while the branch stands still
+  # (a failed ask falls through to the fetch, which says so itself)
+  if [ "${FORCE:-0}" != 1 ]; then
+    remote="$($GIT -C "$d" ls-remote -q origin "refs/heads/$br" 2>>"$BOX_DIR/box.log" | cut -f1)" || remote=""
+    [ -n "$remote" ] && [ "$remote" = "$cur" ] && continue
+    # a release this box refused (RESET) or rolled back is tried again at the old five-minute rhythm, not every
+    # minute — no rebuild loop, no alert a minute (ALLOW_RESET asks again at once)
+    if [ -n "$remote" ] && [ -f "$BOX_DIR/.refused-$name" ] && [ "${ALLOW_RESET:-0}" != 1 ]; then
+      read -r rsha rat < "$BOX_DIR/.refused-$name" || true
+      if [ "$remote" = "${rsha:-}" ] && [ $(( $(date +%s) - ${rat:-0} )) -lt "${RETRY_AFTER:-300}" ]; then continue; fi
+    fi
+  fi
+  $GIT -C "$d" fetch -q origin "$br" --tags 2>>"$BOX_DIR/box.log" || { log "fetch failed for $name — keeping $(state_sha "$name")"; continue; }
+  new="$($GIT -C "$d" rev-parse "origin/$br")"
   if [ "$new" = "$cur" ] && [ "${FORCE:-0}" != 1 ]; then continue; fi
   msg="$($GIT -C "$d" tag -l --format='%(contents:subject)' --points-at "$new" 2>/dev/null | head -1)"
   if [[ "$msg" == *RESET* ]] && [ "${ALLOW_RESET:-0}" != 1 ]; then
-    log "$name: $new is tagged RESET — refusing without ALLOW_RESET=1"; alert "$name: release $new needs a data reset; held"; continue
+    log "$name: $new is tagged RESET — refusing without ALLOW_RESET=1"; alert "$name: release $new needs a data reset; held"
+    echo "$new $(date +%s)" > "$BOX_DIR/.refused-$name"; continue
   fi
   log "$name: $cur → $new ($br)"
   $GIT -C "$d" diff --name-only "$cur" "$new" > "$BOX_DIR/.changed-$name" 2>/dev/null || : > "$BOX_DIR/.changed-$name"
   $GIT -C "$d" checkout -q -f "$new"
+  tried[$name]="$new"
   changed+=("$name")
 done
 
@@ -81,13 +99,17 @@ apply() {   # build the affected roles, bring the stack up, reload Caddy when it
 
 if apply "${changed[@]}" && failed="$(health_gate)"; then
   write_state false
+  for name in "${changed[@]}"; do rm -f "$BOX_DIR/.refused-$name"; done
   log "updated: ${changed[*]} — healthy"
   exit 0
 fi
 
 failed="${failed:-build}"
 log "health gate RED (role: $failed) — rolling back ${changed[*]}"
-for name in "${changed[@]}"; do $GIT -C "$(repo_dir "$name")" checkout -q -f "${previous[$name]}"; done
+for name in "${changed[@]}"; do
+  $GIT -C "$(repo_dir "$name")" checkout -q -f "${previous[$name]}"
+  echo "${tried[$name]} $(date +%s)" > "$BOX_DIR/.refused-$name"   # tried again after RETRY_AFTER, not every minute
+done
 apply "${changed[@]}" || log "rollback rebuild failed too — box needs a human"
 write_state true "$failed"
 alert "update of ${changed[*]} failed health ($failed); back on the previous release"

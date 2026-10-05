@@ -11,9 +11,13 @@ import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 import { peopleRows } from './botPeople.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isOwnTelegramChat } from './doorBridges.js';
 import { cachedShare } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
+
+/** How many entries of one part the week overview shows before it says how many more there are. */
+export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
 
 /**
  * The door's callSkill, with its own ops handled here, and nothing else changed.
@@ -48,6 +52,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     'assistant-overview':  { values: ['on', 'off'], now: (id) => (threads.overviewOn(id) ? 'on' : 'off') },
     'assistant-language':  { values: ['nl', 'en', 'auto'], now: (id) => threads.langOf(id) ?? 'auto' },
     'assistant-view':      { values: [...SURFACE_PREFS], now: (id) => threads.viewOf(id) },
+    // the person's own quiet hours: the household's (`huis`), or one of a few common ones (any other: `/stil 22:30-07:30`)
+    'assistant-quiet':     { values: ['huis', '22:00-07:00', '23:00-08:00', '23:00-09:00'], now: (id) => threads.quietOf?.(id) ?? 'huis' },
   };
   /** The household's settings (`/huishouden <key> <value>`), each a row. */
   const HOUSEHOLD_SETTINGS = [
@@ -129,13 +135,20 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       // a person's own op answers in their language (`/taal`, set after this call for the language op itself)
       const tp = personT(threadId);
       // a switch asked without its value: how it stands now, with a button per value (as `/instellingen` paints it)
-      if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?._match)) return oneSettingOp(threadId, op);
+      if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?.hours ?? args?._match)) return oneSettingOp(threadId, op);
       if (op === 'assistant-memory') {
         const mode = args?.mode ?? args?._match;
         threads.setMode(threadId, mode);
         return { ok: true, message: tp(`circle.bot.memory_${mode}`) };
       }
       if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx, tp) };
+      if (op === 'assistant-quiet') {
+        const w = String(args?.hours ?? args?._match ?? '').trim().toLowerCase();
+        if (w === 'huis' || w === 'house') { threads.setQuiet(threadId, null); return { ok: true, message: tp('circle.bot.quiet_house') }; }
+        if (!isQuietHours(w)) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.quiet_usage') } };
+        threads.setQuiet(threadId, w);
+        return { ok: true, message: tp('circle.bot.quiet_set', { hours: w }) };
+      }
       if (op === 'assistant-reminders' || op === 'assistant-overview') {
         const mode = switchOf(args?.mode ?? args?._match);
         if (!mode) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
@@ -289,31 +302,46 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
 
 
   /**
-   * A person's week, asked AS them: their open chores (with a date) and the coming appointments go through the gate as
-   * that person; the two counts (open on the shopping list, chores nobody holds) are the household's, and name nobody.
+   * A person's week, asked AS them: the coming appointments, what is on the shopping list, and every open chore with who
+   * holds it and its day — the lists are read through the gate as that person, so a chore's holder is worded as the
+   * household's names setting lets them see ("jij", a name, or "opgepakt"). A long list shows its first entries and
+   * how many more.
    */
   async function weekOverviewText(ctx, tp = t) {
     const pad = (n) => String(n).padStart(2, '0');
-    const localDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso).slice(0, 10) : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    // a chore's day, and its time when it has one (a due at the day's 00:00 is a day)
+    const localDay = (iso) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+      const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      return d.getHours() || d.getMinutes() ? `${day} ${pad(d.getHours())}:${pad(d.getMinutes())}` : day;
+    };
     const asThem = (a, o, x) => callSkill(a, o, x, ctx);
     const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
-    const mine = itemsOf(await asThem('tasks', 'listMine', {}).catch(() => null));
+    const labelOf = (i) => i?.label ?? i?.text ?? i?.title ?? '';
+    const max = WEEK_OVERVIEW_MAX_ITEMS;
+    const more = (n) => (n > max ? [tp('circle.bot.overview_more', { n: n - max })] : []);
     const events = itemsOf(await asThem('calendar', 'listEvents', { days: 7 }).catch(() => null));
-    const shopping = itemsOf(await callSkill('lists', 'listEntries', { list: tp('circle.lists.template.shopping') }).catch(() => null));
-    const open = itemsOf(await callSkill('tasks', 'listOpen', {}).catch(() => null));
-    const unheld = open.filter((it) => ![...(Array.isArray(it.assignees) ? it.assignees : []), it.assignee].some(Boolean)).length;
+    const shoppingName = tp('circle.lists.template.shopping');
+    const choresName = tp('circle.lists.template.chores');
+    const shopping = itemsOf(await asThem('lists', 'listEntries', { list: shoppingName }).catch(() => null));
+    const chores = itemsOf(await asThem('lists', 'listEntries', { list: choresName }).catch(() => null)).filter((c) => !c?.done);
     const lines = [];
-    if (mine.length) {
-      lines.push(tp('circle.bot.overview_mine'));
-      // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
-      for (const c of mine) lines.push(`• ${c.text ?? c.title ?? c.label ?? ''}${c.dueAt ? ` (${localDay(c.dueAt)})` : ''}`);
-    }
     if (events.length) {
       lines.push(tp('circle.bot.overview_events'));
-      for (const e of events) lines.push(`• ${e.label ?? e.title ?? ''}`);
+      for (const e of events.slice(0, max)) lines.push(`• ${labelOf(e)}`);
+      lines.push(...more(events.length));
     }
-    if (shopping.length) lines.push(tp('circle.bot.overview_shopping', { n: shopping.length, list: tp('circle.lists.template.shopping') }));
-    if (unheld) lines.push(tp('circle.bot.overview_unheld', { n: unheld }));
+    if (shopping.length) {
+      const items = shopping.slice(0, max).map(labelOf).filter(Boolean).join(', ');
+      lines.push([tp('circle.bot.overview_list', { list: shoppingName, items }), ...more(shopping.length)].join(' '));
+    }
+    if (chores.length) {
+      lines.push(tp('circle.bot.overview_list', { list: choresName, items: '' }).trimEnd());
+      // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
+      for (const c of chores.slice(0, max)) { const due = c.dueAt; lines.push(`• ${labelOf(c)}${due ? ` (${localDay(due)})` : ''}`); }
+      lines.push(...more(chores.length));
+    }
     return [tp('circle.bot.overview_head'), ...(lines.length ? lines : [tp('circle.bot.overview_none')])].join('\n');
   }
 
@@ -416,7 +444,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     const lines = [tp('circle.bot.menu_head')];
     const buttons = [];
-    const valueLabel = (v) => tp(`circle.bot.value_${v}`);
+    const valueLabel = (v) => (isQuietHours(v) ? v : tp(`circle.bot.value_${v}`));
     const settingsOps = assistantManifest.operations.filter((o) => o.group === 'settings' && o.id !== 'assistant-settings');
     for (const o of settingsOps) {
       const spec = PERSON_SETTINGS[o.id];
@@ -465,6 +493,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!person) return { ok: false, error: 'no-thread' };
     const tp = personT(person);
     const w = String(word ?? '').trim().toLowerCase();
+    // without a word: how it stands, a button per choice (as the other switches answer)
+    if (!w) return oneSettingOp(person, 'assistant-view');
     const view = SURFACE_PREFS.find((v) => v === w || ['nl', 'en'].some((lng) => String(t(`circle.bot.view_word_${v}`, undefined, lng)).toLowerCase() === w));
     if (!view) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.view_usage') } };
     threads.setView(person, view);

@@ -5,7 +5,8 @@
  * pastes the invite into its own join screen.
  *
  * What it proves: the joined app holds the household's EXISTING lines — melk, put there before Bert ever joined — in its
- * own store for the household's circle, without a reload (the content lanes are pulled at the join).
+ * own store for the household's circle, without a reload (the content lanes are pulled at the join); a later line
+ * reaches it; and after `/revoke` a line the household adds no longer does (the eviction's consequence, not only the call).
  *
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8797 npx playwright test --project=relay test-browser/household-in-app-box.spec.js
  */
@@ -88,6 +89,23 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
       const r = await window.onderlingCall('lists', 'listEntries', { circleId: cid, list: 'Boodschappen' });
       return (r?.items ?? []).map((i) => i.label ?? i.text);
     }, circleId), { timeout: 60_000, message: 'melk reached the joined app' }).toContain('melk');
+
+    // ── /revoke: the eviction's CONSEQUENCE — a line the household adds later no longer reaches Bert's app ──
+    const bertHas = (text) => page.evaluate(async ({ cid, text }) => {
+      const r = await window.onderlingCall('lists', 'listEntries', { circleId: cid, list: 'Boodschappen' });
+      return (r?.items ?? []).some((i) => (i.label ?? i.text) === text);
+    }, { cid: circleId, text });
+    // the control: before the revoke, a later line does reach him (the path works)
+    expect(await annAsk('zet kaas op de boodschappen')).toContain('kaas');
+    await expect.poll(() => bertHas('kaas'), { timeout: 60_000, message: 'a later line reached the joined app' }).toBe(true);
+    const users = await annAsk('/users');
+    const bert = users.split('\n').find((l) => !/beheerder|admin/i.test(l))?.split(' — ')[0]?.trim();
+    expect(bert, `no member in /users:\n${users}`).toBeTruthy();
+    expect(await annAsk(`/revoke ${bert}`)).toMatch(/huishouden in de app|household in the app/i);
+    expect(await annAsk('zet brood op de boodschappen')).toContain('brood');
+    // the bot holds it; the revoked app does not, however long it waits
+    await page.waitForTimeout(20_000);
+    expect(await bertHas('brood'), 'a line added after /revoke reached the revoked app').toBe(false);
     await ctx.close();
   } finally {
     await teardown(ann).catch?.(() => {});

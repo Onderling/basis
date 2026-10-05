@@ -4341,7 +4341,7 @@
     "invite_usage": "Gebruik: /invite (een lid) of /invite coordinator of /invite observer.",
     "role_flat_two_words": "Onder \"plat\" zijn alle leden gelijk: kies lid (member) of observer.",
     "role_word_lid": "lid",
-    "inapp_question": "Wil je het huishouden ook in je eigen app? Dan staan lijsten, klusjes en agenda op je telefoon. De bot-regels (namen, rollen) gelden daar dan niet meer.",
+    "inapp_question": "Wil je het huishouden ook in je eigen app? Dan staan lijsten, klusjes en agenda op je telefoon. De bot-regels (namen, rollen) gelden daar dan niet meer. Je kunt er later via je app weer uit.",
     "inapp_invite": "Je uitnodiging voor het huishouden in je eigen app. Alleen jij kunt hem gebruiken, één keer, binnen 24 uur. Plak hem in de app bij Kringen → Lid worden:\n{{invite}}",
     "inapp_declined": "Goed, het blijft bij de chat.",
     "inapp_off": "Het huishouden in je eigen app staat niet aan; dat kan de beheerder aanzetten.",

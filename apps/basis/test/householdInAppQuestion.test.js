@@ -85,6 +85,9 @@ describe('the question after /koppel', () => {
     const done = await d.linkAnn();
     expect(done.message).toContain('circle.bot.link_done');
     expect(done.message).toContain('circle.bot.inapp_question');
+    // the way out is said with the way in (Fable)
+    const nl = (await import('../src/locales/circle.nl.json', { with: { type: 'json' } })).default;
+    expect(nl.bot.inapp_question).toMatch(/Je kunt er later via je app weer uit\.$/);
     expect((done.quickReplies ?? []).map((b) => b.slash)).toEqual(expect.arrayContaining(['/in-app ja', '/in-app nee']));
   });
   it('yes, privately: an invite bound to the linked key; no: nothing', async () => {

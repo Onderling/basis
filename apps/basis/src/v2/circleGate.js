@@ -75,13 +75,15 @@ export function listsGateRules(_locale, lists = []) {
     return byWord.get(w) ?? byWord.get(w.replace(/(?:lijstje|lijst|list)$/, '')) ?? null;
   };
   const chores = lists.find((l) => l.defaultChild === 'task')?.name ?? null;
+  // the household's general shopping list: the template's SHOPPING role, never a name
+  const shopping = lists.find((l) => l.kind === 'shopping')?.name ?? null;
   // The WORDS are the locale files' (gate.<lang>.json: patterns, examples, what must not match); the household bot
   // understands its languages side by side. What each rule DOES stays here, keyed by the entry's id.
   const compiled = compileGateWords(GATE_WORDS, { list: [...byWord.keys()] });
   return GATE_RULES.map(({ id, name, build }) => {
     const forms = compiled.get(id) ?? [];
     const slotsOf = (text) => { for (const f of forms) { const m = f.match(text); if (m) return m; } return null; };
-    const command = (text) => { const m = slotsOf(String(text ?? '')); return m ? build(m, String(text).trim(), { listFor, holdsEvents, chores }) : null; };
+    const command = (text) => { const m = slotsOf(String(text ?? '')); return m ? build(m, String(text).trim(), { listFor, holdsEvents, chores, shopping }) : null; };
     // a rule TAKES a line when it builds a command for it — its own checks included, not only its words
     return { name, test: (text) => Boolean(command(text)), command };
   });
@@ -101,6 +103,8 @@ const GATE_RULES = [
     // a list of appointments is read as the coming days, with their times — the calendar's own read
     return holdsEvents.has(list) ? { opId: 'listEvents', args: {}, appOrigin: 'calendar' } : { opId: 'listEntries', args: { list } };
   } },
+  // at a shop: the general list and the shop's own lists; a shop no list mentions is the model's ("ik ben bij de tandarts")
+  { id: 'lists.shopVisit', name: 'lists:shopVisit(at-shop)', build: (m, _t, { shopping }) => (m.shop && !/\b(?:geweest|been)\b/i.test(m.shop) ? { opId: 'shopVisit', args: { shop: m.shop.replace(/[.!?]+$/, '').trim(), ...(shopping ? { general: shopping } : {}) }, fallback: 'model' } : null) },
   { id: 'tasks.listMine', name: 'tasks:listMine(read)', build: () => ({ opId: 'listMine', args: {} }) },
   // the person's week overview — by rule, so the model does not summarise the week itself
   { id: 'assistant.weekOverview', name: 'assistant:weekOverview(read)', build: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },

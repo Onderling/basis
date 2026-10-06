@@ -146,8 +146,21 @@
       "haal de kinderen van school"
     ]
   },
+  "lists.shopVisit": {
+    "doc": "At a shop: the general shopping list and that shop's own list(s).",
+    "patterns": [
+      "ik (ben|sta) (nu)? (bij|in|op) (de|het)? {shop}"
+    ],
+    "examples": [
+      "ik ben bij de Lidl",
+      "Ik ben nu in de Albert Heijn"
+    ],
+    "not": [
+      "ik ben bij de tandarts geweest"
+    ]
+  },
   "lists.createList": {
-    "doc": "Make a new list (the admin's).",
+    "doc": "Make a new list (anyone in the household).",
     "patterns": [
       "maak (een)? (nieuwe)? lijst (voor|genaamd)? {name}",
       "maak (een)? (nieuwe)? lijst met (de)? naam {name}"

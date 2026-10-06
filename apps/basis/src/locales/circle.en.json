@@ -3812,6 +3812,18 @@
       "text": "\"{{text}}\" is not a plain line; it does not become a chore.",
       "doc": "A line on a list made a chore in place (the same item; who and when as said)."
     },
+    "no_shop_list": {
+      "text": "No list for {{shop}}.",
+      "doc": "At a shop (\"ik ben bij de Lidl\"): the general shopping list and the shop's own lists, each on one line."
+    },
+    "shop_part": {
+      "text": "{{list}}: {{items}}",
+      "doc": "At a shop (\"ik ben bij de Lidl\"): the general shopping list and the shop's own lists, each on one line."
+    },
+    "shop_part_empty": {
+      "text": "{{list}}: nothing",
+      "doc": "At a shop (\"ik ben bij de Lidl\"): the general shopping list and the shop's own lists, each on one line."
+    },
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — taken",
     "chore_open": "{{text}} — nobody yet",
@@ -4195,6 +4207,38 @@
       "text": "{{list}}: \"dentist tomorrow at 10\" adds an appointment; \"what's in the agenda\" shows them.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
+    "welcome_own_lists": {
+      "text": "You can make lists yourself too (\"new list Lidl\") and throw them away; a removed list comes back within 30 days.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_make_chore": {
+      "text": "Say who does something or when (\"milk for Henk\", \"cake for Saturday\") and it becomes a chore.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_people": {
+      "text": "/wie: who is in the household.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_screen": {
+      "text": "/scherm: a screen with buttons for the household, on your phone or computer.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_link": {
+      "text": "Have the Basis app? /koppel links it to you.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_link_inapp": {
+      "text": "Have the Basis app? /koppel links it to you; then /inapp puts the household in your app too.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_quiet": {
+      "text": "/stil 23:00-08:00: your own quiet hours.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_shop": {
+      "text": "At a shop? \"I'm at the Lidl\" shows the shopping list and your own Lidl list.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
     "welcome_week": {
       "text": "\"What's on this week?\" or /week: your chores and the appointments of the coming seven days.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
@@ -4449,6 +4493,7 @@
       },
       "ops": {
         "lists": {
+          "shopVisit": "at a shop: the shopping list and that shop's list (or say: I'm at the Lidl)",
           "listLists": "which lists there are",
           "listEntries": "what is on a list",
           "addToList": "put something on a list (or say: put milk on the shopping)",

@@ -57,6 +57,10 @@ describe('the week overview', () => {
     await own('lists', 'addToList', { list: 'Boodschappen', text: 'melk' });
     await own('lists', 'addToList', { list: 'Boodschappen', text: 'kaas' });
     await as('telegram:1')('calendar', 'addEvent', { title: 'tandarts', when: `${tomorrow}T10:00` });
+    // a list someone made themselves: the seeds are not kinds (Frits 2026-10-06) — its open lines are in the week too
+    await own('lists', 'createList', { text: 'Feest' });
+    await own('lists', 'addToList', { list: 'Feest', text: 'slingers' });
+    await own('lists', 'createList', { text: 'Leeg' });
 
     const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     await threads.load();
@@ -73,6 +77,9 @@ describe('the week overview', () => {
     expect(r.message).toContain('circle.lists.chore_held {"text":"bladeren","who":"Bert"}');
     expect(r.message).toContain('circle.lists.chore_open {"text":"ramen lappen"}');
     expect(r.message).not.toContain('overview_unheld');
+    expect(r.message).toMatch(/overview_list[^\n]*"list":"Feest"[^\n]*"items":"slingers"/);
+    expect(r.message, 'an empty list says nothing').not.toContain('"list":"Leeg"');
+    expect(r.message, 'the Agenda is the appointments part, not a list of lines').not.toContain('"list":"Agenda"');
   }, 180_000);
 
   it('"wat staat er deze week" is the overview by the gate — the model does not summarise it itself', async () => {
@@ -88,7 +95,10 @@ describe('the week overview', () => {
   it('a long list shows its first entries and how many more', async () => {
     const { WEEK_OVERVIEW_MAX_ITEMS } = await import('../src/v2/assistantOps.js');
     const many = Array.from({ length: WEEK_OVERVIEW_MAX_ITEMS + 2 }, (_, i) => ({ id: `s${i}`, label: `ding${i}` }));
-    const callSkill = async (app, op, args) => (app === 'lists' && op === 'listEntries' && args.list === 'Boodschappen' ? { ok: true, items: many } : { ok: true, items: [] });
+    const callSkill = async (app, op, args) => {
+      if (app === 'lists' && op === 'listLists') return { ok: true, items: [{ id: 'l1', label: 'Boodschappen', type: 'list' }] };
+      return app === 'lists' && op === 'listEntries' && args.list === 'Boodschappen' ? { ok: true, items: many } : { ok: true, items: [] };
+    };
     const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     const door = withAssistantOps({ callSkill, threads, t, refusal: async () => null, admin: {} });
     const r = await door('assistant', 'weekOverview', {}, { caller: 'telegram:1', threadId: 'telegram:1' });

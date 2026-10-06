@@ -7451,6 +7451,18 @@
         "text": "✓ Afgekeurd: {{title}}{{note}}",
         "doc": "A task op's confirmation line (the note: why a task was rejected)."
       },
+      "unchanged": {
+        "text": "Niets veranderd aan: {{title}}",
+        "doc": "An edit of a chore that changed nothing (the form sent as it stood): said, with the chore."
+      },
+      "reassigned": {
+        "text": "✓ Doorgegeven: {{title}}",
+        "doc": "A chore action that came back without words (moved, removed): what happened, and to which chore."
+      },
+      "removed": {
+        "text": "✓ Weggehaald: {{title}}",
+        "doc": "A chore action that came back without words (moved, removed): what happened, and to which chore."
+      },
       "edited": {
         "text": "✓ Aangepast: {{title}}{{note}}",
         "doc": "A task op's confirmation line (the note: why a task was rejected)."

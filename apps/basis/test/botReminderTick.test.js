@@ -27,17 +27,19 @@ function world({ now, reminders = 'on', store = memoryThreadStore() }) {
 }
 
 describe('the reminder tick', () => {
-  it('at 19:05 the evening before: one message to the maker, the first one says how to stop; not said twice', async () => {
+  it('at 19:05 the evening before: one message to each person in the household (the agenda is shared), the first one says how to stop; not said twice', async () => {
     const w = world({ now: new Date('2026-10-01T17:05:00.000Z').getTime() });
     await w.threads.load();
     await w.tick.pass();
-    expect(w.sent).toHaveLength(1);
-    expect(w.sent[0].id).toBe('telegram:1');
-    expect(w.sent[0].text).toContain('circle.bot.reminder_event');
-    expect(w.sent[0].text).toContain('"time":"10:00"');
-    expect(w.sent[0].text).toContain('circle.bot.reminder_first');
+    const first = w.sent.length;
+    expect(first).toBeGreaterThanOrEqual(1);
+    expect(new Set(w.sent.map((m) => m.id)).size, 'one message per person').toBe(first);
+    const maker = w.sent.find((m) => m.id === 'telegram:1');
+    expect(maker.text).toContain('circle.bot.reminder_event');
+    expect(maker.text).toContain('"time":"10:00"');
+    expect(maker.text).toContain('circle.bot.reminder_first');
     await w.tick.pass();
-    expect(w.sent).toHaveLength(1);
+    expect(w.sent).toHaveLength(first);
   });
 
   it('a restart between the moment and the send still sends once', async () => {
@@ -49,7 +51,9 @@ describe('the reminder tick', () => {
     const after = world({ now: new Date('2026-10-01T17:35:00.000Z').getTime(), store });
     await after.threads.load();
     await after.tick.pass();
-    expect(before.sent.length + after.sent.length).toBe(1);
+    // each person once, whichever side of the restart
+    const ids = [...before.sent, ...after.sent].map((m) => m.id);
+    expect(ids.length).toBe(new Set(ids).size);
   });
 
   it('the morning after, the chore due that day; a box off over the appointment says nothing of it', async () => {

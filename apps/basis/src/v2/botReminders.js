@@ -50,6 +50,22 @@ export function inQuiet(w, quiet) {
 }
 
 /**
+ * Who an appointment reminds. The household's agenda is SHARED (Frits 2026-10-06, a member's feedback: "gezamenlijke
+ * afspraken … dat iedereen er een melding van krijgt"): everyone in it — unless the appointment NAMES people
+ * (`attendees`), then those, its maker, and whoever said they come. Never someone who said they do not.
+ * @param {{createdBy?: string, attendees?: string[], rsvp?: Record<string, string>}} e
+ * @param {Array<{id: string}>} people
+ * @returns {string[]}
+ */
+export function remindedFor(e, people = []) {
+  const rsvp = e?.rsvp ?? {};
+  const named = Array.isArray(e?.attendees) ? e.attendees.filter((a) => typeof a === 'string' && a) : [];
+  const coming = Object.entries(rsvp).filter(([, r]) => r === 'accepted' || r === 'tentative').map(([who]) => who);
+  const base = named.length ? named : people.map((p) => p?.id).filter(Boolean);
+  return [...new Set([...base, e?.createdBy, ...coming].filter(Boolean))].filter((who) => rsvp[who] !== 'declined');
+}
+
+/**
  * @param {object} a
  * @param {Array<{id:string, text?:string, dueAt?:string, completedAt?:any, assignees?:string[], assignee?:string}>} [a.chores]
  * @param {Array<{id:string, title?:string, startsAt?:string, createdBy?:string, rsvp?:object, state?:string, completedAt?:any}>} [a.events]
@@ -88,8 +104,7 @@ export function dueReminders({ chores = [], events = [], people = [], said = {},
       const start = new Date(e.startsAt).getTime();
       if (!(start > now) || ymd(wallClockInTz(start, tz)) !== tomorrow) continue;
       const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${today}:evening` };
-      const coming = Object.entries(e.rsvp ?? {}).filter(([, r]) => r === 'accepted' || r === 'tentative').map(([who]) => who);
-      for (const who of new Set([e.createdBy, ...coming].filter(Boolean))) add(who, item);
+      for (const who of remindedFor(e, people)) add(who, item);
     }
   }
   // shortly before: due from `start − lead` until the start, once per appointment and day (`<date>:soon`)
@@ -102,8 +117,7 @@ export function dueReminders({ chores = [], events = [], people = [], said = {},
       const made = e.createdAt ? new Date(e.createdAt).getTime() : null;
       if (made != null && start - made < leadMs) continue;   // they just made it: nothing to remind them of yet
       const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${ymd(wallClockInTz(start, tz))}:soon`, soon: true };
-      const coming = Object.entries(e.rsvp ?? {}).filter(([, r]) => r === 'accepted' || r === 'tentative').map(([who]) => who);
-      for (const who of new Set([e.createdBy, ...coming].filter(Boolean))) add(who, item);
+      for (const who of remindedFor(e, people)) add(who, item);
     }
     // a chore with a TIME (its due is not the day's 00:00): the same short notice before it, to whoever holds it
     for (const c of chores) {

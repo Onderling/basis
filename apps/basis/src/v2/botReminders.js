@@ -17,6 +17,10 @@
  * reminders off get none. Everything due for one person at one moment is ONE entry (one message).
  */
 import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+/** The evening before is only for an appointment starting before this, the next morning (an earlier one than the 08:00 message). */
+export const EVENING_BEFORE_UNTIL = param({ key: 'assistant.eveningBeforeUntil', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: '10:00' });
 
 /** The two moments of a day, on the household's clock. */
 export const REMINDER_MOMENTS = Object.freeze({ morning: '08:00', evening: '19:00' });
@@ -27,7 +31,7 @@ export const REMINDER_MOMENTS = Object.freeze({ morning: '08:00', evening: '19:0
  */
 export function reminderPromptLines() {
   return [
-    `REMINDERS — you (this bot) send them yourself, and only these: an appointment is reminded the evening before at ${REMINDER_MOMENTS.evening} and again shortly before it starts (the household's lead time, set by the admin in /huishouden; not when it was made just before), to whoever added it and whoever comes; a chore due today is reminded that morning at ${REMINDER_MOMENTS.morning}, to whoever holds it, and a chore with a time also shortly before that time; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). You send nothing in a person's quiet hours: their own (/stil 23:00-08:00) or else the household's (the admin's /huishouden shows them). Asked whether you send reminders: say yes, and when.`,
+    `REMINDERS — you (this bot) send them yourself, and only these: everything of the day — chores due today AND today's appointments — is said that morning at ${REMINDER_MOMENTS.morning}; an appointment early the next morning (before ${EVENING_BEFORE_UNTIL}) is also reminded the evening before at ${REMINDER_MOMENTS.evening}; anything with a time is reminded again shortly before it starts (the household's lead time, set by the admin in /huishouden; not when it was made just before), an appointment goes to everyone in the household unless it names people (then those, its maker and who comes); a chore to whoever holds it; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). You send nothing in a person's quiet hours: their own (/stil 23:00-08:00) or else the household's (the admin's /huishouden shows them). Asked whether you send reminders: say yes, and when.`,
     'Each person switches their own reminders on or off (the assistant-reminders tool; /herinneringen aan | uit). You cannot remind at a time a person chooses: say so plainly, never promise one, and offer an appointment (reminded the evening before and shortly before) instead.',
   ];
 }
@@ -103,6 +107,9 @@ export function dueReminders({ chores = [], events = [], people = [], said = {},
       if (!e || e.state === 'cancelled' || e.completedAt || !e.startsAt) continue;
       const start = new Date(e.startsAt).getTime();
       if (!(start > now) || ymd(wallClockInTz(start, tz)) !== tomorrow) continue;
+      // the evening before only for what starts before the morning's message can say it (Frits 2026-10-06: one rhythm)
+      const sw = wallClockInTz(start, tz);
+      if (`${String(sw.hour).padStart(2, '0')}:${String(sw.minute).padStart(2, '0')}` >= EVENING_BEFORE_UNTIL) continue;
       const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${today}:evening` };
       for (const who of remindedFor(e, people)) add(who, item);
     }
@@ -140,6 +147,16 @@ export function dueReminders({ chores = [], events = [], people = [], said = {},
       const item = { id: c.id, kind: 'chore', text: c.text ?? c.title ?? '', at: c.dueAt, slot: `${today}:morning` };
       const holders = [...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter(Boolean);
       for (const who of new Set(holders)) add(who, item);
+    }
+    // …and today's appointments still to come: the morning says everything of the day, chores and appointments alike
+    for (const e of events) {
+      if (!e || e.state === 'cancelled' || e.completedAt || !e.startsAt) continue;
+      const start = new Date(e.startsAt).getTime();
+      if (!(start > now) || ymd(wallClockInTz(start, tz)) !== today) continue;
+      // one made after the morning's moment is not "this morning's" news to anyone (its reminder is shortly before)
+      if (e.createdAt && new Date(e.createdAt).getTime() >= atToday(REMINDER_MOMENTS.morning)) continue;
+      const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${today}:morning` };
+      for (const who of remindedFor(e, people)) add(who, item);
     }
   }
   return [...out].map(([personId, items]) => ({ personId, slot: slotNow, items }));

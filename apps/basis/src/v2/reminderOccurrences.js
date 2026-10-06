@@ -51,6 +51,33 @@ export function householdRules(lead = 0) {
   return ['morning', 'evening-before', ...(n > 0 ? [`before:${n}`] : [])];
 }
 
+/** The layers, far to near. */
+export const REMINDER_LAYERS = Object.freeze({ household: 'household', person: 'person', item: 'item', 'person-item': 'person-item' });
+const MODES = new Set(['replace', 'add']);
+
+/**
+ * The rules that apply to one person for one item, from the four layers far to near: the household's, the person's
+ * own default, the item's own (the household's statement about it), the person's own for that item. Each layer
+ * `{ mode: 'replace'|'add', rules }` replaces what came before or adds to it; a rule two layers share is named by the
+ * nearer one (which decides, e.g., whether `evening-before` carries the household's early-morning condition).
+ * @param {{household?: string[], personDefault?: object|null, item?: object|null, personItem?: object|null}} layers
+ * @returns {Array<{rule: string, layer: string}>}
+ */
+export function layeredRules({ household = [], personDefault = null, item = null, personItem = null } = {}) {
+  let list = new Map();
+  const put = (rules, layer) => { for (const r of rules ?? []) if (parseReminderRule(r)) { list.delete(r); list.set(r, layer); } };
+  put(household, 'household');
+  for (const [layer, l] of [['person', personDefault], ['item', item], ['person-item', personItem]]) {
+    if (!l || !MODES.has(l.mode) || !Array.isArray(l.rules)) continue;
+    if (l.mode === 'replace') list = new Map();
+    put(l.rules, layer);
+  }
+  // keep the household's order for what it named; what a nearer layer added comes after
+  const order = (household ?? []).filter((r) => list.has(r));
+  const rest = [...list.keys()].filter((r) => !order.includes(r));
+  return [...order, ...rest].map((rule) => ({ rule, layer: list.get(rule) }));
+}
+
 /** A local wall-clock time on a local day, as an instant. */
 const atLocal = (day, time, tz) => { const [hour, minute] = time.split(':').map(Number); return utcInstantForWallClock({ ...day, hour, minute, tz }); };
 const dayOf = (w) => ({ year: w.year, month: w.month, day: w.day });

@@ -11,6 +11,7 @@
  * A list lives in the circle's own store, like a task or a message, so it rides the one fan-out path and
  * obeys the circle's data-move branch. Nothing here knows about sharing; that is the point.
  */
+import { reminderLayerFromWords, describeRules } from './reminderWords.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
@@ -320,6 +321,23 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       await svc.storeFor(at.circleId).put({ ...at.entry, text }, { by: localActor });
       return { ok: true, message: t('circle.lists.edited', { text, name: at.target.text ?? '' }) };
+    },
+
+    /**
+     * The reminders everyone it is for gets for one entry, in a person's words; "gewoon" drops them (the usual ones
+     * apply again). The household's statement about the item, so it syncs like its words.
+     */
+    entryReminders: async (args) => {
+      const words = String(args?.reminders ?? '').trim();
+      const usual = /^(gewoon|normaal|usual|normal)$/i.test(words);
+      const reminders = usual ? null : reminderLayerFromWords(words);
+      if (!usual && !reminders) return { ok: false, error: t('circle.bot.reminders_usage') };
+      const at = await locate(args);
+      if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
+      const { reminders: _old, ...entry } = at.entry;
+      await svc.storeFor(at.circleId).put(reminders ? { ...entry, reminders } : entry, { by: localActor });
+      const name = at.entry.text ?? at.entry.title ?? '';
+      return { ok: true, message: reminders ? t('circle.lists.reminders_set', { text: name, rules: describeRules(reminders.rules, t) + (reminders.mode === 'add' ? ` (${t('circle.lists.reminders_on_top')})` : '') }) : t('circle.lists.reminders_usual', { text: name }) };
     },
 
     /** The service itself, for a screen that projects containers (a read, not a second write path). */

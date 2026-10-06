@@ -69,6 +69,8 @@ export const calendarManifest = {
         // envelope; their basis surfaces a time-card embed
         // with [Accept]/[Decline]/[Tentative] that RSVPs back.
         { name: 'attendees-addr', kind: 'string', required: false },
+        // its own reminders, in a person's words ("ook avond", "60", "7:30"): the household's for this appointment
+        { name: 'reminders',     kind: 'string', required: false },
       ],
       surfaces: {
         // Part C gate — "schedule X" / "afspraak X" → addEvent{title}. PARTIAL: binds title; the

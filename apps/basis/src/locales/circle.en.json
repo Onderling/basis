@@ -3827,7 +3827,19 @@
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — taken",
     "chore_open": "{{text}} — nobody yet",
-    "chore_you": "you"
+    "chore_you": "you",
+    "reminders_set": {
+      "text": "Reminders for {{text}}: {{rules}}.",
+      "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    },
+    "reminders_on_top": {
+      "text": "on top of the usual ones",
+      "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    },
+    "reminders_usual": {
+      "text": "For {{text}} the usual reminders apply again.",
+      "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    }
   },
   "share": {
     "error": {
@@ -4183,6 +4195,62 @@
       "text": "Reminders are off.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "reminders_rules_set": {
+      "text": "Your reminders: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "reminders_rules_household": {
+      "text": "Your reminders follow the household again: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "reminders_usage": {
+      "text": "Use: /herinneringen on · off · 60 (an hour before) · morning · evening · 7:30 · also … (on top, not instead) · none · house (as the household).",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_morning": {
+      "text": "in the morning (08:00)",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_evening": {
+      "text": "the evening before (19:00)",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_before": {
+      "text": "{{n}} min before",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_at": {
+      "text": "at {{time}}",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rules_none": {
+      "text": "none",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_set": {
+      "text": "For {{item}}: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_added": {
+      "text": "For {{item}}, on top: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_cleared": {
+      "text": "For {{item}} you follow the usual reminders again.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_not_found": {
+      "text": "I can't find an appointment or chore with \"{{item}}\".",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_which": {
+      "text": "Which one? {{items}}",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_usage": {
+      "text": "Say which appointment or chore, and when — for example: remind me an hour before the dentist.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
     "overview_on": {
       "text": "The weekly overview is on (Sunday 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4248,7 +4316,7 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "When something has a date I remind you: the evening before an appointment (19:00) and on the morning of a chore (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
+      "text": "When something has a date, I remind you: at 08:00 everything of that day, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
@@ -4479,7 +4547,7 @@
     "screen_confirm_none": "None of these",
     "reminder_event_soon": "Soon: {{title}}, {{time}}.",
     "reminder_chore_soon": "Coming up: {{text}}, at {{time}}.",
-    "welcome_reminders_on_lead": "When something has a date, I remind you: the evening before an appointment (19:00), {{lead}} minutes before it, and the morning a chore is due (08:00). Between {{from}} and {{to}} I send nothing. To stop: /herinneringen uit.",
+    "welcome_reminders_on_lead": "When something has a date, I remind you: at 08:00 everything of that day, {{lead}} minutes before it, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
     "menu_lead": "Reminder beforehand",
     "value_lead_min": "{{n}} minutes",
     "value_lead_off": "none",
@@ -4503,7 +4571,8 @@
           "editEntry": "change the words of an entry",
           "createList": "a new list",
           "restoreList": "put a removed list back (within 30 days)",
-          "removeList": "throw away a whole list"
+          "removeList": "throw away a whole list",
+          "entryReminders": "the reminders everyone gets for one appointment or chore (60 · morning · evening · also … · usual)"
         },
         "tasks": {
           "listMine": "your own chores",
@@ -4525,7 +4594,7 @@
           "assistant-people": "who is in this household",
           "weekOverview": "your week: chores, appointments, shopping",
           "assistant-menu": "your settings, with buttons",
-          "assistant-reminders": "reminders on or off",
+          "assistant-reminders": "reminders on or off, or when (60 · morning · evening · also …)",
           "assistant-overview": "the Sunday overview on or off",
           "assistant-language": "the language I answer you in",
           "assistant-memory": "how much of our conversation I remember",
@@ -4555,7 +4624,8 @@
           "assistant-link-confirm": "pick the code your Basis app shows",
           "assistant-unlink": "unlink your Basis app",
           "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",
-          "assistant-circles": "the circles the bot is in"
+          "assistant-circles": "the circles the bot is in",
+          "remindMe": "your own reminder for one appointment or chore"
         }
       }
     },
@@ -7646,7 +7716,8 @@
       "editEntry": "Edit",
       "assistant-role": "Role",
       "assistant-revoke": "Remove",
-      "removeFromList": "Remove"
+      "removeFromList": "Remove",
+      "entryReminders": "Reminders"
     },
     "household": "The household",
     "people": "Who is in the household",

@@ -152,6 +152,25 @@ export const listsManifest = {
       },
     },
     {
+      // The reminders EVERYONE it is for gets for one entry (an appointment, a dated chore): the household's statement
+      // about it, in a person's words ("60", "ook avond", "7:30"; "gewoon" drops it) — whoever may edit the entry.
+      id:        'entryReminders', group: 'compose',
+      verb:      'update',
+      writes: { scope: 'circle' },
+      appliesTo: { type: 'list-item' },
+      requires:  ['lists'],
+      resolves:  [{ field: 'reminders', policy: 'content' }],
+      params: [
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'reminders', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-reminders', body: 'flags' },
+        chat:  { reply: 'text', hint: 'The reminders everyone gets for one entry (an appointment or a dated chore), in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop them. For one person\'s own reminder use remindMe.' },
+      },
+    },
+    {
       // At a shop: the general shopping list and that shop's own lists together (a member's idea, 2026-10-06).
       id:        'shopVisit', group: 'data',
       verb:      'list',

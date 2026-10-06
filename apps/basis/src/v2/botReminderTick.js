@@ -11,6 +11,7 @@
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { wallClockInTz } from '@onderling/notifier';
 import { dueReminders } from './botReminders.js';
+import { layeredRules, householdRules } from './reminderOccurrences.js';
 import { doneMarksOn } from './intentionRunner.js';
 import { EventLog } from '../eventLog.js';
 
@@ -28,8 +29,8 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {{sendToPerson: Function}} a.reach  `doorReach`
  * @param {(key: string, vars?: object) => string} a.t
  * @param {string} a.tz  the household's zone
- * @param {() => {reminders?: string, quiet?: string, lead?: number}} a.settings  the household's switch, quiet hours and the
- *   minutes before an appointment for the short-notice reminder
+ * @param {() => {reminders?: string, quiet?: string, rules?: string[], lead?: number}} a.settings  the household's switch, quiet
+ *   hours and its reminder rules (or, without a list, the minutes before for the short notice)
  * @param {() => number} [a.now]
  * @param {number} [a.every]  its period on the host's clock
  * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null, at?: string, what?: Array<{kind: string, id: string, slot: string, rule?: string}>}) => void} [a.onSent]  each send, for the walk log
@@ -54,7 +55,13 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     const { chores = [], events = [] } = (await sources()) ?? {};
     const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id), quiet: threads.quietOf?.(r.id) ?? null }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
-    const due = dueReminders({ chores, events, people, said, done: marks.ids(), now: at, tz, ...(s.quiet ? { quiet: s.quiet } : {}), ...(s.lead !== undefined ? { lead: s.lead } : {}) });
+    // the rules per person per item: the household's list, then their own default, the item's own, their own for it
+    const household = Array.isArray(s.rules) ? s.rules : householdRules(s.lead ?? 0);
+    const rulesFor = (item, personId) => layeredRules({
+      household, personDefault: threads.reminderDefaultOf?.(personId) ?? null,
+      item: item?.reminders ?? null, personItem: threads.reminderExtraOf?.(personId, item?.id) ?? null,
+    });
+    const due = dueReminders({ chores, events, people, said, done: marks.ids(), now: at, tz, rulesFor, ...(s.quiet ? { quiet: s.quiet } : {}) });
     let sent = 0;
     for (const { personId, items } of due) {
       const first = !threads.remindedOnce(personId);
@@ -82,6 +89,8 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       const mine = threads.saidOf(r.id);
       const kept = Object.fromEntries(Object.entries(mine).filter(([id]) => open.has(id)));
       if (Object.keys(kept).length !== Object.keys(mine).length) threads.setSaid(r.id, kept);
+      // a person's own reminders for an item that is done or past go with it
+      for (const itemId of threads.reminderExtraIds?.(r.id) ?? []) if (!open.has(itemId)) threads.setReminderExtra(r.id, itemId, null);
     }
     return { sent };
   }

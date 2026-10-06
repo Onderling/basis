@@ -8,16 +8,17 @@ import { reminderPromptLines, REMINDER_MOMENTS } from '../src/v2/botReminders.js
 import { localNow } from '../src/v2/interpretCommand.js';
 
 describe('what the model knows of reminders and the time', () => {
-  it('the moments the tick uses, the switch, and that there is no reminder at a chosen time', () => {
+  it('the moments the tick uses, how a person sets their own, and that no other kind exists', () => {
     const lines = reminderPromptLines().join('\n');
     expect(lines).toContain(REMINDER_MOMENTS.evening);
     expect(lines).toContain(REMINDER_MOMENTS.morning);
     expect(lines).toContain('/herinneringen');
-    expect(lines).toMatch(/cannot remind at a time a person chooses/);
+    expect(lines).toMatch(/remindMe/);
+    expect(lines).toMatch(/"60" \(minutes before\)/);
     // second person: the model IS the bot — told in the third person it answered "ik stuur zelf geen herinneringen"
     expect(lines).toMatch(/you \(this bot\) send them yourself/);
     expect(lines).toMatch(/shortly before it starts/);
-    expect(lines).toMatch(/never promise one/);
+    expect(lines).toMatch(/never promise another/);
   });
 
   it('the local date and time, with the weekday', () => {

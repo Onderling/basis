@@ -5,6 +5,7 @@
  */
 
 import { BASE_PROPERTIES, BASE_REQUIRED, NAMESPACE } from '../baseSchema.js';
+import { ITEM_REMINDERS_SCHEMA } from '../reminderRules.js';
 
 export const TASK_SCHEMA = {
   iri:         `${NAMESPACE}Task`,
@@ -54,5 +55,7 @@ export const TASK_SCHEMA = {
     // The person the task was added FOR when the key with authority (`addedBy`) acts on someone's behalf —
     // a contact id such as `telegram:123`. Attribution only; every authority gate keeps reading `addedBy`.
     actor: { type: 'string' },
+    // the household's reminders for this item (`morning` · `evening-before` · `before:<min>` · `at:<HH:MM>`)
+    reminders: ITEM_REMINDERS_SCHEMA,
   },
 };

@@ -73,6 +73,14 @@ describe('the bot answers its inbox on a function profile', () => {
     expect(welcomed, `no welcome after the code. Runner:\n${out.slice(-1200)}`).toBe(true);
   }, 120_000);
 
+  it('/herinneringen 60 sets the person\'s own reminders, and says so in words', async () => {
+    const card = cardFrom(out);
+    const before = (await botSaid(sender)).length;
+    await sender.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text: '/herinneringen 60' }).sent;
+    const reply = await until(async () => { const said = await botSaid(sender); return said.length > before ? said[said.length - 1] : null; }, { timeout: 30_000, step: 500 });
+    expect(reply, `no answer to /herinneringen. Runner:\n${out.slice(-1200)}`).toMatch(/60 min/);
+  }, 90_000);
+
   it('/overzicht aan writes the person\'s planned Sunday overview into the box\'s own-devices store — sealed', async () => {
     const card = cardFrom(out);
     const before = (await botSaid(sender)).length;

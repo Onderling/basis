@@ -11,7 +11,7 @@ import { createReminderTick } from '../src/v2/botReminderTick.js';
 const TZ = 'Europe/Amsterdam';
 const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
 const people = [{ id: 'telegram:1', channel: 'telegram', uid: '1', role: 'member' }, { id: 'telegram:2', channel: 'telegram', uid: '2', role: 'member' }];
-const tandarts = { id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-02T08:00:00.000Z', createdBy: 'telegram:1' };
+const tandarts = { id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-02T07:00:00.000Z', createdBy: 'telegram:1' };
 const vuilnis = { id: 'c1', type: 'task', text: 'vuilnis', dueAt: '2026-10-01T22:00:00.000Z', assignees: ['telegram:1'] };   // Fri 2 Oct
 
 function world({ now, reminders = 'on', store = memoryThreadStore(), logged = [] }) {
@@ -37,7 +37,7 @@ describe('the reminder tick', () => {
     expect(new Set(w.sent.map((m) => m.id)).size, 'one message per person').toBe(first);
     const maker = w.sent.find((m) => m.id === 'telegram:1');
     expect(maker.text).toContain('circle.bot.reminder_event');
-    expect(maker.text).toContain('"time":"10:00"');
+    expect(maker.text).toContain('"time":"09:00"');
     expect(maker.text).toContain('circle.bot.reminder_first');
     await w.tick.pass();
     expect(w.sent).toHaveLength(first);

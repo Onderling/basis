@@ -152,6 +152,20 @@ export const listsManifest = {
       },
     },
     {
+      // At a shop: the general shopping list and that shop's own lists together (a member's idea, 2026-10-06).
+      id:        'shopVisit', group: 'data',
+      verb:      'list',
+      requires:  ['lists'],
+      params: [
+        { name: 'shop', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'general', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/winkel', body: 'argline' },
+        chat:  { reply: 'text', hint: 'The person is at a shop: the general shopping list and that shop\'s own list(s).' },
+      },
+    },
+    {
       id:        'listEntries', group: 'data',
       verb:      'list',
       requires:  ['lists'],

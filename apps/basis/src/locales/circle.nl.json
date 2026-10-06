@@ -3812,6 +3812,18 @@
       "text": "\"{{text}}\" is geen gewone regel; daar maak ik geen klusje van.",
       "doc": "A line on a list made a chore in place (the same item; who and when as said)."
     },
+    "no_shop_list": {
+      "text": "Geen lijst voor {{shop}}.",
+      "doc": "At a shop (\"ik ben bij de Lidl\"): the general shopping list and the shop's own lists, each on one line."
+    },
+    "shop_part": {
+      "text": "{{list}}: {{items}}",
+      "doc": "At a shop (\"ik ben bij de Lidl\"): the general shopping list and the shop's own lists, each on one line."
+    },
+    "shop_part_empty": {
+      "text": "{{list}}: niets",
+      "doc": "At a shop (\"ik ben bij de Lidl\"): the general shopping list and the shop's own lists, each on one line."
+    },
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — opgepakt",
     "chore_open": "{{text}} — nog niemand",
@@ -4195,6 +4207,38 @@
       "text": "{{list}}: \"tandarts morgen om 10 uur\" zet een afspraak; \"wat staat er in de agenda\" laat ze zien.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
+    "welcome_own_lists": {
+      "text": "Je kunt ook zelf lijsten maken (\"nieuwe lijst Lidl\") en weggooien; een weggegooide lijst komt binnen 30 dagen terug.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_make_chore": {
+      "text": "Zeg je bij iets wie het doet of wanneer (\"melk voor Henk\", \"taart voor zaterdag\"), dan wordt het een klusje.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_people": {
+      "text": "/wie: wie er in het huishouden zit.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_screen": {
+      "text": "/scherm: een scherm met knoppen voor het huishouden, op je telefoon of computer.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_link": {
+      "text": "Heb je de Basis-app? /koppel koppelt hem aan jou.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_link_inapp": {
+      "text": "Heb je de Basis-app? /koppel koppelt hem aan jou; daarna zet /inapp het huishouden ook in je app.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_quiet": {
+      "text": "/stil 23:00-08:00: je eigen stille uren.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_shop": {
+      "text": "In een winkel? \"ik ben bij de Lidl\" laat de boodschappen én je eigen Lidl-lijst zien.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
     "welcome_week": {
       "text": "\"Wat staat er deze week?\" of /week: jouw klusjes en de afspraken van de komende zeven dagen.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
@@ -4449,6 +4493,7 @@
       },
       "ops": {
         "lists": {
+          "shopVisit": "in een winkel: de boodschappen en de lijst van die winkel (of zeg: ik ben bij de Lidl)",
           "listLists": "welke lijsten er zijn",
           "listEntries": "wat er op een lijst staat",
           "addToList": "iets op een lijst zetten (of zeg: zet melk op de boodschappen)",

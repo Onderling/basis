@@ -35,8 +35,9 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {number} [a.every]  its period on the host's clock
  * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null, at?: string, what?: Array<{kind: string, id: string, slot: string, rule?: string}>}) => void} [a.onSent]  each send, for the walk log
  * @param {{append: Function, query: Function}} [a.log]  the device log: what was said is a done-mark per occurrence there
+ * @param {{heldLines: Function, sentHeld: Function}} [a.announcer]  announcements held through quiet hours, said in the next message
  */
-export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, onSent = null, log = null }) {
+export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, onSent = null, log = null, announcer = null }) {
   let running = null;
   // what was said: a done-mark per occurrence on the device log (an in-memory one when none is handed in)
   const marks = doneMarksOn(log ?? new EventLog({ initial: [], muted: [] }), now);
@@ -51,7 +52,17 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     const s = typeof settings === 'function' ? (settings() ?? {}) : {};
     const rows = (await users.list()) ?? [];
     const at = now();
-    if (s.reminders === 'off') return { sent: 0 };
+    // announcements held through a person's quiet hours: said in their next message, now that it may be sent
+    const held = new Map();
+    for (const r of rows) { const h = announcer?.heldLines?.(r.id); if (h) held.set(r.id, h); }
+    const sayHeldAlone = async (except = new Set()) => {
+      for (const [personId, h] of held) {
+        if (except.has(personId)) continue;
+        const r = await reach.sendToPerson(personId, { text: h.lines.join('\n') });
+        if (r?.ok) announcer.sentHeld(personId, h.ids);
+      }
+    };
+    if (s.reminders === 'off') { await sayHeldAlone(); return { sent: 0 }; }
     const { chores = [], events = [] } = (await sources()) ?? {};
     const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id), quiet: threads.quietOf?.(r.id) ?? null }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
@@ -69,17 +80,19 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       const chore = items.find((i) => i.kind === 'chore');
       const textOnly = rows.find((r) => r.id === personId)?.channel === 'web';
       const tp = tFor(personId);
-      const text = [...items.map((i) => lineOf(i, tp)), ...(textOnly && chore ? [tp('circle.bot.reminder_done_words', { text: chore.text })] : []), ...(first ? [tp('circle.bot.reminder_first')] : [])].join('\n');
+      const text = [...(held.get(personId)?.lines ?? []), ...items.map((i) => lineOf(i, tp)), ...(textOnly && chore ? [tp('circle.bot.reminder_done_words', { text: chore.text })] : []), ...(first ? [tp('circle.bot.reminder_first')] : [])].join('\n');
       const buttons = items.filter((i) => i.kind === 'chore').map((i) => ({ id: `completeTask:${i.id}`, label: tp('circle.bot.reminder_done') }));
       const r = await reach.sendToPerson(personId, { text, buttons });
       // when, which item, which kind: a reminder that did not come must be traceable from the log alone
       try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null, at: new Date(now()).toISOString(), what: items.map((i) => ({ kind: i.kind, id: i.id, slot: i.slot, rule: i.rule })) }); } catch { /* a listener never stops the tick */ }
       if (!r?.ok) continue;
       sent += 1;
+      if (held.has(personId)) announcer.sentHeld(personId, held.get(personId).ids);
       // every occurrence it said, each its own mark: the morning and the short notice are two, and neither undoes the other
       for (const i of items) for (const id of i.occurrences ?? []) marks.mark(id, { item: i.id, rule: i.rule });
       if (first) threads.markReminded(personId);
     }
+    await sayHeldAlone(new Set(due.map((d) => d.personId)));
     // the thread rows' older slots for what is done or past are dropped: only what can still be due keeps one
     const open = new Set([
       ...chores.filter((c) => c && !c.completedAt).map((c) => c.id),

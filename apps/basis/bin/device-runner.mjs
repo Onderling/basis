@@ -84,6 +84,7 @@ import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
+import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { createCommandMenus } from '../src/v2/botCommandMenu.js';
 import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
@@ -932,6 +933,14 @@ if (tgToken || inboxDoor.bridge) {
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), actor: 'host' });
   await planned.load();
+  // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
+  // the op, through the door — held through a person's quiet hours and said in their next message.
+  const announcer = isFunctionProfile ? createAnnouncer({
+    sources: () => agent.reminderSources(), users: botUsers, threads, reach, t, tz: boxTz,
+    quiet: () => reminderSettings().quiet, log: deviceLog,
+    // the walk log keeps who (the last digits), which item (its tail), what kind and how it went — never its words
+    onAnnounced: (e) => walkLog({ kind: 'announce', ts: new Date().toISOString(), to: String(e.personId).slice(-4), ...(e.item ? { item: String(e.item).slice(-6) } : {}), what: e.kind, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}), ...(e.count ? { count: e.count } : {}) }),
+  }) : null;
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
@@ -1082,6 +1091,7 @@ if (tgToken || inboxDoor.bridge) {
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     // the planned overview: written by `/overzicht`, sent to the person's own door, never in their quiet hours
+    announcer,
     intentions: { book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz },
     admin: {
       screens,
@@ -1203,6 +1213,7 @@ if (tgToken || inboxDoor.bridge) {
       sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
       // what was said: a done-mark per occurrence on the device log (sealed, kept across restarts)
       log: deviceLog,
+      announcer,
       tz: boxTz,
       settings: reminderSettings,
       // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words

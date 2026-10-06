@@ -163,6 +163,12 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { [itemId]: _e, ...others } = row.reminderExtras ?? {};
       return save({ ...row, reminderExtras: layer ? { ...others, [itemId]: checkLayer(layer) } : others });
     },
+    /** Announcements held through this person's quiet hours (said in their next message, then let go). */
+    heldAnnouncementsOf: (id) => [...(rows.get(id)?.heldAnnouncements ?? [])],
+    setHeldAnnouncements(id, list) {
+      const { heldAnnouncements: _h, ...rest } = rowOf(id);
+      return save(list?.length ? { ...rest, heldAnnouncements: list.map((a) => ({ ...a })) } : rest);
+    },
     /** The items this person has extras for (so finished ones can be let go). */
     reminderExtraIds: (id) => Object.keys(rows.get(id)?.reminderExtras ?? {}),
     /** What was already said to this person: item id → the slots it was said for (before the done-marks; read only). */

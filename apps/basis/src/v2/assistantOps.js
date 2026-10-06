@@ -50,7 +50,17 @@ export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxIt
 const SWITCH_WORDS = Object.freeze({ on: 'on', aan: 'on', ja: 'on', yes: 'on', off: 'off', uit: 'off', nee: 'off', no: 'off' });
 const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()] ?? null;
 
-export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {} }) {
+/**
+ * The writing ops whose change may concern others (an appointment made, moved or cancelled; a chore given): the door
+ * tells them, at once, after the op (`announcements.js`). A read never does.
+ */
+const ANNOUNCED_OPS = Object.freeze(new Set([
+  'calendar.addEvent', 'calendar.cancelEvent',
+  'lists.addToList', 'lists.makeChore', 'lists.editEntry',
+  'tasks.reassignTask', 'tasks.editTask',
+]));
+
+export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {}, announcer = null }) {
   // The planned work of the people this door serves (the week overview's row): the host's own-devices store; a
   // composition that hands none keeps it in memory.
   const book = intentions.book ?? createIntentionBook({ store: createOwnDevicesStore(), actor: 'door', now });
@@ -98,7 +108,10 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
       return holdForYes(caller, app, op, args, ctx);
     }
-    if (app !== 'assistant') return callSkill(app, op, args, ctx);
+    if (app !== 'assistant') {
+      if (announcer && ANNOUNCED_OPS.has(`${app}.${op}`)) return announcer.around(() => callSkill(app, op, args, ctx), ctx);
+      return callSkill(app, op, args, ctx);
+    }
     if (caller && typeof refusal === 'function') {
       const refused = await refusal(op, caller, levelOf(op));
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line

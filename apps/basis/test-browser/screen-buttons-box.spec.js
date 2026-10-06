@@ -75,6 +75,10 @@ test('every button on the admin\'s management screen answers without an error', 
     // ── every action on a list line and on a person ──
     const household = page.locator('section[data-section="household"]');
     await expect(household.locator('[data-line] [data-action]').first()).toBeVisible({ timeout: 40_000 });   // painted after connecting
+    // …and EVERY line added above, before the actions are counted: the screen paints as the lines arrive, and on a
+    // slow runner the first one shows while the rest are still on their way (CI ran out of plain lines that way)
+    const added = Object.values(LINES).flat().length;
+    await expect.poll(() => household.locator('[data-line]').count(), { timeout: 60_000, message: 'every added line painted' }).toBeGreaterThanOrEqual(added);
     // one line per action: each action is pressed on a line no earlier action touched
     const rowActions = await household.locator('[data-action]').evaluateAll((els) => els.map((e) => ({ skill: e.getAttribute('data-action'), row: (e.closest('[data-line]') ?? e.closest('[data-person]'))?.getAttribute(e.closest('[data-line]') ? 'data-line' : 'data-person') })));
     expect(rowActions.length, 'the household section has line actions to press').toBeGreaterThan(0);

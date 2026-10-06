@@ -183,6 +183,22 @@ export function backendSnapshotIo(backend, ref = REF) {
  *  degrades to an empty log rather than a broken boot. The write goes to a temporary neighbour first and
  *  is renamed over the target, which on every filesystem this runs on is atomic — so a process killed
  *  mid-save leaves the previous snapshot intact instead of a truncated one. */
+/**
+ * One file's operations, one at a time. A write is a temp file and a rename, and a key-value change is a read, a
+ * change and a write: run two at once and they share the temp name (the second rename finds nothing — ENOENT, which
+ * crashed the box when it joined two circles together) and each writes back only its own change. Every operation on
+ * one path waits for the one before; a failed one does not stop the next.
+ */
+const fileQueues = new Map();
+function onePerFile(filePath, op) {
+  const prev = fileQueues.get(filePath) ?? Promise.resolve();
+  const run = prev.catch(() => {}).then(op);
+  const tail = run.catch(() => {});
+  fileQueues.set(filePath, tail);
+  tail.then(() => { if (fileQueues.get(filePath) === tail) fileQueues.delete(filePath); });
+  return run;
+}
+
 /** A `{getItem, setItem, removeItem}` store over one JSON file — the node shape of the shells' plain
  *  storage (localStorage, AsyncStorage), for what a device on a machine stashes between two starts:
  *  the add-a-device offer that waits out the enrol ceremony. Same write discipline as the snapshot io. */
@@ -201,9 +217,9 @@ export function fileKeyValueStorage(filePath) {
     await rename(tmp, filePath);
   };
   return {
-    async getItem(key) { return (await read())[key] ?? null; },
-    async setItem(key, value) { const m = await read(); m[key] = String(value); await write(m); },
-    async removeItem(key) { const m = await read(); delete m[key]; await write(m); },
+    getItem: (key) => onePerFile(filePath, async () => (await read())[key] ?? null),
+    setItem: (key, value) => onePerFile(filePath, async () => { const m = await read(); m[key] = String(value); await write(m); }),
+    removeItem: (key) => onePerFile(filePath, async () => { const m = await read(); delete m[key]; await write(m); }),
   };
 }
 
@@ -214,13 +230,15 @@ export function fileSnapshotIo(filePath) {
       try { return JSON.parse(await readFile(filePath, 'utf8')); }
       catch (err) { if (err?.code === 'ENOENT') return null; throw err; }
     },
-    async save(events) {
-      const { writeFile, rename, mkdir } = await import('node:fs/promises');
-      const dir = filePath.slice(0, filePath.lastIndexOf('/'));
-      if (dir) await mkdir(dir, { recursive: true }).catch(() => { /* it usually exists */ });
-      const tmp = `${filePath}.tmp`;
-      await writeFile(tmp, JSON.stringify(events), { mode: 0o600 });
-      await rename(tmp, filePath);
+    save(events) {
+      return onePerFile(filePath, async () => {
+        const { writeFile, rename, mkdir } = await import('node:fs/promises');
+        const dir = filePath.slice(0, filePath.lastIndexOf('/'));
+        if (dir) await mkdir(dir, { recursive: true }).catch(() => { /* it usually exists */ });
+        const tmp = `${filePath}.tmp`;
+        await writeFile(tmp, JSON.stringify(events), { mode: 0o600 });
+        await rename(tmp, filePath);
+      });
     },
   };
 }

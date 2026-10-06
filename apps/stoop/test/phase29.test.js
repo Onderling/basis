@@ -55,6 +55,26 @@ async function buildBundle({ persistPath } = {}) {
 
 /* ── 29.1 RevealsCache ─────────────────────────────────────── */
 
+
+/**
+ * Wait until the store's files under `dir` hold `marker` — the write behind them is debounced and fire-and-forget
+ * (FilePersist), so a fixed sleep raced it on a loaded CI runner. Then a cold boot asks the real question: does it
+ * find it on disk. Bounded, and says so when the write never came.
+ */
+async function onDisk(dir, marker, { timeoutMs = 10_000, everyMs = 50 } = {}) {
+  const { readdir, readFile, stat } = await import('node:fs/promises');
+  const filesUnder = async (d) => (await Promise.all((await readdir(d).catch(() => [])).map(async (n) => {
+    const p = join(d, n);
+    return (await stat(p).catch(() => null))?.isDirectory() ? filesUnder(p) : [p];
+  }))).flat();
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    for (const f of await filesUnder(dir)) if (!f.endsWith('.tmp') && (await readFile(f, 'utf8').catch(() => '')).includes(marker)) return true;
+    await new Promise((r) => setTimeout(r, everyMs));
+  }
+  throw new Error(`the write never reached disk under ${dir} (looked for ${marker})`);
+}
+
 describe('Stoop V2 Phase 29.1 — RevealsCache', () => {
   it('Reveals mutations write through to mem://stoop/reveals.json', async () => {
     const bundle = await buildBundle();
@@ -74,9 +94,7 @@ describe('Stoop V2 Phase 29.1 — RevealsCache', () => {
     try {
       const b1 = await buildBundle({ persistPath: dir });
       b1.reveals.setPeerReveal(BOB, true);
-      // Allow FilePersist debounce.
-      await new Promise(r => setTimeout(r, 250));
-
+      await onDisk(dir, BOB);
       const b2 = await buildBundle({ persistPath: dir });
       const decision = b2.reveals.decide({ peerWebid: BOB });
       expect(decision.showDisplayName).toBe(true);
@@ -108,8 +126,7 @@ describe('Stoop V2 Phase 29.2 — InterestProfileCache', () => {
       updateInterest(b1.interestProfile, 'kun je mijn fiets repareren?');
       updateInterest(b1.interestProfile, 'fiets band');
       b1.interestProfileFlushNow();
-      await new Promise(r => setTimeout(r, 250));
-
+      await onDisk(dir, 'fiets');
       const b2 = await buildBundle({ persistPath: dir });
       expect(b2.interestProfile.totalDocs).toBe(2);
       expect(b2.interestProfile.centroidTerm.fiets).toBeGreaterThanOrEqual(2);
@@ -163,8 +180,7 @@ describe('Stoop V2 Phase 29.3 — PushRegistryCache', () => {
     try {
       const b1 = await buildBundle({ persistPath: dir });
       await callSkill(b1.agent, 'subscribeWebPush', { subscription: SUB });
-      await new Promise(r => setTimeout(r, 250));
-
+      await onDisk(dir, SUB.endpoint);
       const b2 = await buildBundle({ persistPath: dir });
       expect(b2.pushRegistry.list(ANNE)).toHaveLength(1);
       expect(b2.pushRegistry.list(ANNE)[0].endpoint).toBe(SUB.endpoint);

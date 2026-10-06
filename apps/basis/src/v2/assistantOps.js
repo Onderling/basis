@@ -118,6 +118,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         const items = (await peopleFor(caller)).map((it) => ({ ...it, roleWord: roleWordFor(it.role, preset) }));
         return { ok: true, items, message: usersText(items, preset) };
       }
+      if (op === 'assistant-people') return peopleOp(caller ?? ctx?.threadId);
       if (op === 'assistant-cohort') return cohortOp(args?.spec ?? args?._match);
       if (op === 'assistant-invite') return inviteOp(args?.role ?? args?._match);
       if (op === 'assistant-rotate') return rotateOp();
@@ -818,6 +819,27 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const rows = typeof admin.users === 'function' ? ((await admin.users()) ?? []) : [];
     const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
     return peopleRows({ rows, setting: (r?.params ?? []).find((p) => p.key === NAMES_KEY)?.value, callerId: caller ?? null });
+  }
+
+  /**
+   * `/wie` — who is in the household, for anyone in it: the people by NAME as the names setting lets the asker see them
+   * (`peopleRows`, the chores' rule), with their role word; the asker as "jij". Never an id (a person without a name the
+   * asker may read is left out), never whether someone linked an app — that is the admin's `/users`.
+   */
+  async function peopleOp(person) {
+    if (!person) return { ok: false, error: 'no-thread' };
+    const tp = personT(person);
+    const preset = rolesPresetFrom(await userParam(ROLES_KEY));
+    const rows = typeof admin.users === 'function' ? ((await admin.users()) ?? []) : [];
+    const me = rows.find((r) => r.id === person) ?? null;
+    const word = (role) => roleWordFor(role, preset);
+    const lines = [`• ${tp('circle.bot.people_you')}${me?.role ? ` — ${word(me.role)}` : ''}`];
+    for (const it of await peopleFor(person)) {
+      const row = rows.find((r) => r.id === it.id);
+      if (it.id === person || row?.hidden || !row?.displayName || it.label !== row.displayName) continue;
+      lines.push(`• ${it.label} — ${word(it.role)}`);
+    }
+    return { ok: true, message: [tp('circle.bot.people_head'), ...lines].join('\n') };
   }
 
   /** `/users` in words: the rows, painted (a linked Basis app is said, never its key). */

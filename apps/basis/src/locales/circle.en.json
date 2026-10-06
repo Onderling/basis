@@ -4341,6 +4341,8 @@
     "invite_usage": "Use: /invite (a member), or /invite coordinator, or /invite observer.",
     "role_flat_two_words": "Under \"flat\" all members are equal: choose member or observer.",
     "role_word_lid": "member",
+    "people_head": "In this household:",
+    "people_you": "you",
     "inapp_question": "Would you like the household in your own app too? Then lists, chores and the agenda are on your phone. The bot's rules (names, roles) no longer apply there. You can leave it again later from your app.",
     "inapp_invite": "Your invite to the household in your own app. Only you can use it, once, within 24 hours. Paste it in the app under Circles → Join:\n{{invite}}",
     "inapp_declined": "Fine, it stays with the chat.",
@@ -4475,6 +4477,7 @@
           "cancelEvent": "cancel an appointment"
         },
         "assistant": {
+          "assistant-people": "who is in this household",
           "weekOverview": "your week: chores, appointments, shopping",
           "assistant-menu": "your settings, with buttons",
           "assistant-reminders": "reminders on or off",

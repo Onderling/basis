@@ -18,7 +18,7 @@ import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 const nodes = [];
 afterAll(() => teardown(nodes));
 
-const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'makeChore', 'listMine', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview'];
+const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'makeChore', 'listMine', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview', 'assistant-people'];
 const ADMIN_EXTRA = ['reassignTask', 'removeTask', 'editTask'];
 
 describe('the bot\'s slim map', () => {

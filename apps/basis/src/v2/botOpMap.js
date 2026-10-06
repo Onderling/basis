@@ -24,10 +24,12 @@ export const BOT_OP_MAP = Object.freeze({
     'listMine', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
     'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview',
+    // who is in the household (names as the household allows): anyone in it may ask
+    'assistant-people',
   ]),
   admin: Object.freeze(['reassignTask', 'removeTask', 'editTask']),
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview', 'weekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp']),
+  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview', 'weekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people']),
 });
 
 const MEMBER = new Set(BOT_OP_MAP.member);

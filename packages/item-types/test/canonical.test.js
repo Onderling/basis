@@ -52,6 +52,7 @@ describe('Canonical types — registration via default registry', () => {
       'claim',
       'contact',
       'inbox-item',
+      'intention',
       'list',
       'list-item',
       'media',
@@ -114,6 +115,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'media':             { source: { type: 'blob', ref: 'blob://abc123' } },
     // The subtask negotiation's noun — `kind` is what it waits for, and is required.
     'inbox-item':        { kind: 'subtask-proposal' },
+    // Pending work: a waist call to run as a person when a trigger fires.
+    'intention':         { op: 'weekOverview', trigger: { every: 'week', on: 'sun', at: '18:00' }, actsAs: 'telegram:1' },
   };
 
   for (const [name, extra] of Object.entries(MINIMAL)) {

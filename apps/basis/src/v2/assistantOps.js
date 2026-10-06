@@ -325,25 +325,34 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const max = WEEK_OVERVIEW_MAX_ITEMS;
     const more = (n) => (n > max ? [tp('circle.bot.overview_more', { n: n - max })] : []);
     const events = itemsOf(await asThem('calendar', 'listEvents', { days: 7 }).catch(() => null));
-    const shoppingName = tp('circle.lists.template.shopping');
-    const choresName = tp('circle.lists.template.chores');
-    const shopping = itemsOf(await asThem('lists', 'listEntries', { list: shoppingName }).catch(() => null));
-    const chores = itemsOf(await asThem('lists', 'listEntries', { list: choresName }).catch(() => null)).filter((c) => !c?.done);
+    // every list with open entries — the seeded ones are not kinds (Frits 2026-10-06: "the given lists are contingent"):
+    // a list holding chores shows one per line (who, when), a list of plain lines on one line; the Agenda is the
+    // appointments part above, never a list of lines
+    const lists = itemsOf(await asThem('lists', 'listLists', {}).catch(() => null));
+    const parts = [];
+    for (const list of lists) {
+      const name = list.label ?? list.text;
+      if (!name) continue;
+      const entries = itemsOf(await asThem('lists', 'listEntries', { list: name }).catch(() => null)).filter((c) => !c?.done);
+      if (!entries.length || entries.every((c) => c?.type === 'calendar-event')) continue;
+      parts.push({ name, entries: entries.filter((c) => c?.type !== 'calendar-event') });
+    }
     const lines = [];
     if (events.length) {
       lines.push(tp('circle.bot.overview_events'));
       for (const e of events.slice(0, max)) lines.push(`• ${labelOf(e)}`);
       lines.push(...more(events.length));
     }
-    if (shopping.length) {
-      const items = shopping.slice(0, max).map(labelOf).filter(Boolean).join(', ');
-      lines.push([tp('circle.bot.overview_list', { list: shoppingName, items }), ...more(shopping.length)].join(' '));
-    }
-    if (chores.length) {
-      lines.push(tp('circle.bot.overview_list', { list: choresName, items: '' }).trimEnd());
-      // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
-      for (const c of chores.slice(0, max)) { const due = c.dueAt; lines.push(`• ${labelOf(c)}${due ? ` (${localDay(due)})` : ''}`); }
-      lines.push(...more(chores.length));
+    for (const { name, entries } of parts) {
+      if (entries.some((c) => c?.state)) {
+        lines.push(tp('circle.bot.overview_list', { list: name, items: '' }).trimEnd());
+        // a chore's date on the household's clock (the box runs in its zone): a local midnight is the day before in UTC
+        for (const c of entries.slice(0, max)) { const due = c.dueAt; lines.push(`• ${labelOf(c)}${due ? ` (${localDay(due)})` : ''}`); }
+        lines.push(...more(entries.length));
+      } else {
+        const items = entries.slice(0, max).map(labelOf).filter(Boolean).join(', ');
+        lines.push([tp('circle.bot.overview_list', { list: name, items }), ...more(entries.length)].join(' '));
+      }
     }
     return [tp('circle.bot.overview_head'), ...(lines.length ? lines : [tp('circle.bot.overview_none')])].join('\n');
   }

@@ -80,6 +80,10 @@ import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js'
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
 import { createHostTick } from '../src/v2/hostTick.js';
+import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
+import { createIntentionBook } from '../src/v2/intentionBook.js';
+import { createIntentionRunner } from '../src/v2/intentionRunner.js';
+import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { createCommandMenus } from '../src/v2/botCommandMenu.js';
 import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
@@ -922,6 +926,11 @@ if (tgToken || inboxDoor.bridge) {
   });
   // A household bot's people connect screens (`/scherm`): the grant is their role column, each token acting as them.
   const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
+  // The host's planned work (the own-devices store): its own rows and those of the people it is the device for — the
+  // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
+  const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), actor: 'host' });
+  await planned.load();
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
@@ -1071,6 +1080,8 @@ if (tgToken || inboxDoor.bridge) {
   }
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
+    // the planned overview: written by `/overzicht`, sent to the person's own door, never in their quiet hours
+    intentions: { book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz },
     admin: {
       screens,
       identityLink,
@@ -1189,14 +1200,23 @@ if (tgToken || inboxDoor.bridge) {
   if (isFunctionProfile) {
     const reminderTick = createReminderTick({
       sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
-      tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      tz: boxTz,
       settings: reminderSettings,
       // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
       onSent: (e) => walkLog({ kind: 'reminder', ...(e.at ? { ts: e.at } : {}), to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}), ...(Array.isArray(e.what) ? { what: e.what.map((w) => ({ kind: w.kind, id: String(w.id).slice(-6), slot: w.slot })) } : {}) }),
-      // the Sunday overview is the weekOverview op asked AS the person — the gate, the role and the names apply
-      overviewFor: async (id) => (await doorCall('assistant', 'weekOverview', {}, { caller: id, threadId: id }))?.message ?? null,
     });
     hostTick.add('reminders', { every: reminderTick.every, run: () => reminderTick.pass() });
+    // Planned work: each due row through the door AS its person (the gate, the role, the names apply), once. The switch
+    // that used to live on thread rows becomes a row first.
+    const moved = await moveOverviewSwitchesToRows({ threads, users: botUsers, book: planned });
+    if (moved) walkLog({ kind: 'overview-rows', moved });
+    const intentionRunner = createIntentionRunner({
+      book: planned, log: deviceLog, tz: boxTz,
+      run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: o.actsAs, threadId: o.actsAs }),
+      // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
+      onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
+    });
+    hostTick.add('intentions', { every: 60_000, run: () => intentionRunner.pass() });
     // The model route, watched: a model the provider stopped serving, or an account over its limit, reaches the admin
     if (built?.listModels) {
       modelWatch.ref = createModelWatch({

@@ -168,7 +168,17 @@ does is a job on its tick (`apps/basis/src/v2/hostTick.js`) — a name, a period
 never two runs of one job at once, one job's failure never stopping another's (`lint-host-tick` refuses an interval
 beside it). The clock has no powers of its own: it only says *when to ask*; what is due is each job's own projection,
 and what it does goes through the same calls a tap would. Today the box's jobs are the reminders, the nightly export,
-the model watch and the unlocked-key sweep.
+the model watch, the unlocked-key sweep, and planned work.
+
+**Planned work is a row, not a timer.** What someone wants done later is an `intention` item — a waist call
+(`op`, `appOrigin`, `args`) to run AS a person (`actsAs`) when a trigger fires (`{ at }` once; `{ every: 'day'|'week',
+on, at }` on the zone's wall clock; `{ everyMs, from }` an interval). Its occurrences are never stored: `upcoming` and
+`due` (`src/v2/intentions.js`) read them from the rows; the host's `intentions` job runs each due one through the door
+as its person, with the occurrence id, and leaves an `intention-done` entry on the device log (first write wins) and
+the row's `lastRunAt`. A missed run fires once; a row with a clock time may run the rest of that day. The rows of a host
+live in its **own-devices store** (`src/v2/ownDevicesStore.js`) — a person's (or a bot's) own typed items, keyed by
+the own-devices scope, sealed, no circle's; on a household bot it holds the rows of the people it is the device for.
+The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOverview` delivers it).
 
 ### The event log — one record, many projections
 

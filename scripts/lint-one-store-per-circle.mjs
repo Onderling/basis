@@ -36,6 +36,9 @@ const ALLOWED = Object.freeze({
   'packages/kring-host/src/circleLists.js':
     'The documented fallback for a composition with no circle store (tests, and a shell before its agent '
     + 'exists). A composition that HAS one passes `storeFor` and this branch is not taken.',
+  'apps/basis/src/v2/ownDevicesStore.js':
+    'The own-devices store — a person\'s (or a bot\'s) OWN typed items, keyed by the own-devices scope the grants lane '
+    + 'rides: it reaches only their own devices, never a circle\'s members. A different scope, not a second store for a circle.',
   'apps/basis/src/v2/contactDmStore.js':
     'The contact DM store — `getStore(\'dm\')`, a 1:1 thread, not a circle. A different scope, not a '
     + 'second store for the same one. Shared web≡mobile so the two shells cannot each build their own.',

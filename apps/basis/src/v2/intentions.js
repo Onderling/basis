@@ -5,6 +5,9 @@
  *     (its moment has come, inside its window) or `skipped` (its window passed and it never ran);
  *   due({ rows, done, now, tz })              → the `due` ones: what a host's tick runs.
  *
+ * Windows: an `at` row and an `every` row with a clock time may run the rest of that local day; an interval row
+ * (`everyMs`) the whole interval; a row's own `window` ('day' or milliseconds) wins.
+ *
  * Nothing is stored but the rows and the done-marks. An occurrence's id is its row (`at`) or its row and slot
  * (`<row>:<slot>`), and a done-mark under that id — or a `lastRunAt` on the row at or after it — takes it off. Of the
  * occurrences already past, only the LATEST of each row counts: a host that was off for a month runs a missed job once,
@@ -52,13 +55,8 @@ function occurrencesOf(row, from, to, tz) {
       if (ymd(day) === last) break;
       w = nextDay(day);
     }
-    // the natural window of a calendar occurrence ends at the next one
-    const step = t.every === 'day' ? 1 : 7;
-    return out.map((o) => {
-      const [y, mo, d] = o.slot.split('-').map(Number);
-      const n = nextDay({ year: y, month: mo, day: d }, step);
-      return { ...o, windowEnd: utcInstantForWallClock({ ...n, hour: Number(m[1]), minute: Number(m[2]), tz }) };
-    });
+    // a row with a clock time may still run the rest of THAT day: the Sunday overview is not sent on a Wednesday
+    return out.map((o) => ({ ...o, windowEnd: endOfLocalDay(o.at, tz) }));
   }
   if (Number.isFinite(t.everyMs) && t.everyMs > 0 && Number.isFinite(ms(t.from))) {
     const start = ms(t.from);

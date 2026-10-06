@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'week-overview': 'read', 'invite-to-app': 'write', 'list-people': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'invite-to-app': 'write', 'list-people': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
@@ -50,6 +50,14 @@ export const assistantManifest = {
         slash: { command: '/week', body: 'none' },
         chat:  { reply: 'text', hint: "This member's week: their own chores, the appointments, what is open on the shopping list." },
       },
+    },
+    {
+      // the planned Sunday overview (`/overzicht aan` writes the row): the week overview sent to the caller's OWN door.
+      // No surface: the host's runner calls it as the person whose row it is; anyone calling it reaches only themself.
+      id:     'sendWeekOverview',
+      verb:   'send-week-overview',
+      params: [{ name: 'occurrence', kind: 'string', required: false }],
+      surfaces: {},
     },
     {
       id:     'assistant-reminders',

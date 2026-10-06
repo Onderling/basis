@@ -55,13 +55,17 @@ describe('upcoming and due', () => {
     expect(list.map((o) => new Date(o.at).toISOString())).toEqual(['2026-10-25T17:00:00.000Z', '2026-11-01T17:00:00.000Z']);
   });
 
-  it("an `every` row's window is its interval by default; a row may carry a shorter one (the rest of that day)", () => {
+  it('a row with a clock time may run the rest of THAT day; an interval row the whole interval; a row may set its own', () => {
     const monday = at('2026-10-12T09:00:00Z');
-    expect(due({ rows: [weekly], done: new Set(), now: monday, tz: TZ }).map((o) => o.id)).toEqual(['r1:2026-10-11']);
-    const sameDay = row({ ...weekly, window: 'day' });
-    expect(due({ rows: [sameDay], done: new Set(), now: monday, tz: TZ })).toEqual([]);
-    const skipped = upcoming({ rows: [sameDay], done: new Set(), now: monday, tz: TZ, horizon: 2 * D });
+    // the Sunday overview missed on Sunday is not sent on Monday
+    expect(due({ rows: [weekly], done: new Set(), now: monday, tz: TZ })).toEqual([]);
+    const skipped = upcoming({ rows: [weekly], done: new Set(), now: monday, tz: TZ, horizon: 2 * D });
     expect(skipped.map((o) => [o.slot, o.state])).toEqual([['2026-10-11', 'skipped']]);
+    // still due late that Sunday evening
+    expect(due({ rows: [weekly], done: new Set(), now: at('2026-10-11T21:30:00Z'), tz: TZ }).map((o) => o.id)).toEqual(['r1:2026-10-11']);
+    // its own window: two days
+    const longer = row({ ...weekly, window: 2 * D });
+    expect(due({ rows: [longer], done: new Set(), now: monday, tz: TZ }).map((o) => o.id)).toEqual(['r1:2026-10-11']);
   });
 
   it('an interval row that missed several runs fires ONCE, for the latest', () => {

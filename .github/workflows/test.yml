@@ -121,6 +121,33 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+  # ── The one check `development` requires: the gate passed, or these bytes passed it already. ──
+  # A matrix job skipped by `same bytes?` never expands into its per-suite names, so a branch that requires `basis`,
+  # `stoop`, … by name waits forever on a merge-back whose bytes were tested. This job always runs and says one thing:
+  # green when the same bytes passed before, or when every gate job passed now; red otherwise (a skip counts as red
+  # unless the bytes were the same). The browser tail is not here: it does not run on pull requests.
+  tests-passed:
+    name: tests passed
+    needs: [same-bytes, checks, suites, pod, journeys]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verdict
+        env:
+          SAME: ${{ needs.same-bytes.outputs.same }}
+          SAME_RESULT: ${{ needs.same-bytes.result }}
+          CHECKS: ${{ needs.checks.result }}
+          SUITES: ${{ needs.suites.result }}
+          POD: ${{ needs.pod.result }}
+          JOURNEYS: ${{ needs.journeys.result }}
+        run: |
+          if [ "$SAME_RESULT" = "success" ] && [ "$SAME" = "true" ]; then echo "same bytes: the gate passed on them before"; exit 0; fi
+          for r in "checks=$CHECKS" "suites=$SUITES" "pod=$POD" "journeys=$JOURNEYS"; do
+            [ "${r#*=}" = "success" ] || { echo "not passed: $r"; exit 1; }
+          done
+          echo "every gate job passed"
+
   # ── Rung 2: structural checks. Cheap, deterministic, first to fail. ─────────
   checks:
     name: guards + doc lint

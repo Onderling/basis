@@ -39,18 +39,20 @@ describe('a household bot lets go of a circle it left', () => {
       deviceLog,
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
-    await ensureHouseholdLists({ callSkill: (a, o, x) => own(a, o, { ...x, circleId: 'household' }), t });
-    await own('lists', 'addToList', { list: 'Boodschappen', text: 'thuis-melk', circleId: 'household' });
+    const HOME = agent.householdCircleId;   // the household's own circle id, derived from the bot's key
+    await ensureHouseholdLists({ callSkill: (a, o, x) => own(a, o, { ...x, circleId: HOME }), t });
+    await own('lists', 'addToList', { list: 'Boodschappen', text: 'thuis-melk', circleId: HOME });
     await own('lists', 'createList', { text: 'Kring-lijst', circleId: JOINED });
     await own('lists', 'addToList', { list: 'Kring-lijst', text: 'kring-geheim', circleId: JOINED });
     deviceLog.append({ id: 'joined-msg', ts: Date.now(), app: 'circle', type: 'chat-message', circleId: JOINED, payload: { text: 'kring-geheim' } });
-    deviceLog.append({ id: 'house-msg', ts: Date.now(), app: 'circle', type: 'chat-message', circleId: 'household', payload: { text: 'thuis' } });
+    deviceLog.append({ id: 'house-msg', ts: Date.now(), app: 'circle', type: 'chat-message', circleId: HOME, payload: { text: 'thuis' } });
 
     const exported = JSON.stringify(await agent.householdItems());
     expect(exported).toContain('thuis-melk');
     expect(exported).not.toContain('kring-geheim');
     expect(JSON.stringify(await agent.reminderSources())).not.toContain('kring-geheim');
 
+    expect(await agent.forgetCircleContent(HOME)).toMatchObject({ ok: false });
     expect(await agent.forgetCircleContent('household')).toMatchObject({ ok: false });
     expect(await agent.forgetCircleContent('')).toMatchObject({ ok: false });
 

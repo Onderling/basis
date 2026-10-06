@@ -200,7 +200,7 @@ import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/c
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
 // The lane table both shells (and a headless device) build from one place.
-import { buildCircleLanes } from '../../src/v2/circleLanes.js';
+import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
@@ -1399,9 +1399,7 @@ function circleOnJoined({ circleId, invite = null }) {
     recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
     // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
     registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
-    pullLanes: (cid) => Promise.allSettled(
-      [memCatchUpShell, govCatchUpShell, keyCatchUpShell].map((c) => c?.requestCircle?.(cid, { callSkill: rawCallSkill })),
-    ),
+    pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: taskCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
   });
 }
 let circlePairRoster = null;     // the pair roster for contacts (L105) — composed with the contact channel
@@ -8653,6 +8651,8 @@ async function boot() {
             // a member admitted into a PAIR circle is its co-admin (the pair roster's rule)
             onAdmitted: (a) => circlePairRoster?.onAdmitted?.(a),
             sendPeer: (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
+            // a code bound to one person is theirs from any of their addresses (the canonical chat key)
+            identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
             publishEvent: publishEventToLog,
             // …and return OUR per-circle address for the circle being joined, proven the same way the
             // joiner proves theirs, so per-circle addressing works in both directions from the join on.

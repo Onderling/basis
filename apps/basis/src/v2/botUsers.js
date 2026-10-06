@@ -31,6 +31,16 @@ export function personNamed(rows, nameOrId) {
 }
 
 /**
+ * A person's Basis key on the bot, or null: the key their `/koppel` linked (a door row: Telegram), or — on the inbox
+ * door — the row's own id, which IS their key (the book does not repeat it as `pubKey`).
+ */
+export function linkedKeyOf(row) {
+  if (!row || typeof row !== 'object') return null;
+  if (typeof row.pubKey === 'string' && row.pubKey) return row.pubKey;
+  return row.channel === 'web' && typeof row.id === 'string' && row.id ? row.id : null;
+}
+
+/**
  * @param {object} a
  * @param {{get: (id: string) => Promise<object|null>, put: (row: object) => Promise<object>, list: () => Promise<object[]>}} a.store
  * @param {string|null} [a.adminUid]  the uid (on any channel) the bot was started naming as its admin

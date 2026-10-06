@@ -72,6 +72,7 @@ import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js'
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { createScreenNudge } from '../src/v2/screenNudge.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
+import { createHouseholdInApp } from '../src/v2/householdInApp.js';
 import { createScreenStepUp, SCREEN_STEP_UP_SUBTYPE } from '../src/v2/screenStepUp.js';
 import { SCREEN_OFFER_SUBTYPE, SCREEN_REFUSED_SUBTYPE, SCREEN_WAITING_SUBTYPE } from '../src/v2/screenView.js';
 import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
@@ -101,7 +102,7 @@ import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src
 import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
-import { buildCircleLanes } from '../src/v2/circleLanes.js';
+import { buildCircleLanes, pullCircleLanes } from '../src/v2/circleLanes.js';
 import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
@@ -372,7 +373,7 @@ let inboxDoor = { bridge: null, feed: () => false };
 let pairRoster = null;         // the pair roster for contacts (L105) — composed with the contact channel
 // A household bot's circles (`/kring`): the join, the leave and "am I still in it" need the wire, composed below; the
 // door that answers `/kring` comes after. A removal the membership lane folds reaches the bot's record through `removed`.
-const circleSeams = { join: null, leave: null, stillIn: null, removed: null, landed: null, rosterChanged: null };
+const circleSeams = { join: null, leave: null, stillIn: null, removed: null, landed: null, rosterChanged: null, reachable: null };
 if (relayUrl) {
   // The durable home of 1:1 threads, file-backed so a restart is the same conversations. Same
   // constructor both shells use; only the backing differs, which is the whole of what a shell decides.
@@ -551,9 +552,11 @@ if (relayUrl) {
   pairSeams.onJoined = ({ circleId } = {}) => makeCircleReachable({
     agent, circleId,
     registerCirclePresence: () => registerCirclePresence([circleId]),
-    pullLanes: (cid) => Promise.allSettled(['membership', 'gov', 'key'].map((k) => lanes.catchUps[k]?.requestCircle?.(cid, { callSkill }))),
+    pullLanes: (cid) => pullCircleLanes(lanes.catchUps, cid, { callSkill }),
   });
 
+  // …and the same presence for a circle the bot FOUNDS (the household's own, when someone is first invited into it)
+  circleSeams.reachable = (circleId) => pairSeams.onJoined?.({ circleId });
   // A circle the household bot joins on its admin's word: the same join chain as the wizard and the pair roster, with
   // the rules accepted (the admin said yes to them), a fresh per-circle key, and a handle for that roster alone.
   circleSeams.join = async ({ inviteUri, handle, rulesAccepted }) => {
@@ -599,6 +602,8 @@ if (relayUrl) {
         callSkill, sendPeer,
         publishEvent: (e) => walkLog({ kind: 'redeem', ...(e?.type ? { type: e.type } : {}), circleId: e?.circleId ?? e?.groupId ?? null }),
         onAdmitted: (a) => pairRoster?.onAdmitted?.(a),
+        // a code bound to one person is theirs from any of their addresses (the canonical chat key)
+        identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
         signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
         propagateCircleAddresses: ({ circleId, newMemberWebid }) => propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
@@ -838,6 +843,8 @@ if (tgToken || inboxDoor.bridge) {
   // next message).
   const inGate = await doorAdmit.atStart().catch((e) => { console.warn(`device-runner: could not put the bot's people in the gate at start: ${e?.message ?? e}`); return null; });
   walkLog({ kind: 'gate-at-start', people: inGate });
+  // The household's rows moved to its own circle id on this boot (once, the first boot of the version that gave it one)
+  if (agent.householdCircleMove) walkLog({ kind: 'household-circle-move', rows: agent.householdCircleMove.rows, to: agent.householdCircleMove.to, ...(agent.householdCircleMove.leftover ? { leftover: agent.householdCircleMove.leftover } : {}) });
   // A bot nobody can get into: no admin yet and no bootstrap id. One code for one person, printed HERE (the box's
   // console, never a chat or the walk log) — the first person admitted is the bot's admin.
   let bootstrapCode = null;
@@ -981,6 +988,20 @@ if (tgToken || inboxDoor.bridge) {
     },
     where: () => ({ appUrl: appUrl || null, botAddress: agent.identity?.chat?.pubKey ?? null, relayUrl: relayUrl || null, botName: tgBridge?.botUsername ? `@${tgBridge.botUsername}` : null }),
   }) : null;
+  // The household in a linked person's own app (`/in-app`, behind the admin's `assistant.householdInApp`): an invite into
+  // the household's own circle, bound to the chat key they linked; the bot founds the circle the first time someone is
+  // invited, and is then present in it as a function (its kind on its own row), as after a join.
+  const householdInApp = isFunctionProfile && agent.householdCircleId ? createHouseholdInApp({
+    callSkill, circleId: agent.householdCircleId, selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey,
+    name: () => t('circle.bot.household_circle_name'), relayUrl: () => relayUrl || null,
+    identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+    onCreated: async ({ circleId }) => {
+      await circleSeams.reachable?.(circleId);
+      const handle = tgBridge?.botUsername ?? t('circle.bot.household_circle_name');
+      const said = await agent.emitMemberProps?.({ circleIds: [circleId], props: { handle, kind: 'function' } }).catch(() => null);
+      walkLog({ kind: 'household-circle', created: true, saidKind: (said?.emitted ?? []).length > 0 || (said?.unchanged ?? []).length > 0 });
+    },
+  }) : null;
   // The bot's door in each circle it joined: a member who names it is answered there, as that member with their role in
   // that circle, in that circle's lists — one runner per circle (its own lists' lines and memory), no door ops at all.
   const circleCatalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps(), withoutDoorOps: true });
@@ -1047,6 +1068,7 @@ if (tgToken || inboxDoor.bridge) {
     admin: {
       screens,
       identityLink,
+      householdInApp,
       circles: botCircles,
       stepUp,
       catalogue: doorCatalogue,

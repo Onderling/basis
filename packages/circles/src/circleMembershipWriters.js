@@ -48,6 +48,12 @@ import { releaseUnchanged } from '@onderling/agent-registry';
  * monotonic integers, so acceptance of a then-current version stays valid after a rules change.
  * A circle WITHOUT a rules doc admits exactly as before. The joiner does not control this device.
  */
+/** Is this code bound to a key other than the redeemer's? (A bound code is one person's, whoever else holds it.) */
+function boundElsewhere(codeItem, redeemer) {
+  const bound = codeItem?.source?.boundTo;
+  return typeof bound === 'string' && bound !== '' && bound !== redeemer;
+}
+
 /** ONE sealing key family: a member's group key is wrapped to the ed2curve image of their PROVEN per-circle
  *  address. A joiner-supplied key still wins when present; otherwise it is derived from the verified address
  *  (an unproven address grants nothing — deny-by-default holds here too). */
@@ -90,6 +96,8 @@ export async function redeemMembershipCode({
   const now = Date.now();
   const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
   if (!valid) return { error: 'invalid-or-expired-code' };
+  // a code bound to one key: only that key (the authenticated redeemer) — see the peer path below
+  if (boundElsewhere(valid, from)) return { error: 'invalid-or-expired-code' };
   // Rules-gated admission (task #80) — refused BEFORE any row, key grant, announce or spine entry exists.
   const rulesRefusal = await rulesAcceptanceRefusal(store, a.groupId, a.rulesAccepted);
   if (rulesRefusal) return rulesRefusal;
@@ -253,6 +261,10 @@ export async function verifyMembershipCodeForPeer({
   const now = Date.now();
   const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
   if (!valid) return { error: 'invalid-or-expired-code' };
+  // A code bound to one key is that key's alone — before any other check, and the same answer as a wrong code (no
+  // oracle for "this code exists but is someone else's"). Fail closed: never the shared rule.
+  // checked against the redeemer's canonical key, which the admin's handler resolved from the verified sender
+  if (boundElsewhere(valid, a.requesterKey || a.requesterWebid)) return { error: 'invalid-or-expired-code' };
   // Rules-gated admission (task #80) — refused BEFORE any row, key grant, announce or spine entry exists.
   const rulesRefusal = await rulesAcceptanceRefusal(store, a.groupId, a.rulesAccepted);
   if (rulesRefusal) return rulesRefusal;

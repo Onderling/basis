@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'week-overview': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'week-overview': 'read', 'invite-to-app': 'write', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
@@ -319,6 +319,16 @@ export const assistantManifest = {
       writes: { scope: 'person' },
       params: [{ name: 'answer', kind: 'string', required: true }],
       surfaces: { slash: { command: '/koppel-code', body: 'argline' } },
+    },
+    {
+      // The household in your own app (`/in-app ja|nee`): asked after `/koppel` where the admin turned it on; a yes is an
+      // invite into the household's circle bound to the linked key, sent to the private chat only.
+      id:     'assistant-inapp',
+      verb:   'invite-to-app',
+      visibility: 'authenticated',
+      writes: { scope: 'circle' },
+      params: [{ name: 'answer', kind: 'string', required: true }],
+      surfaces: { slash: { command: '/in-app', body: 'argline' } },
     },
     {
       // Undo the link (`/ontkoppel`): the key goes, and every screen grant minted to it.

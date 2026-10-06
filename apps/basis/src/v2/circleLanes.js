@@ -314,3 +314,15 @@ export function buildCircleLanes({
     landedCarrier,
   };
 }
+
+/**
+ * The lanes a device pulls for ONE circle right after it joins: its authority (membership, governance, keys) AND its
+ * content (the task lane carries every list, chore and appointment; the chat lane the conversation). Without the
+ * content lanes a fresh joiner saw the circle empty until its next boot.
+ */
+export const JOIN_PULL_LANES = Object.freeze(['membership', 'gov', 'key', 'task', 'chat']);
+
+/** Pull `JOIN_PULL_LANES` for one circle from the members this device knows; a missing or failing lane stops none. */
+export function pullCircleLanes(catchUps, circleId, { callSkill } = {}) {
+  return Promise.allSettled(JOIN_PULL_LANES.map(async (k) => catchUps?.[k]?.requestCircle?.(circleId, { callSkill })));
+}

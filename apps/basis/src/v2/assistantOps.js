@@ -725,7 +725,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!key) return { ok: false, error: { code: 'not-linked', message: tp('circle.bot.inapp_link_first') } };
     const r = await inApp.inviteFor(key).catch((e) => ({ ok: false, reason: e?.message ?? 'failed' }));
     if (!r?.ok || !r.uri) return { ok: false, error: { code: r?.reason ?? 'failed', message: tp('circle.bot.inapp_failed') } };
-    return { ok: true, message: tp('circle.bot.inapp_invite', { invite: r.uri }) };
+    return { ok: true, message: r.link ? tp('circle.bot.inapp_invite_link', { link: r.link, invite: r.uri }) : tp('circle.bot.inapp_invite', { invite: r.uri }) };
   }
 
   /** `/ontkoppel` — from the private door only: the key goes, and its screen grants. */

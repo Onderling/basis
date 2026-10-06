@@ -51,7 +51,7 @@ async function door({ setting = null } = {}) {
     t, refusal: async () => null, threads: createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() }),
     admin: {
       users: async () => users.list(), identityLink: link,
-      householdInApp: { inviteFor: async (key) => { invited.push(key); return { ok: true, uri: `onderling-invite://for-${key.slice(0, 6)}`, expiresAt: Date.now() + 86_400_000 }; }, evict: async (key) => { evicted.push(key); return { removed: 1 }; } },
+      householdInApp: { inviteFor: async (key) => { invited.push(key); return { ok: true, uri: `onderling-invite://for-${key.slice(0, 6)}`, link: `https://basis.example/app/?join=x-${key.slice(0, 6)}`, expiresAt: Date.now() + 86_400_000 }; }, evict: async (key) => { evicted.push(key); return { removed: 1 }; } },
       revoke: async (who) => (await users.list()).find((u) => u.displayName === who) ?? null,
     },
   });
@@ -99,6 +99,9 @@ describe('the question after /koppel', () => {
     expect(yes.ok, JSON.stringify(yes)).toBe(true);
     expect(d.invited).toEqual([KEY]);
     expect(yes.message).toContain('onderling-invite://');
+    // the link that opens the app with the invite, first; the invite to paste, as the way if the link does not open
+    expect(yes.message).toContain('https://basis.example/app/?join=');
+    expect(yes.message).toContain('circle.bot.inapp_invite_link');
   });
   it('no invite from a group, before linking, or with the setting off', async () => {
     const off = await door();

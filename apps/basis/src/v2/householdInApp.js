@@ -10,6 +10,7 @@
 
 import { quickCreateCircle } from './circleCreate.js';
 import { buildCircleInviteUri } from './circleInvite.js';
+import { inviteDeepLink } from './inviteDeepLink.js';
 
 /**
  * @param {object} a
@@ -21,8 +22,9 @@ import { buildCircleInviteUri } from './circleInvite.js';
  * @param {(a: {circleId: string}) => any} [a.onCreated]  after founding: the bot's presence in the circle (as after a join)
  * @param {number} [a.hours]            how long an invite is good for
  * @param {(addr: string) => string} [a.identityOf]  an address → the person's canonical (chat) key
+ * @param {() => string|null} [a.appUrl]  where the app is served: the invite is then also a link that opens it (`?join=`)
  */
-export function createHouseholdInApp({ callSkill, circleId, selfWebid, name, relayUrl = null, onCreated = null, hours = 24, identityOf = (a) => a } = {}) {
+export function createHouseholdInApp({ callSkill, circleId, selfWebid, name, relayUrl = null, onCreated = null, hours = 24, identityOf = (a) => a, appUrl = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId || !selfWebid) throw new TypeError('createHouseholdInApp: callSkill, circleId and selfWebid are required');
 
   /** The household's circle rules, made once (the bot its founder and admin). */
@@ -43,7 +45,12 @@ export function createHouseholdInApp({ callSkill, circleId, selfWebid, name, rel
       callSkill, circleId, adminPeerAddr: selfWebid, boundTo: personKey, boundForHours: hours,
       ...(typeof relayUrl === 'function' && relayUrl() ? { relayUrl: relayUrl() } : {}),
     });
-    return inv?.uri ? { ok: true, uri: inv.uri, expiresAt: inv.expiresAt ?? null } : { ok: false, reason: inv?.error ?? 'no-invite' };
+    if (!inv?.uri) return { ok: false, reason: inv?.error ?? 'no-invite' };
+    // …and as the link a phone opens: the app, with the invite (and where the bot is) — the same `?join=` its QR carries
+    const base = typeof appUrl === 'function' ? appUrl() : null;
+    let link = null;
+    if (base) { try { const u = new URL(base); link = inviteDeepLink({ origin: u.origin, pathname: u.pathname }, inv.uri, typeof relayUrl === 'function' ? relayUrl() : null); } catch { link = null; } }
+    return { ok: true, uri: inv.uri, ...(link ? { link } : {}), expiresAt: inv.expiresAt ?? null };
   }
 
   /**

@@ -4351,6 +4351,7 @@
     "menu_app": "In je eigen app",
     "household_circle_name": "Huishouden",
     "revoked_circle": "Uit het huishouden in de app gehaald.",
+    "inapp_invite_link": "Je uitnodiging voor het huishouden in je eigen app. Alleen jij kunt hem gebruiken, één keer, binnen 24 uur. Tik op deze link op je telefoon; de app opent met de uitnodiging:\n{{link}}\n\nOpent hij niet, plak dan dit in de app bij Kringen → Lid worden:\n{{invite}}",
     "menu_roles": "Rollen",
     "value_standard": "standaard (de beheerder beslist meer)",
     "value_flat": "plat (iedereen doet wat de beheerder doet, behalve mensen en instellingen)",

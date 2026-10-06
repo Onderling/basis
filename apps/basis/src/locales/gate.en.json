@@ -134,8 +134,22 @@
       "take the kids from school"
     ]
   },
+  "lists.shopVisit": {
+    "doc": "At a shop: the general shopping list and that shop's own list(s).",
+    "patterns": [
+      "i'm (now)? (at|in) (the)? {shop}",
+      "i am (now)? (at|in) (the)? {shop}"
+    ],
+    "examples": [
+      "I'm at the Lidl",
+      "i am at Tesco"
+    ],
+    "not": [
+      "i am at the Lidl, been there already"
+    ]
+  },
   "lists.createList": {
-    "doc": "Make a new list (the admin's).",
+    "doc": "Make a new list (anyone in the household).",
     "patterns": [
       "(make|create) (a)? (new)? list (called|named)? {name}"
     ],

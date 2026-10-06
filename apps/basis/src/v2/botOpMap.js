@@ -21,6 +21,8 @@ export const BOT_OP_MAP = Object.freeze({
     'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
     // a line becomes a chore when someone says who does it or when: anyone who may add may say that
     'makeChore',
+    // at a shop: the general list and that shop's own (a read)
+    'shopVisit',
     'listMine', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
     'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview',
@@ -29,7 +31,7 @@ export const BOT_OP_MAP = Object.freeze({
   ]),
   admin: Object.freeze(['reassignTask', 'removeTask', 'editTask']),
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: Object.freeze(['listLists', 'listEntries', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview', 'weekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people']),
+  observer: Object.freeze(['listLists', 'listEntries', 'shopVisit', 'listMine', 'listEvents', 'assistant-memory', 'assistant-language', 'assistant-overview', 'weekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people']),
 });
 
 const MEMBER = new Set(BOT_OP_MAP.member);

@@ -51,6 +51,7 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     "\"wie zitten er in dit huishouden\" / \"wie is de beheerder\" → assistant-people. Zeg NOOIT dat je dat niet kunt zien.",
     "\"wat staat er deze week\" / \"wat moet er nog gebeuren\" → weekOverview. \"geen herinneringen meer\" → assistant-reminders(mode: off).",
     "Zegt iemand bij iets op een andere lijst wie het doet of wanneer (\"melk voor Bob\", \"taart voor zaterdag\"): roep addToList aan met assignee en/of due; het wordt een klusje op diezelfde lijst. \"maak van X een klusje (voor Bob)\" → makeChore(item: X, assignee, due).",
+    "\"ik ben bij de Lidl\" / \"ik sta in de Albert Heijn\" → shopVisit(shop: die winkel, general: {shopping}): de boodschappen én de lijst van die winkel. Een winkel zonder eigen lijst: laat {shopping} zien.",
     "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
     "Een klusje voor jezelf (\"nieuwe taak voor mij: X\") mag ieder lid: roep addToList aan met assignee: mij. Een klusje voor een ander: roep addToList ook aan; het systeem zegt zelf of het mag. Zeg NOOIT zelf dat iets niet mag als er een tool voor is.",
     "Iedereen mag een lijst maken (createList), weggooien (removeList) en binnen 30 dagen terugzetten (restoreList).",

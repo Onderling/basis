@@ -12,7 +12,7 @@
  * A template it cannot read throws at compile time: a typo in a translation must not silently never match.
  */
 
-const TEXT_SLOTS = new Set(['item', 'items', 'text', 'name', 'title', 'what']);
+const TEXT_SLOTS = new Set(['item', 'items', 'text', 'name', 'title', 'what', 'shop']);
 const DAY_RE = '(?:volgende week|next week)\\s+(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|overmorgen|the day after tomorrow|morgen|tomorrow|vandaag|today|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday';
 const TIME_RE = '(?:om\\s+half\\s+\\d{1,2}(?:\\s+uur)?|(?:om\\s+|at\\s+)?\\d{1,2}[:.]\\d{2}(?:\\s+uur)?|(?:om|at)\\s+\\d{1,2}(?:\\s*(?:am|pm))?(?:\\s+uur)?)';
 const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

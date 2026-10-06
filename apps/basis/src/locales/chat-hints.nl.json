@@ -66,6 +66,10 @@
       "text": "Haal een regel van een lijst: item = de woorden of het id. De lijst is niet nodig.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
+    "shopVisit": {
+      "text": "Iemand is in een winkel (\"ik ben bij de Lidl\"): laat de algemene boodschappenlijst én de lijst(en) van die winkel zien. general = de boodschappenlijst.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
     "makeChore": {
       "text": "Maak van een regel op een lijst een klusje: wie het doet (assignee) en/of wanneer (due). Dezelfde regel, op dezelfde lijst.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."

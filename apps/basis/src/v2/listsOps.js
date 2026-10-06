@@ -166,6 +166,29 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, itemId: entry.id, kind: 'task', message: t('circle.lists.chore_made', { text: entry.text ?? '' }) };
     },
 
+    /**
+     * At a shop ("ik ben bij de Lidl"): the household's general shopping list AND every list whose name mentions that
+     * shop — what to buy here. A shop no list mentions is `not-found` (the door hands such words to the model).
+     */
+    shopVisit: async (args) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
+      const shop = String(args?.shop ?? '').trim();
+      if (!shop) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      const containers = (await svc.listContainers(circleId)).filter((c) => c.type === 'list');
+      const lower = shop.toLowerCase();
+      const own = containers.filter((c) => String(c.text ?? '').toLowerCase().includes(lower));
+      if (!own.length) return { ok: false, code: 'not-found', error: t('circle.lists.no_shop_list', { shop }) };
+      const general = String(args?.general ?? '').trim();
+      const generalList = general ? containers.find((c) => String(c.text ?? '').toLowerCase() === general.toLowerCase() && !own.includes(c)) : null;
+      const parts = [];
+      for (const list of [...(generalList ? [generalList] : []), ...own]) {
+        const open = await entriesOf(circleId, list.id);
+        parts.push(open.length ? t('circle.lists.shop_part', { list: list.text, items: open.map((c) => c.text).filter(Boolean).join(', ') }) : t('circle.lists.shop_part_empty', { list: list.text }));
+      }
+      return { ok: true, message: parts.join('\n') };
+    },
+
     markListItemDone: async (args, ctx) => {
       // Never "done" for an entry that is not there: nothing would have been ticked.
       const at = await locate(args);

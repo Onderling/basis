@@ -138,7 +138,8 @@ test('every button on the admin\'s management screen answers without an error', 
 
     testInfo.annotations.push({ type: 'skipped (walked elsewhere)', description: skipped.join(', ') });
     console.log('BUTTONS-WALK', JSON.stringify({ results, skipped }, null, 1));
-    const failed = results.filter((r) => BAD.test(r.answer) || r.answer === '(nothing)' || r.answer === '(no line left for it)');
+    // …and never a bare tick: an answer must say what happened, and to what (three chore actions said only "✓")
+    const failed = results.filter((r) => BAD.test(r.answer) || r.answer === '(nothing)' || r.answer === '(no line left for it)' || /^\s*✓\s*$/.test(r.answer));
     expect(failed, JSON.stringify(failed, null, 1)).toEqual([]);
     expect(results.length, 'buttons were pressed').toBeGreaterThan(10);
     await ctx.close();

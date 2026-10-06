@@ -5049,6 +5049,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * @param {{actor?: string|null, named?: string|null}} [who]  the person the call was for, and the task's words when
    *        the door named it by its words (the reply names the task FOUND, never the words it was asked by)
    */
+  /** The chore actions whose bare `{ok}` the door words itself (see `adaptTasksReply`). */
+  const WORDED_BY_DOOR = Object.freeze({ reassignTask: 'reassigned', removeTask: 'removed', editTask: 'edited' });
   function adaptTasksReply(opId, data, { actor = null, named = null, args = {} } = {}) {
     if (data == null) return null;
     // (B8) — DAG hard-dep blocking surface. Real skill returns
@@ -5112,6 +5114,21 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the ok/message envelope to render the confirmation bubble.
       editTask:    'Edited',
     };
+    // Moving, removing or editing a chore can come back as a bare `{ok}` — and a bare ok is painted as "✓", which tells a
+    // person neither what happened nor to what. Say it, with the chore's words the door read before the call (an edit:
+    // the new words).
+    // an edit sent as it stood changes nothing: said, with the chore's words — not an error, and never a bare "✓"
+    if (opId === 'editTask' && data?.error === 'no fields to update') {
+      const title = named || args?.id || '';
+      const message = typeof opts.t === 'function' ? opts.t('circle.tasks.reply.unchanged', { title, note: '' }) : `Nothing changed: ${title}`;
+      return { ok: true, unchanged: true, message, ...(args?.id ? { itemId: args.id } : {}), _sync: simulateSync() };
+    }
+    if (WORDED_BY_DOOR[opId] && !(verbMap[opId] && task) && data && !data.error && data.ok !== false) {
+      const title = (opId === 'editTask' && (args?.text || args?.title)) || task?.text || task?.title || named || args?.id || '';
+      const key = WORDED_BY_DOOR[opId];
+      const message = typeof opts.t === 'function' ? opts.t(`circle.tasks.reply.${key}`, { title, note: '' }) : `✓ ${key}: ${title}`;
+      return { ok: true, message, ...(task ? { task: { ...task, type: 'task', state: _statusToChatState(task.status, task) } } : {}), ...(args?.id ? { itemId: args.id } : {}), _sync: simulateSync() };
+    }
     if (verbMap[opId] && task) {
       const title = task.text || task.title || named || task.id;
       // Reject path: surface the audit-log note in the message so

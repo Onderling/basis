@@ -4348,7 +4348,7 @@
     "inapp_declined": "Fine, it stays with the chat.",
     "inapp_off": "The household in your own app is not switched on; the admin can switch it on.",
     "inapp_link_first": "Link your app first (/koppel); then I can invite you.",
-    "inapp_usage": "Usage: /in-app yes or /in-app no.",
+    "inapp_usage": "Usage: /inapp yes or /inapp no.",
     "inapp_failed": "That did not work; please try again later.",
     "menu_app": "In your own app",
     "household_circle_name": "Household",

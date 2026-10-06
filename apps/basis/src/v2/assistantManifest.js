@@ -332,14 +332,14 @@ export const assistantManifest = {
       surfaces: { slash: { command: '/koppel-code', body: 'argline' } },
     },
     {
-      // The household in your own app (`/in-app ja|nee`): asked after `/koppel` where the admin turned it on; a yes is an
+      // The household in your own app (`/inapp ja|nee`): asked after `/koppel` where the admin turned it on; a yes is an
       // invite into the household's circle bound to the linked key, sent to the private chat only.
       id:     'assistant-inapp',
       verb:   'invite-to-app',
       visibility: 'authenticated',
       writes: { scope: 'circle' },
       params: [{ name: 'answer', kind: 'string', required: true }],
-      surfaces: { slash: { command: '/in-app', body: 'argline' } },
+      surfaces: { slash: { command: '/inapp', body: 'argline' } },
     },
     {
       // Undo the link (`/ontkoppel`): the key goes, and every screen grant minted to it.

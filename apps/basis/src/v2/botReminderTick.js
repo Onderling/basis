@@ -5,7 +5,8 @@
  * (`dueReminders`) says what is due for whom; each person gets ONE message on their own door (`sendToPerson`), the
  * first they ever get ending with how to stop; what was said is marked on their thread row (the only reminder state),
  * and marks for things that are done or past are dropped in the same pass. It runs once at start, then every few
- * minutes. Only a box that hosts a bot composes it — a person's node writes first to nobody.
+ * minutes — as a job on the host's one clock (`hostTick`), which owns the timer. Only a box that hosts a bot composes it —
+ * a person's node writes first to nobody.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { wallClockInTz } from '@onderling/notifier';
@@ -28,13 +29,11 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {() => {reminders?: string, quiet?: string, lead?: number}} a.settings  the household's switch, quiet hours and the
  *   minutes before an appointment for the short-notice reminder
  * @param {() => number} [a.now]
- * @param {number} [a.every]
- * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
+ * @param {number} [a.every]  its period on the host's clock
  * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null, at?: string, what?: Array<{kind: string, id: string, slot: string}>}) => void} [a.onSent]  each send, for the walk log
  * @param {(personId: string) => Promise<string|null>} [a.overviewFor]  a person's week overview, asked AS them (Sunday 18:00)
  */
-export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, timers = globalThis, onSent = null, overviewFor = null }) {
-  let handle = null;
+export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, onSent = null, overviewFor = null }) {
   let running = null;
   const timeOf = (iso) => { const w = wallClockInTz(new Date(iso).getTime(), tz); return `${pad(w.hour)}:${pad(w.minute)}`; };
   // in each person's own language when they fixed one (`/taal`), else the bot's
@@ -119,12 +118,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       running ??= passOnce().finally(() => { running = null; });
       return running;
     },
-    /** Once now, then every `every` ms. */
-    start() {
-      if (handle) return;
-      this.pass().catch(() => {});
-      handle = timers.setInterval(() => { this.pass().catch(() => {}); }, Math.max(60_000, Number(every) || REMINDER_TICK_MS));
-    },
-    stop() { if (handle) timers.clearInterval(handle); handle = null; },
+    /** Its period on the host's clock: never under a minute. */
+    every: Math.max(60_000, Number(every) || REMINDER_TICK_MS),
   };
 }

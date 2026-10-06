@@ -79,6 +79,7 @@ import { SURFACE_GRANT_TTL_MS } from '../src/v2/surfaceGrants.js';
 import { screenColumnFor, exposeDoorToScreens } from '../src/v2/screenActing.js';
 import { parsePairingOffer } from '../src/v2/connectionPairing.js';
 import { createReminderTick } from '../src/v2/botReminderTick.js';
+import { createHostTick } from '../src/v2/hostTick.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { createCommandMenus } from '../src/v2/botCommandMenu.js';
 import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
@@ -764,6 +765,9 @@ if (contactChannel) {
   inboxDoor = await createInboxDoor({ profileKind: () => agent.profileKind(), sendTurn: (turn) => contactChannel.sendTurn(turn) });
 }
 
+// ── The host's one clock: every timed thing this box does is a job on it, started in the order added ──────────
+const hostTick = createHostTick({ onError: (e) => walkLog({ kind: 'tick-error', job: e.job, error: e.error }) });
+
 // ── The assistant: its doors (Telegram, the bot's inbox), ONE engine behind them ─────────────────────────────
 let tgRunner = null;
 if (tgToken || inboxDoor.bridge) {
@@ -880,7 +884,7 @@ if (tgToken || inboxDoor.bridge) {
     try { if (!unlockedSecret(readFileSync(p, 'utf8'))) rmSync(p, { force: true }); } catch { /* none */ }
   };
   sweepUnlocked();
-  setInterval(sweepUnlocked, 60_000).unref?.();
+  hostTick.add('unlocked-key-sweep', { every: 60_000, run: sweepUnlocked });
   const exportShelf = createExportShelf({
     files: {
       list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
@@ -1192,7 +1196,7 @@ if (tgToken || inboxDoor.bridge) {
       // the Sunday overview is the weekOverview op asked AS the person — the gate, the role and the names apply
       overviewFor: async (id) => (await doorCall('assistant', 'weekOverview', {}, { caller: id, threadId: id }))?.message ?? null,
     });
-    reminderTick.start();
+    hostTick.add('reminders', { every: reminderTick.every, run: () => reminderTick.pass() });
     // The model route, watched: a model the provider stopped serving, or an account over its limit, reaches the admin
     if (built?.listModels) {
       modelWatch.ref = createModelWatch({
@@ -1203,10 +1207,9 @@ if (tgToken || inboxDoor.bridge) {
         },
         log: walkLog,
       });
-      modelWatch.ref.check();
-      setInterval(() => modelWatch.ref.check(), MODEL_WATCH_EVERY_MS).unref?.();
+      hostTick.add('model-watch', { every: MODEL_WATCH_EVERY_MS, run: () => modelWatch.ref.check() });
     }
-    exportShelf.start();
+    hostTick.add('export-shelf', { every: exportShelf.every, atStart: exportShelf.atStart, run: () => exportShelf.writeNow() });
     walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });
   }
   // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a
@@ -1221,6 +1224,9 @@ if (tgToken || inboxDoor.bridge) {
   if (bootstrapCode && tgBridge?.botUsername) console.log(`device-runner: …or open  https://t.me/${tgBridge.botUsername}?start=${bootstrapCode}`);
   walkLog({ kind: 'assistant', doors: [tgBridge ? 'telegram' : null, inboxDoor.bridge ? 'inbox' : null].filter(Boolean), admission: 'codes', bootstrap: bootstrapUids.length, llm: llm ? llmModel : null, apps, turns: turnLogMode ?? 'off' });
 }
+
+await hostTick.start();
+walkLog({ kind: 'host-tick', jobs: hostTick.names() });
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────
 const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null);
@@ -1237,6 +1243,7 @@ if (card?.payload) {
 console.log(`  walk log  ${walkLogFile}\n`);
 
 const stop = async () => {
+  hostTick.stop();
   try { await tgRunner?.stop?.(); } catch { /* stopping is best-effort */ }
   // The stores write behind a short debounce (200 ms in the file adapters, 400 ms for the device log,
   // whose timer is unref'd and would not hold the process either). A stop that exits inside that window

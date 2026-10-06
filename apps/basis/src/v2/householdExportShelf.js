@@ -37,7 +37,6 @@ export const isExportName = (name) => NAME.test(String(name ?? ''));
  * @param {number} [a.keep]
  * @param {number} [a.every]
  * @param {() => number} [a.now]
- * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
  * @param {(e: {name?: string, ok: boolean, error?: string, sealed?: boolean}) => void} [a.onWritten]
  * @param {() => Promise<{publicKey: string, sealedSecret: string}|null>} [a.sealWith]  the admin's export key, or null (plain)
  */
@@ -45,8 +44,7 @@ export const isExportName = (name) => NAME.test(String(name ?? ''));
 const holds = (f) => (f && typeof f.holds === 'boolean' ? f.holds   // a sealed file says only this, beside its ciphertext
   : Boolean(f && ((f.people ?? []).length || (f.loose ?? []).length || (f.lists ?? []).some((l) => (l.entries ?? []).length))));
 
-export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP, every = EXPORT_EVERY_MS, now = () => Date.now(), timers = globalThis, onWritten = null, sealWith = null }) {
-  let handle = null;
+export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP, every = EXPORT_EVERY_MS, now = () => Date.now(), onWritten = null, sealWith = null }) {
   // (`param()` hands the value itself.) Never more often than hourly, never fewer than one kept: a bad number must not
   // make the box write in a loop or delete its only copy.
   const period = Math.max(3_600_000, Number(every) || EXPORT_EVERY_MS);
@@ -83,9 +81,10 @@ export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP, every 
       if (!isExportName(name)) throw new Error('not-an-export-name');
       return JSON.parse(await files.read(name));
     },
+    /** Its period on the host's clock (`hostTick`). */
+    every: period,
     // no write at boot: a box that restarts in a loop, or boots a version that cannot read its store, must not fill the
-    // shelf; the first export comes one period after the start
-    start() { if (!handle) { handle = timers.setInterval(() => { writeNow(); }, period); handle?.unref?.(); } return Promise.resolve(null); },
-    stop() { if (handle) { timers.clearInterval(handle); handle = null; } },
+    // shelf; the first export comes one period after the start (the job is added with `atStart: false`)
+    atStart: false,
   };
 }

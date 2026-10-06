@@ -40,7 +40,7 @@ describe('the shelf seals when the admin has set a key', () => {
     let at = new Date('2026-10-01T02:00:00').getTime();
     let full = true;
     const shelf = createExportShelf({
-      files, keep: 2, now: () => at, timers: { setInterval: () => 1, clearInterval: () => {} },
+      files, keep: 2, now: () => at,
       exportNow: async () => (full ? FILE : { ...FILE, lists: [] }),
       sealWith: async () => key,
     });
@@ -124,7 +124,7 @@ describe('the review of the sealed export', () => {
     const disk = new Map();
     const files = { list: async () => [...disk.keys()], write: async (n, t) => { disk.set(n, t); }, read: async (n) => disk.get(n), remove: async (n) => { disk.delete(n); } };
     const seen = [];
-    const shelf = createExportShelf({ files, exportNow: async () => FILE, timers: { setInterval: () => 1, clearInterval: () => {} },
+    const shelf = createExportShelf({ files, exportNow: async () => FILE,
       sealWith: async () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }); }, onWritten: (e) => seen.push(e) });
     expect(await shelf.writeNow()).toBeNull();
     expect(disk.size).toBe(0);

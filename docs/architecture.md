@@ -163,6 +163,13 @@ circle bot's answers are grounded, and how the two surface families compose.*
 6. **Result** — flows back to the invoking surface. Verify the *result*, not just that dispatch fired: a gate
    can route correctly while the op silently fails.
 
+**Timed work has one clock per host.** Nothing in the app code keeps an interval of its own: every timed thing a host
+does is a job on its tick (`apps/basis/src/v2/hostTick.js`) — a name, a period, what to run — started in a fixed order,
+never two runs of one job at once, one job's failure never stopping another's (`lint-host-tick` refuses an interval
+beside it). The clock has no powers of its own: it only says *when to ask*; what is due is each job's own projection,
+and what it does goes through the same calls a tap would. Today the box's jobs are the reminders, the nightly export,
+the model watch and the unlocked-key sweep.
+
 ### The event log — one record, many projections
 
 Underneath that flow there is one **append-only event log per device** — not one per circle, and not one per

@@ -1,29 +1,21 @@
 /**
- * botReminders — what a household bot must say NOW, as a projection.
+ * botReminders — what a household bot must say NOW: the reminder occurrences that are due (`reminderOccurrences`, the
+ * engine: item × the rules that apply × each person), grouped per person into ONE message.
  *
- * A reminder is not a stored job. "What must be said now" is a pure read over the items (an appointment's `startsAt`, a
- * chore's `dueAt`), the people and what was already said: a cancelled or moved appointment needs no cancel bookkeeping,
- * a restart loses nothing, and a box that was off says a thing once or not at all. One timer asks this every few
- * minutes (the box's tick); nothing else holds reminder state but `said`.
- *
- * Only things a person put a date on, and only for the people they concern:
- *   - an appointment tomorrow → the evening before (19:00), to the one who added it and to everyone who comes or
- *     comes maybe;
- *   - a chore due today → the morning of that day (08:00), to the one(s) who hold it; a chore with a TIME also `lead`
- *     minutes before that time, as an appointment is;
- *   - an appointment soon → `lead` minutes before it starts (the household's `assistant.reminderLeadMin`, 0 = off), to
- *     the same people as the evening one — unless it was made less than the lead before its start (they just made it).
- * Nothing in quiet hours (the morning opens when they end). An observer, a revoked person, and one who switched
- * reminders off get none. Everything due for one person at one moment is ONE entry (one message).
+ * A reminder is not a stored job: a cancelled or moved appointment needs no bookkeeping, a restart loses nothing, a box
+ * that was off says a thing once or not at all. What was said is a done-mark per occurrence on the device log (the
+ * thread rows' older `said` slots are still read until those items are done). Without layers, the rules are the
+ * household's rhythm: the morning (everything of the day), the evening before (an appointment early the next morning),
+ * and `lead` minutes before anything with a time. Nothing in a person's quiet hours (theirs, else the household's); an
+ * observer, a revoked person and one who switched reminders off get none. Several of one item's rules due at once are
+ * one line, the nearest kind of notice.
  */
-import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { wallClockInTz } from '@onderling/notifier';
+import { reminderOccurrences, householdRules, EVENING_BEFORE_UNTIL, REMINDER_MOMENTS, remindedFor } from './reminderOccurrences.js';
 
-/** The evening before is only for an appointment starting before this, the next morning (an earlier one than the 08:00 message). */
-export const EVENING_BEFORE_UNTIL = param({ key: 'assistant.eveningBeforeUntil', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: '10:00' });
+// The moments and who an appointment is for are the engine's; read here, and by the bot's older readers, from it.
+export { EVENING_BEFORE_UNTIL, REMINDER_MOMENTS, remindedFor };
 
-/** The two moments of a day, on the household's clock. */
-export const REMINDER_MOMENTS = Object.freeze({ morning: '08:00', evening: '19:00' });
 /**
  * What the bot's model is told about its reminders — exactly what the tick does, so it neither denies them ("I cannot
  * set reminders") nor invents others ("an hour before and five minutes before", seen on the real bot 2026-10-02).
@@ -39,8 +31,6 @@ export function reminderPromptLines() {
 /** Quiet hours, on the household's clock: nothing is said inside them. */
 export const QUIET_HOURS = '21:00-08:00';
 
-const pad = (n) => String(n).padStart(2, '0');
-const ymd = (w) => `${w.year}-${pad(w.month)}-${pad(w.day)}`;
 const minutesOf = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + m; };
 
 /**
@@ -61,22 +51,6 @@ export function inQuiet(w, quiet) {
 }
 
 /**
- * Who an appointment reminds. The household's agenda is SHARED (Frits 2026-10-06, a member's feedback: "gezamenlijke
- * afspraken … dat iedereen er een melding van krijgt"): everyone in it — unless the appointment NAMES people
- * (`attendees`), then those, its maker, and whoever said they come. Never someone who said they do not.
- * @param {{createdBy?: string, attendees?: string[], rsvp?: Record<string, string>}} e
- * @param {Array<{id: string}>} people
- * @returns {string[]}
- */
-export function remindedFor(e, people = []) {
-  const rsvp = e?.rsvp ?? {};
-  const named = Array.isArray(e?.attendees) ? e.attendees.filter((a) => typeof a === 'string' && a) : [];
-  const coming = Object.entries(rsvp).filter(([, r]) => r === 'accepted' || r === 'tentative').map(([who]) => who);
-  const base = named.length ? named : people.map((p) => p?.id).filter(Boolean);
-  return [...new Set([...base, e?.createdBy, ...coming].filter(Boolean))].filter((who) => rsvp[who] !== 'declined');
-}
-
-/**
  * @param {object} a
  * @param {Array<{id:string, text?:string, dueAt?:string, completedAt?:any, assignees?:string[], assignee?:string}>} [a.chores]
  * @param {Array<{id:string, title?:string, startsAt?:string, createdBy?:string, rsvp?:object, state?:string, completedAt?:any}>} [a.events]
@@ -86,85 +60,32 @@ export function remindedFor(e, people = []) {
  * @param {string} a.tz  the household's zone
  * @param {string} [a.quiet]
  * @param {number} [a.lead]  minutes before an appointment for the short-notice reminder; 0 (the default here) = none
+ * @param {Set<string>} [a.done]  occurrence ids already said (the done-marks on the device log)
+ * @param {(item: object, personId: string) => Array<string|{rule: string, layer: string}>|null} [a.rulesFor]  the layers; absent = the household's rhythm
  * @returns {Array<{personId: string, slot: string, items: Array<{id:string, kind:'chore'|'event', text:string, at:string, slot:string}>}>}
  */
-export function dueReminders({ chores = [], events = [], people = [], said = {}, now = Date.now(), tz, quiet = QUIET_HOURS, lead = 0 } = {}) {
+export function dueReminders({ chores = [], events = [], people = [], said = {}, done = new Set(), now = Date.now(), tz, quiet = QUIET_HOURS, lead = 0, rulesFor = null } = {}) {
   const w = wallClockInTz(now, tz);
-  const today = ymd(w);
-  const atToday = (hhmm) => { const [hour, minute] = hhmm.split(':').map(Number); return utcInstantForWallClock({ year: w.year, month: w.month, day: w.day, hour, minute, tz }); };
-  const tomorrow = ymd(wallClockInTz(atToday('12:00') + 86_400_000, tz));
-  const eveningOpen = now >= atToday(REMINDER_MOMENTS.evening);
-  const morningOpen = now >= atToday(REMINDER_MOMENTS.morning);
-  const slotNow = `${today}:${eveningOpen ? 'evening' : 'morning'}`;
-
+  const eveningOpen = w.hour * 60 + w.minute >= Number(REMINDER_MOMENTS.evening.slice(0, 2)) * 60 + Number(REMINDER_MOMENTS.evening.slice(3));
+  const slotNow = `${w.year}-${String(w.month).padStart(2, '0')}-${String(w.day).padStart(2, '0')}:${eveningOpen ? 'evening' : 'morning'}`;
   const byId = new Map(people.map((p) => [p.id, p]));
   // quiet hours are each recipient's: their own (`/stil`), else the household's — one person's quiet holds back no one else
   const reachable = (id) => { const p = byId.get(id); return Boolean(p && !p.revoked && !p.remindersOff && p.role !== 'observer' && !inQuiet(w, p.quiet || quiet)); };
-  const out = new Map();   // personId → items
-  const add = (personId, item) => {
-    if (!reachable(personId)) return;
-    if (saidSlots(said?.[personId]?.[item.id]).includes(item.slot)) return;
-    const list = out.get(personId) ?? [];
-    if (!list.some((i) => i.id === item.id)) list.push(item);
-    out.set(personId, list);
-  };
-
-  if (eveningOpen) {
-    for (const e of events) {
-      if (!e || e.state === 'cancelled' || e.completedAt || !e.startsAt) continue;
-      const start = new Date(e.startsAt).getTime();
-      if (!(start > now) || ymd(wallClockInTz(start, tz)) !== tomorrow) continue;
-      // the evening before only for what starts before the morning's message can say it (Frits 2026-10-06: one rhythm)
-      const sw = wallClockInTz(start, tz);
-      if (`${String(sw.hour).padStart(2, '0')}:${String(sw.minute).padStart(2, '0')}` >= EVENING_BEFORE_UNTIL) continue;
-      const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${today}:evening` };
-      for (const who of remindedFor(e, people)) add(who, item);
-    }
+  const occurrences = reminderOccurrences({ chores, events, people, now, tz, rulesFor: rulesFor ?? (() => householdRules(lead)) });
+  // several of one item's rules due at once for one person are ONE line — the nearest kind of notice wins — and all of
+  // them are marked as said, so none comes back on the next pass
+  const RANK = { before: 0, at: 1, 'evening-before': 2, morning: 3 };
+  const rankOf = (o) => RANK[o.rule.split(':')[0]] ?? 9;
+  const out = new Map();   // personId → Map(itemId → item)
+  for (const o of [...occurrences].sort((a, b) => rankOf(a) - rankOf(b))) {
+    if (o.state !== 'due' || !reachable(o.personId)) continue;
+    // said before: a done-mark under the occurrence's id, or (thread rows written before the marks) the item's slot
+    if (done.has(o.id) || saidSlots(said?.[o.personId]?.[o.itemId]).includes(o.slot)) continue;
+    const mine = out.get(o.personId) ?? new Map();
+    const have = mine.get(o.itemId);
+    if (have) { have.occurrences.push(o.id); have.slots.push(o.slot); continue; }
+    mine.set(o.itemId, { id: o.itemId, kind: o.kind, text: o.text, at: o.anchor, slot: o.slot, rule: o.rule, ...(o.soon ? { soon: true } : {}), occurrences: [o.id], slots: [o.slot] });
+    out.set(o.personId, mine);
   }
-  // shortly before: due from `start − lead` until the start, once per appointment and day (`<date>:soon`)
-  const leadMs = Math.max(0, Number(lead) || 0) * 60_000;
-  if (leadMs > 0) {
-    for (const e of events) {
-      if (!e || e.state === 'cancelled' || e.completedAt || !e.startsAt) continue;
-      const start = new Date(e.startsAt).getTime();
-      if (!(now >= start - leadMs && now < start)) continue;
-      const made = e.createdAt ? new Date(e.createdAt).getTime() : null;
-      if (made != null && start - made < leadMs) continue;   // they just made it: nothing to remind them of yet
-      const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${ymd(wallClockInTz(start, tz))}:soon`, soon: true };
-      for (const who of remindedFor(e, people)) add(who, item);
-    }
-    // a chore with a TIME (its due is not the day's 00:00): the same short notice before it, to whoever holds it
-    for (const c of chores) {
-      if (!c || c.completedAt || !c.dueAt) continue;
-      const due = new Date(c.dueAt).getTime();
-      const wall = wallClockInTz(due, tz);
-      if (wall.hour === 0 && wall.minute === 0) continue;   // a day, not a time: the morning reminder only
-      if (!(now >= due - leadMs && now < due)) continue;
-      const made = c.createdAt ? new Date(c.createdAt).getTime() : null;
-      if (made != null && due - made < leadMs) continue;
-      const item = { id: c.id, kind: 'chore', text: c.text ?? c.title ?? '', at: c.dueAt, slot: `${ymd(wall)}:soon`, soon: true };
-      const holders = [...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter(Boolean);
-      for (const who of new Set(holders)) add(who, item);
-    }
-  }
-  if (morningOpen) {
-    for (const c of chores) {
-      if (!c || c.completedAt || !c.dueAt) continue;
-      if (ymd(wallClockInTz(new Date(c.dueAt).getTime(), tz)) !== today) continue;
-      const item = { id: c.id, kind: 'chore', text: c.text ?? c.title ?? '', at: c.dueAt, slot: `${today}:morning` };
-      const holders = [...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter(Boolean);
-      for (const who of new Set(holders)) add(who, item);
-    }
-    // …and today's appointments still to come: the morning says everything of the day, chores and appointments alike
-    for (const e of events) {
-      if (!e || e.state === 'cancelled' || e.completedAt || !e.startsAt) continue;
-      const start = new Date(e.startsAt).getTime();
-      if (!(start > now) || ymd(wallClockInTz(start, tz)) !== today) continue;
-      // one made after the morning's moment is not "this morning's" news to anyone (its reminder is shortly before)
-      if (e.createdAt && new Date(e.createdAt).getTime() >= atToday(REMINDER_MOMENTS.morning)) continue;
-      const item = { id: e.id, kind: 'event', text: e.title ?? '', at: e.startsAt, slot: `${today}:morning` };
-      for (const who of remindedFor(e, people)) add(who, item);
-    }
-  }
-  return [...out].map(([personId, items]) => ({ personId, slot: slotNow, items }));
+  return [...out].map(([personId, items]) => ({ personId, slot: slotNow, items: [...items.values()] }));
 }

@@ -16,6 +16,19 @@ import { due } from './intentions.js';
 export const INTENTION_DONE_KIND = 'intention-done';
 
 /**
+ * The done-marks on a device log: the ids of what already ran or was said, and the mark for one more. First write wins
+ * (the kind is auditable), so a repeat never records a second run. Shared by the runner and the reminder tick.
+ * @param {{append: Function, query: Function}} log
+ * @param {() => number} [now]
+ */
+export function doneMarksOn(log, now = Date.now) {
+  return {
+    ids: () => new Set(log.query({ filter: { type: INTENTION_DONE_KIND } }).map((e) => e?.payload?.occurrence).filter(Boolean)),
+    mark: (occurrence, payload = {}) => log.append({ id: `${INTENTION_DONE_KIND}:${occurrence}`, type: INTENTION_DONE_KIND, ts: now(), payload: { ...payload, occurrence } }),
+  };
+}
+
+/**
  * @param {object} a
  * @param {ReturnType<import('./intentionBook.js').createIntentionBook>} a.book
  * @param {{append: Function, query: Function}} a.log    the device log
@@ -29,14 +42,14 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
   /** What was already said for an occurrence that has not run ("not-yet:quiet", "failed:door down"). */
   const said = new Map();
   const tell = (e) => { try { onFired?.(e); } catch { /* a listener never stops the runner */ } };
-  const doneIds = () => new Set(log.query({ filter: { type: INTENTION_DONE_KIND } }).map((e) => e?.payload?.occurrence).filter(Boolean));
+  const marks = doneMarksOn(log, now);
 
   async function runOne(o) {
     const base = { occurrence: o.id, row: o.rowId, op: o.op, actsAs: o.actsAs };
     let res;
     try { res = await run(o); } catch (e) { res = { ok: false, reason: e?.message ?? String(e) }; }
     if (res?.ok) {
-      log.append({ id: `${INTENTION_DONE_KIND}:${o.id}`, type: INTENTION_DONE_KIND, ts: now(), payload: { occurrence: o.id, row: o.rowId, op: o.op } });
+      marks.mark(o.id, { row: o.rowId, op: o.op });
       said.delete(o.id);
       try { await book.ran(o.rowId); } catch { /* the done-mark already keeps it from running again */ }
       tell({ ...base, outcome: 'ran' });
@@ -53,7 +66,7 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
   return {
     /** One pass: every due occurrence, each once. */
     async pass() {
-      const list = due({ rows: book.rows(), done: doneIds(), now: now(), tz });
+      const list = due({ rows: book.rows(), done: marks.ids(), now: now(), tz });
       for (const o of list) {
         if (inFlight.has(o.id)) continue;
         inFlight.add(o.id);

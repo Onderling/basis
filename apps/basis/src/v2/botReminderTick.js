@@ -3,14 +3,16 @@
  *
  * Each pass: the household's switch (`assistant.reminders`) — off, nothing; the items and the people; the projection
  * (`dueReminders`) says what is due for whom; each person gets ONE message on their own door (`sendToPerson`), the
- * first they ever get ending with how to stop; what was said is marked on their thread row (the only reminder state),
- * and marks for things that are done or past are dropped in the same pass. It runs once at start, then every few
+ * first they ever get ending with how to stop; what was said is a done-mark per occurrence on the device log (the
+ * older slots on thread rows are still read, and dropped once their item is done or past). It runs once at start, then every few
  * minutes — as a job on the host's one clock (`hostTick`), which owns the timer. Only a box that hosts a bot composes it —
  * a person's node writes first to nobody.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { wallClockInTz } from '@onderling/notifier';
-import { dueReminders, saidSlots } from './botReminders.js';
+import { dueReminders } from './botReminders.js';
+import { doneMarksOn } from './intentionRunner.js';
+import { EventLog } from '../eventLog.js';
 
 /** How often the box asks what is due. Reminders are for the evening and the morning; minutes are close enough. */
 // every minute: a reminder 5 minutes before an appointment lands 5–4 minutes before, not anywhere in the last five
@@ -30,10 +32,13 @@ const pad = (n) => String(n).padStart(2, '0');
  *   minutes before an appointment for the short-notice reminder
  * @param {() => number} [a.now]
  * @param {number} [a.every]  its period on the host's clock
- * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null, at?: string, what?: Array<{kind: string, id: string, slot: string}>}) => void} [a.onSent]  each send, for the walk log
+ * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null, at?: string, what?: Array<{kind: string, id: string, slot: string, rule?: string}>}) => void} [a.onSent]  each send, for the walk log
+ * @param {{append: Function, query: Function}} [a.log]  the device log: what was said is a done-mark per occurrence there
  */
-export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, onSent = null }) {
+export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, onSent = null, log = null }) {
   let running = null;
+  // what was said: a done-mark per occurrence on the device log (an in-memory one when none is handed in)
+  const marks = doneMarksOn(log ?? new EventLog({ initial: [], muted: [] }), now);
   const timeOf = (iso) => { const w = wallClockInTz(new Date(iso).getTime(), tz); return `${pad(w.hour)}:${pad(w.minute)}`; };
   // in each person's own language when they fixed one (`/taal`), else the bot's
   const tFor = (personId) => { const lang = threads?.langOf?.(personId) ?? null; return lang ? (k, p) => t(k, p, lang) : t; };
@@ -49,7 +54,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     const { chores = [], events = [] } = (await sources()) ?? {};
     const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id), quiet: threads.quietOf?.(r.id) ?? null }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
-    const due = dueReminders({ chores, events, people, said, now: at, tz, ...(s.quiet ? { quiet: s.quiet } : {}), ...(s.lead !== undefined ? { lead: s.lead } : {}) });
+    const due = dueReminders({ chores, events, people, said, done: marks.ids(), now: at, tz, ...(s.quiet ? { quiet: s.quiet } : {}), ...(s.lead !== undefined ? { lead: s.lead } : {}) });
     let sent = 0;
     for (const { personId, items } of due) {
       const first = !threads.remindedOnce(personId);
@@ -61,16 +66,14 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       const buttons = items.filter((i) => i.kind === 'chore').map((i) => ({ id: `completeTask:${i.id}`, label: tp('circle.bot.reminder_done') }));
       const r = await reach.sendToPerson(personId, { text, buttons });
       // when, which item, which kind: a reminder that did not come must be traceable from the log alone
-      try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null, at: new Date(now()).toISOString(), what: items.map((i) => ({ kind: i.kind, id: i.id, slot: i.slot })) }); } catch { /* a listener never stops the tick */ }
+      try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null, at: new Date(now()).toISOString(), what: items.map((i) => ({ kind: i.kind, id: i.id, slot: i.slot, rule: i.rule })) }); } catch { /* a listener never stops the tick */ }
       if (!r?.ok) continue;
       sent += 1;
-      const mine = threads.saidOf(personId);
-      // every slot it was said for: the morning and the short notice are two, and neither may undo the other
-      for (const i of items) mine[i.id] = [...new Set([...saidSlots(mine[i.id]), i.slot])];
-      threads.setSaid(personId, mine);
+      // every occurrence it said, each its own mark: the morning and the short notice are two, and neither undoes the other
+      for (const i of items) for (const id of i.occurrences ?? []) marks.mark(id, { item: i.id, rule: i.rule });
       if (first) threads.markReminded(personId);
     }
-    // marks for what is done or past are dropped: only what can still be due keeps its mark
+    // the thread rows' older slots for what is done or past are dropped: only what can still be due keeps one
     const open = new Set([
       ...chores.filter((c) => c && !c.completedAt).map((c) => c.id),
       ...events.filter((e) => e && e.state !== 'cancelled' && !e.completedAt && new Date(e.startsAt).getTime() > at).map((e) => e.id),

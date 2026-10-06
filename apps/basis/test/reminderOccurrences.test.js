@@ -52,6 +52,12 @@ describe('reminder occurrences', () => {
     ]);
   });
 
+  it('a day chore takes a person\'s own evening-before (19:00 the day before), never the household\'s', () => {
+    const own = (item, personId) => (item.id === 'c1' ? [{ rule: 'evening-before', layer: 'person' }] : []);
+    expect(ids(run('2026-10-07T17:30:00Z', { rulesFor: own }))).toEqual(['c1:evening-before:2026-10-07:telegram:2']);
+    expect(run('2026-10-07T17:30:00Z', { rulesFor: () => ['evening-before'], events: [] })).toEqual([]);
+  });
+
   it('`at:` a time on the item\'s day, before it; a day chore takes only `morning`', () => {
     const due = run('2026-10-08T05:31:00Z', { rulesFor: () => ['at:07:30'] });   // Thu 07:31
     expect(ids(due)).toEqual([

@@ -9,13 +9,35 @@
  * `rulesFor(item, personId)` — the layers; a rule given as a bare string is the HOUSEHOLD's. Two things differ by
  * layer, and only these: the household's `evening-before` is for an appointment early the next morning (before
  * `assistant.eveningBeforeUntil`), never a chore — a person's or an item's own is unconditional; and a chore due on a
- * DAY (no time) takes only `morning` — it has no time to be before.
+ * DAY (no time) takes `morning` and `evening-before` only — it has no time to be before.
  *
  * Today's rhythm is `householdRules(lead)`: the morning, the evening before (early appointments), and `before:<lead>`.
  */
 import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
 import { parseReminderRule } from '@onderling/item-types';
-import { EVENING_BEFORE_UNTIL, REMINDER_MOMENTS, remindedFor } from './botReminders.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+/** The evening before is only for an appointment starting before this, the next morning (an earlier one than the 08:00 message). */
+export const EVENING_BEFORE_UNTIL = param({ key: 'assistant.eveningBeforeUntil', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: '10:00' });
+
+/** The two moments of a day, on the household's clock. */
+export const REMINDER_MOMENTS = Object.freeze({ morning: '08:00', evening: '19:00' });
+/**
+ * Who an appointment reminds. The household's agenda is SHARED (Frits 2026-10-06, a member's feedback: "gezamenlijke
+ * afspraken … dat iedereen er een melding van krijgt"): everyone in it — unless the appointment NAMES people
+ * (`attendees`), then those, its maker, and whoever said they come. Never someone who said they do not.
+ * @param {{createdBy?: string, attendees?: string[], rsvp?: Record<string, string>}} e
+ * @param {Array<{id: string}>} people
+ * @returns {string[]}
+ */
+export function remindedFor(e, people = []) {
+  const rsvp = e?.rsvp ?? {};
+  const named = Array.isArray(e?.attendees) ? e.attendees.filter((a) => typeof a === 'string' && a) : [];
+  const coming = Object.entries(rsvp).filter(([, r]) => r === 'accepted' || r === 'tentative').map(([who]) => who);
+  const base = named.length ? named : people.map((p) => p?.id).filter(Boolean);
+  return [...new Set([...base, e?.createdBy, ...coming].filter(Boolean))].filter((who) => rsvp[who] !== 'declined');
+}
+
 
 const DAY = 86_400_000;
 const pad = (n) => String(n).padStart(2, '0');
@@ -56,7 +78,6 @@ function momentOf(parsed, layer, item, tz, eveningBeforeUntil) {
       return { at, windowEnd: endOfDay, day: ymd(aw), slot: `${ymd(aw)}:morning` };
     }
     case 'evening-before': {
-      if (dayOnly) return null;
       if (layer === 'household' && (item.kind !== 'event' || hhmm(aw) >= eveningBeforeUntil)) return null;
       const eve = shiftDay(day, -1);
       const at = atLocal(eve, REMINDER_MOMENTS.evening, tz);

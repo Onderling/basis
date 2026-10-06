@@ -14,7 +14,7 @@ const people = [{ id: 'telegram:1', channel: 'telegram', uid: '1', role: 'member
 const tandarts = { id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-02T07:00:00.000Z', createdBy: 'telegram:1' };
 const vuilnis = { id: 'c1', type: 'task', text: 'vuilnis', dueAt: '2026-10-01T22:00:00.000Z', assignees: ['telegram:1'] };   // Fri 2 Oct
 
-function world({ now, reminders = 'on', store = memoryThreadStore(), logged = [] }) {
+function world({ now, reminders = 'on', store = memoryThreadStore(), logged = [], log = new EventLog({ initial: [], muted: [] }) }) {
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store });
   const sent = [];
   const reach = { sendToPerson: async (id, m) => { sent.push({ id, ...m }); return { ok: true }; } };
@@ -22,9 +22,9 @@ function world({ now, reminders = 'on', store = memoryThreadStore(), logged = []
     sources: async () => ({ chores: [vuilnis], events: [tandarts] }),
     users: { list: async () => people }, threads, reach, t, tz: TZ,
     settings: () => ({ reminders, quiet: '21:00-08:00' }), now: () => now,
-    onSent: (e) => logged.push(e),
+    onSent: (e) => logged.push(e), log,
   });
-  return { threads, sent, tick, store, logged };
+  return { threads, sent, tick, store, logged, log };
 }
 
 describe('the reminder tick', () => {
@@ -45,16 +45,35 @@ describe('the reminder tick', () => {
 
   it('a restart between the moment and the send still sends once', async () => {
     const store = memoryThreadStore();
-    const before = world({ now: new Date('2026-10-01T17:05:00.000Z').getTime(), store });
+    // the device log survives the restart, as the box's does (sealed on disk)
+    const log = new EventLog({ initial: [], muted: [] });
+    const before = world({ now: new Date('2026-10-01T17:05:00.000Z').getTime(), store, log });
     await before.threads.load();
     await before.tick.pass();
     await new Promise((r) => setTimeout(r, 10));   // the thread row reaches its store
-    const after = world({ now: new Date('2026-10-01T17:35:00.000Z').getTime(), store });
+    const after = world({ now: new Date('2026-10-01T17:35:00.000Z').getTime(), store, log });
     await after.threads.load();
     await after.tick.pass();
     // each person once, whichever side of the restart
     const ids = [...before.sent, ...after.sent].map((m) => m.id);
     expect(ids.length).toBe(new Set(ids).size);
+  });
+
+  it('what was said is a done-mark per person per occurrence on the device log — not a slot on the thread row', async () => {
+    const w = world({ now: new Date('2026-10-01T17:05:00.000Z').getTime() });
+    await w.threads.load();
+    await w.tick.pass();
+    const marks = w.log.query({ filter: { type: 'intention-done' } }).map((e) => e.payload.occurrence).sort();
+    expect(marks).toEqual(people.map((p) => `e1:evening-before:2026-10-01:${p.id}`).sort());
+    expect(w.threads.saidOf('telegram:1')).toEqual({});
+  });
+
+  it('a slot a thread row still holds from before the marks is not said again', async () => {
+    const w = world({ now: new Date('2026-10-01T17:05:00.000Z').getTime() });
+    await w.threads.load();
+    for (const p of people) w.threads.setSaid(p.id, { e1: '2026-10-01:evening' });
+    await w.tick.pass();
+    expect(w.sent).toEqual([]);
   });
 
   it('the morning after, the chore due that day; a box off over the appointment says nothing of it', async () => {

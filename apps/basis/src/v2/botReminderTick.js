@@ -10,7 +10,7 @@
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { wallClockInTz } from '@onderling/notifier';
-import { dueReminders } from './botReminders.js';
+import { dueReminders, saidSlots } from './botReminders.js';
 
 /** How often the box asks what is due. Reminders are for the evening and the morning; minutes are close enough. */
 // every minute: a reminder 5 minutes before an appointment lands 5–4 minutes before, not anywhere in the last five
@@ -65,7 +65,8 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       if (!r?.ok) continue;
       sent += 1;
       const mine = threads.saidOf(personId);
-      for (const i of items) mine[i.id] = i.slot;
+      // every slot it was said for: the morning and the short notice are two, and neither may undo the other
+      for (const i of items) mine[i.id] = [...new Set([...saidSlots(mine[i.id]), i.slot])];
       threads.setSaid(personId, mine);
       if (first) threads.markReminded(personId);
     }

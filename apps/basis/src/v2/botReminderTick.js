@@ -30,7 +30,7 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {() => number} [a.now]
  * @param {number} [a.every]
  * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
- * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null}) => void} [a.onSent]  each send, for the walk log
+ * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null, at?: string, what?: Array<{kind: string, id: string, slot: string}>}) => void} [a.onSent]  each send, for the walk log
  * @param {(personId: string) => Promise<string|null>} [a.overviewFor]  a person's week overview, asked AS them (Sunday 18:00)
  */
 export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, timers = globalThis, onSent = null, overviewFor = null }) {
@@ -63,7 +63,8 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       const text = [...items.map((i) => lineOf(i, tp)), ...(textOnly && chore ? [tp('circle.bot.reminder_done_words', { text: chore.text })] : []), ...(first ? [tp('circle.bot.reminder_first')] : [])].join('\n');
       const buttons = items.filter((i) => i.kind === 'chore').map((i) => ({ id: `completeTask:${i.id}`, label: tp('circle.bot.reminder_done') }));
       const r = await reach.sendToPerson(personId, { text, buttons });
-      try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null }); } catch { /* a listener never stops the tick */ }
+      // when, which item, which kind: a reminder that did not come must be traceable from the log alone
+      try { onSent?.({ personId, items: items.length, ok: Boolean(r?.ok), reason: r?.reason ?? null, at: new Date(now()).toISOString(), what: items.map((i) => ({ kind: i.kind, id: i.id, slot: i.slot })) }); } catch { /* a listener never stops the tick */ }
       if (!r?.ok) continue;
       sent += 1;
       const mine = threads.saidOf(personId);

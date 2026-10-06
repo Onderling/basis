@@ -1188,7 +1188,7 @@ if (tgToken || inboxDoor.bridge) {
       tz: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
       settings: reminderSettings,
       // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
-      onSent: (e) => walkLog({ kind: 'reminder', to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}) }),
+      onSent: (e) => walkLog({ kind: 'reminder', ...(e.at ? { ts: e.at } : {}), to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}), ...(Array.isArray(e.what) ? { what: e.what.map((w) => ({ kind: w.kind, id: String(w.id).slice(-6), slot: w.slot })) } : {}) }),
       // the Sunday overview is the weekOverview op asked AS the person — the gate, the role and the names apply
       overviewFor: async (id) => (await doorCall('assistant', 'weekOverview', {}, { caller: id, threadId: id }))?.message ?? null,
     });

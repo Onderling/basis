@@ -14,7 +14,7 @@ const people = [{ id: 'telegram:1', channel: 'telegram', uid: '1', role: 'member
 const tandarts = { id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-02T08:00:00.000Z', createdBy: 'telegram:1' };
 const vuilnis = { id: 'c1', type: 'task', text: 'vuilnis', dueAt: '2026-10-01T22:00:00.000Z', assignees: ['telegram:1'] };   // Fri 2 Oct
 
-function world({ now, reminders = 'on', store = memoryThreadStore() }) {
+function world({ now, reminders = 'on', store = memoryThreadStore(), logged = [] }) {
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store });
   const sent = [];
   const reach = { sendToPerson: async (id, m) => { sent.push({ id, ...m }); return { ok: true }; } };
@@ -22,8 +22,9 @@ function world({ now, reminders = 'on', store = memoryThreadStore() }) {
     sources: async () => ({ chores: [vuilnis], events: [tandarts] }),
     users: { list: async () => people }, threads, reach, t, tz: TZ,
     settings: () => ({ reminders, quiet: '21:00-08:00' }), now: () => now,
+    onSent: (e) => logged.push(e),
   });
-  return { threads, sent, tick, store };
+  return { threads, sent, tick, store, logged };
 }
 
 describe('the reminder tick', () => {
@@ -108,5 +109,14 @@ describe('the reminder tick', () => {
     await tick.pass();
     expect(sent[0].text).toContain('circle.bot.reminder_done_words');
     expect(sent[0].text).toContain('vuilnis');
+  });
+
+  it('the log line says WHEN, WHICH item and WHICH kind — a reminder that did not come can be traced', async () => {
+    const w = world({ now: new Date('2026-10-01T17:05:00.000Z').getTime() });
+    await w.threads.load();
+    await w.tick.pass();
+    const e = w.logged.find((x) => x.personId === 'telegram:1');
+    expect(e.at).toBe('2026-10-01T17:05:00.000Z');
+    expect(e.what).toEqual([expect.objectContaining({ kind: 'event', id: 'e1', slot: '2026-10-01:evening' })]);
   });
 });

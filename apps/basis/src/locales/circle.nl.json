@@ -4112,11 +4112,11 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen). Verbruik zien: {{usage}} (admin: alleen de beheerder · members: iedereen). Rollen: {{roles}} (standard: de beheerder beslist meer · flat: iedereen gelijk).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen). Verbruik zien: {{usage}} (admin: alleen de beheerder · members: iedereen). Rollen: {{roles}} (standard: de beheerder beslist meer · flat: iedereen gelijk). In je eigen app: {{app}} (off: niet gevraagd · on: na /koppel gevraagd).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat",
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_saved": {
@@ -4343,6 +4343,17 @@
     "role_word_lid": "lid",
     "people_head": "In dit huishouden:",
     "people_you": "jij",
+    "inapp_question": "Wil je het huishouden ook in je eigen app? Dan staan lijsten, klusjes en agenda op je telefoon. De bot-regels (namen, rollen) gelden daar dan niet meer. Je kunt er later via je app weer uit.",
+    "inapp_invite": "Je uitnodiging voor het huishouden in je eigen app. Alleen jij kunt hem gebruiken, één keer, binnen 24 uur. Plak hem in de app bij Kringen → Lid worden:\n{{invite}}",
+    "inapp_declined": "Goed, het blijft bij de chat.",
+    "inapp_off": "Het huishouden in je eigen app staat niet aan; dat kan de beheerder aanzetten.",
+    "inapp_link_first": "Koppel eerst je app (/koppel); daarna kan ik je uitnodigen.",
+    "inapp_usage": "Gebruik: /in-app ja of /in-app nee.",
+    "inapp_failed": "Dat lukte niet; probeer het later nog eens.",
+    "menu_app": "In je eigen app",
+    "household_circle_name": "Huishouden",
+    "revoked_circle": "Uit het huishouden in de app gehaald.",
+    "inapp_invite_link": "Je uitnodiging voor het huishouden in je eigen app. Alleen jij kunt hem gebruiken, één keer, binnen 24 uur. Tik op deze link op je telefoon; de app opent met de uitnodiging:\n{{link}}\n\nOpent hij niet, plak dan dit in de app bij Kringen → Lid worden:\n{{invite}}",
     "menu_roles": "Rollen",
     "value_standard": "standaard (de beheerder beslist meer)",
     "value_flat": "plat (iedereen doet wat de beheerder doet, behalve mensen en instellingen)",
@@ -4495,6 +4506,7 @@
           "assistant-export-key-set": "de exportsleutel zetten (je wachtwoord, alleen op je scherm)",
           "assistant-export-key-unlock": "de exportsleutel een uur openen, voor /import",
           "assistant-link": "je Basis-app aan jezelf koppelen",
+          "assistant-inapp": "het huishouden ook in je eigen app (na /koppel, als de beheerder het aanzette)",
           "assistant-link-confirm": "de code van je Basis-app kiezen",
           "assistant-unlink": "je Basis-app ontkoppelen",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",

@@ -4,11 +4,11 @@
  */
 import { parsePairingOffer } from './connectionPairing.js';
 import { screenLabel } from './botScreens.js';
-import { personNamed } from './botUsers.js';
+import { personNamed, linkedKeyOf } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
-import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
 import { peopleRows } from './botPeople.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
@@ -62,6 +62,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     ['reminders', REMINDERS_KEY, REMINDERS_MODES, remindersModeFrom],
     ['usage', USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom],
     ['roles', ROLES_KEY, ROLES_PRESETS, rolesPresetFrom],
+    ['app', HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom],
   ];
   const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
   /** An op's declared step-up, from the door's catalogue (any app), else the door's own manifest. */
@@ -97,6 +98,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-screen-approve') return approveOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-link') return linkOp(caller ?? ctx?.threadId, args?.offer ?? args?._match, ctx);
       if (op === 'assistant-link-confirm') return linkConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
+      if (op === 'assistant-inapp') return inAppOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-unlink') return unlinkOp(caller ?? ctx?.threadId, ctx);
       if (op === 'assistant-circle') return circleOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       if (op === 'assistant-circles') return circlesOp(caller ?? ctx?.threadId);
@@ -249,7 +251,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: reminderLeadFrom(of(REMINDER_LEAD_KEY)), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)) });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: reminderLeadFrom(of(REMINDER_LEAD_KEY)), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)), app: inAppModeFrom(of(HOUSEHOLD_IN_APP_KEY)) });
     };
     const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
@@ -280,7 +282,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!isQuietHours(value)) return usage;
       return set(QUIET_KEY, value);
     }
-    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES], roles: [ROLES_KEY, ROLES_PRESETS], usage: [USAGE_VISIBLE_KEY, USAGE_VISIBILITY] }[what];
+    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES], roles: [ROLES_KEY, ROLES_PRESETS], usage: [USAGE_VISIBLE_KEY, USAGE_VISIBILITY], app: [HOUSEHOLD_IN_APP_KEY, IN_APP_MODES] }[what];
     if (!setting || !setting[1].includes(value)) return usage;
     return set(setting[0], value);
   }
@@ -422,8 +424,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!row) return { ok: false, error: { code: 'unknown-user', message: t('circle.bot.revoke_unknown', { who: String(who ?? '') }) } };
     // a person who is no longer admitted keeps no screen
     const dropped = typeof admin.screens?.dropAll === 'function' ? await admin.screens.dropAll(row.id) : 0;
+    // …and is no longer in the household's circle on their own app (by the key they linked)
+    const evicted = linkedKeyOf(row) && typeof admin.householdInApp?.evict === 'function'
+      ? ((await admin.householdInApp.evict(linkedKeyOf(row)).catch(() => null))?.removed ?? 0) : 0;
     const said = t('circle.bot.revoked', { who: row.displayName ?? row.id });
-    return { ok: true, message: dropped ? `${said} ${t('circle.bot.revoked_screens', { n: dropped })}` : said };
+    const parts = [said, ...(dropped ? [t('circle.bot.revoked_screens', { n: dropped })] : []), ...(evicted ? [t('circle.bot.revoked_circle')] : [])];
+    return { ok: true, message: parts.join(' ') };
   }
 
 
@@ -688,10 +694,39 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (!person || !link) return { ok: false, error: 'unwired' };
     const tp = personT(person);
     const r = await link.confirm(person, answer, { isPrivate: await fromPrivateDoor(person, ctx) });
-    if (r.ok && r.linked) return { ok: true, message: tp('circle.bot.link_done') };
+    if (r.ok && r.linked) {
+      // the household in their own app too? Asked only where the admin said so, and only here (privately, just linked)
+      if (!admin.householdInApp || inAppModeFrom(await userParam(HOUSEHOLD_IN_APP_KEY)) !== 'on') return { ok: true, message: tp('circle.bot.link_done') };
+      return {
+        ok: true, message: `${tp('circle.bot.link_done')}\n\n${tp('circle.bot.inapp_question')}`,
+        quickReplies: [{ label: tp('circle.bot.stepup_yes'), slash: '/in-app ja' }, { label: tp('circle.bot.stepup_no'), slash: '/in-app nee' }],
+      };
+    }
     if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.link_declined') };
     const key = { 'not-private': 'link_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'link_nothing' }[r.reason] ?? 'link_failed';
     return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
+  }
+
+  /**
+   * `/in-app ja|nee` — the household in the person's own app: an invite into the household's circle, bound to the key
+   * their `/koppel` linked (only that key redeems it, once, within a day), sent here, privately. Only where the admin
+   * turned it on, only from the private door, only once linked.
+   */
+  async function inAppOp(person, answer, ctx) {
+    const inApp = admin.householdInApp;
+    if (!person || !inApp) return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    if (inAppModeFrom(await userParam(HOUSEHOLD_IN_APP_KEY)) !== 'on') return { ok: false, error: { code: 'off', message: tp('circle.bot.inapp_off') } };
+    if (!(await fromPrivateDoor(person, ctx))) return { ok: false, error: { code: 'not-private', message: tp('circle.bot.link_not_private') } };
+    const yes = switchOf(String(answer ?? '').trim().toLowerCase());
+    if (!yes) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.inapp_usage') } };
+    if (yes === 'off') return { ok: true, message: tp('circle.bot.inapp_declined') };
+    const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
+    const key = linkedKeyOf(row);
+    if (!key) return { ok: false, error: { code: 'not-linked', message: tp('circle.bot.inapp_link_first') } };
+    const r = await inApp.inviteFor(key).catch((e) => ({ ok: false, reason: e?.message ?? 'failed' }));
+    if (!r?.ok || !r.uri) return { ok: false, error: { code: r?.reason ?? 'failed', message: tp('circle.bot.inapp_failed') } };
+    return { ok: true, message: r.link ? tp('circle.bot.inapp_invite_link', { link: r.link, invite: r.uri }) : tp('circle.bot.inapp_invite', { invite: r.uri }) };
   }
 
   /** `/ontkoppel` — from the private door only: the key goes, and its screen grants. */

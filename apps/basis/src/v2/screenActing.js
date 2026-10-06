@@ -24,6 +24,8 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-link',
   'assistant.assistant-link-confirm',
   'assistant.assistant-unlink',
+  // …and the household in their own app: an invite to their key, asked for in the private chat
+  'assistant.assistant-inapp',
 ]);
 
 /**

@@ -49,7 +49,8 @@ test('every button on the admin\'s management screen answers without an error', 
     expect(await until(async () => ((await said()).length ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
     // something on the lists and the chores, so the line actions have lines
     // a line for every line action (each action gets a line of its own: ticking one off takes it away)
-    const LINES = { Boodschappen: ['melk', 'kaas', 'brood'], Klusjes: ['afwassen', 'stofzuigen', 'ramen', 'planten'] };
+    // (plain lines: done · remove · edit · make-a-chore — four)
+    const LINES = { Boodschappen: ['melk', 'kaas', 'brood', 'eieren'], Klusjes: ['afwassen', 'stofzuigen', 'ramen', 'planten'] };
     for (const [list, texts] of Object.entries(LINES)) for (const text of texts) await send(`/add-to-list --list ${list} --text ${text}`);
     expect(await until(async () => ((await said()).filter((x) => /planten/.test(x)).length ? true : null), { timeout: 40_000, step: 500 }), `the lines were not added:\n${(await said()).slice(-3).join('\n')}`).toBe(true);
     await send('/scherm link');
@@ -74,6 +75,10 @@ test('every button on the admin\'s management screen answers without an error', 
     // ── every action on a list line and on a person ──
     const household = page.locator('section[data-section="household"]');
     await expect(household.locator('[data-line] [data-action]').first()).toBeVisible({ timeout: 40_000 });   // painted after connecting
+    // …and EVERY line added above, before the actions are counted: the screen paints as the lines arrive, and on a
+    // slow runner the first one shows while the rest are still on their way (CI ran out of plain lines that way)
+    const added = Object.values(LINES).flat().length;
+    await expect.poll(() => household.locator('[data-line]').count(), { timeout: 60_000, message: 'every added line painted' }).toBeGreaterThanOrEqual(added);
     // one line per action: each action is pressed on a line no earlier action touched
     const rowActions = await household.locator('[data-action]').evaluateAll((els) => els.map((e) => ({ skill: e.getAttribute('data-action'), row: (e.closest('[data-line]') ?? e.closest('[data-person]'))?.getAttribute(e.closest('[data-line]') ? 'data-line' : 'data-person') })));
     expect(rowActions.length, 'the household section has line actions to press').toBeGreaterThan(0);

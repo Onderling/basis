@@ -14,13 +14,31 @@ const people = [{ id: 'frits' }, { id: 'bert' }, { id: 'anne' }, { id: 'olga', r
 const tandarts = { id: 'e1', title: 'tandarts', startsAt: '2026-10-02T08:00:00.000Z', createdBy: 'frits', rsvp: { bert: 'accepted', anne: 'declined' } };
 
 describe('what the bot must say now', () => {
-  it('an appointment tomorrow: at 19:00 the evening before, to its maker and to those who come — not to others', () => {
+  it('an appointment tomorrow: at 19:00 the evening before, to everyone in the household — but not who said no', () => {
+    // Frits 2026-10-06 (a member's feedback: "gezamenlijke afspraken … dat iedereen er een melding van krijgt"): the
+    // household's agenda is shared — everyone is reminded, unless the appointment names people
     const due = dueReminders({ events: [tandarts], people, now: at('2026-10-01T17:05:00.000Z'), tz: TZ });   // 19:05
-    expect(due.map((d) => d.personId).sort()).toEqual(['bert', 'frits']);
+    expect(due.map((d) => d.personId).sort()).toEqual(['bert', 'frits']);   // anne declined; olga observes; gone is gone
     expect(due[0].items[0]).toMatchObject({ id: 'e1', kind: 'event', text: 'tandarts' });
     expect(due[0].slot).toBe('2026-10-01:evening');
     // before 19:00: not yet
     expect(dueReminders({ events: [tandarts], people, now: at('2026-10-01T16:30:00.000Z'), tz: TZ })).toEqual([]);
+  });
+
+  it('nobody answered: everyone is reminded (the shared agenda), not only its maker', () => {
+    const eten = { id: 'e2', title: 'eten', startsAt: '2026-10-02T17:45:00.000Z', createdBy: 'anne' };
+    const due = dueReminders({ events: [eten], people, now: at('2026-10-01T17:05:00.000Z'), tz: TZ });
+    expect(due.map((d) => d.personId).sort()).toEqual(['anne', 'bert', 'frits']);
+  });
+
+  it('an appointment that NAMES people reminds them (and its maker, and who said they come) — nobody else', () => {
+    const henk = { id: 'e3', title: 'tandarts', startsAt: '2026-10-02T08:00:00.000Z', createdBy: 'frits', attendees: ['bert'] };
+    const due = dueReminders({ events: [henk], people, now: at('2026-10-01T17:05:00.000Z'), tz: TZ });
+    expect(due.map((d) => d.personId).sort()).toEqual(['bert', 'frits']);
+    const shortly = dueReminders({ events: [{ ...henk, createdAt: '2026-09-30T08:00:00.000Z' }], people, now: at('2026-10-02T07:56:00.000Z'), tz: TZ, lead: 5 });
+    expect(shortly.map((d) => d.personId).sort()).toEqual(['bert', 'frits']);
+    const all = dueReminders({ events: [{ id: 'e4', title: 'eten', startsAt: '2026-10-02T08:00:00.000Z', createdAt: '2026-09-30T08:00:00.000Z', createdBy: 'frits' }], people, now: at('2026-10-02T07:56:00.000Z'), tz: TZ, lead: 5 });
+    expect(all.map((d) => d.personId).sort(), 'the short notice too: everyone').toEqual(['anne', 'bert', 'frits']);
   });
 
   it('said once, it is not due again; moved to next week or cancelled, it is not due', () => {

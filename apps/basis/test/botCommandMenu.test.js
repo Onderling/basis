@@ -89,3 +89,16 @@ describe('the people tell the menus when someone comes, goes or gets another rol
     expect(n).toBe(5);
   });
 });
+
+describe('the household-in-your-app command is in the menu', () => {
+  // Telegram's menu takes letters, digits and underscores only: `/in-app` was typed-only, so a person who missed the
+  // question after /koppel found no way back to it in the menu (Frits 2026-10-06: "not officially listed")
+  it('a member and an observer see it, and every person-facing command fits Telegram\'s name rule', () => {
+    const tr = (k) => { const v = k.split('.').slice(1).reduce((o, x) => o?.[x], nl); return typeof v === 'string' ? v : (v?.text ?? k); };
+    for (const role of ['member', 'observer']) {
+      const list = botCommandList({ catalogue: scopeCatalogueToRole(catalogue, role), t: tr }).map((c) => c.command);
+      expect(list, role).toContain('inapp');
+      expect(list, role).toContain('wie');
+    }
+  });
+});

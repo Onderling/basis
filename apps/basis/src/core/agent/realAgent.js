@@ -4057,6 +4057,33 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /**
+   * Words that name people ("Henk", "mij en Yvonne", "iedereen") → the household's people, under the names setting, as
+   * the chore's who is read. `{ok, ids}` — no ids for "iedereen"/"everyone" — or the refusal a person reads.
+   */
+  async function peopleNamed(words, ctx) {
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const caller = actorOf(ctx);
+    const parts = String(words ?? '').split(/\s*(?:,|&|\ben\b|\band\b)\s*/i).map((w) => w.trim()).filter(Boolean);
+    const EVERYONE = /^(iedereen|allemaal|alle(n)?|everyone|everybody|all)$/i;
+    if (!parts.length || parts.every((w) => EVERYONE.test(w))) return { ok: true, ids: [] };
+    const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+    const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
+    const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
+    const callerRole = caller ? (roles[caller] ?? null) : null;
+    const roleMayAssign = caller ? buildStandardRolePolicy(roles).canReassign(caller) : true;
+    const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
+    const ids = [];
+    for (const w of parts.filter((x) => !EVERYONE.test(x))) {
+      if (isSelfWord(w)) { if (caller) ids.push(caller); continue; }
+      if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
+      const hit = known.filter((c) => c.webid === w || String(c.displayName ?? '').trim().toLowerCase() === w.toLowerCase());
+      if (hit.length !== 1) return { ok: false, error: tr('circle.tasks.no_such_person', { name: w }) };
+      ids.push(hit[0].webid);
+    }
+    return { ok: true, ids: [...new Set(ids)] };
+  }
+
+  /**
    * The add of a chore with its person and its day (see the lists branch of `callSkill`) — or a line already there made
    * one (`makeChore`). A who or a when said on a line that is not a chore yet makes it one, in place: the same item.
    */
@@ -4158,6 +4185,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A chore that says who and when (a household bot): "nieuwe taak voor Bert: X (maandag)". The add on a list whose
     // entries are chores takes an `assignee` (me, or a person the bot knows by name) and a `due` day; WHO may be named
     // is the bot's setting (`assistant.assignPolicy`), decided here — the model only passes the words on.
+    // An appointment that NAMES people ("tandarts voor Henk"): the names become the household's people, as a chore's who
+    // is read — so its reminder goes to them (and its maker), never everyone. "iedereen" names nobody: the shared agenda.
+    if (appOrigin === 'calendar' && opId === 'addEvent' && opts.tasksCircleId && typeof args?.attendees === 'string' && args.attendees.trim()) {
+      const named = await peopleNamed(args.attendees, ctx);
+      if (!named.ok) return named;
+      const { attendees, ...rest } = args;
+      return callSkill('calendar', 'addEvent', named.ids.length ? { ...rest, attendees: named.ids } : rest, ctx);
+    }
     if (appOrigin === 'lists' && (opId === 'addToList' || opId === 'makeChore') && opts.tasksCircleId && (args?.assignee || args?.due)) {
       return addChoreFor(args ?? {}, ctx, opId);
     }

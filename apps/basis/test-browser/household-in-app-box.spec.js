@@ -1,7 +1,7 @@
 /**
  * THE HOUSEHOLD IN YOUR OWN APP, IN A REAL BROWSER — the real box runner as a household bot; Ann (its first person, so
  * its admin, a headless node) puts melk on Boodschappen, turns the setting on and makes Bert a code. Bert is the WEB
- * APP in Chromium: it adds the bot by its card, comes in on the code through the bot's inbox, says `/in-app ja`, and
+ * APP in Chromium: it adds the bot by its card, comes in on the code through the bot's inbox, says `/inapp ja`, and
  * taps the link the bot sends — the app opens with the invite (`?join=`) and runs its own join.
  *
  * What it proves: the joined app holds the household's EXISTING lines — melk, put there before Bert ever joined — in its
@@ -73,7 +73,7 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
       return null;
     }, { text, extra, bot: card.peerAddr });
     expect(await bertAsk('hallo', { admission: code }), `Bert not admitted:\n${out.slice(-1200)}`).toBeTruthy();
-    const yes = await bertAsk('/in-app ja');
+    const yes = await bertAsk('/inapp ja');
     const invite = /onderling-invite:\/\/\S+/.exec(yes ?? '')?.[0];
     expect(invite, `no invite; the bot said: ${yes}`).toBeTruthy();
 

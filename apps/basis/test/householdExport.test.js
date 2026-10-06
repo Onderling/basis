@@ -176,12 +176,10 @@ describe('the export shelf, with its defaults', () => {
     const { createExportShelf } = await import('../src/v2/householdExportShelf.js');
     const disk = new Map();
     const files = { list: async () => [...disk.keys()], write: async (n, t) => { disk.set(n, t); }, read: async (n) => disk.get(n), remove: async (n) => { disk.delete(n); } };
-    const intervals = [];
-    const timers = { setInterval: (_fn, ms) => { intervals.push(ms); return 1; }, clearInterval: () => {} };
     let at = new Date('2026-10-01T02:00:00').getTime();
-    const shelf = createExportShelf({ files, exportNow: async () => ({ v: 1 }), now: () => at, timers });
-    await shelf.start();
-    expect(intervals).toEqual([24 * 3_600_000]);
+    const shelf = createExportShelf({ files, exportNow: async () => ({ v: 1 }), now: () => at });
+    expect(shelf.every).toBe(24 * 3_600_000);
+    expect(createExportShelf({ files, exportNow: async () => ({}), every: 5 }).every, 'a bad number never a tight loop').toBe(3_600_000);
     for (let d = 1; d < 10; d++) { at += 86_400_000; await shelf.writeNow(); }
     expect((await shelf.names()).length).toBe(7);
   });
@@ -250,8 +248,12 @@ describe('the shelf never loses the last good copy', () => {
     const exportNow = async () => (full
       ? { format: 'onderling-household-export', v: 1, lists: [{ n: 1, name: 'B', entries: [{ n: 2, type: 'list-item', text: 'melk' }] }], people: [], loose: [] }
       : { format: 'onderling-household-export', v: 1, lists: [], people: [], loose: [] });
-    const shelf = createExportShelf({ files, exportNow, keep: 3, now: () => at, timers: { setInterval: () => 1, clearInterval: () => {} } });
-    await shelf.start();
+    const shelf = createExportShelf({ files, exportNow, keep: 3, now: () => at });
+    // on the host's clock, as the box adds it: the boot's tick does not write
+    const { createHostTick } = await import('../src/v2/hostTick.js');
+    const clock = createHostTick({ now: () => at, timers: { setInterval: () => 1, clearInterval: () => {} } });
+    clock.add('export-shelf', { every: shelf.every, atStart: shelf.atStart, run: () => shelf.writeNow() });
+    await clock.start();
     expect(disk.size, 'a boot does not write').toBe(0);
     await shelf.writeNow();
     at += 3_600_000; await shelf.writeNow();   // the same day: a second file, not a replacement

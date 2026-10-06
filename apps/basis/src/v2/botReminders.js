@@ -43,6 +43,13 @@ const pad = (n) => String(n).padStart(2, '0');
 const ymd = (w) => `${w.year}-${pad(w.month)}-${pad(w.day)}`;
 const minutesOf = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + m; };
 
+/**
+ * What was said of one item to one person: every slot it was said for (a list), or one slot (as the thread rows kept it
+ * before). One slot per item was the bug: the morning message and the short notice for the same appointment each
+ * overwrote the other's mark, and the two went out in turn every minute until it started (live 2026-10-07).
+ */
+export const saidSlots = (v) => (Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : []));
+
 /** Is this wall-clock time inside the quiet hours ("21:00-08:00" wraps midnight)? */
 export function inQuiet(w, quiet) {
   const [from, to] = String(quiet || '').split('-');
@@ -74,7 +81,7 @@ export function remindedFor(e, people = []) {
  * @param {Array<{id:string, text?:string, dueAt?:string, completedAt?:any, assignees?:string[], assignee?:string}>} [a.chores]
  * @param {Array<{id:string, title?:string, startsAt?:string, createdBy?:string, rsvp?:object, state?:string, completedAt?:any}>} [a.events]
  * @param {Array<{id:string, role?:string, revoked?:boolean, remindersOff?:boolean, quiet?:string|null}>} [a.people]  `quiet`: the person's own quiet hours (else the household's)
- * @param {Record<string, Record<string, string>>} [a.said]  per person: item id → the slot it was said for
+ * @param {Record<string, Record<string, string|string[]>>} [a.said]  per person: item id → the slots it was said for
  * @param {number} [a.now]
  * @param {string} a.tz  the household's zone
  * @param {string} [a.quiet]
@@ -96,7 +103,7 @@ export function dueReminders({ chores = [], events = [], people = [], said = {},
   const out = new Map();   // personId → items
   const add = (personId, item) => {
     if (!reachable(personId)) return;
-    if (said?.[personId]?.[item.id] === item.slot) return;
+    if (saidSlots(said?.[personId]?.[item.id]).includes(item.slot)) return;
     const list = out.get(personId) ?? [];
     if (!list.some((i) => i.id === item.id)) list.push(item);
     out.set(personId, list);

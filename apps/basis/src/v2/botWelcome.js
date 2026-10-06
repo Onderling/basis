@@ -80,6 +80,7 @@ export const WELCOME_SAYS = Object.freeze({
   "assistant-settings": "welcome_admin",
 });
 export const WELCOME_LEAVES = Object.freeze({
+  sendWeekOverview: "not typed: the host's runner sends it to whoever switched the overview on (said on the overview line)",
   listLists: "part of the lists line: reading a list is said there",
   listEntries: "part of the lists line: reading a list is said there",
   markListItemDone: "part of the lists line (\"melk is gekocht\")",

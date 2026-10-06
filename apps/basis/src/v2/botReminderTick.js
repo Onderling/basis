@@ -5,11 +5,12 @@
  * (`dueReminders`) says what is due for whom; each person gets ONE message on their own door (`sendToPerson`), the
  * first they ever get ending with how to stop; what was said is marked on their thread row (the only reminder state),
  * and marks for things that are done or past are dropped in the same pass. It runs once at start, then every few
- * minutes. Only a box that hosts a bot composes it — a person's node writes first to nobody.
+ * minutes — as a job on the host's one clock (`hostTick`), which owns the timer. Only a box that hosts a bot composes it —
+ * a person's node writes first to nobody.
  */
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { wallClockInTz } from '@onderling/notifier';
-import { dueReminders, inQuiet, QUIET_HOURS } from './botReminders.js';
+import { dueReminders, saidSlots } from './botReminders.js';
 
 /** How often the box asks what is due. Reminders are for the evening and the morning; minutes are close enough. */
 // every minute: a reminder 5 minutes before an appointment lands 5–4 minutes before, not anywhere in the last five
@@ -28,13 +29,10 @@ const pad = (n) => String(n).padStart(2, '0');
  * @param {() => {reminders?: string, quiet?: string, lead?: number}} a.settings  the household's switch, quiet hours and the
  *   minutes before an appointment for the short-notice reminder
  * @param {() => number} [a.now]
- * @param {number} [a.every]
- * @param {{setInterval: Function, clearInterval: Function}} [a.timers]
+ * @param {number} [a.every]  its period on the host's clock
  * @param {(e: {personId: string, items: number, ok: boolean, reason: string|null, at?: string, what?: Array<{kind: string, id: string, slot: string}>}) => void} [a.onSent]  each send, for the walk log
- * @param {(personId: string) => Promise<string|null>} [a.overviewFor]  a person's week overview, asked AS them (Sunday 18:00)
  */
-export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, timers = globalThis, onSent = null, overviewFor = null }) {
-  let handle = null;
+export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, onSent = null }) {
   let running = null;
   const timeOf = (iso) => { const w = wallClockInTz(new Date(iso).getTime(), tz); return `${pad(w.hour)}:${pad(w.minute)}`; };
   // in each person's own language when they fixed one (`/taal`), else the bot's
@@ -47,8 +45,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     const s = typeof settings === 'function' ? (settings() ?? {}) : {};
     const rows = (await users.list()) ?? [];
     const at = now();
-    const sentOverviews = await sendOverviews(rows, at, s);
-    if (s.reminders === 'off') return { sent: sentOverviews };
+    if (s.reminders === 'off') return { sent: 0 };
     const { chores = [], events = [] } = (await sources()) ?? {};
     const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id), quiet: threads.quietOf?.(r.id) ?? null }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
@@ -68,12 +65,13 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       if (!r?.ok) continue;
       sent += 1;
       const mine = threads.saidOf(personId);
-      for (const i of items) mine[i.id] = i.slot;
+      // every slot it was said for: the morning and the short notice are two, and neither may undo the other
+      for (const i of items) mine[i.id] = [...new Set([...saidSlots(mine[i.id]), i.slot])];
       threads.setSaid(personId, mine);
       if (first) threads.markReminded(personId);
     }
     // marks for what is done or past are dropped: only what can still be due keeps its mark
-    const open = new Set(['overview',
+    const open = new Set([
       ...chores.filter((c) => c && !c.completedAt).map((c) => c.id),
       ...events.filter((e) => e && e.state !== 'cancelled' && !e.completedAt && new Date(e.startsAt).getTime() > at).map((e) => e.id),
     ]);
@@ -85,46 +83,13 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
     return { sent };
   }
 
-  /**
-   * Sunday from 18:00 (outside quiet hours): the week overview to each person who switched it on, once that week — the
-   * overview is the person's own ask, so it goes whether or not the household's reminders are on.
-   */
-  async function sendOverviews(rows, at, s) {
-    if (typeof overviewFor !== 'function') return 0;
-    const w = wallClockInTz(at, tz);
-    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(new Date(at));
-    if (weekday !== 'Sun' || w.hour < 18) return 0;
-    const week = `${w.year}-${pad(w.month)}-${pad(w.day)}:overview`;
-    let sent = 0;
-    for (const r of rows) {
-      if (!r?.id || r.hidden || !threads.overviewOn(r.id)) continue;
-      // each person's own quiet hours, else the household's
-      if (inQuiet(w, threads.quietOf?.(r.id) || s.quiet || QUIET_HOURS)) continue;
-      const mine = threads.saidOf(r.id);
-      if (mine.overview === week) continue;
-      const text = await overviewFor(r.id).catch(() => null);
-      if (!text) continue;
-      const res = await reach.sendToPerson(r.id, { text });
-      try { onSent?.({ personId: r.id, items: 0, ok: Boolean(res?.ok), reason: res?.reason ?? null }); } catch { /* never stops the tick */ }
-      if (!res?.ok) continue;
-      threads.setSaid(r.id, { ...mine, overview: week });
-      sent += 1;
-    }
-    return sent;
-  }
-
   return {
     /** One pass (never two at once). */
     pass() {
       running ??= passOnce().finally(() => { running = null; });
       return running;
     },
-    /** Once now, then every `every` ms. */
-    start() {
-      if (handle) return;
-      this.pass().catch(() => {});
-      handle = timers.setInterval(() => { this.pass().catch(() => {}); }, Math.max(60_000, Number(every) || REMINDER_TICK_MS));
-    },
-    stop() { if (handle) timers.clearInterval(handle); handle = null; },
+    /** Its period on the host's clock: never under a minute. */
+    every: Math.max(60_000, Number(every) || REMINDER_TICK_MS),
   };
 }

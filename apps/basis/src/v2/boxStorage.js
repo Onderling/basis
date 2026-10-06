@@ -118,6 +118,7 @@ export function boxStores(dataDir) {
     botThreads:   path.join(dataDir, 'bot-threads.json'),
     botAdmission: path.join(dataDir, 'bot-admission.json'),
     botCircles:   path.join(dataDir, 'bot-circles.json'),
+    ownDevices:   path.join(dataDir, 'own-devices.json'),
   };
   return {
     paths,
@@ -132,5 +133,8 @@ export function boxStores(dataDir) {
     botAdmissionSource: () => buildHouseholdDataSource({ path: paths.botAdmission }, { strategy: shellContentSeal() }),
     // The circles a household bot joined on its admin's word (`/kring`): their ids and names, when, on whose word.
     botCirclesSource: () => buildHouseholdDataSource({ path: paths.botCircles }, { strategy: shellContentSeal() }),
+    // The host's own typed items (the own-devices store): the bot's planned work and that of the people it is the
+    // device for — never a circle's.
+    ownDevicesSource: () => buildHouseholdDataSource({ path: paths.ownDevices }, { strategy: shellContentSeal() }),
   };
 }

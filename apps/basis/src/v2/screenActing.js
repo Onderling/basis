@@ -26,6 +26,8 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-unlink',
   // …and the household in their own app: an invite to their key, asked for in the private chat
   'assistant.assistant-inapp',
+  // the planned Sunday overview is sent by the host's runner, as the person whose row it is — not a button
+  'assistant.sendWeekOverview',
 ]);
 
 /**

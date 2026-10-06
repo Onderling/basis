@@ -163,6 +163,9 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
       const { [itemId]: _e, ...others } = row.reminderExtras ?? {};
       return save({ ...row, reminderExtras: layer ? { ...others, [itemId]: checkLayer(layer) } : others });
     },
+    /** Was this person asked, once, how they want to be reminded (at their first dated add)? */
+    reminderAskedOf: (id) => rows.get(id)?.reminderAsked === true,
+    markReminderAsked(id) { return save({ ...rowOf(id), reminderAsked: true }); },
     /** Announcements held through this person's quiet hours (said in their next message, then let go). */
     heldAnnouncementsOf: (id) => [...(rows.get(id)?.heldAnnouncements ?? [])],
     setHeldAnnouncements(id, list) {

@@ -4195,6 +4195,26 @@
       "text": "Reminders are off.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "reminders_ask": {
+      "text": "How do you want to be reminded of this — now and from now on? (Change it later: /herinneringen.)",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_morning": {
+      "text": "Morning",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_hour": {
+      "text": "1 hour before",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_none": {
+      "text": "None",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_usual": {
+      "text": "As usual",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
     "announce_new": {
       "text": "New in the agenda: {{title}}, {{when}}.",
       "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."

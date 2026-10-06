@@ -11,7 +11,7 @@ const TZ = 'Europe/Amsterdam';
 // 2026-10-01 is a Thursday; Amsterdam is UTC+2 in October
 const at = (iso) => new Date(iso).getTime();
 const people = [{ id: 'frits' }, { id: 'bert' }, { id: 'anne' }, { id: 'olga', role: 'observer' }, { id: 'gone', revoked: true }];
-const tandarts = { id: 'e1', title: 'tandarts', startsAt: '2026-10-02T08:00:00.000Z', createdBy: 'frits', rsvp: { bert: 'accepted', anne: 'declined' } };
+const tandarts = { id: 'e1', title: 'tandarts', startsAt: '2026-10-02T07:00:00.000Z', createdBy: 'frits', rsvp: { bert: 'accepted', anne: 'declined' } };
 
 describe('what the bot must say now', () => {
   it('an appointment tomorrow: at 19:00 the evening before, to everyone in the household — but not who said no', () => {
@@ -26,19 +26,38 @@ describe('what the bot must say now', () => {
   });
 
   it('nobody answered: everyone is reminded (the shared agenda), not only its maker', () => {
-    const eten = { id: 'e2', title: 'eten', startsAt: '2026-10-02T17:45:00.000Z', createdBy: 'anne' };
+    const eten = { id: 'e2', title: 'eten', startsAt: '2026-10-02T06:45:00.000Z', createdBy: 'anne' };   // Fri 08:45: early, reminded the evening before
     const due = dueReminders({ events: [eten], people, now: at('2026-10-01T17:05:00.000Z'), tz: TZ });
     expect(due.map((d) => d.personId).sort()).toEqual(['anne', 'bert', 'frits']);
   });
 
   it('an appointment that NAMES people reminds them (and its maker, and who said they come) — nobody else', () => {
-    const henk = { id: 'e3', title: 'tandarts', startsAt: '2026-10-02T08:00:00.000Z', createdBy: 'frits', attendees: ['bert'] };
+    const henk = { id: 'e3', title: 'tandarts', startsAt: '2026-10-02T07:00:00.000Z', createdBy: 'frits', attendees: ['bert'] };
     const due = dueReminders({ events: [henk], people, now: at('2026-10-01T17:05:00.000Z'), tz: TZ });
     expect(due.map((d) => d.personId).sort()).toEqual(['bert', 'frits']);
-    const shortly = dueReminders({ events: [{ ...henk, createdAt: '2026-09-30T08:00:00.000Z' }], people, now: at('2026-10-02T07:56:00.000Z'), tz: TZ, lead: 5 });
+    const shortly = dueReminders({ events: [{ ...henk, createdAt: '2026-09-30T08:00:00.000Z' }], people, now: at('2026-10-02T06:56:00.000Z'), tz: TZ, lead: 5 });
     expect(shortly.map((d) => d.personId).sort()).toEqual(['bert', 'frits']);
     const all = dueReminders({ events: [{ id: 'e4', title: 'eten', startsAt: '2026-10-02T08:00:00.000Z', createdAt: '2026-09-30T08:00:00.000Z', createdBy: 'frits' }], people, now: at('2026-10-02T07:56:00.000Z'), tz: TZ, lead: 5 });
     expect(all.map((d) => d.personId).sort(), 'the short notice too: everyone').toEqual(['anne', 'bert', 'frits']);
+  });
+
+  it('the rhythm (Frits 2026-10-06): the evening before only for an EARLY appointment; 08:00 says everything of today', () => {
+    const early = { id: 'e5', title: 'fysio', startsAt: '2026-10-02T06:30:00.000Z', createdBy: 'frits' };   // Fri 08:30
+    const afternoon = { id: 'e6', title: 'tandarts', startsAt: '2026-10-02T12:00:00.000Z', createdBy: 'frits' };   // Fri 14:00
+    const evening = dueReminders({ events: [early, afternoon], people, now: at('2026-10-01T17:05:00.000Z'), tz: TZ });   // Thu 19:05
+    expect(evening.flatMap((d) => d.items.map((i) => i.id))).toContain('e5');
+    expect(evening.flatMap((d) => d.items.map((i) => i.id)), 'a 14:00 appointment is not reminded the evening before').not.toContain('e6');
+    // the morning of the day: today's appointments that have not begun, beside the chores due today
+    const morning = dueReminders({ events: [early, afternoon], people, now: at('2026-10-02T06:05:00.000Z'), tz: TZ });   // Fri 08:05
+    const ids = morning.find((d) => d.personId === 'bert')?.items.map((i) => i.id) ?? [];
+    expect(ids, 'the 14:00 tandarts is in the 08:00 message, for everyone').toContain('e6');
+    expect(ids, 'the 08:30 fysio had its evening; at 08:05 it is still to come, so it is said too').toContain('e5');
+    expect(morning.find((d) => d.personId === 'bert').items.find((i) => i.id === 'e6').slot).toBe('2026-10-02:morning');
+    // one made after 08:00 today is not this morning's news (it is reminded shortly before): no message at 11:25 for it
+    const later = { ...afternoon, id: 'e7', createdAt: '2026-10-02T09:24:00.000Z' };   // made Fri 11:24
+    expect(dueReminders({ events: [later], people, now: at('2026-10-02T09:25:00.000Z'), tz: TZ })).toEqual([]);
+    // past appointments are never in the morning
+    expect(dueReminders({ events: [{ ...afternoon, startsAt: '2026-10-02T05:00:00.000Z' }], people, now: at('2026-10-02T06:05:00.000Z'), tz: TZ })).toEqual([]);
   });
 
   it('said once, it is not due again; moved to next week or cancelled, it is not due', () => {

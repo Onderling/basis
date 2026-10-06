@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,4 +72,16 @@ describe('the bot answers its inbox on a function profile', () => {
     const welcomed = await until(async () => ((await botSaid(sender)).length >= 2 ? true : null), { timeout: 30_000, step: 500 });
     expect(welcomed, `no welcome after the code. Runner:\n${out.slice(-1200)}`).toBe(true);
   }, 120_000);
+
+  it('/overzicht aan writes the person\'s planned Sunday overview into the box\'s own-devices store — sealed', async () => {
+    const card = cardFrom(out);
+    const before = (await botSaid(sender)).length;
+    await sender.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text: '/overzicht aan' }).sent;
+    const answered = await until(async () => ((await botSaid(sender)).length > before ? true : null), { timeout: 30_000, step: 500 });
+    expect(answered, `no answer to /overzicht. Runner:\n${out.slice(-1200)}`).toBe(true);
+    const file = path.join(dataDir, 'own-devices.json');
+    const written = await until(async () => (existsSync(file) && readFileSync(file).length > 0 ? true : null), { timeout: 15_000, step: 250 });
+    expect(written, 'the planned row never reached the own-devices file').toBe(true);
+    expect(readFileSync(file).toString('latin1'), 'the row is sealed on disk').not.toContain('sendWeekOverview');
+  }, 90_000);
 });

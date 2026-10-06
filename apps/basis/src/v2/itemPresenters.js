@@ -32,7 +32,11 @@ export const ITEM_PRESENTERS = Object.freeze({
 export const LOG_PROJECTED = Object.freeze({ 'chat-message': 'the event-log projection', 'chat-thread': 'the event-log projection' });
 
 /** Never shown in a merged view, by design: a removed list is kept aside and offered back by `restoreList` only. */
-export const NOT_MERGED = Object.freeze({ 'removed-list': 'kept aside; offered back by /list-restore, never merged into a view' });
+export const NOT_MERGED = Object.freeze({
+  'removed-list': 'kept aside; offered back by /list-restore, never merged into a view',
+  // an intention is never a chore, an item or a reminder: what is planned is read by `upcoming` (intentions.js) only
+  intention: 'pending work; read by `upcoming` only, never merged into chores, "Mijn dingen" or reminders',
+});
 
 /** Canonical nouns without a presenter yet — this list only shrinks. */
 export const NOT_YET = Object.freeze(['claim', 'contact', 'reveal-request', 'neighbourhood-job', 'view', 'circle', 'shared-ref', 'media', 'inbox-item', 'board']);

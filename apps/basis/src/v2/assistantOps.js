@@ -10,6 +10,11 @@ import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { assistantManifest } from './assistantManifest.js';
+import { createIntentionBook } from './intentionBook.js';
+import { createOwnDevicesStore } from './ownDevicesStore.js';
+import { WEEK_OVERVIEW_OP, weekOverviewOn, switchWeekOverview } from './weekOverviewRows.js';
+import { inQuiet } from './botReminders.js';
+import { wallClockInTz } from '@onderling/notifier';
 import { peopleRows } from './botPeople.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isOwnTelegramChat } from './doorBridges.js';
@@ -43,13 +48,16 @@ export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxIt
 const SWITCH_WORDS = Object.freeze({ on: 'on', aan: 'on', ja: 'on', yes: 'on', off: 'off', uit: 'off', nee: 'off', no: 'off' });
 const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()] ?? null;
 
-export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now }) {
+export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {} }) {
+  // The planned work of the people this door serves (the week overview's row): the host's own-devices store; a
+  // composition that hands none keeps it in memory.
+  const book = intentions.book ?? createIntentionBook({ store: createOwnDevicesStore(), actor: 'door', now });
   const levelOf = (op) => assistantManifest.operations.find((o) => o.id === op)?.visibility ?? 'authenticated';
   /** What a settings op's buttons can set, and the value it has now, for this person. */
   const PERSON_SETTINGS = {
     'assistant-memory':    { values: ['off', 'short', 'long'], now: (id) => threads.modeOf(id) },
     'assistant-reminders': { values: ['on', 'off'], now: (id) => (threads.remindersOn(id) ? 'on' : 'off') },
-    'assistant-overview':  { values: ['on', 'off'], now: (id) => (threads.overviewOn(id) ? 'on' : 'off') },
+    'assistant-overview':  { values: ['on', 'off'], now: (id) => (weekOverviewOn(book, id) ? 'on' : 'off') },
     'assistant-language':  { values: ['nl', 'en', 'auto'], now: (id) => threads.langOf(id) ?? 'auto' },
     'assistant-view':      { values: [...SURFACE_PREFS], now: (id) => threads.viewOf(id) },
     // the person's own quiet hours: the household's (`huis`), or one of a few common ones (any other: `/stil 22:30-07:30`)
@@ -145,6 +153,15 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         return { ok: true, message: tp(`circle.bot.memory_${mode}`) };
       }
       if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx, tp) };
+      // the planned overview: sent to the person's own door, as them — and not in their quiet hours ("not yet": the
+      // runner keeps it due until the day is over)
+      if (op === WEEK_OVERVIEW_OP) {
+        if (typeof intentions.sendToPerson !== 'function') return { ok: false, error: 'unwired' };
+        const quiet = intentions.quietOf?.(threadId) ?? null;
+        if (quiet && inQuiet(wallClockInTz(now(), intentions.tz ?? 'UTC'), quiet)) return { ok: false, notYet: 'quiet' };
+        const r = await intentions.sendToPerson(threadId, { text: await weekOverviewText(ctx, tp) });
+        return r?.ok ? { ok: true } : { ok: false, reason: r?.reason ?? 'not-sent' };
+      }
       if (op === 'assistant-quiet') {
         const w = String(args?.hours ?? args?._match ?? '').trim().toLowerCase();
         if (w === 'huis' || w === 'house') { threads.setQuiet(threadId, null); return { ok: true, message: tp('circle.bot.quiet_house') }; }
@@ -156,7 +173,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         const mode = switchOf(args?.mode ?? args?._match);
         if (!mode) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
         const which = op === 'assistant-reminders' ? 'reminders' : 'overview';
-        if (which === 'reminders') threads.setReminders(threadId, mode === 'on'); else threads.setOverview(threadId, mode === 'on');
+        if (which === 'reminders') threads.setReminders(threadId, mode === 'on'); else await switchWeekOverview(book, threadId, mode === 'on');
         return { ok: true, message: tp(`circle.bot.${which}_${mode}`) };
       }
       if (op === 'assistant-language') {

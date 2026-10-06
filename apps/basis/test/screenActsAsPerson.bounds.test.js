@@ -19,6 +19,9 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows } from '../src/v2/botOpMap.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
+import { createIntentionBook } from '../src/v2/intentionBook.js';
+import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
+import { weekOverviewOn } from '../src/v2/weekOverviewRows.js';
 import { createBotUsers, contactBookStore } from '../src/v2/botUsers.js';
 import { screenActsAs, BOT_SCREEN_NEVER } from '../src/v2/screenActing.js';
 import { listsManifest } from '../../lists/manifest.js';
@@ -38,7 +41,7 @@ const SNEAKY = { actor: ADMIN, caller: ADMIN, threadId: ADMIN, createdBy: ADMIN 
 const holders = (i) => [...(i?.assignees ?? []), i?.assignee, i?.createdBy, i?.author].filter(Boolean);
 
 describe('a screen acts as its person, and no further', () => {
-  let dir; let agent; let own; let threads; let users; let bot; let view; let failBook = false;
+  let dir; let agent; let own; let threads; let users; let bot; let view; let failBook = false; let planned;
   // the bot's own tokens come from its own grants (on the lane, as `/scherm` mints them); any other issuer signs directly
   const mint = async (skill, constraints, issuer = null, subject = view.pubKey, extra = {}) => {
     if (!issuer) {
@@ -70,7 +73,8 @@ describe('a screen acts as its person, and no further', () => {
     await own('stoop', 'setContactName', { webid: BERT, name: 'Bert' }).catch(() => {});
     threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     await threads.load();
-    const doorCall = withAssistantOps({ callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), threads, t, refusal: agent.doorRefusal, admin: {} });
+    planned = createIntentionBook({ store: createOwnDevicesStore(), actor: 'bot' });
+    const doorCall = withAssistantOps({ callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), threads, t, refusal: agent.doorRefusal, admin: {}, intentions: { book: planned } });
     const book = createBotUsers({ store: contactBookStore(own) });
     users = { list: async () => { if (failBook) throw new Error('book unreadable'); return book.list(); }, revoke: (w) => book.revoke(w) };
     agent.exposeToPeers(renderA2A([listsManifest, calendarManifest, assistantManifest], { callSkill: doorCall }, { ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER }));
@@ -116,12 +120,12 @@ describe('a screen acts as its person, and no further', () => {
     expect(holders(all.find((i) => i.text === 'ramen'))).toContain(MEMBER);
     const appt = all.find((i) => i.type === 'calendar-event' && /tandarts/.test(JSON.stringify(i)));
     expect(JSON.stringify(appt), 'the appointment does not name the admin').not.toContain(ADMIN);
-    // the overview switch lands on the member's thread row; the admin's row is unchanged
-    expect(threads.overviewOn(ADMIN)).toBe(false);
+    // the overview switch writes the member's planned row; the admin has none
+    expect(weekOverviewOn(planned, ADMIN)).toBe(false);
     const ov = await asMember('assistant.assistant-overview', { mode: 'on', ...SNEAKY });
     expect(ov.ok, JSON.stringify(ov)).not.toBe(false);
-    expect(threads.overviewOn(MEMBER)).toBe(true);
-    expect(threads.overviewOn(ADMIN), 'another person\'s thread row is unchanged').toBe(false);
+    expect(weekOverviewOn(planned, MEMBER)).toBe(true);
+    expect(weekOverviewOn(planned, ADMIN), 'another person has no row').toBe(false);
   });
 
   it('a stolen token: the member\'s valid token from a different key is refused at the token check', async () => {

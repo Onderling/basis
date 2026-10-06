@@ -32,9 +32,12 @@ describe('the bot\'s slim map', () => {
     // standard roles preset; an observer's is the reads
     expect(tools('coordinator')).toEqual([...MEMBER, 'reassignTask', 'editTask'].sort());
     // the screen ops are on the observer's column (a read screen) but slash only: never a tool the model holds
+    // and the planned overview is the host runner's: no surface at all, never a tool
+    const RUNNER_ONLY = ['sendWeekOverview'];
     const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp'];
-    expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].filter((op) => !SLASH_ONLY.includes(op)).sort());
-    expect(BOT_OP_MAP.member).toEqual(MEMBER);
+    expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].filter((op) => !SLASH_ONLY.includes(op) && !RUNNER_ONLY.includes(op)).sort());
+    expect(BOT_OP_MAP.member.filter((op) => !RUNNER_ONLY.includes(op))).toEqual(MEMBER);
+    expect(BOT_OP_MAP.member, 'the runner may send a member their overview').toContain('sendWeekOverview');
   });
 
   it('a member\'s command menu (their /help) holds no admin command; the admin\'s does', () => {

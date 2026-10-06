@@ -21,11 +21,14 @@ import { VaultNodeFs } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../../src/core/agent/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
 import { boxStores } from '../../src/v2/boxStorage.js';
+import { createOwnDevicesStore } from '../../src/v2/ownDevicesStore.js';
+import { createIntentionBook } from '../../src/v2/intentionBook.js';
 
 const LOG_WORDS = 'de-brief-van-oma-ligt-in-de-la-7731';
 const POLICY_WORDS = 'alleen-op-dinsdag-open-5520';
 const DM_WORDS = 'fietssleutel-onder-de-mat-9087';
 const THREAD_WORDS = 'vraag-het-aan-tante-6618';
+const OWN_WORDS = 'zondag-overzicht-voor-oom-7731';
 
 async function everyFile(dir) {
   const out = [];
@@ -56,7 +59,7 @@ describe('the box at rest', () => {
         deviceLog, deviceLogIo: stores.deviceLogIo,
         seedDemoData: false, seedHousehold: false,
       });
-      return { agent, deviceLog, stores, dm: await stores.contactDmSource(), threads: await stores.botThreadsSource() };
+      return { agent, deviceLog, stores, dm: await stores.contactDmSource(), threads: await stores.botThreadsSource(), own: await stores.ownDevicesSource() };
     };
 
     const first = await boot();
@@ -64,16 +67,21 @@ describe('the box at rest', () => {
     await first.stores.circlePolicyKv.setItem('cc.circlePolicy.c1', JSON.stringify({ note: POLICY_WORDS }));
     await first.dm.write('mem://contact-dm/t1', JSON.stringify({ text: DM_WORDS }));
     await first.threads.write('mem://basis/bot-threads/t1', JSON.stringify({ id: 't1', pending: { text: THREAD_WORDS } }));
+    // the own-devices store: what the box plans to do, and for whom
+    const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: first.own }), actor: 'bot' });
+    await book.load();
+    await book.intend({ trigger: { every: 'week', on: 'sun', at: '18:00' }, op: 'sendWeekOverview', appOrigin: 'assistant', actsAs: 'telegram:1', label: OWN_WORDS });
     await new Promise((r) => setTimeout(r, 1500));   // past the log's and the DM store's debounce
     await first.dm.flush?.();
     await first.threads.flush?.();
+    await first.own.flush?.();
     await first.agent.stop?.().catch(() => {});
 
     const leaks = [];
     for (const f of await everyFile(dir)) {
       if (path.basename(f) === 'vault.passphrase') continue;
       const text = (await readFile(f)).toString('latin1');
-      for (const w of [LOG_WORDS, POLICY_WORDS, DM_WORDS, THREAD_WORDS]) if (text.includes(w)) leaks.push(`${path.relative(dir, f)}: ${w}`);
+      for (const w of [LOG_WORDS, POLICY_WORDS, DM_WORDS, THREAD_WORDS, OWN_WORDS]) if (text.includes(w)) leaks.push(`${path.relative(dir, f)}: ${w}`);
     }
     expect(leaks, 'words readable on disk').toEqual([]);
 
@@ -84,6 +92,9 @@ describe('the box at rest', () => {
       expect(await second.stores.circlePolicyKv.getItem('cc.circlePolicy.c1'), 'the policy came back').toContain(POLICY_WORDS);
       expect(JSON.stringify(await second.dm.read('mem://contact-dm/t1')), 'the DM state came back').toContain(DM_WORDS);
       expect(JSON.stringify(await second.threads.read('mem://basis/bot-threads/t1')), 'the thread row came back').toContain(THREAD_WORDS);
+      const again = createIntentionBook({ store: createOwnDevicesStore({ dataSource: second.own }), actor: 'bot' });
+      await again.load();
+      expect(again.rows().map((r) => r.label), 'the planned work came back').toEqual([OWN_WORDS]);
     } finally {
       await second.agent.stop?.().catch(() => {});
     }

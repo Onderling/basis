@@ -699,7 +699,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!admin.householdInApp || inAppModeFrom(await userParam(HOUSEHOLD_IN_APP_KEY)) !== 'on') return { ok: true, message: tp('circle.bot.link_done') };
       return {
         ok: true, message: `${tp('circle.bot.link_done')}\n\n${tp('circle.bot.inapp_question')}`,
-        quickReplies: [{ label: tp('circle.bot.stepup_yes'), slash: '/in-app ja' }, { label: tp('circle.bot.stepup_no'), slash: '/in-app nee' }],
+        quickReplies: [{ label: tp('circle.bot.stepup_yes'), slash: '/inapp ja' }, { label: tp('circle.bot.stepup_no'), slash: '/inapp nee' }],
       };
     }
     if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.link_declined') };
@@ -708,7 +708,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
   /**
-   * `/in-app ja|nee` — the household in the person's own app: an invite into the household's circle, bound to the key
+   * `/inapp ja|nee` — the household in the person's own app: an invite into the household's circle, bound to the key
    * their `/koppel` linked (only that key redeems it, once, within a day), sent here, privately. Only where the admin
    * turned it on, only from the private door, only once linked.
    */

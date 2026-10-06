@@ -74,6 +74,10 @@ describe('the invite as a link that opens the app', () => {
     expect(r.link).toContain('&relay=wss%3A%2F%2Frelay.example');
     const { parseInviteDeepLink } = await import('../src/v2/inviteDeepLink.js');
     expect(parseInviteDeepLink(r.link)?.inviteUri).toBe(r.uri);
+    // the tablet's setting has no trailing slash (BASIS_APP_URL=https://onderling.org/basis): the app's path is kept,
+    // never read as a file name and dropped (the first live link went to onderling.org, the site, not the app)
+    const bare = createHouseholdInApp({ callSkill, circleId: 'household:00', selfWebid: 'BOT', name: () => 'Thuis', appUrl: () => 'https://onderling.org/basis' });
+    expect((await bare.inviteFor('BOB-KEY')).link).toMatch(/^https:\/\/onderling\.org\/basis\/\?join=/);
     const without = createHouseholdInApp({ callSkill, circleId: 'household:00', selfWebid: 'BOT', name: () => 'Thuis' });
     expect((await without.inviteFor('BOB-KEY')).link ?? null).toBeNull();
   });

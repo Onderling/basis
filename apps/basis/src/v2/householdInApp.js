@@ -49,7 +49,9 @@ export function createHouseholdInApp({ callSkill, circleId, selfWebid, name, rel
     // …and as the link a phone opens: the app, with the invite (and where the bot is) — the same `?join=` its QR carries
     const base = typeof appUrl === 'function' ? appUrl() : null;
     let link = null;
-    if (base) { try { const u = new URL(base); link = inviteDeepLink({ origin: u.origin, pathname: u.pathname }, inv.uri, typeof relayUrl === 'function' ? relayUrl() : null); } catch { link = null; } }
+    // the configured address names the app's FOLDER (`…/basis`, with or without a trailing slash): never read its last
+    // part as a file name, which would send the link to the site's root instead of the app
+    if (base) { try { const u = new URL(base); const dir = u.pathname.endsWith('/') ? u.pathname : `${u.pathname}/`; link = inviteDeepLink({ origin: u.origin, pathname: dir }, inv.uri, typeof relayUrl === 'function' ? relayUrl() : null); } catch { link = null; } }
     return { ok: true, uri: inv.uri, ...(link ? { link } : {}), expiresAt: inv.expiresAt ?? null };
   }
 

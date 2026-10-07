@@ -4140,11 +4140,15 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}} · {{lead}} minutes beforehand (0: none). Who sees the use: {{usage}} (admin: the admin only · members: everyone). Roles: {{roles}} (standard: the admin decides more · flat: everyone equal). In your own app: {{app}} (off: not asked · on: asked after /koppel).",
+      "text": "Settings — giving a chore to someone else: {{assign}} (roles: the role decides · anyone: everyone · self: nobody). Seeing names: {{names}} (members: everyone · assigners: those who may assign · admin: only the admin · none: nobody). What is done or has passed: {{passed}} (keep: stays · hide: shown {{days}} more days · delete: removed). Cancelling appointments: {{cancel}} (own: whoever set it, and the admin · admin: only the admin). Reminders: {{reminders}} · quiet between {{quiet}} · {{lead}} minutes beforehand (0: none). Who sees the use: {{usage}} (admin: the admin only · members: everyone). Roles: {{roles}} (standard: the admin decides more · flat: everyone equal). In your own app: {{app}} (off: not asked · on: asked after /koppel). Telling others of a change: {{announce}} (/huishouden announce appointments|chores on|off).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on",
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off",
+      "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
+    },
+    "settings_announce_none_here": {
+      "text": "This household has no announcements (yet) to switch on or off.",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_saved": {

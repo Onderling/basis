@@ -105,6 +105,8 @@ export function createIntentionBook({ store, circles = null, actor, signerFor = 
       return keep(await held.get(scope).put(await signed(row, scope), { by: actor }), scope);
     },
     async cancel(id) { return update(id, { state: 'cancelled' }); },
+    /** Switched on again (a household's announce row): open, as it was. */
+    async reopen(id) { return update(id, { state: 'open' }); },
     /** It ran now: a one-off row is finished, a recurring row's last run moves (its earlier occurrences are done). */
     async ran(id) {
       const row = byId.get(id);

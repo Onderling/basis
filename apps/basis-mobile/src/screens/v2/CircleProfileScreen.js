@@ -7,13 +7,14 @@
  * mutations via the injected `callSkill`. Availability/quiet-hours is a sub-screen
  * reached via `onAvailability`.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { plannedForMe, plannedLines } from '../../../../basis/src/v2/plannedForMe.js';
+import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
 
-export default function CircleProfileScreen({ callSkill, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
+export default function CircleProfileScreen({ callSkill, personClock = null, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [profile, setProfile] = useState({});
@@ -25,6 +26,9 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
   const [busy, setBusy] = useState(false);
   // Gepland: what is coming for me, wherever it lives — read on this device (no bot); null while it loads
   const [planned, setPlanned] = useState(null);
+  // the person's own week overview: on · off · null while it loads or switches (absent: no clock here)
+  const [weekOn, setWeekOn] = useState(undefined);
+  const meRef = useRef(null);
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
@@ -39,6 +43,9 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
     setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
     try {
       const me = (await callSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      meRef.current = me;
+      const clock = personClock ? await personClock : null;
+      if (clock && me) setWeekOn(personWeekOn(clock.book, me));
       const r = await plannedForMe({ callSkill, me });
       // the device's own zone (the line builder's default)
       setPlanned(plannedLines(r.items, { t, lang: lang() }));
@@ -120,6 +127,28 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
         {planned === null || planned.length === 0
           ? <Text style={styles.muted} testID="profile-planned-empty">{t(planned === null ? 'circle.profile.planned_loading' : 'circle.profile.planned_none')}</Text>
           : planned.map((line, i) => <Text key={`${i}-${line}`} style={styles.plannedItem} testID="profile-planned-item">{line}</Text>)}
+        {weekOn !== undefined ? (
+          <View style={styles.weekRow}>
+            <Text style={styles.muted}>{t('circle.profile.week_switch')}</Text>
+            <Pressable
+              testID="profile-week-toggle"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: weekOn === true, disabled: weekOn === null }}
+              disabled={weekOn === null}
+              onPress={async () => {
+                const clock = personClock ? await personClock : null;
+                if (!clock || !meRef.current) return;
+                const next = !personWeekOn(clock.book, meRef.current);
+                setWeekOn(null);
+                try { await switchPersonWeek(clock.book, meRef.current, next); } catch { /* shown as it stands below */ }
+                setWeekOn(personWeekOn(clock.book, meRef.current));
+              }}
+              style={styles.weekToggle}
+            >
+              <Text style={styles.weekToggleText}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </Section>
 
       <Section title={t('circle.profile.location')}>
@@ -214,5 +243,8 @@ const makeStyles = (theme) => StyleSheet.create({
   catChipText: { fontSize: 13, color: theme.color.accent },
   locCurrent: { fontSize: 14, color: theme.color.ink },
   plannedItem: { fontSize: 14, color: theme.color.ink },
+  weekRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
+  weekToggle: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radius ?? 6, borderWidth: 1, borderColor: theme.color.ink },
+  weekToggleText: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
   locResult: { flex: 1, fontSize: 14, color: theme.color.ink },
 });

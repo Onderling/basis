@@ -74,18 +74,18 @@ addresses, sizes, timing and ciphertext — never content.
 |---|---|---|---|---|---|
 | keep a message for an address that is offline, at the relay | the relay's forward queue | `packages/relay/src/ForwardQueue.js` (+ `SqliteForwardStore`) | the relay: addresses, size, timing, ciphertext; 24 h | `relay/server.js` (every `RelayTransport`) | anything longer than a day (→ the device's own hold) |
 
-## Inert — built, reached by nothing in production (measured 2026-10-07)
+## Inert — built, reached by nothing in production (measured 2026-10-07; each is an adopt-or-retire decision for Frits)
 
 | What it would do | Mechanism | Lives in | Only reached by |
 |---|---|---|---|
 | subscribe across agents to a topic | protocol pub/sub | `packages/core/src/protocol/pubSub.js` | wired in `core/Agent.js` and published to by `ReachabilityOracle`, but nothing in production subscribes |
 | pub/sub for skills | `SkillsPubSub` | `packages/core/src/SkillsPubSub.js` | the core index re-export |
 | stream a task's output | streaming | `packages/core/src/protocol/streaming.js` | the core index re-export |
-| go through a third agent | the hop tunnel | `packages/core/src/routing/hopTunnel.js`, `security/tunnelSeal.js` | `mesh-demo`, `sdk-smoke` |
+| go through a third agent | the hop tunnel | `packages/core/src/routing/hopTunnel.js`, `callWithHop.js` | `mesh-demo`, `sdk-smoke` (its seal, `security/tunnelSeal.js`, is live: task exchange, `tunnelReceiveSealed`, the link seal) |
 | fetch from several recipients at once | the relay's multi-recipient queue | `packages/relay/src/MultiRecipientQueue.js` | no client sends `multi-request` |
 | drop sealed mail for an away owner at a companion | the sealed inbox | `apps/companion-node/src/sealedInbox.js` | tests (`boot.js` never turns it on) |
 | serve the photo edge over HTTP | the blob gate's HTTP mount | `blob-gateway/httpGate.js`, `relay/blobGateMount.js`, companion `mediaEdge.js` | tests (no shipped boot passes a `blobGate`) |
-| carry items the old way | the secure-mesh envelope adapter | `packages/core/src/sync/secureMeshEnvelopeAdapter.js` | wired in `realAgent.js`, but task and noticeboard writes go through the task lane |
+| carry items the old way | the secure-mesh envelope adapter | `packages/core/src/sync/secureMeshEnvelopeAdapter.js` | half: its SEND is superseded (task and noticeboard writes go through the task lane), its INBOUND handler is still wired in `realAgent.js` — a retire candidate; probe what still arrives through it first |
 | BLE, MQTT transports | the transports | `@onderling/transports` | `mesh-demo` (basis builds them with `ble: false`) |
 
 **Transports actually built by the shells:** the relay WebSocket everywhere; NKN on web (when its script loads) and

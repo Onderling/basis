@@ -28,8 +28,8 @@ export const ANNOUNCE_ROWS = Object.freeze([
 export const isAnnounceRow = (row) => row?.op === ANNOUNCE_OP && row?.actsAs === HOUSEHOLD_ACTS_AS;
 
 /**
- * Write the household's announce rows once, into the circle store named by `scope`: a row that exists — open, or
- * cancelled (switched off) — is left as it is. Returns how many were written.
+ * Write the household's announce rows once, into the circle store named by `scope`, each watching THAT circle only: a
+ * row that exists — open, or cancelled (switched off) — is left as it is. Returns how many were written.
  * @param {ReturnType<import('./intentionBook.js').createIntentionBook>} book
  * @param {string} scope   the household's circle id
  */
@@ -41,7 +41,8 @@ export async function seedAnnounceRows(book, scope) {
   for (const spec of ANNOUNCE_ROWS) {
     if (have.has(spec.label)) continue;
     await book.intend({
-      trigger: JSON.parse(JSON.stringify(spec.trigger)), op: ANNOUNCE_OP, appOrigin: 'assistant',
+      // the household's own circle only: a bot that joined another circle never announces that circle's changes here
+      trigger: { event: { ...spec.trigger.event, circleId: scope } }, op: ANNOUNCE_OP, appOrigin: 'assistant',
       args: JSON.parse(JSON.stringify(spec.args)), actsAs: HOUSEHOLD_ACTS_AS, label: spec.label, scope,
     });
     made += 1;

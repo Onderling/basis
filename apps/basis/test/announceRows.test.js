@@ -49,4 +49,12 @@ describe('the household\'s announce rows', () => {
     const fired2 = eventOccurrences({ rows: w.book.rows(), change: { circleId: 'c-home', before: { ...chore, assignees: [], clock: 1 }, after: chore } });
     expect(fired2.map((o) => o.args.kinds)).toEqual([['given', 'moved']]);
   });
+
+  it('only the household\'s own circle: an appointment in another circle the bot is in fires nothing', async () => {
+    const w = await world();
+    await seedAnnounceRows(w.book, 'c-home');
+    const appt = { id: 'e2', type: 'calendar-event', title: 'elders', startsAt: '2026-10-12T12:00:00.000Z', clock: 1 };
+    expect(eventOccurrences({ rows: w.book.rows(), change: { circleId: 'c-other', before: null, after: appt } })).toEqual([]);
+    expect(eventOccurrences({ rows: w.book.rows(), change: { circleId: 'c-home', before: null, after: appt } })).toHaveLength(1);
+  });
 });

@@ -8,8 +8,12 @@
  * its door does. A store layout can change under it; the ops' contract is what it depends on, and a checked-in v1
  * file that must keep importing (`test/fixtures/household-export-v1.json`) holds us to it.
  *
+ * The household's SWITCHES that live as planned rows — a person's week overview on, an announcement switched off — are
+ * in the file as switches (`switches`), never as rows: a row is the host's own (its signature, its scope), and the new
+ * box seeds its own announce rows at boot; the import sets the switches on what is there.
+ *
  * Not in the file: a person's thread with the bot (theirs, sealed to the bot), the reminder marks, creation times,
- * ids. Containment is the nesting; an entry on a second list is referred to by its number in the file.
+ * ids, the planned rows themselves. Containment is the nesting; an entry on a second list is referred to by its number in the file.
  *
  * Reading a file back onto a household that has things already: what is there stays (an entry, chore or appointment
  * that exists is kept as it is, and a person in the book keeps the role the book gives them). A file is not trusted
@@ -18,6 +22,8 @@
  * chore's maker (its holder writes it) — and any step the gate refuses is returned in `notRestored`.
  */
 import { childIdsOf } from '@onderling/item-store';
+import { isAnnounceRow } from './announceRows.js';
+import { WEEK_OVERVIEW_OP } from './weekOverviewRows.js';
 
 export const EXPORT_FORMAT = 'onderling-household-export';
 export const EXPORT_VERSION = 1;
@@ -50,7 +56,7 @@ function entryOf(it) {
  * @param {Record<string, any>} [a.settings]  the household's own settings (`assistant.*`)
  * @param {number} [a.now]
  */
-export function exportHousehold({ items = [], people = [], settings = {}, now = Date.now() } = {}) {
+export function exportHousehold({ items = [], people = [], settings = {}, planned = [], now = Date.now() } = {}) {
   const byId = new Map(items.filter(Boolean).map((i) => [i.id, i]));
   const numberOf = new Map();   // item id → its number in the file (the first place it is written)
   let next = 1;
@@ -66,12 +72,17 @@ export function exportHousehold({ items = [], people = [], settings = {}, now = 
     return clean({ n: numberOf.get(l.id), name: l.text ?? '', kind: l.type === 'board' ? 'board' : undefined, defaultChild: l.defaultChild, entries: childIdsOf(l).map((id) => byId.get(id)).filter(Boolean).map(write) });
   });
   // what sits on no list (a chore added without one): kept, beside the lists
-  const loose = items.filter((i) => i && !CONTAINERS.has(i.type) && !numberOf.has(i.id) && !(Array.isArray(i.containedBy) && i.containedBy.length)).map(write);
+  // a planned row is the host's, not a thing of the household's: its switch is carried below, never the row
+  const loose = items.filter((i) => i && !CONTAINERS.has(i.type) && i.type !== 'intention' && !numberOf.has(i.id) && !(Array.isArray(i.containedBy) && i.containedBy.length)).map(write);
+  const rows = [...planned, ...items.filter((i) => i?.type === 'intention')];
+  const overview = [...new Set(rows.filter((r) => r.op === WEEK_OVERVIEW_OP && r.state === 'open' && r.actsAs).map((r) => r.actsAs))];
+  const off = [...new Set(rows.filter((r) => isAnnounceRow(r) && r.state === 'cancelled').map((r) => r.label))];
   return {
     format: EXPORT_FORMAT, v: EXPORT_VERSION, exportedAt: new Date(now).toISOString(),
     lists, loose,
     people: people.filter((p) => p?.id).map((p) => clean({ id: p.id, channel: p.channel, uid: p.uid, role: p.role, displayName: p.displayName })),
     settings: { ...settings },
+    switches: clean({ overview, off }),
     knowledge: [],
   };
 }
@@ -83,10 +94,12 @@ export function exportHousehold({ items = [], people = [], settings = {}, now = 
  * @param {() => Promise<object[]>} a.items
  * @param {() => Promise<object[]>} a.people
  * @param {() => Promise<Array<{key: string, value: any}>>} a.params
+ * @param {() => Promise<object[]>} [a.planned]   the host's planned rows (every store it holds): their switches go in the file
  */
-export async function exportFromHost({ items, people, params }) {
+export async function exportFromHost({ items, people, params, planned = null }) {
   const own = ((await params().catch(() => [])) ?? []).filter((p) => HOUSEHOLD_SETTING.test(String(p?.key ?? '')));
-  return exportHousehold({ items: await items(), people: await people(), settings: Object.fromEntries(own.map((p) => [p.key, p.value])) });
+  const rows = typeof planned === 'function' ? ((await planned().catch(() => [])) ?? []) : [];
+  return exportHousehold({ items: await items(), people: await people(), settings: Object.fromEntries(own.map((p) => [p.key, p.value])), planned: rows });
 }
 
 /** Is this a file this version can read? `{ok}` or `{ok: false, reason}`. */
@@ -116,14 +129,16 @@ export function countExport(file) {
  * @param {(app: string, op: string, args: object, ctx?: object) => Promise<any>} a.call  the host's call: without a
  *        caller it is the host's own write; with `ctx.caller` the gate vouches for that person, as a door does
  * @param {(id: string, role: string) => Promise<void>} [a.tier]  put a restored person in the gate (their role)
+ * @param {{overview: (id: string) => Promise<void>, off: (label: string) => Promise<boolean>}} [a.switches]  the host's
+ *        planned-row switches: a person's week overview on; one of the household's announce rows off (false: none here)
  */
-export async function importHousehold(file, { call, tier = null } = {}) {
+export async function importHousehold(file, { call, tier = null, switches = null } = {}) {
   const checked = checkExport(file);
   if (!checked.ok) return { ok: false, reason: checked.reason };
   const done = { lists: 0, entries: 0, chores: 0, appointments: 0, people: 0, settings: 0, kept: 0 };
   const notRestored = [];
   try {
-    await restore(file, { call, tier, done, notRestored });
+    await restore(file, { call, tier, switches, done, notRestored });
   } catch (e) {
     // a failure part-way still says what was restored before it
     return { ok: false, reason: 'failed', error: e?.message ?? String(e), done, notRestored };
@@ -136,7 +151,7 @@ const HOUSEHOLD_SETTING = /^assistant\./;
 /** The roles a file may give a NEW person: a file never makes an admin (the one importing already is one). */
 const FILE_ROLES = new Set(['member', 'coordinator', 'observer']);
 
-async function restore(file, { call, tier, done, notRestored }) {
+async function restore(file, { call, tier, switches, done, notRestored }) {
   // The book as it is now. A person already in it keeps the role the book gives them (a file is older than the book);
   // a new person comes in with the file's role, never as an admin.
   const bookNow = await call('stoop', 'listContacts', {});
@@ -164,6 +179,18 @@ async function restore(file, { call, tier, done, notRestored }) {
     if (!HOUSEHOLD_SETTING.test(key)) { notRestored.push({ what: 'setting', key, why: 'not-the-household-s' }); continue; }
     const r = await call('params', 'set-param', { key, value });
     if (r?.ok === false) notRestored.push({ what: 'setting', key, why: r.error ?? 'refused' }); else done.settings += 1;
+  }
+  // the switches that live as the host's planned rows: set on what this box has (its own announce rows, seeded at boot)
+  const sw = file.switches ?? {};
+  for (const id of sw.overview ?? []) {
+    if (!inBook.has(id)) { notRestored.push({ what: 'overview', who: id, why: 'not-in-the-book' }); continue; }
+    if (!switches?.overview) { notRestored.push({ what: 'overview', who: id, why: 'unwired' }); continue; }
+    await switches.overview(id);
+    done.settings += 1;
+  }
+  for (const label of sw.off ?? []) {
+    if (!switches?.off || !(await switches.off(label))) { notRestored.push({ what: 'announce-off', label, why: switches?.off ? 'not-here' : 'unwired' }); continue; }
+    done.settings += 1;
   }
 
   // A write is made AS a person the book now holds (the gate vouches for them); anyone else — the host's own

@@ -209,6 +209,9 @@ import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
+import { renderPersonCard } from './personCard.js';
+import { createPersonClock, webAppState } from '../../src/v2/personClock.js';
+import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.js';
 import { contactCardFromLink, loadShareMyContact } from '../../src/v2/contactCardLink.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../src/v2/contactUnread.js';
 import { renderShareMyContact } from './shareMyContact.js';
@@ -864,6 +867,8 @@ function mountBasisOpsOnAgent(agent) {
     catalogue: circleCatalogue ?? undefined,
     t,
     agent,
+    // the person's clock shows them a card (their week) at the top of the app, until they close it
+    showPersonCard: (card) => renderPersonCard(document.body, card, { t }),
     callSkill: rawCallSkill,
     localActor: LOCAL_ACTOR,
     eventLog,
@@ -1226,6 +1231,8 @@ const agentRequestStore = createAgentRequestStore({
 // applied post-boot (after the agent hydrates it) — see where `circleHouseholdAgent` is assigned. Changing it
 // routes through the one kind-gated `set-param` op (onSetRetention below).
 const eventLog = new EventLog({ initial: [], muted: [], retention: retentionFromDays(DEFAULT_RETENTION_DAYS) });
+/** The person's clock (a promise of it, once the agent is up): their own planned rows, while the page is in view. */
+let personClock = null;
 
 /**
  * The display-theme preference — read and written by BOTH "My data" and Settings.
@@ -4147,6 +4154,7 @@ async function showMij() {
   let busy = false;
   // Gepland: what is coming for me, wherever it lives — read here, on this device (no bot); null while it loads
   let planned = null;
+  let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
 
   async function load() {
     try {
@@ -4158,6 +4166,18 @@ async function showMij() {
       const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
       const r = await plannedForMe({ callSkill: rawCallSkill, me });
       planned = plannedLines(r.items, { t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: currentLang() });
+      // the person's own week overview: a row in their own store, switched here
+      const clock = await personClock;
+      if (clock && me) {
+        weekOverview = {
+          on: personWeekOn(clock.book, me),
+          onToggle: async () => {
+            weekOverview = { ...weekOverview, on: null }; rerender();
+            try { await switchPersonWeek(clock.book, me, !personWeekOn(clock.book, me)); } catch (e) { console.warn('[person-clock] switch failed:', e?.message ?? e); }
+            weekOverview = { ...weekOverview, on: personWeekOn(clock.book, me) }; rerender();
+          },
+        };
+      }
     } catch { planned = []; }
     rerender();
   }
@@ -4172,6 +4192,7 @@ async function showMij() {
   const rerender = () => renderCircleProfile(rootEl, {
     profile, geocodeResult, busy, t,
     plannedLines: planned,
+    weekOverview,
     // the projected PAGE surface drives the header label (labelKey via t).
     profilePage,
     onSaveProfile: async ({ handle, displayName }) => {
@@ -8397,6 +8418,13 @@ async function boot() {
         publishEvent: publishEventToLog,
       });
       mountBasisOpsOnAgent(agent);
+      // THE PERSON'S CLOCK: their own planned rows (their week on Saturday), run while this page is in view — the page's
+      // visibility is the app state; a hidden page does not tick
+      if (!personClock) {
+        personClock = createPersonClock({ agent, log: eventLog, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, AppState: webAppState(document) })
+          .then(async (c) => { await c.start(); return c; })
+          .catch((e) => { console.warn('[person-clock] not started:', e?.message ?? e); return null; });
+      }
       // …and the composable lists, whose service the shell owns per circle.
       try { agent.mountAppOps?.('lists', listsOpsForShell(), listsManifest); } catch { /* older composition */ }
       // Governance rides the RAIL: signed, circle-scoped statements. The shell exposes the agent's

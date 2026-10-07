@@ -16,6 +16,7 @@
 // same owner-gated surface as the relay path, no new privilege. The owner key
 // never leaves the node; the browser only ever holds a revocable session token.
 import http from 'node:http';
+import { parseFeedPath } from './feedShelf.js';
 import { randomBytes } from 'node:crypto';
 
 const mkToken = () => randomBytes(24).toString('base64url');
@@ -84,9 +85,10 @@ tok()?dash():pair();
  * @param {string[]} o.allowedOps                           the ONLY ops the HTTP API may dispatch
  * @param {number}   [o.port=0]                             0 → OS-assigned
  * @param {string}   [o.host='127.0.0.1']
+ * @param {ReturnType<import('./feedShelf.js').createFeedShelf>} [o.feed]  the owner's agenda files → `GET /feed/<id>.<k>.ics`
  * @returns {Promise<{server,port,url,approvePairing,stop}>}
  */
-export function startManageServer({ agent, ownerPubKey, allowedOps, port = 0, host = '127.0.0.1' }) {
+export function startManageServer({ agent, ownerPubKey, allowedOps, port = 0, host = '127.0.0.1', feed = null }) {
   const allow    = new Set(allowedOps);
   const sessions = new Set();   // approved session tokens
   const pairings = new Map();   // code → { token, approved }
@@ -99,6 +101,16 @@ export function startManageServer({ agent, ownerPubKey, allowedOps, port = 0, ho
     let url; try { url = new URL(req.url, `http://${req.headers.host || host}`); } catch { return json(res, 400, { error: 'bad-request' }); }
     const p = url.pathname;
 
+    // a person's agenda link: opened with the key the path carries, `text/calendar`, never cached, never logged; every
+    // miss (unknown, wrong key, no file, a feed that is off) falls through to the one 404 below
+    if (feed && req.method === 'GET' && p.startsWith('/feed/')) {
+      const at = parseFeedPath(p);
+      const ics = at ? await feed.open(at.id, at.k).catch(() => null) : null;
+      if (ics) {
+        res.writeHead(200, { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+        return res.end(ics);
+      }
+    }
     if (req.method === 'GET' && (p === '/manage' || p === '/manage/')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(PAGE);
     }

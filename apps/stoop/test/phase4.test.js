@@ -3,7 +3,6 @@
  *
  * CachingDataSource: local-first reads + queued writes + flush on
  * online + attachInner mid-flight.
- * SyncCadence: foreground-only ticking.
  * Agent factory: cache wired by default; bundle.cache exposed.
  */
 
@@ -12,7 +11,6 @@ import { AgentIdentity, InternalBus, InternalTransport, MemorySource, DataPart }
 import { VaultMemory } from '@onderling/vault';
 
 import { CachingDataSource } from '../src/lib/CachingDataSource.js';
-import { SyncCadence }       from '../src/lib/SyncCadence.js';
 import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ANNE = 'https://id.example/anne';
@@ -178,121 +176,6 @@ describe('CachingDataSource — with an inner DataSource', () => {
       ['f', 1],
       ['p', 2],
     ]);
-  });
-});
-
-// ── SyncCadence ───────────────────────────────────────────────────────────
-
-describe('SyncCadence — foreground-only ticking', () => {
-  function buildCadence() {
-    let now = 0;
-    const timers = [];
-    const setTimeoutFn = (fn, delay) => {
-      const id = timers.length;
-      timers.push({ fn, fireAt: now + delay, cancelled: false });
-      return id;
-    };
-    const clearTimeoutFn = (id) => { if (timers[id]) timers[id].cancelled = true; };
-    /**
-     * Advance time stepwise to each maturing timer so handlers that
-     * call `setTimeoutFn` during their tick see the correct `now`.
-     */
-    const advance = async (ms) => {
-      const target = now + ms;
-      while (true) {
-        let next = null;
-        for (const t of timers) {
-          if (!t.cancelled && t.fireAt <= target && (next == null || t.fireAt < next.fireAt)) {
-            next = t;
-          }
-        }
-        if (!next) break;
-        if (next.fireAt > now) now = next.fireAt;
-        next.cancelled = true;
-        await next.fn();
-      }
-      now = target;
-    };
-    return { advance, setTimeoutFn, clearTimeoutFn, getNow: () => now };
-  }
-
-  it('does not tick when foreground=false', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildCadence();
-    let ticks = 0;
-    const cadence = new SyncCadence({
-      onTick: () => { ticks += 1; },
-      intervalMs: 100,
-      now: getNow,
-      setTimeoutFn, clearTimeoutFn,
-    });
-    await advance(1000);
-    expect(ticks).toBe(0);
-  });
-
-  it('ticks repeatedly while foreground=true', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildCadence();
-    let ticks = 0;
-    const cadence = new SyncCadence({
-      onTick: () => { ticks += 1; },
-      intervalMs: 100,
-      now: getNow,
-      setTimeoutFn, clearTimeoutFn,
-    });
-    cadence.setForeground(true);
-    await advance(350);    // 100, 200, 300 → 3 ticks
-    expect(ticks).toBe(3);
-  });
-
-  it('setForeground(false) stops further ticks', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildCadence();
-    let ticks = 0;
-    const cadence = new SyncCadence({
-      onTick: () => { ticks += 1; },
-      intervalMs: 100,
-      now: getNow,
-      setTimeoutFn, clearTimeoutFn,
-    });
-    cadence.setForeground(true);
-    await advance(150);
-    expect(ticks).toBe(1);
-    cadence.setForeground(false);
-    await advance(500);
-    expect(ticks).toBe(1);
-  });
-
-  it('tickNow fires immediately regardless of foreground', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildCadence();
-    let ticks = 0;
-    const cadence = new SyncCadence({
-      onTick: () => { ticks += 1; },
-      intervalMs: 100,
-      now: getNow,
-      setTimeoutFn, clearTimeoutFn,
-    });
-    await cadence.tickNow();
-    expect(ticks).toBe(1);
-  });
-
-  it('emits foreground / background / tick events', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildCadence();
-    const events = [];
-    const cadence = new SyncCadence({
-      onTick:     async () => {},
-      intervalMs: 100,
-      setTimeoutFn, clearTimeoutFn,
-    });
-    cadence.on('foreground', () => events.push('fg'));
-    cadence.on('background', () => events.push('bg'));
-    cadence.on('tick',       () => events.push('tk'));
-
-    cadence.setForeground(true);
-    await advance(100);
-    cadence.setForeground(false);
-    expect(events).toEqual(['fg', 'tk', 'bg']);
-  });
-
-  it('rejects missing onTick', () => {
-    expect(() => new SyncCadence({})).toThrow(/onTick/);
   });
 });
 

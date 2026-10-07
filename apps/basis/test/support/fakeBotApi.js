@@ -28,7 +28,11 @@ export function fakeBotApi() {
     const command = text.startsWith('/') ? [{ type: 'bot_command', offset: 0, length: text.split(' ')[0].length }] : undefined;
     queue.push({ update_id: nextId++, message: { message_id: nextId++, date: Math.floor(Date.now() / 1000), text, ...(command ? { entities: command } : {}), chat: { id: Number(uid), type: 'private', first_name: firstName }, from: { id: Number(uid), is_bot: false, first_name: firstName } } });
   };
+  /** A person taps a button the bot showed them (Telegram's `callback_query`: the button's id comes back as their line). */
+  const tap = (uid, data, firstName = 'Ann') => {
+    queue.push({ update_id: nextId++, callback_query: { id: String(nextId++), data, chat_instance: '1', from: { id: Number(uid), is_bot: false, first_name: firstName }, message: { message_id: nextId++, date: Math.floor(Date.now() / 1000), chat: { id: Number(uid), type: 'private', first_name: firstName } } } });
+  };
   /** What the bot said to this chat (its sendMessage calls, in order). */
   const said = (uid) => calls.filter((c) => c.method === 'sendMessage' && String(c.args.chat_id) === String(uid)).map((c) => c.args);
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ calls, write, said, server, root: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => server.close(r)) })));
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ calls, write, tap, said, server, root: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => server.close(r)) })));
 }

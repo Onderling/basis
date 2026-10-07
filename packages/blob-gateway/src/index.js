@@ -27,6 +27,8 @@ export {
 export {
   bytesToB64u, b64uToBytes, randomKey,
 } from './bytes.js';
+// a blob that opens with the key a link carries (a reader that is no agent: a calendar app)
+export { sealForLink, openForLink, isLinkSealed } from './linkSeal.js';
 
 // REAL adapters that satisfy the injected contracts (Objective S, second slice).
 // Kept behind subpath exports so this core entry stays browser-safe (the S3 +

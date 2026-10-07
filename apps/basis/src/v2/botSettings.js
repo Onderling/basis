@@ -145,3 +145,13 @@ export const HOUSEHOLD_IN_APP_KEY = 'assistant.householdInApp';
 export const IN_APP_MODES = Object.freeze(['off', 'on']);
 export const IN_APP_MODE = param({ key: HOUSEHOLD_IN_APP_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'off' });
 export const inAppModeFrom = (v) => (IN_APP_MODES.includes(v) ? v : IN_APP_MODE);
+
+/**
+ * Whether the people of the household may get their agenda as a link (`/agenda-link`): a file of the appointments that
+ * concern them, served by the household's companion for a calendar app. The household's, off by default: whoever holds
+ * a link reads that agenda, and the calendar service it is pasted into holds it in clear.
+ */
+export const CALENDAR_FEED_KEY = 'assistant.calendarFeed';
+export const CALENDAR_FEED_MODES = Object.freeze(['off', 'on']);
+export const CALENDAR_FEED_MODE = param({ key: CALENDAR_FEED_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'off' });
+export const calendarFeedFrom = (v) => (CALENDAR_FEED_MODES.includes(v) ? v : CALENDAR_FEED_MODE);

@@ -4140,7 +4140,7 @@
       "doc": "The household bot when its model route is slow (retrying on the fallback model) or does not answer at all."
     },
     "settings_list": {
-      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen). Verbruik zien: {{usage}} (admin: alleen de beheerder · members: iedereen). Rollen: {{roles}} (standard: de beheerder beslist meer · flat: iedereen gelijk). In je eigen app: {{app}} (off: niet gevraagd · on: na /koppel gevraagd). Wijzigingen melden: {{announce}} (/huishouden announce appointments|chores on|off).",
+      "text": "Instellingen — klusjes geven aan een ander: {{assign}} (roles: de rol beslist · anyone: iedereen · self: niemand). Namen zien: {{names}} (members: iedereen · assigners: wie mag toewijzen · admin: alleen de beheerder · none: niemand). Wat klaar of geweest is: {{passed}} (keep: blijft staan · hide: nog {{days}} dagen zichtbaar · delete: weg). Afspraken schrappen: {{cancel}} (own: wie hem zette, en de beheerder · admin: alleen de beheerder). Herinneringen: {{reminders}} · stil tussen {{quiet}} · {{lead}} minuten vooraf (0: geen). Verbruik zien: {{usage}} (admin: alleen de beheerder · members: iedereen). Rollen: {{roles}} (standard: de beheerder beslist meer · flat: iedereen gelijk). In je eigen app: {{app}} (off: niet gevraagd · on: na /koppel gevraagd). Wijzigingen melden: {{announce}} (/huishouden announce appointments|chores on|off). Agenda-link: {{agenda}} (/huishouden agenda on|off).",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
@@ -4563,6 +4563,7 @@
     "inapp_usage": "Gebruik: /inapp ja of /inapp nee.",
     "inapp_failed": "Dat lukte niet; probeer het later nog eens.",
     "menu_app": "In je eigen app",
+    "menu_agenda": "Agenda-link",
     "household_circle_name": "Huishouden",
     "revoked_circle": "Uit het huishouden in de app gehaald.",
     "inapp_invite_link": "Je uitnodiging voor het huishouden in je eigen app. Alleen jij kunt hem gebruiken, één keer, binnen 24 uur. Tik op deze link op je telefoon; de app opent met de uitnodiging:\n{{link}}\n\nOpent hij niet, plak dan dit in de app bij Kringen → Lid worden:\n{{invite}}",
@@ -4591,6 +4592,13 @@
     "screen_sent_privately": "Ik heb je de link privé gestuurd.",
     "screen_not_reachable": "Ik kan je niet privé schrijven. Stuur me eerst zelf een bericht in een privégesprek, en vraag dan opnieuw /scherm.",
     "screen_link_remembered": "Ik heb je een link gestuurd om een scherm te koppelen.",
+    "agenda_link": "Je agenda als link — de afspraken die jou aangaan, voor je agenda-app. Wie deze link heeft, kan je agenda lezen; de agenda-dienst waar je hem in plakt, bewaart hem leesbaar. Deel hem niet. Vraag je opnieuw /agenda-link, dan werkt deze niet meer.\n\niPhone (tik): {{webcal}}\nGoogle Agenda (Instellingen → Agenda toevoegen → Via URL): {{https}}",
+    "agenda_link_remembered": "Ik heb je een link naar je agenda gestuurd.",
+    "agenda_link_sent_privately": "Ik heb je de agenda-link privé gestuurd.",
+    "agenda_link_off": "De agenda-link staat uit in dit huishouden. De beheerder kan hem aanzetten met /huishouden agenda on.",
+    "agenda_link_none_here": "Dit huishouden heeft geen agenda-link.",
+    "agenda_link_failed": "De agenda-link kon ik nu niet maken. Probeer het straks nog eens.",
+    "agenda_calendar_name": "Huishouden",
     "menu_head": "Je instellingen (tik om te wijzigen):",
     "menu_household": "Voor het hele huishouden:",
     "menu_on_screen": "Je instellingen staan op je gekoppelde scherm. Een ander scherm koppelen: /scherm.",
@@ -4700,6 +4708,7 @@
           "assistant-memory": "hoeveel ik van ons gesprek onthoud",
           "assistant-view": "knoppen, je scherm of woorden",
           "assistant-screen": "een scherm koppelen",
+          "assistant-agenda-link": "je agenda als link, voor je agenda-app (een nieuwe; de vorige werkt dan niet meer)",
           "assistant-screens": "je gekoppelde schermen",
           "assistant-settings": "instellingen voor het hele huishouden",
           "assistant-users": "wie er in het huishouden zitten",
@@ -5396,6 +5405,30 @@
     "planned_title": {
       "text": "Gepland",
       "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "week_card_title": {
+      "text": "Je week",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_card_note": {
+      "text": "Je ziet dit omdat de app open is — een telefoon maakt je er niet voor wakker.",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_switch": {
+      "text": "Weekoverzicht op zaterdag om 9:00 — je ziet het als de app open is",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_on": {
+      "text": "Aan",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_off": {
+      "text": "Uit",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_card_close": {
+      "text": "Sluiten",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
     },
     "planned_loading": {
       "text": "Even kijken wat er aankomt…",

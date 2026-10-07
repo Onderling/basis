@@ -138,6 +138,20 @@ describe('createS3Bucket — delete', () => {
   });
 });
 
+describe('createS3Bucket — get', () => {
+  it('signs + GETs the object and returns its text; a 404 is null; other errors throw', async () => {
+    const calls = [];
+    const fetch = async (url, init = {}) => { calls.push({ url, init }); return { ok: true, status: 200, text: async () => 'ciphertext' }; };
+    const bucket = createS3Bucket({ ...CFG, fetch });
+    expect(await bucket.get('objkey123')).toBe('ciphertext');
+    expect(calls[0].init.method).toBe('GET');
+    expect(calls[0].url).toBe('https://s3.us-east-1.amazonaws.com/onderling-blobs/objkey123');
+    expect(calls[0].init.headers.authorization).toMatch(/^AWS4-HMAC-SHA256 /);
+    expect(await createS3Bucket({ ...CFG, fetch: stubFetch({ ok: false, status: 404 }) }).get('k')).toBeNull();
+    await expect(createS3Bucket({ ...CFG, fetch: stubFetch({ ok: false, status: 500 }) }).get('k')).rejects.toThrow(/read failed .*500/);
+  });
+});
+
 describe('createS3Bucket — config validation', () => {
   it('requires all S3 credentials', () => {
     expect(() => createS3Bucket({ ...CFG, endpoint: undefined, fetch: stubFetch() }))

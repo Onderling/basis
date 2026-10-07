@@ -38,7 +38,7 @@
  * behaviour change.
  */
 
-import { CachingDataSource, SyncCadence } from '@onderling/local-store';
+import { CachingDataSource } from '@onderling/local-store';
 
 import { pickPersist } from './persist/persistPicker.js';
 import { sealedPersist } from '@onderling/local-store';   // content is sealed on the way to disk, plaintext in the cache
@@ -74,14 +74,10 @@ import { sealedPersist } from '@onderling/local-store';   // content is sealed o
  *   Tasks V1 default: `['mem://tasks/settings/devices/',
  *   'mem://tasks/settings/.migrated-from-v2']` so per-device settings
  *   + the migration marker stay local.
- * @param {object} [args.cadence]
- *   Optional `SyncCadence` configuration (currently informational —
- *   apps wire the cadence's `start()` / `stop()` themselves).
  *
  * @returns {(
  *   {
  *     cache:        CachingDataSource,
- *     cadence:      SyncCadence | null,
  *     attachInner:  (inner: object) => Promise<void>,
  *     detachInner:  () => Promise<void>,
  *     close:        () => Promise<void>,
@@ -99,7 +95,6 @@ export function buildBundle({
   onLocalChange,
   persistDb,
   localOnlyPrefixes,
-  cadence: cadenceCfg,
 } = {}) {
   // The async-persistence path is opt-in.  When `persistDb` is set we
   // load the prior snapshot first, then construct the bundle with
@@ -111,7 +106,6 @@ export function buildBundle({
       inner,
       persistDb,
       localOnlyPrefixes,
-      cadenceCfg,
     });
   }
 
@@ -162,7 +156,6 @@ export function buildBundle({
     localStore,
     onLocalChange,
     localOnlyPrefixes,
-    cadenceCfg,
     podCtx,
     podInnerKeyMap,
     persist: null,
@@ -181,7 +174,6 @@ async function buildBundleWithPersistImpl({
   persistDb,
   contentSeal = null,
   localOnlyPrefixes,
-  cadenceCfg,
 }) {
   const picked = await pickPersist(persistDb);
   // `pickPersist` returns null when no path/dbName is set — defensive
@@ -230,7 +222,6 @@ async function buildBundleWithPersistImpl({
     localStore:        loadedStore,
     onLocalChange,
     localOnlyPrefixes,
-    cadenceCfg,
     podCtx,
     podInnerKeyMap,
     persist,
@@ -243,7 +234,6 @@ function assembleBundle({
   localStore,
   onLocalChange,
   localOnlyPrefixes,
-  cadenceCfg,
   podCtx,
   podInnerKeyMap,
   persist,
@@ -259,11 +249,8 @@ function assembleBundle({
     innerKeyMap: podInnerKeyMap,
   });
 
-  const cadence = cadenceCfg ? new SyncCadence(cadenceCfg) : null;
-
   return {
     cache,
-    cadence,
     // M4: expose the mutable podCtx as `_podCtx` so `attachTasksBundle`
     // can fill it at pod sign-in time (same seam as Stoop's Agent.js
     // Phase 2.4-core, and as tasks-mobile's forward-courtesy seam).
@@ -281,7 +268,6 @@ function assembleBundle({
       await cache.attachInner(null);
     },
     async close() {
-      if (cadence?.stop) await cadence.stop();
       // `persist` lifecycle: the debounced save fires on its own (the
       // pendingTimer closes over the live Map reference, so the most
       // recent state lands on disk).  Tests that need strict ordering

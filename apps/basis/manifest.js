@@ -203,6 +203,14 @@ export const basisManifest = {
      * either an existing eventId (lookup) OR creation params.
      */
     {
+      // The person's own week overview: their clock runs it — a planned row in their own store, switched on Mij →
+      // Gepland — while the app is open. Not typed, not a button: `internal` keeps it out of coverage and the drawer.
+      id:    'personWeekOverview',
+      verb:  'list',
+      params: [{ name: 'occurrence', kind: 'string', required: false }],
+      surfaces: { internal: true },
+    },
+    {
       id:    'embed-time',
       verb:  'add',
       writes: { scope: 'circle' },

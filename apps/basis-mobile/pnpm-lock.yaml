@@ -57,6 +57,12 @@ importers:
       '@onderling/oidc-session-rn':
         specifier: file:../../packages/oidc-session-rn
         version: file:../../packages/oidc-session-rn(3ddf39cc705ecfacb6432da749a6d86a)
+      '@onderling/online-cadence':
+        specifier: file:../../packages/online-cadence
+        version: file:../../packages/online-cadence(@onderling/sync-engine-rn@file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(react@18.3.1))
+      '@onderling/params':
+        specifier: file:../../packages/params
+        version: file:../../packages/params
       '@onderling/pod-client':
         specifier: workspace:*
         version: link:../../packages/pod-client
@@ -1395,6 +1401,17 @@ packages:
 
   '@onderling/oidc-session@file:../../packages/oidc-session':
     resolution: {directory: ../../packages/oidc-session, type: directory}
+
+  '@onderling/online-cadence@file:../../packages/online-cadence':
+    resolution: {directory: ../../packages/online-cadence, type: directory}
+    peerDependencies:
+      '@onderling/sync-engine-rn': ^0.1.0
+    peerDependenciesMeta:
+      '@onderling/sync-engine-rn':
+        optional: true
+
+  '@onderling/params@file:../../packages/params':
+    resolution: {directory: ../../packages/params, type: directory}
 
   '@onderling/react-native@file:../../packages/react-native':
     resolution: {directory: ../../packages/react-native, type: directory}
@@ -6993,6 +7010,7 @@ snapshots:
       '@onderling/app-manifest': link:../../packages/app-manifest
       '@onderling/attribute-charter': link:../../packages/attribute-charter
       '@onderling/blob-gateway': link:../../packages/blob-gateway
+      '@onderling/calendar-emission': link:../../packages/calendar-emission
       '@onderling/chat-nav': link:../../packages/chat-nav
       '@onderling/circles': link:../../packages/circles
       '@onderling/core': link:../../packages/core
@@ -7005,6 +7023,7 @@ snapshots:
       '@onderling/manifest-host': link:../../packages/manifest-host
       '@onderling/notifier': link:../../packages/notifier
       '@onderling/oidc-session': link:../../packages/oidc-session
+      '@onderling/online-cadence': link:../../packages/online-cadence
       '@onderling/pod-client': link:../../packages/pod-client
       '@onderling/pod-onboarding': link:../../packages/pod-onboarding
       '@onderling/pod-routing': link:../../packages/pod-routing
@@ -7070,6 +7089,14 @@ snapshots:
     dependencies:
       '@inrupt/solid-client-authn-node': 4.0.0
       '@onderling/params': link:../../packages/params
+
+  '@onderling/online-cadence@file:../../packages/online-cadence(@onderling/sync-engine-rn@file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(react@18.3.1))':
+    dependencies:
+      '@onderling/params': link:../../packages/params
+    optionalDependencies:
+      '@onderling/sync-engine-rn': file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(react@18.3.1)
+
+  '@onderling/params@file:../../packages/params': {}
 
   '@onderling/react-native@file:../../packages/react-native(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(@onderling/transports@..+packages+transports)(@onderling/vault@file:../../packages/vault)(@react-native-async-storage/async-storage@1.24.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(@react-native-community/netinfo@11.4.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(buffer@6.0.3)(nkn-sdk@1.3.6)(react-native-ble-plx@3.5.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native-get-random-values@1.11.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native-keychain@10.0.0)':
     dependencies:

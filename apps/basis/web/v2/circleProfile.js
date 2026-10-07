@@ -32,6 +32,8 @@ export function renderCircleProfile(container, {
   onOpenMij,
   // Gepland's lines (shared `plannedLines`); null while they load; absent = the shell does not show Gepland
   plannedLines = undefined,
+  // the person's own week overview: `{ on, onToggle }` (absent = no switch; on null while it loads)
+  weekOverview = undefined,
   onGeocode,
   onSaveLocation,
   onClearLocation,
@@ -121,6 +123,22 @@ export function renderCircleProfile(container, {
         ul.appendChild(li);
       }
       planned.appendChild(ul);
+    }
+    if (weekOverview) {
+      const row = document.createElement('div');
+      row.className = 'cc-profile__week';
+      const label = document.createElement('span');
+      label.className = 'cc-profile__week-label';
+      label.textContent = tr('circle.profile.week_switch');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cc-profile__week-toggle cc-btn';
+      btn.dataset.on = weekOverview.on ? 'true' : 'false';
+      btn.disabled = weekOverview.on === null;
+      btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
+      btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
+      row.append(label, btn);
+      planned.appendChild(row);
     }
     container.appendChild(planned);
   }

@@ -89,18 +89,20 @@ import { createChangeFeed } from '../src/v2/changeFeed.js';
 import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { exportDirFiles } from '../src/v2/exportDirFiles.js';
 import { createExportRequestJob } from '../src/v2/exportRequest.js';
-import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
+import { seedAnnounceRows, isAnnounceRow, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
 import { createCircleRowGate } from '../src/v2/circleRowGate.js';
 import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
-import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
+import { moveOverviewSwitchesToRows, switchWeekOverview } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { createCommandMenus } from '../src/v2/botCommandMenu.js';
 import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
+import { createBotFeeds } from '../src/v2/botFeeds.js';
+import { DataPart, Parts } from '@onderling/core';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
-import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom } from '../src/v2/botSettings.js';
+import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom, CALENDAR_FEED_KEY, calendarFeedFrom } from '../src/v2/botSettings.js';
 import { REMINDER_RULES_KEY, reminderRulesFrom, leadOf } from '../src/v2/reminderWords.js';
 import { ensureHouseholdLists, householdBotApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
@@ -927,6 +929,8 @@ if (tgToken || inboxDoor.bridge) {
         items: () => agent.householdItems(),
         people: () => botUsers.list(),
         params: async () => (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? [],
+        // the switches kept as planned rows (a person's week overview, an announcement off) travel as switches
+        planned: async () => { await planned.load(); return planned.rows(); },
       });
     },
     // sealed to the admin's export key once one is set (`bin/export-key.mjs set`, on the box)
@@ -940,6 +944,21 @@ if (tgToken || inboxDoor.bridge) {
   });
   // A household bot's people connect screens (`/scherm`): the grant is their role column, each token acting as them.
   const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
+  // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file. Wired
+  // when the box knows the companion (its address, as `COMPANION_MANAGE_OWNER_PUBKEY` there names this bot) and the
+  // public address it is served at; off in the household until the admin switches it on.
+  const feedCompanion = process.env.ONDERLING_FEED_COMPANION || '';
+  const feedBase = process.env.ONDERLING_FEED_BASE_URL || '';
+  const companionCall = async (skill, data) => Parts.data(await agent.sa.peer.invoke(feedCompanion, skill, [DataPart(data)])) ?? null;
+  const feeds = isFunctionProfile && feedCompanion && feedBase ? createBotFeeds({
+    threads,
+    events: async () => (await agent.reminderSources())?.events ?? [],
+    people: () => botUsers.list(),
+    calendarName: async () => t('circle.bot.agenda_calendar_name'),
+    put: (id, envelope) => companionCall('feed.put', { id, envelope }),
+    drop: (id) => companionCall('feed.drop', { id }),
+    base: feedBase,
+  }) : null;
   // The host's planned work (the own-devices store): its own rows and those of the people it is the device for — the
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1127,7 +1146,18 @@ if (tgToken || inboxDoor.bridge) {
       revoke: (who) => botUsers.revoke(who),
       setRole: (who, role) => botUsers.setRole(who, role),
       // a changed roles preset changes what each person's Telegram menu lists
-      onSettingChanged: (key) => { if (key === ROLES_KEY) commandMenus.publish(); },
+      onSettingChanged: (key) => {
+        if (key === ROLES_KEY) commandMenus.publish();
+        // the agenda link switched off: every link goes dark (the files dropped from the companion)
+        if (key === CALENDAR_FEED_KEY && feeds) {
+          (async () => {
+            const v = (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params?.find((x) => x.key === CALENDAR_FEED_KEY)?.value;
+            if (calendarFeedFrom(v) === 'off') await feeds.endAll();
+          })().catch(() => {});
+        }
+      },
+      feeds,
+      sendPrivately: (person, text, rememberAs) => reach.sendToPerson(person, { text, rememberAs, noPreview: true }),
       exports: exportShelf,
       // the export key's set and unlock from the admin's screen: the same core as `bin/export-key.mjs`, over this box's files
       exportKey: createExportKeyFile({
@@ -1141,7 +1171,19 @@ if (tgToken || inboxDoor.bridge) {
       unlockedKey: async () => { sweepUnlocked(); try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
       lockKey: async () => rmSync(path.join(dataDir, UNLOCKED_KEY_FILE), { force: true }),
       // the file's things written back through their own ops, each as its person (the host vouches, as its door does)
-      importFile: (file) => importHousehold(file, { call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller }),
+      importFile: (file) => importHousehold(file, {
+        call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller,
+        // the switches on this box's own rows: a person's week overview on; the household's announce row of that kind off
+        switches: {
+          overview: (id) => switchWeekOverview(planned, id, true),
+          off: async (label) => {
+            const row = planned.rows().find((r) => isAnnounceRow(r) && r.label === label);
+            if (!row) return false;
+            if (row.state === 'open') await planned.cancel(row.id);
+            return true;
+          },
+        },
+      }),
       // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
       inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
       status: async () => ({
@@ -1165,6 +1207,11 @@ if (tgToken || inboxDoor.bridge) {
     consumers: changeConsumers,
   });
   await changeFeed.seedAll((await agent.heldCircleStores()).map((c) => c.scope));
+  if (feeds) {
+    // an appointment changed: every agenda link is re-rendered (a burst is one push); and once now, at boot
+    changeConsumers.push((change) => feeds.touched(change));
+    feeds.pushAll().catch(() => {});
+  }
   circleWrite.fn = (circleId, item, removedId) => (removedId ? changeFeed.removed(circleId, removedId) : changeFeed.own(circleId, item));
   itemLanded.fn = (circleId, item) => changeFeed.landed(circleId, item);
   if (screens) {
@@ -1335,6 +1382,8 @@ console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
+// the address another node names this one by — e.g. the household's companion, whose owner it is (COMPANION_MANAGE_OWNER_PUBKEY)
+console.log(`  address   ${agent.identity?.chat?.pubKey ?? '—'}`);
 if (card?.payload) {
   console.log('\n  This device as a contact — hand this to whoever should be able to write to you:\n');
   console.log(`    ${card.payload}\n`);

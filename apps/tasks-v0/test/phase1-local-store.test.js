@@ -28,12 +28,11 @@ const TEST_MEMBERS = [
 ];
 
 describe('Phase 1 — local-store wiring', () => {
-  it('buildBundle returns a usable cache + null cadence by default', () => {
+  it('buildBundle returns a usable cache by default', () => {
     const bundle = buildBundle();
     expect(bundle.cache).toBeDefined();
     expect(typeof bundle.cache.read).toBe('function');
     expect(typeof bundle.cache.write).toBe('function');
-    expect(bundle.cadence).toBeNull();
   });
 
   it('buildBundle.attachInner refuses non-DataSource arguments', async () => {

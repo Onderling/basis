@@ -130,6 +130,29 @@ describe('the household export', () => {
     expect(await importHousehold({ format: 'onderling-household-export', v: 9 }, { call })).toEqual({ ok: false, reason: 'unknown-version' });
     expect(calls).toEqual([]);
   });
+
+  it('the switches kept as planned rows travel as switches, never as rows or loose things', async () => {
+    const rows = [
+      { id: 'r1', type: 'intention', op: 'sendWeekOverview', actsAs: 'telegram:222', state: 'open' },
+      { id: 'r2', type: 'intention', op: 'sendWeekOverview', actsAs: 'telegram:333', state: 'cancelled' },
+      { id: 'r3', type: 'intention', op: 'announceChange', actsAs: 'household', label: 'announce-chores', state: 'cancelled' },
+      { id: 'r4', type: 'intention', op: 'announceChange', actsAs: 'household', label: 'announce-appointments', state: 'open' },
+    ];
+    // the announce rows sit in the household's store (its items); the overview rows in the host's own store (planned)
+    const file = exportHousehold({ items: [rows[2], rows[3]], people: PEOPLE, planned: [rows[0], rows[1]] });
+    expect(file.loose ?? []).toEqual([]);
+    expect(file.switches).toEqual({ overview: ['telegram:222'], off: ['announce-chores'] });
+    expect(countExport(file).entries).toBe(0);
+    const set = [];
+    const call = async (app, op) => (op === 'listContacts' ? { contacts: PEOPLE.map((p) => ({ webid: p.id, role: p.role })) } : { ok: true, items: [] });
+    const r = await importHousehold(JSON.parse(JSON.stringify(file)), { call, switches: { overview: async (id) => { set.push(['overview', id]); }, off: async (label) => { set.push(['off', label]); return true; } } });
+    expect(r.ok).toBe(true);
+    expect(set).toEqual([['overview', 'telegram:222'], ['off', 'announce-chores']]);
+    expect(r.notRestored).toEqual([]);
+    // a box without the switches wired says so, per switch
+    const bare = await importHousehold(JSON.parse(JSON.stringify(file)), { call });
+    expect(bare.notRestored.map((n) => n.what)).toEqual(['overview', 'announce-off']);
+  });
 });
 
 describe('the export shelf', () => {

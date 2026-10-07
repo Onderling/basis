@@ -2,55 +2,23 @@
  * Attachments — Stoop Phase 39 (2026-05-07); canonical-media
  * consolidation (media Phase 1 anti-drift tail, 2026-07-10).
  *
- * Server-side helpers for image attachments on noticeboard posts and
- * 1:1 chat messages.  Storage shape: each attachment's full bytes
- * live as a separate blob in the bundle's `CachingDataSource` at
- *
- *   mem://stoop/items/<itemId>/attachments/<attId>.<ext>
- *
- * The Item record carries a canonical **`media` item**
+ * Helpers for image attachments on noticeboard posts and 1:1 chat
+ * messages.  The Item record carries one canonical **`media` item**
  * (`@onderling/item-types` MEDIA_SCHEMA) per attachment — no bytes:
  *
  *   item.source.attachments = [
  *     { type: 'media', id, createdAt, createdBy,
- *       source: { type: 'stoop-att', ref: 'stoop-att://<itemId>/<attId>' },
- *       mime, width, height,            // canonical render hints
- *       bytes, thumbnail,               // stoop extras (forward-additive)
- *       ref }                           // LOCAL-ONLY cache path
+ *       source: { type: 'blob', ref: 'blob://<key>', enc: { sealed: true, …, thumb } },
+ *       mime, width, height }           // canonical render hints
  *   ]
- *
- * - `id` (ulid-shaped, `att-...`) — stable per-attachment identifier;
- *   also the filename stem.  Same key as the pre-consolidation shape,
- *   so mixed-version peers keep resolving attachments by id.
- * - `source` — the embeds-shaped `{type, ref}` storage pointer the
- *   media schema requires.  Stoop's ref convention is
- *   `stoop-att://<itemId>/<attId>`: install-independent (any stoop
- *   instance resolves it via the item's attachment list — local cache
- *   when the bytes are here, `requestAttachment` round-trip when not).
- *   NOT a local path, NOT a pod URL — safe on the wire.
- * - `mime` / `width` / `height` — canonical writer-asserted render
- *   hints (same keys as the legacy shape — old peers read them
- *   unchanged).
- * - `bytes` — size of the post-resize payload (informational; stoop
- *   extra, allowed by the schema's forward-additive policy).
- * - `thumbnail` — `data:image/jpeg;base64,...` (~3-8 KB after
- *   client-side resize to ~120px).  Travels in broadcasts.  UNSEALED
- *   today — see the sealing note below.
- * - `ref` — local cache path (sender) or absent (recipient that
- *   hasn't fetched the full bytes yet).  Recipients populate
- *   `ref` after a `requestAttachment` round-trip.
  *
  * **Privacy invariants** (per the project-wide rule
  * `Project Files/projects/README.md#personal-pod-urls-stay-out-of-peer-to-peer-messages`):
  *
- * - The `ref` field is local-only — NEVER goes on the wire.  The
- *   `toBroadcastShape()` helper strips it explicitly.  (`source.ref`
- *   — the stoop-att:// wire ref — DOES travel; it names the
- *   attachment, not a location.)
- * - Full bytes do NOT travel in broadcasts.  Recipients see the
- *   thumbnail; on click, they request the bytes from the original
- *   author over a 1:1 chat channel.  Bytes for chat messages DO
- *   travel inline (1:1, smaller, expected behaviour).
+ * - No plaintext bytes, `data:` thumbnail or local cache `ref` ever goes on
+ *   the wire; `toBroadcastShape()` strips them defensively.
+ * - Full bytes never travel in chat or broadcasts.  Recipients open the sealed
+ *   thumbnail and the full image through their own circle media gateway.
  *
  * **Sealing status (2026-07-11 — sealed-media):** DONE.  Stoop image
  * attachments are now SEALED end to end, via the SAME per-circle path
@@ -66,9 +34,10 @@
  * (`validateInboundAttachment` refuses it).  Recipients open the sealed inline
  * thumbnail (`openThumbnail`) + the full image (`openBlob`, gated) through
  * their own circle media gateway — the sealing key stays out of stoop.  The
- * `@onderling/chat-p2p` plaintext `attachment-request`/`-response` handlers are
- * now structurally inert (stoop no longer injects `attachmentSupport`, and no
- * plaintext bytes exist to serve).
+ * older plaintext fetch route (the author answering an `attachment-request`
+ * over chat with base64 bytes, plus the `requestAttachment` /
+ * `getAttachmentDataUrl` skills and the local-cache path helpers it needed)
+ * was superseded by this sealed path and removed on 2026-10-07.
  */
 
 import nacl from 'tweetnacl';
@@ -94,20 +63,10 @@ export const MAX_ATTACHMENTS_PER_POST = param({ key: 'stoop.maxAttachmentsPerPos
 /** Max bytes per noticeboard attachment AFTER client-side resize. */
 export const MAX_NOTICEBOARD_BYTES_PER_ATT = param({ key: 'attachment.maxNoticeboardBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });     // ~600 KB
 
-/** Max bytes per chat-message attachment AFTER client-side resize. */
-// NOT migrated to param(): read only by a test (phase39) that pins its value, never by production code — the
-// stale-param guard rightly treats test-only usage as unread, so registering it would be a dead param.
-// Flagged as a production-dead export (an unenforced cap) for review/cleanup.
-export const MAX_CHAT_BYTES_PER_ATT = 250_000;         // ~250 KB
-
 /** Allowed mime types. */
 export const ALLOWED_MIMES = Object.freeze(new Set([
   'image/jpeg', 'image/png', 'image/webp',
 ]));
-
-const MIME_TO_EXT = Object.freeze({
-  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
-});
 
 /**
  * Generate a fresh attachment id.  ULID-ish: time-prefixed +
@@ -118,51 +77,6 @@ export function freshAttachmentId() {
   const rand = _b64encode(nacl.randomBytes(6))
     .replace(/[+/=]/g, '').slice(0, 8);
   return `att-${time}-${rand}`;
-}
-
-/**
- * Build the local cache path for an attachment.
- */
-export function attachmentPath(itemId, attId, mime) {
-  const ext = MIME_TO_EXT[mime];
-  if (!ext) throw new Error(`Attachments: unsupported mime ${mime}`);
-  return `mem://stoop/items/${itemId}/attachments/${attId}.${ext}`;
-}
-
-/* ── Canonical media wire-ref convention ──────────────────────
- * `stoop-att://<itemId>/<attId>` — the install-independent name of
- * an attachment.  Any stoop instance resolves it: locate the item,
- * find the attachment by id, then read the local cache (when `ref`
- * is present) or run the `requestAttachment` round-trip.  This is
- * the `source.ref` of the canonical media item; it replaces nothing
- * local (bytes stay at `attachmentPath(...)`) and leaks nothing
- * (no local path, no pod URL).
- * ────────────────────────────────────────────────────────────── */
-
-/** `source.type` of a stoop-resolved media item. */
-export const STOOP_ATT_REF_TYPE = 'stoop-att';
-
-/** Ref scheme prefix — mirrors the type name. */
-export const STOOP_ATT_REF_SCHEME = 'stoop-att://';
-
-/** Build the wire ref for an attachment: `stoop-att://<itemId>/<attId>`. */
-export function attachmentWireRef(itemId, attId) {
-  if (!itemId || !attId) throw new Error('attachmentWireRef: itemId + attId required');
-  return `${STOOP_ATT_REF_SCHEME}${itemId}/${attId}`;
-}
-
-/**
- * Parse a `stoop-att://<itemId>/<attId>` ref.  Returns
- * `{itemId, attId}` or null when the ref isn't ours.  attIds carry
- * no slashes (`att-<time>-<rand>`), so the LAST segment is the
- * attId and everything before it is the itemId.
- */
-export function parseAttachmentWireRef(ref) {
-  if (typeof ref !== 'string' || !ref.startsWith(STOOP_ATT_REF_SCHEME)) return null;
-  const rest = ref.slice(STOOP_ATT_REF_SCHEME.length);
-  const cut = rest.lastIndexOf('/');
-  if (cut <= 0 || cut === rest.length - 1) return null;
-  return { itemId: rest.slice(0, cut), attId: rest.slice(cut + 1) };
 }
 
 /**
@@ -236,19 +150,6 @@ export async function persistInboundAttachment({ att, actor } = {}) {
 }
 
 /**
- * Read attachment bytes from the local cache.  Returns base64 (so
- * it can travel in a chat envelope as a string).  null when the
- * blob isn't on this machine.
- */
-export async function readAttachmentBytesB64({ dataSource, ref }) {
-  const data = await dataSource.read(ref);
-  if (data == null) return null;
-  if (data instanceof Uint8Array) return _b64encode(data);
-  if (typeof data === 'string') return data;       // already-encoded; legacy path
-  return null;
-}
-
-/**
  * Project an attachment onto its WIRE shape (broadcasts + chat envelopes).
  *
  * SEALED media pointer (the only shape stoop now produces): carry the opaque
@@ -259,9 +160,9 @@ export async function readAttachmentBytesB64({ dataSource, ref }) {
  * is no local cache `ref` (the bytes live in the gateway bucket, not in stoop).
  * A defensive strip below drops any of those anyway — belt and braces.
  *
- * Legacy records (a pre-seal peer's `stoop-att://` item, or the chat-p2p
- * substrate's receiver-built record) pass through in the legacy shape so a
- * mixed-version network still renders; stoop no longer MINTS that shape.
+ * Legacy records (a pre-seal peer's `stoop-att://` item) pass through in the
+ * legacy shape so a mixed-version network still renders; stoop no longer MINTS
+ * that shape.
  */
 export function toWireShape(attachment) {
   if (!attachment || typeof attachment !== 'object') return null;

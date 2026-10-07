@@ -2054,7 +2054,6 @@ export default function CircleLauncherScreen({
         eventLog={eventLog}
         circles={circles}
         recipeStore={recipeStore}
-        onStoopEvent={bundle?.onStoopEvent}
         emitMemberProps={bundle?.emitMemberProps}
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}
@@ -2562,7 +2561,7 @@ function CircleDetail({
   readMembershipStatements = null,
   eventLog,
   circles = [],
-  recipeStore = null, onStoopEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -4102,7 +4101,7 @@ function CircleDetail({
         ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
-          <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
+          <CircleNoticeboard callSkill={stoopCall} media={circleMedia}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}

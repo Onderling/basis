@@ -116,8 +116,7 @@
     "pictures_error":     { "text": "{count} foto's konden niet verwerkt worden.", "doc": "Inline status when one or more images failed to resize. {count} is an integer." },
     "open_picture":       { "text": "Open foto", "doc": "ARIA label on a thumbnail in the feed. Triggers the modal that loads the full image." },
     "close":              { "text": "Sluiten", "doc": "Close button label on the attachment modal." },
-    "picture_loading":    { "text": "Foto ophalen…", "doc": "Modal status text shown while the full bytes are being fetched." },
-    "picture_pending":    { "text": "Foto wordt opgehaald — kan even duren als de afzender offline is.", "doc": "Modal status text shown when the requestAttachment skill returned `pending: true`. The fetch continues in the background." }
+    "picture_loading":    { "text": "Foto ophalen…", "doc": "Modal status text shown while the full bytes are being fetched." }
   },
   "menu": {
     "mute":     "Mute deze persoon",

@@ -34,6 +34,7 @@ import { getCircleVersionStore } from './circleVersioning.js';
 import { loadVerifyMappings } from '../../../basis/src/v2/mappingsLoader.js';
 import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 import { PERSON_NODE_STORE_OPTS } from '../../../basis/src/v2/personNodeStore.js';
+import { lazyOwnStore } from '../../../basis/src/v2/ownDevicesStore.js';
 // Shared contact/bot exposed-skill registry (feedback-extension) — web≡mobile core.
 import { createContactSkillRegistry } from '../../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../../basis/src/v2/contactThreadChannel.js';
@@ -308,6 +309,8 @@ export async function bootAgentBundle(opts = {}) {
       t: opts.t,
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
       ...PERSON_NODE_STORE_OPTS,
+      // …which is my OWN store (the own-devices scope): sealed, in AsyncStorage, back after a restart
+      ownStore: lazyOwnStore(opts.asyncStorage ? { dbName: 'cc-own-devices', asyncStorage: opts.asyncStorage } : null),
       chatVault,
       hostVault,
       ownerRootVault,

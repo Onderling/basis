@@ -190,8 +190,10 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
   /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
   async function askAbout(person, { viewPubKey, nonce, label }) {
     if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
-    const previous = threads.screenOfferOf(person);   // a second offer drops the first, and its screen is told
-    if (previous) { try { await tellRefused?.(previous.viewPubKey); } catch { /* the screen times out on its own */ } }
+    const previous = threads.screenOfferOf(person);   // a second offer drops the first, and its screen is told —
+    // unless it IS this screen (a reload, a second /scherm on the same browser): the screen asking now must not be the
+    // one told it was refused, or it gives up on the offer it just made
+    if (previous && previous.viewPubKey !== viewPubKey) { try { await tellRefused?.(previous.viewPubKey); } catch { /* the screen times out on its own */ } }
     const code = await screenCode(viewPubKey, nonce);
     threads.setScreenOffer(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm', until: now() + SCREEN_LINK_TTL_MS });
     const asked = await ask(person, { codes: codeChoices(code, rand), replaced: Boolean(previous) });

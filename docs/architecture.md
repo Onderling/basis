@@ -1464,6 +1464,10 @@ device.
 *How agents reach each other: transports are adapters behind one surface, and every hop is designed
 around "who learns what."*
 
+**Every way bytes move or wait, by what you want to do** — with who learns what and what uses it today — is one table:
+[`carrying-index.md`](conventions/carrying-index.md). Check it before building anything that sends, holds, fans, syncs,
+serves or wakes.
+
 **Routes, not reach-arounds.** Apps never construct a transport; the mesh builder composes them
 (local network, BLE, NKN, relay) behind one agent and a peer surface. In a circle, **your address is
 your signing key** — one derivation, so knowing where to reach someone *is* holding the key that

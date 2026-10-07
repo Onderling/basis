@@ -6,6 +6,9 @@
  * ask "is it on?" without waiting. Occurrences are never written here — they are read from the rows (`intentions.js`).
  */
 
+import { ulid } from '@onderling/item-store';
+import { signIntention } from './intentionSignature.js';
+
 const iso = (t) => new Date(t).toISOString();
 
 /**
@@ -14,9 +17,11 @@ const iso = (t) => new Date(t).toISOString();
  * @param {() => Promise<Array<{scope: string, store: import('@onderling/item-store').CircleItemStore}>>} [a.circles]
  *   the circle stores the host holds, each under its circle id
  * @param {string} a.actor          who writes the rows (the host)
+ * @param {(scope: string) => Promise<{identity: object, ref: string}|null>} [a.signerFor]   the author's circle key in a
+ *   circle: a row written into a circle's store carries its author's signature (a host runs no unsigned circle row)
  * @param {() => number} [a.now]
  */
-export function createIntentionBook({ store, circles = null, actor, now = Date.now }) {
+export function createIntentionBook({ store, circles = null, actor, signerFor = null, now = Date.now }) {
   /** @type {Map<string, object>} */
   const byId = new Map();
   /** A row's circle (absent: the host's own store). */
@@ -33,6 +38,12 @@ export function createIntentionBook({ store, circles = null, actor, now = Date.n
     return held;
   };
   const storeOf = (id) => (scopes.has(id) ? held.get(scopes.get(id)) : store);
+  /** The row signed by its author's circle key, when one is to be had (else as it is: a host will not run it). */
+  const signed = async (row, scope) => {
+    let s = null;
+    try { s = typeof signerFor === 'function' ? await signerFor(scope) : null; } catch { s = null; }
+    return s?.identity?.sign ? signIntention(row, s) : row;
+  };
 
   async function update(id, patch) {
     const where = storeOf(id);
@@ -77,11 +88,21 @@ export function createIntentionBook({ store, circles = null, actor, now = Date.n
         where = held.get(scope) ?? (await readCircles()).get(scope);
         if (!where) throw new Error(`intend: this host holds no circle ${scope}`);
       }
-      const row = {
+      let row = {
         type: 'intention', trigger, op, args, actsAs, state: 'open',
         ...(appOrigin ? { appOrigin } : {}), ...(label ? { label } : {}), ...(win !== undefined ? { window: win } : {}),
       };
+      // a circle row carries its author's signature over what it does and as whom (its id fixed first)
+      if (scope) row = await signed({ ...row, id: ulid() }, scope);
       return keep(await where.put(row, { by: actor }), scope);
+    },
+    /** Sign a circle row this host wrote and that has no signature yet (rows written before signing existed). */
+    async sign(id) {
+      const scope = scopes.get(id);
+      if (!scope) return null;
+      const row = (await held.get(scope)?.get(id)) ?? byId.get(id);
+      if (!row || row.authorSig) return row ?? null;
+      return keep(await held.get(scope).put(await signed(row, scope), { by: actor }), scope);
     },
     async cancel(id) { return update(id, { state: 'cancelled' }); },
     /** It ran now: a one-off row is finished, a recurring row's last run moves (its earlier occurrences are done). */

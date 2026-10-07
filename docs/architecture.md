@@ -192,9 +192,11 @@ The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOve
 - **A host ticks the rows of every store it holds, and across hosts the row is the truth.** The rule is that a planned
   row in a circle's store is held by every member and run by whichever host may; the runner reads every store its host
   holds (the own-devices store and each circle's) and reads them again each pass. A circle row's `actsAs` is a field
-  any member can write — the sync proves who sent a snapshot, not who wrote the row — so a host runs no circle row as a
-  person until the row carries its author's signature, verified against the key the roster binds to that person; the
-  box runs only the household's announce rows, as the household. When two hosts hold one row, the claim is the task
+  any member can write — the sync proves who sent a snapshot, not who wrote the row — so a circle row carries its
+  AUTHOR'S signature over `{id, actsAs, op, args, trigger}`, made with their circle key (`intentionSignature.js`), and a
+  host runs it as `actsAs` only when the signature verifies, the roster binds that key to the author, the row acts as
+  its author (or as the household, signed by the host itself, to announce), and the host acts for that person
+  (`circleRowGate.js`; on a household bot: a person whose row is, or is linked to, the author). When two hosts hold one row, the claim is the task
   lifecycle's compare-and-swap on the row, and the host that claimed it keeps it; the row's `lastRunAt` is what the
   other host sees; the `intention-done` entry is bound to its host and never travels — it is each host's own
   idempotency, never the cross-host truth.

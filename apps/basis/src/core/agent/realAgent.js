@@ -1122,11 +1122,12 @@ export async function createRealHouseholdAgent(opts = {}) {
         // unsigned mirror carry is deleted. The valve is built per publish call so it sees the task
         // emitter even though this wiring can run at boot, before the rails are handed the device log;
         // on a device-log composition a pre-emitter write REFUSES loudly instead of silently not-fanning.
-        // …and the composition hears that the circle's content changed (`opts.onCircleWrite`: a bot nudges its screens)
-        const wrote = () => { try { opts.onCircleWrite?.(id); } catch { /* a listener never breaks a write */ } };
+        // …and the composition hears what this node wrote (`opts.onCircleWrite(circleId, item | null, removedId?)`:
+        // the box's change feed — its event rows, its screens' nudge)
+        const wrote = (item, removedId) => { try { opts.onCircleWrite?.(id, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
         wireStoreMirror(circleStore, {
-          publishItem:        (item)          => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(); return r; },
-          publishItemRemoved: (rid, removed)  => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(); return r; },
+          publishItem:        (item)          => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(item); return r; },
+          publishItemRemoved: (rid, removed)  => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
         });
         reFanOwedChat(id);   // what a restart still owes this circle goes out again (idempotent)
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
@@ -3351,7 +3352,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       callSkill: (...a) => callSkill(...a),
       storeFor: (circleId) => (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null),
       // A landed snapshot that is a noticeboard post goes to the shell's bridge (stoop's index + notification).
-      onItemApplied: (circleId, item) => (typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item) : undefined),
+      // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
+      onItemApplied: async (circleId, item) => {
+        try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
+        return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item) : undefined;
+      },
     });
     taskEmit = makeTaskEmitter({
       rail: taskRail,

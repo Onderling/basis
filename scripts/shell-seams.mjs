@@ -60,6 +60,10 @@ export const SEAMS = Object.freeze([
   // The stores write behind a short debounce; a shell that goes away inside it loses the last change. Each shell flushes
   // the waiting saves when it leaves: a page on pagehide/hidden, the app on going to the background, the box on stop.
   { id: 'flush-on-exit', pattern: /flushPendingSaves\(/, why: 'a change made a moment before a reload, a closed tab, a backgrounded app or a restart is still there afterwards' },
+  // One place a host hears that an item it holds changed — its own write or a member's that landed — for its event rows
+  // and its screens' nudge. Only a host that runs planned work composes it today (the box); web and mobile join with
+  // their clock.
+  { id: 'change-feed', pattern: /createChangeFeed\(/, shells: ['box'], why: 'a change a member makes in their app reaches the bot\'s event rows and its screens, not only the bot\'s own writes' },
   { id: 'own-devices-store', pattern: /createOwnDevicesStore\(|lazyOwnStore\(/, shells: ['web', 'mobile', 'box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door

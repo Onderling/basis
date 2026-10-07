@@ -84,6 +84,7 @@ import { createHostTick } from '../src/v2/hostTick.js';
 import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
+import { createChangeFeed } from '../src/v2/changeFeed.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
@@ -247,11 +248,13 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const circleWrite = { fn: null };
+const itemLanded = { fn: null };
 const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  // the household's store changed: a bot nudges its connected screens (bound below, once the screens exist)
-  onCircleWrite: (circleId) => circleWrite.fn?.(circleId),
+  // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
+  onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
+  onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
   ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
   ownerRootVault: vault,
   chatVault,
@@ -1138,13 +1141,27 @@ if (tgToken || inboxDoor.bridge) {
     },
   });
   doorCallRef.fn = doorCall;
+  // ONE place this box hears that an item it holds changed — its own write or a member's that landed — handed to each
+  // consumer with the item before and after: the screens' nudge, the planned work's event rows.
+  const changeConsumers = [];
+  const heldStores = new Map();   // circle id → its store, read again when a circle is new here
+  const changeFeed = createChangeFeed({
+    storeFor: async (circleId) => {
+      if (!heldStores.has(circleId)) for (const c of await agent.heldCircleStores()) heldStores.set(c.scope, c.store);
+      return heldStores.get(circleId) ?? null;
+    },
+    consumers: changeConsumers,
+  });
+  await changeFeed.seedAll((await agent.heldCircleStores()).map((c) => c.scope));
+  circleWrite.fn = (circleId, item, removedId) => (removedId ? changeFeed.removed(circleId, removedId) : changeFeed.own(circleId, item));
+  itemLanded.fn = (circleId, item) => changeFeed.landed(circleId, item);
   if (screens) {
     // A household change reaches the connected screens as a nudge that names nothing; each reads again as its person.
     const nudge = createScreenNudge({
       listScreens: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
       send: (viewPubKey, payload) => agent.sendPeerMessage(viewPubKey, payload),
     });
-    circleWrite.fn = () => nudge.touched();
+    changeConsumers.push(() => nudge.touched());
     // The door's ops, to a connected screen: each call runs as the person its token names, through this door's own
     // call — the same gate as their typed line — and what a screen never gets is withheld at the kernel's door.
     const exposed = exposeDoorToScreens({ agent, catalogue: doorCatalogue.catalogue(), manifests: Object.values(doorCatalogue.manifestsByOrigin()), doorCall, users: botUsers });
@@ -1240,6 +1257,8 @@ if (tgToken || inboxDoor.bridge) {
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });
     hostTick.add('intentions', { every: 60_000, run: () => intentionRunner.pass() });
+    // ...and the rows a CHANGE fires (an event trigger), as the change happens
+    changeConsumers.push((change, o) => intentionRunner.onChange(change, o));
     // The model route, watched: a model the provider stopped serving, or an account over its limit, reaches the admin
     if (built?.listModels) {
       modelWatch.ref = createModelWatch({

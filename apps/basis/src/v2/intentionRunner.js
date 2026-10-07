@@ -23,7 +23,7 @@
  * other host leaves the row from then on.
  */
 import { claim as claimItem } from '@onderling/item-store';
-import { due } from './intentions.js';
+import { due, eventOccurrences } from './intentions.js';
 
 /** The device-log kind a run leaves behind (declared in the entry-kind table). */
 export const INTENTION_DONE_KIND = 'intention-done';
@@ -112,7 +112,26 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
     tell({ ...base, outcome, reason });
   }
 
+  /** How many event occurrences are running now: what the host writes meanwhile fires no event row (no loops). */
+  let eventDepth = 0;
+
   return {
+    /**
+     * A change to an item the host holds (its own write, or one that landed from another member): the event rows it
+     * fires, each once (`<row>:<item>:<version>`), through the same run as a timed row — the gate, the claim, the mark.
+     * @param {{circleId: string, before: object|null, after: object}} change
+     * @param {{origin?: 'own'|'landed'}} [opts]
+     */
+    async onChange(change, { origin = 'landed' } = {}) {
+      if (origin === 'own' && eventDepth > 0) return;
+      const list = eventOccurrences({ rows: book.rows(), change, done: marks.ids() });
+      for (const o of list) {
+        if (inFlight.has(o.id)) continue;
+        inFlight.add(o.id);
+        eventDepth += 1;
+        try { await runOne(o); } finally { eventDepth -= 1; inFlight.delete(o.id); }
+      }
+    },
     /** One pass: every due occurrence, each once. */
     async pass() {
       // read again: a row a member's device wrote into a circle's store reaches this host by sync, not by this book

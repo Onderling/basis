@@ -189,3 +189,29 @@ describe('two hosts holding one circle row', () => {
     expect(b.fired).toEqual([expect.objectContaining({ outcome: 'elsewhere', reason: 'claimed by host-a' })]);
   });
 });
+
+describe('event rows, on a change', () => {
+  const eventRow = { trigger: { event: { kind: 'added', type: 'calendar-event' } }, op: 'announceChange', appOrigin: 'assistant', args: {}, actsAs: 'household', label: 'announce' };
+  const appt = { id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-12T12:00:00.000Z', clock: 1 };
+
+  it('a change fires the matching rows once, through the same run, with the change in its args', async () => {
+    const w = await world();
+    await w.book.intend(eventRow);
+    await w.runner.onChange({ circleId: 'c1', before: null, after: appt });
+    await w.runner.onChange({ circleId: 'c1', before: null, after: appt });   // the same change, delivered twice
+    expect(w.calls).toHaveLength(1);
+    expect(w.calls[0]).toMatchObject({ op: 'announceChange', actsAs: 'household', args: { change: { circleId: 'c1', itemId: 'e1' } } });
+    expect(w.fired).toEqual([expect.objectContaining({ outcome: 'ran', occurrence: expect.stringMatching(/:e1:1$/) })]);
+  });
+
+  it('what a host writes while an event row runs fires no event row (no loops); a person\'s write does', async () => {
+    let feed;
+    const w = await world({ run: async () => { await feed({ circleId: 'c1', before: null, after: { ...appt, id: 'e2' } }, { origin: 'own' }); return { ok: true }; } });
+    feed = (c, o) => w.runner.onChange(c, o);
+    await w.book.intend(eventRow);
+    await w.runner.onChange({ circleId: 'c1', before: null, after: appt }, { origin: 'own' });
+    expect(w.calls.map((c) => c.args.change.itemId)).toEqual(['e1']);
+    await w.runner.onChange({ circleId: 'c1', before: null, after: { ...appt, id: 'e3' } }, { origin: 'own' });
+    expect(w.calls.map((c) => c.args.change.itemId)).toEqual(['e1', 'e3']);
+  });
+});

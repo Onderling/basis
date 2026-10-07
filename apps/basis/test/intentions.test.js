@@ -4,7 +4,7 @@
  * is its row (`at`) or its row and slot (`every`), and a done-mark under that id is what takes it off.
  */
 import { describe, it, expect } from 'vitest';
-import { upcoming, due, occurrenceId } from '../src/v2/intentions.js';
+import { upcoming, due, occurrenceId, eventOccurrences } from '../src/v2/intentions.js';
 import { validate } from '@onderling/item-types';
 
 const TZ = 'Europe/Amsterdam';
@@ -98,5 +98,35 @@ describe('upcoming and due', () => {
     const list = upcoming({ rows: [weekly, a], done: new Set(), now: at('2026-10-10T10:00:00Z'), tz: TZ, horizon: 7 * D });
     expect(list.map((o) => o.rowId)).toEqual(['a', 'r1']);
     expect(list[1]).toMatchObject({ op: 'sendWeekOverview', appOrigin: 'assistant', args: {}, actsAs: 'telegram:1', label: 'weekoverzicht' });
+  });
+});
+
+describe('event triggers', () => {
+  const row = (event, extra = {}) => ({ id: 'r1', type: 'intention', state: 'open', trigger: { event }, op: 'announceChange', appOrigin: 'assistant', args: { kinds: ['new'] }, actsAs: 'household', ...extra });
+  const appt = (v) => ({ id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-12T12:00:00.000Z', clock: v, ...(v > 1 ? { startsAt: '2026-10-12T13:00:00.000Z' } : {}) });
+
+  it('an "added" row fires for a new item of its type, in its circle', () => {
+    const list = eventOccurrences({ rows: [row({ kind: 'added', type: 'calendar-event' })], change: { circleId: 'c1', before: null, after: appt(1) } });
+    expect(list).toEqual([expect.objectContaining({ id: 'r1:e1:1', rowId: 'r1', op: 'announceChange', actsAs: 'household', args: { kinds: ['new'], change: { circleId: 'c1', itemId: 'e1', before: null, after: appt(1) } } })]);
+  });
+
+  it('a "changed" row fires only when its field changed; other types, other circles and closed rows do not fire', () => {
+    const moved = { circleId: 'c1', before: appt(1), after: appt(2) };
+    expect(eventOccurrences({ rows: [row({ kind: 'changed', type: 'calendar-event', field: 'startsAt' })], change: moved })).toHaveLength(1);
+    expect(eventOccurrences({ rows: [row({ kind: 'changed', type: 'calendar-event', field: 'state' })], change: moved })).toEqual([]);
+    expect(eventOccurrences({ rows: [row({ kind: 'changed', type: 'task' })], change: moved })).toEqual([]);
+    expect(eventOccurrences({ rows: [row({ kind: 'changed', circleId: 'c2' })], change: moved })).toEqual([]);
+    expect(eventOccurrences({ rows: [row({ kind: 'changed' }, { state: 'cancelled' })], change: moved })).toEqual([]);
+    expect(eventOccurrences({ rows: [row({ kind: 'added' })], change: moved })).toEqual([]);
+  });
+
+  it('a change already acted on (its done-mark) does not fire again; time rows never fire on a change', () => {
+    const change = { circleId: 'c1', before: null, after: appt(1) };
+    expect(eventOccurrences({ rows: [row({ kind: 'added' })], change, done: new Set(['r1:e1:1']) })).toEqual([]);
+    expect(eventOccurrences({ rows: [{ ...row({}), trigger: { every: 'day', at: '08:00' } }], change })).toEqual([]);
+  });
+
+  it('a row with an event trigger has no moments in time', () => {
+    expect(upcoming({ rows: [row({ kind: 'added' })], now: Date.parse('2026-10-11T10:00:00Z'), tz: 'Europe/Amsterdam' })).toEqual([]);
   });
 });

@@ -92,12 +92,16 @@ test('a new commit is checked out, built, started, recorded with its tag', () =>
   assert.equal(b.state().repos.mono.tag, 'v0.2.0');
   assert.ok(b.calls().some((c) => /build --pull thing/.test(c)), 'built the changed repo\'s role');
   assert.ok(b.calls().some((c) => /up -d --remove-orphans/.test(c)));
+  // a healthy update trims the build cache to its budget (every release adds one, and a full disk fails the next build)
+  assert.ok(b.calls().some((c) => /builder prune -f --max-used-space 5gb/.test(c)), 'the build cache is trimmed');
+  assert.ok(b.calls().some((c) => /image prune -f/.test(c)), 'dangling images are dropped');
 });
 
 test('a red health gate rolls back to the previous sha and says so', () => {
   const b = makeBox();
   b.run({ FORCE: '1' });
   const before = b.headOfBox();
+  b.clearCalls();
   const bad = b.commit('v3 breaks');
   writeFileSync(join(b.box, 'RED'), '');         // the role's health script fails while this exists
   const r = b.run();
@@ -107,6 +111,7 @@ test('a red health gate rolls back to the previous sha and says so', () => {
   assert.equal(b.state().rolledBack, true);
   assert.equal(b.state().failedRole, 'thing');
   assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /health gate RED \(role: thing\)/);
+  assert.ok(!b.calls().some((c) => /builder prune/.test(c)), 'nothing is pruned after a rollback (the cache is what the next try reuses)');
   // a tick inside the retry window leaves the failed release alone: no rebuild, no second alert (the timer runs
   // every minute; a release that failed is tried again at the old five-minute rhythm, RETRY_AFTER)
   b.clearCalls();
@@ -311,7 +316,7 @@ test('a release that touches nothing in a role\'s declared paths does not rebuil
   assert.equal(r.status, 0, r.stderr);
   assert.equal(b.headOfBox(), unrelated, 'the release is applied');
   assert.equal(b.state().repos.mono.sha, unrelated, 'and recorded');
-  assert.ok(!b.calls().some((c) => /build/.test(c)), `nothing rebuilt: ${b.calls().join(' | ')}`);
+  assert.ok(!b.calls().some((c) => /\bbuild\b/.test(c)), `nothing rebuilt: ${b.calls().join(' | ')}`);   // not `builder prune`
   assert.ok(b.calls().some((c) => /up -d/.test(c)), 'the stack is still brought up');
   assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /no role's build paths changed/);
 

@@ -262,13 +262,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const out = [tp('circle.bot.planned_head'), ...(lines.length ? lines.map((l) => `• ${l.text}`) : [tp('circle.bot.planned_none')])];
     if (!remindersOn) out.push(tp('circle.bot.planned_reminders_off'));
     // what a change tells others — the household's announce rows, for everyone (each kind a row it can switch off)
-    const announce = book.rows().filter(isAnnounceRow);
-    if (announce.length) {
-      const on = ANNOUNCE_ROWS.filter((spec) => announce.some((r) => r.label === spec.label && r.state === 'open'));
-      out.push(on.length
-        ? tp('circle.bot.planned_announce', { which: on.map((spec) => tp(`circle.bot.planned_${spec.label.replace(/-/g, '_')}`)).join(', ') })
-        : tp('circle.bot.planned_announce_none'));
-    }
+    const which = announcingWhich(tp);
+    if (which !== null) out.push(which ? tp('circle.bot.planned_announce', { which }) : tp('circle.bot.planned_announce_none'));
     if (rows.find((r) => r.id === person)?.role === 'admin') out.push('', tp('circle.bot.planned_household', { rules: describeRules(household, tp) }));
     return { ok: true, message: out.join('\n') };
   }
@@ -405,11 +400,19 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: true, message: t('circle.bot.import_done', { ...r.done }) + (missed ? `\n${t('circle.bot.import_missed', { count: missed })}` : '') };
   }
 
+  /** Which changes the household's rows announce, in words ('' when none is on), or null when it has none at all. */
+  function announcingWhich(tp = t) {
+    const rows = book?.rows?.().filter(isAnnounceRow) ?? [];
+    if (!rows.length) return null;
+    return ANNOUNCE_ROWS.filter((spec) => rows.some((r) => r.label === spec.label && r.state === 'open'))
+      .map((spec) => tp(`circle.bot.planned_${spec.label.replace(/-/g, '_')}`)).join(', ');
+  }
+
   async function settingsOp(change, person, caller, ctx) {
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: leadOf(reminderRulesFrom(of(REMINDER_RULES_KEY))), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)), app: inAppModeFrom(of(HOUSEHOLD_IN_APP_KEY)) });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: leadOf(reminderRulesFrom(of(REMINDER_RULES_KEY))), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)), app: inAppModeFrom(of(HOUSEHOLD_IN_APP_KEY)), announce: announcingWhich() ?? '—' });
     };
     const [what, value, ...more] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
@@ -443,6 +446,16 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!layer) return usage;
       const next = layer.mode === 'add' ? [...new Set([...(await householdRules()), ...layer.rules])] : layer.rules;
       return set(REMINDER_RULES_KEY, reminderRulesValue(next));
+    }
+    // what a change tells others: the household's announce row of that kind, cancelled (off) or open again (on)
+    if (what === 'announce') {
+      const label = { appointments: 'announce-appointments', chores: 'announce-chores' }[value];
+      const mode = more[0];
+      if (!label || !['on', 'off'].includes(mode)) return usage;
+      const row = book?.rows?.().find((r) => isAnnounceRow(r) && r.label === label);
+      if (!row) return { ok: false, error: { code: 'not-here', message: t('circle.bot.settings_announce_none_here') } };
+      try { await (mode === 'off' ? book.cancel(row.id) : book.reopen(row.id)); } catch { return { ok: false, error: { code: 'not-saved', message: t('circle.bot.settings_failed') } }; }
+      return { ok: true, message: `${personT(person)('circle.bot.settings_saved')}\n\n${await current()}` };
     }
     if (what === 'quiet') {
       if (!isQuietHours(value)) return usage;

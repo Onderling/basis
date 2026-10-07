@@ -15,6 +15,7 @@ function setup() {
   const told = [];
   const privately = [];
   const asked = [];
+  const refused = [];
   const admitted = new Set(['telegram:1']);
   let reachable = true;
   const screens = createBotScreens({
@@ -27,10 +28,11 @@ function setup() {
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
     notify: (person, key, params) => { told.push({ person, key, params }); },
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
+    tellRefused: async (k) => { refused.push(k); },
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: 'wss://relay.example' }),
     now: () => clock,
   });
-  return { threads, screens, grants, told, privately, asked, admitted, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
+  return { threads, screens, grants, told, privately, asked, refused, admitted, unreachable: () => { reachable = false; }, tick: (ms) => { clock += ms; } };
 }
 const linkText = (link, minutes) => `link ${link} (${minutes} min)`;
 const start = async (ctx, person = 'telegram:1') => { const r = await ctx.screens.start(person, linkText); return r.ok ? ctx.privately.at(-1).text : null; };
@@ -42,6 +44,35 @@ const connect = async (ctx, v, person = 'telegram:1') => {
 const nonceOf = (text) => parseScreenLink(/https?:\/\/\S+/.exec(text)[0]).nonce;
 
 describe('a person connects a screen to the bot', () => {
+  it('the SAME screen offering again (a reload, a second /scherm) is not refused by its own earlier offer; another screen is', async () => {
+    const ctx = setup();
+    const n1 = nonceOf(await start(ctx));
+    expect(await ctx.screens.offer({ from: 'V', viewPubKey: 'V', nonce: n1 })).toMatchObject({ ok: true, pending: true });
+    const n2 = nonceOf(await start(ctx));
+    expect(await ctx.screens.offer({ from: 'V', viewPubKey: 'V', nonce: n2 })).toMatchObject({ ok: true, pending: true });
+    expect(ctx.refused, 'the screen that is asking is not told it was refused').toEqual([]);
+    // the second offer REPLACED the first: what the person is asked about is the second one, so its code grants…
+    expect(ctx.threads.screenOfferOf('telegram:1')?.nonce).toBe(n2);
+    expect(await ctx.screens.confirm('telegram:1', await screenCode('V', n2), { isPrivate: true })).toMatchObject({ ok: true });
+    expect(ctx.grants.map((g) => g.viewPubKey)).toEqual(['V']);
+    // a DIFFERENT screen's offer still drops the earlier one, and that earlier screen is told
+    const n3 = nonceOf(await start(ctx));
+    await ctx.screens.offer({ from: 'W', viewPubKey: 'W', nonce: n3 });
+    const n4 = nonceOf(await start(ctx));
+    await ctx.screens.offer({ from: 'X', viewPubKey: 'X', nonce: n4 });
+    expect(ctx.refused).toEqual(['W']);
+  });
+
+  it('…and the first offer\'s code no longer confirms once the same screen offered again', async () => {
+    const ctx = setup();
+    const n1 = nonceOf(await start(ctx));
+    await ctx.screens.offer({ from: 'V', viewPubKey: 'V', nonce: n1 });
+    const n2 = nonceOf(await start(ctx));
+    await ctx.screens.offer({ from: 'V', viewPubKey: 'V', nonce: n2 });
+    expect(await ctx.screens.confirm('telegram:1', await screenCode('V', n1), { isPrivate: true })).toMatchObject({ ok: true, declined: true });
+    expect(ctx.grants).toEqual([]);
+  });
+
   it('the link goes to the person privately; it carries the bot, the relay and a nonce — kept only as its hash', async () => {
     const ctx = setup();
     const r = await ctx.screens.start('telegram:1', linkText);

@@ -74,7 +74,7 @@ addresses, sizes, timing and ciphertext — never content.
 |---|---|---|---|---|---|
 | keep a message for an address that is offline, at the relay | the relay's forward queue | `packages/relay/src/ForwardQueue.js` (+ `SqliteForwardStore`) | the relay: addresses, size, timing, ciphertext; 24 h | `relay/server.js` (every `RelayTransport`) | anything longer than a day (→ the device's own hold) |
 
-## Inert — built, reached by nothing in production (measured 2026-10-07; each is an adopt-or-retire decision for Frits)
+## Inert — built, reached by nothing in production (measured 2026-10-07; all KEPT, Frits 2026-10-07 — before building something like them, use these)
 
 | What it would do | Mechanism | Lives in | Only reached by |
 |---|---|---|---|

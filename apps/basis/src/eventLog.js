@@ -87,6 +87,9 @@ export const RETENTION_MS = RETENTION_DEFAULTS.chat;
  * pull-me note (the next slice) needs.
  */
 
+/** The kinds a person's own purge reaches: their conversations — with people, and with an assistant. */
+const PURGEABLE_KINDS = new Set(['chat-message', 'assistant-turn']);
+
 /** App tag for log entries written by the system lane (not a user/peer app). */
 export const SYSTEM_APP = 'system';
 
@@ -355,21 +358,25 @@ export class EventLog {
   /**
    * EXPLICITLY delete conversation entries older than `olderThanMs` — the user's own destructive act,
    * distinct from retention POLICY. Chat messages are record-class (never auto-expire); this is the one
-   * deliberate way they leave the device. Touches ONLY the conversation kind: membership, governance,
-   * the audit trail and its summaries are never purgeable through it. Optionally scoped to one circle.
+   * deliberate way they leave the device. Touches ONLY the conversation kinds — a person's chat and their turns
+   * with an assistant (`assistant-turn`, which also age out on the chat window): membership, governance, the audit
+   * trail and its summaries are never purgeable through it. Optionally scoped to one circle, or to ONE person's
+   * thread with an assistant (`threadId` — their turns only, never a circle's line that carries the same id; this is
+   * `/vergeet` at the household bot's door). `olderThanMs: 0` is "everything until now".
    * Persists the shrunk log; returns how many were deleted (the confirmation the UI reports back).
    *
-   * @param {{olderThanMs: number, circleId?: string}} args
+   * @param {{olderThanMs: number, circleId?: string, threadId?: string}} args
    * @returns {number} the number of deleted conversation entries
    */
-  purgeConversation({ olderThanMs, circleId = null } = {}) {
+  purgeConversation({ olderThanMs, circleId = null, threadId = null } = {}) {
     if (typeof olderThanMs !== 'number' || !Number.isFinite(olderThanMs) || olderThanMs < 0) return 0;
     const cutoff = this.#now() - olderThanMs;
     const before = this.#events.length;
     this.#events = this.#events.filter((e) => !(
-      e.type === 'chat-message'
-      && e.ts < cutoff
+      PURGEABLE_KINDS.has(e.type)
+      && e.ts <= cutoff
       && (circleId == null || circleOfEntry(e) === circleId)
+      && (threadId == null || (e.payload?.threadId === threadId && circleOfEntry(e) == null))
     ));
     const deleted = before - this.#events.length;
     if (deleted) this.#persist(this.#events.slice()).catch(() => {});

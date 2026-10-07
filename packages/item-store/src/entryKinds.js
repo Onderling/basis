@@ -92,6 +92,11 @@ export const ENTRY_KINDS = Object.freeze({
   ask:               K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),   // legacy content kinds: demo seed + noticeboard intents, never a signed statement
   offer:             K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),
   lend:              K(LANE.HUMAN, true,  RETAIN.CHAT, false, LOCAL_BINDING),
+  // A person's turn with an assistant (the household bot's door): their words and its replies. NOT the record — what
+  // a turn DID (a list line, an appointment, a setting) is a store row and stays; the words are plumbing to it, which is
+  // the chat class by its own definition. The record rule is for people's conversations with each other. Written by
+  // the device that hosts the door, about the one person whose thread it is; never accepted from a peer, never carried.
+  'assistant-turn':  K(LANE.HUMAN, false, RETAIN.CHAT, false, { signs: SIGNS.LOCAL, subject: SUBJECT.PERSON, accepts: ACCEPTS.NONE, syncPolicy: SYNC.NONE }),
 
   // ── system lane ───────────────────────────────────────────────────────────
   // `governance` carries ONE per-event exception, which stays explicit rather than becoming a second

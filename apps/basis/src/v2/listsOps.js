@@ -11,6 +11,7 @@
  * A list lives in the circle's own store, like a task or a message, so it rides the one fan-out path and
  * obeys the circle's data-move branch. Nothing here knows about sharing; that is the point.
  */
+import { parseDateInput } from '@onderling-app/calendar';
 import { reminderLayerFromWords, describeRules } from './reminderWords.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -316,11 +317,22 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
 
     editEntry: async (args) => {
       const text = String(args?.text ?? '').trim();
-      if (!text) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      // a new time: an appointment moves (keeping its length), a chore gets a new due — the line's time, as its words
+      const when = args?.when ? parseDateInput(args.when) : null;
+      if (args?.when && !when) return { ok: false, error: t('circle.lists.need_list_and_text') };
+      if (!text && !when) return { ok: false, error: t('circle.lists.need_list_and_text') };
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
-      await svc.storeFor(at.circleId).put({ ...at.entry, text }, { by: localActor });
-      return { ok: true, message: t('circle.lists.edited', { text, name: at.target.text ?? '' }) };
+      const timed = {};
+      if (when && at.entry.type === 'calendar-event') {
+        const length = Math.max(0, new Date(at.entry.endsAt ?? at.entry.startsAt).getTime() - new Date(at.entry.startsAt).getTime());
+        Object.assign(timed, { startsAt: when, endsAt: new Date(new Date(when).getTime() + (length || 3_600_000)).toISOString() });
+      } else if (when) {
+        Object.assign(timed, { dueAt: when });
+      }
+      const words = text || at.entry.text || at.entry.title || '';
+      await svc.storeFor(at.circleId).put({ ...at.entry, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: localActor });
+      return { ok: true, message: t('circle.lists.edited', { text: words, name: at.target.text ?? '' }) };
     },
 
     /**

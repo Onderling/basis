@@ -31,8 +31,9 @@ addresses, sizes, timing and ciphertext — never content.
 | put an item in a circle so every member has it (tasks, lists, appointments, the noticeboard) | the circle's store, carried as signed snapshots on the task lane | `apps/basis/src/v2/taskRail.js` (`routeTaskMirror`, `onItemApplied`), `noticeboardCarry.js`, `noticeboardFan.js` | each member's device: the signed item; the relay: size and timing | `core/agent/realAgent.js`, `circleLanes.js` (every shell) | one person only (→ contact thread) |
 | say who joined, left or was evicted | membership statements on the membership lane | `membershipRail.js`; fan: stoop `broadcastCircleMembership` | every member; an evicted person also gets their own evict | `realAgent.js`, `circleLanes.js` | anything but membership |
 | carry chat, governance, keys, a circle's rules or policy | the statement lanes | `chatRail.js`, `keyRail.js`, `governanceAppWiring.js`, `policyUpdateLane.js`, `rulesUpdateLane.js` | every member | `realAgent.js`, `circleLanes.js`, mobile `CircleLauncherScreen.js` | content for one person |
-| catch up on what I missed while offline | pull-all (governance) and windowed frontier replay (tasks, chat) | `governanceCatchUp.js`, `frontierReplay.js`, `catchUpTargets.js` | the peer asked learns who asked and their frontier | `realAgent.js`, `circleLanes.js`, `enrollOffer.js`, mobile `ChatScreen.js` | a live push (→ the lanes) |
+| catch up on what I missed while offline | pull-all (governance) and windowed frontier replay (tasks, chat) | `governanceCatchUp.js`, `frontierReplay.js`, `catchUpTargets.js` | the peer asked learns who asked and their frontier | `realAgent.js`, `circleLanes.js`, `enrollOffer.js` (the shells kick it through the agent) | a live push (→ the lanes) |
 | hold a sealed photo or file for the members who hold its key | the blob bucket behind a gate (token → ACL → presigned URL; the client opens) | `@onderling/blob-gateway` (`uploadBlob`, `openBlob`, `gatekeeper`), `circleMediaGateway.js` | the bucket: ciphertext and size; the gate: who holds a token | `core/handlers/mediaEmbed.js`, `profileMediaReseal.js`, mobile `CircleLauncherScreen.js` | serving plaintext (→ link-sealed blob) |
+| be told when another agent publishes on a topic (offer matching) | protocol pub/sub — the publisher keeps the subscribers (in memory, no offline hold, not sealed by the secure layer) | `packages/core/src/protocol/pubSub.js` (`publish`, `subscribe`) | the publisher learns its subscribers | `packages/offering-match/src/OfferingMatch.js` (built by stoop's and tasks' agents) | anything that must reach an offline member (→ the lanes) |
 
 ## Between me and one other person
 
@@ -40,9 +41,9 @@ addresses, sizes, timing and ciphertext — never content.
 |---|---|---|---|---|---|
 | talk one-to-one with a contact or a bot | contact threads over the points on the contact card | `contactThreadChannel.js` | the relay: address and size; the other end: the text | `bin/device-runner.mjs`, mobile `agentBundle.js`, `src/index.js` | a circle (→ the lanes) |
 | have a bot write first (a reminder, a link sent privately) | the door's reach to a person's own chat | `doorReach.js` (`createPersonReach`) | Telegram learns the text on a Telegram door; the inbox path learns the turn | `bin/device-runner.mjs` | anything a person did not ask the bot for |
-| call a skill on another agent (an op, with a token) | task exchange (A2A-style) | `packages/core/src/protocol/taskExchange.js`, `secure-agent/peerSkillCalls.js` | the callee learns the op, its args and the token | `core/Agent.js`, the box (`device-runner.mjs`), `screenView.js`, `botFeeds.js` (the agenda link's `feed.put`) | a broadcast |
+| call a skill on another agent (an op, with a token) | task exchange (A2A-style) | `packages/core/src/protocol/taskExchange.js`, `secure-agent/peerSkillCalls.js` (`peer.invoke`) | the callee learns the op, its args and the token | `core/src/Agent.js`, the box (`bin/device-runner.mjs`), `screenView.js`, the box's agenda link through the runner (`feed.put`) | a broadcast |
 | let another person's agent act for me on one task | a task grant | `packages/core/src/permissions/TaskGrant.js` | the holder learns the scope | `apps/tasks-v0/src/Agent.js` (loaded by `realAgent.js`), `mandate.js`, mobile `CircleLauncherScreen.js` | standing access (→ surface grants) |
-| ask the people in the room (Nearby) | the nearby ask channel over the local network | `nearbyAskChannel.js` | any peer on the LAN: the ask's text and tags | `nearbyRoomBinding.js` (mobile `agentBundle.js`, `CircleLauncherScreen.js`), `src/index.js` | anything private |
+| ask the people in the room (Nearby) | the nearby ask channel over the local network | `nearbyAskChannel.js` | any peer on the LAN: the ask's text and tags | `nearbyRoomBinding.js` (composed by the mobile shell and `src/index.js`) | anything private |
 
 ## Between my own devices
 
@@ -52,13 +53,13 @@ addresses, sizes, timing and ciphertext — never content.
 | make a circle I joined appear on my other devices | circle follow | `circleFollowSync.js` | my devices: the circle's id, handle, address and relays | `realAgent.js` | other people |
 | keep my own rows (my appointments, my planned work) on all my devices | the own-devices store, on the task lane under its own scope, fanned by the sibling carry | `ownDevicesStore.js` (+ `grantsRail.js`'s sibling-gated catch-up) | my devices only; a household bot has no siblings, so there it stays local | `bin/device-runner.mjs`, `realAgent.js`, mobile `agentBundle.js`, `assistantOps.js` | anything a circle should see |
 | back up my device's log to my pod, and let a connected screen read its slice | the history mirror and view lanes | `historyMirror.js` (`provisionHistoryMirror`), `surfaceGrants.js` (`viewLaneId`), `surfaceNudge.js` | the pod: ciphertext and batch sizes | `realAgent.js`; only web hands it a provider (`circleApp.js`); off by default | live traffic |
-| write through to my pod (registry, settings, a shared-pod circle) | pod write-through | `registryCarrier.js`; stoop's pod writes | the pod: sealed blobs under opaque names | `realAgent.js`, mobile `core/circlePods.js`, web `circleApp.js` | anything that must reach another person live |
+| write through to my pod (registry, settings, a shared-pod circle) | pod write-through | `registryCarrier.js`; stoop's pod writes (`stoopPodWrite`) | the pod: sealed blobs under opaque names | `realAgent.js`, mobile `core/circlePods.js`, web `circleApp.js` | anything that must reach another person live |
 
 ## To a reader that is no agent
 
 | I want to… | Mechanism | Lives in | Who learns what | Used today by | Not for |
 |---|---|---|---|---|---|
-| serve something at a link to a program that holds no key (a calendar app) | a link-sealed blob in the companion's bucket, opened at serve time with the key the request brings (`/feed/<id>.<k>.ics`) | `@onderling/blob-gateway` `linkSeal.js`; companion `feedShelf.js` | the companion: what it serves, while it serves it; at rest only ciphertext; whoever holds the link reads it | companion `index.js` (when `COMPANION_FEEDS` is on); the bot's agenda link (`botFeeds.js`, `personFeed.js`) | anything an agent could fetch itself (→ the blob bucket) |
+| serve something at a link to a program that holds no key (a calendar app) | a link-sealed blob in the companion's bucket, opened at serve time with the key the request brings (`/feed/<id>.<k>.ics`) | `@onderling/blob-gateway` `linkSeal.js` (`sealForLink`); companion `feedShelf.js` | the companion: what it serves, while it serves it; at rest only ciphertext; whoever holds the link reads it | `companion-node/src/index.js` (when `COMPANION_FEEDS` is on); the bot's agenda link (`personFeed.js` seals it, the bot puts it) | anything an agent could fetch itself (→ the blob bucket) |
 
 ## Inside one host
 
@@ -72,20 +73,19 @@ addresses, sizes, timing and ciphertext — never content.
 
 | I want to… | Mechanism | Lives in | Who learns what | Used today by | Not for |
 |---|---|---|---|---|---|
-| keep a message for an address that is offline, at the relay | the relay's forward queue | `packages/relay/src/ForwardQueue.js` (+ `SqliteForwardStore`) | the relay: addresses, size, timing, ciphertext; 24 h | `relay/server.js` (every `RelayTransport`) | anything longer than a day (→ the device's own hold) |
+| keep a message for an address that is offline, at the relay | the relay's forward queue | `packages/relay/src/ForwardQueue.js` (+ `SqliteForwardStore`) | the relay: addresses, size, timing, ciphertext; 24 h | `relay/src/server.js` (every `RelayTransport`) | anything longer than a day (→ the device's own hold) |
 
 ## Inert — built, reached by nothing in production (measured 2026-10-07; all KEPT, Frits 2026-10-07 — before building something like them, use these)
 
 | What it would do | Mechanism | Lives in | Only reached by |
 |---|---|---|---|
-| subscribe across agents to a topic | protocol pub/sub | `packages/core/src/protocol/pubSub.js` | wired in `core/Agent.js` and published to by `ReachabilityOracle`, but nothing in production subscribes |
 | pub/sub for skills | `SkillsPubSub` | `packages/core/src/SkillsPubSub.js` | the core index re-export |
 | stream a task's output | streaming | `packages/core/src/protocol/streaming.js` | the core index re-export |
 | go through a third agent | the hop tunnel | `packages/core/src/routing/hopTunnel.js`, `callWithHop.js` | `mesh-demo`, `sdk-smoke` (its seal, `security/tunnelSeal.js`, is live: task exchange, `tunnelReceiveSealed`, the link seal) |
 | fetch from several recipients at once | the relay's multi-recipient queue | `packages/relay/src/MultiRecipientQueue.js` | no client sends `multi-request` |
 | drop sealed mail for an away owner at a companion | the sealed inbox | `apps/companion-node/src/sealedInbox.js` | tests (`boot.js` never turns it on) |
 | serve the photo edge over HTTP | the blob gate's HTTP mount | `blob-gateway/httpGate.js`, `relay/blobGateMount.js`, companion `mediaEdge.js` | tests (no shipped boot passes a `blobGate`) |
-| carry items the old way | the secure-mesh envelope adapter | `packages/core/src/sync/secureMeshEnvelopeAdapter.js` | half: its SEND is superseded (task and noticeboard writes go through the task lane), its INBOUND handler is still wired in `realAgent.js` — a retire candidate; probe what still arrives through it first |
+| carry items the old way | the secure-mesh envelope adapter | `apps/basis/src/core/sync/secureMeshEnvelopeAdapter.js` | half: its SEND is superseded (task and noticeboard writes go through the task lane), its INBOUND handler is still wired in `realAgent.js` — a retire candidate; probe what still arrives through it first |
 | BLE, MQTT transports | the transports | `@onderling/transports` | `mesh-demo` (basis builds them with `ble: false`) |
 
 **Transports actually built by the shells:** the relay WebSocket everywhere; NKN on web (when its script loads) and

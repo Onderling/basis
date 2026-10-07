@@ -160,6 +160,14 @@ if apply "${changed[@]}" && failed="$(health_gate)"; then
   write_state false
   for name in "${changed[@]}"; do rm -f "$BOX_DIR/.refused-$name" "$BOX_DIR/.abandoned-$name"; done
   log "updated: ${changed[*]} — healthy"
+  # Every release builds an image and leaves its build cache behind; on the household tablet that reached 25 GB of a
+  # 56 GB disk in a month (2026-10-08), and a full disk fails the NEXT update's build. So after a healthy update the
+  # cache is trimmed to a budget (BOX_BUILD_CACHE_MAX, default 5gb — enough for the next build to reuse layers) and
+  # dangling images go. Best-effort: never fails an update. Not after a rollback: that cache is what the retry reuses.
+  cache_max="${BOX_BUILD_CACHE_MAX:-5gb}"
+  $DOCKER builder prune -f --max-used-space "$cache_max" >/dev/null 2>&1 \
+    || $DOCKER builder prune -f --keep-storage "$cache_max" >/dev/null 2>&1 || true   # older Docker: --keep-storage
+  $DOCKER image prune -f >/dev/null 2>&1 || true
   exit 0
 fi
 

@@ -17,6 +17,7 @@
  * `apps/basis/manifest.js`.
  */
 
+import { PERSON_WEEK_OP, personWeekCard } from '../v2/personWeekOverview.js';
 import { buildFileShareEnvelope } from './handlers/fileShare.js';
 import { describeFilter }    from '../filter.js';
 import { buildEmbed }        from '../embed.js';
@@ -77,6 +78,7 @@ export function createLocalBuiltins({
   mediaGateway,               // media — { bucket, sealer, opener?, keyRef? } (blob-gateway seams; injected by composition)
   encodeImage,                // media — web canvas encoder (attachmentEncoder.encodeImageFile); optional
   storeMediaItem,             // media — item-store seam for the `media` item; optional (absent ⇒ item rides on the embed)
+  showPersonCard,             // the person's clock — how this shell paints a card for the person (their week); optional
 }) {
   return {
     help: async () => formatHelp(catalogue, t),
@@ -86,6 +88,14 @@ export function createLocalBuiltins({
       mediaGateway, encodeImage, storeMediaItem,
     }),
     'embed-time': async (args) => createTimeEmbed(args, { localActor, t, simPeers, threadStore, callSkill }),
+    // the person's own week overview, run by their clock while the app is open: the card of their coming week
+    [PERSON_WEEK_OP]: async () => {
+      if (typeof showPersonCard !== 'function') return { ok: false, reason: 'no-screen' };
+      const me = (await callSkill?.('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      const card = await personWeekCard({ callSkill, me, t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      showPersonCard(card);
+      return { ok: true };
+    },
     // v0.7.5 / v0.7.1c — also expose openLogsPanel reachable to
     // handlers (currently only used by /logs but reads well at this
     // layer).

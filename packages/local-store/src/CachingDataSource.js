@@ -34,7 +34,7 @@
  *
  * List / query: local only. Fresh data from inner is pulled by
  * `pullFromInner(prefix)` on the app's chosen cadence (typically
- * tied to foreground state via `SyncCadence`).
+ * tied to foreground state by the host's clock — the foreground cadence on a phone).
  *
  * Events (Emitter): `online`, `offline`, `queued`, `flushed`, `pulled`, `error`,
  * `bulk-sync-started`, `bulk-sync-progress`, `bulk-sync-finished`.

@@ -276,7 +276,6 @@ if (values['storage-root']) {
   const cache = new CachingDataSource({ inner: fs });
   localStoreBundle = {
     cache,
-    cadence: null,
     async attachInner(ds) { await cache.attachInner(ds); },
     async detachInner()   { await cache.attachInner(null); },
     async close()         {},
@@ -290,7 +289,6 @@ if (values['storage-root']) {
   const cache = new CachingDataSource({});
   localStoreBundle = {
     cache,
-    cadence: null,
     async attachInner(ds) { await cache.attachInner(ds); },
     async detachInner()   { await cache.attachInner(null); },
     async close()         {},

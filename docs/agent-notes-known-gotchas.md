@@ -56,6 +56,10 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   triggered it and add *that* package's `node_modules` — provided it has no RN native modules.
 
 - **New workspace dep needs its `node_modules` symlink materialized.**
+  *(2026-10-07: `@onderling/online-cadence` added to `apps/basis` (`workspace:*`) and `apps/basis-mobile` (`file:`) —
+  the person's clock imports its plain ticker as `@onderling/online-cadence/cadence`, never the package index, which
+  re-exports React Native background helpers. Links: `apps/{basis,basis-mobile}/node_modules/@onderling/online-cadence
+  → ../../../../packages/online-cadence`.)*
   This repo has NO root hoisting: each package's `file:` deps live as symlinks in *its own*
   `node_modules`. Adding a `@onderling/*` dep to a package's `package.json` is not enough for a fresh
   checkout that doesn't re-run install — the symlink must exist. (2026-07-10) wired

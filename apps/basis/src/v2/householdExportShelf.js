@@ -24,11 +24,18 @@ export function unlockedSecret(text, now = Date.now()) {
 }
 
 const NAME = /^household-export-(\d{4}-\d{2}-\d{2})-(\d{4})\.json$/;
+/** The export made before an update: when, and which version it was made by (the one being replaced). */
+const PRE_UPDATE = /^pre-update-(\d{4}-\d{2}-\d{2})-(\d{4})-([0-9A-Za-z]{1,12})\.json$/;
+/** How many pre-update files stay (their own rotation: updates never push the nightly files off, nor the reverse). */
+export const PRE_UPDATE_KEEP = 3;
 const pad = (n) => String(n).padStart(2, '0');
 /** The file's name for a moment, to the minute: a write never replaces an earlier file. */
 export const exportNameFor = (now) => { const d = new Date(now); return `household-export-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`; };
+/** The pre-update file's name: the moment, and the outgoing version (its first twelve characters). */
+export const preUpdateNameFor = (now, sha) => exportNameFor(now).replace(/^household-export-/, 'pre-update-').replace(/\.json$/, `-${String(sha ?? '').replace(/[^0-9A-Za-z]/g, '').slice(0, 12) || 'unknown'}.json`);
 /** Is this one of the shelf's files (and not anything else a person might name)? */
-export const isExportName = (name) => NAME.test(String(name ?? ''));
+export const isExportName = (name) => NAME.test(String(name ?? '')) || PRE_UPDATE.test(String(name ?? ''));
+const isPreUpdate = (name) => PRE_UPDATE.test(String(name ?? ''));
 
 /**
  * @param {object} a
@@ -52,9 +59,10 @@ export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP, every 
   /** The shelf's files, newest first. */
   const names = async () => (await files.list()).filter(isExportName).sort().reverse();
   const readQuiet = async (n) => { try { return JSON.parse(await files.read(n)); } catch { return null; } };
-  const writeNow = async () => {
+  /** Write the export now — the nightly one, or (with `preUpdateSha`) the one an update asks for first. */
+  const writeNow = async ({ preUpdateSha = null } = {}) => {
     try {
-      const name = exportNameFor(now());
+      const name = preUpdateSha ? preUpdateNameFor(now(), preUpdateSha) : exportNameFor(now());
       const plain = await exportNow();
       // sealed to the admin's export key when one is set (read at every write: it may be set after the box started)
       const key = typeof sealWith === 'function' ? await sealWith() : null;
@@ -63,9 +71,11 @@ export function createExportShelf({ files, exportNow, keep = EXPORT_KEEP, every 
       // The newest `kept` stay, and so does the newest file that HOLDS something: a version that cannot read its store
       // boots empty, and a week of empty exports must not rotate the last good one away.
       const all = await names();
+      const nightly = all.filter((n) => !isPreUpdate(n));
       let good = null;
-      for (const n of all) { if (holds(await readQuiet(n))) { good = n; break; } }
-      for (const old of all.slice(kept)) if (old !== good) await files.remove(old);
+      for (const n of nightly) { if (holds(await readQuiet(n))) { good = n; break; } }
+      for (const old of nightly.slice(kept)) if (old !== good) await files.remove(old);
+      for (const old of all.filter(isPreUpdate).slice(PRE_UPDATE_KEEP)) await files.remove(old);
       onWritten?.({ name, ok: true, sealed: Boolean(key) });
       return name;
     } catch (e) {

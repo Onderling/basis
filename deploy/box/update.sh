@@ -27,45 +27,6 @@ load_conf
 # read (root's shell in /home/ubuntu, mode 750) and docker compose stats "." before doing anything.
 cd "$BOX_DIR"
 
-[ -f "$BOX_DIR/HOLD" ] && { log "HOLD present — not updating"; exit 0; }
-
-changed=()
-declare -A previous tried
-for name in $(repo_names); do
-  d="$(repo_dir "$name")"; br="$(repo_branch "$name")"
-  [ -d "$d/.git" ] || die "repo $name not cloned at $d"
-  cur="$(state_sha "$name")"
-  [ -z "$cur" ] && cur="$($GIT -C "$d" rev-parse HEAD)"
-  previous[$name]="$cur"
-  # ask first, fetch only on news: one small request a minute, nothing written while the branch stands still
-  # (a failed ask falls through to the fetch, which says so itself)
-  if [ "${FORCE:-0}" != 1 ]; then
-    remote="$($GIT -C "$d" ls-remote -q origin "refs/heads/$br" 2>>"$BOX_DIR/box.log" | cut -f1)" || remote=""
-    [ -n "$remote" ] && [ "$remote" = "$cur" ] && continue
-    # a release this box refused (RESET) or rolled back is tried again at the old five-minute rhythm, not every
-    # minute — no rebuild loop, no alert a minute (ALLOW_RESET asks again at once)
-    if [ -n "$remote" ] && [ -f "$BOX_DIR/.refused-$name" ] && [ "${ALLOW_RESET:-0}" != 1 ]; then
-      read -r rsha rat < "$BOX_DIR/.refused-$name" || true
-      if [ "$remote" = "${rsha:-}" ] && [ $(( $(date +%s) - ${rat:-0} )) -lt "${RETRY_AFTER:-300}" ]; then continue; fi
-    fi
-  fi
-  $GIT -C "$d" fetch -q origin "$br" --tags 2>>"$BOX_DIR/box.log" || { log "fetch failed for $name — keeping $(state_sha "$name")"; continue; }
-  new="$($GIT -C "$d" rev-parse "origin/$br")"
-  if [ "$new" = "$cur" ] && [ "${FORCE:-0}" != 1 ]; then continue; fi
-  msg="$($GIT -C "$d" tag -l --format='%(contents:subject)' --points-at "$new" 2>/dev/null | head -1)"
-  if [[ "$msg" == *RESET* ]] && [ "${ALLOW_RESET:-0}" != 1 ]; then
-    log "$name: $new is tagged RESET — refusing without ALLOW_RESET=1"; alert "$name: release $new needs a data reset; held"
-    echo "$new $(date +%s)" > "$BOX_DIR/.refused-$name"; continue
-  fi
-  log "$name: $cur → $new ($br)"
-  $GIT -C "$d" diff --name-only "$cur" "$new" > "$BOX_DIR/.changed-$name" 2>/dev/null || : > "$BOX_DIR/.changed-$name"
-  $GIT -C "$d" checkout -q -f "$new"
-  tried[$name]="$new"
-  changed+=("$name")
-done
-
-[ ${#changed[@]} -eq 0 ] && exit 0
-
 # The roles a release touches: of the changed repos' roles, those whose declared build paths saw a change.
 # FORCE (the install's first bring-up) and a repo we cannot diff mean "all of them".
 affected_roles() {
@@ -97,9 +58,100 @@ apply() {   # build the affected roles, bring the stack up, reload Caddy when it
   return 0
 }
 
+# BY HAND, back to the version before the newest green one (`ROLLBACK=1`): for the release whose health gate was green
+# but which the household says is wrong. The abandoned version is not taken again on the next tick; a newer one is.
+if [ "${ROLLBACK:-0}" = 1 ]; then
+  rolled=()
+  for name in $(repo_names); do
+    d="$(repo_dir "$name")"; target="$(prevgood_sha "$name")"
+    [ -n "$target" ] || continue
+    cur="$($GIT -C "$d" rev-parse HEAD)"
+    [ "$target" = "$cur" ] && continue
+    $GIT -C "$d" diff --name-only "$target" "$cur" > "$BOX_DIR/.changed-$name" 2>/dev/null || : > "$BOX_DIR/.changed-$name"
+    echo "$cur" > "$BOX_DIR/.abandoned-$name"
+    $GIT -C "$d" checkout -q -f "$target"
+    mv "$BOX_DIR/.prevgood-$name" "$BOX_DIR/.good-$name"   # the restored version is the good one again
+    rolled+=("$name")
+  done
+  [ ${#rolled[@]} -eq 0 ] && { log "ROLLBACK: no earlier good version to return to"; exit 1; }
+  if apply "${rolled[@]}" && failed="$(health_gate)"; then
+    write_state true
+    log "rolled back by hand: ${rolled[*]} — healthy"; alert "rolled back by hand: ${rolled[*]}"
+    exit 0
+  fi
+  write_state true "${failed:-build}"
+  log "rolled back by hand: ${rolled[*]} — health gate RED (role: ${failed:-build})"; alert "rollback by hand of ${rolled[*]} is not healthy"
+  exit 1
+fi
+
+[ -f "$BOX_DIR/HOLD" ] && { log "HOLD present — not updating"; exit 0; }
+
+# THE FRESH EXPORT COMES FIRST: before the first checkout, the running assistant writes the household's export named by
+# the outgoing version (the shelf in its data dir; `bin/export-now.mjs`). If it fails the update is HELD — nothing is
+# checked out — and says so. A box whose assistant is not running has nothing to ask and updates (a fix must land).
+exported=0
+pre_update_export() {   # pre_update_export <outgoing sha>
+  [ "$exported" = 1 ] && return 0
+  exported=1
+  role_names | grep -qx assistant || return 0
+  local cmd; cmd="$(compose_cmd)"
+  if ! eval "$cmd ps --status running --services" 2>/dev/null | grep -qx assistant; then
+    log "assistant not running — no pre-update export"; return 0
+  fi
+  if eval "$cmd exec -T assistant node apps/basis/bin/export-now.mjs --sha $1" >>"$BOX_DIR/box.log" 2>&1; then
+    log "pre-update export written ($1)"; return 0
+  fi
+  return 1
+}
+
+changed=()
+declare -A previous tried
+for name in $(repo_names); do
+  d="$(repo_dir "$name")"; br="$(repo_branch "$name")"
+  [ -d "$d/.git" ] || die "repo $name not cloned at $d"
+  cur="$(state_sha "$name")"
+  [ -z "$cur" ] && cur="$($GIT -C "$d" rev-parse HEAD)"
+  previous[$name]="$cur"
+  # ask first, fetch only on news: one small request a minute, nothing written while the branch stands still
+  # (a failed ask falls through to the fetch, which says so itself)
+  if [ "${FORCE:-0}" != 1 ]; then
+    remote="$($GIT -C "$d" ls-remote -q origin "refs/heads/$br" 2>>"$BOX_DIR/box.log" | cut -f1)" || remote=""
+    [ -n "$remote" ] && [ "$remote" = "$cur" ] && continue
+    # a release rolled back BY HAND is not taken again; a newer one is
+    [ -n "$remote" ] && [ "$remote" = "$(cat "$BOX_DIR/.abandoned-$name" 2>/dev/null)" ] && continue
+    # a release this box refused (RESET) or rolled back is tried again at the old five-minute rhythm, not every
+    # minute — no rebuild loop, no alert a minute (ALLOW_RESET asks again at once)
+    if [ -n "$remote" ] && [ -f "$BOX_DIR/.refused-$name" ] && [ "${ALLOW_RESET:-0}" != 1 ]; then
+      read -r rsha rat < "$BOX_DIR/.refused-$name" || true
+      if [ "$remote" = "${rsha:-}" ] && [ $(( $(date +%s) - ${rat:-0} )) -lt "${RETRY_AFTER:-300}" ]; then continue; fi
+    fi
+  fi
+  $GIT -C "$d" fetch -q origin "$br" --tags 2>>"$BOX_DIR/box.log" || { log "fetch failed for $name — keeping $(state_sha "$name")"; continue; }
+  new="$($GIT -C "$d" rev-parse "origin/$br")"
+  if [ "$new" = "$cur" ] && [ "${FORCE:-0}" != 1 ]; then continue; fi
+  if [ "${FORCE:-0}" != 1 ] && [ "$new" = "$(cat "$BOX_DIR/.abandoned-$name" 2>/dev/null)" ]; then continue; fi
+  msg="$($GIT -C "$d" tag -l --format='%(contents:subject)' --points-at "$new" 2>/dev/null | head -1)"
+  if [[ "$msg" == *RESET* ]] && [ "${ALLOW_RESET:-0}" != 1 ]; then
+    log "$name: $new is tagged RESET — refusing without ALLOW_RESET=1"; alert "$name: release $new needs a data reset; held"
+    echo "$new $(date +%s)" > "$BOX_DIR/.refused-$name"; continue
+  fi
+  if ! pre_update_export "$cur"; then
+    log "pre-update export failed — update held"; alert "update held: the export before updating failed"
+    exit 1
+  fi
+  log "$name: $cur → $new ($br)"
+  $GIT -C "$d" diff --name-only "$cur" "$new" > "$BOX_DIR/.changed-$name" 2>/dev/null || : > "$BOX_DIR/.changed-$name"
+  $GIT -C "$d" checkout -q -f "$new"
+  tried[$name]="$new"
+  changed+=("$name")
+done
+
+[ ${#changed[@]} -eq 0 ] && exit 0
+
 if apply "${changed[@]}" && failed="$(health_gate)"; then
+  mark_good
   write_state false
-  for name in "${changed[@]}"; do rm -f "$BOX_DIR/.refused-$name"; done
+  for name in "${changed[@]}"; do rm -f "$BOX_DIR/.refused-$name" "$BOX_DIR/.abandoned-$name"; done
   log "updated: ${changed[*]} — healthy"
   exit 0
 fi
@@ -107,7 +159,9 @@ fi
 failed="${failed:-build}"
 log "health gate RED (role: $failed) — rolling back ${changed[*]}"
 for name in "${changed[@]}"; do
-  $GIT -C "$(repo_dir "$name")" checkout -q -f "${previous[$name]}"
+  # back to the last version that passed the gate (else the one this run started from)
+  target="$(good_sha "$name")"; [ -n "$target" ] || target="${previous[$name]}"
+  $GIT -C "$(repo_dir "$name")" checkout -q -f "$target"
   echo "${tried[$name]} $(date +%s)" > "$BOX_DIR/.refused-$name"   # tried again after RETRY_AFTER, not every minute
 done
 apply "${changed[@]}" || log "rollback rebuild failed too — box needs a human"

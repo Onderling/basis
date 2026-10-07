@@ -43,7 +43,7 @@ function makeBox({ roles = [], paths = {}, caddySnippets = {} } = {}) {
   // the fake docker: appends every argv line to calls.log; `compose … exec/ps` answer ok
   const bin = join(root, 'bin'); mkdirSync(bin);
   // like the real docker compose, the fake stats "." first — an unreadable cwd is the 2026-09-06 failure
-  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf '${all.join('\\n')}\\n';; esac\nexit 0\n`);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf '${all.join('\\n')}\\n';; esac\ncase "$*" in *"export-now"*) [ -f "${box}/EXPORT_FAIL" ] \&\& exit 1;; esac\nexit 0\n`);
   chmodSync(join(bin, 'docker'), 0o755);
 
   const commit = (msg, tag, file = 'CHANGE') => {
@@ -394,4 +394,82 @@ test('the one-minute check: an unchanged release branch is asked with ls-remote 
   assert.equal(b.run({ GIT: wrap }).status, 0);
   assert.equal(b.state().repos?.mono?.sha ?? b.headOfBox(), sha);
   assert.ok(readFileSync(gitLog, 'utf8').includes('fetch'), 'fetched once there was something new');
+});
+
+test('a fresh export of the running assistant comes first; when it fails, the update is held and nothing changes', () => {
+  const b = makeBox({ roles: ['assistant'] });
+  b.run({ FORCE: '1' });
+  const v1 = b.headOfBox();
+  b.clearCalls();
+  b.commit('v2');
+  const r = b.run();
+  assert.equal(r.status, 0, r.stderr);
+  const calls = b.calls();
+  const exportAt = calls.findIndex((c) => /exec -T assistant node apps\/basis\/bin\/export-now\.mjs --sha [0-9a-f]+/.test(c));
+  const buildAt = calls.findIndex((c) => /compose .* build/.test(c));
+  assert.ok(exportAt >= 0, `the export was asked for: ${JSON.stringify(calls)}`);
+  assert.ok(buildAt > exportAt, 'the export comes before any build');
+  assert.match(calls[exportAt], new RegExp(`--sha ${v1}`), 'named by the OUTGOING version');
+
+  // a failed export: held, nothing checked out, nothing built, said so
+  writeFileSync(join(b.box, 'EXPORT_FAIL'), '');
+  const before = b.headOfBox();
+  const stateBefore = readFileSync(join(b.box, 'state.json'), 'utf8');
+  b.clearCalls();
+  b.commit('v3');
+  const held = b.run();
+  assert.notEqual(held.status, 0, 'a held update exits non-zero');
+  assert.equal(b.headOfBox(), before, 'nothing checked out');
+  assert.ok(!b.calls().some((c) => /compose .* (build|up -d)/.test(c)), 'nothing built or started');
+  assert.equal(readFileSync(join(b.box, 'state.json'), 'utf8'), stateBefore, 'state untouched');
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /pre-update export failed — update held/);
+  // the export works again: the update goes through
+  rmSync(join(b.box, 'EXPORT_FAIL'));
+  assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
+  assert.notEqual(b.headOfBox(), before);
+});
+
+test('the last working version is written down; a red gate goes back to it; ROLLBACK=1 returns to it by hand', () => {
+  const b = makeBox();
+  b.run({ FORCE: '1' });
+  const good = b.headOfBox();
+  assert.equal(b.state().lastGood?.mono?.sha, good, 'a green gate writes lastGood');
+  assert.ok(b.state().lastGood.mono.at, 'with when');
+
+  // the box is on a version that was never proven good (state says v2, as after a hand checkout or an older updater)
+  const v2 = b.commit('v2 unproven');
+  sh('git', ['-C', join(b.box, 'repos/mono'), 'fetch', '-q', 'origin', 'live']);
+  sh('git', ['-C', join(b.box, 'repos/mono'), 'checkout', '-q', '-f', v2]);
+  const st = b.state(); st.repos.mono.sha = v2; writeFileSync(join(b.box, 'state.json'), JSON.stringify(st));
+  // the next release is red: back to the last GOOD version, not merely to v2
+  b.commit('v3 red');
+  writeFileSync(join(b.box, 'RED'), '');
+  assert.notEqual(b.run().status, 0);
+  assert.equal(b.headOfBox(), good, 'rolled back to lastGood');
+  assert.equal(b.state().lastGood.mono.sha, good, 'a red gate keeps lastGood');
+  rmSync(join(b.box, 'RED'));
+
+  // green on v4, then the household says it is not right: ROLLBACK=1 by hand
+  const v4 = b.commit('v4');
+  assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
+  assert.equal(b.headOfBox(), v4);
+  assert.equal(b.state().lastGood.mono.sha, v4, 'the newest green replaces it');
+  const v5 = b.commit('v5 green but wrong');
+  assert.equal(b.run().status, 0);
+  assert.equal(b.headOfBox(), v5);
+  assert.equal(b.state().previousGood?.mono?.sha, v4, 'the one before it is kept too');
+  // green, but the household says it is not right: by hand, back to the version before
+  const back = b.run({ ROLLBACK: '1' });
+  assert.equal(back.status, 0, back.stderr);
+  assert.equal(b.headOfBox(), v4, 'ROLLBACK=1 returns to the version before the newest green one');
+  assert.equal(b.state().rolledBack, true);
+  assert.equal(b.state().lastGood.mono.sha, v4, 'the restored version is the good one again');
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /rolled back by hand/);
+  // the abandoned release is not taken again on the next tick …
+  assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
+  assert.equal(b.headOfBox(), v4, 'v5 stays abandoned');
+  // … but a newer release is
+  const v6 = b.commit('v6 the fix');
+  assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
+  assert.equal(b.headOfBox(), v6);
 });

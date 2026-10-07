@@ -952,7 +952,7 @@ if (tgToken || inboxDoor.bridge) {
     threads,
     events: async () => (await agent.reminderSources())?.events ?? [],
     people: () => botUsers.list(),
-    calendarName: async () => `${t('circle.bot.agenda_calendar_name')}${tgBridge?.botUsername ? ` (@${tgBridge.botUsername})` : ''}`,
+    calendarName: async () => t('circle.bot.agenda_calendar_name'),
     put: (id, envelope) => companionCall('feed.put', { id, envelope }),
     drop: (id) => companionCall('feed.drop', { id }),
     base: feedBase,

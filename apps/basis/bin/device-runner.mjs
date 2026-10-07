@@ -87,6 +87,8 @@ import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
 import { createChangeFeed } from '../src/v2/changeFeed.js';
 import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
+import { exportDirFiles } from '../src/v2/exportDirFiles.js';
+import { createExportRequestJob } from '../src/v2/exportRequest.js';
 import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
@@ -909,19 +911,9 @@ if (tgToken || inboxDoor.bridge) {
   };
   sweepUnlocked();
   hostTick.add('unlocked-key-sweep', { every: 60_000, run: sweepUnlocked });
+  const exportFiles = exportDirFiles(exportsDir);
   const exportShelf = createExportShelf({
-    files: {
-      list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
-      // written whole or not at all: a crash mid-write leaves a temp file, never a cut-off export under its own name
-      write: async (name, text) => {
-        mkdirSync(exportsDir, { recursive: true, mode: 0o700 });
-        const tmp = path.join(exportsDir, `.${name}.tmp`);
-        writeFileSync(tmp, text, { mode: 0o600 });
-        renameSync(tmp, path.join(exportsDir, name));
-      },
-      read: async (name) => readFileSync(path.join(exportsDir, name), 'utf8'),
-      remove: async (name) => rmSync(path.join(exportsDir, name), { force: true }),
-    },
+    files: exportFiles,
     exportNow: async () => {
       // beside it, the bot's own recovery file (its circles and their members, sealed to its recovery phrase — the
       // existing carrier): one snapshot of the folder then holds all a restore needs besides the phrase
@@ -1294,6 +1286,10 @@ if (tgToken || inboxDoor.bridge) {
       hostTick.add('model-watch', { every: MODEL_WATCH_EVERY_MS, run: () => modelWatch.ref.check() });
     }
     hostTick.add('export-shelf', { every: exportShelf.every, atStart: exportShelf.atStart, run: () => exportShelf.writeNow() });
+    // the box's updater asks for a fresh export before it changes anything (`bin/export-now.mjs`): answered here, by the
+    // one process that holds the household's store
+    const exportRequests = createExportRequestJob({ files: exportFiles, shelf: exportShelf });
+    hostTick.add('export-request', { every: 1_000, run: () => exportRequests.run() });
     walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });
   }
   // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a

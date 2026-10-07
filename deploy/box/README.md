@@ -55,7 +55,7 @@ the URL the device would then ADVERTISE on its contact card, which nobody outsid
 |---|---|
 | `box.conf` | the profile: `REPOS="name=url#branch …"` and `ROLES="role@repo …"` |
 | `.env` | secrets + hostnames for compose (`RELAY_DOMAIN`, `POD_DOMAIN`, `ACTIVATE_HOST`, `PORTAL_HOST`, `ACME_EMAIL`, `PRIVATEMODE_API_KEY`, optional `R2_*`/push, the alert chat). **`update.sh` never writes it.** |
-| `state.json` | what is RUNNING: per repo the sha + tag + when, `rolledBack`, `failedRole` — the answer to "what are testers on?" |
+| `state.json` | what is RUNNING: per repo the sha + tag + when, `rolledBack`, `failedRole`, `lastGood` (the last version that passed the health gate) and `previousGood` (the one before it) — the answer to "what are testers on?" |
 | `HOLD` | present ⇒ the updater does nothing. `touch HOLD` before a walk, `rm HOLD` after. |
 | `box.log` | one line per event (fetches, updates, health, rollbacks) |
 | `repos/<name>/` | one git checkout per repo, detached at the release sha |
@@ -77,21 +77,29 @@ nothing secret on it. Anything interactive (freeze, force an update) stays a com
    minute. Otherwise: fetch it with its tags.
    *A box installed before 2026-10-05 keeps its five-minute timer until the unit is copied again:*
    `sudo cp <repo>/deploy/box/systemd/onderling-box.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart onderling-box.timer`.
-3. New sha → check it out (detached), `compose build` the roles of that repo **whose `<role>.paths` the
+3. **A fresh export comes first.** Before the first checkout, when the assistant role is running, the updater asks it
+   for an export of the household (`compose exec -T assistant node apps/basis/bin/export-now.mjs --sha <outgoing>`:
+   the running assistant writes `exports/pre-update-<when>-<sha>.json` on its shelf, the last three kept beside the
+   nightly ones). If that fails, the update is **held**: nothing is checked out, the log and the alert say so. A box
+   whose assistant is not running has nothing to ask and updates.
+4. New sha → check it out (detached), `compose build` the roles of that repo **whose `<role>.paths` the
    release actually touched**, then `compose up -d`. This is what keeps a docs-only release from
    recreating the public relay container — which drops its in-memory hold-and-forward queue and
    disconnects every client (measured on the first box: the relay had been restarted by a release that
    changed only the web app).
-4. If the rendered Caddyfile changed, reload Caddy in place — its config is a bind mount, so
+5. If the rendered Caddyfile changed, reload Caddy in place — its config is a bind mount, so
    `compose up -d` never notices a change to it (a role added, a hostname edited) and the old config
    would keep serving.
-5. Wait for every enabled role's health script (`HEALTH_TIMEOUT`, 60 s).
-6. Green → write `state.json`. Red → check the previous sha back out, restart, write `state.json` with
+6. Wait for every enabled role's health script (`HEALTH_TIMEOUT`, 60 s).
+7. Green → the running version becomes `lastGood` (the one it replaces `previousGood`), write `state.json`. Red →
+   check `lastGood` back out (the previous sha when there is none yet), restart, write `state.json` with
    `rolledBack: true` + the failing role, log it, and send one Telegram line when `BOX_ALERT_TG_TOKEN` +
    `BOX_ALERT_TG_CHAT` are set in `.env`.
 
 A release whose tag message contains `RESET` (a data reset by the no-backwards-compat rule) is refused
-until the box is run with `ALLOW_RESET=1`. `FORCE=1 update.sh` rebuilds without a new sha (the first
+until the box is run with `ALLOW_RESET=1`. **`ROLLBACK=1 update.sh`** is the way back by hand, for a release whose
+health gate was green but which the household says is wrong: it returns to `previousGood` (the version before the
+newest green one), which becomes `lastGood` again; the abandoned release is not taken again, a newer one is. `FORCE=1 update.sh` rebuilds without a new sha (the first
 bring-up uses it). Run by hand: `sudo -u onderling BOX_DIR=/opt/onderling bash /opt/onderling/repos/basis/deploy/box/update.sh`.
 
 ## The role contract (how a repo plugs in)

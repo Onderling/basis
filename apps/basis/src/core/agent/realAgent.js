@@ -284,6 +284,9 @@ const SEED_HOUSEHOLD_ITEMS = [
  * }>}
  */
 export async function createRealHouseholdAgent(opts = {}) {
+  // The agent's own words go through the shell's translator — resolved ONCE here (every shell hands `opts.t`; a bare
+  // composition without one gets the keys, never English).
+  const agentT = typeof opts.t === 'function' ? opts.t : (k) => k;
   /** The user's address-fallback setting, read LIVE (the host hands a getter) — every send asks, and so
    *  does the re-drive of messages that were held under the previous answer. */
   const addressFallbackOn = () => (typeof opts.allowAddressFallback === 'function'
@@ -4045,7 +4048,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       ops: makeListsOps({
         storeFor: (circleId) => householdService.stores.getStore(circleId),
         // No localisation on a bare agent: a key IS the message (the basis default table's rule).
-        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        t: agentT,
         activeCircle: () => resolveCircleId({}),
         localActor: 'me',
         // a household bot: a chore ticked by its words is the chore's own `completeTask`, as the person (the gate)
@@ -4062,7 +4065,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     catalogue: mergeManifests([{ manifest: basisManifest }]),
     // No localisation on a bare agent: a key IS the message, and a key is at least true. A shell that
     // mounts its own table brings the real resolver with it.
-    t: typeof opts.t === 'function' ? opts.t : (k) => k,
+    t: agentT,
     agent: selfAgent,
   }));
 
@@ -4117,7 +4120,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   async function withChoreHolders(items, caller, inCircle = null) {
     if (!items.some((i) => Array.isArray(i?.holders))) return items;
-    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const tr = agentT;
     // In a circle the bot joined, the household's book and its names setting are not the circle's: nobody is named but
     // the reader ("you") — the household's names never reach a circle, whoever is in both.
     const people = inCircle ? [] : await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
@@ -4143,7 +4146,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * the chore's who is read. `{ok, ids}` — no ids for "iedereen"/"everyone" — or the refusal a person reads.
    */
   async function peopleNamed(words, ctx) {
-    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const tr = agentT;
     const caller = actorOf(ctx);
     const parts = String(words ?? '').split(/\s*(?:,|&|\ben\b|\band\b)\s*/i).map((w) => w.trim()).filter(Boolean);
     const EVERYONE = /^(iedereen|allemaal|alle(n)?|everyone|everybody|all)$/i;
@@ -4170,7 +4173,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * one (`makeChore`). A who or a when said on a line that is not a chore yet makes it one, in place: the same item.
    */
   async function addChoreFor(args, ctx, opId = 'addToList') {
-    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const tr = agentT;
     const { assignee, due, ...rest } = args;
     const caller = actorOf(ctx);
     // in a circle: its roster is who may be named, and assigning follows the standard role table (no household setting)
@@ -4292,7 +4295,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           : (opId === 'completeTask' && who ? open.filter((it) => heldBy(it).includes(who)) : null);
         const first = narrow ? matchEntry(narrow, args.id, words) : null;
         const { entry: task, among } = (first?.entry || first?.among?.length) ? first : matchEntry(open, args.id, words);
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         // `code: 'not-found'` when the words name nothing (a rule that may fall back to the model reads it); two that
         // match ask which, and that is an answer
         if (!task) return among.length ? { ok: false, error: tr('circle.lists.which_one', { options: choicesOf(among, words) }) } : { ok: false, code: 'not-found', error: tr('circle.tasks.no_such_task', { item: args.id }) };
@@ -4437,7 +4440,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         const list = await callSkill('tasks', 'listMine', args?.actor ? { actor: args.actor } : {});
         const items = (list?.items ?? []).filter((t) => t.state === 'open');
         if (items.length === 0) return { ok: true };   // empty → /brief skips
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         return {
           items:   items.map((t) => ({ id: t.id, label: t.text ?? t.title })),
           message: tr('circle.tasks.brief', { count: items.length }),
@@ -4516,7 +4519,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (realOpId === 'archiveCircle' && realArgs.confirm !== true) {
         // two-step confirm.
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         return { ok: false, error: tr('circle.tasks.state.archive_confirm') };
       }
       if (realOpId === 'suggestSchedule' && realArgs['lookahead-days']) {
@@ -4574,14 +4577,14 @@ export async function createRealHouseholdAgent(opts = {}) {
               ? globalThis.atob(padded) : padded;
             realArgs = { ...realArgs, invite: JSON.parse(json) };
           } catch (err) {
-            const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+            const tr = agentT;
             return { ok: false, error: tr('circle.tasks.invite.bad_url', { error: err.message ?? String(err) }) };
           }
         } else if (inv.startsWith('{')) {
           try {
             realArgs = { ...realArgs, invite: JSON.parse(inv) };
           } catch (err) {
-            const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+            const tr = agentT;
             return { ok: false, error: tr('circle.tasks.invite.bad_json', { error: err.message ?? String(err) }) };
           }
         }
@@ -4629,7 +4632,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         const list = await callSkill('stoop', 'listFeed', {});
         const items = list?.items ?? [];
         if (items.length === 0) return { ok: true };   // empty → /brief skips
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         return {
           items:   items.slice(0, 3).map((p) => ({ id: p.id, label: p.text ?? p.label })),
           message: tr('circle.noticeboard.brief', { count: items.length }),
@@ -4794,7 +4797,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (realOpId === 'leaveGroup' && realArgs.confirm !== true) {
         // style two-step confirm. Short-circuit before invoke.
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         return { ok: false, error: tr('circle.groups.leave_confirm') };
       }
       // Synthesize a `/groups` op locally — there's no listMyGroups
@@ -4806,7 +4809,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           [DataPart({ groupId: opts.stoopGroup ?? 'cc-default-circle' })],
         );
         const members = membersResult?.[0]?.data?.members ?? [];
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         return {
           title:       tr('circle.groups.current_title'),
           groupId:     opts.stoopGroup ?? 'cc-default-circle',
@@ -4910,7 +4913,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         && doorRoles.get(ctx.caller) !== 'admin'
         // under the `flat` roles preset, members and coordinators cancel anyone's appointment, as the admin does
         && !(rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY)) === 'flat' && ['member', 'coordinator'].includes(doorRoles.get(ctx.caller)))) {
-      const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+      const tr = agentT;
       // (in a circle the standard rule only: the one who added it, or the circle's admin — no household setting)
       if (!doorCircleOf(ctx) && cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {
         return { ok: false, error: tr('circle.calendar.cancel_admin_only'), refusal: refuse('door-settings', 'setting:cancel') };
@@ -4927,7 +4930,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (appOrigin === 'calendar' && personNode && !args?.circleId) {
       ownCalendarReady ??= (async () => {
         ownCalendarStore = await getOwnStore();
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         const lists = makeCircleLists({ storeFor: () => ownCalendarStore, manifests: [calendarManifest] });
         const containers = await lists.listContainers(OWN_DEVICES_SCOPE);
         if (!containers.some((c) => c.defaultChild === 'calendar-event')) {
@@ -4938,7 +4941,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const ops = (ownCalendar ??= makeCircleCalendarOps({
         storeFor: () => ownCalendarStore,
         activeCircle: () => OWN_DEVICES_SCOPE,
-        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        t: agentT,
         localActor: 'me',
       }));
       const handler = ops[opId];
@@ -4955,7 +4958,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const ops = (circleCalendar ??= makeCircleCalendarOps({
         storeFor: (circleId) => householdService.stores.getStore(circleId),
         activeCircle: () => resolveCircleId({}),
-        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        t: agentT,
         localActor: 'me',
       }));
       const handler = ops[opId];
@@ -4979,7 +4982,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (opId === 'viewAgent') {
         // A miss surfaces as a soft failure (message, not a false record).
-        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const tr = agentT;
         return data?.agent ?? { ok: false, error: tr('circle.op.no_agent', { agent: String(args?.agentId ?? '') }) };
       }
       return data;
@@ -5089,7 +5092,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // not a false "✓".  On MORE THAN ONE open match the core returns `{ambiguous:[…]}` and acts on none
     // — reproduce the legacy chat-shell disambiguation prompt (identical text/shape) so the user picks by
     // id-prefix rather than the tool silently completing the wrong item.
-    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const tr = agentT;
     if (opId === 'markComplete' || opId === 'removeItem' || opId === 'claim' || opId === 'reassign') {
       const match = String(args?.match ?? '');
       if (Array.isArray(data?.ambiguous)) {
@@ -5129,7 +5132,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     catch { open = []; }
     if (!open.length) return { ok: true };   // empty → /brief skips the section
     const items = open.slice(0, 5).map((it) => ({ id: it.id, label: it.text }));
-    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const tr = agentT;
     return { items, message: tr('circle.household.brief', { count: open.length }) };
   }
 
@@ -5154,7 +5157,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   function adaptTasksReply(opId, data, { actor = null, named = null, args = {} } = {}) {
     if (data == null) return null;
     // In the person's words: every shell hands the agent its translator.
-    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const tr = agentT;
     // (B8) — DAG hard-dep blocking surface. Real skill returns
     // {error: 'has-open-dependencies', openDeps: [...]} when the user
     // tries to complete a task whose subtasks aren't done.  Translate
@@ -5642,7 +5645,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   function adaptStoopReply(opId, data, args) {
     if (data == null) return null;
     // In the person's words: every shell hands the agent its translator.
-    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    const tr = agentT;
     if (data.ok === false || data.error)  {
       // Pass through error envelopes; basis dispatch handles them.
       return data.ok === false ? data : { ok: false, error: data.error };

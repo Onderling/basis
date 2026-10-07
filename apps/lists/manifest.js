@@ -256,12 +256,15 @@ export const listsManifest = {
       resolves:  [{ field: 'text', policy: 'content' }],
       params: [
         { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
-        { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
+        // new words, or a new time, or both — a form still asks for the words (`ask`)
+        { name: 'text', kind: 'string', required: false, ask: true, schema: { minLength: 1 } },
         { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+        // an appointment's new start (it keeps its length) or a chore's new due: the line's time, edited as its words are
+        { name: 'when', kind: 'date', required: false },
       ],
       surfaces: {
         slash: { command: '/list-edit', body: 'flags' },
-        chat:  { reply: 'text', hint: 'Change the words of an entry on a list.' },
+        chat:  { reply: 'text', hint: 'Change an entry on a list: its words (text), and/or its time (when — an appointment moves, keeping its length; a chore gets a new due). "zet de tandarts op vrijdag 14:00" → item tandarts, when.' },
       },
     },
   ],

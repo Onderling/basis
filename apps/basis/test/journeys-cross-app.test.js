@@ -104,7 +104,8 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
       return agent.callSkill('folio', opId, args);
     }
     if (appOrigin === 'calendar') {
-      return agent.callSkill('household', `calendar_${opId}`, args);
+      // the agent's own calendar route (a person's own appointments live in their own store)
+      return agent.callSkill('calendar', opId, args);
     }
     return { ok: false, error: `${appOrigin}.${opId} not wired in cross-app tests` };
   };

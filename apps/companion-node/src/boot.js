@@ -13,6 +13,7 @@
  *                                  (the ONLY key allowed to manage). Absent ⇒ OFF.
  *   COMPANION_MANAGE_HTTP_PORT     serve the online /manage web on this port
  *   COMPANION_MANAGE_HTTP_HOST     bind host (default 127.0.0.1; use 0.0.0.0 behind Caddy)
+ *   COMPANION_FEEDS                on → the owner may put agenda files, served at /feed/<id>.<k>.ics
  *   ── the local radio (opt-in) ──
  *   COMPANION_NEARBY               same values as `--nearby` below; the flag wins when both are given
  *
@@ -40,6 +41,8 @@ const manageHttp   = management && process.env.COMPANION_MANAGE_HTTP_PORT
   ? parseInt(process.env.COMPANION_MANAGE_HTTP_PORT, 10)
   : false;
 const manageHttpHost = process.env.COMPANION_MANAGE_HTTP_HOST ?? '127.0.0.1';
+// a person's agenda as a link: the owner's sealed files, served at /feed/ (needs the owner and the manage HTTP port)
+const feeds = Boolean(manageHttp) && /^(1|on|true|yes)$/i.test(process.env.COMPANION_FEEDS ?? '');
 
 // The local radio. A bad value stops the boot rather than starting a node whose radio is quietly off —
 // "nobody is nearby" and "I never turned it on" look identical from the outside, which is the one
@@ -48,7 +51,7 @@ const { nearby, error: nearbyError } = parseNearbyFlag(process.argv.slice(2), pr
 if (nearbyError) { console.error(`\n  ${nearbyError}\n`); process.exit(1); }
 
 const node = await startCompanionNode({
-  relayUrl, port, host, management, managementOwnerPubKey, manageHttp, manageHttpHost, nearby,
+  relayUrl, port, host, management, managementOwnerPubKey, manageHttp, manageHttpHost, nearby, feeds,
 });
 
 console.log('');

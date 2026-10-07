@@ -232,6 +232,9 @@ export async function startCompanionNode(opts = {}) {
     managementOwnerPubKey,      // the ONLY key allowed to manage; default podOwnerPubKey ?? inboxOwnerPubKey
     manageHttp         = false, // surface ② — serve the /manage web (true → random port, or a port number)
     manageHttpHost     = '127.0.0.1',
+    // ── a person's agenda as a link: sealed files the owner (a household bot) puts, served at /feed/ ──
+    feeds              = false, // needs management (the owner) and the manage HTTP server (the route)
+    feedStore,                  // inject a store (tests); default file-backed under configDir
   } = opts;
   const bootAt = Date.now();
 
@@ -629,6 +632,7 @@ export async function startCompanionNode(opts = {}) {
   //     Same deny-by-default / opaque-`forbidden` posture as `inbox.drain`. BOTH the
   //     in-app (basis over the relay) and the online interface project THESE.
   const mgmtOwner = managementOwnerPubKey ?? podOwnerPubKey ?? inboxOwnerPubKey ?? null;
+  let feedShelf = null;
   if (management) {
     if (!mgmtOwner) {
       throw new Error('companion-node: management requires managementOwnerPubKey (or podOwnerPubKey / inboxOwnerPubKey)');
@@ -672,6 +676,23 @@ export async function startCompanionNode(opts = {}) {
       return { ok: true, revoked: tokenId };
     });
 
+    // ── a person's agenda as a link (the owner's files, blind at rest: `feedShelf.js`) ─────────────
+    // `feed.put` / `feed.drop` — OWNER-GATED, refused before the body is read; the node never logs an id.
+    if (feeds) {
+      const { createFeedShelf, FileFeedStore } = await import('./feedShelf.js');
+      feedShelf = createFeedShelf({ store: feedStore ?? new FileFeedStore(join(resolveConfigDir(configDir), 'feeds.json')) });
+      agent.register('feed.put', async (ctx) => {
+        if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
+        const { id, blob } = Parts.data(ctx?.parts) ?? {};
+        return feedShelf.put(id, blob);
+      });
+      agent.register('feed.drop', async (ctx) => {
+        if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
+        const { id } = Parts.data(ctx?.parts) ?? {};
+        return feedShelf.drop(id);
+      });
+    }
+
     // ── surface ② — the ONLINE /manage interface (node-served HTTP tenant) ──────
     // Projects the SAME ops as a web page, behind an owner-PAIRING flow. The
     // browser gets a session token only after the owner approves its code from
@@ -684,6 +705,7 @@ export async function startCompanionNode(opts = {}) {
         allowedOps:  ['node.status', 'node.listTenants', 'grant.revoke'],
         port: typeof manageHttp === 'number' ? manageHttp : 0,
         host: manageHttpHost,
+        feed: feedShelf,
       });
       agent.register('manage.approvePairing', async (ctx) => {
         if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
@@ -733,6 +755,8 @@ export async function startCompanionNode(opts = {}) {
     // owner-gated; drains to the owner device on reconnect via `inbox.drain`.
     inbox: sealedInbox,
     inboxOwnerPubKey: inbox ? inboxOwnerPubKey : null,
+    // the owner's agenda files (null when `feeds` is off): sealed, served at /feed/<id>.<k>.ics
+    feeds: feedShelf,
     // R2 — the inbound gate + its authority surface (all null when gate is OFF).
     gate,
     policyEngine,

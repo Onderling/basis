@@ -42,6 +42,13 @@
 	handle /manage* {
 		reverse_proxy companion:8790
 	}
+	# a person's agenda link (`/feed/<id>.<k>.ics`): the companion's owner (a household bot) puts the sealed file, the
+	# companion opens it with the key the link carries. The path IS the key: this site block keeps no access log (no
+	# `log` directive) — if one is ever added, `log_skip` must stay in this handle (checked by the companion's tests).
+	handle /feed/* {
+		log_skip
+		reverse_proxy companion:8790
+	}
 	handle {
 		reverse_proxy relay:8787
 	}

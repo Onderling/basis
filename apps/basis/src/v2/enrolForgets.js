@@ -36,6 +36,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc-agent-registry',        // which circles this device is in, which devices the person has
     'cc-device-log',            // the record every lane rides
     'cc-contact-dm-state',      // 1:1 threads
+    'cc-own-devices',           // the person's own items: their appointments of no circle, their planned rows
     'cc-outbox-state',          // web's outbox
     'cc-outbox-cache',          // mobile's
     // Settings, the stoop and the household — each shell names its own, and the two sets are NOT the same

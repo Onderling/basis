@@ -8,6 +8,7 @@
  *                      the Agenda (the list whose default child is an event, else the one by the template's name);
  *   - `listEvents`   — a read over the store with a window (`days`, default 7), soonest first;
  *   - `rsvpAccept` · `rsvpDecline` · `rsvpTentative` — the child's rsvp for the person who asks;
+ *   - `briefSummary` · `searchEvents` — the next 24 hours for the morning brief; appointments by their words;
  *   - `cancelEvent`  — the child kept as cancelled (the calendar's own soft cancel: the Agenda's edge stays whole and
  *                      the record stays; the window no longer lists it);
  *   - `getEventSnapshot` — one event.
@@ -70,7 +71,13 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
     addEvent: async (args) => {
       const circleId = circleOf(args);
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
-      const agenda = await agendaOf(circleId);
+      // a circle that has no Agenda yet (only a household's template makes one) gets it with its first appointment,
+      // as a person's own calendar does — an appointment made in any circle is that circle's
+      let agenda = await agendaOf(circleId);
+      if (!agenda) {
+        try { await lists.createList(circleId, t('circle.lists.template.schedule'), who(args), { defaultChild: 'calendar-event' }); } catch { /* read again below */ }
+        agenda = await agendaOf(circleId);
+      }
       if (!agenda) return { ok: false, error: t('circle.calendar.no_agenda') };
       let event;
       try { event = buildEvent(args, { actorDefault: who(args) }); }
@@ -97,6 +104,26 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       // the list's own name above its appointments, as any list read says which list it is
       const agenda = await agendaOf(circleId);
       return { ok: true, ...(agenda?.text ? { title: agenda.text } : {}), items: open.map((e) => ({ id: e.id, label: label(e), type: 'calendar-event', title: titleOf(e), startsAt: e.startsAt ?? null, ...(e.createdBy ? { createdBy: e.createdBy } : {}) })) };
+    },
+
+    /** The morning brief's calendar slot: the next 24 hours, the first five; nothing when there is nothing. */
+    briefSummary: async (args) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: true };
+      const now = Date.now();
+      const soon = eventsInWindow(await eventsOf(circleId), { since: now, until: now + 86_400_000 });
+      if (!soon.length) return { ok: true };
+      return { ok: true, items: soon.slice(0, 5).map((e) => ({ id: e.id, label: label(e) })), message: t('circle.calendar.brief', { count: soon.length }) };
+    },
+
+    /** Appointments whose title holds the words, soonest first (cancelled ones not). */
+    searchEvents: async (args) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
+      const q = String(args?.query ?? '').trim().toLowerCase();
+      const hits = (await eventsOf(circleId)).filter((e) => e.state !== 'cancelled' && (!q || String(titleOf(e) ?? '').toLowerCase().includes(q)))
+        .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+      return { ok: true, items: hits.map((e) => ({ id: e.id, label: label(e), type: 'calendar-event', title: titleOf(e), startsAt: e.startsAt ?? null })) };
     },
 
     getEventSnapshot: async (args) => {

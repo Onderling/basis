@@ -679,6 +679,10 @@
     "cancel_admin_only": {
       "text": "Here only the admin cancels appointments.",
       "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
+    },
+    "brief": {
+      "text": "{{count}} appointments in the next 24 hours",
+      "doc": "The morning brief's calendar slot: how many appointments in the next 24 hours."
     }
   },
   "embed": {
@@ -4231,6 +4235,22 @@
       "text": "The household reminds: {{rules}} (the evening before only for an appointment before 10:00). Change it: /huishouden rules …",
       "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
     },
+    "planned_announce": {
+      "text": "When something changes, the bot tells whoever it concerns: {{which}}.",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
+    "planned_announce_appointments": {
+      "text": "appointments",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
+    "planned_announce_chores": {
+      "text": "chores",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
+    "planned_announce_none": {
+      "text": "When something changes, the bot tells nobody.",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
     "reminders_ask": {
       "text": "How do you want to be reminded of this — now and from now on? (Change it later: /herinneringen.)",
       "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
@@ -5368,6 +5388,30 @@
     "share_contact": {
       "text": "Share my contact →",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
+    },
+    "planned_title": {
+      "text": "Planned",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_loading": {
+      "text": "Looking at what is coming…",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_none": {
+      "text": "Nothing planned in the coming week.",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_event": {
+      "text": "{{when}} · {{title}}",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_chore": {
+      "text": "{{when}} · {{title}} (chore)",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_where": {
+      "text": " · {{circle}}",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
     }
   },
   "blocked": {

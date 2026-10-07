@@ -72,12 +72,13 @@ export function announcementLine(a, tp, tz, lang = 'nl') {
 }
 
 /**
- * The door-side effect: around a writing op, the household before and after it; what it tells others goes out at
- * once to whoever can be reached now — one message each, in their language — and is HELD on the thread row of anyone
- * in their quiet hours (the reminder tick says it in their next message). A done-mark per announcement keeps one
- * change said once; a person who switched the bot's messages off, an observer or a revoked person hears nothing.
+ * The announcer: ONE change to an item (as the host's change feed hands it over — the host's own write or a member's
+ * that landed) and what it tells others goes out at once to whoever can be reached now — one message each, in their
+ * language — and is HELD on the thread row of anyone in their quiet hours (the reminder tick says it in their next
+ * message). The one who made the change is the item's last writer. A done-mark per announcement keeps one change said
+ * once; a person who switched the bot's messages off, an observer or a revoked person hears nothing. The household's
+ * announce rows call it (`announceRows.js`), each for its kinds.
  * @param {object} a
- * @param {() => Promise<{events: object[], chores: object[]}>} a.sources  the household's items
  * @param {{list: () => Promise<object[]>}} a.users
  * @param {object} a.threads
  * @param {{sendToPerson: Function}} a.reach
@@ -88,7 +89,7 @@ export function announcementLine(a, tp, tz, lang = 'nl') {
  * @param {() => number} [a.now]
  * @param {(e: object) => void} [a.onAnnounced]   for the walk log: who · when · item · kind
  */
-export function createAnnouncer({ sources, users, threads, reach, t, tz, quiet, log, now = Date.now, onAnnounced = null }) {
+export function createAnnouncer({ users, threads, reach, t, tz, quiet, log, now = Date.now, onAnnounced = null }) {
   const marks = doneMarksOn(log, now);
   const langOf = (id) => threads?.langOf?.(id) ?? null;
   const tFor = (id) => { const lang = langOf(id); return lang ? (k, p) => t(k, p, lang) : t; };
@@ -121,17 +122,24 @@ export function createAnnouncer({ sources, users, threads, reach, t, tz, quiet, 
   }
 
   return {
-    /** Run one op; tell others what it changed. The op's own answer is returned untouched. */
-    async around(run, ctx = {}) {
-      const before = await sources().catch(() => null);
-      const res = await run();
-      if (!before || res?.ok === false) return res;
-      try {
-        const after = await sources();
-        const people = ((await users.list()) ?? []).map((r) => ({ id: r.id }));
-        await deliver(announcementsFor({ before, after, people, maker: ctx?.caller ?? null, now: now() }));
-      } catch { /* telling others never undoes what was done */ }
-      return res;
+    /**
+     * One change: tell others what it means for them — only the `kinds` asked for (all, when none are named).
+     * @param {{circleId?: string, before: object|null, after: object|null}} change
+     * @param {{kinds?: string[]|null}} [opts]
+     */
+    async forChange(change, { kinds = null } = {}) {
+      const was = change?.before ?? null;
+      const it = change?.after ?? null;
+      const type = (it ?? was)?.type;
+      const bucket = type === 'calendar-event' ? 'events' : (type === 'task' ? 'chores' : null);
+      if (!bucket) return { ok: true, told: 0 };
+      const side = (item) => ({ events: [], chores: [], ...(item ? { [bucket]: [item] } : {}) });
+      const maker = it?.updatedBy ?? it?.createdBy ?? was?.updatedBy ?? null;
+      const people = ((await users.list()) ?? []).map((r) => ({ id: r.id }));
+      const list = announcementsFor({ before: side(was), after: side(it), people, maker, now: now() })
+        .filter((a) => !Array.isArray(kinds) || kinds.includes(a.kind));
+      await deliver(list);
+      return { ok: true, told: list.length };
     },
     /**
      * A person's held announcements as lines, once their quiet hours are over — or null. The tick says them (in the

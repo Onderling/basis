@@ -57,11 +57,21 @@ export const SEAMS = Object.freeze([
   // Planned work: a host's own typed items (the own-devices store) and the job that runs the due ones as their person.
   // The box first (the Sunday overview of the people it serves); web and mobile join when the calendar's no-circle
   // appointments move into the store and they tick on foreground.
-  { id: 'own-devices-store', pattern: /createOwnDevicesStore\(/, shells: ['box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
+  // The stores write behind a short debounce; a shell that goes away inside it loses the last change. Each shell flushes
+  // the waiting saves when it leaves: a page on pagehide/hidden, the app on going to the background, the box on stop.
+  { id: 'flush-on-exit', pattern: /flushPendingSaves\(/, why: 'a change made a moment before a reload, a closed tab, a backgrounded app or a restart is still there afterwards' },
+  // One place a host hears that an item it holds changed — its own write or a member's that landed — for its event rows
+  // and its screens' nudge. Only a host that runs planned work composes it today (the box); web and mobile join with
+  // their clock.
+  { id: 'change-feed', pattern: /createChangeFeed\(/, shells: ['box'], why: 'a change a member makes in their app reaches the bot\'s event rows and its screens, not only the bot\'s own writes' },
+  { id: 'own-devices-store', pattern: /createOwnDevicesStore\(|lazyOwnStore\(/, shells: ['web', 'mobile', 'box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
   // that hosts the bot, at once; a person's device writes first to nobody.
   { id: 'announcer', pattern: /createAnnouncer\(/, shells: ['box'], why: 'the household hears of a shared appointment, a move or a cancel, and a chore given to them, when it happens' },
+  // What is coming for me, wherever it lives (my circles' appointments, my own, my dated chores) — read on the
+  // person's device, no bot (the household bot is optional). The box hosts no person, so it has no Mij.
+  { id: 'planned-for-me', pattern: /plannedForMe\(/, shells: ['web', 'mobile'], why: 'a person sees what is coming for them on Mij, from every circle and their own calendar' },
   { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
@@ -123,7 +133,7 @@ export const SEAMS = Object.freeze([
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

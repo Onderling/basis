@@ -4,7 +4,7 @@
  * The book writes rows, finishes them, cancels them, and reads them synchronously after `load()` (a setting's "now").
  */
 import { describe, it, expect } from 'vitest';
-import { memoryDataSource } from '@onderling/item-store';
+import { memoryDataSource, createCircleStores } from '@onderling/item-store';
 import { validate } from '@onderling/item-types';
 import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
@@ -52,5 +52,32 @@ describe('the intention book', () => {
     await book.load();
     await expect(book.intend({ ...weekly, op: '' })).rejects.toThrow(/op/);
     await expect(book.intend({ ...weekly, actsAs: null })).rejects.toThrow(/actsAs/);
+  });
+});
+
+describe('the book over every store the host holds', () => {
+  const circleStore = (id) => createCircleStores({ dataSource: memoryDataSource(), registry: { validate } }).getStore(id);
+
+  it('reads the rows of each circle store beside its own, and knows which store a row is in', async () => {
+    const own = createOwnDevicesStore({ dataSource: memoryDataSource() });
+    const home = circleStore('c-home');
+    const fromAMember = await home.put({ type: 'intention', ...weekly, actsAs: 'telegram:2', state: 'open' }, { by: 'member' });
+    const book = createIntentionBook({ store: own, circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot' });
+    await book.load();
+    const mine = await book.intend(weekly);
+    expect(book.rows().map((r) => r.id).sort()).toEqual([mine.id, fromAMember.id].sort());
+    expect(book.scopeOf(mine.id)).toBe(null);
+    expect(book.scopeOf(fromAMember.id)).toBe('c-home');
+  });
+
+  it('writes a row into the circle it names, and finishes it there', async () => {
+    const home = circleStore('c-home');
+    const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot' });
+    await book.load();
+    const row = await book.intend({ ...weekly, trigger: { at: '2026-10-11T16:00:00.000Z' }, scope: 'c-home' });
+    expect((await home.get(row.id))?.op).toBe('sendWeekOverview');
+    await book.ran(row.id);
+    expect((await home.get(row.id))?.state).toBe('done');
+    await expect(book.intend({ ...weekly, scope: 'c-elsewhere' })).rejects.toThrow(/c-elsewhere/);
   });
 });

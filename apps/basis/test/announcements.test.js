@@ -66,9 +66,10 @@ describe('the announcer: at once, held through quiet hours, said once', async ()
     let household = { events: [], chores: [] };
     const sent = [];
     const reach = { sendToPerson: async (id, m) => { sent.push({ id, text: m.text }); return { ok: true }; } };
-    const announcer = createAnnouncer({ sources: async () => household, users: { list: async () => rows }, threads, reach, t, tz: TZ, quiet: () => '23:00-07:00', log, now: () => at });
+    const announcer = createAnnouncer({ users: { list: async () => rows }, threads, reach, t, tz: TZ, quiet: () => '23:00-07:00', log, now: () => at });
     const tick = createReminderTick({ sources: async () => household, users: { list: async () => rows }, threads, reach, t, tz: TZ, settings: () => ({ reminders: 'on', quiet: '23:00-07:00', rules: [] }), now: () => at, log, announcer });
-    const add = (e) => announcer.around(async () => { household = { ...household, events: [...household.events, e] }; return { ok: true }; }, { caller: 'telegram:1' });
+    // a change as the host's change feed hands it over: the item before (none: it is new) and after
+    const add = (e) => { household = { ...household, events: [...household.events, e] }; return announcer.forChange({ circleId: 'h', before: null, after: e }); };
     return { threads, sent, add, tick, announcer, setNow: (iso) => { at = Date.parse(iso); } };
   }
 
@@ -95,39 +96,71 @@ describe('the announcer: at once, held through quiet hours, said once', async ()
     expect(w.threads.heldAnnouncementsOf('telegram:3')).toEqual([]);
   });
 
-  it('the same change through a second door call is not said twice', async () => {
+  it('the same change handed over twice is not said twice', async () => {
     const w = await world();
     const e = { id: 'e9', type: 'calendar-event', title: 'kapper', startsAt: '2026-10-09T12:00:00.000Z', createdBy: 'telegram:1' };
     await w.add(e);
-    await w.announcer.around(async () => ({ ok: true }), { caller: 'telegram:1' });   // nothing changed
+    await w.announcer.forChange({ circleId: 'h', before: null, after: e });
     expect(w.sent.filter((m) => m.id === 'telegram:2')).toHaveLength(1);
+  });
+
+  it('the one who changed it is the item\'s last writer: a move by another member is not told to them', async () => {
+    const w = await world();
+    const e = { id: 'e9', type: 'calendar-event', title: 'kapper', startsAt: '2026-10-09T12:00:00.000Z', createdBy: 'telegram:1' };
+    await w.announcer.forChange({ circleId: 'h', before: e, after: { ...e, startsAt: '2026-10-09T13:00:00.000Z', updatedBy: 'telegram:2' } });
+    expect(w.sent.map((m) => m.id)).toEqual(['telegram:1']);
+    expect(w.sent[0].text).toContain('circle.bot.announce_moved');
+  });
+
+  it('only the kinds asked for: a chores-only row says nothing of an appointment', async () => {
+    const w = await world();
+    await w.announcer.forChange({ circleId: 'h', before: null, after: { id: 'e9', type: 'calendar-event', title: 'kapper', startsAt: '2026-10-09T12:00:00.000Z', createdBy: 'telegram:1' } }, { kinds: ['given'] });
+    expect(w.sent).toEqual([]);
+    await w.announcer.forChange({ circleId: 'h', before: { id: 'c1', type: 'task', text: 'vuilnis', assignees: [] }, after: { id: 'c1', type: 'task', text: 'vuilnis', assignees: ['telegram:2'], updatedBy: 'telegram:1' } }, { kinds: ['given'] });
+    expect(w.sent.map((m) => m.id)).toEqual(['telegram:2']);
   });
 });
 
-describe('the door announces after a writing op — a typed line, the model and a screen alike', async () => {
+describe('the door\'s announce op: the host\'s runner calls it, nobody else', async () => {
   const { EventLog } = await import('../src/eventLog.js');
   const { createBotThreads, memoryThreadStore } = await import('../src/v2/botThreads.js');
   const { createAnnouncer } = await import('../src/v2/announcements.js');
   const { withAssistantOps } = await import('../src/v2/assistantOps.js');
+  const { ANNOUNCE_OP, HOST_CALL } = await import('../src/v2/announceRows.js');
 
-  it('addEvent through the door tells the others; a read through the door tells nobody', async () => {
+  async function door() {
     const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     await threads.load();
-    let household = { events: [], chores: [] };
     const sent = [];
     const rows = [{ id: 'telegram:1', role: 'member' }, { id: 'telegram:2', role: 'member' }];
     const announcer = createAnnouncer({
-      sources: async () => household, users: { list: async () => rows }, threads, t: (k) => k, tz: 'Europe/Amsterdam', quiet: () => '23:00-07:00',
-      reach: { sendToPerson: async (id, m) => { sent.push(id); return { ok: true }; } }, log: new EventLog({ initial: [], muted: [] }), now: () => Date.parse('2026-10-07T10:00:00Z'),
+      users: { list: async () => rows }, threads, t: (k) => k, tz: 'Europe/Amsterdam', quiet: () => '23:00-07:00',
+      reach: { sendToPerson: async (id) => { sent.push(id); return { ok: true }; } }, log: new EventLog({ initial: [], muted: [] }), now: () => Date.parse('2026-10-07T10:00:00Z'),
     });
-    const callSkill = async (app, op) => {
-      if (app === 'calendar' && op === 'addEvent') { household = { ...household, events: [{ id: 'e1', type: 'calendar-event', title: 'kapper', startsAt: '2026-10-09T12:00:00.000Z', createdBy: 'telegram:1' }] }; return { ok: true }; }
-      return { ok: true, items: [] };
-    };
-    const door = withAssistantOps({ callSkill, threads, t: (k) => k, announcer });
-    await door('calendar', 'listEvents', {}, { caller: 'telegram:1' });
-    expect(sent).toEqual([]);
-    await door('calendar', 'addEvent', { title: 'kapper' }, { caller: 'telegram:1' });
-    expect(sent).toEqual(['telegram:2']);
+    const callSkill = async (app, op) => { calls.push(`${app}.${op}`); return { ok: true, items: [] }; };
+    const calls = [];
+    return { sent, calls, door: withAssistantOps({ callSkill, threads, t: (k) => k, announcer }) };
+  }
+  const change = { circleId: 'h', before: null, after: { id: 'e1', type: 'calendar-event', title: 'kapper', startsAt: '2026-10-09T12:00:00.000Z', createdBy: 'telegram:1' } };
+
+  it('as the host, it tells the others of the change', async () => {
+    const w = await door();
+    const res = await w.door('assistant', ANNOUNCE_OP, { change, kinds: ['new', 'moved', 'cancelled'] }, { [HOST_CALL]: true });
+    expect(res.ok).toBe(true);
+    expect(w.sent).toEqual(['telegram:2']);
+  });
+
+  it('a person calling it is refused, and nothing is said — a plain "host" flag from outside counts for nothing', async () => {
+    const w = await door();
+    expect((await w.door('assistant', ANNOUNCE_OP, { change }, { caller: 'telegram:1', threadId: 'telegram:1' })).ok).toBe(false);
+    expect((await w.door('assistant', ANNOUNCE_OP, { change }, JSON.parse(JSON.stringify({ host: true, 'host-call': true })))).ok).toBe(false);
+    expect(w.sent).toEqual([]);
+  });
+
+  it('a writing op through the door announces nothing by itself any more (the change feed does)', async () => {
+    const w = await door();
+    await w.door('calendar', 'addEvent', { title: 'kapper' }, { caller: 'telegram:1' });
+    expect(w.calls).toEqual(['calendar.addEvent']);
+    expect(w.sent).toEqual([]);
   });
 });

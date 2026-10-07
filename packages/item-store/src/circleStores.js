@@ -37,7 +37,7 @@ import { CircleItemStore } from './CircleItemStore.js';
  * @returns {{getStore: (circleId: string) => object, has: (circleId: string) => boolean,
  *   rootFor: (circleId: string) => string}}
  */
-export function createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor } = {}) {
+export function createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf } = {}) {
   if (!dataSource || typeof dataSource.read !== 'function') {
     throw new Error('createCircleStores: a shared core.DataSource (read/write/delete/list) is required');
   }
@@ -57,7 +57,7 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
         // backing (today's behaviour). The store row stays THE materialised head either way (G-C1) — only
         // its medium differs, which is the "pod is truth, local cache is reality" posture for a pod circle.
         const backing = (typeof dataSourceFor === 'function' && dataSourceFor(circleId)) || dataSource;
-        store = new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution });
+        store = new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution, originOf });
         stores.set(circleId, store);
         if (typeof onStore === 'function') { try { onStore(circleId, store); } catch { /* best-effort wiring */ } }
       }

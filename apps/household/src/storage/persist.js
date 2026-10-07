@@ -22,7 +22,7 @@
  * tasks-v0's `storage/persist/*` so behaviour is identical.
  */
 
-import { CachingDataSource, sealedPersist } from '@onderling/local-store';
+import { CachingDataSource, sealedPersist, trackPendingSave } from '@onderling/local-store';
 
 /**
  * Build a persistent household DataSource from a `persistDb` descriptor.
@@ -132,6 +132,7 @@ async function pickPersist(args = {}) {
 class FilePersist {
   #path; #saveDelayMs;
   #pendingTimer = null;
+  #untrack = null;
   #lastSerialised = null;
 
   constructor({ path, saveDelayMs = 200 } = {}) {
@@ -167,19 +168,30 @@ class FilePersist {
 
   scheduleSave(map) {
     if (this.#pendingTimer) clearTimeout(this.#pendingTimer);
+    this.#untrack?.();
+    const run = () => this.save(map).catch(() => { /* best-effort */ });
+    // tracked while it waits: a shell flushes it at once when the page or the app goes away
+    this.#untrack = trackPendingSave(async () => {
+      if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+      this.#untrack = null;
+      await run();
+    });
     this.#pendingTimer = setTimeout(() => {
       this.#pendingTimer = null;
-      this.save(map).catch(() => { /* best-effort */ });
+      this.#untrack?.(); this.#untrack = null;
+      run();
     }, this.#saveDelayMs);
   }
 
   async flush(map) {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
     await this.save(map);
   }
 
   cancel() {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
   }
 
   close() { this.cancel(); }
@@ -190,6 +202,7 @@ class IndexedDBPersist {
   #dbName; #storeName; #saveDelayMs;
   #db = null;
   #pendingTimer = null;
+  #untrack = null;
   #lastSerialised = null;
   static #SNAPSHOT_KEY = 'state';
 
@@ -227,19 +240,30 @@ class IndexedDBPersist {
 
   scheduleSave(map) {
     if (this.#pendingTimer) clearTimeout(this.#pendingTimer);
+    this.#untrack?.();
+    const run = () => this.save(map).catch(() => { /* best-effort */ });
+    // tracked while it waits: a shell flushes it at once when the page or the app goes away
+    this.#untrack = trackPendingSave(async () => {
+      if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+      this.#untrack = null;
+      await run();
+    });
     this.#pendingTimer = setTimeout(() => {
       this.#pendingTimer = null;
-      this.save(map).catch(() => { /* best-effort */ });
+      this.#untrack?.(); this.#untrack = null;
+      run();
     }, this.#saveDelayMs);
   }
 
   async flush(map) {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
     await this.save(map);
   }
 
   cancel() {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
   }
 
   close() {
@@ -275,9 +299,13 @@ class IndexedDBPersist {
   async #put(key, value) {
     const db = await this.#open();
     return new Promise((resolve, reject) => {
-      const req = db.transaction(this.#storeName, 'readwrite').objectStore(this.#storeName).put(value, key);
+      const tx = db.transaction(this.#storeName, 'readwrite');
+      const req = tx.objectStore(this.#storeName).put(value, key);
       req.onsuccess = ()  => resolve();
       req.onerror   = (e) => reject(e.target.error);
+      // Commit now rather than when the browser next gets round to it: a save made on the way out of a page (the
+      // flush on pagehide) is otherwise abandoned with the page — the put issued, the transaction never done.
+      tx.commit?.();
     });
   }
 }
@@ -286,6 +314,7 @@ class IndexedDBPersist {
 class AsyncStoragePersist {
   #key; #saveDelayMs; #storage;
   #pendingTimer = null;
+  #untrack = null;
   #lastSerialised = null;
 
   constructor({ dbName, prefix = 'household-cache:', saveDelayMs = 200, asyncStorage } = {}) {
@@ -329,19 +358,30 @@ class AsyncStoragePersist {
 
   scheduleSave(map) {
     if (this.#pendingTimer) clearTimeout(this.#pendingTimer);
+    this.#untrack?.();
+    const run = () => this.save(map).catch(() => { /* best-effort */ });
+    // tracked while it waits: a shell flushes it at once when the page or the app goes away
+    this.#untrack = trackPendingSave(async () => {
+      if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+      this.#untrack = null;
+      await run();
+    });
     this.#pendingTimer = setTimeout(() => {
       this.#pendingTimer = null;
-      this.save(map).catch(() => { /* best-effort */ });
+      this.#untrack?.(); this.#untrack = null;
+      run();
     }, this.#saveDelayMs);
   }
 
   async flush(map) {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
     await this.save(map);
   }
 
   cancel() {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
   }
 
   close() { /* no-op — AsyncStorage holds no connection state */ }

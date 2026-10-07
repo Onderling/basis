@@ -16,6 +16,7 @@ import { assistantManifest } from './assistantManifest.js';
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
 import { WEEK_OVERVIEW_OP, weekOverviewOn, switchWeekOverview } from './weekOverviewRows.js';
+import { ANNOUNCE_OP, HOST_CALL, ANNOUNCE_ROWS, isAnnounceRow } from './announceRows.js';
 import { inQuiet } from './botReminders.js';
 import { wallClockInTz } from '@onderling/notifier';
 import { peopleRows } from './botPeople.js';
@@ -55,11 +56,6 @@ const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()]
  * The writing ops whose change may concern others (an appointment made, moved or cancelled; a chore given): the door
  * tells them, at once, after the op (`announcements.js`). A read never does.
  */
-const ANNOUNCED_OPS = Object.freeze(new Set([
-  'calendar.addEvent', 'calendar.cancelEvent',
-  'lists.addToList', 'lists.makeChore', 'lists.editEntry',
-  'tasks.reassignTask', 'tasks.editTask',
-]));
 
 export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {}, announcer = null }) {
   // The planned work of the people this door serves (the week overview's row): the host's own-devices store; a
@@ -110,8 +106,13 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return holdForYes(caller, app, op, args, ctx);
     }
     if (app !== 'assistant') {
-      const res = announcer && ANNOUNCED_OPS.has(`${app}.${op}`) ? await announcer.around(() => callSkill(app, op, args, ctx), ctx) : await callSkill(app, op, args, ctx);
+      const res = await callSkill(app, op, args, ctx);
       return askOnce(app, op, args, ctx, res);
+    }
+    // the household's announce rows: the HOST's runner calls this as itself — a person, a screen or the model never can
+    if (op === ANNOUNCE_OP) {
+      if (ctx?.[HOST_CALL] !== true || !announcer) return { ok: false, error: { code: 'host-only', message: t('circle.bot.admin_only') } };
+      return announcer.forChange(args?.change, { kinds: Array.isArray(args?.kinds) ? args.kinds : null });
     }
     if (caller && typeof refusal === 'function') {
       const refused = await refusal(op, caller, levelOf(op));
@@ -260,6 +261,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     lines.sort((a, b) => a.at - b.at);
     const out = [tp('circle.bot.planned_head'), ...(lines.length ? lines.map((l) => `• ${l.text}`) : [tp('circle.bot.planned_none')])];
     if (!remindersOn) out.push(tp('circle.bot.planned_reminders_off'));
+    // what a change tells others — the household's announce rows, for everyone (each kind a row it can switch off)
+    const announce = book.rows().filter(isAnnounceRow);
+    if (announce.length) {
+      const on = ANNOUNCE_ROWS.filter((spec) => announce.some((r) => r.label === spec.label && r.state === 'open'));
+      out.push(on.length
+        ? tp('circle.bot.planned_announce', { which: on.map((spec) => tp(`circle.bot.planned_${spec.label.replace(/-/g, '_')}`)).join(', ') })
+        : tp('circle.bot.planned_announce_none'));
+    }
     if (rows.find((r) => r.id === person)?.role === 'admin') out.push('', tp('circle.bot.planned_household', { rules: describeRules(household, tp) }));
     return { ok: true, message: out.join('\n') };
   }

@@ -24,11 +24,14 @@ import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
 import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
+import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
+import { plannedForMe, plannedLines } from '../../src/v2/plannedForMe.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
 // buffer only; a bug-report door reads it (pending — see the report kind's appender note). PII-safe.
 import { configureLog, consoleSink } from '@onderling/logger';
+import { flushPendingSaves } from '@onderling/local-store';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
 import { createPeek } from '../../src/v2/circlePeek.js';
@@ -290,7 +293,7 @@ import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
 import { attachEntriesFor } from '../../src/v2/attachEntries.js';
-import { cardForCreatedItem } from '../../src/v2/createdCard.js';
+import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
 import { makeListsOps } from '../../src/v2/listsOps.js';
@@ -4142,12 +4145,20 @@ async function showMij() {
   let profile = {};
   let geocodeResult = null;
   let busy = false;
+  // Gepland: what is coming for me, wherever it lives — read here, on this device (no bot); null while it loads
+  let planned = null;
 
   async function load() {
     try {
       const prof = await rawCallSkill('stoop', 'getMyProfile', {}).catch(() => null);
       profile = prof?.entry ?? {};
     } catch { /* keep defaults */ }
+    rerender();
+    try {
+      const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      const r = await plannedForMe({ callSkill: rawCallSkill, me });
+      planned = plannedLines(r.items, { t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: currentLang() });
+    } catch { planned = []; }
     rerender();
   }
 
@@ -4160,6 +4171,7 @@ async function showMij() {
 
   const rerender = () => renderCircleProfile(rootEl, {
     profile, geocodeResult, busy, t,
+    plannedLines: planned,
     // the projected PAGE surface drives the header label (labelKey via t).
     profilePage,
     onSaveProfile: async ({ handle, displayName }) => {
@@ -6528,12 +6540,14 @@ function showCircle(id, circle, policy) {
   /** Run a device op for this conversation and put whatever it answered where it belongs. */
   _runComposerOpForCircle = (opId, args, appOrigin) => runComposerOp(opId, args, appOrigin);
   async function runComposerOp(opId, args, appOrigin = 'basis') {
+    const declared = (circleManifestsByOrigin?.[appOrigin]?.operations ?? (appOrigin === 'basis' ? basisManifest.operations : []))
+      .find((o) => o.id === opId) ?? null;
     let reply = null;
-    try { reply = await rawCallSkill(appOrigin, opId, args ?? {}); }
+    // an op that writes into the circle (the + menu's Appointment) is made in the circle it was opened in
+    try { reply = await rawCallSkill(appOrigin, opId, composerArgs(declared, args, id)); }
     catch (err) { reply = { ok: false, error: String(err?.message ?? err) }; }
     // A CREATOR answers `{ok, itemId}` — making the thing is its job, and the conversation is not its
     // business. If it declares how its card is read, read it, so the thing appears where it was made.
-    const declared = circleManifestsByOrigin?.[appOrigin]?.operations?.find((o) => o.id === opId) ?? null;
     const card = await cardForCreatedItem({
       reply, op: declared, appOrigin, callSkill: rawCallSkill, localActor: LOCAL_ACTOR,
     });
@@ -8108,6 +8122,11 @@ async function boot() {
     watch.check().catch(() => {});
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') watch.check().catch(() => {}); });
   }
+  // A LEAVING PAGE WRITES WHAT IS WAITING. The stores save behind a short debounce; a reload or a closed tab inside
+  // that window lost the change (an appointment added and the tab closed at once — a tester's first move). Hidden is
+  // the last moment a page is sure to get on a phone's browser; pagehide covers a reload and a closed tab.
+  window.addEventListener('pagehide', () => { flushPendingSaves().catch(() => {}); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPendingSaves().catch(() => {}); });
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
@@ -8154,6 +8173,8 @@ async function boot() {
       t,
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
       ...PERSON_NODE_STORE_OPTS,
+      // …which is my OWN store (the own-devices scope): sealed, in IndexedDB, back after a reload
+      ownStore: lazyOwnStore({ dbName: 'cc-own-devices', storeName: 'items' }),
       publishEvent: publishEventToLog,
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.

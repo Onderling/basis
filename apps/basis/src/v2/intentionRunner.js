@@ -9,8 +9,21 @@
  *   • a failure → said once, tried again next tick, until its window closes.
  * One row's failure never stops another's; two passes at once never run one occurrence twice. At one host the
  * done-mark IS the claim; a second executor will claim by compare-and-swap first.
+ *
+ * WHO A ROW MAY ACT AS. A row in the host's own store was written here (or by the person's own devices), so it runs as
+ * the person it names. A row in a CIRCLE's store is a field any member can write — the sync proves which member SENT
+ * it, not who wrote it — so by default it is not run as anyone: it is said once ("refused") and left. A host lets a
+ * circle row through only by its own rule (`mayRun`), which sees the op, the circle and whom it would act as.
+ *
+ * ONE HOST PER CIRCLE ROW. Every member's host holds the same circle row; before running one, a host CLAIMS the row
+ * (the task lifecycle's compare-and-swap on its holders) and keeps it — a row another host claimed is left to that
+ * host. Across hosts the row is the truth (its holders and its last run sync with it); the done-mark never leaves its
+ * host and only keeps this host from running one occurrence twice. Two hosts that cannot see each other may both claim
+ * (each on its own copy) and both run one occurrence; when the copies meet, the claim fold keeps one holder and the
+ * other host leaves the row from then on.
  */
-import { due } from './intentions.js';
+import { claim as claimItem } from '@onderling/item-store';
+import { due, eventOccurrences } from './intentions.js';
 
 /** The device-log kind a run leaves behind (declared in the entry-kind table). */
 export const INTENTION_DONE_KIND = 'intention-done';
@@ -35,19 +48,58 @@ export function doneMarksOn(log, now = Date.now) {
  * @param {(o: object) => Promise<{ok?: boolean, notYet?: string, reason?: string}>} a.run   the op through the door, as `o.actsAs`
  * @param {string} a.tz
  * @param {() => number} [a.now]
- * @param {(e: {occurrence: string, row: string, op: string, actsAs: string, outcome: 'ran'|'not-yet'|'failed', reason?: string}) => void} [a.onFired]
+ * @param {(e: {occurrence: string, row: string, op: string, actsAs: string, outcome: 'ran'|'not-yet'|'failed'|'refused', reason?: string}) => void} [a.onFired]
+ * @param {(o: object, scope: string) => true|string} [a.mayRun]   a circle row's way through: true, or why not
+ * @param {string} [a.claimAs]   this host, as a circle row's claim names it (a key, unique to the host)
+ * @param {(origin: {intention: string}, fn: () => Promise<any>) => Promise<any>} [a.withOrigin]   runs a row's op
+ *   under the row as the origin of whatever it writes (the host's ambient origin; the store stamps it on the item, and
+ *   no host's change feed hands such a write on — the loop rule across hosts)
  */
-export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null }) {
+export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null, mayRun = null, claimAs = null, withOrigin = (origin, fn) => fn() }) {
   const inFlight = new Set();
   /** What was already said for an occurrence that has not run ("not-yet:quiet", "failed:door down"). */
   const said = new Map();
   const tell = (e) => { try { onFired?.(e); } catch { /* a listener never stops the runner */ } };
   const marks = doneMarksOn(log, now);
 
+  /** True, or why a circle row is not run here. */
+  const allowed = (o) => {
+    const scope = book.scopeOf?.(o.rowId) ?? null;
+    if (!scope) return true;
+    let verdict = 'a circle row names whom it acts as, and nothing proves it';
+    if (typeof mayRun === 'function') { try { verdict = mayRun(o, scope); } catch (e) { verdict = e?.message ?? 'refused'; } }
+    return verdict === true ? true : String(verdict || 'refused');
+  };
+
+  /** True when this host holds the row (its own store's rows always; a circle row once claimed), or who does. */
+  async function claimed(o) {
+    if (!book.scopeOf?.(o.rowId)) return true;
+    if (!claimAs) return 'this host has no name to claim with';
+    const store = book.storeOf(o.rowId);
+    try {
+      const res = await claimItem(store, o.rowId, { actor: claimAs });
+      if (!res?.error) return true;
+      const holders = [...new Set([...(res.current?.assignees ?? []), res.current?.assignee].filter(Boolean))];
+      return holders.includes(claimAs) ? true : `claimed by ${String(holders[0] ?? 'another host').slice(0, 12)}`;
+    } catch (e) { return e?.message ?? 'claim failed'; }
+  }
+
   async function runOne(o) {
     const base = { occurrence: o.id, row: o.rowId, op: o.op, actsAs: o.actsAs };
+    const ok = allowed(o);
+    if (ok !== true) {
+      const key = `refused:${ok}`;
+      if (said.get(o.id) !== key) { said.set(o.id, key); tell({ ...base, outcome: 'refused', reason: ok }); }
+      return;
+    }
+    const mine = await claimed(o);
+    if (mine !== true) {
+      const key = `elsewhere:${mine}`;
+      if (said.get(o.id) !== key) { said.set(o.id, key); tell({ ...base, outcome: 'elsewhere', reason: mine }); }
+      return;
+    }
     let res;
-    try { res = await run(o); } catch (e) { res = { ok: false, reason: e?.message ?? String(e) }; }
+    try { res = await withOrigin({ intention: o.rowId }, () => run(o)); } catch (e) { res = { ok: false, reason: e?.message ?? String(e) }; }
     if (res?.ok) {
       marks.mark(o.id, { row: o.rowId, op: o.op });
       said.delete(o.id);
@@ -63,9 +115,30 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
     tell({ ...base, outcome, reason });
   }
 
+  /** How many event occurrences are running now: what the host writes meanwhile fires no event row (no loops). */
+  let eventDepth = 0;
+
   return {
+    /**
+     * A change to an item the host holds (its own write, or one that landed from another member): the event rows it
+     * fires, each once (`<row>:<item>:<version>`), through the same run as a timed row — the gate, the claim, the mark.
+     * @param {{circleId: string, before: object|null, after: object}} change
+     * @param {{origin?: 'own'|'landed'}} [opts]
+     */
+    async onChange(change, { origin = 'landed' } = {}) {
+      if (origin === 'own' && eventDepth > 0) return;
+      const list = eventOccurrences({ rows: book.rows(), change, done: marks.ids() });
+      for (const o of list) {
+        if (inFlight.has(o.id)) continue;
+        inFlight.add(o.id);
+        eventDepth += 1;
+        try { await runOne(o); } finally { eventDepth -= 1; inFlight.delete(o.id); }
+      }
+    },
     /** One pass: every due occurrence, each once. */
     async pass() {
+      // read again: a row a member's device wrote into a circle's store reaches this host by sync, not by this book
+      try { await book.load?.(); } catch { /* the rows as last read still serve */ }
       const list = due({ rows: book.rows(), done: marks.ids(), now: now(), tz });
       for (const o of list) {
         if (inFlight.has(o.id)) continue;

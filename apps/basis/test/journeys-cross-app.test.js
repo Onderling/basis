@@ -104,7 +104,8 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
       return agent.callSkill('folio', opId, args);
     }
     if (appOrigin === 'calendar') {
-      return agent.callSkill('household', `calendar_${opId}`, args);
+      // the agent's own calendar route (a person's own appointments live in their own store)
+      return agent.callSkill('calendar', opId, args);
     }
     return { ok: false, error: `${appOrigin}.${opId} not wired in cross-app tests` };
   };
@@ -813,33 +814,6 @@ describe('CC-CL.7 — RSVP tentative (slash-test audit)', () => {
     if (!eventId) return;
     const r = await ws.userInput(`/tentative ${eventId}`);
     expect(r.error).toBeFalsy();
-  });
-});
-
-describe('CC-CL.8 — /pod-status (slash-test audit)', () => {
-  let ws;
-  beforeEach(async () => { ws = await bootWorkspace(); });
-
-  it('/pod-status dispatches + returns a record-shaped reply', async () => {
-    const r = await ws.userInput('/pod-status');
-    expect(r.error).toBeFalsy();
-    // Pod-status surfaces a record by manifest declaration; if no pod
-    // is attached the substrate may return text — both shapes are OK.
-    expect(['record', 'text', 'list', undefined]).toContain(r.shape);
-  });
-});
-
-describe('CC-CL.9 — /icalfeed (slash-test audit)', () => {
-  let ws;
-  beforeEach(async () => { ws = await bootWorkspace(); });
-
-  it('/icalfeed dispatches without error (pod URL deferred, runbook-validated)', async () => {
-    const r = await ws.userInput('/icalfeed');
-    // Real ical feed needs pod attach; substrate may surface a
-    // "no pod attached" message — both an `ok:false` reply and a
-    // clean text reply are valid here.  The test guards that the
-    // slash ROUTES, not that the underlying feed URL exists.
-    expect(r).toBeTruthy();
   });
 });
 

@@ -15,7 +15,8 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Pressable, Text, StyleSheet, BackHandler } from 'react-native';
+import { View, Pressable, Text, StyleSheet, BackHandler, AppState } from 'react-native';
+import { flushPendingSaves } from '@onderling/local-store';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from './src/core/mappingsStoreRN.js';
@@ -96,6 +97,14 @@ export default function App() {
   const [localeReady, setLocaleReady] = useState(false);
   const [, setLangVersion] = useState(0);   // bumped on app-language change → re-render the tree with new t()
   useEffect(() => subscribeLang(() => setLangVersion((v) => v + 1)), []);
+  // An app sent to the background writes what is waiting: the stores save behind a short debounce, and the
+  // system may end a backgrounded app without another word — the last change would be lost.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') flushPendingSaves().catch(() => {});
+    });
+    return () => sub.remove();
+  }, []);
   // cluster J — podAuth is built in the (hidden) ChatScreen; lift it here so the visible v2 launcher can
   // drive pod sign-in (the launcher had no sign-in entry, stranding the OidcSessionRN flow).
   const [podAuth, setPodAuth] = useState(null);

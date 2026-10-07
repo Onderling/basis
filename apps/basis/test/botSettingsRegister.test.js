@@ -17,7 +17,7 @@ const settingKeys = Object.entries(botSettings).filter(([name]) => name.endsWith
 describe('the household settings are registered params', () => {
   it('every key botSettings declares is in the register as a settable param', () => {
     const settable = new Set(basisParamRegistry().userParams().map((p) => p.key));
-    expect(settingKeys).toContain('assistant.reminderLeadMin');
+    expect(settingKeys).toContain('assistant.reminderRules');
     expect(settingKeys.filter((k) => !settable.has(k))).toEqual([]);
   });
 

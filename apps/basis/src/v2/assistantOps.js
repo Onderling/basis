@@ -8,7 +8,9 @@ import { personNamed, linkedKeyOf } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
-import { REMINDER_LEAD_KEY, REMINDER_LEAD_CHOICES, reminderLeadFrom, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { REMINDER_RULES_KEY, reminderRulesFrom, reminderRulesValue, reminderLayerFromWords, leadOf, withLead, describeRules } from './reminderWords.js';
+import { layeredRules } from './reminderOccurrences.js';
 import { assistantManifest } from './assistantManifest.js';
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
@@ -146,7 +148,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       // a person's own op answers in their language (`/taal`, set after this call for the language op itself)
       const tp = personT(threadId);
       // a switch asked without its value: how it stands now, with a button per value (as `/instellingen` paints it)
-      if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?.hours ?? args?._match)) return oneSettingOp(threadId, op);
+      if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?.hours ?? args?.rules ?? args?._match)) return oneSettingOp(threadId, op);
       if (op === 'assistant-memory') {
         const mode = args?.mode ?? args?._match;
         threads.setMode(threadId, mode);
@@ -169,7 +171,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         threads.setQuiet(threadId, w);
         return { ok: true, message: tp('circle.bot.quiet_set', { hours: w }) };
       }
-      if (op === 'assistant-reminders' || op === 'assistant-overview') {
+      if (op === 'assistant-reminders') return remindersOp(threadId, args, tp);
+      if (op === 'remindMe') return remindMeOp(threadId, args, ctx, tp);
+      if (op === 'assistant-overview') {
         const mode = switchOf(args?.mode ?? args?._match);
         if (!mode) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
         const which = op === 'assistant-reminders' ? 'reminders' : 'overview';
@@ -188,6 +192,63 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: false, error: 'unknown-op', app, op };
   };
   return door;
+
+  /** The household's reminder rules as they stand. */
+  async function householdReminderRules() {
+    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+    return reminderRulesFrom((r?.params ?? []).find((p) => p.key === REMINDER_RULES_KEY)?.value);
+  }
+
+  /**
+   * `/herinneringen`: on or off; or WHEN, as the person's own default over the household's (`60`, `ook avond`, `geen`);
+   * `huis` follows the household again. A word it does not know sets nothing.
+   */
+  async function remindersOp(person, args, tp) {
+    const words = String(args?.rules ?? args?.mode ?? args?._match ?? '').trim();
+    const sw = switchOf(words);
+    if (sw) { threads.setReminders(person, sw === 'on'); return { ok: true, message: tp(`circle.bot.reminders_${sw}`) }; }
+    const household = await householdReminderRules();
+    if (/^(huis|house|standaard|default)$/i.test(words)) {
+      threads.setReminderDefault(person, null);
+      return { ok: true, message: tp('circle.bot.reminders_rules_household', { rules: describeRules(household, tp) }) };
+    }
+    const layer = reminderLayerFromWords(words);
+    if (!layer) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.reminders_usage') } };
+    threads.setReminderDefault(person, layer);
+    // asking for reminders at a time is asking for reminders: a person who had them off gets them again
+    if (layer.rules.length) threads.setReminders(person, true);
+    const now = layeredRules({ household, personDefault: layer }).map((r) => r.rule);
+    return { ok: true, message: tp('circle.bot.reminders_rules_set', { rules: describeRules(now, tp) }) };
+  }
+
+  /**
+   * `remindMe`: the person's own reminders for ONE appointment or chore — found by its words among what THEY see (the
+   * calendar and the lists, read as them), written on their thread row only. "gewoon" drops their own for it.
+   */
+  async function remindMeOp(person, args, ctx, tp) {
+    const q = String(args?.item ?? '').trim().toLowerCase();
+    const words = String(args?.rules ?? '').trim();
+    const usual = /^(gewoon|normaal|usual|normal)$/i.test(words);
+    const layer = usual ? null : reminderLayerFromWords(words);
+    if (!q || (!usual && !layer)) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.remind_me_usage') } };
+    const asThem = (a, o, x) => callSkill(a, o, x, { ...ctx, caller: person, threadId: person }).catch(() => null);
+    const rows = (r) => (Array.isArray(r?.items) ? r.items : []);
+    const seen = new Map();
+    for (const e of rows(await asThem('calendar', 'listEvents', { days: 60 }))) if (e?.id) seen.set(e.id, e);
+    for (const list of rows(await asThem('lists', 'listLists', {}))) {
+      const name = list?.label ?? list?.text;
+      if (!name) continue;
+      for (const c of rows(await asThem('lists', 'listEntries', { list: name }))) if (c?.id && (c.dueAt || c.startsAt) && !c.done) seen.set(c.id, c);
+    }
+    const titleOf = (i) => String(i?.title ?? i?.label ?? i?.text ?? '');
+    const hits = [...seen.values()].filter((i) => i.id === args?.item || titleOf(i).toLowerCase().includes(q));
+    if (!hits.length) return { ok: false, error: { code: 'not-found', message: tp('circle.bot.remind_me_not_found', { item: args.item }) } };
+    if (hits.length > 1) return { ok: true, message: tp('circle.bot.remind_me_which', { items: hits.map(titleOf).join(' · ') }) };
+    const [hit] = hits;
+    threads.setReminderExtra(person, hit.id, layer);
+    if (!layer) return { ok: true, message: tp('circle.bot.remind_me_cleared', { item: titleOf(hit) }) };
+    return { ok: true, message: tp(layer.mode === 'add' ? 'circle.bot.remind_me_added' : 'circle.bot.remind_me_set', { item: titleOf(hit), rules: describeRules(layer.rules, tp) }) };
+  }
 
   /** The translator for a person: their fixed `/taal` language, else the door's. */
   function personT(threadId) {
@@ -268,9 +329,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: reminderLeadFrom(of(REMINDER_LEAD_KEY)), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)), app: inAppModeFrom(of(HOUSEHOLD_IN_APP_KEY)) });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: leadOf(reminderRulesFrom(of(REMINDER_RULES_KEY))), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)), app: inAppModeFrom(of(HOUSEHOLD_IN_APP_KEY)) });
     };
-    const [what, value] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
+    const [what, value, ...more] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
     const usage = { ok: false, error: { code: 'invalid-argument', message: t('circle.bot.settings_usage') } };
     // the write's own answer decides: a refused set is said, never answered with the list as it was
@@ -290,10 +351,18 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!Number.isInteger(n) || n < 0) return usage;
       return set(PASSED_DAYS_KEY, n);
     }
+    // the household's reminder rules: `lead 15` rewrites its short notice; `rules ochtend avond 15` (or `ook …`) the list
+    const householdRules = async () => reminderRulesFrom((await callSkill('params', 'list-user-params', {}).catch(() => null))?.params?.find((p) => p.key === REMINDER_RULES_KEY)?.value);
     if (what === 'lead') {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 0 || n > 240) return usage;
-      return set(REMINDER_LEAD_KEY, n);
+      return set(REMINDER_RULES_KEY, reminderRulesValue(withLead(await householdRules(), n)));
+    }
+    if (what === 'rules') {
+      const layer = reminderLayerFromWords([value, ...more].filter(Boolean).join(' '));
+      if (!layer) return usage;
+      const next = layer.mode === 'add' ? [...new Set([...(await householdRules()), ...layer.rules])] : layer.rules;
+      return set(REMINDER_RULES_KEY, reminderRulesValue(next));
     }
     if (what === 'quiet') {
       if (!isQuietHours(value)) return usage;
@@ -499,7 +568,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     if (await reaches('assistant-settings')) {
       // the minutes before an appointment for the short-notice reminder (a number, so its own row)
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
-      const now = reminderLeadFrom((r?.params ?? []).find((p) => p.key === REMINDER_LEAD_KEY)?.value);
+      const now = leadOf(reminderRulesFrom((r?.params ?? []).find((p) => p.key === REMINDER_RULES_KEY)?.value));
       const leadLabel = (n) => (n === 0 ? tp('circle.bot.value_lead_off') : tp('circle.bot.value_lead_min', { n }));
       lines.push(tp('circle.bot.menu_row', { label: tp('circle.bot.menu_lead'), value: leadLabel(now) }));
       for (const n of REMINDER_LEAD_CHOICES) buttons.push({ label: `${tp('circle.bot.menu_lead')}: ${leadLabel(n)}${n === now ? ' ✓' : ''}`, slash: `${slashOf('assistant-settings')} lead ${n}` });

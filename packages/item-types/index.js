@@ -48,7 +48,7 @@ export { adaptForCanonical, makeValidateCanonical } from './src/adapter.js';
 export const validateCanonical = (item) => _defaultRegistry.validate(adaptForCanonical(item));
 export { INBOX_ITEM_SCHEMA, INBOX_KIND, isInboxItem } from './src/types/inbox-item.js';
 // The reminder rules (a closed vocabulary) and the time anchors they apply to.
-export { REMINDER_RULE_KINDS, parseReminderRule, isReminderRule, TIME_ANCHORS, timeAnchorOf } from './src/reminderRules.js';
+export { REMINDER_RULE_KINDS, parseReminderRule, isReminderRule, TIME_ANCHORS, timeAnchorOf, ITEM_REMINDERS_SCHEMA } from './src/reminderRules.js';
 // The contact type's doors and its keyless row: the closed set of channels, and the shape every reader of the
 // contact book is tested over.
 export {

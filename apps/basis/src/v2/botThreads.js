@@ -18,6 +18,7 @@
  *               the household's and stays; only the conversation is not kept;
  *   - `long`  — short, plus what the bot knows about the household once that exists; until then it reads as short.
  */
+import { isReminderRule } from '@onderling/item-types';
 import { isQuietHours } from './botSettings.js';
 import { addUsage as addCounts, emptyUsage, monthOf } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
@@ -38,6 +39,15 @@ const isMode = (m) => MEMORY_MODES.includes(m);
  * @param {{read:Function, write:Function, list:Function}} ds
  * @param {string} [prefix]
  */
+/** A reminder layer as the thread row keeps it: a mode and rules of the closed vocabulary — anything else is refused. */
+function checkLayer(layer) {
+  if (layer?.mode !== 'replace' && layer?.mode !== 'add') throw new TypeError(`botThreads: a reminder layer's mode is replace or add, not "${layer?.mode}"`);
+  const rules = Array.isArray(layer.rules) ? layer.rules : [];
+  const bad = rules.find((r) => !isReminderRule(r));
+  if (bad !== undefined) throw new TypeError(`botThreads: "${bad}" is not a reminder rule`);
+  return { mode: layer.mode, rules: [...new Set(rules)] };
+}
+
 export function dataSourceRowStore(ds, prefix = 'mem://basis/bot-threads/') {
   const pathOf = (id) => `${prefix}${encodeURIComponent(id)}`;
   const parse = (v) => { if (v == null) return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } };
@@ -140,7 +150,22 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     /** Has this person had a reminder before (the first one says how to stop)? */
     remindedOnce: (id) => rows.get(id)?.reminded === true,
     markReminded(id) { return save({ ...rowOf(id), reminded: true }); },
-    /** What was already said to this person: item id → the slot it was said for (the reminders' only state). */
+    /** The person's own default reminders `{mode, rules}` (over the household's), or null: the household's. */
+    reminderDefaultOf: (id) => rows.get(id)?.reminderDefault ?? null,
+    setReminderDefault(id, layer) {
+      const { reminderDefault: _d, ...rest } = rowOf(id);
+      return save(layer ? { ...rest, reminderDefault: checkLayer(layer) } : rest);
+    },
+    /** The person's own reminders for one item `{mode, rules}` (over everything else), or null. */
+    reminderExtraOf: (id, itemId) => rows.get(id)?.reminderExtras?.[itemId] ?? null,
+    setReminderExtra(id, itemId, layer) {
+      const row = rowOf(id);
+      const { [itemId]: _e, ...others } = row.reminderExtras ?? {};
+      return save({ ...row, reminderExtras: layer ? { ...others, [itemId]: checkLayer(layer) } : others });
+    },
+    /** The items this person has extras for (so finished ones can be let go). */
+    reminderExtraIds: (id) => Object.keys(rows.get(id)?.reminderExtras ?? {}),
+    /** What was already said to this person: item id → the slots it was said for (before the done-marks; read only). */
     saidOf: (id) => ({ ...(rows.get(id)?.said ?? {}) }),
     setSaid(id, said) { return save({ ...rowOf(id), said: { ...said } }); },
     /** The ask this thread is waiting on (a form, a confirmation), or null. */

@@ -19,13 +19,15 @@ export const BOT_OP_MAP = Object.freeze({
   member: Object.freeze([
     // making, removing and putting back a list are everyone's (Frits 2026-10-05: a removed list can come back 30 days)
     'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
+    // the reminders everyone gets for an entry: whoever may edit it may set them
+    'entryReminders',
     // a line becomes a chore when someone says who does it or when: anyone who may add may say that
     'makeChore',
     // at a shop: the general list and that shop's own (a read)
     'shopVisit',
     'listMine', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
-    'assistant-memory', 'assistant-language', 'assistant-reminders', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
+    'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
     // who is in the household (names as the household allows): anyone in it may ask
     'assistant-people',
   ]),

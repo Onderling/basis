@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'invite-to-app': 'write', 'list-people': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
@@ -64,12 +64,25 @@ export const assistantManifest = {
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-reminders',
-      // a person's own switch for the reminders the bot writes first (only things they dated); on the thread row
+      // a person's own reminders: on or off, or WHEN — their own default over the household's (`60`, `ochtend`,
+      // `ook avond`, `geen`, `huis` = as the household); on the thread row
       writes: { scope: 'device' },
-      params: [{ name: 'mode', kind: 'enum', of: ['on', 'off'], required: false }],
+      // one argument, so a button's `/herinneringen aan` and a typed `/herinneringen ook avond` land in the same place
+      params: [{ name: 'mode', kind: 'string', required: false }],
       surfaces: {
         slash: { command: '/herinneringen', body: 'argline' },
-        chat:  { reply: 'text', hint: 'Reminders on or off for this person (mode = on or off).' },
+        chat:  { reply: 'text', hint: 'This person\'s own reminders, all in mode: on or off; or rules in words — "60" (minutes before), "ochtend"/"morning", "avond"/"evening" (the evening before), "7:30" (at a time), "ook …"/"also …" to add instead of replace, "geen"/"none", "huis"/"house" to follow the household again.' },
+      },
+    },
+    {
+      // a person's own reminders for ONE appointment or chore (their layer; nobody else's): "herinner me een uur van
+      // tevoren aan de tandarts" → item "tandarts", rules "60"; "ook de avond ervoor" → rules "ook avond"
+      id:     'remindMe',
+      verb:   'remind-me',
+      writes: { scope: 'device' },
+      params: [{ name: 'item', kind: 'string', required: true }, { name: 'rules', kind: 'string', required: true }],
+      surfaces: {
+        chat:  { reply: 'text', hint: 'This person\'s own reminder for one appointment or chore. item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it.' },
       },
     },
     {

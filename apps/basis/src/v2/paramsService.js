@@ -34,7 +34,8 @@ import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
-import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, QUIET_KEY, QUIET_DEFAULT, REMINDER_LEAD_KEY, REMINDER_LEAD_DEFAULT, USAGE_VISIBLE_KEY, USAGE_VISIBLE, MONTHLY_TOKEN_LIMIT_KEY, MONTHLY_TOKEN_LIMIT, ROLES_KEY, ROLES_PRESET, HOUSEHOLD_IN_APP_KEY, IN_APP_MODE } from './botSettings.js';
+import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, QUIET_KEY, QUIET_DEFAULT, USAGE_VISIBLE_KEY, USAGE_VISIBLE, MONTHLY_TOKEN_LIMIT_KEY, MONTHLY_TOKEN_LIMIT, ROLES_KEY, ROLES_PRESET, HOUSEHOLD_IN_APP_KEY, IN_APP_MODE } from './botSettings.js';
+import { REMINDER_RULES_KEY, REMINDER_RULES_PARAM } from './reminderWords.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -109,8 +110,8 @@ export const BASIS_USER_PARAMS = [
   // Reminders on a household bot (on · off) and the hours nothing is sent ("21:00-08:00").
   { key: REMINDERS_KEY,                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDERS_DEFAULT },
   { key: QUIET_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: QUIET_DEFAULT },
-  // How many minutes before an appointment the short-notice reminder comes (0 = none).
-  { key: REMINDER_LEAD_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDER_LEAD_DEFAULT },
+  // The household's reminder rules (`morning,evening-before,before:5` — today's rhythm); its `before:` is the lead.
+  { key: REMINDER_RULES_KEY,                    scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDER_RULES_PARAM },
   // Who sees the household's model use (admin · members), and the monthly limit it is shown against.
   { key: USAGE_VISIBLE_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: USAGE_VISIBLE },
   { key: MONTHLY_TOKEN_LIMIT_KEY,               scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: MONTHLY_TOKEN_LIMIT },

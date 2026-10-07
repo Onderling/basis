@@ -89,3 +89,30 @@ describe('reminder occurrences', () => {
     expect(list.some((o) => o.id === 'e2:before:5:2026-10-08:telegram:2')).toBe(true);
   });
 });
+
+describe('the layers: the nearest replaces or adds', async () => {
+  const { layeredRules } = await import('../src/v2/reminderOccurrences.js');
+  const household = ['morning', 'evening-before', 'before:5'];
+
+  it('no layer of their own: the household\'s rules', () => {
+    expect(layeredRules({ household })).toEqual([{ rule: 'morning', layer: 'household' }, { rule: 'evening-before', layer: 'household' }, { rule: 'before:5', layer: 'household' }]);
+  });
+
+  it('a person\'s own default replaces, or adds to, the household\'s', () => {
+    expect(layeredRules({ household, personDefault: { mode: 'replace', rules: ['before:60'] } })).toEqual([{ rule: 'before:60', layer: 'person' }]);
+    expect(layeredRules({ household, personDefault: { mode: 'add', rules: ['before:60'] } }).map((r) => r.rule)).toEqual(['morning', 'evening-before', 'before:5', 'before:60']);
+  });
+
+  it('the item\'s own, then the person\'s own for that item; the nearest layer names a rule they share', () => {
+    const got = layeredRules({ household, item: { mode: 'add', rules: ['evening-before'] }, personItem: { mode: 'add', rules: ['at:07:00'] } });
+    expect(got).toEqual([
+      { rule: 'morning', layer: 'household' }, { rule: 'evening-before', layer: 'item' }, { rule: 'before:5', layer: 'household' }, { rule: 'at:07:00', layer: 'person-item' },
+    ]);
+    expect(layeredRules({ household, item: { mode: 'replace', rules: [] } })).toEqual([]);
+  });
+
+  it('a rule outside the vocabulary, or a layer that is not one, is passed over', () => {
+    expect(layeredRules({ household, personDefault: { mode: 'add', rules: ['every-hour', 'before:30'] } }).map((r) => r.rule)).toEqual(['morning', 'evening-before', 'before:5', 'before:30']);
+    expect(layeredRules({ household, personDefault: { mode: 'sideways', rules: ['before:30'] } }).map((r) => r.rule)).toEqual(['morning', 'evening-before', 'before:5']);
+  });
+});

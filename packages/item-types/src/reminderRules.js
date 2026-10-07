@@ -46,3 +46,17 @@ export const TIME_ANCHORS = Object.freeze({ 'calendar-event': 'startsAt', task: 
 
 /** The field that is this type's moment, or null when the type has none. */
 export const timeAnchorOf = (type) => (Object.prototype.hasOwnProperty.call(TIME_ANCHORS, type) ? TIME_ANCHORS[type] : null);
+
+/**
+ * The field an item with a moment carries for ITS reminders: the household's statement about the item (synced like any
+ * content field), set by whoever may edit the item. `replace` stands instead of the layers below it; `add` keeps them.
+ * A person's own reminders for an item are theirs and never live on the item.
+ */
+export const ITEM_REMINDERS_SCHEMA = Object.freeze({
+  type: 'object',
+  required: ['mode', 'rules'],
+  properties: {
+    mode: { enum: ['replace', 'add'] },
+    rules: { type: 'array', items: { type: 'string' } },
+  },
+});

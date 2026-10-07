@@ -28,3 +28,19 @@ describe('the reminder rules', () => {
     expect(timeAnchorOf('note')).toBeNull();
   });
 });
+
+describe('an item\'s own reminders', async () => {
+  const { validate } = await import('../index.js');
+  const base = { id: 'x', createdAt: '2026-10-07T10:00:00.000Z', createdBy: 'telegram:1' };
+  const event = { ...base, type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-08T07:00:00.000Z' };
+  const task = { ...base, type: 'task', text: 'vuilnis' };
+
+  it('appointments and chores carry the household\'s reminders for them: a mode and rules', () => {
+    for (const item of [event, task]) {
+      expect(validate({ ...item, reminders: { mode: 'add', rules: ['evening-before', 'before:60'] } }).ok).toBe(true);
+      expect(validate({ ...item, reminders: { mode: 'replace', rules: [] } }).ok).toBe(true);
+      expect(validate({ ...item, reminders: { mode: 'sideways', rules: [] } }).ok).toBe(false);
+      expect(validate({ ...item, reminders: { mode: 'add' } }).ok).toBe(false);
+    }
+  });
+});

@@ -4195,6 +4195,42 @@
       "text": "Herinneringen staan uit.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "planned_head": {
+      "text": "Gepland voor jou (komende week):",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_reminder": {
+      "text": "{{when}} · {{title}} ({{rule}})",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_row": {
+      "text": "{{when}} · {{what}}",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_skipped": {
+      "text": "{{when}} · {{what}} — overgeslagen",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_week_overview": {
+      "text": "weekoverzicht",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_row_label": {
+      "text": "gepland",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_none": {
+      "text": "Niets gepland.",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_reminders_off": {
+      "text": "Je herinneringen staan uit (/herinneringen aan).",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_household": {
+      "text": "Het huishouden herinnert: {{rules}} (de avond ervoor alleen bij een afspraak vóór 10:00). Wijzigen: /huishouden rules …",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
     "reminders_ask": {
       "text": "Hoe wil je hieraan herinnerd worden — nu en voortaan? (Later anders: /herinneringen.)",
       "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
@@ -4665,7 +4701,8 @@
           "assistant-unlink": "je Basis-app ontkoppelen",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",
           "assistant-circles": "de kringen waar de bot in zit",
-          "remindMe": "een eigen herinnering voor één afspraak of klusje"
+          "remindMe": "een eigen herinnering voor één afspraak of klusje",
+          "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)"
         }
       }
     },

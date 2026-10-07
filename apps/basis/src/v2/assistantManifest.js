@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
@@ -182,6 +182,18 @@ export const assistantManifest = {
       visibility: 'trusted',
       params: [],
       surfaces: { slash: { command: '/users', body: 'none' } },
+    },
+    {
+      // What the bot will send this person in the coming week (`/gepland`): their reminders and their planned rows; an
+      // admin also sees the household's rules. A read.
+      id:     'assistant-planned',
+      verb:   'list-planned',
+      visibility: 'authenticated',
+      params: [],
+      surfaces: {
+        slash: { command: '/gepland', body: 'none' },
+        chat:  { reply: 'text', hint: 'What the bot will send this person in the coming week: their reminders (as their own settings make them) and their planned messages such as the Sunday overview. For "wat ga je me sturen", "welke herinneringen krijg ik".' },
+      },
     },
     {
       // Who is in the household (`/wie`), for anyone in it: names as the household's names setting allows, role words.

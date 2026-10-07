@@ -10,7 +10,8 @@ import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
 import { REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { REMINDER_RULES_KEY, reminderRulesFrom, reminderRulesValue, reminderLayerFromWords, leadOf, withLead, describeRules } from './reminderWords.js';
-import { layeredRules } from './reminderOccurrences.js';
+import { layeredRules, reminderOccurrences } from './reminderOccurrences.js';
+import { upcoming } from './intentions.js';
 import { assistantManifest } from './assistantManifest.js';
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
@@ -186,6 +187,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       }
       if (op === 'assistant-reminders') return remindersOp(threadId, args, tp);
       if (op === 'remindMe') return remindMeOp(threadId, args, ctx, tp);
+      if (op === 'assistant-planned') return plannedOp(threadId, tp);
       if (op === 'assistant-overview') {
         const mode = switchOf(args?.mode ?? args?._match);
         if (!mode) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.switch_usage', { command: op === 'assistant-reminders' ? '/herinneringen' : '/overzicht' }) } };
@@ -224,6 +226,40 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const buttons = [['ask_morning', 'ochtend'], ['ask_hour', '60'], ['ask_none', 'geen'], ['ask_usual', 'huis']]
       .map(([label, words]) => ({ label: tp(`circle.bot.${label}`), slash: `${slash} ${words}` }));
     return { ...res, message: [res.message, tp('circle.bot.reminders_ask')].filter(Boolean).join('\n\n'), quickReplies: [...(res.quickReplies ?? []), ...buttons] };
+  }
+
+  /**
+   * `/gepland`: what the bot will send THIS person in the coming week — their reminders as their layers make them, and
+   * their planned rows (a missed one says so), in time order. An admin also sees the household's own rules, never
+   * anyone's personal extras. Read from the record each time; nothing is stored for it.
+   */
+  async function plannedOp(person, tp) {
+    if (typeof intentions.sources !== 'function') return { ok: false, error: 'unwired' };
+    const at = now();
+    const tz = intentions.tz ?? 'UTC';
+    const horizon = 7 * 86_400_000;
+    const lang = threads?.langOf?.(person) ?? 'nl';
+    const when = (ms) => new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'nl-NL', { timeZone: tz, weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
+    const rows = (await intentions.users?.().catch(() => null)) ?? [];
+    const household = await householdReminderRules();
+    const lines = [];
+    const remindersOn = threads.remindersOn(person);
+    if (remindersOn) {
+      const { events = [], chores = [] } = (await intentions.sources().catch(() => null)) ?? {};
+      const rulesFor = (item, pid) => layeredRules({ household, personDefault: threads.reminderDefaultOf?.(pid) ?? null, item: item?.reminders ?? null, personItem: threads.reminderExtraOf?.(pid, item?.id) ?? null });
+      for (const o of reminderOccurrences({ events, chores, people: rows.map((r) => ({ id: r.id })), now: at, tz, rulesFor, horizon })) {
+        if (o.personId === person) lines.push({ at: o.at, text: tp('circle.bot.planned_reminder', { when: when(o.at), title: o.text, rule: describeRules([o.rule], tp) }) });
+      }
+    }
+    for (const o of upcoming({ rows: book.rows().filter((r) => r.actsAs === person), now: at, tz, horizon })) {
+      const what = tp(`circle.bot.planned_${String(o.label ?? 'row').replace(/-/g, '_')}`);
+      lines.push({ at: o.at, text: tp(o.state === 'skipped' ? 'circle.bot.planned_skipped' : 'circle.bot.planned_row', { when: when(o.at), what }) });
+    }
+    lines.sort((a, b) => a.at - b.at);
+    const out = [tp('circle.bot.planned_head'), ...(lines.length ? lines.map((l) => `• ${l.text}`) : [tp('circle.bot.planned_none')])];
+    if (!remindersOn) out.push(tp('circle.bot.planned_reminders_off'));
+    if (rows.find((r) => r.id === person)?.role === 'admin') out.push('', tp('circle.bot.planned_household', { rules: describeRules(household, tp) }));
+    return { ok: true, message: out.join('\n') };
   }
 
   /** The household's reminder rules as they stand. */

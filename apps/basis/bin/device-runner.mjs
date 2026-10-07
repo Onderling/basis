@@ -1092,7 +1092,11 @@ if (tgToken || inboxDoor.bridge) {
     callSkill, threads, t, refusal: agent.doorRefusal,
     // the planned overview: written by `/overzicht`, sent to the person's own door, never in their quiet hours
     announcer,
-    intentions: { book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz },
+    intentions: {
+      book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz,
+      // `/gepland` reads what is coming from the household's items and its people
+      sources: () => agent.reminderSources(), users: () => botUsers.list(),
+    },
     admin: {
       screens,
       identityLink,

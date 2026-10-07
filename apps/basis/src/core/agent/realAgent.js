@@ -1029,6 +1029,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     sendPeerMessage: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
     selfAddress:     chatId.pubKey,
   });
+  // inbound peer messages the router refuses, by reason (`inboundRefusals()`)
+  const inboundRefused = {};
   const circleSubstrate = buildHouseholdSubstrateStack({
     transport: householdEnvelopeAdapter,
     deviceId:  chatId.pubKey,
@@ -6378,8 +6380,16 @@ export async function createRealHouseholdAgent(opts = {}) {
             .catch(() => {});
           return;
         }
-        try { if (householdEnvelopeAdapter.handleInbound(env?.from, env?.payload)) return; }
-        catch { /* fall through to the shell router */ }
+        // THE OLD ITEM-ENVELOPE WIRE IS CUT INBOUND (2026-10-07). An envelope tagged `__ntfyEnv` used to reach
+        // notify-envelope, which writes its payload into this agent's local pseudo-pod at whatever `ref` it names
+        // before anything checks it — the pod that holds this agent's endorsements (the catalogue's trust). Any
+        // address that could say hello on the relay could rewrite them. Nothing current sends the shape (items ride
+        // the signed task lane), so it stops here, counted, and writes nothing. The adapter and the mirror stay in
+        // the tree (kept mechanisms); the wire to them is what is cut.
+        if (env?.payload && typeof env.payload === 'object' && Object.prototype.hasOwnProperty.call(env.payload, '__ntfyEnv')) {
+          inboundRefused['old-envelope'] = (inboundRefused['old-envelope'] ?? 0) + 1;
+          return;
+        }
         return onPeerMessage?.(env);
       };
       // THE RELAY NEVER WAITS ON NKN (2026-09-18). This used to `await` NKN first and dial the relay after
@@ -6527,6 +6537,10 @@ export async function createRealHouseholdAgent(opts = {}) {
      * primitive the factory wires without re-exposing each one.
      */
     sa,
+    /** Read one resource of this agent's local substrate pod (diagnostics: what a peer could have written there). */
+    readLocalPod: (uri) => circleSubstrate.pseudoPod.read(uri),
+    /** Inbound peer messages the router refused, by reason (never silent). */
+    inboundRefusals: () => ({ ...inboundRefused }),
     // Diagnostic (step 2.4a) — the enforcement gate on the host skills' agent. Non-null proves
     // the PolicyEngine attached (vs the try/catch having silently swallowed it).
     hostPolicyEngine: hostAgent.policyEngine ?? null,

@@ -28,6 +28,20 @@ export async function createInboxDoor({ profileKind, sendTurn }) {
   return { bridge, feed: (msg) => bridge.feed(msg) };
 }
 
+/**
+ * A reply as plain text: a contact turn is painted as text, so the model's markdown would show its marks. Bold/italic
+ * pairs (`**x**`, `__x__`), inline code, heading marks and list bullets become plain; a lone star or an underscore
+ * inside a word stays as it is.
+ */
+export function plainReply(text) {
+  return String(text)
+    .replace(/\*\*(\S(?:[^*]*?\S)?)\*\*/g, '$1')
+    .replace(/(^|[^\w])__(\S(?:[^_]*?\S)?)__(?=[^\w]|$)/g, '$1$2')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '• ');
+}
+
 /** @param {{sendTurn: Function}} a */
 export function createContactDoorBridge({ sendTurn }) {
   if (typeof sendTurn !== 'function') throw new TypeError('createContactDoorBridge: sendTurn is required');
@@ -46,7 +60,7 @@ export function createContactDoorBridge({ sendTurn }) {
     // reaches nobody. The channel's own routing picks the way to the person, as it does for every shell's reply.
     async sendReply({ chatId, text }) {
       if (!chatId || typeof text !== 'string' || !text) return;
-      await sendTurn({ peerAddr: chatId, threadId: chatId, text });
+      await sendTurn({ peerAddr: chatId, threadId: chatId, text: plainReply(text) });
     },
     /**
      * A contact's message, already landed in the inbox by the host.

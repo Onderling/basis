@@ -7010,6 +7010,7 @@ snapshots:
       '@onderling/app-manifest': link:../../packages/app-manifest
       '@onderling/attribute-charter': link:../../packages/attribute-charter
       '@onderling/blob-gateway': link:../../packages/blob-gateway
+      '@onderling/calendar-emission': link:../../packages/calendar-emission
       '@onderling/chat-nav': link:../../packages/chat-nav
       '@onderling/circles': link:../../packages/circles
       '@onderling/core': link:../../packages/core

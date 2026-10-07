@@ -220,6 +220,17 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
     usageOf: (id, now = Date.now()) => { const month = monthOf(now); const c = rows.get(id)?.usage; return c?.month === month ? { ...c } : emptyUsage(month); },
     /** The household's counts this month (every call, whoever made it). */
     householdUsage: (now = Date.now()) => { const month = monthOf(now); const c = rows.get(HOUSEHOLD_ROW)?.usage; return c?.month === month ? { ...c } : emptyUsage(month); },
+    /**
+     * The person's agenda link (`/agenda-link`): `{id, k}`, kept so the bot can re-seal their file after a change (this
+     * store is the bot's own, sealed at rest); never shown again, and never on the companion.
+     */
+    feedLinkOf: (id) => { const l = rows.get(id)?.feedLink; return l?.id && l?.k ? { id: l.id, k: l.k } : null; },
+    setFeedLink(id, link) {
+      const { feedLink: _f, ...rest } = rowOf(id);
+      return save(link?.id && link?.k ? { ...rest, feedLink: { id: link.id, k: link.k } } : rest);
+    },
+    /** Who has an agenda link now. */
+    feedPeople: () => [...rows].filter(([, r]) => r?.feedLink?.id).map(([id]) => id),
     /** A person's own quiet hours ("23:00-09:00"), or null: they follow the household's. */
     quietOf: (id) => { const v = rows.get(id)?.quiet; return isQuietHours(v) ? v : null; },
     setQuiet(id, hours) {

@@ -8,7 +8,7 @@ import { personNamed, linkedKeyOf } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
-import { REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, CALENDAR_FEED_KEY, CALENDAR_FEED_MODES, calendarFeedFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { REMINDER_RULES_KEY, reminderRulesFrom, reminderRulesValue, reminderLayerFromWords, leadOf, withLead, describeRules } from './reminderWords.js';
 import { layeredRules, reminderOccurrences } from './reminderOccurrences.js';
 import { upcoming } from './intentions.js';
@@ -80,6 +80,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     ['usage', USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom],
     ['roles', ROLES_KEY, ROLES_PRESETS, rolesPresetFrom],
     ['app', HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom],
+    ['agenda', CALENDAR_FEED_KEY, CALENDAR_FEED_MODES, calendarFeedFrom],
   ];
   const slashOf = (opId) => assistantManifest.operations.find((o) => o.id === opId)?.surfaces?.slash?.command ?? null;
   /** An op's declared step-up, from the door's catalogue (any app), else the door's own manifest. */
@@ -152,6 +153,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-usage') return usageOp(caller ?? ctx?.threadId);
       if (op === 'assistant-view') return viewOp(caller ?? ctx?.threadId, args?.mode ?? args?._match);
       if (op === 'assistant-screen') return screenOp(caller ?? ctx?.threadId, args?.how ?? args?._match);
+      if (op === 'assistant-agenda-link') return agendaLinkOp(caller ?? ctx?.threadId, ctx);
       if (op === 'assistant-screen-paste') return screenPasteOp(caller ?? ctx?.threadId, args?.offer ?? args?._match);
       if (op === 'assistant-screen-confirm') return screenConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-screens') return screensOp(caller ?? ctx?.threadId, args?.change ?? args?._match);
@@ -412,7 +414,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
       const of = (key) => (r?.params ?? []).find((p) => p.key === key)?.value;
-      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: leadOf(reminderRulesFrom(of(REMINDER_RULES_KEY))), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)), app: inAppModeFrom(of(HOUSEHOLD_IN_APP_KEY)), announce: announcingWhich() ?? '—' });
+      return t('circle.bot.settings_list', { assign: assignPolicyFrom(of(ASSIGN_POLICY_KEY)), names: namesPolicyFrom(of(NAMES_KEY)), passed: passedPolicyFrom(of(PASSED_KEY)), days: passedDaysFrom(of(PASSED_DAYS_KEY)), cancel: cancelPolicyFrom(of(CANCEL_KEY)), reminders: remindersModeFrom(of(REMINDERS_KEY)), quiet: quietHoursFrom(of(QUIET_KEY)), lead: leadOf(reminderRulesFrom(of(REMINDER_RULES_KEY))), usage: usageVisibleFrom(of(USAGE_VISIBLE_KEY)), roles: rolesPresetFrom(of(ROLES_KEY)), app: inAppModeFrom(of(HOUSEHOLD_IN_APP_KEY)), agenda: calendarFeedFrom(of(CALENDAR_FEED_KEY)), announce: announcingWhich() ?? '—' });
     };
     const [what, value, ...more] = String(change ?? '').trim().split(/\s+/).filter(Boolean);
     if (!what) return { ok: true, message: await current() };
@@ -461,7 +463,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!isQuietHours(value)) return usage;
       return set(QUIET_KEY, value);
     }
-    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES], roles: [ROLES_KEY, ROLES_PRESETS], usage: [USAGE_VISIBLE_KEY, USAGE_VISIBILITY], app: [HOUSEHOLD_IN_APP_KEY, IN_APP_MODES] }[what];
+    const setting = { assign: [ASSIGN_POLICY_KEY, ASSIGN_POLICIES], names: [NAMES_KEY, NAMES_POLICIES], passed: [PASSED_KEY, PASSED_POLICIES], cancel: [CANCEL_KEY, CANCEL_POLICIES], reminders: [REMINDERS_KEY, REMINDERS_MODES], roles: [ROLES_KEY, ROLES_PRESETS], usage: [USAGE_VISIBLE_KEY, USAGE_VISIBILITY], app: [HOUSEHOLD_IN_APP_KEY, IN_APP_MODES], agenda: [CALENDAR_FEED_KEY, CALENDAR_FEED_MODES] }[what];
     if (!setting || !setting[1].includes(value)) return usage;
     return set(setting[0], value);
   }
@@ -615,6 +617,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     // …and is no longer in the household's circle on their own app (by the key they linked)
     const evicted = linkedKeyOf(row) && typeof admin.householdInApp?.evict === 'function'
       ? ((await admin.householdInApp.evict(linkedKeyOf(row)).catch(() => null))?.removed ?? 0) : 0;
+    // …and their agenda link goes dark (the file dropped from the companion)
+    if (typeof admin.feeds?.end === 'function') await admin.feeds.end(row.id).catch(() => {});
     const said = t('circle.bot.revoked', { who: row.displayName ?? row.id });
     const parts = [said, ...(dropped ? [t('circle.bot.revoked_screens', { n: dropped })] : []), ...(evicted ? [t('circle.bot.revoked_circle')] : [])];
     return { ok: true, message: parts.join(' ') };
@@ -717,6 +721,26 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return { ok: false, error: { code: r.reason, message: tp(key) } };
     }
     return { ok: true, message: tp('circle.bot.screen_sent_privately') };
+  }
+
+  /**
+   * `/agenda-link`: a NEW link to the person's agenda (the old one goes dark), for a calendar app — sent to their PRIVATE
+   * chat only, never shown again. Only when the admin switched it on; the reply says what holding the link means.
+   */
+  async function agendaLinkOp(person, ctx) {
+    if (!person) return { ok: false, error: 'no-thread' };
+    const tp = personT(person);
+    if (!admin.feeds || typeof admin.sendPrivately !== 'function') return { ok: false, error: { code: 'unwired', message: tp('circle.bot.agenda_link_none_here') } };
+    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+    if (calendarFeedFrom((r?.params ?? []).find((p) => p.key === CALENDAR_FEED_KEY)?.value) !== 'on') {
+      return { ok: false, error: { code: 'off', message: tp('circle.bot.agenda_link_off') } };
+    }
+    const made = await admin.feeds.mint(person);
+    if (!made.ok) return { ok: false, error: { code: made.reason, message: tp('circle.bot.agenda_link_failed') } };
+    const sent = await admin.sendPrivately(person, tp('circle.bot.agenda_link', { https: made.urls.https, webcal: made.urls.webcal }), tp('circle.bot.agenda_link_remembered'));
+    // a link that never reached the person is not left standing
+    if (!sent?.ok) { await admin.feeds.end(person).catch(() => {}); return { ok: false, error: { code: 'not-reachable', message: tp('circle.bot.screen_not_reachable') } }; }
+    return { ok: true, message: tp('circle.bot.agenda_link_sent_privately') };
   }
 
   /**

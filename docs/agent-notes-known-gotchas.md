@@ -67,6 +67,9 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   (`pnpm install --lockfile-only`, which writes no `node_modules`) and commit ONLY the lockfiles of the packages you
   changed: the same run re-resolves unrelated ones (2026-10-07 it moved `openai` 7.10 → 6.49 in four other packages) —
   restore those.
+  *(2026-10-07: `@onderling/calendar-emission` added to `apps/basis` (`workspace:*`, the box renders a person's agenda
+  link with it) — link `apps/basis/node_modules/@onderling/calendar-emission → ../../../../packages/calendar-emission`;
+  its `ical.js` resolves from the package's own `node_modules`. Box-only: nothing on web or mobile imports it.)*
   This repo has NO root hoisting: each package's `file:` deps live as symlinks in *its own*
   `node_modules`. Adding a `@onderling/*` dep to a package's `package.json` is not enough for a fresh
   checkout that doesn't re-run install — the symlink must exist. (2026-07-10) wired

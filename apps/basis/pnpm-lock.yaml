@@ -48,6 +48,9 @@ importers:
       '@onderling/blob-gateway':
         specifier: workspace:*
         version: link:../../packages/blob-gateway
+      '@onderling/calendar-emission':
+        specifier: workspace:*
+        version: link:../../packages/calendar-emission
       '@onderling/chat-nav':
         specifier: workspace:*
         version: link:../../packages/chat-nav

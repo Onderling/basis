@@ -25,6 +25,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
+import { tEn } from './support/bundleTranslator.js';
 
 const CIRCLE = 'shared-work-three';
 
@@ -58,9 +59,9 @@ describe('the collaborative task corridor — three people, one circle', () => {
 
   it('create → claim → decompose → the parent is blocked until the child closes → submit + approve, seen by all three', async () => {
     [A, B, C] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true }),
-      bootRealAgentNode('B', { taskLane: true }),
-      bootRealAgentNode('C', { taskLane: true }),
+      bootRealAgentNode('A', { taskLane: true, agentOpts: { t: tEn } }),
+      bootRealAgentNode('B', { taskLane: true, agentOpts: { t: tEn } }),
+      bootRealAgentNode('C', { taskLane: true, agentOpts: { t: tEn } }),
     ]);
     await connectNodesOverBus([A, B, C]);
     for (const n of [A, B, C]) wireInboundLikeShell(n);

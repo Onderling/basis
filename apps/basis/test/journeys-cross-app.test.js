@@ -33,6 +33,7 @@ import {
   loadCircleItems, makeResolvingCallSkill,
 } from '../src/index.js';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
+import { tEn } from './support/bundleTranslator.js';
 import {
   mockTasksManifest, mockStoopManifest, mockFolioManifest,
 } from '../src/core/manifests/mockManifests.js';
@@ -58,6 +59,8 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
     // the resolveContact demo directory), so opt into the demo scaffolding —
     // it is OFF by default now that a real circle shows only real members.
     seedDemoData: true,
+    // like every shell, hand the agent its translator (the replies are read in English below)
+    t: tEn,
     publishEvent: (event) => {
       if (routerRef) routerRef.deliver(event);
     },

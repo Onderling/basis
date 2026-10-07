@@ -15,7 +15,7 @@
  *   - seed items: Milk (shopping), Post a parcel (errand), Vacuum living
  *     room (task)
  *   - markComplete({match}) (keyword/id), not markComplete({choreId})
- *   - reply text "✓ marked complete: <text>" (the real skill's wording)
+ *   - the household reply in the translator's words ("✓ Marked complete: <text>" in English)
  *
  * This test runs in the node env (default vitest); the same code also runs
  * in the browser bundle (verified by `vite build` + the dev-server smoke).
@@ -24,6 +24,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
+// Every shell hands the agent its translator; the replies below are read in English.
+import { tEn } from './support/bundleTranslator.js';
 
 describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   it("listOpen returns the 3 seed household items via real Agent.invoke roundtrip", async () => {
@@ -44,10 +46,10 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   });
 
   it("markComplete({match}) flips state + listOpen reflects it", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ t: tEn });
     const done = await a.callSkill('household', 'markComplete', { match: 'Milk' });
     expect(done).toMatchObject({
-      ok: true, message: '✓ marked complete: Milk', text: 'Milk',
+      ok: true, message: '✓ Marked complete: Milk', text: 'Milk',
     });
     expect(typeof done.itemId).toBe('string');
     expect(done._sync).toBeTruthy();
@@ -57,18 +59,18 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   });
 
   it("markComplete with no match returns ok:false with the skill's message", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ t: tEn });
     const r = await a.callSkill('household', 'markComplete', { match: 'nope-zzz' });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Couldn't find an open item/);
   });
 
   it("markComplete with >1 candidate surfaces the disambiguation list (acts on NONE)", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ t: tEn });
     // 'a' appears in "Post a parcel" + "Vacuum living room" → ambiguous.
     const r = await a.callSkill('household', 'markComplete', { match: 'a' });
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Multiple matches/);
+    expect(r.error).toMatch(/More than one match/);
     // …and NOTHING was completed — both candidates are still open.
     const list = await a.callSkill('household', 'listOpen', {});
     expect(list.items.find((c) => c.label === 'Post a parcel')).toBeTruthy();
@@ -76,28 +78,28 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   });
 
   it("markComplete with exactly ONE candidate resolves + acts", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ t: tEn });
     // 'Milk' is unique → completes it (single-match resolve, not a disambiguation prompt).
     const r = await a.callSkill('household', 'markComplete', { match: 'Milk' });
-    expect(r).toMatchObject({ ok: true, message: '✓ marked complete: Milk', text: 'Milk' });
+    expect(r).toMatchObject({ ok: true, message: '✓ Marked complete: Milk', text: 'Milk' });
     const list = await a.callSkill('household', 'listOpen', {});
     expect(list.items.find((c) => c.label === 'Milk')).toBeUndefined();
   });
 
   it("claim with >1 candidate surfaces the disambiguation list (acts on NONE)", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ t: tEn });
     await a.callSkill('household', 'addTask', { text: 'paint the fence' });
     await a.callSkill('household', 'addTask', { text: 'mend the fence' });
     const r = await a.callSkill('household', 'claim', { match: 'fence' });
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Multiple matches/);
+    expect(r.error).toMatch(/More than one match/);
     // neither task was claimed
     const tasks = (await a.callSkill('household', 'listTasks', {})).items;
     expect(tasks.filter((t) => /fence/.test(t.label)).every((t) => !t.claimedBy)).toBe(true);
   });
 
   it("addItem + addTask + claim round-trip through the real skills", async () => {
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ t: tEn });
     const add = await a.callSkill('household', 'addItem', { type: 'shopping', text: 'Bread' });
     expect(add).toMatchObject({ ok: true, text: 'Bread' });
     expect(add.message).toMatch(/Bread/);
@@ -107,7 +109,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
 
     const claim = await a.callSkill('household', 'claim', { match: 'leaky' });
     expect(claim).toMatchObject({ ok: true, text: 'Fix the leaky tap' });
-    expect(claim.message).toMatch(/claimed/);
+    expect(claim.message).toMatch(/claimed/i);
   });
 
   it("exposes a transport-NEUTRAL isPeerReachable() (false when no transport connected)", async () => {
@@ -191,7 +193,7 @@ describe('createRealHouseholdAgent — pipeline integration', () => {
       renderReply, Thread,
     } = await import('../src/index.js');
 
-    const a = await createRealHouseholdAgent();
+    const a = await createRealHouseholdAgent({ t: tEn });
     const catalogue = mergeManifests([{ manifest: a.manifest }]);
     const thread  = new Thread();
 
@@ -214,7 +216,7 @@ describe('createRealHouseholdAgent — pipeline integration', () => {
     const rendered2 = renderReply(reply2);
     thread.addShellMessage(rendered2);
     expect(rendered2.kind).toBe('text');
-    expect(rendered2.text).toBe('✓ marked complete: Milk');
+    expect(rendered2.text).toBe('✓ Marked complete: Milk');
   });
 });
 

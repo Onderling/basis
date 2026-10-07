@@ -4437,9 +4437,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         const list = await callSkill('tasks', 'listMine', args?.actor ? { actor: args.actor } : {});
         const items = (list?.items ?? []).filter((t) => t.state === 'open');
         if (items.length === 0) return { ok: true };   // empty → /brief skips
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
         return {
           items:   items.map((t) => ({ id: t.id, label: t.text ?? t.title })),
-          message: `${items.length} open task${items.length === 1 ? '' : 's'}`,
+          message: tr('circle.tasks.brief', { count: items.length }),
         };
       }
       if (opId === 'searchTasks') {
@@ -4515,10 +4516,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (realOpId === 'archiveCircle' && realArgs.confirm !== true) {
         // two-step confirm.
-        return {
-          ok: false,
-          error: 'Archiving the circle puts it read-only. Re-run with --confirm=true to proceed.',
-        };
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        return { ok: false, error: tr('circle.tasks.state.archive_confirm') };
       }
       if (realOpId === 'suggestSchedule' && realArgs['lookahead-days']) {
         realArgs = {
@@ -4575,13 +4574,15 @@ export async function createRealHouseholdAgent(opts = {}) {
               ? globalThis.atob(padded) : padded;
             realArgs = { ...realArgs, invite: JSON.parse(json) };
           } catch (err) {
-            return { ok: false, error: `Couldn't decode invite URL: ${err.message ?? err}` };
+            const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+            return { ok: false, error: tr('circle.tasks.invite.bad_url', { error: err.message ?? String(err) }) };
           }
         } else if (inv.startsWith('{')) {
           try {
             realArgs = { ...realArgs, invite: JSON.parse(inv) };
           } catch (err) {
-            return { ok: false, error: `Couldn't parse invite JSON: ${err.message ?? err}` };
+            const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+            return { ok: false, error: tr('circle.tasks.invite.bad_json', { error: err.message ?? String(err) }) };
           }
         }
       }
@@ -4628,9 +4629,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         const list = await callSkill('stoop', 'listFeed', {});
         const items = list?.items ?? [];
         if (items.length === 0) return { ok: true };   // empty → /brief skips
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
         return {
           items:   items.slice(0, 3).map((p) => ({ id: p.id, label: p.text ?? p.label })),
-          message: `${items.length} circle request${items.length === 1 ? '' : 's'}`,
+          message: tr('circle.noticeboard.brief', { count: items.length }),
         };
       }
       // Derived: searchPosts (no dedicated skill in stoop today).
@@ -4792,10 +4794,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (realOpId === 'leaveGroup' && realArgs.confirm !== true) {
         // style two-step confirm. Short-circuit before invoke.
-        return {
-          ok: false,
-          error: 'Leaving your circle is irreversible. Re-run with --confirm=true to proceed.',
-        };
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        return { ok: false, error: tr('circle.groups.leave_confirm') };
       }
       // Synthesize a `/groups` op locally — there's no listMyGroups
       // skill in single-circle mode; we render what we know.  After
@@ -4806,12 +4806,13 @@ export async function createRealHouseholdAgent(opts = {}) {
           [DataPart({ groupId: opts.stoopGroup ?? 'cc-default-circle' })],
         );
         const members = membersResult?.[0]?.data?.members ?? [];
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
         return {
-          title:       'Your circle',
+          title:       tr('circle.groups.current_title'),
           groupId:     opts.stoopGroup ?? 'cc-default-circle',
           memberCount: members.length,
-          mode:        'single-circle (V0)',
-          note:        'Multi-circle support requires multi-agent topology — separate slice.',
+          mode:        tr('circle.groups.single_mode'),
+          note:        tr('circle.groups.current_note'),
         };
       }
       let rawReply = null;   // the stoop reply before shaping — the own-devices fan below reads the contact row
@@ -4978,7 +4979,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (opId === 'viewAgent') {
         // A miss surfaces as a soft failure (message, not a false record).
-        return data?.agent ?? { ok: false, error: `No agent matches "${String(args?.agentId ?? '')}"` };
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        return data?.agent ?? { ok: false, error: tr('circle.op.no_agent', { agent: String(args?.agentId ?? '') }) };
       }
       return data;
     }
@@ -5087,27 +5089,26 @@ export async function createRealHouseholdAgent(opts = {}) {
     // not a false "✓".  On MORE THAN ONE open match the core returns `{ambiguous:[…]}` and acts on none
     // — reproduce the legacy chat-shell disambiguation prompt (identical text/shape) so the user picks by
     // id-prefix rather than the tool silently completing the wrong item.
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
     if (opId === 'markComplete' || opId === 'removeItem' || opId === 'claim' || opId === 'reassign') {
+      const match = String(args?.match ?? '');
       if (Array.isArray(data?.ambiguous)) {
         const lines = data.ambiguous.map((it) => `- [${String(it.id ?? '').slice(0, 8)}] ${it.text}`);
-        return {
-          ok:    false,
-          error: `Multiple matches for '${String(args?.match ?? '')}'. Reply with the id-prefix:\n${lines.join('\n')}`,
-        };
+        return { ok: false, error: tr('circle.household.ambiguous', { match, options: lines.join('\n') }) };
       }
       if (!data || data.ok === false) {
-        const noun = (opId === 'claim' || opId === 'reassign') ? 'open task' : 'open item';
-        return { ok: false, error: `Couldn't find an ${noun} matching '${String(args?.match ?? '')}'.` };
+        const key = (opId === 'claim' || opId === 'reassign') ? 'circle.household.not_found_task' : 'circle.household.not_found_item';
+        return { ok: false, error: tr(key, { match }) };
       }
       const item   = data.item ?? null;
       const text   = item?.text ?? '';
       const itemId = item?.id ?? data.removed ?? undefined;
       let message;
       switch (opId) {
-        case 'markComplete': message = `✓ marked complete: ${text}`; break;
-        case 'removeItem':   message = `✓ removed: ${text}`; break;
-        case 'claim':        message = `✓ claimed: ${text}`; break;
-        default:             message = `✓ reassigned: ${text} → ${String(args?.assignee ?? '').trim()}`; break;
+        case 'markComplete': message = tr('circle.household.completed', { text }); break;
+        case 'removeItem':   message = tr('circle.household.removed', { text }); break;
+        case 'claim':        message = tr('circle.household.claimed', { text }); break;
+        default:             message = tr('circle.household.reassigned', { text, who: String(args?.assignee ?? '').trim() }); break;
       }
       publish(itemId, message);
       return { ok: true, message, ...(text ? { text } : {}), ...(itemId ? { itemId } : {}), _sync: simulateSync() };
@@ -5116,7 +5117,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // addItem / addTask — `data` is the stored item.
     const item    = data ?? {};
     const text    = item.text ?? '';
-    const message = opId === 'addTask' ? `✓ added task: ${text}` : `✓ added to ${item.type}: ${text}`;
+    const message = opId === 'addTask' ? tr('circle.household.added_task', { text }) : tr('circle.household.added_to', { list: item.type, text });
     publish(item.id, message);
     return { ok: true, message, ...(text ? { text } : {}), ...(item.id ? { itemId: item.id } : {}), _sync: simulateSync() };
   }
@@ -5128,7 +5129,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     catch { open = []; }
     if (!open.length) return { ok: true };   // empty → /brief skips the section
     const items = open.slice(0, 5).map((it) => ({ id: it.id, label: it.text }));
-    return { items, message: `${open.length} open household item${open.length === 1 ? '' : 's'}` };
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+    return { items, message: tr('circle.household.brief', { count: open.length }) };
   }
 
   /**
@@ -5151,6 +5153,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   const WORDED_BY_DOOR = Object.freeze({ reassignTask: 'reassigned', removeTask: 'removed', editTask: 'edited' });
   function adaptTasksReply(opId, data, { actor = null, named = null, args = {} } = {}) {
     if (data == null) return null;
+    // In the person's words: every shell hands the agent its translator.
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
     // (B8) — DAG hard-dep blocking surface. Real skill returns
     // {error: 'has-open-dependencies', openDeps: [...]} when the user
     // tries to complete a task whose subtasks aren't done.  Translate
@@ -5161,7 +5165,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const deps = Array.isArray(data.openDeps) ? data.openDeps : [];
       return {
         ok:    false,
-        error: `🔒 Blocked: ${deps.length} open dependenc${deps.length === 1 ? 'y' : 'ies'} (${deps.slice(0, 3).join(', ')}${deps.length > 3 ? '…' : ''}). Close the sub-tasks first.`,
+        error: tr('circle.tasks.blocked', { count: deps.length, deps: `${deps.slice(0, 3).join(', ')}${deps.length > 3 ? '…' : ''}` }),
         openDeps: deps,
       };
     }
@@ -5175,7 +5179,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A claim that LOST comes back as its result (`{error: 'already-claimed', current}`) — never a "✓": someone else has
     // the task, or this person had it already.
     if (task && typeof task.error === 'string' && task.error) {
-      const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
       const cur = task.current ?? {};
       const title = cur.text || cur.title || named || '';
       if (task.error === 'already-claimed') {
@@ -5192,7 +5195,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (opId === 'addTask' && task) {
       return {
         ok:      true,
-        message: `✓ Added task: ${task.text ?? task.title ?? task.id}`,
+        message: tr('circle.tasks.reply.added', { title: task.text ?? task.title ?? task.id }),
         itemId:  task.id,
         // S6.A — carry the mock-era `state` + `type` the manifest's appliesTo gates
         // on (the real circle uses `status`), so inline buttons compute on the reply.
@@ -5291,7 +5294,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           const baseRow = { ...t, state: _statusToChatState(t.status, t) };
           if (openDeps.length > 0) {
             baseRow.blockedBy = openDeps;
-            baseRow.label = `${t.text ?? t.title ?? t.id} 🔒 blocked by ${openDeps.length} dep${openDeps.length === 1 ? '' : 's'}`;
+            baseRow.label = tr('circle.tasks.blocked_label', { title: t.text ?? t.title ?? t.id, count: openDeps.length });
           }
           return baseRow;
         }),
@@ -5325,13 +5328,13 @@ export async function createRealHouseholdAgent(opts = {}) {
       const qrUri = `onderling-invite://${b64url}`;
       const expires = inv?.expiresAt
         ? new Date(inv.expiresAt).toISOString()
-        : '(no expiry)';
+        : tr('circle.tasks.invite.no_expiry');
       return {
-        title:    'Circle invite',
+        title:    tr('circle.tasks.invite.title'),
         role:     inv?.role ?? 'member',
         expires,
         invite:   qrUri,   // classified as kind:'qr' by classifyFieldKind
-        message:  `🎟️ Single-use invite minted. Have the invitee scan the QR or paste the URL into /redeem-invite.`,
+        message:  tr('circle.tasks.invite.minted'),
       };
     }
     // redeemInvite: real returns {groupProof, members, ...} → friendly text.
@@ -5339,7 +5342,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const memberCount = Array.isArray(data.members) ? data.members.length : '?';
       return {
         ok: true,
-        message: `✓ Joined circle. ${memberCount} members visible. /mytasks shows the circle's tasks.`,
+        message: tr('circle.tasks.invite.joined', { members: memberCount }),
         circle:   data,
         _sync:  simulateSync(),
       };
@@ -5350,12 +5353,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (opId === 'getMyAvailability') {
       if (data.enabled === false) {
         return {
-          title:   'Availability',
+          title:   tr('circle.availability.title'),
           status:  'disabled-for-circle',
-          message: 'Availability hints aren\'t enabled for this circle yet. Ask an admin to enable them, then /availability-opt-in on to start setting your week.',
+          message: tr('circle.tasks.availability.disabled'),
         };
       }
-      const week = data.week ?? '(this week)';
+      const week = data.week ?? tr('circle.tasks.availability.this_week');
       // 2026-05-24 — pad with a default blank 7×2 grid so the renderer
       // always has a structural grid to draw.  Real cells overlay
       // 'unknown' defaults; empty `data.grid` no longer renders as
@@ -5369,24 +5372,26 @@ export async function createRealHouseholdAgent(opts = {}) {
         merged[day] = { ...blankGrid[day], ...halves };
       }
       return {
-        title:   `Availability — ${week}`,
+        title:   tr('circle.tasks.availability.title_week', { week }),
         optedIn: !!data.optedIn,
         week,
         // classifyFieldKind detects {0-6: {AM, PM}} shape as 'grid' →
         // renderGridField in domAdapter draws clickable cells.
         grid:    merged,
         message: data.optedIn
-          ? 'Click a cell to cycle: unknown → open → tight → unavailable → unknown.'
-          : 'You haven\'t opted in. /availability-opt-in on to start broadcasting.',
+          ? tr('circle.tasks.availability.cycle_hint')
+          : tr('circle.tasks.availability.not_opted_in'),
       };
     }
     // setMyAvailability: {ok, week, day, half, state} → text.
     if (opId === 'setMyAvailability' && data.ok) {
       const STATE_GLYPH = { open: '🟢', tight: '🟡', unavailable: '🔴', unknown: '⚪' };
-      const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][data.day] ?? '?';
+      const dayName = Number.isInteger(data.day) && data.day >= 0 && data.day <= 6 ? tr(`circle.tasks.availability.day.${data.day}`) : '?';
+      const half = data.half === 'AM' || data.half === 'PM' ? tr(`circle.tasks.availability.half.${data.half}`) : data.half;
+      const state = STATE_GLYPH[data.state] ? tr(`circle.tasks.availability.state.${data.state}`) : data.state;
       return {
         ok: true,
-        message: `${STATE_GLYPH[data.state] ?? '⚪'} ${dayName} ${data.half}: ${data.state}`,
+        message: `${STATE_GLYPH[data.state] ?? '⚪'} ${dayName} ${half}: ${state}`,
         _sync: simulateSync(),
       };
     }
@@ -5395,8 +5400,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       return {
         ok: true,
         message: data.optedIn
-          ? '✓ Opted in. Your availability hints are visible to your circle.'
-          : '✓ Opted out. Coordinator sees you as "unknown" (indistinguishable from non-opted).',
+          ? tr('circle.tasks.availability.opted_in')
+          : tr('circle.tasks.availability.opted_out'),
         _sync: simulateSync(),
       };
     }
@@ -5410,7 +5415,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (data.suggestions.length === 0) {
         return {
           items:   [],
-          message: 'No schedulable tasks in your lookahead window (set --lookahead-days to expand).',
+          message: tr('circle.tasks.schedule.none'),
         };
       }
       const items = [];
@@ -5436,7 +5441,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       return {
         items,
-        message: `${data.suggestions.length} task${data.suggestions.length === 1 ? '' : 's'} with suggestions (${data.lookaheadDays}-day window). Click a slot to schedule it.`,
+        message: tr('circle.tasks.schedule.found', { count: data.suggestions.length, days: data.lookaheadDays }),
         _sync:   simulateSync(),
       };
     }
@@ -5445,10 +5450,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       const t = data.task;
       const when = Number.isFinite(t.scheduledAt)
         ? new Date(t.scheduledAt).toLocaleString()
-        : '(no time)';
+        : tr('circle.tasks.schedule.no_time');
       return {
         ok:      true,
-        message: `📅 Scheduled "${t.text ?? t.title ?? t.id}" at ${when}.`,
+        message: tr('circle.tasks.schedule.scheduled', { title: t.text ?? t.title ?? t.id, when }),
         task:    t,
         _sync:   simulateSync(),
       };
@@ -5468,7 +5473,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         pendingItems.push({
           id:    circleId,
           type:  'circle',
-          label: `${info.name} (${info.kind}) — (pending — reload to activate)`,
+          label: tr('circle.tasks.circles.pending_row', { name: info.name, kind: info.kind }),
           circleId,
           name:  info.name,
           kind:  info.kind,
@@ -5479,7 +5484,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (data.circles.length === 0 && pendingItems.length === 0) {
         return {
           items:   [],
-          message: 'You\'re not in any circles yet. Use /circle-new to create one.',
+          message: tr('circle.tasks.circles.none'),
         };
       }
       let totalOpen = 0, totalOverdue = 0, totalMine = 0, totalApproval = 0;
@@ -5490,10 +5495,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         totalMine     += cnt.mine ?? 0;
         totalApproval += cnt.awaitingApproval ?? 0;
         const stats = [
-          `${cnt.open ?? 0} open`,
-          cnt.overdue ? `${cnt.overdue} overdue` : null,
-          cnt.mine    ? `${cnt.mine} mine`       : null,
-          cnt.awaitingApproval ? `${cnt.awaitingApproval} awaiting approval` : null,
+          tr('circle.tasks.circles.stat_open', { n: cnt.open ?? 0 }),
+          cnt.overdue ? tr('circle.tasks.circles.stat_overdue', { n: cnt.overdue }) : null,
+          cnt.mine    ? tr('circle.tasks.circles.stat_mine', { n: cnt.mine }) : null,
+          cnt.awaitingApproval ? tr('circle.tasks.circles.stat_awaiting', { n: cnt.awaitingApproval }) : null,
         ].filter(Boolean).join(' · ');
         return {
           id:    c.circleId,
@@ -5507,10 +5512,13 @@ export async function createRealHouseholdAgent(opts = {}) {
       });
       const allItems = [...items, ...pendingItems];
       const pendingSuffix = pendingItems.length > 0
-        ? ` + ${pendingItems.length} pending (reload to activate)` : '';
+        ? ` + ${tr('circle.tasks.circles.pending', { n: pendingItems.length })}` : '';
       return {
         items: allItems,
-        message: `Circles: ${data.circles.length}${pendingSuffix} · Total: ${totalOpen} open, ${totalOverdue} overdue, ${totalMine} mine, ${totalApproval} awaiting approval`,
+        message: tr('circle.tasks.circles.summary', {
+          n: data.circles.length, pending: pendingSuffix,
+          open: totalOpen, overdue: totalOverdue, mine: totalMine, awaiting: totalApproval,
+        }),
         _sync: simulateSync(),
       };
     }
@@ -5520,23 +5528,23 @@ export async function createRealHouseholdAgent(opts = {}) {
       const circle = data.circle;
       if (!circle) {
         return {
-          title:   'Circle config',
+          title:   tr('circle.tasks.config.title'),
           status:  'not-found',
-          message: 'No circle config found for this id.',
+          message: tr('circle.tasks.config.not_found'),
         };
       }
       // 2026-05-24 — DON'T inline members[] here.  The record renderer
       // JSON-stringifies arrays of objects (unreadable).  Use the
       // separate /circle-members list reply (see listCircleMembers below).
       return {
-        title:       'Circle config',
+        title:       tr('circle.tasks.config.title'),
         circleId:      circle.circleId,
         name:        circle.name ?? circle.circleId,
         kind:        circle.kind ?? 'household',
         memberCount: Array.isArray(circle.members) ? circle.members.length : 0,
         paused:      !!circle.paused,
         archived:    !!circle.archived,
-        hint:        'Use /circle-members for the member list.',
+        hint:        tr('circle.tasks.config.members_hint'),
       };
     }
     // 2026-05-24 — listCircleMembers (derived from getCircleConfig): list
@@ -5544,7 +5552,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (opId === 'listCircleMembers') {
       const circle = data?.circle;
       if (!circle || !Array.isArray(circle.members)) {
-        return { items: [], message: 'No circle config — try /circle-info first.' };
+        return { items: [], message: tr('circle.tasks.config.members_none') };
       }
       return {
         items: circle.members.map((m) => ({
@@ -5554,7 +5562,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           label: `${m.displayName ?? m.webid.slice(0, 12)} (${m.role ?? 'member'})`,
           role:  m.role ?? 'member',
         })),
-        message: `${circle.members.length} member${circle.members.length === 1 ? '' : 's'} in ${circle.name ?? circle.circleId}`,
+        message: tr('circle.tasks.config.members_count', { count: circle.members.length, circle: circle.name ?? circle.circleId }),
         _sync: simulateSync(),
       };
     }
@@ -5564,8 +5572,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       return {
         ok: true,
         message: data.paused
-          ? '⏸️ Circle paused. No new tasks; existing tasks remain workable.'
-          : '✓ Circle already unpaused.',
+          ? tr('circle.tasks.state.paused')
+          : tr('circle.tasks.state.not_paused'),
         _sync: simulateSync(),
       };
     }
@@ -5573,8 +5581,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       return {
         ok: true,
         message: data.paused
-          ? '✓ Circle is paused.'
-          : '▶️ Circle resumed. New tasks can be added again.',
+          ? tr('circle.tasks.state.still_paused')
+          : tr('circle.tasks.state.resumed'),
         _sync: simulateSync(),
       };
     }
@@ -5582,8 +5590,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       return {
         ok: true,
         message: data.archived
-          ? '📦 Circle archived. Read-only ledger; use /unarchive-circle to reverse.'
-          : '✓ Circle already unarchived.',
+          ? tr('circle.tasks.state.archived')
+          : tr('circle.tasks.state.not_archived'),
         _sync: simulateSync(),
       };
     }
@@ -5591,8 +5599,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       return {
         ok: true,
         message: data.archived
-          ? '✓ Circle is archived.'
-          : '✓ Circle unarchived. Active again.',
+          ? tr('circle.tasks.state.still_archived')
+          : tr('circle.tasks.state.unarchived'),
         _sync: simulateSync(),
       };
     }
@@ -5612,7 +5620,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       return {
         ok:      true,
-        message: `✓ Circle "${circleId ?? '?'}" provisioned. It shows in /circles as "(pending)" — full activation requires multi-circle topology (deferred slice).`,
+        message: tr('circle.tasks.state.provisioned', { circle: circleId ?? '?' }),
         circleId,
         circle:    data.circle ?? data,
         _sync:   simulateSync(),
@@ -5633,6 +5641,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   function adaptStoopReply(opId, data, args) {
     if (data == null) return null;
+    // In the person's words: every shell hands the agent its translator.
+    const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
     if (data.ok === false || data.error)  {
       // Pass through error envelopes; basis dispatch handles them.
       return data.ok === false ? data : { ok: false, error: data.error };
@@ -5640,10 +5650,10 @@ export async function createRealHouseholdAgent(opts = {}) {
 
     // postRequest: {requestId, claims} → {ok, message, itemId, _sync}
     if (opId === 'postRequest' && data.requestId) {
-      const text = args?.text ?? '(post)';
+      const text = args?.text ?? tr('circle.noticeboard.untitled');
       return {
         ok:      true,
-        message: `✓ Posted: ${text}`,
+        message: tr('circle.noticeboard.posted_text', { text }),
         itemId:  data.requestId,
         request: data,                       // preserve full shape
         _sync:   simulateSync(),
@@ -5692,7 +5702,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (opId === 'getStoopProfile') {
       const e = data.entry ?? {};
       return {
-        title:       'Stoop profile',
+        title:       tr('circle.noticeboard.profile_title'),
         handle:      e.handle ?? null,
         displayName: e.displayName ?? null,
         circle:       opts.stoopGroup ?? 'cc-default-circle',
@@ -5704,13 +5714,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // chat-shell `peer`/`action` vocab; the peer→peerWebid +
     // action→reveal transforms happen before invoke.
     if (opId === 'setPeerReveal') {
-      const peer   = args?.peer ?? args?.peerWebid ?? '(peer)';
+      const peer   = args?.peer ?? args?.peerWebid ?? tr('circle.reveal.someone');
       const action = args?.action ?? (args?.reveal ? 'on' : 'off');
       return {
         ok: true,
         message: action === 'on'
-          ? `🔓 Reveal flipped on for ${peer}. (Bilateral — they must flip on their side too.)`
-          : `🔒 Reveal flipped off for ${peer}.`,
+          ? tr('circle.reveal.on', { peer })
+          : tr('circle.reveal.off', { peer }),
         peer, action,
       };
     }
@@ -5719,15 +5729,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       return {
         ok: true,
         message: data.holidayMode
-          ? '🌙 Holiday mode on. Notifications suppressed; your skills marked unavailable.'
-          : '🌅 Holiday mode off. Notifications and skill-match resume.',
+          ? tr('circle.holiday.on')
+          : tr('circle.holiday.off'),
         holidayMode: data.holidayMode,
       };
     }
     // getHolidayMode: real returns {holidayMode: bool} → record reply.
     if (opId === 'getHolidayMode' && typeof data.holidayMode === 'boolean') {
       return {
-        title:       'Holiday mode',
+        title:       tr('circle.availability.holiday'),
         holidayMode: data.holidayMode,
         status:      data.holidayMode ? 'on' : 'off',
       };
@@ -5779,10 +5789,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       const who = c.displayName ?? c.handle ?? c.webid;
       const trustEn = c.trustLevel
         ? (TRUST_NL_TO_EN[c.trustLevel] ?? c.trustLevel) : null;
+      // the trust level in the person's words (the book stores the Dutch codes `bekend` / `vertrouwd`)
+      const trustSaid = c.trustLevel && TRUST_NL_TO_EN[c.trustLevel] ? tr(`circle.contacts.trust.${c.trustLevel}`) : (c.trustLevel ?? null);
       const msg = opId === 'addContact'
-        ? `✓ Added contact: ${who}`
+        ? tr('circle.contacts.added_named', { name: who })
         : opId === 'setContactTrust'
-          ? `✓ Trust level updated for ${who}: ${trustEn ?? '(cleared)'}`
+          ? tr('circle.contacts.trust_updated', { name: who, level: trustSaid ?? tr('circle.contacts.trust_cleared') })
           : `✓ Tags updated for ${who}: ${(c.tags ?? []).join(', ') || '(none)'}`;
       return {
         ok: true, message: msg, contact: { ...c, trustLevel: trustEn }, _sync: simulateSync(),
@@ -5793,12 +5805,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // QR generator).  Canvas-rendered QR image is a follow-up.
     if (opId === 'getContactShareQr' && data.payload) {
       return {
-        title:    'Share your contact card',
+        title:    tr('circle.contacts.share_title'),
         trust:    args?.trustOffer ?? args?.trust ?? 'bekend',
         payload:  data.payload,
         // Where the card says this person can be found — surfaced so the person sees what they hand out.
         ...(Array.isArray(data.relays) ? { relays: data.relays } : {}),
-        message:  'Copy the payload above + paste into any QR generator.  The receiver scans + uses /add-contact to add you with the proposed trust level.',
+        message:  tr('circle.contacts.share_hint'),
       };
     }
     // listGroupMembers: {groupId, members: []} → chat-shell list.
@@ -5828,9 +5840,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (opId === 'getGroupRules') {
       if (!data || data.error) {
         return {
-          title:   'Group rules',
+          title:   tr('circle.rules.title'),
           status:  'no-rules-set',
-          message: 'No rules have been set for this circle yet.',
+          message: tr('circle.rules.none'),
         };
       }
       const item = data.rules ?? data.item ?? data;
@@ -5851,30 +5863,31 @@ export async function createRealHouseholdAgent(opts = {}) {
         // silently dropped `agreements`, `admission`, `leaving` and `responsibility`. The agreements
         // are the part a person reads, and the part a joiner is asked to ACCEPT, so a rules document
         // that answers without them answers with the machinery and not the meaning (F-014).
-        if (rulesObj.purpose)        parts.push(`Purpose: ${rulesObj.purpose}`);
-        if (rulesObj.agreements)     parts.push(`Agreements: ${rulesObj.agreements}`);
-        if (rulesObj.admission)      parts.push(`Admission: ${rulesObj.admission}`);
-        if (rulesObj.leaving)        parts.push(`Leaving: ${rulesObj.leaving}`);
-        if (rulesObj.responsibility) parts.push(`Responsibility: ${rulesObj.responsibility}`);
-        if (rulesObj.conflict)       parts.push(`Conflict: ${rulesObj.conflict}`);
-        if (rulesObj.accessPolicy)   parts.push(`Access: ${rulesObj.accessPolicy}`);
-        if (rulesObj.leavePolicy)    parts.push(`Leave: ${rulesObj.leavePolicy}`);
-        if (rulesObj.conflictPolicy) parts.push(`Conflict resolution: ${rulesObj.conflictPolicy}`);
+        const field = (name, value) => `${tr(`circle.rules.field.${name}`)}: ${value}`;
+        if (rulesObj.purpose)        parts.push(field('purpose', rulesObj.purpose));
+        if (rulesObj.agreements)     parts.push(field('agreements', rulesObj.agreements));
+        if (rulesObj.admission)      parts.push(field('admission', rulesObj.admission));
+        if (rulesObj.leaving)        parts.push(field('leaving', rulesObj.leaving));
+        if (rulesObj.responsibility) parts.push(field('responsibility', rulesObj.responsibility));
+        if (rulesObj.conflict)       parts.push(field('conflict', rulesObj.conflict));
+        if (rulesObj.accessPolicy)   parts.push(field('access', rulesObj.accessPolicy));
+        if (rulesObj.leavePolicy)    parts.push(field('leave_policy', rulesObj.leavePolicy));
+        if (rulesObj.conflictPolicy) parts.push(field('conflict_policy', rulesObj.conflictPolicy));
         if (Array.isArray(rulesObj.tags) && rulesObj.tags.length) {
-          parts.push(`Tags: ${rulesObj.tags.join(', ')}`);
+          parts.push(field('tags', rulesObj.tags.join(', ')));
         }
         if (Array.isArray(rulesObj.additionalAdmins) && rulesObj.additionalAdmins.length) {
-          parts.push(`Extra admins: ${rulesObj.additionalAdmins.join(', ')}`);
+          parts.push(field('extra_admins', rulesObj.additionalAdmins.join(', ')));
         }
         rulesText = parts.length > 0
           ? parts.join('\n')
-          : '(no freeform rules set; defaults apply)';
+          : tr('circle.rules.defaults_apply');
       }
       if (!rulesText) {
-        rulesText = '(no rules set)';
+        rulesText = tr('circle.rules.none_set');
       }
       return {
-        title:   'Group rules',
+        title:   tr('circle.rules.title'),
         groupId: item?.source?.groupId ?? args?.groupId ?? '(unknown)',
         rules:   rulesText,
         addedAt: item?.addedAt ? new Date(item.addedAt).toISOString() : null,
@@ -5891,7 +5904,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       clearCirclePeers(args?.groupId ?? args?.circleId ?? args?.circleId).catch(() => {});
       return {
         ok: true,
-        message: '👋 Left the circle. Your local data stays; you no longer receive feed updates.',
+        message: tr('circle.groups.left'),
         _sync: simulateSync(),
       };
     }

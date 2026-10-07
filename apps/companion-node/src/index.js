@@ -234,7 +234,7 @@ export async function startCompanionNode(opts = {}) {
     manageHttpHost     = '127.0.0.1',
     // ── a person's agenda as a link: sealed files the owner (a household bot) puts, served at /feed/ ──
     feeds              = false, // needs management (the owner) and the manage HTTP server (the route)
-    feedStore,                  // inject a store (tests); default file-backed under configDir
+    feedBucket,                 // the bucket the files live in (tests, or a real R2/S3); default a file bucket under configDir
   } = opts;
   const bootAt = Date.now();
 
@@ -679,12 +679,13 @@ export async function startCompanionNode(opts = {}) {
     // ── a person's agenda as a link (the owner's files, blind at rest: `feedShelf.js`) ─────────────
     // `feed.put` / `feed.drop` — OWNER-GATED, refused before the body is read; the node never logs an id.
     if (feeds) {
-      const { createFeedShelf, FileFeedStore } = await import('./feedShelf.js');
-      feedShelf = createFeedShelf({ store: feedStore ?? new FileFeedStore(join(resolveConfigDir(configDir), 'feeds.json')) });
+      const { createFeedShelf } = await import('./feedShelf.js');
+      const { makeFileBlobBucket } = await import('./mediaEdge.js');
+      feedShelf = createFeedShelf({ bucket: feedBucket ?? makeFileBlobBucket(join(resolveConfigDir(configDir), 'feeds')) });
       agent.register('feed.put', async (ctx) => {
         if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
-        const { id, blob } = Parts.data(ctx?.parts) ?? {};
-        return feedShelf.put(id, blob);
+        const { id, envelope } = Parts.data(ctx?.parts) ?? {};
+        return feedShelf.put(id, envelope);
       });
       agent.register('feed.drop', async (ctx) => {
         if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };

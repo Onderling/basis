@@ -5372,6 +5372,30 @@
     "share_contact": {
       "text": "Mijn contact delen →",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
+    },
+    "planned_title": {
+      "text": "Gepland",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_loading": {
+      "text": "Even kijken wat er aankomt…",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_none": {
+      "text": "Niets gepland de komende week.",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_event": {
+      "text": "{{when}} · {{title}}",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_chore": {
+      "text": "{{when}} · {{title}} (klusje)",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "planned_where": {
+      "text": " · {{circle}}",
+      "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
     }
   },
   "blocked": {

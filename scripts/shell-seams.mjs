@@ -62,6 +62,9 @@ export const SEAMS = Object.freeze([
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
   // that hosts the bot, at once; a person's device writes first to nobody.
   { id: 'announcer', pattern: /createAnnouncer\(/, shells: ['box'], why: 'the household hears of a shared appointment, a move or a cancel, and a chore given to them, when it happens' },
+  // What is coming for me, wherever it lives (my circles' appointments, my own, my dated chores) — read on the
+  // person's device, no bot (the household bot is optional). The box hosts no person, so it has no Mij.
+  { id: 'planned-for-me', pattern: /plannedForMe\(/, shells: ['web', 'mobile'], why: 'a person sees what is coming for them on Mij, from every circle and their own calendar' },
   { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
@@ -123,7 +126,7 @@ export const SEAMS = Object.freeze([
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

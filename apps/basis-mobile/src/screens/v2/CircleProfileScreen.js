@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { plannedForMe, plannedLines } from '../../../../basis/src/v2/plannedForMe.js';
 
 export default function CircleProfileScreen({ callSkill, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
   const theme = useTheme();
@@ -22,6 +23,8 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
   const [geoQuery, setGeoQuery] = useState('');
   const [geoResult, setGeoResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Gepland: what is coming for me, wherever it lives — read on this device (no bot); null while it loads
+  const [planned, setPlanned] = useState(null);
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
@@ -34,6 +37,12 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
     setHandle(entry.handle ?? '');
     setDisplay(entry.displayName ?? '');
     setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
+    try {
+      const me = (await callSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      const r = await plannedForMe({ callSkill, me });
+      // the device's own zone (the line builder's default)
+      setPlanned(plannedLines(r.items, { t, lang: lang() }));
+    } catch { setPlanned([]); }
   }, [callSkill]);
 
   useEffect(() => { load(); }, [load]);
@@ -105,6 +114,12 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
             </Pressable>
           ))}
         </View>
+      </Section>
+
+      <Section title={t('circle.profile.planned_title')}>
+        {planned === null || planned.length === 0
+          ? <Text style={styles.muted} testID="profile-planned-empty">{t(planned === null ? 'circle.profile.planned_loading' : 'circle.profile.planned_none')}</Text>
+          : planned.map((line, i) => <Text key={`${i}-${line}`} style={styles.plannedItem} testID="profile-planned-item">{line}</Text>)}
       </Section>
 
       <Section title={t('circle.profile.location')}>
@@ -198,5 +213,6 @@ const makeStyles = (theme) => StyleSheet.create({
   catChip: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 14, borderWidth: 1, borderColor: theme.color.accent },
   catChipText: { fontSize: 13, color: theme.color.accent },
   locCurrent: { fontSize: 14, color: theme.color.ink },
+  plannedItem: { fontSize: 14, color: theme.color.ink },
   locResult: { flex: 1, fontSize: 14, color: theme.color.ink },
 });

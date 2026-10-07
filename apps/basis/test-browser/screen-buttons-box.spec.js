@@ -49,8 +49,8 @@ test('every button on the admin\'s management screen answers without an error', 
     expect(await until(async () => ((await said()).length ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
     // something on the lists and the chores, so the line actions have lines
     // a line for every line action (each action gets a line of its own: ticking one off takes it away)
-    // (plain lines: done · remove · edit · make-a-chore — four)
-    const LINES = { Boodschappen: ['melk', 'kaas', 'brood', 'eieren'], Klusjes: ['afwassen', 'stofzuigen', 'ramen', 'planten'] };
+    // (plain lines: done · remove · edit · make-a-chore · reminders — five; one per action, each its own line)
+    const LINES = { Boodschappen: ['melk', 'kaas', 'brood', 'eieren', 'thee'], Klusjes: ['afwassen', 'stofzuigen', 'ramen', 'planten'] };
     for (const [list, texts] of Object.entries(LINES)) for (const text of texts) await send(`/add-to-list --list ${list} --text ${text}`);
     expect(await until(async () => ((await said()).filter((x) => /planten/.test(x)).length ? true : null), { timeout: 40_000, step: 500 }), `the lines were not added:\n${(await said()).slice(-3).join('\n')}`).toBe(true);
     await send('/scherm link');

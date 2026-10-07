@@ -57,7 +57,7 @@ export const SEAMS = Object.freeze([
   // Planned work: a host's own typed items (the own-devices store) and the job that runs the due ones as their person.
   // The box first (the Sunday overview of the people it serves); web and mobile join when the calendar's no-circle
   // appointments move into the store and they tick on foreground.
-  { id: 'own-devices-store', pattern: /createOwnDevicesStore\(/, shells: ['box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
+  { id: 'own-devices-store', pattern: /createOwnDevicesStore\(|lazyOwnStore\(/, shells: ['web', 'box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
   // that hosts the bot, at once; a person's device writes first to nobody.

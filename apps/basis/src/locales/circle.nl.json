@@ -4195,6 +4195,26 @@
       "text": "Herinneringen staan uit.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "announce_new": {
+      "text": "Nieuw in de agenda: {{title}}, {{when}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_moved": {
+      "text": "Verplaatst: {{title}} — nu {{when}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_cancelled": {
+      "text": "Gaat niet door: {{title}} ({{when}}).",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_given": {
+      "text": "Voor jou: {{text}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_given_when": {
+      "text": "Voor jou: {{text}}, {{when}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
     "reminders_rules_set": {
       "text": "Je herinneringen: {{rules}}.",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."

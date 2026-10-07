@@ -208,9 +208,13 @@ The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOve
 - **The own-devices store is the store of the scope "a person and their devices", and it syncs by the sibling carry.**
   A person's devices already behave as a circle of devices: a proven sibling set, one carry for a device's own writes
   to its siblings, sibling-gated catch-up (the grants lane), and a circle founded on one device followed by the
-  others. A circle store's rows reach a person's other devices that way today; the own-devices store does not yet
-  (it is not registered with the stores the task rail serves, and its fan must be the sibling carry alone, with no
-  roster) — three joins, no new mechanism. Until they land, two devices of one person hold two own stores.
+  others. The own-devices store rides the task lane under its own scope, between the person's devices only: signed by
+  the device's delegation key and verified by the device-set binding (never the person key, which a revoked device
+  holds too), sealed in flight to the person's seal-to-self key, fanned by the sibling carry alone (there is no
+  roster), and caught up from siblings, served to siblings only. A device that cannot sign or seal keeps it local. A
+  store fans by its SCOPE, never by a per-row filter: the own-devices scope holds only the person's rows (or the host's
+  own); rows a host keeps for OTHER people belong in a scope that never fans (a household bot has no siblings, so its
+  one store is harmless today; the split comes the day a person's device serves a household).
 - A multi-step planned thing is a row whose op starts a declared flow (`flowRunner`: a DAG of ops through the waist,
   resumable between steps); a requirement or a claim per step is designed, not built, and waits for two executors
   sharing one flow.

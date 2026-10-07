@@ -792,6 +792,11 @@ export default function ChatScreen({
           globalThis.__onderlingPersonKeyKicked = true;
           setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
         }
+        // The person's own store (their own appointments, their planned rows) as their other devices hold it — web parity.
+        if (bundle?.agent?.ownStoreSync && !globalThis.__onderlingOwnStoreKicked) {
+          globalThis.__onderlingOwnStoreKicked = true;
+          setTimeout(() => { bundle.agent.ownStoreSync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
         // …and which of the person's devices is primary for direct messages (sync-policy §12), web parity.
         if (bundle?.agent?.primaryDevice && !globalThis.__onderlingPrimaryDeviceKicked) {
           globalThis.__onderlingPrimaryDeviceKicked = true;

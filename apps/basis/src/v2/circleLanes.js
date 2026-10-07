@@ -30,6 +30,7 @@ import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUB
 import { makeSyncSelection, HOLD_EVERYTHING } from './syncSelection.js';
 import { GRANTS_BROADCAST } from './grantsRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from './taskRail.js';
+import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { makeFrontierReplay } from './frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from './chatRail.js';
 import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler } from './keyRail.js';
@@ -140,6 +141,8 @@ export function buildCircleLanes({
     ...aim,
     subtypes: TASK_CATCHUP_SUBTYPES,
     statementsFor: (circleId) => agent.taskRail.catchUpStatements(circleId),
+    // the person's own scope is never served on a circle's catch-up: it has its own, between their devices only
+    mayServe: (fromPeerAddr, circleId) => circleId !== OWN_DEVICES_SCOPE,
   }) : null;
 
   // Chat replays the same way, with one rung above it: past the auto-allow ceiling the person is asked
@@ -257,6 +260,8 @@ export function buildCircleLanes({
         carryLandedStatement({ carry, subtype: TASK_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
     }) } : {}),
     ...catchUpEntries(task),
+    // …and the person's own scope, asked of and served to their own devices only
+    ...catchUpEntries(agent.ownStoreSync),
     ...(agent.membershipRail ? {
       [MEMBERSHIP_BROADCAST]: unlessKringOff(makeMembershipPeerHandler({
         rail: agent.membershipRail,

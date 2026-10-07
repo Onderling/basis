@@ -407,6 +407,12 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // the statement and causally merges the item snapshot into the circle's store head, which is what
     // makes an item written on A appear in B's store.
     ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
+    // …and the person's own scope's catch-up between their devices, as the lane table registers it.
+    ...(agent.ownStoreSync ? {
+      [agent.ownStoreSync.subtypes.request]: agent.ownStoreSync.onRequest,
+      [agent.ownStoreSync.subtypes.batch]:   agent.ownStoreSync.onBatch,
+      ...(agent.ownStoreSync.onOffer ? { [agent.ownStoreSync.subtypes.offer]: agent.ownStoreSync.onOffer } : {}),
+    } : {}),
     // The MEMBERSHIP lane, when this node has a device log (the factory builds the rail off it): the
     // fan's receive half and the catch-up pair, the same registration the shared lane table makes for
     // both shells. Two walks (the replace ceremony, the lost phone) wired this by hand before an

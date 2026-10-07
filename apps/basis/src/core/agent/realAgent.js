@@ -54,7 +54,8 @@ import {
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
 import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
-import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
+import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, OWN_TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js';
+import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
 
@@ -73,6 +74,8 @@ const CATCHUP_REPLY_SUBTYPES = new Set([
   GRANTS_CATCHUP_SUBTYPES.batch,
   TASK_CATCHUP_SUBTYPES.batch,
   TASK_CATCHUP_SUBTYPES.offer,
+  OWN_TASK_CATCHUP_SUBTYPES.batch,
+  OWN_TASK_CATCHUP_SUBTYPES.offer,
   CHAT_CATCHUP_SUBTYPES.batch,
   CHAT_CATCHUP_SUBTYPES.offer,
   KEY_CATCHUP_SUBTYPES.batch,
@@ -342,6 +345,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
   let taskRail = null;
   let taskEmit = null;
+  let ownStoreSync = null;   // the own scope's catch-up between the person's devices (built with the task lane)
   // The personal history mirror's state — assigned at the end of boot (the sync block); declared
   // here so the params dispatch (a live switch flip) can kick the reconciler.
   let historyMirror = null;
@@ -1959,6 +1963,35 @@ export async function createRealHouseholdAgent(opts = {}) {
     siblings: ownDeviceSiblings,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
+  // THE PERSON'S OWN STORE (the own-devices scope): ONE per node — what the shell hands in (sealed on its medium),
+  // else in memory — read by the calendar's own appointments and a host's planned work. It rides the task lane
+  // between the person's OWN devices only: signed by this device's delegation key, verified by the device-set
+  // binding, sealed in flight to the person's seal-to-self key (the one every enrolled device derives — the at-rest
+  // key is per device and would not open on a sibling). A device that cannot sign (not enrolled) keeps it local.
+  // It holds only rows of the person (or the host itself); rows a host keeps FOR OTHERS belong in a scope that never
+  // fans — a household bot has no siblings, so today its one store is harmless.
+  let ownStoreNow = null;
+  let ownStoreMade = null;
+  let ownLaneWired = false;
+  const ownSeal = settingsSealStrategyForIdentity(chatId);
+  function wireOwnLane() {
+    if (ownLaneWired || !ownStoreNow || !taskEmit) return;
+    ownLaneWired = true;
+    const valve = routeTaskMirror({ circleId: OWN_DEVICES_SCOPE, emitter: taskEmit });
+    // …and the composition hears what this node wrote there, as it hears a circle's writes (`opts.onCircleWrite`)
+    const wrote = (item, removedId) => { try { opts.onCircleWrite?.(OWN_DEVICES_SCOPE, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
+    wireStoreMirror(ownStoreNow, {
+      publishItem:        (item)         => { const r = valve.publishItem(item); wrote(item); return r; },
+      publishItemRemoved: (rid, removed) => { const r = valve.publishItemRemoved(rid, removed); wrote(null, rid); return r; },
+    });
+    // what landed for it before it was open (parked on the log) is applied now
+    Promise.resolve(taskRail?.rebuildHead?.(OWN_DEVICES_SCOPE)).catch(() => {});
+  }
+  const getOwnStore = () => (ownStoreMade ??= (async () => {
+    ownStoreNow = await (typeof opts.ownStore === 'function' ? opts.ownStore() : createOwnDevicesStore());
+    wireOwnLane();
+    return ownStoreNow;
+  })());
   // THE PERSON KEY between my devices: the rotation ceremony hands the new version to the survivors over the
   // same sibling set and send; a landed one is stored monotonically and takes effect at once.
   // WHICH DEVICE OTHERS' DIRECT MESSAGES LAND ON (sync-policy §12): the choice, kept sealed and carried to the
@@ -3352,7 +3385,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       circleIdentityFor,
       myRef: chatId.pubKey,
       callSkill: (...a) => callSkill(...a),
-      storeFor: (circleId) => (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null),
+      storeFor: (circleId) => (circleId === OWN_DEVICES_SCOPE ? ownStoreNow : (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null)),
+      // the person's own scope: between their own devices only (see the own store above)
+      own: {
+        scope: OWN_DEVICES_SCOPE,
+        signer: () => grantsSignerPromise,
+        verifyBinding: deviceSetVerifier,
+        seal: () => ownSeal,
+        delegation: () => enrolledDevice?.record ?? null,
+      },
       // A landed snapshot that is a noticeboard post goes to the shell's bridge (stoop's index + notification).
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
       onItemApplied: async (circleId, item) => {
@@ -3366,7 +3407,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // it made a lost statement invisible (a claim fanned right after its task never reached the peer,
       // and nothing said so — 2026-08-20). Under-delivery and rejection both warn; catch-up reconciles
       // either way, but now the log says WHEN it will have to.
-      fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleTask', {
+      // the person's own scope has no members to fan to: it reaches their other devices by the one carry, only
+      fan: (circleId, statement) => (circleId === OWN_DEVICES_SCOPE
+        ? siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {})
+        : callSkill('stoop', 'broadcastCircleTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
@@ -3381,8 +3425,30 @@ export async function createRealHouseholdAgent(opts = {}) {
       }, (err) => {
         console.warn(`[task-lane] fan REJECTED for ${circleId} ${statement.body.kind}`
           + ` hash=${statement.body.hash.slice(0, 8)}:`, err?.message ?? err);
-      }),
+      })),
     });
+    wireOwnLane();   // an own store opened before the lane existed joins it now
+    // THE OWN SCOPE'S CATCH-UP: what a sibling wrote while this device was off, asked of the person's own devices and
+    // served to them only (a stranger asking gets nothing, sealed or not). The shells kick it on connect.
+    {
+      const replay = makeFrontierReplay({
+        rail: taskRail,
+        sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+        subtypes: OWN_TASK_CATCHUP_SUBTYPES,
+        statementsFor: (circleId) => taskRail.catchUpStatements(circleId),
+        mayServe: async (fromPeerAddr, circleId) => circleId === OWN_DEVICES_SCOPE && (await ownDeviceSiblings()).includes(fromPeerAddr),
+      });
+      ownStoreSync = {
+        ...replay,
+        async requestFromSiblings() {
+          let requested = 0;
+          for (const addr of await ownDeviceSiblings().catch(() => [])) {
+            try { await replay.requestFrom(addr, OWN_DEVICES_SCOPE); requested += 1; } catch { /* the next connect asks again */ }
+          }
+          return { requested };
+        },
+      };
+    }
     // The chat lane: each sent message appends its SIGNED render entry to the device log (non-silent —
     // the entry IS the bubble) and fans the statement; receivers verify at their rail, where the roster
     // binding doubles as the eviction gate. The shells' send sites call chatEmit instead of the
@@ -4807,7 +4873,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const personNode = opts.personalCalendar || !opts.calendarInCircle;
     if (appOrigin === 'calendar' && personNode && !args?.circleId) {
       ownCalendarReady ??= (async () => {
-        ownCalendarStore = await (typeof opts.ownStore === 'function' ? opts.ownStore() : createOwnDevicesStore());
+        ownCalendarStore = await getOwnStore();
         const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
         const lists = makeCircleLists({ storeFor: () => ownCalendarStore, manifests: [calendarManifest] });
         const containers = await lists.listContainers(OWN_DEVICES_SCOPE);
@@ -6597,6 +6663,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     contactPersonKeyOf,
     // The one sibling carry (L100): the lane table (`buildCircleLanes`) hands it every landed statement.
     siblingCarry,
+    /** The person's own store (the own-devices scope), one per node: built on first ask from what the shell handed in. */
+    ownStore: getOwnStore,
+    /** Its catch-up between the person's devices: `requestFromSiblings()` on connect; `onRequest`/`onBatch`/`onOffer` + `subtypes` for the router. */
+    ownStoreSync,
     /** Inbound envelopes the security layer refused, per reason — the diagnostic read of the warning above. */
     refusedInboundByReason: () => Object.fromEntries(refusedInbound),
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its

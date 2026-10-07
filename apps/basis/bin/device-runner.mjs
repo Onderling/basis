@@ -89,10 +89,10 @@ import { createChangeFeed } from '../src/v2/changeFeed.js';
 import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { exportDirFiles } from '../src/v2/exportDirFiles.js';
 import { createExportRequestJob } from '../src/v2/exportRequest.js';
-import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
+import { seedAnnounceRows, isAnnounceRow, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
 import { createCircleRowGate } from '../src/v2/circleRowGate.js';
 import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
-import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
+import { moveOverviewSwitchesToRows, switchWeekOverview } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { createCommandMenus } from '../src/v2/botCommandMenu.js';
@@ -927,6 +927,8 @@ if (tgToken || inboxDoor.bridge) {
         items: () => agent.householdItems(),
         people: () => botUsers.list(),
         params: async () => (await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? [],
+        // the switches kept as planned rows (a person's week overview, an announcement off) travel as switches
+        planned: async () => { await planned.load(); return planned.rows(); },
       });
     },
     // sealed to the admin's export key once one is set (`bin/export-key.mjs set`, on the box)
@@ -1141,7 +1143,19 @@ if (tgToken || inboxDoor.bridge) {
       unlockedKey: async () => { sweepUnlocked(); try { return unlockedSecret(readFileSync(path.join(dataDir, UNLOCKED_KEY_FILE), 'utf8')); } catch { return null; } },
       lockKey: async () => rmSync(path.join(dataDir, UNLOCKED_KEY_FILE), { force: true }),
       // the file's things written back through their own ops, each as its person (the host vouches, as its door does)
-      importFile: (file) => importHousehold(file, { call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller }),
+      importFile: (file) => importHousehold(file, {
+        call: (app, op, args, ctx) => agent.callSkill(app, op, args, ctx), tier: agent.setDoorCaller,
+        // the switches on this box's own rows: a person's week overview on; the household's announce row of that kind off
+        switches: {
+          overview: (id) => switchWeekOverview(planned, id, true),
+          off: async (label) => {
+            const row = planned.rows().find((r) => isAnnounceRow(r) && r.label === label);
+            if (!row) return false;
+            if (row.state === 'open') await planned.cancel(row.id);
+            return true;
+          },
+        },
+      }),
       // Telegram's own link: tapping it opens the bot and sends `/start <code>`.
       inviteLink: (code) => (tgBridge?.botUsername ? `https://t.me/${tgBridge.botUsername}?start=${code}` : null),
       status: async () => ({

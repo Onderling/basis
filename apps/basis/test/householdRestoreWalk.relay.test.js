@@ -4,7 +4,8 @@
  * key is set on the box; `/export` puts a sealed file on the shelf. Box B: an EMPTY data dir and so a NEW identity;
  * before anything it knows neither the line nor the person; the file is copied onto its shelf, its key opened on the
  * box from the file (`export-key.mjs unlock --from`), `/import` asks with what the file holds, the yes reads it back —
- * and B shows the same line and the same person.
+ * and B shows the same line, the same person, and the switches the household keeps as planned rows (a person's week
+ * overview, an announcement switched off), with nothing said to be lost.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
@@ -60,13 +61,19 @@ describe('the household restore, on two real boxes', () => {
     cleanup.push(() => { child.kill('SIGKILL'); });
     return { stop, log: () => out };
   }
-  /** Write as a person and wait for the bot's next line to them that passes `test`. */
+  /**
+   * Write as a person; wait for the bot's line that passes `test`, then until it is quiet (a door may answer in more
+   * than one message) — and hand back everything it said to that line, joined, so a check reads the whole answer.
+   */
   async function ask(api, uid, text, test = () => true, { name = 'Frits', log = () => '' } = {}) {
     const before = api.said(uid).length;
     api.write(uid, text, name);
     const got = await until(async () => api.said(uid).slice(before).find((m) => test(m)) ?? null, { timeout: 60_000, step: 250 });
     expect(got, `no answer to "${text}" (said: ${JSON.stringify(api.said(uid).slice(before).map((m) => m.text))})\n${log().slice(-1500)}`).toBeTruthy();
-    return got;
+    let n = -1;
+    while (n !== api.said(uid).length) { n = api.said(uid).length; await new Promise((r) => { setTimeout(r, 1200); }); }
+    const all = api.said(uid).slice(before);
+    return { ...got, all: all.map((m) => m.text).join('\n') };
   }
   const said = (api, uid) => api.said(uid).map((m) => m.text).join('\n');
 
@@ -87,7 +94,12 @@ describe('the household restore, on two real boxes', () => {
     const code = invite.text.match(/\/start (\S+)/)[1];
     await ask(a.api, BEA, `/start ${code}`, () => true, { name: 'Bea', log: runA.log });
     const usersA = await ask(a.api, ADMIN, '/users', (m) => /Bea/.test(m.text), { log: runA.log });
-    expect(usersA.text).toContain('Bea');
+    expect(usersA.all).toContain('Bea');
+    // the switches the household keeps as planned rows: Bea's own week overview on, the chore announcements off
+    await ask(a.api, BEA, '/overzicht aan', () => true, { name: 'Bea', log: runA.log });
+    await ask(a.api, ADMIN, '/huishouden announce chores off', () => true, { log: runA.log });
+    const plannedA = (await ask(a.api, BEA, '/gepland', () => true, { name: 'Bea', log: runA.log })).all;
+    expect(plannedA, 'the overview is on for Bea').toMatch(/overzicht/i);
     const written = await ask(a.api, ADMIN, '/export', (m) => /household-export-[\d-]+\.json/.test(m.text), { log: runA.log });
     const name = written.text.match(/household-export-[\d-]+\.json/)[0];
     expect(written.text, 'sealed: the key was set').toMatch(/verzegeld|sealed/i);
@@ -99,9 +111,10 @@ describe('the household restore, on two real boxes', () => {
     await ask(b.api, ADMIN, '/start', () => true, { log: runB.log });
     // red first: B knows neither the line nor the person
     const emptyList = await ask(b.api, ADMIN, 'wat staat er op de boodschappen', () => true, { log: runB.log });
-    expect(emptyList.text).not.toMatch(/havermelk/i);
+    expect(emptyList.all, 'a read of the list, not a refusal').toMatch(/Boodschappen/);
+    expect(emptyList.all).not.toMatch(/havermelk/i);
     const emptyUsers = await ask(b.api, ADMIN, '/users', () => true, { log: runB.log });
-    expect(emptyUsers.text).not.toContain('Bea');
+    expect(emptyUsers.all).not.toContain('Bea');
 
     // the file onto B's shelf; its key opened on the box from the file itself (`export-key.mjs unlock --from <file>`)
     mkdirSync(path.join(b.dataDir, 'exports'), { recursive: true });
@@ -119,11 +132,16 @@ describe('the household restore, on two real boxes', () => {
     const done = await until(async () => b.api.said(ADMIN).slice(before).find((m) => /Teruggezet|Restored/i.test(m.text)) ?? null, { timeout: 60_000, step: 250 });
     expect(done, `no import answer: ${said(b.api, ADMIN).slice(-800)}\n${runB.log().slice(-1500)}`).toBeTruthy();
 
-    // B now shows the same line and the same person
+    // nothing the household had is said to be lost
+    expect(done.text).not.toMatch(/niet terugzetten/);
+    // B now shows the same line, the same person, and the same switches
     const list = await ask(b.api, ADMIN, 'wat staat er op de boodschappen', () => true, { log: runB.log });
-    expect(list.text).toMatch(/havermelk/i);
+    expect(list.all).toMatch(/havermelk/i);
     const users = await ask(b.api, ADMIN, '/users', () => true, { log: runB.log });
-    expect(users.text).toContain('Bea');
+    expect(users.all).toContain('Bea');
+    // Bea's first line to the new box is greeted; then her planned work reads as it did on A
+    await ask(b.api, BEA, '/start', () => true, { name: 'Bea', log: runB.log });
+    expect((await ask(b.api, BEA, '/gepland', () => true, { name: 'Bea', log: runB.log })).all).toBe(plannedA);
     await runB.stop();
   }, 300_000);
 });

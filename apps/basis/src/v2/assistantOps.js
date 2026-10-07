@@ -109,8 +109,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return holdForYes(caller, app, op, args, ctx);
     }
     if (app !== 'assistant') {
-      if (announcer && ANNOUNCED_OPS.has(`${app}.${op}`)) return announcer.around(() => callSkill(app, op, args, ctx), ctx);
-      return callSkill(app, op, args, ctx);
+      const res = announcer && ANNOUNCED_OPS.has(`${app}.${op}`) ? await announcer.around(() => callSkill(app, op, args, ctx), ctx) : await callSkill(app, op, args, ctx);
+      return askOnce(app, op, args, ctx, res);
     }
     if (caller && typeof refusal === 'function') {
       const refused = await refusal(op, caller, levelOf(op));
@@ -205,6 +205,26 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return { ok: false, error: 'unknown-op', app, op };
   };
   return door;
+
+  /**
+   * The question, once per person: at their first dated add, when they have no reminders of their own, the reply asks
+   * how they want to be reminded — four buttons, each a `/herinneringen` of its own ("zoals altijd" = the household's).
+   * After that never unprompted. An add that was refused, or a second one of the same thing, asks nothing.
+   */
+  function askOnce(app, op, args, ctx, res) {
+    if (!res?.ok || res.duplicate) return res;
+    const person = (typeof ctx?.caller === 'string' && ctx.caller) || (typeof ctx?.threadId === 'string' && ctx.threadId) || null;
+    if (!person || !threads?.reminderAskedOf || threads.reminderAskedOf(person) || threads.reminderDefaultOf(person)) return res;
+    const dated = (app === 'calendar' && op === 'addEvent')
+      || (app === 'lists' && (op === 'addToList' || op === 'makeChore') && Boolean(args?.due ?? args?.dueAt ?? args?.when));
+    if (!dated) return res;
+    threads.markReminderAsked(person);
+    const tp = personT(person);
+    const slash = slashOf('assistant-reminders');
+    const buttons = [['ask_morning', 'ochtend'], ['ask_hour', '60'], ['ask_none', 'geen'], ['ask_usual', 'huis']]
+      .map(([label, words]) => ({ label: tp(`circle.bot.${label}`), slash: `${slash} ${words}` }));
+    return { ...res, message: [res.message, tp('circle.bot.reminders_ask')].filter(Boolean).join('\n\n'), quickReplies: [...(res.quickReplies ?? []), ...buttons] };
+  }
 
   /** The household's reminder rules as they stand. */
   async function householdReminderRules() {

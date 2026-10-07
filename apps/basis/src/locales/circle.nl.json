@@ -4195,6 +4195,26 @@
       "text": "Herinneringen staan uit.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "reminders_ask": {
+      "text": "Hoe wil je hieraan herinnerd worden — nu en voortaan? (Later anders: /herinneringen.)",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_morning": {
+      "text": "Ochtend",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_hour": {
+      "text": "1 uur van tevoren",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_none": {
+      "text": "Geen",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_usual": {
+      "text": "Zoals altijd",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
     "announce_new": {
       "text": "Nieuw in de agenda: {{title}}, {{when}}.",
       "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."

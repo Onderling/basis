@@ -40,7 +40,8 @@ export default function CircleProfileScreen({ callSkill, onAvailability, onMyDat
     try {
       const me = (await callSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
       const r = await plannedForMe({ callSkill, me });
-      setPlanned(plannedLines(r.items, { t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: lang() }));
+      // the device's own zone (the line builder's default)
+      setPlanned(plannedLines(r.items, { t, lang: lang() }));
     } catch { setPlanned([]); }
   }, [callSkill]);
 

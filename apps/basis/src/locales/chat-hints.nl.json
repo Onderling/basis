@@ -119,6 +119,10 @@
     "remindMe": {
       "text": "Een eigen herinnering van dit lid voor één afspraak of klusje. item = woorden uit de titel; rules in woorden: \"60\" (minuten van tevoren), \"ochtend\", \"avond\" (de avond ervoor), \"7:30\", \"ook …\" om toe te voegen aan de gewone, \"gewoon\" om de eigen weer weg te halen. Voor 'herinner me een uur van tevoren aan de tandarts'.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "assistant-planned": {
+      "text": "Wat de bot dit lid de komende week stuurt: de herinneringen (zoals hun eigen instellingen ze maken) en geplande berichten zoals het weekoverzicht. Voor 'wat ga je me sturen', 'welke herinneringen krijg ik'.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "tasks": {

@@ -92,4 +92,13 @@ describe('the bot answers its inbox on a function profile', () => {
     expect(written, 'the planned row never reached the own-devices file').toBe(true);
     expect(readFileSync(file).toString('latin1'), 'the row is sealed on disk').not.toContain('sendWeekOverview');
   }, 90_000);
+
+  it('/gepland lists what the bot will send them — the week overview they just switched on', async () => {
+    const card = cardFrom(out);
+    const before = (await botSaid(sender)).length;
+    await sender.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text: '/gepland' }).sent;
+    const reply = await until(async () => { const said = await botSaid(sender); return said.length > before ? said[said.length - 1] : null; }, { timeout: 30_000, step: 500 });
+    expect(reply, `no answer to /gepland. Runner:\n${out.slice(-1200)}`).toMatch(/Gepland voor jou/);
+    expect(reply).toMatch(/weekoverzicht/);
+  }, 90_000);
 });

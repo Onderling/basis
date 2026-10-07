@@ -662,8 +662,12 @@ async function _fanOutViaReliableSend({
   }
   let sent = 0;
   const errors = unresolved.map((webid) => ({ webid, reason: 'recipient-pubkey-unknown' }));
+  // what happened to each recipient — delivered, HELD (counted as sent: queued for their next presence), failed or
+  // without an address — so a statement that must arrive can say where it went (a probe that names its branch)
+  const outcomes = unresolved.map((webid) => ({ webid, outcome: 'no-address' }));
   await Promise.all([...targets.values()].map(async ({ webid, candidates }) => {
     let failure = null;
+    let last = null;
     for (const addr of candidates) {
       try {
         // Circle-scoped: this traffic belongs to `circleId`, and the host constrains it to that circle's
@@ -673,9 +677,10 @@ async function _fanOutViaReliableSend({
         // held (offline → queued for hold-forward) AND delivered both count as sent; a send
         // that explicitly reports neither is the only genuine transient failure — try the member's
         // next proven address before giving up on them.
-        if (r && r.held === false && r.delivered === false) { failure = { webid, reason: 'not-delivered' }; continue; }
+        if (r && r.held === false && r.delivered === false) { failure = { webid, reason: 'not-delivered' }; last = { webid, addr, outcome: 'not-delivered' }; continue; }
         sent += 1;
         failure = null;
+        last = { webid, addr, outcome: r?.held ? `held${r.reason ? `:${r.reason}` : ''}` : 'delivered' };
         // Held because this circle has NO route it may use (its points cannot carry per-circle addressing
         // and the user has not accepted the fallback) — a standing fact, not a peer being briefly offline.
         // Report it as BLOCKED so it reaches the same offer the other blocked case does: holding silently
@@ -686,11 +691,13 @@ async function _fanOutViaReliableSend({
         break;
       } catch (err) {
         failure = { webid, reason: String(err?.message ?? err) };
+        last = { webid, addr, outcome: 'threw' };
       }
     }
     if (failure) errors.push(failure);
+    if (last) outcomes.push(last);
   }));
-  return { sent, attempted: targets.size + unresolved.length, errors };
+  return { sent, attempted: targets.size + unresolved.length, errors, outcomes };
 }
 
 /**

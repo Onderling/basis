@@ -221,6 +221,9 @@ export function makeMembershipPeerHandler({ rail, onChange = null, onLanded = nu
       // a statement that arrived and was refused says why: a member who never learns of a leave is then the fold's
       // gate, not delivery
       if (res && !res.ok) console.info(`[membership] refused a ${statement?.body?.kind ?? '?'} from ${String(fromPeerAddr ?? '').slice(0, 8)} in ${String(circleId).slice(0, 8)}: ${res.reason ?? '?'}`);
+      // …and a leave or an evict that LANDED says so too: with the leaver's line (where each copy went), the two ends of
+      // one statement can be read side by side
+      if (res?.ok && !res.existed && (statement?.body?.kind === 'leave' || statement?.body?.kind === 'evict')) console.info(`[membership] landed a ${statement.body.kind} from ${String(fromPeerAddr ?? '').slice(0, 8)} in ${String(circleId).slice(0, 8)}`);
       if (res?.ok && typeof onChange === 'function') { try { onChange(circleId); } catch { /* best-effort */ } }
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
         try { await onLanded(circleId, statement, fromPeerAddr); } catch { /* side effects are best-effort */ }

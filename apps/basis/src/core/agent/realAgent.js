@@ -3361,8 +3361,13 @@ export async function createRealHouseholdAgent(opts = {}) {
         // a leave or an evict is told once, with no later chance: say whom it did not reach (a probe that names its
         // branch — a member who never learns of it is then delivery, not the fold)
         const kind = statement?.body?.kind;
-        if ((kind === 'leave' || kind === 'evict') && (r?.error || (r?.attempted ?? 0) > (r?.sent ?? 0))) {
-          console.info(`[membership-fan] ${kind} in ${String(circleId).slice(0, 8)}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}${r?.error ? ` (${r.error})` : ''}${(r?.errors ?? []).length ? ` — ${JSON.stringify(r.errors).slice(0, 200)}` : ''}`);
+        // …and, for a leave or an evict, ALWAYS where each copy went: delivered, held (counted as sent — queued for
+        // the recipient's next presence, which may not come), or not at all (L128: a leave that reached the admin
+        // and never the bystander, with this line silent because a hold counts as sent)
+        if (kind === 'leave' || kind === 'evict') {
+          const tail = (x) => String(x ?? '').slice(0, 6);
+          const where = (r?.outcomes ?? []).map((o) => `${tail(o.webid)}@${tail(o.addr)}:${o.outcome}`).join(' ');
+          console.info(`[membership-fan] ${kind} in ${String(circleId).slice(0, 8)}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}${r?.error ? ` (${r.error})` : ''}${where ? ` — ${where}` : ''}${(r?.errors ?? []).length ? ` — ${JSON.stringify(r.errors).slice(0, 200)}` : ''}`);
         }
         return r;
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ })

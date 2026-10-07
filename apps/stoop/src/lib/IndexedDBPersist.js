@@ -182,6 +182,8 @@ export class IndexedDBPersist {
       const req = tx.objectStore(this.#storeName).put(value, key);
       req.onsuccess = ()  => resolve();
       req.onerror   = (e) => reject(e.target.error);
+      // Commit now: a save made on the way out of a page (the flush on pagehide) is otherwise abandoned with it.
+      tx.commit?.();
     });
   }
 }

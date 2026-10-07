@@ -299,9 +299,13 @@ class IndexedDBPersist {
   async #put(key, value) {
     const db = await this.#open();
     return new Promise((resolve, reject) => {
-      const req = db.transaction(this.#storeName, 'readwrite').objectStore(this.#storeName).put(value, key);
+      const tx = db.transaction(this.#storeName, 'readwrite');
+      const req = tx.objectStore(this.#storeName).put(value, key);
       req.onsuccess = ()  => resolve();
       req.onerror   = (e) => reject(e.target.error);
+      // Commit now rather than when the browser next gets round to it: a save made on the way out of a page (the
+      // flush on pagehide) is otherwise abandoned with the page — the put issued, the transaction never done.
+      tx.commit?.();
     });
   }
 }

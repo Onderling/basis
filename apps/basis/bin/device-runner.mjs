@@ -116,6 +116,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { boxStores } from '../src/v2/boxStorage.js';
+import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
 import { registerCircleAddressesOnRelays, unregisterCircleAddressesOnRelays } from '../src/v2/circleAddressRegistration.js';
@@ -290,6 +291,9 @@ const agent = await createRealHouseholdAgent({
   seedHousehold: false,
   enrollOfferStorage: offerStash,
 });
+// The device log's windows from the register (the agent hydrated it at boot), as web and mobile apply them: the
+// windowed classes — the bot's turns with each person among them (chat class) — age out on this device's chat window.
+try { deviceLog.setRetention(retentionFromDays(agent.getParamValue?.('retention.chatDays'))); } catch { /* the defaults stand */ }
 // `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
 const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
 

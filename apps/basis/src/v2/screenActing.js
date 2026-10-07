@@ -24,6 +24,8 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-link',
   'assistant.assistant-link-confirm',
   'assistant.assistant-unlink',
+  // …and emptying their thread with the bot: their act, in their own chat
+  'assistant.assistant-forget',
   // …and the household in their own app: an invite to their key, asked for in the private chat
   'assistant.assistant-inapp',
   // the planned Sunday overview is sent by the host's runner, as the person whose row it is — not a button

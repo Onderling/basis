@@ -42,6 +42,7 @@ export const APPENDERS = {
   ask:               { file: 'apps/basis/src/core/agent/realAgent.js', needle: "'ask'" },
   offer:             { file: 'apps/basis/src/core/agent/realAgent.js', needle: "'offer'" },
   lend:              { file: 'apps/basis/web/v2/circleNoticeboard.js', needle: "'lend'" },
+  'assistant-turn':  { file: 'apps/basis/src/v2/botThreads.js', needle: 'ASSISTANT_TURN_KIND' },
   governance:        { file: 'apps/basis/src/v2/governanceAppWiring.js', needle: 'GOVERNANCE_LANE' },
   report:            { pending: 'the "Report a problem" panel rode the feedback surface, cut from basis 2026-09-05 (feedback is an external bot); the bug-report door returns as a basis affordance — plans/PLAN-bots-and-channels.md §3 step 8, REMAINING-WORK ledger L87' },
   'delivery-state':  { file: 'apps/basis/src/v2/chatRail.js', needle: "'delivery-state'" },

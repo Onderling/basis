@@ -79,6 +79,10 @@ export const SEAMS = Object.freeze([
   // person's device, no bot (the household bot is optional). The box hosts no person, so it has no Mij.
   { id: 'planned-for-me', pattern: /plannedForMe\(/, shells: ['web', 'mobile'], why: 'a person sees what is coming for them on Mij, from every circle and their own calendar' },
   { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
+  // The device log's retention windows come from the register (`retention.chatDays`), applied after boot on every
+  // shell. The box composed none until 2026-10-08 and ran on the built-in defaults: the same numbers today, but a
+  // window the register changed would have reached web and mobile and never the box — where the bot's turns age out.
+  { id: 'retention-window', pattern: /setRetention(?:\?\.)?\(retentionFromDays\(/, why: 'the windowed log classes (plumbing, the bot\'s turns, the trail\'s detail) age out on the window the register holds, on every device' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds
   // it on the governance change (live fan + catch-up), and serves its head at catch-up — the box above all, the

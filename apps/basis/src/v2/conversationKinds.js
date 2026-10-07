@@ -32,12 +32,21 @@
  * it back on brings the history with it. That is the whole reason `entryKinds.js` carries `lane` centrally
  * rather than each surface deciding for itself.
  */
-import { ENTRY_KINDS, LANE, conversationKinds as humanKinds } from '@onderling/item-store';
+import { ENTRY_KINDS, LANE, SUBJECT, bindingOf, conversationKinds as humanKinds } from '@onderling/item-store';
+
+/**
+ * Can a CIRCLE's conversation hold this kind? Human-facing, and not about one person: a kind whose subject is a person
+ * is that person's own (their thread with the household bot's assistant), kept on the device that hosts the door and
+ * carried by no circle — a circle setting for it would appear to do something and do nothing.
+ */
+export function isCircleConversationKind(kind) {
+  return ENTRY_KINDS[kind]?.lane === LANE.HUMAN && !bindingOf(kind).subject.includes(SUBJECT.PERSON);
+}
 
 /** Kinds that are on unless a circle says otherwise. */
 export function defaultConversationKinds() {
   // Derived, not listed: adding a human kind to the registry cannot forget the conversation surface.
-  return humanKinds();
+  return humanKinds().filter(isCircleConversationKind);
 }
 
 /** Every kind an admin may choose from, with whether it is on by default. */
@@ -45,7 +54,7 @@ export function availableConversationKinds() {
   return Object.entries(ENTRY_KINDS).map(([kind, spec]) => ({
     kind,
     lane: spec.lane,
-    defaultOn: spec.lane === LANE.HUMAN,
+    defaultOn: isCircleConversationKind(kind),
   }));
 }
 
@@ -186,7 +195,9 @@ export function conversationKindsRows({ circleSetting = null, templateKind = nul
   // here would appear to do something and do nothing. Worse, it would invite an admin to try putting
   // decisions in the conversation, which J-L1 exists to prevent. The lane is enforced by the projection;
   // this control should not pretend otherwise.
-  return availableConversationKinds().filter(({ lane }) => lane === LANE.HUMAN).map(({ kind, lane }) => {
+  // …and of those, only the kinds a circle carries (`isCircleConversationKind`): a person's own thread with an assistant
+  // is in no circle, so a row for it would be the same do-nothing checkbox.
+  return availableConversationKinds().filter(({ kind }) => isCircleConversationKind(kind)).map(({ kind, lane }) => {
     const on = current.includes(kind);
     return {
       kind,

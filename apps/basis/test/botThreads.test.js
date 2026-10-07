@@ -4,7 +4,7 @@
  * The Telegram door kept its memory in a Map in the engine and its pending ask in a Map in the runner: a restart
  * forgot every conversation and every half-answered question, and the thread was the CHAT, so two people in one
  * group chat shared one memory. Now a thread is the admitted person's (their contact id); its turns are
- * `chat-message` entries on the device log and its settings one row in a store the host hands in.
+ * `assistant-turn` entries on the device log and its settings one row in a store the host hands in.
  *
  * Through the real runner and engine; the "restart" is a new runner and a new thread set over the same log and store.
  */
@@ -40,7 +40,7 @@ function door({ eventLog, store, memoryDefault, llm = null, interpret = null }) 
 }
 
 describe('the bot\'s threads', () => {
-  it('one thread per person, even in one group chat; the turns are chat-message entries on the log, not the circle\'s', async () => {
+  it('one thread per person, even in one group chat; the turns are assistant-turn entries on the log, not the circle\'s', async () => {
     const eventLog = new EventLog({ initial: [], muted: [] });
     const d = door({ eventLog, store: memoryThreadStore() });
     await d.start();
@@ -51,10 +51,10 @@ describe('the bot\'s threads', () => {
     expect(ann.some((l) => l === 'you: /help')).toBe(true);
     expect(ann.some((l) => l === 'you: /mine'), 'Bo\'s line is not in Ann\'s thread').toBe(false);
     expect(bo.some((l) => l === 'you: /mine')).toBe(true);
-    const entries = eventLog.query({}).filter((e) => e.type === 'chat-message');
+    const entries = eventLog.query({}).filter((e) => e.type === 'assistant-turn');
     expect(entries.length).toBeGreaterThan(0);
+    expect(eventLog.query({}).filter((e) => e.type === 'chat-message'), 'no turn is a chat message (the record kind)').toEqual([]);
     for (const e of entries) {
-      expect(e.payload.scope).toBe('self');
       expect(e.payload.circleId).toBeUndefined();
       expect(['telegram:111', 'telegram:222']).toContain(e.payload.threadId);
     }
@@ -89,7 +89,7 @@ describe('the bot\'s threads', () => {
     d.threads.setMode('telegram:111', 'off');
     await d.say('111', 'zet kwartelei op de boodschappen');
     await d.say('111', 'en broccoli ook');
-    expect(eventLog.query({}).filter((e) => e.type === 'chat-message' && e.payload.threadId === 'telegram:111')).toEqual([]);
+    expect(eventLog.query({}).filter((e) => e.payload?.threadId === 'telegram:111')).toEqual([]);
     expect(d.runner.recentTurns('telegram:111')).toEqual([]);
     // the follow-up reached the interpreter, and nothing of the line before it came along
     const followUp = seen.find((s0) => String(s0.text).includes('broccoli'));

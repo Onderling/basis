@@ -521,6 +521,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   householdService = householdApp.createHouseholdService({
     dataSource: householdDataSource,
     dataSourceFor: (id) => circleMedia.get(id) ?? null,
+    // what a write is made for, when a planned row made it (`opts.writeOrigin`: the host's runner's ambient origin)
+    ...(typeof opts.writeOrigin === 'function' ? { originOf: opts.writeOrigin } : {}),
   });
   // THE HISTORY KEYS (the replace ceremony's re-wrap, held locally): group-key versions this person is
   // entitled to that were wrapped to a RETIRED device's derivable sealing key. The ceremony unwraps them

@@ -42,6 +42,7 @@
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
  * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -250,12 +251,16 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const circleWrite = { fn: null };
 const itemLanded = { fn: null };
+// What a write is made for while a planned row runs (`{ intention: <row> }`), ambient across the row's awaits: the
+// stores stamp it on what the row writes, and no host's change feed hands such a write on.
+const writeOrigin = new AsyncLocalStorage();
 const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
   onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
+  writeOrigin: () => writeOrigin.getStore() ?? null,
   ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
   ownerRootVault: vault,
   chatVault,
@@ -1256,6 +1261,7 @@ if (tgToken || inboxDoor.bridge) {
       book: planned, log: deviceLog, tz: boxTz,
       // a circle row this box runs is claimed in its key's name first — another host of the circle then leaves it
       claimAs: agent.identity?.chat?.pubKey ?? null,
+      withOrigin: (origin, fn) => writeOrigin.run(origin, fn),
       // a circle row runs here only as the household's announcer: nothing proves whom any other circle row names
       mayRun: (o) => (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? true : 'a circle row names whom it acts as, and nothing proves it'),
       // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that

@@ -8,6 +8,10 @@
  * per change — never a second truth. A circle not yet seeded is seeded from its store at its first change, which then
  * compares the item with itself and fires nothing: a change missed in that moment is better than every item of a
  * circle announced as new after a restart.
+ *
+ * A write a planned row made carries its origin (`origin: { intention: <row> }`, stamped by the store while the row
+ * runs) and is not handed on — on the host that made it and on every host it lands on — so a row whose op writes never
+ * fires a row again (the loop rule across hosts).
  */
 
 /**
@@ -44,6 +48,8 @@ export function createChangeFeed({ storeFor, consumers = [] }) {
     const k = key(circleId, item.id);
     const before = seen.get(k) ?? null;
     seen.set(k, copy(after));
+    // a write a planned row made (on this host or another) is nobody's change to react to: no row fires on it again
+    if (after?.origin?.intention) return;
     await tellAll({ circleId, before, after }, origin);
   }
 

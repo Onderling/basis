@@ -51,8 +51,11 @@ export function doneMarksOn(log, now = Date.now) {
  * @param {(e: {occurrence: string, row: string, op: string, actsAs: string, outcome: 'ran'|'not-yet'|'failed'|'refused', reason?: string}) => void} [a.onFired]
  * @param {(o: object, scope: string) => true|string} [a.mayRun]   a circle row's way through: true, or why not
  * @param {string} [a.claimAs]   this host, as a circle row's claim names it (a key, unique to the host)
+ * @param {(origin: {intention: string}, fn: () => Promise<any>) => Promise<any>} [a.withOrigin]   runs a row's op
+ *   under the row as the origin of whatever it writes (the host's ambient origin; the store stamps it on the item, and
+ *   no host's change feed hands such a write on — the loop rule across hosts)
  */
-export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null, mayRun = null, claimAs = null }) {
+export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null, mayRun = null, claimAs = null, withOrigin = (origin, fn) => fn() }) {
   const inFlight = new Set();
   /** What was already said for an occurrence that has not run ("not-yet:quiet", "failed:door down"). */
   const said = new Map();
@@ -96,7 +99,7 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
       return;
     }
     let res;
-    try { res = await run(o); } catch (e) { res = { ok: false, reason: e?.message ?? String(e) }; }
+    try { res = await withOrigin({ intention: o.rowId }, () => run(o)); } catch (e) { res = { ok: false, reason: e?.message ?? String(e) }; }
     if (res?.ok) {
       marks.mark(o.id, { row: o.rowId, op: o.op });
       said.delete(o.id);

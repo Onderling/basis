@@ -215,3 +215,22 @@ describe('event rows, on a change', () => {
     expect(w.calls.map((c) => c.args.change.itemId)).toEqual(['e1', 'e3']);
   });
 });
+
+describe('what a fired row writes', () => {
+  it('is written under the row\'s origin: the host\'s ambient origin is the row while its op runs', async () => {
+    const { AsyncLocalStorage } = await import('node:async_hooks');
+    const running = new AsyncLocalStorage();
+    const seen = [];
+    const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), actor: 'bot', now: () => SUN_1930 });
+    await book.load();
+    const runner = createIntentionRunner({
+      book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => SUN_1930,
+      withOrigin: (origin, fn) => running.run(origin, fn),
+      run: async () => { await Promise.resolve(); seen.push(running.getStore() ?? null); return { ok: true }; },
+    });
+    const row = await book.intend({ trigger: { event: { kind: 'added', type: 'calendar-event' } }, op: 'announceChange', appOrigin: 'assistant', args: {}, actsAs: 'household' });
+    await runner.onChange({ circleId: 'c1', before: null, after: { id: 'e1', type: 'calendar-event', clock: 1 } });
+    expect(seen).toEqual([{ intention: row.id }]);
+    expect(running.getStore(), 'outside the run there is none').toBeUndefined();
+  });
+});

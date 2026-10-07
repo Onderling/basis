@@ -48,6 +48,38 @@ export function sealedLocalBackend(backend) {
 }
 
 /**
+ * Wrap a key-value storage (localStorage on web, AsyncStorage on mobile, a file on the box) so the VALUES are sealed at
+ * rest with this device's content key; the KEYS stay legible, so a store that lists its keys (a versions store) still
+ * can. A plain value written before this reads as it is (`open` passes it through: no migration, as everywhere); a
+ * write before the key exists is REFUSED rather than stored in the clear.
+ * @param {object} storage  `getItem` / `setItem` / `removeItem` (sync or async), and whatever listing it offers
+ *   (`key(i)` + `length`, or `getAllKeys()`), passed through
+ */
+export function sealedKeyValue(storage, { name = 'a store' } = {}) {
+  const strategy = () => {
+    const s = shellContentSeal();
+    if (!s) throw new Error(`sealedKeyValue: refusing to write ${name} unsealed — no content key yet`);
+    return s;
+  };
+  const kv = {
+    async getItem(key) {
+      const v = await storage.getItem(key);
+      if (v == null) return null;
+      const s = shellContentSeal();
+      return s ? s.open(v) : v;
+    },
+    async setItem(key, value) { await storage.setItem(key, strategy().seal(String(value))); },
+    async removeItem(key) { await storage.removeItem(key); },
+  };
+  if (typeof storage.key === 'function') {
+    kv.key = (i) => storage.key(i);
+    Object.defineProperty(kv, 'length', { get: () => storage.length, enumerable: true });
+  }
+  if (typeof storage.getAllKeys === 'function') kv.getAllKeys = (...a) => storage.getAllKeys(...a);
+  return kv;
+}
+
+/**
  * Wrap the per-circle KEY vault so what it holds is sealed at rest.
  *
  * ── What was found, 2026-09-10 ──────────────────────────────────────────────────────────────────

@@ -35,6 +35,7 @@ import {
 // basis package by relative path (Metro-friendly; same pattern
 // as podStorage above).
 import { asyncStorageObjectVersions } from './objectVersionsStorageRN.js';
+import { sealedKeyValue } from '../../../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 // 5.4c — pod-writer build is also imported via relative path (Metro doesn't
 // honour package.json "exports" subpaths; same pattern as podPeerAddr.js).
 import {
@@ -74,15 +75,17 @@ export function asyncFixedIo(key, storage) {
  * 5.4a — `getPodWriter` is an optional thunk returning a podWriter (or null).
  * Defaults to `null` so behaviour is unchanged until 5.4b wires a session.
  */
-export function makeCirclePolicyStoreRN(storage, { getPodWriter } = {}) {
-  const localIo = asyncKeyedIo('cc.circlePolicy.', storage);
+export function makeCirclePolicyStoreRN(rawStorage, { getPodWriter } = {}) {
+  // the policy sealed at rest with the shell's content key, as web and the box do (its versions seal on their own:
+  // `asyncStorageObjectVersions` wraps its backend in `sealedLocalBackend`)
+  const localIo = asyncKeyedIo('cc.circlePolicy.', sealedKeyValue(rawStorage, { name: 'the circle policy' }));
   const podIo   = podPolicyIo({
     getWriter: typeof getPodWriter === 'function' ? getPodWriter : () => null,
     app: 'cc-circle',
   });
   // γ.2 — version capture wired ABOVE the tier so snapshots happen
   // regardless of whether the write lands in AsyncStorage or pod.
-  const versions = asyncStorageObjectVersions('policy', storage);
+  const versions = asyncStorageObjectVersions('policy', rawStorage);
   return createCirclePolicyStore({ ...tieredPolicyIo(localIo, podIo), versions });
 }
 

@@ -74,9 +74,13 @@ export function createHostTick({ every = HOST_TICK_MS, now = Date.now, timers = 
       if (handle) return Promise.resolve();
       const at = now();
       for (const job of jobs) if (job.lastAt === null && !job.atStart) job.lastAt = at;
+      // the first tick BEFORE the timer: a timer that fires at once when set (the foreground cadence on a person's
+      // device) would otherwise start the jobs itself, and this tick would find them running and resolve before
+      // they settled
+      const first = this.tick();
       handle = timers.setInterval(() => { this.tick(); }, period);
       handle?.unref?.();
-      return this.tick();
+      return first;
     },
     stop() { if (handle) { timers.clearInterval(handle); handle = null; } },
     /** The jobs on the clock, in order — for the walk log at boot. */

@@ -18,6 +18,8 @@
  *     restore(circleId, ts)    → Promise<value|null>  // optional (@onderling/versioning consolidation)
  *   }
  */
+import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
+import { sealedKeyValue } from './localStoreSeal.js';
 import {
   normalizeCirclePolicy, mergeCirclePolicy,
   normalizeMemberOverride, mergeMemberOverride,
@@ -75,6 +77,15 @@ export function createCirclePolicyStore({ load, save, versions } = {}) {
   };
 }
 
+/**
+ * A device's own circle-policy store, SEALED at rest (the policy and its version snapshots) over a localStorage-shaped
+ * storage — what the web shell composes. The box seals its copy too (`boxStorage.js`), mobile in `circleStoresRN.js`.
+ */
+export function localCirclePolicyStore(storage = globalThis.localStorage) {
+  const sealed = sealedKeyValue(storage, { name: 'the circle policy' });
+  return createCirclePolicyStore({ ...localStoragePolicyIo(sealed), versions: localStorageObjectVersions('policy', sealed) });
+}
+
 /** localStorage-backed load/save (web). Key: `cc.circlePolicy.<circleId>`. */
 export function localStoragePolicyIo(storage = globalThis.localStorage) {
   const key = (id) => `cc.circlePolicy.${id}`;
@@ -88,7 +99,7 @@ export function localStoragePolicyIo(storage = globalThis.localStorage) {
       }
     },
     save: async (id, policy) => {
-      try { storage?.setItem(key(id), JSON.stringify(policy)); } catch { /* ignore */ }
+      try { await storage?.setItem(key(id), JSON.stringify(policy)); } catch { /* ignore: quota, or no content key yet */ }
     },
   };
 }

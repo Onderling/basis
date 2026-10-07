@@ -67,7 +67,7 @@ import { createRegistryPodMedium } from '../../src/v2/registryCarrier.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
-import { sealedLocalBackend, sealedLocalVault } from '../../src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedLocalBackend, sealedLocalVault, sealedKeyValue } from '../../src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault';
 // S4 circle OIDC — reuse the existing browser Solid-OIDC wrapper (no rebuild). A signed-in
 // session routes a sealed circle to the user's REAL pod; otherwise the in-memory pseudo-pod.
@@ -783,7 +783,7 @@ import { mergeAvailability } from '../../src/v2/memberAvailability.js';
 import { createAvailabilityStore, localStorageAvailabilityIo, podAvailabilityIo, tieredAvailabilityIo } from '../../src/v2/memberAvailability.js';
 import { renderCircleAvailability } from './circleAvailability.js';
 import {
-  createCirclePolicyStore, localStoragePolicyIo,
+  createCirclePolicyStore, localStoragePolicyIo, localCirclePolicyStore,
   createMemberOverrideStore, localStorageOverrideIo,
 } from '../../src/v2/circlePolicyStore.js';
 // β.5 — per-user "pin to top" store + adapter.
@@ -1059,11 +1059,11 @@ async function dialRelayUrl(url) {
 // so capture happens ABOVE the (localStorage / pod) tier — γ.3 will
 // read these slots for 3-way merge after a remote sync.  Each store
 // keys into its own slot prefix to keep histories isolated.
-const policyVersions = localStorageObjectVersions('policy');
 const recipeVersions = localStorageObjectVersions('recipe');
 const rulesVersions  = localStorageObjectVersions('rules');
 
-const policyStore = createCirclePolicyStore({ ...localStoragePolicyIo(), versions: policyVersions });
+// sealed at rest, the policy and its versions (`localCirclePolicyStore`, the same call the create-group wizard makes)
+const policyStore = localCirclePolicyStore();
 // THE CIRCLE'S POLICY ON THE GOVERNANCE LANE — an admin's save (and the founder's first write) states it as a signed
 // statement; every member, a joiner included, catches it up and applies it here. The local store is this device's
 // copy of circle state, no longer a per-device setting that only a settings save ever broadcast.
@@ -2418,7 +2418,7 @@ function buildCircleBot(agent) {
     catch { return null; }
   };
   circleResolveRagEmbedder = resolveCircleRagEmbedder;   // reachable from the agent boot (see declaration)
-  const policyIo = localStoragePolicyIo();
+  const policyIo = localStoragePolicyIo(sealedKeyValue(globalThis.localStorage, { name: 'the circle policy' }));
   async function policyFor() {
     const cid = getActiveCircle();
     if (!cid) return { llmTool: CIRCLE_LLM_POLICY };

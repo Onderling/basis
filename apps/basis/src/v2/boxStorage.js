@@ -16,7 +16,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import path from 'node:path';
 import { buildHouseholdDataSource } from '@onderling-app/household';
 import { backendSnapshotIo, fileKeyValueStorage } from './eventLogPersistence.js';
-import { sealedLocalBackend, shellContentSeal } from './localStoreSeal.js';
+import { sealedLocalBackend, sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
 
 /**
  * A `StorageBackend` over a directory: one file per key (the key, URI-encoded, is the file name), each write
@@ -87,22 +87,7 @@ export function boxDeviceLogIo(dir, { legacyFile = null } = {}) {
  * @param {string} filePath
  */
 export function sealedFileKeyValue(filePath) {
-  const kv = fileKeyValueStorage(filePath);
-  const strategy = () => {
-    const s = shellContentSeal();
-    if (!s) throw new Error(`sealedFileKeyValue: refusing to write ${path.basename(filePath)} unsealed — no content key yet`);
-    return s;
-  };
-  return {
-    async getItem(key) {
-      const v = await kv.getItem(key);
-      if (v == null) return null;
-      const s = shellContentSeal();
-      return s ? s.open(v) : v;
-    },
-    async setItem(key, value) { await kv.setItem(key, strategy().seal(String(value))); },
-    async removeItem(key) { await kv.removeItem(key); },
-  };
+  return sealedKeyValue(fileKeyValueStorage(filePath), { name: path.basename(filePath) });
 }
 
 /**

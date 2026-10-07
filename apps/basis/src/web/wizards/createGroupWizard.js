@@ -43,7 +43,7 @@ import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 import { markAxisTouched } from '../../v2/circleTemplates.js';
 import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
-import { createCirclePolicyStore, localStoragePolicyIo } from '../../v2/circlePolicyStore.js';
+import { localCirclePolicyStore } from '../../v2/circlePolicyStore.js';
 import { consequenceKeyFor } from '../../v2/optionConsequences.js';
 import { t } from '../../localisation.js';
 
@@ -59,7 +59,7 @@ async function persistCreatedCirclePolicy(groupId, state) {
   const patch = policyPatchFromState(state);
   if (Object.keys(patch).length === 0) return;
   try {
-    const store = createCirclePolicyStore(localStoragePolicyIo());
+    const store = localCirclePolicyStore();   // sealed at rest, as the app's own store
     await store.update(groupId, patch);
   } catch { /* policy write is best-effort; creation already succeeded */ }
 }

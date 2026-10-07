@@ -53,4 +53,18 @@ export async function cardForCreatedItem({ reply, op, appOrigin, callSkill, loca
   }
 }
 
+/**
+ * The args a composer op runs with: one that WRITES into the circle (the manifest says `writes: { scope: 'circle' }` —
+ * the + menu's Appointment) is made in the circle the composer is open in, unless it names one itself. Every other op
+ * runs with its args as given. One rule for web and mobile.
+ * @param {object|null} op       the op's manifest declaration
+ * @param {object} [args]
+ * @param {string|null} circleId the circle the composer is open in
+ */
+export function composerArgs(op, args, circleId) {
+  const a = args ?? {};
+  if (op?.writes?.scope !== 'circle' || typeof circleId !== 'string' || !circleId || a.circleId) return a;
+  return { ...a, circleId };
+}
+
 export default cardForCreatedItem;

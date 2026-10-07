@@ -293,7 +293,7 @@ import { createLocalBuiltins } from '../../src/core/localBuiltins.js';
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
 import { composerReplyToStream } from '../../src/v2/composerReply.js';
 import { attachEntriesFor } from '../../src/v2/attachEntries.js';
-import { cardForCreatedItem } from '../../src/v2/createdCard.js';
+import { cardForCreatedItem, composerArgs } from '../../src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../src/core/embedButtons.js';
 import { listsManifest } from '../../../lists/manifest.js';
 import { makeListsOps } from '../../src/v2/listsOps.js';
@@ -6540,12 +6540,14 @@ function showCircle(id, circle, policy) {
   /** Run a device op for this conversation and put whatever it answered where it belongs. */
   _runComposerOpForCircle = (opId, args, appOrigin) => runComposerOp(opId, args, appOrigin);
   async function runComposerOp(opId, args, appOrigin = 'basis') {
+    const declared = (circleManifestsByOrigin?.[appOrigin]?.operations ?? (appOrigin === 'basis' ? basisManifest.operations : []))
+      .find((o) => o.id === opId) ?? null;
     let reply = null;
-    try { reply = await rawCallSkill(appOrigin, opId, args ?? {}); }
+    // an op that writes into the circle (the + menu's Appointment) is made in the circle it was opened in
+    try { reply = await rawCallSkill(appOrigin, opId, composerArgs(declared, args, id)); }
     catch (err) { reply = { ok: false, error: String(err?.message ?? err) }; }
     // A CREATOR answers `{ok, itemId}` — making the thing is its job, and the conversation is not its
     // business. If it declares how its card is read, read it, so the thing appears where it was made.
-    const declared = circleManifestsByOrigin?.[appOrigin]?.operations?.find((o) => o.id === opId) ?? null;
     const card = await cardForCreatedItem({
       reply, op: declared, appOrigin, callSkill: rawCallSkill, localActor: LOCAL_ACTOR,
     });

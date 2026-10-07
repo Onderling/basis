@@ -71,7 +71,13 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
     addEvent: async (args) => {
       const circleId = circleOf(args);
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
-      const agenda = await agendaOf(circleId);
+      // a circle that has no Agenda yet (only a household's template makes one) gets it with its first appointment,
+      // as a person's own calendar does — an appointment made in any circle is that circle's
+      let agenda = await agendaOf(circleId);
+      if (!agenda) {
+        try { await lists.createList(circleId, t('circle.lists.template.schedule'), who(args), { defaultChild: 'calendar-event' }); } catch { /* read again below */ }
+        agenda = await agendaOf(circleId);
+      }
       if (!agenda) return { ok: false, error: t('circle.calendar.no_agenda') };
       let event;
       try { event = buildEvent(args, { actorDefault: who(args) }); }

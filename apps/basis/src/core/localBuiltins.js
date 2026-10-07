@@ -1043,6 +1043,10 @@ async function createTimeEmbed(args, { localActor, t, simPeers, threadStore, cal
   const location = String(args?.location ?? '').trim() || undefined;
   const share    = String(args?.share    ?? '').trim();
   const issuer   = localActor ?? 'webid:local-demo-user';
+  // the circle it was made in (the composer hands it over): the appointment is that circle's, in its Agenda — never
+  // the maker's own calendar, which is what a call without a circle reaches on a person's node
+  const circleId = typeof args?.circleId === 'string' && args.circleId ? args.circleId : null;
+  const inCircle = circleId ? { circleId } : {};
 
   // v0.7.10 — dispatch to the calendar app's real addEvent skill.
   // The calendar app persists the event to its store; we then build
@@ -1057,12 +1061,14 @@ async function createTimeEmbed(args, { localActor, t, simPeers, threadStore, cal
         ...(location ? { location } : {}),
         attendees: share ? [share] : [],
         actor:     issuer,
+        ...inCircle,
       });
       if (reply?.ok === false) return reply;   // pass through error
-      // Read back the snapshot for the embed.
-      event = reply?.itemId
-        ? await callSkill('calendar', 'getEventSnapshot', { id: reply.itemId })
+      // Read back the snapshot for the embed — the calendar answers `{ ok, event }`.
+      const snap = reply?.itemId
+        ? await callSkill('calendar', 'getEventSnapshot', { id: reply.itemId, ...inCircle })
         : null;
+      event = snap?.ok === false ? snap : (snap?.event ?? snap);
     } catch (err) {
       return { ok: false, error: err?.message ?? String(err) };
     }

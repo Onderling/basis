@@ -679,6 +679,10 @@
     "cancel_admin_only": {
       "text": "Here only the admin cancels appointments.",
       "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
+    },
+    "brief": {
+      "text": "{{count}} appointments in the next 24 hours",
+      "doc": "The morning brief's calendar slot: how many appointments in the next 24 hours."
     }
   },
   "embed": {

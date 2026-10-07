@@ -216,9 +216,7 @@ import { bindCircleAddressKeysFor } from '../../v2/householdRosterPairing.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
-import {
-  CalendarStore, registerCalendarSkills, parseDateInput as parseCalendarDate,
-} from '@onderling-app/calendar';
+import { parseDateInput as parseCalendarDate } from '@onderling-app/calendar';
 // Imported by RELATIVE path (not the `@onderling-app/household` package name)
 // because basis doesn't carry household as a workspace dep yet (the
 // dissolve is in progress).  Mirrors basis-mobile/composeManifests.js,
@@ -245,6 +243,7 @@ import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
 import { linkOfferMessage } from '../../v2/identityLink.js';                    // the one message signLinkOffer signs
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';
+import { createOwnDevicesStore }           from '../../v2/ownDevicesStore.js';                   // a person's own appointments, when the shell hands no store
 import { makeCircleLists }                 from '@onderling/kring-host/circleLists';             // a person's own Agenda in their own store
 import { calendarManifest }                from '../../../../calendar/manifest.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
@@ -360,13 +359,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   const HOUSEHOLD_WIRED_OPS = new Set([
     'addItem', 'addTask', 'markComplete', 'removeItem', 'claim', 'reassign', 'listOpen', 'listTasks',
   ]);
-  // v0.7.12 — multi-pod RSVP coordination (simulated for the demo).
-  // calendar.addEvent calls this when attendees are present; default
-  // is no-op (registerCalendarSkills's inviteAttendee:null path).
-  // main.js wires the real impl post-construction (forward-ref) since
-  // it owns the simPeers map + threadStore.
-  let inviteAttendeeRef = async (/* webid, snapshot */) => {};
-
   // v0.7.7 — optional event publisher.  When supplied, mutation
   // skills publish item-changed events via this callback so the
   // chat-shell EventRouter routes them to matching threads.
@@ -1247,28 +1239,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { peers = circleMirror?.listPeers?.() ?? []; } catch { peers = []; }
     return { style: 'decentralized', peers, pending: [], unreachable: [] };
   }
-
-  /* ─────────── v0.7.10 — Calendar app skills ─────────── */
-  // Composed via @onderling-app/calendar's registerCalendarSkills.  The
-  // calendar app's CalendarStore is built fresh per agent instance
-  // (in-memory pseudo-pod for v0.7.10; v0.7.11 swaps to real pod).
-  //
-  // v0.7.10 limitation: all 5 apps' skills register on ONE hostAgent.
-  // For brief / search, app-prefixed names (calendar_briefSummary,
-  // tasks_briefSummary, ...) avoid the collision.  main.js's callSkill
-  // remaps the bare op id → the prefixed id.  v0.7.11+ may mount each
-  // app as its own agent on the InternalBus for cleaner architecture.
-  const calendarStore = new CalendarStore({ actor: 'webid:local-demo-user' });
-  registerCalendarSkills(hostAgent, calendarStore, {
-    simulateSync,
-    publishEvent,
-    skillPrefix: 'calendar_',     // ← namespaces colliding skill ids
-    // v0.7.12 — invite-attendee callback wired by main.js (which has
-    // the simPeers map).  Forward-ref pattern: realAgent doesn't
-    // know about main.js's threadStore + simPeers at construction,
-    // so we expose a setter the caller wires post-construction.
-    inviteAttendee: (webid, snapshot) => inviteAttendeeRef(webid, snapshot),
-  });
 
   /* ─────────── L3 — household via the uniform route + wireSkill (the DEFAULT, legacy retired) ───────────
    * The dissolved-onto-CircleItemStore cores in `v2/householdApp.js` are registered on a DEDICATED
@@ -4826,9 +4796,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     // A person's node (`opts.personalCalendar`, web and mobile): a call without a circle is their OWN appointment — an
     // item in their own-devices store, under an own Agenda, served by the same ops as a circle's.
-    if (appOrigin === 'calendar' && opts.personalCalendar && !args?.circleId && typeof opts.ownStore === 'function') {
+    // A composition with neither option (a test, a tool) is a person's node with an in-memory own store.
+    const personNode = opts.personalCalendar || !opts.calendarInCircle;
+    if (appOrigin === 'calendar' && personNode && !args?.circleId) {
       ownCalendarReady ??= (async () => {
-        ownCalendarStore = await opts.ownStore();
+        ownCalendarStore = await (typeof opts.ownStore === 'function' ? opts.ownStore() : createOwnDevicesStore());
         const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
         const lists = makeCircleLists({ storeFor: () => ownCalendarStore, manifests: [calendarManifest] });
         const containers = await lists.listContainers(OWN_DEVICES_SCOPE);
@@ -4844,11 +4816,16 @@ export async function createRealHouseholdAgent(opts = {}) {
         localActor: 'me',
       }));
       const handler = ops[opId];
-      return handler ? handler(args ?? {}) : { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
+      if (!handler) return { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
+      const res = await handler(args ?? {});
+      // where it was saved, as every write's reply says it: on this device, no peer to wait for (the own store
+      // reaches the person's other devices, never a circle's members) — the renderer's "saved locally"
+      const writes = ['addEvent', 'cancelEvent', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative'];
+      return res?.ok && writes.includes(opId) && !res._sync ? { ...res, _sync: { style: 'decentralized', peers: [], pending: [], unreachable: [] } } : res;
     }
     // A person's node (`opts.personalCalendar`, web and mobile): a call naming a circle reads and writes that circle's
     // store; a call without one (and no own store handed in) stays on the person's own calendar below.
-    if (appOrigin === 'calendar' && opts.calendarInCircle && !(opts.personalCalendar && !args?.circleId)) {
+    if (appOrigin === 'calendar') {
       const ops = (circleCalendar ??= makeCircleCalendarOps({
         storeFor: (circleId) => householdService.stores.getStore(circleId),
         activeCircle: () => resolveCircleId({}),
@@ -4857,19 +4834,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       }));
       const handler = ops[opId];
       return handler ? handler(args ?? {}) : { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
-    }
-    if (appOrigin === 'calendar') {
-      // Calendar skills are registered on the household host agent with the
-      // 'calendar_' prefix (v0.7.10 multi-app collision-avoidance).  Routing
-      // lives HERE in the shared agent — not in a per-shell wrapper — so EVERY
-      // surface reaches calendar through the bare `agent.callSkill`: the
-      // classic web shell, the v2 circle launcher (web), and mobile (both pass
-      // the bare agent, so before this they threw "unknown appOrigin" on every
-      // calendar gate verb — schedule/accept/decline/cancel).  CLAUDE.md
-      // invariant #1: routing belongs in shared code, not a shell.  The
-      // cross-peer invite/RSVP fan-out (calendarOutbound hook) stays a
-      // shell/bundle concern layered ON TOP of this routing.
-      return callSkill('household', `calendar_${opId}`, args);
     }
     if (appOrigin === 'agents') {
       // The read-only "your agents" skills live on hostAgent (wireSkill-wrapped
@@ -6044,12 +6008,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // token wiring fell back to registry-only mode.  Tests + admin surfaces
     // consult `isRevoked(tokenId)` here.
     agentsTokenRegistry,
-    // v0.7.12 — caller wires the invite-attendee callback after
-    // construction (so the simPeers map + threadStore from main.js
-    // are visible here).
-    setInviteAttendee(fn) {
-      if (typeof fn === 'function') inviteAttendeeRef = fn;
-    },
     // v0.7. — caller wires the pod-writer on sign-in / clears on
     // sign-out so calendar's .ics feed writes-through to the user's
     // pod under <pod>/onderling/calendar/feed.ics.

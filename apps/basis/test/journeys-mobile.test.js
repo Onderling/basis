@@ -80,7 +80,7 @@ async function bootWorkspace({ chatVault } = {}) {
     if (appOrigin === 'tasks')    return agent.callSkill('tasks', opId, args);
     if (appOrigin === 'stoop')       return agent.callSkill('stoop', opId, args);
     if (appOrigin === 'folio')       return agent.callSkill('folio', opId, args);
-    if (appOrigin === 'calendar')    return agent.callSkill('household', `calendar_${opId}`, args);
+    if (appOrigin === 'calendar')    return agent.callSkill('calendar', opId, args);
     return { ok: false, error: `${appOrigin}.${opId} not wired` };
   };
 

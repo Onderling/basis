@@ -109,33 +109,13 @@ async function bootTestWorkspace() {
       return agent.callSkill('folio', opId, args);
     }
     if (appOrigin === 'calendar') {
-      return agent.callSkill('household', `calendar_${opId}`, args);
+      return agent.callSkill('calendar', opId, args);
     }
     return { ok: false, error: `${appOrigin}.${opId} not wired in test` };
   };
   callSkillRef = callSkill;
 
   // Wire publishEvent → router (so mutations broadcast).
-  agent.setInviteAttendee?.(async (webid, snapshot) => {
-    const peerName = webid.replace(/^webid:/, '');
-    const peer     = SIM_PEERS[peerName];
-    if (!peer) return;
-    const dest = store.getThread(peer.threadId);
-    if (!dest) return;
-    dest.addShellMessage({
-      kind:           'embed-card',
-      messageId:      `invite-${snapshot.id}-${peerName}-${Date.now()}`,
-      threadId:       peer.threadId,
-      lifecycleState: 'live',
-      embed: {
-        kind:      'time-card',
-        appOrigin: 'calendar',
-        itemRef:   { app: 'calendar', type: 'calendar-event', id: snapshot.id },
-        snapshot,
-        issuedBy:  LOCAL_ACTOR,
-      },
-    });
-  });
 
   const localBuiltins = createLocalBuiltins({
     catalogue: rawCatalogue, t: (k, p) => p ? `${k}(${JSON.stringify(p)})` : k,
@@ -366,45 +346,7 @@ describe('J7 — Embed + multi-user RSVP round-trip', () => {
     expect(embed.issuedBy).toBe(ws.LOCAL_ACTOR);
   });
 
-  it("calendar invite dispatches an embed-card to Anne's sim-peer thread", async () => {
-    // Organiser creates event with Anne as attendee.  Use callSkill
-    // directly (skips slash parsing) so the args land cleanly.
-    const reply = await ws.callSkill('calendar', 'addEvent', {
-      title:     'Drinks',
-      startsAt:  '2026-06-15T18:00:00Z',
-      attendees: ['webid:anne'],
-    });
-    expect(reply.ok).toBe(true);
 
-    const anne = ws.store.getThread('sim-anne');
-    expect(anne).toBeTruthy();
-    const invite = anne.messages.find((m) =>
-      m.rendered?.kind === 'embed-card'
-      && m.rendered.embed?.itemRef?.app === 'calendar',
-    );
-    expect(invite).toBeTruthy();
-    expect(invite.rendered.embed.snapshot.title).toBe('Drinks');
-  });
-
-  it("Anne's RSVP records on the event + broadcasts back via EventRouter", async () => {
-    const add = await ws.callSkill('calendar', 'addEvent', {
-      title:     'Coffee',
-      startsAt:  '2026-06-10T10:00:00Z',
-      attendees: ['webid:anne'],
-    });
-    expect(add.ok).toBe(true);
-    const eventId = add.itemId;
-
-    // Anne accepts (as if she clicked [Accept] in her thread).
-    const ack = await ws.callSkill('calendar', 'rsvpAccept', {
-      id: eventId, actor: 'webid:anne',
-    });
-    expect(ack.ok).toBe(true);
-
-    // Organiser's view via getEventSnapshot reflects Anne's response.
-    const snap = await ws.callSkill('calendar', 'getEventSnapshot', { id: eventId });
-    expect(snap.fields.rsvp).toMatch(/webid:anne: accepted/);
-  });
 });
 
 /* ─────────────── J8 — Focused alerts thread ─────────────── */

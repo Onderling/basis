@@ -152,6 +152,25 @@ export const listsManifest = {
       },
     },
     {
+      // The reminders EVERYONE it is for gets for one entry (an appointment, a dated chore): the household's statement
+      // about it, in a person's words ("60", "ook avond", "7:30"; "gewoon" drops it) — whoever may edit the entry.
+      id:        'entryReminders', group: 'compose',
+      verb:      'update',
+      writes: { scope: 'circle' },
+      appliesTo: { type: 'list-item' },
+      requires:  ['lists'],
+      resolves:  [{ field: 'reminders', policy: 'content' }],
+      params: [
+        { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'reminders', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/list-reminders', body: 'flags' },
+        chat:  { reply: 'text', hint: 'The reminders everyone gets for one entry (an appointment or a dated chore), in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop them. For one person\'s own reminder use remindMe.' },
+      },
+    },
+    {
       // At a shop: the general shopping list and that shop's own lists together (a member's idea, 2026-10-06).
       id:        'shopVisit', group: 'data',
       verb:      'list',
@@ -237,12 +256,15 @@ export const listsManifest = {
       resolves:  [{ field: 'text', policy: 'content' }],
       params: [
         { name: 'item', kind: 'string', required: true, schema: { minLength: 1 } },
-        { name: 'text', kind: 'string', required: true, schema: { minLength: 1 } },
+        // new words, or a new time, or both — a form still asks for the words (`ask`)
+        { name: 'text', kind: 'string', required: false, ask: true, schema: { minLength: 1 } },
         { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+        // an appointment's new start (it keeps its length) or a chore's new due: the line's time, edited as its words are
+        { name: 'when', kind: 'date', required: false },
       ],
       surfaces: {
         slash: { command: '/list-edit', body: 'flags' },
-        chat:  { reply: 'text', hint: 'Change the words of an entry on a list.' },
+        chat:  { reply: 'text', hint: 'Change an entry on a list: its words (text), and/or its time (when — an appointment moves, keeping its length; a chore gets a new due). "zet de tandarts op vrijdag 14:00" → item tandarts, when.' },
       },
     },
   ],

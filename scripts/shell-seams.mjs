@@ -59,6 +59,9 @@ export const SEAMS = Object.freeze([
   // appointments move into the store and they tick on foreground.
   { id: 'own-devices-store', pattern: /createOwnDevicesStore\(/, shells: ['box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
+  // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
+  // that hosts the bot, at once; a person's device writes first to nobody.
+  { id: 'announcer', pattern: /createAnnouncer\(/, shells: ['box'], why: 'the household hears of a shared appointment, a move or a cancel, and a chore given to them, when it happens' },
   { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   { id: 'lane-table',            pattern: /buildCircleLanes\(/,                 why: 'the one lane table (governance, membership, keys, tasks, chat, the own-devices handlers) — a shell wires its reactions, never a lane of its own' },
   // THE CIRCLE'S POLICY is circle state on the governance lane (2026-09-26): every shell builds the one lane, folds

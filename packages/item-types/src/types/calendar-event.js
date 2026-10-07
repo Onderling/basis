@@ -5,6 +5,7 @@
  */
 
 import { BASE_PROPERTIES, BASE_REQUIRED, NAMESPACE } from '../baseSchema.js';
+import { ITEM_REMINDERS_SCHEMA } from '../reminderRules.js';
 
 export const CALENDAR_EVENT_SCHEMA = {
   iri:         `${NAMESPACE}CalendarEvent`,
@@ -20,6 +21,8 @@ export const CALENDAR_EVENT_SCHEMA = {
     endsAt:    { type: 'string', format: 'date-time' },
     location:  { type: 'string' },
     attendees: { type: 'array', items: { type: 'string' } },
+    // the household's reminders for this item (`morning` · `evening-before` · `before:<min>` · `at:<HH:MM>`)
+    reminders: ITEM_REMINDERS_SCHEMA,
     organiser: { type: 'string' },
   },
 };

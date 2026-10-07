@@ -102,13 +102,16 @@ export const isQuietHours = (v) => QUIET_SHAPE.test(String(v ?? ''));
 export const quietHoursFrom = (v) => (isQuietHours(v) ? v : QUIET_DEFAULT);
 
 /**
- * How many minutes before an appointment the short-notice reminder comes (on top of the evening before); 0 = none.
- * The household's (`/huishouden lead 5`), the admin's; the tick runs every minute, so 5 means 5–4 minutes before.
+ * The household's short notice: how many minutes before something with a time (`/huishouden lead 5`, the admin's) —
+ * the `before:` rule of the household's list; the tick runs every minute, so 5 means 5–4 minutes before.
  */
-export const REMINDER_LEAD_KEY = 'assistant.reminderLeadMin';
+/** The household's reminder rules (`/huishouden rules …`, `lead …`): where the list is kept. */
+export const REMINDER_RULES_KEY = 'assistant.reminderRules';
+/** Today's rhythm: the morning, the evening before (early appointments), five minutes before (Frits 2026-10-05). */
+export const HOUSEHOLD_RULES_DEFAULT = Object.freeze(['morning', 'evening-before', 'before:5']);
+export const REMINDER_RULES_PARAM = param({ key: REMINDER_RULES_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: HOUSEHOLD_RULES_DEFAULT.join(',') });
+/** The lead minutes the household's menu offers (its `before:` rule in `assistant.reminderRules`); 0 = none. */
 export const REMINDER_LEAD_CHOICES = Object.freeze([0, 5, 15, 30, 60]);
-export const REMINDER_LEAD_DEFAULT = param({ key: REMINDER_LEAD_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 5 });   // Frits 2026-10-05
-export const reminderLeadFrom = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 0 && n <= 240 ? n : REMINDER_LEAD_DEFAULT; };
 
 /**
  * Who sees the household's model use (the month's calls and tokens): the admin only, or everyone in the household. A

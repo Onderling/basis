@@ -3827,7 +3827,19 @@
     "chore_held": "{{text}} — {{who}}",
     "chore_taken": "{{text}} — opgepakt",
     "chore_open": "{{text}} — nog niemand",
-    "chore_you": "jij"
+    "chore_you": "jij",
+    "reminders_set": {
+      "text": "Herinneringen voor {{text}}: {{rules}}.",
+      "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    },
+    "reminders_on_top": {
+      "text": "bovenop de gewone",
+      "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    },
+    "reminders_usual": {
+      "text": "Voor {{text}} gelden weer de gewone herinneringen.",
+      "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    }
   },
   "share": {
     "error": {
@@ -4183,6 +4195,138 @@
       "text": "Herinneringen staan uit.",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
     },
+    "planned_head": {
+      "text": "Gepland voor jou (komende week):",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_reminder": {
+      "text": "{{when}} · {{title}} ({{rule}})",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_row": {
+      "text": "{{when}} · {{what}}",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_skipped": {
+      "text": "{{when}} · {{what}} — overgeslagen",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_week_overview": {
+      "text": "weekoverzicht",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_row_label": {
+      "text": "gepland",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_none": {
+      "text": "Niets gepland.",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_reminders_off": {
+      "text": "Je herinneringen staan uit (/herinneringen aan).",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "planned_household": {
+      "text": "Het huishouden herinnert: {{rules}} (de avond ervoor alleen bij een afspraak vóór 10:00). Wijzigen: /huishouden rules …",
+      "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
+    },
+    "reminders_ask": {
+      "text": "Hoe wil je hieraan herinnerd worden — nu en voortaan? (Later anders: /herinneringen.)",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_morning": {
+      "text": "Ochtend",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_hour": {
+      "text": "1 uur van tevoren",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_none": {
+      "text": "Geen",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "ask_usual": {
+      "text": "Zoals altijd",
+      "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."
+    },
+    "announce_new": {
+      "text": "Nieuw in de agenda: {{title}}, {{when}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_moved": {
+      "text": "Verplaatst: {{title}} — nu {{when}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_cancelled": {
+      "text": "Gaat niet door: {{title}} ({{when}}).",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_given": {
+      "text": "Voor jou: {{text}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "announce_given_when": {
+      "text": "Voor jou: {{text}}, {{when}}.",
+      "doc": "What the household bot tells the OTHERS a change concerns, at once (never the one who made it): a new, moved or cancelled appointment; a chore given to them."
+    },
+    "reminders_rules_set": {
+      "text": "Je herinneringen: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "reminders_rules_household": {
+      "text": "Je herinneringen volgen weer het huishouden: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "reminders_usage": {
+      "text": "Gebruik: /herinneringen aan · uit · 60 (een uur van tevoren) · ochtend · avond · 7:30 · ook … (erbij, niet in plaats van) · geen · huis (zoals het huishouden).",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_morning": {
+      "text": "'s ochtends (08:00)",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_evening": {
+      "text": "de avond ervoor (19:00)",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_before": {
+      "text": "{{n}} min van tevoren",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rule_at": {
+      "text": "om {{time}}",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "rules_none": {
+      "text": "geen",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_set": {
+      "text": "Voor {{item}}: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_added": {
+      "text": "Voor {{item}} komt erbij: {{rules}}.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_cleared": {
+      "text": "Voor {{item}} volg je weer de gewone herinneringen.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_not_found": {
+      "text": "Ik vind geen afspraak of klusje met \"{{item}}\".",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_which": {
+      "text": "Welke bedoel je? {{items}}",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
+    "remind_me_usage": {
+      "text": "Zeg welke afspraak of welk klusje, en wanneer — bijvoorbeeld: herinner me een uur van tevoren aan de tandarts.",
+      "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
+    },
     "overview_on": {
       "text": "Het weekoverzicht staat aan (zondag 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4248,7 +4392,7 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00) en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
+      "text": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
@@ -4479,7 +4623,7 @@
     "screen_confirm_none": "Geen van deze",
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
     "reminder_chore_soon": "Zo meteen: {{text}}, om {{time}}.",
-    "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: de avond vóór een afspraak (19:00), {{lead}} minuten van tevoren, en op de ochtend van een klusje (08:00). Tussen {{from}} en {{to}} stuur ik niets. Uitzetten: /herinneringen uit.",
+    "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, {{lead}} minuten van tevoren, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
     "value_lead_min": "{{n}} minuten",
     "value_lead_off": "geen",
@@ -4503,7 +4647,8 @@
           "editEntry": "de woorden van een regel veranderen",
           "createList": "een nieuwe lijst",
           "restoreList": "een weggehaalde lijst terugzetten (binnen 30 dagen)",
-          "removeList": "een hele lijst weggooien"
+          "removeList": "een hele lijst weggooien",
+          "entryReminders": "de herinneringen die iedereen krijgt voor één afspraak of klusje (60 · ochtend · avond · ook … · gewoon)"
         },
         "tasks": {
           "listMine": "je eigen klusjes",
@@ -4525,7 +4670,7 @@
           "assistant-people": "wie er in dit huishouden zitten",
           "weekOverview": "jouw week: klusjes, afspraken, boodschappen",
           "assistant-menu": "je instellingen, met knoppen",
-          "assistant-reminders": "herinneringen aan of uit",
+          "assistant-reminders": "herinneringen aan of uit, of wanneer (60 · ochtend · avond · ook …)",
           "assistant-overview": "het zondagsoverzicht aan of uit",
           "assistant-language": "de taal waarin ik je antwoord",
           "assistant-memory": "hoeveel ik van ons gesprek onthoud",
@@ -4555,7 +4700,9 @@
           "assistant-link-confirm": "de code van je Basis-app kiezen",
           "assistant-unlink": "je Basis-app ontkoppelen",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",
-          "assistant-circles": "de kringen waar de bot in zit"
+          "assistant-circles": "de kringen waar de bot in zit",
+          "remindMe": "een eigen herinnering voor één afspraak of klusje",
+          "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)"
         }
       }
     },
@@ -7646,7 +7793,8 @@
       "editEntry": "Wijzig",
       "assistant-role": "Rol",
       "assistant-revoke": "Eruit",
-      "removeFromList": "Weg"
+      "removeFromList": "Weg",
+      "entryReminders": "Herinneringen"
     },
     "household": "Het huishouden",
     "people": "Wie er in huis zijn",

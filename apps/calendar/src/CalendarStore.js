@@ -464,6 +464,19 @@ export function parseDateInput(input) {
   return null;
 }
 
+/**
+ * Does this `when` name a time of day, or only a day? A bare date ("2026-10-09") and a day in words ("friday") name a
+ * day; an ISO time or "friday 3pm" name a time. A move keeps an appointment's time of day when only a day is said.
+ */
+export function hasTimeOfDay(input) {
+  if (input instanceof Date) return true;
+  if (typeof input !== 'string' || !input.trim()) return false;
+  const s = input.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{1,2}:\d{2}/.test(s)) return true;
+  try { return Boolean(chrono.parse(s, new Date(), { forwardDate: true })?.[0]?.start?.isCertain('hour')); } catch { return false; }
+}
+
 function toEpoch(input) {
   if (input === undefined || input === null) return null;
   if (typeof input === 'number') return input;

@@ -84,13 +84,15 @@ import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
+import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
 import { createCommandMenus } from '../src/v2/botCommandMenu.js';
 import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
-import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, REMINDER_LEAD_KEY, reminderLeadFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom } from '../src/v2/botSettings.js';
+import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom } from '../src/v2/botSettings.js';
+import { REMINDER_RULES_KEY, reminderRulesFrom, leadOf } from '../src/v2/reminderWords.js';
 import { ensureHouseholdLists, householdBotApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
@@ -830,7 +832,7 @@ if (tgToken || inboxDoor.bridge) {
   // the household's reminder settings as the admin set them (the welcome says them; the tick obeys them)
   // what each role may do on this bot (`/huishouden roles standard|flat`): the menus, the screens and the model read it
   const rolesPreset = () => rolesPresetFrom(agent.getParamValue?.(ROLES_KEY));
-  const reminderSettings = () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)), lead: reminderLeadFrom(agent.getParamValue?.(REMINDER_LEAD_KEY)), inApp: inAppModeFrom(agent.getParamValue?.(HOUSEHOLD_IN_APP_KEY)) });
+  const reminderSettings = () => ({ reminders: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)), quiet: quietHoursFrom(agent.getParamValue?.(QUIET_KEY)), rules: reminderRulesFrom(agent.getParamValue?.(REMINDER_RULES_KEY)), lead: leadOf(reminderRulesFrom(agent.getParamValue?.(REMINDER_RULES_KEY))), inApp: inAppModeFrom(agent.getParamValue?.(HOUSEHOLD_IN_APP_KEY)) });
   const turnLogMode = values['walk-log-turns'] ?? (process.env.ONDERLING_WALK_LOG_TURNS || undefined);
   // Every person is a contact with a role, and their calls carry them to the host gate.
   // Telegram's menu lists, made once the door runs; a publish that fails is logged, never fatal (the commands still work typed)
@@ -931,6 +933,14 @@ if (tgToken || inboxDoor.bridge) {
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), actor: 'host' });
   await planned.load();
+  // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
+  // the op, through the door — held through a person's quiet hours and said in their next message.
+  const announcer = isFunctionProfile ? createAnnouncer({
+    sources: () => agent.reminderSources(), users: botUsers, threads, reach, t, tz: boxTz,
+    quiet: () => reminderSettings().quiet, log: deviceLog,
+    // the walk log keeps who (the last digits), which item (its tail), what kind and how it went — never its words
+    onAnnounced: (e) => walkLog({ kind: 'announce', ts: new Date().toISOString(), to: String(e.personId).slice(-4), ...(e.item ? { item: String(e.item).slice(-6) } : {}), what: e.kind, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}), ...(e.count ? { count: e.count } : {}) }),
+  }) : null;
   const screens = isFunctionProfile ? createBotScreens({
     threads,
     isAdmitted: async (person) => (await botUsers.list()).some((u) => u.id === person),
@@ -1081,7 +1091,12 @@ if (tgToken || inboxDoor.bridge) {
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
     // the planned overview: written by `/overzicht`, sent to the person's own door, never in their quiet hours
-    intentions: { book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz },
+    announcer,
+    intentions: {
+      book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz,
+      // `/gepland` reads what is coming from the household's items and its people
+      sources: () => agent.reminderSources(), users: () => botUsers.list(),
+    },
     admin: {
       screens,
       identityLink,
@@ -1200,10 +1215,13 @@ if (tgToken || inboxDoor.bridge) {
   if (isFunctionProfile) {
     const reminderTick = createReminderTick({
       sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
+      // what was said: a done-mark per occurrence on the device log (sealed, kept across restarts)
+      log: deviceLog,
+      announcer,
       tz: boxTz,
       settings: reminderSettings,
       // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
-      onSent: (e) => walkLog({ kind: 'reminder', ...(e.at ? { ts: e.at } : {}), to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}), ...(Array.isArray(e.what) ? { what: e.what.map((w) => ({ kind: w.kind, id: String(w.id).slice(-6), slot: w.slot })) } : {}) }),
+      onSent: (e) => walkLog({ kind: 'reminder', ...(e.at ? { ts: e.at } : {}), to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}), ...(Array.isArray(e.what) ? { what: e.what.map((w) => ({ kind: w.kind, id: String(w.id).slice(-6), slot: w.slot, ...(w.rule ? { rule: w.rule } : {}) })) } : {}) }),
     });
     hostTick.add('reminders', { every: reminderTick.every, run: () => reminderTick.pass() });
     // Planned work: each due row through the door AS its person (the gate, the role, the names apply), once. The switch

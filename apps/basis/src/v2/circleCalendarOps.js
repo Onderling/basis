@@ -15,6 +15,7 @@
  * zone is read as local, and shown as local.
  * The `.ics` feed is a projection for later (a read, never a second store). A person's node composes none of this.
  */
+import { reminderLayerFromWords } from './reminderWords.js';
 import { addChildTo } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { buildEvent, rsvpEvent, eventsInWindow } from '@onderling-app/calendar';
@@ -74,13 +75,16 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       let event;
       try { event = buildEvent(args, { actorDefault: who(args) }); }
       catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+      // its own reminders, in a person's words ("ook avond", "60"): the household's statement about this appointment
+      const reminders = args?.reminders ? reminderLayerFromWords(args.reminders) : null;
+      if (args?.reminders && !reminders) return { ok: false, error: t('circle.bot.reminders_usage') };
       // the same appointment again — its title (case aside) at the same start — is not a second one
       const same = (await eventsOf(circleId)).find((e) => e.state !== 'cancelled' && !e.completedAt
         && String(e.title ?? '').trim().toLowerCase() === String(event.title ?? '').trim().toLowerCase()
         && new Date(e.startsAt).getTime() === new Date(event.startsAt).getTime());
       if (same) return { ok: true, duplicate: true, itemId: same.id, message: t('circle.calendar.already_there', { title: same.title, when: stamp(same) }) };
       // The Agenda's child, with the event's own id; `text` so the list shows it as an entry too.
-      const made = await addChildTo(storeFor(circleId), agenda.id, { ...event, text: event.title, completedAt: null, createdBy: who(args) });
+      const made = await addChildTo(storeFor(circleId), agenda.id, { ...event, text: event.title, completedAt: null, createdBy: who(args), ...(reminders ? { reminders } : {}) });
       return { ok: true, itemId: made?.id ?? event.id, message: t('circle.calendar.added', { title: event.title, when: stamp(event) }) };
     },
 

@@ -95,7 +95,9 @@ export function screenActionForm(skill, args = {}) {
   for (const [, e] of catalogueForScreen().opsById ?? []) { if (e?.appOrigin === appOrigin && e?.op?.id === opId) { entry = e; break; } }
   if (!entry) return null;
   const params = Array.isArray(entry.op.params) ? entry.op.params : [];
-  const missing = params.filter((p) => p?.required && (args?.[p.name] === undefined || args[p.name] === '')).map((p) => p.name);
+  // what the form asks: the required, and what an op marks `ask` (optional at the waist — "words or a new time" — but
+  // the thing a person edits on a screen)
+  const missing = params.filter((p) => (p?.required || p?.ask) && (args?.[p.name] === undefined || args[p.name] === '')).map((p) => p.name);
   return missing.length ? { opId, appOrigin, params, missing, prefilled: { ...args } } : null;
 }
 

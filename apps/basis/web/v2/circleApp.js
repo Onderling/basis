@@ -31,6 +31,7 @@ import '../../src/web/shims/bufferPolyfill.js';
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
 // buffer only; a bug-report door reads it (pending — see the report kind's appender note). PII-safe.
 import { configureLog, consoleSink } from '@onderling/logger';
+import { flushPendingSaves } from '@onderling/local-store';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
 import { createPeek } from '../../src/v2/circlePeek.js';
@@ -8119,6 +8120,11 @@ async function boot() {
     watch.check().catch(() => {});
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') watch.check().catch(() => {}); });
   }
+  // A LEAVING PAGE WRITES WHAT IS WAITING. The stores save behind a short debounce; a reload or a closed tab inside
+  // that window lost the change (an appointment added and the tab closed at once — a tester's first move). Hidden is
+  // the last moment a page is sure to get on a phone's browser; pagehide covers a reload and a closed tab.
+  window.addEventListener('pagehide', () => { flushPendingSaves().catch(() => {}); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPendingSaves().catch(() => {}); });
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }

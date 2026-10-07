@@ -49,6 +49,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { VaultNodeFs } from '@onderling/vault';
+import { flushPendingSaves } from '@onderling/local-store';
 
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { initLocalisation, t } from '../src/localisation.js';
@@ -1287,9 +1288,8 @@ const stop = async () => {
   // The stores write behind a short debounce (200 ms in the file adapters, 400 ms for the device log,
   // whose timer is unref'd and would not hold the process either). A stop that exits inside that window
   // loses the last change — a roster row learned a moment before a deploy's restart, and the box came
-  // back not knowing a device it had just met (2026-09-14). The stores expose no flush through the
-  // agent yet; until they do, the window is waited out, with margin for the write itself.
-  await new Promise((resolve) => { setTimeout(resolve, 700); });
+  // back not knowing a device it had just met (2026-09-14). The waiting saves are made now, and awaited.
+  await flushPendingSaves();
   process.exit(0);
 };
 process.on('SIGINT', stop);

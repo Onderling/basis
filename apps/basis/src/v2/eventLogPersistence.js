@@ -18,6 +18,8 @@
  * the app to the old in-memory behaviour (logged loudly once), it never breaks an append.
  */
 
+import { trackPendingSave } from '@onderling/local-store';
+
 /** Debounce a snapshot sink: bursts of appends coalesce into one trailing write. */
 function debounced(save, ms) {
   let timer = null;
@@ -27,17 +29,22 @@ function debounced(save, ms) {
     timer = null;
     const events = last;
     last = null;
-    Promise.resolve(save(events)).catch((err) => {
+    return Promise.resolve(save(events)).catch((err) => {
       if (!warned) {
         warned = true;   // once — a broken medium would otherwise warn on every keystroke
         console.warn('[device-log] persist failed — the log is running in-memory this session:', err?.message ?? err);
       }
     });
   };
+  let untrack = null;
+  const flushNow = () => { if (timer) { clearTimeout(timer); timer = null; } untrack = null; return flush(); };
   return (events) => {
     last = events;
     if (timer) clearTimeout(timer);
-    timer = setTimeout(flush, ms);
+    // tracked while it waits: a shell flushes it at once when the page or the app goes away
+    untrack?.();
+    untrack = trackPendingSave(flushNow);
+    timer = setTimeout(() => { untrack?.(); untrack = null; flush(); }, ms);
     if (typeof timer?.unref === 'function') timer.unref();
     // The log chains on the persist result — honour its promise contract (errors surface in flush).
     return Promise.resolve();

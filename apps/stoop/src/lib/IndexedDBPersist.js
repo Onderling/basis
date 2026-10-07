@@ -27,6 +27,8 @@
  * Browser-only.  Throws on construction when `indexedDB` is missing.
  */
 
+import { trackPendingSave } from '@onderling/local-store';
+
 const DEFAULT_STORE_NAME = 'snapshots';
 const SNAPSHOT_KEY       = 'state';
 
@@ -37,6 +39,7 @@ export class IndexedDBPersist {
   #db = null;
   /** @type {ReturnType<typeof setTimeout> | null} */
   #pendingTimer = null;
+  #untrack = null;
   /** Most recent saved snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
 
@@ -106,21 +109,32 @@ export class IndexedDBPersist {
    */
   scheduleSave(map) {
     if (this.#pendingTimer) clearTimeout(this.#pendingTimer);
+    this.#untrack?.();
+    const run = () => this.save(map).catch(() => { /* swallow — caller's onError handler is upstream */ });
+    // tracked while it waits: a shell flushes it at once when the page or the app goes away
+    this.#untrack = trackPendingSave(async () => {
+      if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+      this.#untrack = null;
+      await run();
+    });
     this.#pendingTimer = setTimeout(() => {
       this.#pendingTimer = null;
-      this.save(map).catch(() => { /* swallow — caller's onError handler is upstream */ });
+      this.#untrack?.(); this.#untrack = null;
+      run();
     }, this.#saveDelayMs);
   }
 
   /** Force any pending debounced save to flush now. */
   async flush(map) {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
     await this.save(map);
   }
 
   /** Cancel any pending debounced save without saving. */
   cancel() {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
   }
 
   /** Close the IndexedDB connection.  Optional — adapter survives

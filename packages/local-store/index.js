@@ -23,6 +23,8 @@
  */
 
 export { CachingDataSource } from './src/CachingDataSource.js';
+// The saves waiting on a debounce, made all at once when the page or the app goes away.
+export { trackPendingSave, flushPendingSaves, pendingSaveCount } from './src/pendingSaves.js';
 
 export { SyncCadence } from './src/SyncCadence.js';
 

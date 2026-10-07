@@ -90,6 +90,8 @@ import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { exportDirFiles } from '../src/v2/exportDirFiles.js';
 import { createExportRequestJob } from '../src/v2/exportRequest.js';
 import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
+import { createCircleRowGate } from '../src/v2/circleRowGate.js';
+import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
@@ -942,7 +944,11 @@ if (tgToken || inboxDoor.bridge) {
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // ...and the rows in the stores of the circles it holds (a circle row runs only by the runner's rule, below)
-  const planned = createIntentionBook({ store: await agent.ownStore(), circles: () => agent.heldCircleStores(), actor: 'host' });
+  // a row it writes into a circle's store (the household's announce rows) is signed with its circle key
+  const planned = createIntentionBook({
+    store: await agent.ownStore(), circles: () => agent.heldCircleStores(), actor: 'host',
+    signerFor: async (circleId) => ({ identity: await agent.circleIdentityFor(circleId), ref: agent.identity?.chat?.pubKey }),
+  });
   await planned.load();
   // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
   // the op, through the door — held through a person's quiet hours and said in their next message.
@@ -1257,16 +1263,29 @@ if (tgToken || inboxDoor.bridge) {
     // What a change tells others, as the household's own rows (in its circle's store, so its people can see them)
     const seeded = await seedAnnounceRows(planned, agent.householdCircleId).catch(() => 0);
     if (seeded) walkLog({ kind: 'announce-rows', seeded });
+    const circleRows = createCircleRowGate({
+      hostRef: agent.identity?.chat?.pubKey ?? null,
+      circleKeyFor: (circleId) => agent.circleIdentityFor(circleId),
+      rosterBinding: rosterBindingVerifier(callSkill),
+      people: () => botUsers.list(),
+    });
     const intentionRunner = createIntentionRunner({
       book: planned, log: deviceLog, tz: boxTz,
       // a circle row this box runs is claimed in its key's name first — another host of the circle then leaves it
       claimAs: agent.identity?.chat?.pubKey ?? null,
       withOrigin: (origin, fn) => writeOrigin.run(origin, fn),
       // a circle row runs here only as the household's announcer: nothing proves whom any other circle row names
-      mayRun: (o) => (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? true : 'a circle row names whom it acts as, and nothing proves it'),
+      // a circle row runs only when its author signed it, the roster binds the key, and it acts as its author — a
+      // person this box acts for (or the household, signed by the box itself, to announce)
+      mayRun: (o, scope, row) => circleRows.mayRun(o, scope, row),
       // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that
       // person, through their own column of the door
-      run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? { [HOST_CALL]: true } : { caller: o.actsAs, threadId: o.actsAs }),
+      run: async (o) => {
+        if (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS) return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true });
+        // as the person, through their own column of the door (a member's key maps to the row of the person it names)
+        const as = (await circleRows.callerFor(o.actsAs)) ?? o.actsAs;
+        return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: as, threadId: as });
+      },
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });

@@ -49,7 +49,8 @@ export function doneMarksOn(log, now = Date.now) {
  * @param {string} a.tz
  * @param {() => number} [a.now]
  * @param {(e: {occurrence: string, row: string, op: string, actsAs: string, outcome: 'ran'|'not-yet'|'failed'|'refused', reason?: string}) => void} [a.onFired]
- * @param {(o: object, scope: string) => true|string} [a.mayRun]   a circle row's way through: true, or why not
+ * @param {(o: object, scope: string, row: object) => true|string|Promise<true|string>} [a.mayRun]   a circle row's way
+ *   through: true, or why not (it sees the row: its author's signature, whom it acts as)
  * @param {string} [a.claimAs]   this host, as a circle row's claim names it (a key, unique to the host)
  * @param {(origin: {intention: string}, fn: () => Promise<any>) => Promise<any>} [a.withOrigin]   runs a row's op
  *   under the row as the origin of whatever it writes (the host's ambient origin; the store stamps it on the item, and
@@ -62,12 +63,13 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
   const tell = (e) => { try { onFired?.(e); } catch { /* a listener never stops the runner */ } };
   const marks = doneMarksOn(log, now);
 
-  /** True, or why a circle row is not run here. */
-  const allowed = (o) => {
+  /** True, or why a circle row is not run here (the host's rule sees the row itself: its signature, whom it acts as). */
+  const allowed = async (o) => {
     const scope = book.scopeOf?.(o.rowId) ?? null;
     if (!scope) return true;
     let verdict = 'a circle row names whom it acts as, and nothing proves it';
-    if (typeof mayRun === 'function') { try { verdict = mayRun(o, scope); } catch (e) { verdict = e?.message ?? 'refused'; } }
+    const row = book.rows().find((r) => r.id === o.rowId) ?? null;
+    if (typeof mayRun === 'function') { try { verdict = await mayRun(o, scope, row); } catch (e) { verdict = e?.message ?? 'refused'; } }
     return verdict === true ? true : String(verdict || 'refused');
   };
 
@@ -86,7 +88,7 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
 
   async function runOne(o) {
     const base = { occurrence: o.id, row: o.rowId, op: o.op, actsAs: o.actsAs };
-    const ok = allowed(o);
+    const ok = await allowed(o);
     if (ok !== true) {
       const key = `refused:${ok}`;
       if (said.get(o.id) !== key) { said.set(o.id, key); tell({ ...base, outcome: 'refused', reason: ok }); }

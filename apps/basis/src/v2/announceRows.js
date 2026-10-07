@@ -36,7 +36,11 @@ export const isAnnounceRow = (row) => row?.op === ANNOUNCE_OP && row?.actsAs ===
 export async function seedAnnounceRows(book, scope) {
   if (!scope) return 0;
   await book.load();
-  const have = new Set(book.rows().filter((r) => isAnnounceRow(r) && book.scopeOf(r.id) === scope).map((r) => r.label));
+  const mine = book.rows().filter((r) => isAnnounceRow(r) && book.scopeOf(r.id) === scope);
+  // rows seeded before rows were signed, or signed under an older version: signed now by this host (a host runs no
+  // unsigned circle row; `book.sign` leaves a current signature as it is)
+  for (const r of mine) { try { await book.sign(r.id); } catch { /* said when it is refused */ } }
+  const have = new Set(mine.map((r) => r.label));
   let made = 0;
   for (const spec of ANNOUNCE_ROWS) {
     if (have.has(spec.label)) continue;

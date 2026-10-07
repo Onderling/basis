@@ -32,6 +32,8 @@
  * Forward-compat: normalize drops unknown block types silently so a v3
  * deployment that adds a new block type doesn't break older clients.
  */
+import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
+import { sealedKeyValue } from './localStoreSeal.js';
 
 /** Block types the v2 PDF §2 palette exposes (in editor display order). */
 export const BLOCK_TYPES = Object.freeze([
@@ -285,18 +287,24 @@ export function createCircleRecipeStore({ io = {}, versions } = {}) {
   };
 }
 
+/** A device's own circle-recipe store, SEALED at rest (the recipe and its versions) — what the web shell composes. */
+export function localCircleRecipeStore(storage = globalThis.localStorage) {
+  const sealed = sealedKeyValue(storage, { name: 'the circle recipe' });
+  return createCircleRecipeStore({ io: localStorageRecipeIo(sealed), versions: localStorageObjectVersions('recipe', sealed) });
+}
+
 /** localStorage-backed io.  Key: `cc.circleRecipe.<circleId>`. */
 export function localStorageRecipeIo(storage = globalThis.localStorage) {
   const key = (id) => `cc.circleRecipe.${id}`;
   return {
     load: async (id) => {
       try {
-        const s = storage?.getItem(key(id));
+        const s = await storage?.getItem(key(id));   // awaited: a sealed storage answers async
         return s ? JSON.parse(s) : null;
       } catch { return null; }
     },
     save: async (id, book) => {
-      try { storage?.setItem(key(id), JSON.stringify(book)); } catch { /* quota / disabled */ }
+      try { await storage?.setItem(key(id), JSON.stringify(book)); } catch { /* quota / disabled / no content key yet */ }
     },
   };
 }

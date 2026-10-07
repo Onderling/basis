@@ -369,7 +369,7 @@ import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPend
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
 import {
-  createCircleRecipeStore, localStorageRecipeIo, getActiveRecipe,
+  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe,
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
 } from '../../src/v2/circleRecipe.js';
@@ -750,14 +750,13 @@ import {
   // γ.2 — per-circle rules store factory + localStorage io (was inline
   // localStorage in showRules()).  Routes saves through a single hook
   // point that snapshots into the versions adapter.
-  createCircleRulesStore, localStorageRulesIo,
+  createCircleRulesStore, localStorageRulesIo, localCircleRulesStore,
 } from '../../src/v2/circleRules.js';
 import { renderRulesEditor } from './circleRulesEditor.js';
 // γ.2 — concrete versions adapter (localStorage-backed).  Wired ONCE
 // per circle store at construction time; snapshots every save into
 // `cc.versions.<storeName>.<circleId>`.  Invisible to the UI in γ.2;
 // γ.3 will surface the history.
-import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 import { loadCircles } from '../../src/v2/circleModel.js';
 import { circleSourcesFromAgent, makeResolvingCallSkill } from '../../src/v2/circleSources.js';
 import { loadCircleItems } from '../../src/v2/circleContent.js';
@@ -1059,8 +1058,6 @@ async function dialRelayUrl(url) {
 // so capture happens ABOVE the (localStorage / pod) tier — γ.3 will
 // read these slots for 3-way merge after a remote sync.  Each store
 // keys into its own slot prefix to keep histories isolated.
-const recipeVersions = localStorageObjectVersions('recipe');
-const rulesVersions  = localStorageObjectVersions('rules');
 
 // sealed at rest, the policy and its versions (`localCirclePolicyStore`, the same call the create-group wizard makes)
 const policyStore = localCirclePolicyStore();
@@ -1086,7 +1083,7 @@ const circlePolicyLane = makeCirclePolicyLane({
 });
 // α.1c — per-circle recipe book store (multi-recipe per circle, one active).
 // localStorage now; pod io can swap in later without touching callers.
-const recipeStore = createCircleRecipeStore({ io: localStorageRecipeIo(), versions: recipeVersions });
+const recipeStore = localCircleRecipeStore();   // sealed at rest, the recipe and its versions
 
 // P1.7 — the viewer's per-circle chat filter (device-local; nothing is fanned — a filter that told the
 // circle what you skip would be a new leak).
@@ -1142,7 +1139,7 @@ const DEFAULT_SCREEN_RECIPE = Object.freeze({
   ],
 });
 // γ.2 — per-circle rules store (replaces inline localStorage in showRules()).
-const rulesStore  = createCircleRulesStore({ ...localStorageRulesIo(), versions: rulesVersions });
+const rulesStore  = localCircleRulesStore();    // sealed at rest, the rules and their versions
 // γ-next.recipe — per-circle "incoming recipe" cache.  Receiver writes
 // here on every valid circle-recipe-broadcast envelope; the recipe
 // editor reads on mount + passes the cached recipe via γ.3's

@@ -48,10 +48,14 @@ export function personaOfContact(row) {
  * A row with no pair circle yet (card-only, never written to) is skipped: it has no fact to check against,
  * and it will get its persona from the add flow when it is first used.
  *
+ * The rows are the contact BOOK's rows as stored (`listContacts` → `contacts`), keyed by `webid` — the key the
+ * persona is written under. Not the Contacten projection (`contactId`, no `persona`): that view cannot tell a
+ * row that predates the field from one that has it.
+ *
  * @param {object} a
- * @param {Array<object>} a.rows            contact rows
+ * @param {Array<object>} a.rows            contact book rows (`{ webid, pairCircleId?, persona? }`)
  * @param {string} a.selfWebid              this device's default chat webid
- * @param {(contactId: string, persona: string) => Promise<*>} a.setPersona
+ * @param {(webid: string, persona: string) => Promise<*>} a.setPersona
  * @returns {Promise<{written: number, skipped: number, mismatched: number, mismatches: string[]}>}
  */
 export async function backfillContactPersonas({ rows = [], selfWebid, setPersona } = {}) {
@@ -60,21 +64,21 @@ export async function backfillContactPersonas({ rows = [], selfWebid, setPersona
     return out;
   }
   for (const row of rows) {
-    const contactId = typeof row?.contactId === 'string' ? row.contactId : null;
-    if (!contactId) { out.skipped += 1; continue; }
+    const webid = typeof row?.webid === 'string' && row.webid ? row.webid : null;
+    if (!webid) { out.skipped += 1; continue; }
     if (personaOfContact(row)) { out.skipped += 1; continue; }          // already recorded — nothing to do
     const pairId = typeof row?.pairCircleId === 'string' ? row.pairCircleId : '';
     if (!pairId) { out.skipped += 1; continue; }                        // no pair circle yet: no fact to check
     let expected = null;
-    try { expected = pairCircleIdFor(selfWebid, contactId); } catch { expected = null; }
+    try { expected = pairCircleIdFor(selfWebid, webid); } catch { expected = null; }
     if (!expected || expected !== pairId) {
       // Not the default identity's pair circle. Do not guess what it is.
       out.mismatched += 1;
-      out.mismatches.push(contactId);
+      out.mismatches.push(webid);
       continue;
     }
-    try { await setPersona(contactId, DEFAULT_PERSONA); out.written += 1; }
-    catch { out.mismatched += 1; out.mismatches.push(contactId); }
+    try { await setPersona(webid, DEFAULT_PERSONA); out.written += 1; }
+    catch { out.mismatched += 1; out.mismatches.push(webid); }
   }
   return out;
 }

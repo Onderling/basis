@@ -13,6 +13,12 @@
  * occurrences already past, only the LATEST of each row counts: a host that was off for a month runs a missed job once,
  * not thirty times; and nothing before the row was made exists. The trigger grammar is the type's (closed); a trigger
  * outside it has no occurrences.
+ *
+ *   eventOccurrences({ rows, change, done }) → the rows an item CHANGE fires: an event trigger
+ *     `{ event: { kind: 'added'|'changed', type?, circleId?, field? } }` matches a new item (`added`) or a changed one
+ *     (`changed`; with `field`, only when that field — or one of those fields — differs), of its type, in its circle.
+ *     Its occurrence is `<row>:<item>:<version>`: one change acts once per row, a later change of the same item is new.
+ *     Event rows have no moments in time; time rows never fire on a change.
  */
 import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
 
@@ -117,4 +123,40 @@ export function upcoming({ rows, done = new Set(), now, tz, horizon = 7 * DAY })
 /** What a host's tick runs now: `upcoming`, cut at now. */
 export function due({ rows, done, now, tz }) {
   return upcoming({ rows, done, now, tz, horizon: 0 }).filter((o) => o.state === 'due');
+}
+
+const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * @param {object} a
+ * @param {object[]} a.rows
+ * @param {{circleId: string, before: object|null, after: object}} a.change
+ * @param {Set<string>} [a.done]
+ */
+export function eventOccurrences({ rows, change, done = new Set() }) {
+  const after = change?.after;
+  if (!after?.id) return [];
+  const before = change.before ?? null;
+  const version = after.clock ?? after.updatedAt ?? '';
+  const out = [];
+  for (const row of rows ?? []) {
+    if (!row || row.type !== 'intention' || (row.state && row.state !== 'open')) continue;
+    const ev = row.trigger?.event;
+    if (!ev || typeof ev !== 'object') continue;
+    if (ev.type && ev.type !== after.type) continue;
+    if (ev.circleId && ev.circleId !== change.circleId) continue;
+    if (ev.kind === 'added') { if (before) continue; }
+    else if (ev.kind === 'changed' || (ev.kind === 'any' && before)) {
+      if (!before) continue;
+      const fields = ev.field == null ? null : (Array.isArray(ev.field) ? ev.field : [ev.field]);
+      if (fields ? fields.every((f) => same(before[f], after[f])) : same(before, after)) continue;
+    } else if (ev.kind !== 'any') continue;
+    const id = `${row.id}:${after.id}:${version}`;
+    if (done.has(id)) continue;
+    out.push({
+      id, rowId: row.id, op: row.op, appOrigin: row.appOrigin ?? null, actsAs: row.actsAs, label: row.label ?? null,
+      args: { ...(row.args ?? {}), change: { circleId: change.circleId, itemId: after.id, before, after } },
+    });
+  }
+  return out;
 }

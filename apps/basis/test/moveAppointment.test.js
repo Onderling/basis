@@ -2,21 +2,12 @@
  * J4 — the tandarts moves. An appointment is a line; its edit takes a new time as it takes new words
  * (`editEntry({ item, when })`, gated as any edit of the line). Moved, it keeps its length; the household hears ONE
  * "verplaatst" — not "gaat niet door" + "nieuw" — and its reminders follow it (Thursday's gone, Friday's there).
- * Composed as the household bot is.
+ * Composed as the household bot is: the store's write hook feeds the change feed, whose change fires the household's
+ * announce row, which the runner hands to the door as the host.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { randomBytes } from 'node:crypto';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { VaultNodeFs } from '@onderling/vault';
-import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
-import { ensureHouseholdLists } from '../src/v2/householdTemplate.js';
-import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
-import { EventLog } from '../src/eventLog.js';
-import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
-import { withAssistantOps } from '../src/v2/assistantOps.js';
-import { createAnnouncer } from '../src/v2/announcements.js';
+import { rm } from 'node:fs/promises';
+import { bootAnnouncingBox } from './support/announcingBox.js';
 import { reminderOccurrences, householdRules } from '../src/v2/reminderOccurrences.js';
 import { screenActionForm } from '../src/v2/screenPaint.js';
 
@@ -29,31 +20,21 @@ describe('moving an appointment', () => {
   afterAll(async () => { await agent?.stop?.().catch(() => {}); if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {}); });
 
   it('editEntry with `when` moves it (its length kept): one "moved" to the others, and its reminders follow', async () => {
-    dir = await mkdtemp(path.join(tmpdir(), 'move-appointment-'));
-    const pass = randomBytes(32).toString('base64url');
-    await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });
-    agent = await createRealHouseholdAgent({
-      ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass), chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
-      householdPersistDb: { path: path.join(dir, 'household-items.json') }, seedDemoData: false, seedHousehold: false, ...HOUSEHOLD_BOT_STORE_OPTS, t,
-    });
-    // the agent as the box's own key; the door's context still says who did it (the announcer reads that)
-    const own = (a, o, x) => agent.callSkill(a, o, x);
-    await ensureHouseholdLists({ callSkill: own, t });
-    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
-    await threads.load();
-    const sent = [];
-    const people = [{ id: 'telegram:1', role: 'member' }, { id: 'telegram:2', role: 'member' }];
-    const announcer = createAnnouncer({
-      sources: () => agent.reminderSources(), users: { list: async () => people }, threads, t, tz: TZ, quiet: () => null,
-      reach: { sendToPerson: async (id, m) => { sent.push({ id, text: m.text }); return { ok: true }; } }, log: new EventLog({ initial: [], muted: [] }),
-    });
-    const door = withAssistantOps({ callSkill: own, threads, t, announcer });
+    const box = await bootAnnouncingBox({ t, tz: TZ, people: [{ id: 'telegram:1', name: 'Ann', role: 'member' }, { id: 'telegram:2', name: 'Bert', role: 'member' }] });
+    ({ dir, agent } = box);
+    const { door, sent, settled } = box;
+    expect(box.seeded).toBe(2);
+    const people = [{ id: 'telegram:1' }, { id: 'telegram:2' }];
     const day = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
-    expect((await door('calendar', 'addEvent', { title: 'tandarts', when: `${day(3)}T14:00`, duration: '30m' }, { caller: 'telegram:1' })).ok).toBe(true);
+    const added = await door('calendar', 'addEvent', { title: 'tandarts', when: `${day(3)}T14:00`, duration: '30m' }, { caller: 'telegram:1' });
+    expect(added.ok, JSON.stringify(added)).toBe(true);
+    await settled();
+    expect(sent.map((m) => m.id), 'the new appointment: told to the other, not its maker').toEqual(['telegram:2']);
     sent.length = 0;
 
     const moved = await door('lists', 'editEntry', { item: 'tandarts', when: `${day(4)}T14:00` }, { caller: 'telegram:1' });
     expect(moved.ok, JSON.stringify(moved)).toBe(true);
+    await settled();
     const e = (await agent.reminderSources()).events.find((x) => x.title === 'tandarts');
     expect(e.startsAt.slice(0, 10)).toBe(day(4));
     expect(new Date(e.endsAt) - new Date(e.startsAt), 'its length is kept').toBe(30 * 60_000);

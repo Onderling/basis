@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
@@ -56,6 +56,15 @@ export const assistantManifest = {
       // No surface: the host's runner calls it as the person whose row it is; anyone calling it reaches only themself.
       id:     'sendWeekOverview',
       verb:   'send-week-overview',
+      params: [{ name: 'occurrence', kind: 'string', required: false }],
+      surfaces: {},
+    },
+    {
+      // the household's announce rows (event triggers on appointments and chores) call it: the HOST's runner, as itself
+      // — the door refuses it from a person, a screen or the model. It changes no store; it tells the people a change
+      // concerns, never the one who made it.
+      id:     'announceChange',
+      verb:   'announce-change',
       params: [{ name: 'occurrence', kind: 'string', required: false }],
       surfaces: {},
     },

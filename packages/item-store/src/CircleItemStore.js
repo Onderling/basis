@@ -52,6 +52,7 @@ export class CircleItemStore {
   // safe code floor (`defaultResolutionRegistry` — task's claim cluster is `claim`, everything else content),
   // so a store built without a manifest still dispatches identically to the pre-declaration behaviour.
   /** @type {{ hasChannel:(t:string,r:string)=>boolean }} */ #resolution;
+  /** @type {(() => object|null) | null} */ #originOf;
 
   /**
    * @param {object} args
@@ -63,8 +64,12 @@ export class CircleItemStore {
    * @param {{ hasChannel:(t:string,r:string)=>boolean }} [args.resolution]  the (item-type,field)→policy
    *        registry (`@onderling/item-store` `resolutionPolicy`) the inbound merge enforces. Defaults to the
    *        safe code floor; a composition root injects a manifest-declared one.
+   * @param {() => object|null} [args.originOf]  WHAT a local write is made for, when it is made by something other
+   *        than a person's own act (a fired planned row: `{ intention: <row> }`): stamped on the item as `origin`, so
+   *        every host that holds it can tell — and cleared by a local write made without one. An inbound write
+   *        keeps the origin it arrived with.
    */
-  constructor({ dataSource, rootContainer, registry, resolution } = {}) {
+  constructor({ dataSource, rootContainer, registry, resolution, originOf } = {}) {
     if (!dataSource || typeof dataSource.read !== 'function' || typeof dataSource.write !== 'function') {
       throw new Error('CircleItemStore: dataSource (core.DataSource: read/write/delete/list) required');
     }
@@ -75,6 +80,15 @@ export class CircleItemStore {
     this.#root     = rootContainer.endsWith('/') ? rootContainer : `${rootContainer}/`;
     this.#validate = registry && typeof registry.validate === 'function' ? registry.validate : null;
     this.#resolution = (resolution && typeof resolution.hasChannel === 'function') ? resolution : defaultResolutionRegistry();
+    this.#originOf = typeof originOf === 'function' ? originOf : null;
+  }
+
+  /** A local write's origin: the provider's, or none (an earlier one is cleared). */
+  #stampOrigin(stored) {
+    let o = null;
+    try { o = this.#originOf?.() ?? null; } catch { o = null; }
+    if (o && typeof o === 'object') stored.origin = { ...o };
+    else delete stored.origin;
   }
 
   #uri(id) { return `${this.#root}${ITEMS_DIR}/${id}.json`; }
@@ -148,7 +162,7 @@ export class CircleItemStore {
     // (inbound) write PRESERVES the payload's `clock` (already spread above) and advances the counter to
     // max(local, incoming) — MAX-ON-RECEIVE — so a later local write out-clocks everything seen. See causalMerge.
     if (origin) this.#observeClock(item.clock);
-    else stored.clock = this.#nextClock();
+    else { stored.clock = this.#nextClock(); this.#stampOrigin(stored); }
     if (this.#validate) {
       const res = this.#validate(stored);
       if (res && res.ok === false) {
@@ -265,6 +279,7 @@ export class CircleItemStore {
     // then carries a coordinate for the ordinary content merge when it later syncs to a peer. (Winner-take-all
     // among CAS racers is the etag precondition below; the claim's OWN ordering is `claimSeq`, not this clock.)
     stored.clock = this.#nextClock();
+    this.#stampOrigin(stored);
     if (this.#validate) {
       const res = this.#validate(stored);
       if (res && res.ok === false) {

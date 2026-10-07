@@ -28,6 +28,8 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-inapp',
   // the planned Sunday overview is sent by the host's runner, as the person whose row it is — not a button
   'assistant.sendWeekOverview',
+  // …and what a change tells others is the host's own act, as the household — never a person's button
+  'assistant.announceChange',
 ]);
 
 /**

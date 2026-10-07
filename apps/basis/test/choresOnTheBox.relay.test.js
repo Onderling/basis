@@ -42,7 +42,10 @@ describe('chores on the real box', () => {
     child.stdout.on('data', (b) => { out += String(b); });
     child.stderr.on('data', (b) => { out += String(b); });
     expect(await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 }), `the runner never came up:\n${out.slice(-1500)}`).toBe(true);
-    card = decodeContactCard(/onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(out)[1]);
+    // the card is printed after "up" (another write the pipe may deliver later); wait for it, and say so if it never comes
+    const cardLine = await until(async () => /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(out), { timeout: 15_000, step: 100 });
+    expect(cardLine, `the runner came up but printed no contact card:\n${out.slice(-1500)}`).toBeTruthy();
+    card = decodeContactCard(cardLine[1]);
     ann = await bootRealAgentNode('ann', { contactChannel: true });
     bert = await bootRealAgentNode('bert', { contactChannel: true });
     await connectNodesOverRelay([ann, bert], { relayUrl: relay.url });

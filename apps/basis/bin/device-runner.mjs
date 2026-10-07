@@ -42,6 +42,7 @@
  * ceremony that asks for it, once (`--enrol`, on stdin, echo off on a terminal); storing it beside the
  * machine that runs unattended would hand the whole account to anyone who reads that machine's disk.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -84,6 +85,8 @@ import { createHostTick } from '../src/v2/hostTick.js';
 import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
+import { createChangeFeed } from '../src/v2/changeFeed.js';
+import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
@@ -247,11 +250,17 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const circleWrite = { fn: null };
+const itemLanded = { fn: null };
+// What a write is made for while a planned row runs (`{ intention: <row> }`), ambient across the row's awaits: the
+// stores stamp it on what the row writes, and no host's change feed hands such a write on.
+const writeOrigin = new AsyncLocalStorage();
 const modelWatch = { ref: null };   // the model route's watch, made once the admin can be reached
 const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
-  // the household's store changed: a bot nudges its connected screens (bound below, once the screens exist)
-  onCircleWrite: (circleId) => circleWrite.fn?.(circleId),
+  // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
+  onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
+  onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
+  writeOrigin: () => writeOrigin.getStore() ?? null,
   ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
   ownerRootVault: vault,
   chatVault,
@@ -933,12 +942,13 @@ if (tgToken || inboxDoor.bridge) {
   // The host's planned work (the own-devices store): its own rows and those of the people it is the device for — the
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), actor: 'host' });
+  // ...and the rows in the stores of the circles it holds (a circle row runs only by the runner's rule, below)
+  const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), circles: () => agent.heldCircleStores(), actor: 'host' });
   await planned.load();
   // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
   // the op, through the door — held through a person's quiet hours and said in their next message.
   const announcer = isFunctionProfile ? createAnnouncer({
-    sources: () => agent.reminderSources(), users: botUsers, threads, reach, t, tz: boxTz,
+    users: botUsers, threads, reach, t, tz: boxTz,
     quiet: () => reminderSettings().quiet, log: deviceLog,
     // the walk log keeps who (the last digits), which item (its tail), what kind and how it went — never its words
     onAnnounced: (e) => walkLog({ kind: 'announce', ts: new Date().toISOString(), to: String(e.personId).slice(-4), ...(e.item ? { item: String(e.item).slice(-6) } : {}), what: e.kind, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}), ...(e.count ? { count: e.count } : {}) }),
@@ -1137,13 +1147,27 @@ if (tgToken || inboxDoor.bridge) {
     },
   });
   doorCallRef.fn = doorCall;
+  // ONE place this box hears that an item it holds changed — its own write or a member's that landed — handed to each
+  // consumer with the item before and after: the screens' nudge, the planned work's event rows.
+  const changeConsumers = [];
+  const heldStores = new Map();   // circle id → its store, read again when a circle is new here
+  const changeFeed = createChangeFeed({
+    storeFor: async (circleId) => {
+      if (!heldStores.has(circleId)) for (const c of await agent.heldCircleStores()) heldStores.set(c.scope, c.store);
+      return heldStores.get(circleId) ?? null;
+    },
+    consumers: changeConsumers,
+  });
+  await changeFeed.seedAll((await agent.heldCircleStores()).map((c) => c.scope));
+  circleWrite.fn = (circleId, item, removedId) => (removedId ? changeFeed.removed(circleId, removedId) : changeFeed.own(circleId, item));
+  itemLanded.fn = (circleId, item) => changeFeed.landed(circleId, item);
   if (screens) {
     // A household change reaches the connected screens as a nudge that names nothing; each reads again as its person.
     const nudge = createScreenNudge({
       listScreens: async () => (await agent.callSkill('household', 'listSurfaceGrants', {}))?.surfaces ?? [],
       send: (viewPubKey, payload) => agent.sendPeerMessage(viewPubKey, payload),
     });
-    circleWrite.fn = () => nudge.touched();
+    changeConsumers.push(() => nudge.touched());
     // The door's ops, to a connected screen: each call runs as the person its token names, through this door's own
     // call — the same gate as their typed line — and what a screen never gets is withheld at the kernel's door.
     const exposed = exposeDoorToScreens({ agent, catalogue: doorCatalogue.catalogue(), manifests: Object.values(doorCatalogue.manifestsByOrigin()), doorCall, users: botUsers });
@@ -1230,13 +1254,25 @@ if (tgToken || inboxDoor.bridge) {
     // that used to live on thread rows becomes a row first.
     const moved = await moveOverviewSwitchesToRows({ threads, users: botUsers, book: planned });
     if (moved) walkLog({ kind: 'overview-rows', moved });
+    // What a change tells others, as the household's own rows (in its circle's store, so its people can see them)
+    const seeded = await seedAnnounceRows(planned, agent.householdCircleId).catch(() => 0);
+    if (seeded) walkLog({ kind: 'announce-rows', seeded });
     const intentionRunner = createIntentionRunner({
       book: planned, log: deviceLog, tz: boxTz,
-      run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: o.actsAs, threadId: o.actsAs }),
+      // a circle row this box runs is claimed in its key's name first — another host of the circle then leaves it
+      claimAs: agent.identity?.chat?.pubKey ?? null,
+      withOrigin: (origin, fn) => writeOrigin.run(origin, fn),
+      // a circle row runs here only as the household's announcer: nothing proves whom any other circle row names
+      mayRun: (o) => (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? true : 'a circle row names whom it acts as, and nothing proves it'),
+      // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that
+      // person, through their own column of the door
+      run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? { [HOST_CALL]: true } : { caller: o.actsAs, threadId: o.actsAs }),
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });
     hostTick.add('intentions', { every: 60_000, run: () => intentionRunner.pass() });
+    // ...and the rows a CHANGE fires (an event trigger), as the change happens
+    changeConsumers.push((change, o) => intentionRunner.onChange(change, o));
     // The model route, watched: a model the provider stopped serving, or an account over its limit, reaches the admin
     if (built?.listModels) {
       modelWatch.ref = createModelWatch({

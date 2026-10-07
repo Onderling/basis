@@ -154,7 +154,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
      * they say who does it or when. A chore stays one (`already`); an appointment is its own type and stays it. Who and
      * when are the chore's own verbs' to set, after this (the door's add, or the person's call, passes them on).
      */
-    makeChore: async (args) => {
+    makeChore: async (args, ctx) => {
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       const { circleId, entry } = at;
@@ -164,7 +164,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const store = svc.storeFor(circleId);
       const stored = await store.get(entry.id);
       if (!stored) return { ok: false, error: t('circle.lists.not_there', { item: entry.text ?? '' }), code: 'not-found' };
-      await store.put({ ...stored, type: 'task' }, { by: localActor });
+      await store.put({ ...stored, type: 'task' }, { by: ctx?.caller ?? localActor });
       return { ok: true, itemId: entry.id, kind: 'task', message: t('circle.lists.chore_made', { text: entry.text ?? '' }) };
     },
 
@@ -315,7 +315,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, message: t('circle.lists.removed', { text: at.entry.text ?? '', name: at.target.text ?? '' }) };
     },
 
-    editEntry: async (args) => {
+    editEntry: async (args, ctx) => {
       const text = String(args?.text ?? '').trim();
       // a new time: an appointment moves (keeping its length), a chore gets a new due — the line's time, as its words
       const when = args?.when ? parseDateInput(args.when) : null;
@@ -334,7 +334,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         Object.assign(timed, { dueAt: when });
       }
       const words = text || at.entry.text || at.entry.title || '';
-      await svc.storeFor(at.circleId).put({ ...at.entry, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: localActor });
+      await svc.storeFor(at.circleId).put({ ...at.entry, ...(text ? { text, ...(at.entry.type === 'calendar-event' ? { title: text } : {}) } : {}), ...timed }, { by: ctx?.caller ?? localActor });
       return { ok: true, message: t('circle.lists.edited', { text: words, name: at.target.text ?? '' }) };
     },
 
@@ -342,7 +342,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
      * The reminders everyone it is for gets for one entry, in a person's words; "gewoon" drops them (the usual ones
      * apply again). The household's statement about the item, so it syncs like its words.
      */
-    entryReminders: async (args) => {
+    entryReminders: async (args, ctx) => {
       const words = String(args?.reminders ?? '').trim();
       const usual = /^(gewoon|normaal|usual|normal)$/i.test(words);
       const reminders = usual ? null : reminderLayerFromWords(words);
@@ -350,7 +350,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       const { reminders: _old, ...entry } = at.entry;
-      await svc.storeFor(at.circleId).put(reminders ? { ...entry, reminders } : entry, { by: localActor });
+      await svc.storeFor(at.circleId).put(reminders ? { ...entry, reminders } : entry, { by: ctx?.caller ?? localActor });
       const name = at.entry.text ?? at.entry.title ?? '';
       return { ok: true, message: reminders ? t('circle.lists.reminders_set', { text: name, rules: describeRules(reminders.rules, t) + (reminders.mode === 'add' ? ` (${t('circle.lists.reminders_on_top')})` : '') }) : t('circle.lists.reminders_usual', { text: name }) };
     },

@@ -128,6 +128,8 @@ export function createIndexedDbBackend({
       tx.oncomplete = () => resolve(result);
       tx.onerror    = () => reject(tx.error);
       tx.onabort    = () => reject(tx.error);
+      // Commit now: a write made on the way out of a page (the flush on pagehide) is otherwise abandoned with it.
+      if (mode === 'readwrite') tx.commit?.();
     });
   }
 

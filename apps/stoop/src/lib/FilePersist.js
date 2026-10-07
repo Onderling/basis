@@ -23,6 +23,8 @@
  * `Project Files/Substrates/substrate-candidates.md`.
  */
 
+import { trackPendingSave } from '@onderling/local-store';
+
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -31,6 +33,7 @@ export class FilePersist {
   #saveDelayMs;
   /** @type {ReturnType<typeof setTimeout> | null} */
   #pendingTimer = null;
+  #untrack = null;
   /** Most recent saved-to-disk snapshot (for diffing / no-op skip). */
   #lastSerialised = null;
 
@@ -94,22 +97,33 @@ export class FilePersist {
    */
   scheduleSave(map) {
     if (this.#pendingTimer) clearTimeout(this.#pendingTimer);
+    this.#untrack?.();
+    // Snapshot inside the timer fires so a write during debounce
+    // delay is included in the eventual save.
+    const run = () => this.save(map).catch(() => { /* swallow — caller's onError handler is upstream */ });
+    // tracked while it waits: a shell flushes it at once when the page or the app goes away
+    this.#untrack = trackPendingSave(async () => {
+      if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+      this.#untrack = null;
+      await run();
+    });
     this.#pendingTimer = setTimeout(() => {
       this.#pendingTimer = null;
-      // Snapshot inside the timer fires so a write during debounce
-      // delay is included in the eventual save.
-      this.save(map).catch(() => { /* swallow — caller's onError handler is upstream */ });
+      this.#untrack?.(); this.#untrack = null;
+      run();
     }, this.#saveDelayMs);
   }
 
   /** Force any pending debounced save to flush now. */
   async flush(map) {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
     await this.save(map);
   }
 
   /** Cancel any pending debounced save without saving. */
   cancel() {
     if (this.#pendingTimer) { clearTimeout(this.#pendingTimer); this.#pendingTimer = null; }
+    this.#untrack?.(); this.#untrack = null;
   }
 }

@@ -180,6 +180,35 @@ live in its **own-devices store** (`src/v2/ownDevicesStore.js`) — a person's (
 the own-devices scope, sealed, no circle's; on a household bot it holds the rows of the people it is the device for.
 The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOverview` delivers it).
 
+**Four rules of planned work, learned by walking the code before building the next steps (2026-10-07).**
+- **One hook for everything that reacts to a change.** Every row that lands — the host's own write or a snapshot that
+  arrived from a peer — passes `onItemApplied(circleId, item)` in the task rail, and nothing else sees a landed row.
+  Indexers (the noticeboard bridge today), the screen's nudge, the announcements and the event triggers of planned
+  work are all consumers of that one seam; a change detector built beside it (around the door's own writes only) misses
+  what a member's app sends, which is why the door-side ones are moving onto it.
+- **A host ticks the rows of every store it holds, and across hosts the row is the truth.** The rule is that a planned
+  row in a circle's store is held by every member and run by whichever host may; today the runner reads the
+  own-devices store only, so a row written into a circle's store is not yet ticked by anyone — the gap is named, not
+  hidden. When two hosts hold one row, the claim is the task lifecycle's compare-and-swap on the row (one winner on
+  every device) and the row's `lastRunAt` is what the other host sees; the `intention-done` entry is bound to its host
+  and never travels — it is each host's own idempotency, never the cross-host truth.
+- **A row's authority is the authority that already exists for its case.** Three cases, two without any token: the op
+  lives on the host that ticks it (the box running a member's overview) — the host's own door and the person's column
+  decide; the executor is another device of the same person (a companion) — device enrolment decides, it presents the
+  person's own identity; only when a different person's agent runs an op that lives on the author's agent does a
+  task-scoped grant apply (`TaskGrantManager`: one token, no wider than the issuer's, naming its subject and its callee
+  at mint time, revoked with the row). A capability token always names who may present it and to whom, so there is no
+  "to whoever claims": an author names the executor, or an always-on device of theirs does.
+- **The own-devices store is the store of the scope "a person and their devices", and it syncs by the sibling carry.**
+  A person's devices already behave as a circle of devices: a proven sibling set, one carry for a device's own writes
+  to its siblings, sibling-gated catch-up (the grants lane), and a circle founded on one device followed by the
+  others. A circle store's rows reach a person's other devices that way today; the own-devices store does not yet
+  (it is not registered with the stores the task rail serves, and its fan must be the sibling carry alone, with no
+  roster) — three joins, no new mechanism. Until they land, two devices of one person hold two own stores.
+- A multi-step planned thing is a row whose op starts a declared flow (`flowRunner`: a DAG of ops through the waist,
+  resumable between steps); a requirement or a claim per step is designed, not built, and waits for two executors
+  sharing one flow.
+
 ### The event log — one record, many projections
 
 Underneath that flow there is one **append-only event log per device** — not one per circle, and not one per

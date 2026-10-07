@@ -117,7 +117,7 @@ describe('a row that lands in a circle store later', () => {
     await book.load();
     const log = new EventLog({ initial: [], muted: [] });
     const calls = [];
-    const runner = createIntentionRunner({ book, log, tz: TZ, now: () => at, run: async (o) => { calls.push(o); return { ok: true }; }, mayRun: () => true });
+    const runner = createIntentionRunner({ book, log, tz: TZ, now: () => at, run: async (o) => { calls.push(o); return { ok: true }; }, mayRun: () => true, claimAs: 'host-a' });
     await runner.pass();
     expect(calls).toEqual([]);
     // a member's device wrote it; it synced into this host's copy of the circle's store
@@ -135,7 +135,7 @@ describe('who a circle row may act as', () => {
     const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot', now: () => SUN_1930 });
     const calls = [];
     const fired = [];
-    const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => SUN_1930, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e), ...(mayRun ? { mayRun } : {}) });
+    const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => SUN_1930, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e), claimAs: 'host-a', ...(mayRun ? { mayRun } : {}) });
     // any member can write a row naming anyone: the store does not prove who wrote it
     await home.put({ type: 'intention', ...weekly('telegram:admin'), state: 'open', createdAt: '2026-10-05T10:00:00.000Z' }, { by: 'member' });
     return { runner, calls, fired, book };
@@ -153,5 +153,39 @@ describe('who a circle row may act as', () => {
     const w = await circleWorld({ mayRun: (o, scope) => (scope === 'c-home' && o.op === 'sendWeekOverview' ? true : 'no authority') });
     await w.runner.pass();
     expect(w.calls.map((c) => c.actsAs)).toEqual(['telegram:admin']);
+  });
+});
+
+describe('two hosts holding one circle row', () => {
+  it('the first to claim it runs it; the other, once the claim has reached it, leaves it — that week and the next', async () => {
+    const { createCircleStores } = await import('@onderling/item-store');
+    const { validate } = await import('@onderling/item-types');
+    // one store object stands for the circle's store once both hosts' copies agree (the sync is not under test here)
+    const home = createCircleStores({ dataSource: memoryDataSource(), registry: { validate } }).getStore('c-home');
+    await home.put({ type: 'intention', ...weekly('household'), state: 'open', createdAt: '2026-10-05T10:00:00.000Z' }, { by: 'member' });
+    let at = SUN_1930;
+    const host = (name) => {
+      const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: name, now: () => at });
+      const calls = [];
+      const fired = [];
+      const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => at, claimAs: name, mayRun: () => true, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e) });
+      return { calls, fired, runner };
+    };
+    const a = host('host-a');
+    const b = host('host-b');
+    await a.runner.pass();
+    expect((await home.get((await home.listByType('intention'))[0].id)).assignees).toEqual(['host-a']);
+    await b.runner.pass();
+    expect(a.calls).toHaveLength(1);
+    expect(b.calls).toHaveLength(0);
+    // that Sunday's run is on the row (its last run), so nothing is owed — host B is not even asked again
+    expect(b.fired).toEqual([]);
+    // a week on, the row is still host A's
+    at = SUN_1930 + 7 * 86_400_000;
+    await b.runner.pass();
+    await a.runner.pass();
+    expect(a.calls).toHaveLength(2);
+    expect(b.calls).toHaveLength(0);
+    expect(b.fired).toEqual([expect.objectContaining({ outcome: 'elsewhere', reason: 'claimed by host-a' })]);
   });
 });

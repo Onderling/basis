@@ -14,7 +14,15 @@
  * the person it names. A row in a CIRCLE's store is a field any member can write — the sync proves which member SENT
  * it, not who wrote it — so by default it is not run as anyone: it is said once ("refused") and left. A host lets a
  * circle row through only by its own rule (`mayRun`), which sees the op, the circle and whom it would act as.
+ *
+ * ONE HOST PER CIRCLE ROW. Every member's host holds the same circle row; before running one, a host CLAIMS the row
+ * (the task lifecycle's compare-and-swap on its holders) and keeps it — a row another host claimed is left to that
+ * host. Across hosts the row is the truth (its holders and its last run sync with it); the done-mark never leaves its
+ * host and only keeps this host from running one occurrence twice. Two hosts that cannot see each other may both claim
+ * (each on its own copy) and both run one occurrence; when the copies meet, the claim fold keeps one holder and the
+ * other host leaves the row from then on.
  */
+import { claim as claimItem } from '@onderling/item-store';
 import { due } from './intentions.js';
 
 /** The device-log kind a run leaves behind (declared in the entry-kind table). */
@@ -42,8 +50,9 @@ export function doneMarksOn(log, now = Date.now) {
  * @param {() => number} [a.now]
  * @param {(e: {occurrence: string, row: string, op: string, actsAs: string, outcome: 'ran'|'not-yet'|'failed'|'refused', reason?: string}) => void} [a.onFired]
  * @param {(o: object, scope: string) => true|string} [a.mayRun]   a circle row's way through: true, or why not
+ * @param {string} [a.claimAs]   this host, as a circle row's claim names it (a key, unique to the host)
  */
-export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null, mayRun = null }) {
+export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null, mayRun = null, claimAs = null }) {
   const inFlight = new Set();
   /** What was already said for an occurrence that has not run ("not-yet:quiet", "failed:door down"). */
   const said = new Map();
@@ -59,12 +68,31 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
     return verdict === true ? true : String(verdict || 'refused');
   };
 
+  /** True when this host holds the row (its own store's rows always; a circle row once claimed), or who does. */
+  async function claimed(o) {
+    if (!book.scopeOf?.(o.rowId)) return true;
+    if (!claimAs) return 'this host has no name to claim with';
+    const store = book.storeOf(o.rowId);
+    try {
+      const res = await claimItem(store, o.rowId, { actor: claimAs });
+      if (!res?.error) return true;
+      const holders = [...new Set([...(res.current?.assignees ?? []), res.current?.assignee].filter(Boolean))];
+      return holders.includes(claimAs) ? true : `claimed by ${String(holders[0] ?? 'another host').slice(0, 12)}`;
+    } catch (e) { return e?.message ?? 'claim failed'; }
+  }
+
   async function runOne(o) {
     const base = { occurrence: o.id, row: o.rowId, op: o.op, actsAs: o.actsAs };
     const ok = allowed(o);
     if (ok !== true) {
       const key = `refused:${ok}`;
       if (said.get(o.id) !== key) { said.set(o.id, key); tell({ ...base, outcome: 'refused', reason: ok }); }
+      return;
+    }
+    const mine = await claimed(o);
+    if (mine !== true) {
+      const key = `elsewhere:${mine}`;
+      if (said.get(o.id) !== key) { said.set(o.id, key); tell({ ...base, outcome: 'elsewhere', reason: mine }); }
       return;
     }
     let res;

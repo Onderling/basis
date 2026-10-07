@@ -36,7 +36,8 @@ export function createIntentionBook({ store, circles = null, actor, now = Date.n
 
   async function update(id, patch) {
     const where = storeOf(id);
-    const row = byId.get(id) ?? (await where.get(id));
+    // from what the store holds NOW: a circle row may have been claimed or moved since it was read
+    const row = (await where.get(id)) ?? byId.get(id);
     if (!row) throw new Error(`intention ${id} not found`);
     return keep(await where.put({ ...row, ...patch }, { by: actor }), scopes.get(id) ?? null);
   }

@@ -1233,6 +1233,8 @@ if (tgToken || inboxDoor.bridge) {
     if (moved) walkLog({ kind: 'overview-rows', moved });
     const intentionRunner = createIntentionRunner({
       book: planned, log: deviceLog, tz: boxTz,
+      // a circle row this box runs is claimed in its key's name first — another host of the circle then leaves it
+      claimAs: agent.identity?.chat?.pubKey ?? null,
       run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: o.actsAs, threadId: o.actsAs }),
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),

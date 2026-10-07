@@ -34,6 +34,8 @@ describe('the author\'s signature on a circle row', () => {
     expect(await verifyIntention({ ...signed, args: { to: 'everyone' } }, { circleId: 'c1', bindingOk: w.bindingOk })).toBe('signature');
     expect(await verifyIntention({ ...signed, op: 'assistant-role' }, { circleId: 'c1', bindingOk: w.bindingOk })).toBe('signature');
     expect(await verifyIntention({ ...signed, actsAs: 'person-admin' }, { circleId: 'c1', bindingOk: w.bindingOk })).toBe('signature');
+    // the app it is handed to: the runner dispatches on it, so it is signed too
+    expect(await verifyIntention({ ...signed, appOrigin: 'household' }, { circleId: 'c1', bindingOk: w.bindingOk })).toBe('signature');
   });
 
   it('a member signing a row that acts as someone else is refused, however well signed', async () => {
@@ -111,5 +113,29 @@ describe('the box\'s rule for a circle row', async () => {
     await w.runner.pass();
     expect(w.calls).toEqual([]);
     expect(w.fired.map((e) => e.reason).sort()).toEqual(['acts-as-another', 'signature', 'unsigned'].sort());
+  });
+});
+
+describe('rows signed before the current version', async () => {
+  const { createIntentionBook } = await import('../src/v2/intentionBook.js');
+  const { createOwnDevicesStore } = await import('../src/v2/ownDevicesStore.js');
+  const { memoryDataSource, createCircleStores } = await import('@onderling/item-store');
+  const { validate } = await import('@onderling/item-types');
+  const { INTENTION_SIG_VERSION } = await import('../src/v2/intentionSignature.js');
+
+  it('are refused, and the host re-signs its own (as the boot does for the household\'s announce rows)', async () => {
+    const key = await AgentIdentity.generate(new VaultMemory());
+    const home = createCircleStores({ dataSource: memoryDataSource(), registry: { validate } }).getStore('c-home');
+    const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'host', signerFor: async () => ({ identity: key, ref: 'host-person' }) });
+    await book.load();
+    const made = await book.intend({ trigger: { every: 'day', at: '08:00' }, op: 'announceChange', appOrigin: 'assistant', args: {}, actsAs: 'host-person', scope: 'c-home' });
+    // as a v1 row was: no version, a signature over fields that did not include the app
+    const old = await home.put({ ...made, authorSig: { key: key.pubKey, ref: 'host-person', sig: made.authorSig.sig } }, { by: 'host' });
+    const bindingOk = async () => true;
+    expect(await verifyIntention(old, { circleId: 'c-home', bindingOk })).toBe('signature');
+    await book.load();
+    const resigned = await book.sign(old.id);
+    expect(resigned.authorSig.v).toBe(INTENTION_SIG_VERSION);
+    expect(await verifyIntention(resigned, { circleId: 'c-home', bindingOk })).toBe(true);
   });
 });

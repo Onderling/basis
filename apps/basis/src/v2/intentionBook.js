@@ -7,7 +7,7 @@
  */
 
 import { ulid } from '@onderling/item-store';
-import { signIntention } from './intentionSignature.js';
+import { signIntention, INTENTION_SIG_VERSION } from './intentionSignature.js';
 
 const iso = (t) => new Date(t).toISOString();
 
@@ -96,12 +96,12 @@ export function createIntentionBook({ store, circles = null, actor, signerFor = 
       if (scope) row = await signed({ ...row, id: ulid() }, scope);
       return keep(await where.put(row, { by: actor }), scope);
     },
-    /** Sign a circle row this host wrote and that has no signature yet (rows written before signing existed). */
+    /** Sign a circle row this host wrote whose signature is missing or of an older version (rows written before). */
     async sign(id) {
       const scope = scopes.get(id);
       if (!scope) return null;
       const row = (await held.get(scope)?.get(id)) ?? byId.get(id);
-      if (!row || row.authorSig) return row ?? null;
+      if (!row || row.authorSig?.v === INTENTION_SIG_VERSION) return row ?? null;
       return keep(await held.get(scope).put(await signed(row, scope), { by: actor }), scope);
     },
     async cancel(id) { return update(id, { state: 'cancelled' }); },

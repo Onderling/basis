@@ -193,7 +193,7 @@ The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOve
   row in a circle's store is held by every member and run by whichever host may; the runner reads every store its host
   holds (the own-devices store and each circle's) and reads them again each pass. A circle row's `actsAs` is a field
   any member can write — the sync proves who sent a snapshot, not who wrote the row — so a circle row carries its
-  AUTHOR'S signature over `{id, actsAs, op, args, trigger}`, made with their circle key (`intentionSignature.js`), and a
+  AUTHOR'S signature over `{id, actsAs, appOrigin, op, args, trigger}`, made with their circle key (`intentionSignature.js`), and a
   host runs it as `actsAs` only when the signature verifies, the roster binds that key to the author, the row acts as
   its author (or as the household, signed by the host itself, to announce), and the host acts for that person
   (`circleRowGate.js`; on a household bot: a person whose row is, or is linked to, the author). When two hosts hold one row, the claim is the task

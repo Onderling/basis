@@ -38,6 +38,7 @@ import {
   buildEmbed,
 } from '../src/index.js';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
+import { tEn } from './support/bundleTranslator.js';
 import {
   mockTasksManifest, mockStoopManifest, mockFolioManifest,
 } from '../src/core/manifests/mockManifests.js';
@@ -54,7 +55,8 @@ async function bootTestWorkspace() {
   // These journeys exercise the demo experience (seeded members/tasks/posts), so
   // opt into the demo scaffolding explicitly — it is OFF by default now that a
   // real circle must show only real members + no phantom tasks.
-  const agent = await createRealHouseholdAgent({ seedDemoData: true });
+  // …and, like every shell, hand the agent its translator (the replies are read in English below).
+  const agent = await createRealHouseholdAgent({ seedDemoData: true, t: tEn });
   const rawCatalogue = mergeManifests([
     { manifest: basisManifest },
     { manifest: agent.manifest },
@@ -161,7 +163,7 @@ describe('J1 — Mark a household item done', () => {
   it("/done Milk marks the item complete", async () => {
     const reply = await ws.userInput('/done Milk');
     expect(reply.payload?.ok).toBe(true);
-    expect(reply.payload.message).toBe('✓ marked complete: Milk');
+    expect(reply.payload.message).toBe('✓ Marked complete: Milk');
   });
 
   it("post-completion /list shopping drops the item", async () => {

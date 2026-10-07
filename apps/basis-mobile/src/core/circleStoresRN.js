@@ -148,7 +148,8 @@ export function sessionToPodWriterRN(session) {
 export function makeCircleRecipeStoreRN(storage) {
   const versions = asyncStorageObjectVersions('recipe', storage);
   return createCircleRecipeStore({
-    io: asyncKeyedIo('cc.circleRecipe.', storage),
+    // the recipe sealed at rest, as on web (its versions seal on their own)
+    io: asyncKeyedIo('cc.circleRecipe.', sealedKeyValue(storage, { name: 'the circle recipe' })),
     versions,
   });
 }
@@ -159,7 +160,8 @@ export function makeCircleRecipeStoreRN(storage) {
 export function makeCircleRulesStoreRN(storage) {
   const versions = asyncStorageObjectVersions('rules', storage);
   return createCircleRulesStore({
-    ...asyncKeyedIo('cc.circleRules.', storage),
+    // the rules sealed at rest, as on web (their versions seal on their own)
+    ...asyncKeyedIo('cc.circleRules.', sealedKeyValue(storage, { name: 'the circle rules' })),
     versions,
   });
 }

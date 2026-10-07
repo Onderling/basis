@@ -116,8 +116,7 @@
     "pictures_error":     { "text": "{count} pictures could not be processed.", "doc": "Inline status when one or more images failed to resize. {count} is an integer." },
     "open_picture":       { "text": "Open picture", "doc": "ARIA label on a thumbnail in the feed. Triggers the modal that loads the full image." },
     "close":              { "text": "Close", "doc": "Close button label on the attachment modal." },
-    "picture_loading":    { "text": "Loading picture…", "doc": "Modal status text shown while the full bytes are being fetched." },
-    "picture_pending":    { "text": "Loading picture — may take a moment if the sender is offline.", "doc": "Modal status text shown when the requestAttachment skill returned `pending: true`. The fetch continues in the background." }
+    "picture_loading":    { "text": "Loading picture…", "doc": "Modal status text shown while the full bytes are being fetched." }
   },
   "menu": {
     "mute":     "Mute this person",

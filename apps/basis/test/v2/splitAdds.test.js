@@ -18,6 +18,24 @@ describe('splitting an add', () => {
     expect(splitEntryText('lamp vervangen', pairs)).toEqual(['lamp vervangen']);
   });
 
+  it('a known pair is a PHRASE: kept whole wherever it stands in the line, the rest split around it', () => {
+    const pairs = ['peper en zout', 'zout en peper'];
+    expect(splitEntryText('zout en peper chips', pairs)).toEqual(['zout en peper chips']);
+    expect(splitEntryText('chips met zout en peper', pairs)).toEqual(['chips met zout en peper']);
+    expect(splitEntryText('kaas en zout en peper', pairs)).toEqual(['kaas', 'zout en peper']);
+    expect(splitEntryText('zout en peper en kaas', pairs)).toEqual(['zout en peper', 'kaas']);
+    expect(splitEntryText('melk en kaas', pairs)).toEqual(['melk', 'kaas']);
+    // a word that only CONTAINS a pair's word is not the pair
+    expect(splitEntryText('zoutjes en pepernoten', pairs)).toEqual(['zoutjes', 'pepernoten']);
+  });
+
+  it('the add is recognised by its bare or its qualified id', () => {
+    const expand = expandAdds();
+    expect(expand({ opId: 'lists.addToList', args: { list: 'Boodschappen', text: 'melk en kaas' } })).toHaveLength(2);
+    expect(expand({ opId: 'addToList', args: { list: 'Boodschappen', text: 'melk en kaas' } })).toHaveLength(2);
+    expect(expand({ opId: 'lists.listEntries', args: { list: 'Boodschappen' } })).toHaveLength(1);
+  });
+
   it('only a list of plain entries splits: a chore or an appointment is one thing ("lamp vervangen en ophangen")', () => {
     const names = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
     const expand = expandAdds({ t: (k) => names[k] ?? k });

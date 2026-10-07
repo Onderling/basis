@@ -21,7 +21,9 @@ import { createOwnDevicesStore } from '../../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../../src/v2/intentionRunner.js';
 import { createChangeFeed } from '../../src/v2/changeFeed.js';
-import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../../src/v2/announceRows.js';
+import { seedAnnounceRows, HOST_CALL } from '../../src/v2/announceRows.js';
+import { createCircleRowGate } from '../../src/v2/circleRowGate.js';
+import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
 
 /**
  * @param {object} a
@@ -57,11 +59,20 @@ export async function bootAnnouncingBox({ t, tz, people }) {
   });
   const door = withAssistantOps({ callSkill: own, threads, t, announcer });
   // the box's planned work: the household's announce rows, run on a change, as the host
-  const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: () => agent.heldCircleStores(), actor: 'host' });
+  const hostRef = agent.identity?.chat?.pubKey;
+  const book = createIntentionBook({
+    store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: () => agent.heldCircleStores(), actor: 'host',
+    signerFor: async (circleId) => ({ identity: await agent.circleIdentityFor(circleId), ref: hostRef }),
+  });
   const seeded = await seedAnnounceRows(book, agent.householdCircleId);
+  const gate = createCircleRowGate({
+    hostRef, circleKeyFor: (circleId) => agent.circleIdentityFor(circleId),
+    rosterBinding: rosterBindingVerifier(own), people: async () => people.map((p) => ({ id: p.id })),
+  });
   const runner = createIntentionRunner({
     book, log, tz, claimAs: 'box',
-    mayRun: (o) => (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? true : 'refused'),
+    // the box's own rule: a signed row, the key bound, acting as its author or as the household signed by the box
+    mayRun: (o, scope, row) => gate.mayRun(o, scope, row),
     run: (o) => door(o.appOrigin, o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true }),
   });
   const feed = createChangeFeed({ storeFor: async (id) => (await agent.heldCircleStores()).find((c) => c.scope === id)?.store ?? null, consumers: [(c, o) => runner.onChange(c, o)] });

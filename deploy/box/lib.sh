@@ -124,6 +124,35 @@ role_affected() {
 # state.json helpers (no jq dependency: the file is small and we own its shape)
 state_sha() { [ -f "$BOX_DIR/state.json" ] && sed -n "s/.*\"$1\": *{[^}]*\"sha\": *\"\([0-9a-f]*\)\".*/\1/p" "$BOX_DIR/state.json" | head -1; return 0; }
 
+# The last version that passed the health gate, and the one before it: one small file per repo, "sha tag at".
+# A green gate moves the running version in (the one it replaces becomes previousGood); a red gate rolls back to it.
+good_sha()     { [ -f "$BOX_DIR/.good-$1" ] && cut -d' ' -f1 "$BOX_DIR/.good-$1"; return 0; }
+prevgood_sha() { [ -f "$BOX_DIR/.prevgood-$1" ] && cut -d' ' -f1 "$BOX_DIR/.prevgood-$1"; return 0; }
+mark_good() {
+  local name d sha tag
+  for name in $(repo_names); do
+    d="$(repo_dir "$name")"
+    sha="$($GIT -C "$d" rev-parse HEAD 2>/dev/null)" || continue
+    [ "$sha" = "$(good_sha "$name")" ] && continue
+    [ -f "$BOX_DIR/.good-$name" ] && mv "$BOX_DIR/.good-$name" "$BOX_DIR/.prevgood-$name"
+    tag="$($GIT -C "$d" describe --tags --exact-match 2>/dev/null || echo "")"
+    echo "$sha ${tag:--} $(date -u +%FT%TZ)" > "$BOX_DIR/.good-$name"
+  done
+}
+good_json() {   # good_json <.good|.prevgood> — {"repo": {"sha","tag","at"}, …} from the files that exist
+  local kind="$1" first=1 name f sha tag at
+  printf '{'
+  for name in $(repo_names); do
+    f="$BOX_DIR/$kind-$name"; [ -f "$f" ] || continue
+    read -r sha tag at < "$f"
+    [ "$tag" = "-" ] && tag=""
+    [ $first = 1 ] || printf ', '
+    first=0
+    printf '"%s": {"sha": "%s", "tag": "%s", "at": "%s"}' "$name" "$sha" "$tag" "$at"
+  done
+  printf '}'
+}
+
 write_state() {   # write_state <rolledBack:true|false> [failedRole]
   local rolled="$1" failed="${2:-}"
   {
@@ -132,6 +161,8 @@ write_state() {   # write_state <rolledBack:true|false> [failedRole]
     echo "  \"roles\": \"$ROLES\","
     echo "  \"rolledBack\": $rolled,"
     [ -n "$failed" ] && echo "  \"failedRole\": \"$failed\"," || true
+    echo "  \"lastGood\": $(good_json .good),"
+    echo "  \"previousGood\": $(good_json .prevgood),"
     echo "  \"repos\": {"
     local first=1 name
     for name in $(repo_names); do
@@ -166,6 +197,7 @@ write_status_page() {
     echo "<h1>onderling box · $(hostname | esc)</h1>"
     echo "<dl><dt>profile</dt><dd>${PROFILE:-?} · roles: $(echo "$ROLES" | esc)</dd>"
     echo "<dt>updater frozen (HOLD)</dt><dd>$hold</dd>"
+    echo "<dt>last good version</dt><dd>$(good_json .good | esc) · before it: $(good_json .prevgood | esc)</dd>"
     echo "<dt>last update</dt><dd>$(sed -n 's/.*"updatedAt": *"\([^"]*\)".*/\1/p' "$BOX_DIR/state.json") · rolled back: $(sed -n 's/.*"rolledBack": *\([a-z]*\).*/\1/p' "$BOX_DIR/state.json")</dd></dl>"
     echo "<h2>running</h2><pre>$(esc < "$BOX_DIR/state.json")</pre>"
     echo "<h2>log (last 50)</h2><pre>$(esc < "$www/log.txt")</pre>"

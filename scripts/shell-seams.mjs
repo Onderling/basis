@@ -64,6 +64,9 @@ export const SEAMS = Object.freeze([
   // and its screens' nudge. Only a host that runs planned work composes it today (the box); web and mobile join with
   // their clock.
   { id: 'change-feed', pattern: /createChangeFeed\(/, shells: ['box'], why: 'a change a member makes in their app reaches the bot\'s event rows and its screens, not only the bot\'s own writes' },
+  // The person's own store rides between their own devices (signed by the device, sealed to the person); what a
+  // sibling wrote while this device was off is asked for on connect — every shell that holds the person's store.
+  { id: 'own-store-catch-up', pattern: /ownStoreSync\??\.requestFromSiblings\(|kick\(agent\.ownStoreSync/, why: 'an appointment added on the phone while the laptop was off is on the laptop when it comes back' },
   { id: 'own-devices-store', pattern: /createOwnDevicesStore\(|lazyOwnStore\(/, shells: ['web', 'mobile', 'box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door

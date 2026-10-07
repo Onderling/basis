@@ -8754,6 +8754,8 @@ async function boot() {
         agent.knownPeersSync?.requestFromSiblings().catch(() => {});
         // The person key a ceremony rotated on another device while this one was off.
         agent.personKeySync?.requestFromSiblings().catch(() => {});
+        // The person's own store (their own appointments, their planned rows) as their other devices hold it.
+        agent.ownStoreSync?.requestFromSiblings().catch(() => {});
         // …and which of the person's devices is primary for direct messages (sync-policy §12).
         agent.primaryDevice?.requestFromSiblings?.().catch(() => {});
         // AN ARRIVING CONTACT LINK (`…#contact=<payload>` — the clickable form of someone's contact QR): add the

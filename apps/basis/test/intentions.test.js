@@ -102,7 +102,7 @@ describe('upcoming and due', () => {
 });
 
 describe('event triggers', () => {
-  const row = (event, extra = {}) => ({ id: 'r1', type: 'intention', state: 'open', trigger: { event }, op: 'announceChange', appOrigin: 'assistant', args: { kinds: ['new'] }, actsAs: 'household', ...extra });
+  const row = (event, extra = {}) => ({ id: 'r1', type: 'intention', state: 'open', trigger: { event: { circleId: 'c1', ...event } }, op: 'announceChange', appOrigin: 'assistant', args: { kinds: ['new'] }, actsAs: 'household', ...extra });
   const appt = (v) => ({ id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-12T12:00:00.000Z', clock: v, ...(v > 1 ? { startsAt: '2026-10-12T13:00:00.000Z' } : {}) });
 
   it('an "added" row fires for a new item of its type, in its circle', () => {
@@ -124,6 +124,13 @@ describe('event triggers', () => {
     const change = { circleId: 'c1', before: null, after: appt(1) };
     expect(eventOccurrences({ rows: [row({ kind: 'added' })], change, done: new Set(['r1:e1:1']) })).toEqual([]);
     expect(eventOccurrences({ rows: [{ ...row({}), trigger: { every: 'day', at: '08:00' } }], change })).toEqual([]);
+  });
+
+  it('a row that names no circle is a person\'s own: it fires for the own-devices scope, never for a circle', async () => {
+    const { OWN_DEVICES_SCOPE } = await import('../src/v2/grantsManifest.js');
+    const personal = { id: 'r2', type: 'intention', state: 'open', trigger: { event: { kind: 'added', type: 'calendar-event' } }, op: 'x', actsAs: 'telegram:1' };
+    expect(eventOccurrences({ rows: [personal], change: { circleId: 'c1', before: null, after: appt(1) } })).toEqual([]);
+    expect(eventOccurrences({ rows: [personal], change: { circleId: OWN_DEVICES_SCOPE, before: null, after: appt(1) } })).toHaveLength(1);
   });
 
   it('a row with an event trigger has no moments in time', () => {

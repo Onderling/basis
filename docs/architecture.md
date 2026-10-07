@@ -192,9 +192,11 @@ The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOve
 - **A host ticks the rows of every store it holds, and across hosts the row is the truth.** The rule is that a planned
   row in a circle's store is held by every member and run by whichever host may; the runner reads every store its host
   holds (the own-devices store and each circle's) and reads them again each pass. A circle row's `actsAs` is a field
-  any member can write — the sync proves who sent a snapshot, not who wrote the row — so a host runs no circle row as a
-  person until the row carries its author's signature, verified against the key the roster binds to that person; the
-  box runs only the household's announce rows, as the household. When two hosts hold one row, the claim is the task
+  any member can write — the sync proves who sent a snapshot, not who wrote the row — so a circle row carries its
+  AUTHOR'S signature over `{id, actsAs, appOrigin, op, args, trigger}`, made with their circle key (`intentionSignature.js`), and a
+  host runs it as `actsAs` only when the signature verifies, the roster binds that key to the author, the row acts as
+  its author (or as the household, signed by the host itself, to announce), and the host acts for that person
+  (`circleRowGate.js`; on a household bot: a person whose row is, or is linked to, the author). When two hosts hold one row, the claim is the task
   lifecycle's compare-and-swap on the row, and the host that claimed it keeps it; the row's `lastRunAt` is what the
   other host sees; the `intention-done` entry is bound to its host and never travels — it is each host's own
   idempotency, never the cross-host truth.
@@ -208,9 +210,13 @@ The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOve
 - **The own-devices store is the store of the scope "a person and their devices", and it syncs by the sibling carry.**
   A person's devices already behave as a circle of devices: a proven sibling set, one carry for a device's own writes
   to its siblings, sibling-gated catch-up (the grants lane), and a circle founded on one device followed by the
-  others. A circle store's rows reach a person's other devices that way today; the own-devices store does not yet
-  (it is not registered with the stores the task rail serves, and its fan must be the sibling carry alone, with no
-  roster) — three joins, no new mechanism. Until they land, two devices of one person hold two own stores.
+  others. The own-devices store rides the task lane under its own scope, between the person's devices only: signed by
+  the device's delegation key and verified by the device-set binding (never the person key, which a revoked device
+  holds too), sealed in flight to the person's seal-to-self key, fanned by the sibling carry alone (there is no
+  roster), and caught up from siblings, served to siblings only. A device that cannot sign or seal keeps it local. A
+  store fans by its SCOPE, never by a per-row filter: the own-devices scope holds only the person's rows (or the host's
+  own); rows a host keeps for OTHER people belong in a scope that never fans (a household bot has no siblings, so its
+  one store is harmless today; the split comes the day a person's device serves a household).
 - A multi-step planned thing is a row whose op starts a declared flow (`flowRunner`: a DAG of ops through the waist,
   resumable between steps); a requirement or a claim per step is designed, not built, and waits for two executors
   sharing one flow.

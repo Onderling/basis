@@ -86,7 +86,12 @@ import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
 import { createChangeFeed } from '../src/v2/changeFeed.js';
+import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
+import { exportDirFiles } from '../src/v2/exportDirFiles.js';
+import { createExportRequestJob } from '../src/v2/exportRequest.js';
 import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
+import { createCircleRowGate } from '../src/v2/circleRowGate.js';
+import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
@@ -250,6 +255,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const circleWrite = { fn: null };
+const ownStoreOnDisk = { ref: null };
 const itemLanded = { fn: null };
 // What a write is made for while a planned row runs (`{ intention: <row> }`), ambient across the row's awaits: the
 // stores stamp it on what the row writes, and no host's change feed hands such a write on.
@@ -262,6 +268,9 @@ const agent = await createRealHouseholdAgent({
   onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
   writeOrigin: () => writeOrigin.getStore() ?? null,
   ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
+  // the person's own store, sealed on disk (the own-devices scope): ONE per node — the calendar's own appointments
+  // and the planned book read the same one, and it reaches the person's other devices
+  ownStore: () => (ownStoreOnDisk.ref ??= (async () => createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }))()),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -754,6 +763,8 @@ if (relayUrl) {
     for (const c of hiddenChanged ?? []) walkLog({ kind: 'contact-hidden', contactId: String(c.webid).slice(0, 12), hidden: c.hidden });
   });
   kick(agent.personKeySync, 'person-key', 2500);
+  // the person's own store: what a sibling wrote while this box was off
+  kick(agent.ownStoreSync, 'own-store', 2500);
   // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and
   // at boot by asking, as both shells do. (Found by the shell-seams guard on its first run, 2026-09-19.)
   setTimeout(() => {
@@ -902,19 +913,9 @@ if (tgToken || inboxDoor.bridge) {
   };
   sweepUnlocked();
   hostTick.add('unlocked-key-sweep', { every: 60_000, run: sweepUnlocked });
+  const exportFiles = exportDirFiles(exportsDir);
   const exportShelf = createExportShelf({
-    files: {
-      list: async () => { try { return readdirSync(exportsDir); } catch { return []; } },
-      // written whole or not at all: a crash mid-write leaves a temp file, never a cut-off export under its own name
-      write: async (name, text) => {
-        mkdirSync(exportsDir, { recursive: true, mode: 0o700 });
-        const tmp = path.join(exportsDir, `.${name}.tmp`);
-        writeFileSync(tmp, text, { mode: 0o600 });
-        renameSync(tmp, path.join(exportsDir, name));
-      },
-      read: async (name) => readFileSync(path.join(exportsDir, name), 'utf8'),
-      remove: async (name) => rmSync(path.join(exportsDir, name), { force: true }),
-    },
+    files: exportFiles,
     exportNow: async () => {
       // beside it, the bot's own recovery file (its circles and their members, sealed to its recovery phrase — the
       // existing carrier): one snapshot of the folder then holds all a restore needs besides the phrase
@@ -943,7 +944,11 @@ if (tgToken || inboxDoor.bridge) {
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // ...and the rows in the stores of the circles it holds (a circle row runs only by the runner's rule, below)
-  const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), circles: () => agent.heldCircleStores(), actor: 'host' });
+  // a row it writes into a circle's store (the household's announce rows) is signed with its circle key
+  const planned = createIntentionBook({
+    store: await agent.ownStore(), circles: () => agent.heldCircleStores(), actor: 'host',
+    signerFor: async (circleId) => ({ identity: await agent.circleIdentityFor(circleId), ref: agent.identity?.chat?.pubKey }),
+  });
   await planned.load();
   // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
   // the op, through the door — held through a person's quiet hours and said in their next message.
@@ -1153,6 +1158,7 @@ if (tgToken || inboxDoor.bridge) {
   const heldStores = new Map();   // circle id → its store, read again when a circle is new here
   const changeFeed = createChangeFeed({
     storeFor: async (circleId) => {
+      if (circleId === OWN_DEVICES_SCOPE) return agent.ownStore();
       if (!heldStores.has(circleId)) for (const c of await agent.heldCircleStores()) heldStores.set(c.scope, c.store);
       return heldStores.get(circleId) ?? null;
     },
@@ -1257,16 +1263,29 @@ if (tgToken || inboxDoor.bridge) {
     // What a change tells others, as the household's own rows (in its circle's store, so its people can see them)
     const seeded = await seedAnnounceRows(planned, agent.householdCircleId).catch(() => 0);
     if (seeded) walkLog({ kind: 'announce-rows', seeded });
+    const circleRows = createCircleRowGate({
+      hostRef: agent.identity?.chat?.pubKey ?? null,
+      circleKeyFor: (circleId) => agent.circleIdentityFor(circleId),
+      rosterBinding: rosterBindingVerifier(callSkill),
+      people: () => botUsers.list(),
+    });
     const intentionRunner = createIntentionRunner({
       book: planned, log: deviceLog, tz: boxTz,
       // a circle row this box runs is claimed in its key's name first — another host of the circle then leaves it
       claimAs: agent.identity?.chat?.pubKey ?? null,
       withOrigin: (origin, fn) => writeOrigin.run(origin, fn),
       // a circle row runs here only as the household's announcer: nothing proves whom any other circle row names
-      mayRun: (o) => (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? true : 'a circle row names whom it acts as, and nothing proves it'),
+      // a circle row runs only when its author signed it, the roster binds the key, and it acts as its author — a
+      // person this box acts for (or the household, signed by the box itself, to announce)
+      mayRun: (o, scope, row) => circleRows.mayRun(o, scope, row),
       // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that
       // person, through their own column of the door
-      run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? { [HOST_CALL]: true } : { caller: o.actsAs, threadId: o.actsAs }),
+      run: async (o) => {
+        if (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS) return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true });
+        // as the person, through their own column of the door (a member's key maps to the row of the person it names)
+        const as = (await circleRows.callerFor(o.actsAs)) ?? o.actsAs;
+        return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: as, threadId: as });
+      },
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });
@@ -1286,6 +1305,10 @@ if (tgToken || inboxDoor.bridge) {
       hostTick.add('model-watch', { every: MODEL_WATCH_EVERY_MS, run: () => modelWatch.ref.check() });
     }
     hostTick.add('export-shelf', { every: exportShelf.every, atStart: exportShelf.atStart, run: () => exportShelf.writeNow() });
+    // the box's updater asks for a fresh export before it changes anything (`bin/export-now.mjs`): answered here, by the
+    // one process that holds the household's store
+    const exportRequests = createExportRequestJob({ files: exportFiles, shelf: exportShelf });
+    hostTick.add('export-request', { every: 1_000, run: () => exportRequests.run() });
     walkLog({ kind: 'reminders', on: remindersModeFrom(agent.getParamValue?.(REMINDERS_KEY)) === 'on' });
   }
   // A household bot (a function profile) starts with the household's lists — made once, when it has none. Never on a

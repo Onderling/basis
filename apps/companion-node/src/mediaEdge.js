@@ -46,6 +46,8 @@
  *               // real bucket/verifier swap = Frits' infra action (one documented seam)
  */
 import { createCapabilityVerifier } from '@onderling/blob-gateway/adapters/capability-verifier';
+import { mkdirSync, writeFileSync, renameSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 
 const DEFAULT_TTL   = 60;              // seconds — short-lived presigned URLs
 const DEFAULT_SKILL = 'media.read';
@@ -71,6 +73,8 @@ export function makeDevBlobBucket() {
   return {
     store,
     async put(key, bytes) { store.set(key, bytes); },
+    /** The stored ciphertext, or null (a host that opens at serve time, e.g. an agenda link). */
+    async get(key) { return store.has(key) ? store.get(key) : null; },
     /** Short-lived URL granting GET access to the stored ciphertext. */
     async presign(key, { ttl } = {}) {
       if (!store.has(key)) return null;
@@ -89,6 +93,29 @@ export function makeDevBlobBucket() {
       if (!rec || rec.method !== 'get' || Date.now() > rec.expiresAt) return null;
       return store.get(rec.key);
     },
+  };
+}
+
+/**
+ * DEV-GRADE bucket that survives a restart: the same ciphertext-only contract (`put` / `get` / `delete`), one file per
+ * key under `dir` (readable by the node only). What a companion without a real bucket keeps its link-opened blobs in
+ * (an agenda link's file); the real R2/S3 bucket (`createS3Bucket`) is the same swap as for media.
+ * @param {string} dir
+ */
+export function makeFileBlobBucket(dir) {
+  const fileOf = (key) => {
+    if (typeof key !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(key)) throw new Error('fileBlobBucket: bad key');
+    return join(dir, key);
+  };
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return {
+    async put(key, bytes) {
+      const f = fileOf(key);
+      writeFileSync(`${f}.tmp`, String(bytes), { mode: 0o600 });
+      renameSync(`${f}.tmp`, f);
+    },
+    async get(key) { try { return readFileSync(fileOf(key), 'utf8'); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; } },
+    async delete(key) { rmSync(fileOf(key), { force: true }); },
   };
 }
 

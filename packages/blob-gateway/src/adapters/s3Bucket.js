@@ -1,6 +1,6 @@
 // s3Bucket.js — the REAL bucket adapter satisfying the v0 `bucket` contract:
 //
-//   { put(key, bytes) => Promise, presign(key, {ttl}) => Promise<url>, delete(key) => Promise }
+//   { put(key, bytes) => Promise, get(key) => Promise<string|null>, presign(key, {ttl}) => Promise<url>, delete(key) => Promise }
 //
 // over the S3 REST API with SigV4 signing. Works with AWS S3 AND S3-compatible
 // hosts (Cloudflare R2, MinIO, Backblaze B2 S3) by pointing `endpoint` at them.
@@ -42,6 +42,15 @@ export function createS3Bucket({
         throw new Error(`s3Bucket.put: upload failed for "${key}" (status ${res?.status ?? '??'})`);
       }
       return { key, etag: res.headers?.get?.('etag') ?? null };
+    },
+
+    /** GET the (cipher)bytes at `key` as text, or null when there is none (a host that opens at serve time). */
+    async get(key) {
+      const { url, headers } = signRequest({ ...cfg, method: 'GET', key, payload: '', date: dateNow() });
+      const res = await doFetch(url, { method: 'GET', headers });
+      if (res?.status === 404) return null;
+      if (!res || res.ok !== true) throw new Error(`s3Bucket.get: read failed for "${key}" (status ${res?.status ?? '??'})`);
+      return res.text();
     },
 
     /** A short-lived SigV4 pre-signed GET URL to the ciphertext. */

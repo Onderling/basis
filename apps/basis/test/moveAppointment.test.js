@@ -67,6 +67,20 @@ describe('moving an appointment', () => {
     expect(morning.every((o) => o.id.includes(`:morning:${day(4)}:`))).toBe(true);
   }, 90_000);
 
+  it('a bare day keeps its time of day: "zet de tandarts op vrijdag" → Friday at the same hour, one "verplaatst"', async () => {
+    const own = (a, o, x) => agent.callSkill(a, o, x);
+    const day = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    expect((await own('calendar', 'addEvent', { title: 'kapper', when: `${day(3)}T14:00` })).ok).toBe(true);
+    const before = (await agent.reminderSources()).events.find((x) => x.title === 'kapper');
+    const moved = await own('lists', 'editEntry', { item: 'kapper', when: day(5) });
+    expect(moved.ok, JSON.stringify(moved)).toBe(true);
+    const after = (await agent.reminderSources()).events.find((x) => x.title === 'kapper');
+    const hm = (iso) => { const d = new Date(iso); return `${d.getHours()}:${d.getMinutes()}`; };
+    expect(after.startsAt.slice(0, 10)).toBe(day(5));
+    expect(hm(after.startsAt), 'the hour stays').toBe(hm(before.startsAt));
+    expect(new Date(after.endsAt) - new Date(after.startsAt)).toBe(new Date(before.endsAt) - new Date(before.startsAt));
+  }, 60_000);
+
   it('the screen\'s edit form still asks for the words (and offers the time)', () => {
     expect(screenActionForm('lists.editEntry', { item: 'e1', list: 'Boodschappen' })?.missing).toContain('text');
   });

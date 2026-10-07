@@ -11,7 +11,7 @@
  * A list lives in the circle's own store, like a task or a message, so it rides the one fan-out path and
  * obeys the circle's data-move branch. Nothing here knows about sharing; that is the point.
  */
-import { parseDateInput } from '@onderling-app/calendar';
+import { parseDateInput, hasTimeOfDay } from '@onderling-app/calendar';
 import { reminderLayerFromWords, describeRules } from './reminderWords.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -326,7 +326,10 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const timed = {};
       if (when && at.entry.type === 'calendar-event') {
         const length = Math.max(0, new Date(at.entry.endsAt ?? at.entry.startsAt).getTime() - new Date(at.entry.startsAt).getTime());
-        Object.assign(timed, { startsAt: when, endsAt: new Date(new Date(when).getTime() + (length || 3_600_000)).toISOString() });
+        // only a day said ("zet de tandarts op vrijdag"): the day moves, its time of day stays (14:00 is still 14:00)
+        const start = new Date(when);
+        if (!hasTimeOfDay(args.when)) { const was = new Date(at.entry.startsAt); start.setHours(was.getHours(), was.getMinutes(), 0, 0); }
+        Object.assign(timed, { startsAt: start.toISOString(), endsAt: new Date(start.getTime() + (length || 3_600_000)).toISOString() });
       } else if (when) {
         Object.assign(timed, { dueAt: when });
       }

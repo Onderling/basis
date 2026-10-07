@@ -6471,6 +6471,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     householdCircleMove,
     householdItems: async () => (await householdService.stores.getStore(homeCircleId).list()) ?? [],
     /** A household bot's reminders read the household's chores and appointments, whole (dates, who comes) — never a joined circle's. */
+    /**
+     * The circle stores this node holds, each under its circle id: what its planned-work book reads beside its own
+     * store. The home circle and every circle it is a member of.
+     */
+    heldCircleStores: async () => {
+      const ids = new Set(homeCircleId && homeCircleId !== 'household' ? [homeCircleId] : []);
+      try {
+        for (const c of ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])) {
+          const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
+          if (typeof id === 'string' && id && id !== 'household') ids.add(id);
+        }
+      } catch { /* the home circle alone still serves */ }
+      return [...ids].map((id) => ({ scope: id, store: householdService.stores.getStore(id) }));
+    },
     reminderSources: async () => {
       const store = householdService.stores.getStore(homeCircleId);
       const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);

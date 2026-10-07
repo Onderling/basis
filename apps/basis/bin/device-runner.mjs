@@ -933,7 +933,8 @@ if (tgToken || inboxDoor.bridge) {
   // The host's planned work (the own-devices store): its own rows and those of the people it is the device for — the
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), actor: 'host' });
+  // ...and the rows in the stores of the circles it holds (a circle row runs only by the runner's rule, below)
+  const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), circles: () => agent.heldCircleStores(), actor: 'host' });
   await planned.load();
   // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
   // the op, through the door — held through a person's quiet hours and said in their next message.

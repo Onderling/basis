@@ -9,6 +9,11 @@
  *   • a failure → said once, tried again next tick, until its window closes.
  * One row's failure never stops another's; two passes at once never run one occurrence twice. At one host the
  * done-mark IS the claim; a second executor will claim by compare-and-swap first.
+ *
+ * WHO A ROW MAY ACT AS. A row in the host's own store was written here (or by the person's own devices), so it runs as
+ * the person it names. A row in a CIRCLE's store is a field any member can write — the sync proves which member SENT
+ * it, not who wrote it — so by default it is not run as anyone: it is said once ("refused") and left. A host lets a
+ * circle row through only by its own rule (`mayRun`), which sees the op, the circle and whom it would act as.
  */
 import { due } from './intentions.js';
 
@@ -35,17 +40,33 @@ export function doneMarksOn(log, now = Date.now) {
  * @param {(o: object) => Promise<{ok?: boolean, notYet?: string, reason?: string}>} a.run   the op through the door, as `o.actsAs`
  * @param {string} a.tz
  * @param {() => number} [a.now]
- * @param {(e: {occurrence: string, row: string, op: string, actsAs: string, outcome: 'ran'|'not-yet'|'failed', reason?: string}) => void} [a.onFired]
+ * @param {(e: {occurrence: string, row: string, op: string, actsAs: string, outcome: 'ran'|'not-yet'|'failed'|'refused', reason?: string}) => void} [a.onFired]
+ * @param {(o: object, scope: string) => true|string} [a.mayRun]   a circle row's way through: true, or why not
  */
-export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null }) {
+export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFired = null, mayRun = null }) {
   const inFlight = new Set();
   /** What was already said for an occurrence that has not run ("not-yet:quiet", "failed:door down"). */
   const said = new Map();
   const tell = (e) => { try { onFired?.(e); } catch { /* a listener never stops the runner */ } };
   const marks = doneMarksOn(log, now);
 
+  /** True, or why a circle row is not run here. */
+  const allowed = (o) => {
+    const scope = book.scopeOf?.(o.rowId) ?? null;
+    if (!scope) return true;
+    let verdict = 'a circle row names whom it acts as, and nothing proves it';
+    if (typeof mayRun === 'function') { try { verdict = mayRun(o, scope); } catch (e) { verdict = e?.message ?? 'refused'; } }
+    return verdict === true ? true : String(verdict || 'refused');
+  };
+
   async function runOne(o) {
     const base = { occurrence: o.id, row: o.rowId, op: o.op, actsAs: o.actsAs };
+    const ok = allowed(o);
+    if (ok !== true) {
+      const key = `refused:${ok}`;
+      if (said.get(o.id) !== key) { said.set(o.id, key); tell({ ...base, outcome: 'refused', reason: ok }); }
+      return;
+    }
     let res;
     try { res = await run(o); } catch (e) { res = { ok: false, reason: e?.message ?? String(e) }; }
     if (res?.ok) {
@@ -66,6 +87,8 @@ export function createIntentionRunner({ book, log, run, tz, now = Date.now, onFi
   return {
     /** One pass: every due occurrence, each once. */
     async pass() {
+      // read again: a row a member's device wrote into a circle's store reaches this host by sync, not by this book
+      try { await book.load?.(); } catch { /* the rows as last read still serve */ }
       const list = due({ rows: book.rows(), done: marks.ids(), now: now(), tz });
       for (const o of list) {
         if (inFlight.has(o.id)) continue;

@@ -4,7 +4,7 @@
  * a "not yet" (quiet hours) leaves it due; a failure is said once and tried again next tick. One row's failure never
  * stops another's.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { memoryDataSource, ENTRY_KINDS, isAuditKind, kindWakes, retentionOf } from '@onderling/item-store';
 import { EventLog } from '../src/eventLog.js';
 import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
@@ -100,8 +100,58 @@ describe('the intention runner', () => {
     await w.intend(weekly());
     const one = w.runner.pass();
     const two = w.runner.pass();
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));   // the first pass reads the stores, then runs
     release();
     await Promise.all([one, two]);
     expect(w.calls).toHaveLength(1);
+  });
+});
+
+describe('a row that lands in a circle store later', () => {
+  it('is run on the next pass — the book is read again each pass, not only at boot', async () => {
+    const { createCircleStores } = await import('@onderling/item-store');
+    const { validate } = await import('@onderling/item-types');
+    const home = createCircleStores({ dataSource: memoryDataSource(), registry: { validate } }).getStore('c-home');
+    let at = SUN_1930;
+    const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot', now: () => at });
+    await book.load();
+    const log = new EventLog({ initial: [], muted: [] });
+    const calls = [];
+    const runner = createIntentionRunner({ book, log, tz: TZ, now: () => at, run: async (o) => { calls.push(o); return { ok: true }; }, mayRun: () => true });
+    await runner.pass();
+    expect(calls).toEqual([]);
+    // a member's device wrote it; it synced into this host's copy of the circle's store
+    await home.put({ type: 'intention', ...weekly('telegram:2'), state: 'open', createdAt: '2026-10-05T10:00:00.000Z' }, { by: 'member' });
+    await runner.pass();
+    expect(calls.map((c) => c.actsAs)).toEqual(['telegram:2']);
+  });
+});
+
+describe('who a circle row may act as', () => {
+  async function circleWorld({ mayRun } = {}) {
+    const { createCircleStores } = await import('@onderling/item-store');
+    const { validate } = await import('@onderling/item-types');
+    const home = createCircleStores({ dataSource: memoryDataSource(), registry: { validate } }).getStore('c-home');
+    const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot', now: () => SUN_1930 });
+    const calls = [];
+    const fired = [];
+    const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => SUN_1930, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e), ...(mayRun ? { mayRun } : {}) });
+    // any member can write a row naming anyone: the store does not prove who wrote it
+    await home.put({ type: 'intention', ...weekly('telegram:admin'), state: 'open', createdAt: '2026-10-05T10:00:00.000Z' }, { by: 'member' });
+    return { runner, calls, fired, book };
+  }
+
+  it('by default, a row from a circle\'s store is not run as the person it names — said once, not run', async () => {
+    const w = await circleWorld();
+    await w.runner.pass();
+    await w.runner.pass();
+    expect(w.calls).toEqual([]);
+    expect(w.fired).toEqual([expect.objectContaining({ outcome: 'refused', actsAs: 'telegram:admin' })]);
+  });
+
+  it('a host\'s own rule may let one through (the op, the scope, who it acts as)', async () => {
+    const w = await circleWorld({ mayRun: (o, scope) => (scope === 'c-home' && o.op === 'sendWeekOverview' ? true : 'no authority') });
+    await w.runner.pass();
+    expect(w.calls.map((c) => c.actsAs)).toEqual(['telegram:admin']);
   });
 });

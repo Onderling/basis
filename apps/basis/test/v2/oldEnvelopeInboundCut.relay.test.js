@@ -35,6 +35,23 @@ describe('the old envelope wire, inbound', () => {
     expect(JSON.stringify(after ?? null)).not.toMatch(/forged|from-a-/);
     expect(JSON.stringify(after ?? null)).toBe(JSON.stringify(before ?? null));
 
+    // (d) a stranger's pair request is not honoured: the circle's peer list does not grow, no member gets a re-fan of
+    // the circle's items, one refusal counted; a MEMBER's pair request still is
+    await anne.agent.callSkill('tasks', 'addTask', { text: 'al-bestaand-item', circleId: CIRCLE });
+    expect(await untilTrue(async () => JSON.stringify(await bram.agent.callSkill('tasks', 'listOpen', { circleId: CIRCLE })).includes('al-bestaand-item'), 20_000), 'bram has the item').toBe(true);
+    const peersBefore = JSON.stringify(anne.agent.listHouseholdPeers(CIRCLE));
+    const bramHeard = [];
+    const bramLive = bram._routerRef.fn;
+    bram._routerRef.fn = (env) => { bramHeard.push(JSON.stringify(env?.payload ?? null)); return bramLive?.(env); };
+    await eve.agent.sendPeerMessage(anne.pubKey, { __pairReq: { addr: eve.pubKey, circleId: CIRCLE } });
+    expect(await untilTrue(async () => (anne.agent.inboundRefusals()['pair-request-stranger'] ?? 0) >= 1, 15_000), `refusals: ${JSON.stringify(anne.agent.inboundRefusals())}`).toBe(true);
+    await sleep(3000);
+    expect(JSON.stringify(anne.agent.listHouseholdPeers(CIRCLE)), 'the peer list grew on a stranger\'s say-so').toBe(peersBefore);
+    expect(bramHeard.filter((h) => /al-bestaand-item/.test(h)), 'a stranger made the box re-fan the circle').toEqual([]);
+    bram._routerRef.fn = bramLive;
+    await bram.agent.sendPeerMessage(anne.pubKey, { __pairReq: { addr: bram.pubKey, circleId: CIRCLE } });
+    expect(await untilTrue(async () => anne.agent.listHouseholdPeers(CIRCLE).includes(bram.pubKey), 15_000), 'a member\'s pair request is honoured').toBe(true);
+
     // (c) a stranger's pair request, then a new item in the circle: nothing of the circle reaches the stranger
     const heard = [];
     const live = eve._routerRef.fn;

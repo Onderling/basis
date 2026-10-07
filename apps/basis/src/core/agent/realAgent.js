@@ -1031,6 +1031,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   // inbound peer messages the router refuses, by reason (`inboundRefusals()`)
   const inboundRefused = {};
+  /** Is every one of these addresses a member of that circle (its folded roster) or one of my own devices? */
+  async function pairRequestAllowed(circleId, addrs) {
+    const want = addrs.filter((a) => typeof a === 'string' && a);
+    if (!want.length) return false;
+    const mine = new Set(await ownAddresses().catch(() => []));
+    const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
+    const members = new Set(rows.flatMap((m) => [m?.webid, m?.addr, m?.address, m?.peerAddr]).filter(Boolean));
+    return want.every((a) => mine.has(a) || members.has(a));
+  }
   const circleSubstrate = buildHouseholdSubstrateStack({
     transport: householdEnvelopeAdapter,
     deviceId:  chatId.pubKey,
@@ -6372,11 +6381,19 @@ export async function createRealHouseholdAgent(opts = {}) {
         const pr = env?.payload?.__pairReq;
         if (pr && typeof pr.addr === 'string' && pr.addr && pr.addr !== chatId.pubKey) {
           const cid = (typeof pr.circleId === 'string' && pr.circleId) ? pr.circleId : 'household';
-          const fresh = isNewCirclePeer(cid, pr.addr);
-          ensureCircleMirror(cid)
-            .then((m) => m.addPeer(pr.addr))
-            .then(() => persistCirclePeers(cid))
-            .then(() => { if (fresh) return republishCircleItemsToNewPeer(cid); })   // backfill, per-circle
+          // Honoured only from a member of that circle (by the roster the membership rail folds) or one of my own
+          // devices — the sender AND the address it asks to add. A stranger's request would otherwise grow the
+          // circle's persisted peer list on its say-so, and make this device re-fan every open item to every member
+          // as often as it liked. Refused: counted, nothing added, nothing sent.
+          pairRequestAllowed(cid, [pr.addr, env?.from])
+            .then((ok) => {
+              if (!ok) { inboundRefused['pair-request-stranger'] = (inboundRefused['pair-request-stranger'] ?? 0) + 1; return null; }
+              const fresh = isNewCirclePeer(cid, pr.addr);
+              return ensureCircleMirror(cid)
+                .then((m) => m.addPeer(pr.addr))
+                .then(() => persistCirclePeers(cid))
+                .then(() => { if (fresh) return republishCircleItemsToNewPeer(cid); });   // backfill, per-circle
+            })
             .catch(() => {});
           return;
         }

@@ -194,7 +194,12 @@ function parseFlags(body, params = []) {
       const eq    = tok.indexOf('=');
       const key   = eq === -1 ? tok.slice(2) : tok.slice(2, eq);
       let value   = eq === -1 ? true         : tok.slice(eq + 1);
-      if (eq === -1 && takesValue.has(key) && i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) value = tokens[++i];
+      if (eq === -1 && takesValue.has(key)) {
+        // a value flag takes the next word; with none (`--item` last, or before another flag) it is LEFT OUT, so the
+        // op says what is missing — never `true` read as the value ("'true' staat op geen lijst")
+        if (i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) value = tokens[++i];
+        else continue;
+      }
       out[key] = value;
     } else {
       positional.push(tok);

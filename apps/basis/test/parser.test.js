@@ -151,8 +151,9 @@ describe('parseSlash — body: flags, a value after a space', () => {
     expect(parseInput('/list-remove --confirm brood', withParams).args).toEqual({ confirm: true, _match: 'brood' });
     expect(parseInput('/list-remove --later brood', withParams).args).toEqual({ later: true, _match: 'brood' });
   });
-  it('a value flag followed by another flag has no value: true, as before', () => {
-    expect(parseInput('/list-remove --item --confirm', withParams).args).toEqual({ item: true, confirm: true });
+  it('a value flag with no value is left out — the op then says what is missing, never reads `true` as the value', () => {
+    expect(parseInput('/list-remove --item --confirm', withParams).args).toEqual({ confirm: true });
+    expect(parseInput('/list-remove --item', withParams).args).toEqual({});
   });
 });
 

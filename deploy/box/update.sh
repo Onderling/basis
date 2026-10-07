@@ -88,7 +88,9 @@ fi
 
 # THE FRESH EXPORT COMES FIRST: before the first checkout, the running assistant writes the household's export named by
 # the outgoing version (the shelf in its data dir; `bin/export-now.mjs`). If it fails the update is HELD — nothing is
-# checked out — and says so. A box whose assistant is not running has nothing to ask and updates (a fix must land).
+# checked out — and says so. An assistant that is NOT running cannot be asked: the update goes ahead only when its shelf
+# already holds an export younger than a day (the honest floor); otherwise it is held too — a broken assistant is
+# exactly when a fresh export is worth waiting for.
 exported=0
 pre_update_export() {   # pre_update_export <outgoing sha>
   [ "$exported" = 1 ] && return 0
@@ -96,7 +98,12 @@ pre_update_export() {   # pre_update_export <outgoing sha>
   role_names | grep -qx assistant || return 0
   local cmd; cmd="$(compose_cmd)"
   if ! eval "$cmd ps --status running --services" 2>/dev/null | grep -qx assistant; then
-    log "assistant not running — no pre-update export"; return 0
+    # read its volume without starting it: an export file on its shelf from the last day
+    if [ -n "$(eval "$cmd run --rm --no-deps -T --entrypoint sh assistant -c \"find /data/assistant/exports -maxdepth 1 -name '*.json' -mmin -1440 2>/dev/null | head -1\"" 2>/dev/null)" ]; then
+      log "assistant not running — its shelf holds an export younger than a day; going ahead"; return 0
+    fi
+    HOLD_REASON="assistant not running and no export younger than a day"
+    return 1
   fi
   if eval "$cmd exec -T assistant node apps/basis/bin/export-now.mjs --sha $1" >>"$BOX_DIR/box.log" 2>&1; then
     log "pre-update export written ($1)"; return 0
@@ -136,7 +143,7 @@ for name in $(repo_names); do
     echo "$new $(date +%s)" > "$BOX_DIR/.refused-$name"; continue
   fi
   if ! pre_update_export "$cur"; then
-    log "pre-update export failed — update held"; alert "update held: the export before updating failed"
+    log "${HOLD_REASON:-pre-update export failed} — update held"; alert "update held: ${HOLD_REASON:-the export before updating failed}"
     exit 1
   fi
   log "$name: $cur → $new ($br)"

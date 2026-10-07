@@ -80,8 +80,9 @@ nothing secret on it. Anything interactive (freeze, force an update) stays a com
 3. **A fresh export comes first.** Before the first checkout, when the assistant role is running, the updater asks it
    for an export of the household (`compose exec -T assistant node apps/basis/bin/export-now.mjs --sha <outgoing>`:
    the running assistant writes `exports/pre-update-<when>-<sha>.json` on its shelf, the last three kept beside the
-   nightly ones). If that fails, the update is **held**: nothing is checked out, the log and the alert say so. A box
-   whose assistant is not running has nothing to ask and updates.
+   nightly ones). If that fails, the update is **held**: nothing is checked out, the log and the alert say so. An
+   assistant that is not running cannot be asked: the update goes ahead only when its shelf already holds an export
+   younger than a day (read from its volume without starting it); otherwise it is held too.
 4. New sha → check it out (detached), `compose build` the roles of that repo **whose `<role>.paths` the
    release actually touched**, then `compose up -d`. This is what keeps a docs-only release from
    recreating the public relay container — which drops its in-memory hold-and-forward queue and

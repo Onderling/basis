@@ -43,7 +43,7 @@ function makeBox({ roles = [], paths = {}, caddySnippets = {} } = {}) {
   // the fake docker: appends every argv line to calls.log; `compose … exec/ps` answer ok
   const bin = join(root, 'bin'); mkdirSync(bin);
   // like the real docker compose, the fake stats "." first — an unreadable cwd is the 2026-09-06 failure
-  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf '${all.join('\\n')}\\n';; esac\ncase "$*" in *"export-now"*) [ -f "${box}/EXPORT_FAIL" ] \&\& exit 1;; esac\nexit 0\n`);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf '${all.join('\\n')}\\n' | { if [ -f "${box}/ASSISTANT_DOWN" ]; then grep -vx assistant; else cat; fi; };; esac\ncase "$*" in *"run --rm --no-deps"*"find"*) [ -f "${box}/SHELF_FRESH" ] \&\& echo /data/assistant/exports/household-export-2026-10-07-0300.json; exit 0;; esac\ncase "$*" in *"export-now"*) [ -f "${box}/EXPORT_FAIL" ] \&\& exit 1;; esac\nexit 0\n`);
   chmodSync(join(bin, 'docker'), 0o755);
 
   const commit = (msg, tag, file = 'CHANGE') => {
@@ -472,4 +472,24 @@ test('the last working version is written down; a red gate goes back to it; ROLL
   const v6 = b.commit('v6 the fix');
   assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
   assert.equal(b.headOfBox(), v6);
+});
+
+test('the assistant is down: the update goes ahead only on an export younger than a day on its shelf; else it is held', () => {
+  const b = makeBox({ roles: ['assistant'] });
+  b.run({ FORCE: '1' });
+  writeFileSync(join(b.box, 'ASSISTANT_DOWN'), '');
+  const before = b.headOfBox();
+  // nothing fresh on the shelf: held, nothing checked out, said so
+  b.clearCalls();
+  b.commit('v2');
+  const held = b.run();
+  assert.notEqual(held.status, 0, 'held');
+  assert.equal(b.headOfBox(), before, 'nothing checked out');
+  assert.ok(b.calls().some((c) => /run --rm --no-deps .*assistant.*find/.test(c)), `the shelf was looked at: ${JSON.stringify(b.calls())}`);
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /assistant not running and no export younger than a day — update held/);
+  // a fresh export on the shelf: it goes ahead
+  writeFileSync(join(b.box, 'SHELF_FRESH'), '');
+  assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
+  assert.notEqual(b.headOfBox(), before, 'updated');
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /assistant not running — its shelf holds an export younger than a day/);
 });

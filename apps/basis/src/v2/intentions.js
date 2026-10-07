@@ -146,11 +146,11 @@ export function eventOccurrences({ rows, change, done = new Set() }) {
     if (ev.type && ev.type !== after.type) continue;
     if (ev.circleId && ev.circleId !== change.circleId) continue;
     if (ev.kind === 'added') { if (before) continue; }
-    else if (ev.kind === 'changed') {
+    else if (ev.kind === 'changed' || (ev.kind === 'any' && before)) {
       if (!before) continue;
       const fields = ev.field == null ? null : (Array.isArray(ev.field) ? ev.field : [ev.field]);
       if (fields ? fields.every((f) => same(before[f], after[f])) : same(before, after)) continue;
-    } else continue;
+    } else if (ev.kind !== 'any') continue;
     const id = `${row.id}:${after.id}:${version}`;
     if (done.has(id)) continue;
     out.push({

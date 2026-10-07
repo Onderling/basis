@@ -4235,6 +4235,22 @@
       "text": "Het huishouden herinnert: {{rules}} (de avond ervoor alleen bij een afspraak vóór 10:00). Wijzigen: /huishouden rules …",
       "doc": "/gepland: what the bot will send this person in the coming week (their reminders, their planned rows); an admin also sees the household's rules."
     },
+    "planned_announce": {
+      "text": "Bij een wijziging zegt de bot het tegen wie het aangaat: {{which}}.",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
+    "planned_announce_appointments": {
+      "text": "afspraken",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
+    "planned_announce_chores": {
+      "text": "klusjes",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
+    "planned_announce_none": {
+      "text": "Bij een wijziging zegt de bot het tegen niemand.",
+      "doc": "/gepland: what the household's announce rows do — when an appointment or a chore changes, the bot tells whoever it concerns (each kind a row the household can switch off)."
+    },
     "reminders_ask": {
       "text": "Hoe wil je hieraan herinnerd worden — nu en voortaan? (Later anders: /herinneringen.)",
       "doc": "The one-time question at a person's first dated add (no reminders of their own yet): four buttons, each a /herinneringen of its own."

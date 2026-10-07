@@ -85,6 +85,7 @@ import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
 import { createChangeFeed } from '../src/v2/changeFeed.js';
+import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
 import { botHelpLines } from '../src/v2/botHelp.js';
@@ -942,7 +943,7 @@ if (tgToken || inboxDoor.bridge) {
   // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
   // the op, through the door — held through a person's quiet hours and said in their next message.
   const announcer = isFunctionProfile ? createAnnouncer({
-    sources: () => agent.reminderSources(), users: botUsers, threads, reach, t, tz: boxTz,
+    users: botUsers, threads, reach, t, tz: boxTz,
     quiet: () => reminderSettings().quiet, log: deviceLog,
     // the walk log keeps who (the last digits), which item (its tail), what kind and how it went — never its words
     onAnnounced: (e) => walkLog({ kind: 'announce', ts: new Date().toISOString(), to: String(e.personId).slice(-4), ...(e.item ? { item: String(e.item).slice(-6) } : {}), what: e.kind, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}), ...(e.count ? { count: e.count } : {}) }),
@@ -1248,11 +1249,18 @@ if (tgToken || inboxDoor.bridge) {
     // that used to live on thread rows becomes a row first.
     const moved = await moveOverviewSwitchesToRows({ threads, users: botUsers, book: planned });
     if (moved) walkLog({ kind: 'overview-rows', moved });
+    // What a change tells others, as the household's own rows (in its circle's store, so its people can see them)
+    const seeded = await seedAnnounceRows(planned, agent.householdCircleId).catch(() => 0);
+    if (seeded) walkLog({ kind: 'announce-rows', seeded });
     const intentionRunner = createIntentionRunner({
       book: planned, log: deviceLog, tz: boxTz,
       // a circle row this box runs is claimed in its key's name first — another host of the circle then leaves it
       claimAs: agent.identity?.chat?.pubKey ?? null,
-      run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: o.actsAs, threadId: o.actsAs }),
+      // a circle row runs here only as the household's announcer: nothing proves whom any other circle row names
+      mayRun: (o) => (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? true : 'a circle row names whom it acts as, and nothing proves it'),
+      // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that
+      // person, through their own column of the door
+      run: (o) => doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS ? { [HOST_CALL]: true } : { caller: o.actsAs, threadId: o.actsAs }),
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });

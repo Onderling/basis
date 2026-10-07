@@ -72,3 +72,25 @@ describe('/gepland', () => {
     expect(r.message).toContain('circle.bot.planned_reminders_off');
   });
 });
+
+describe('/gepland and the household\'s announce rows', () => {
+  it('says which changes the bot tells people about; a switched-off kind is left out; none at all says so', async () => {
+    const { seedAnnounceRows } = await import('../src/v2/announceRows.js');
+    const { createCircleStores } = await import('@onderling/item-store');
+    const { validate } = await import('@onderling/item-types');
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    await threads.load();
+    const home = createCircleStores({ dataSource: memoryDataSource(), registry: { validate } }).getStore('c-home');
+    const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot' });
+    await book.load();
+    const callSkill = async () => ({ ok: true, params: [] });
+    const door = withAssistantOps({ callSkill, threads, t, now: () => NOW, intentions: { book, tz: TZ, sources: async () => ({ events: [], chores: [] }), users: async () => [{ id: ANNE, role: 'member' }] } });
+    const call = async () => (await door('assistant', 'assistant-planned', {}, { caller: ANNE, threadId: ANNE })).message;
+    await seedAnnounceRows(book, 'c-home');
+    expect(await call()).toContain('circle.bot.planned_announce {"which":"circle.bot.planned_announce_appointments, circle.bot.planned_announce_chores"}');
+    await book.cancel(book.rows().find((r) => r.label === 'announce-chores').id);
+    expect(await call()).toContain('circle.bot.planned_announce {"which":"circle.bot.planned_announce_appointments"}');
+    await book.cancel(book.rows().find((r) => r.label === 'announce-appointments').id);
+    expect(await call()).toContain('circle.bot.planned_announce_none');
+  });
+});

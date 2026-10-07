@@ -172,7 +172,8 @@ the model watch, the unlocked-key sweep, and planned work.
 
 **Planned work is a row, not a timer.** What someone wants done later is an `intention` item — a waist call
 (`op`, `appOrigin`, `args`) to run AS a person (`actsAs`) when a trigger fires (`{ at }` once; `{ every: 'day'|'week',
-on, at }` on the zone's wall clock; `{ everyMs, from }` an interval). Its occurrences are never stored: `upcoming` and
+on, at }` on the zone's wall clock; `{ everyMs, from }` an interval; `{ event: { kind: 'added'|'changed'|'any', type?,
+circleId?, field? } }` once per change to an item the host holds). Its occurrences are never stored: `upcoming` and
 `due` (`src/v2/intentions.js`) read them from the rows; the host's `intentions` job runs each due one through the door
 as its person, with the occurrence id, and leaves an `intention-done` entry on the device log (first write wins) and
 the row's `lastRunAt`. A missed run fires once; a row with a clock time may run the rest of that day. The rows of a host
@@ -181,17 +182,22 @@ the own-devices scope, sealed, no circle's; on a household bot it holds the rows
 The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOverview` delivers it).
 
 **Four rules of planned work, learned by walking the code before building the next steps (2026-10-07).**
-- **One hook for everything that reacts to a change.** Every row that lands — the host's own write or a snapshot that
-  arrived from a peer — passes `onItemApplied(circleId, item)` in the task rail, and nothing else sees a landed row.
-  Indexers (the noticeboard bridge today), the screen's nudge, the announcements and the event triggers of planned
-  work are all consumers of that one seam; a change detector built beside it (around the door's own writes only) misses
-  what a member's app sends, which is why the door-side ones are moving onto it.
+- **One hook for everything that reacts to a change.** A snapshot that arrived from a peer passes
+  `onItemApplied(circleId, item)` in the task rail, and nothing else sees a landed row; the host's own circle writes
+  pass the store's publish. The host's change feed (`src/v2/changeFeed.js`) joins the two and hands each change, with
+  the item as the host last saw it and as it is now, to its consumers: the screens' nudge and the event triggers of
+  planned work — the announcements are such rows (`announceRows.js`), so a member's change in their app is announced
+  like the bot's own. Indexers (the noticeboard bridge) stay on `onItemApplied`. A change detector built beside it
+  (around the door's own writes only) misses what a member's app sends.
 - **A host ticks the rows of every store it holds, and across hosts the row is the truth.** The rule is that a planned
-  row in a circle's store is held by every member and run by whichever host may; today the runner reads the
-  own-devices store only, so a row written into a circle's store is not yet ticked by anyone — the gap is named, not
-  hidden. When two hosts hold one row, the claim is the task lifecycle's compare-and-swap on the row (one winner on
-  every device) and the row's `lastRunAt` is what the other host sees; the `intention-done` entry is bound to its host
-  and never travels — it is each host's own idempotency, never the cross-host truth.
+  row in a circle's store is held by every member and run by whichever host may; the runner reads every store its host
+  holds (the own-devices store and each circle's) and reads them again each pass. A circle row's `actsAs` is a field
+  any member can write — the sync proves who sent a snapshot, not who wrote the row — so a host runs no circle row as a
+  person until the row carries its author's signature, verified against the key the roster binds to that person; the
+  box runs only the household's announce rows, as the household. When two hosts hold one row, the claim is the task
+  lifecycle's compare-and-swap on the row, and the host that claimed it keeps it; the row's `lastRunAt` is what the
+  other host sees; the `intention-done` entry is bound to its host and never travels — it is each host's own
+  idempotency, never the cross-host truth.
 - **A row's authority is the authority that already exists for its case.** Three cases, two without any token: the op
   lives on the host that ticks it (the box running a member's overview) — the host's own door and the person's column
   decide; the executor is another device of the same person (a companion) — device enrolment decides, it presents the

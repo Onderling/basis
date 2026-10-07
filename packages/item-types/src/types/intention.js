@@ -7,8 +7,8 @@
  *   - `{ at: <ISO> }`                                    once;
  *   - `{ every: 'day' | 'week', on?: 'sun'…'sat', at: 'HH:MM' }`   on the wall clock of the host's zone;
  *   - `{ everyMs: <ms>, from: <ISO> }`                   a plain interval;
- *   - `{ event: { kind: 'added'|'changed', type?, circleId?, field? } }`   when an item the host holds is added or
- *     changed (with `field`, only that field) — once per change.
+ *   - `{ event: { kind: 'added'|'changed'|'any', type?, circleId?, field? } }`   when an item the host holds is
+ *     added, changed (with `field`, only that field) or either — once per change.
  * A trigger outside it has no occurrences. The verbs are the task lifecycle's; the type is its own, so no chore list
  * ever shows a machine row.
  */

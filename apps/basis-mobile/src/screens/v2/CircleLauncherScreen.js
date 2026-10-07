@@ -172,7 +172,7 @@ import QrScannerModal from '../../rn/QrScannerModal.js';
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
-import { cardForCreatedItem } from '../../../../basis/src/v2/createdCard.js';
+import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
 import { listsManifest } from '../../../../lists/manifest.js';
 import { makeListsOps } from '../../../../basis/src/v2/listsOps.js';
@@ -3014,12 +3014,15 @@ function CircleDetail({
     // `rawCallSkill` — the app-TARGETED 3-arg waist. `callSkill` in this scope is the circle's
     // RESOLVING 2-arg form, which reads (opId, args): handing it (app, op, args) shifts the arguments
     // and the call goes nowhere, silently. The same trap `broadcastCircleFanOut` documents.
+    const declared = (manifestsByOrigin?.[appOrigin]?.operations ?? (appOrigin === 'basis' ? basisManifest.operations : []))
+      .find((o) => o.id === opId) ?? null;
+    // an op that writes into the circle (the + menu's Appointment) is made in the circle it was opened in
+    const runArgs = composerArgs(declared, args, circle?.id ?? null);
     const reply = appOrigin === 'basis'
-      ? await onCircleControl?.(opId, args ?? {})
-      : await rawCallSkill?.(appOrigin, opId, args ?? {});
+      ? await onCircleControl?.(opId, runArgs)
+      : await rawCallSkill?.(appOrigin, opId, runArgs);
     // A CREATOR answers `{ok, itemId}`; if it declares how its card is read, read it, so the thing
     // appears in the conversation it was made in and not only in its own tab.
-    const declared = manifestsByOrigin?.[appOrigin]?.operations?.find((o) => o.id === opId) ?? null;
     const card = await cardForCreatedItem({
       reply, op: declared, appOrigin, callSkill: rawCallSkill, localActor: 'me',
     });
@@ -3035,7 +3038,7 @@ function CircleDetail({
     });
     if (sent) broadcastFanOut({ msgId: sent.msgId, text: out.text, ts: sent.ts, card: out.card });
     return reply;
-  }, [onCircleControl, rawCallSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t]);
+  }, [onCircleControl, rawCallSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t, circle?.id]);
 
   // The fallback offer speaks HERE while this circle is open (web parity: the chat makes the offer, at the
   // moment the person is confused about why nobody replied). `scope: 'self'` — a local bubble, never

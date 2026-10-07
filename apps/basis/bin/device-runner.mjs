@@ -208,6 +208,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-agent-registry': contentPaths.registry,
     'cc-device-log': [contentPaths.deviceLog, path.join(dataDir, 'device-log.json')],   // + the plain file a box kept before
     'cc-contact-dm-state': contentPaths.contactDm,
+    'cc-own-devices': stores.paths.ownDevices,
     'cc-outbox-state': contentPaths.outbox,
     'cc-outbox-cache': contentPaths.outbox,
     'cc-settings-state': contentPaths.settings,

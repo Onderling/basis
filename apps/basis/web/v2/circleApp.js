@@ -24,6 +24,7 @@ import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
 import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
+import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -8154,6 +8155,8 @@ async function boot() {
       t,
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
       ...PERSON_NODE_STORE_OPTS,
+      // …which is my OWN store (the own-devices scope): sealed, in IndexedDB, back after a reload
+      ownStore: lazyOwnStore({ dbName: 'cc-own-devices', storeName: 'items' }),
       publishEvent: publishEventToLog,
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.

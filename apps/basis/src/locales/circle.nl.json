@@ -679,6 +679,10 @@
     "cancel_admin_only": {
       "text": "Afspraken schrappen doet hier alleen de beheerder.",
       "doc": "A household bot's reply when an appointment's cancel is refused: not this person's, or the admin keeps cancelling to themselves."
+    },
+    "brief": {
+      "text": "{{count}} afspraken in de komende 24 uur",
+      "doc": "The morning brief's calendar slot: how many appointments in the next 24 hours."
     }
   },
   "embed": {

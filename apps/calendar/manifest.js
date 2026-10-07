@@ -240,39 +240,6 @@ export const calendarManifest = {
         chat: { hint: 'text search across calendar events' },
       },
     },
-
-    /**
-     * `/pod-status` — v0.7.. Returns the current pod-write
-     * diagnostic state (writer wired? last write OK? errors?).
-     * Critical for troubleshooting why a pod might not have
-     * received writes.
-     */
-    {
-      id:    'podStatus', group: 'data',
-      verb:  'list',
-      params: [],
-      surfaces: {
-        slash: { command: '/pod-status' },
-        chat:  { reply: 'text', hint: 'show calendar pod-write diagnostics' },
-      },
-    },
-
-    /**
-     * `getIcsFeed` — v0.7.11.  Returns the calendar's iCal feed URI
-     * (and on request, the body) so users can paste it into Apple
-     * Calendar / Google Calendar / Proton as a subscription URL.
-     * v0.7.11 ships the local pseudo-pod URI; a real pod attach
-     * makes the same feed externally reachable.
-     */
-    {
-      id:    'getIcsFeed', group: 'data',
-      verb:  'list',
-      params: [],
-      surfaces: {
-        slash: { command: '/icalfeed' },
-        chat:  { reply: 'text', hint: 'get the iCal subscription URL' },
-      },
-    },
   ],
 
   views: [

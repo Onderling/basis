@@ -244,7 +244,9 @@ import { listsManifest }                   from '../../../../lists/manifest.js';
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
 import { linkOfferMessage } from '../../v2/identityLink.js';                    // the one message signLinkOffer signs
-import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';                  // a household bot's calendar, over the circle's store
+import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';
+import { makeCircleLists }                 from '@onderling/kring-host/circleLists';             // a person's own Agenda in their own store
+import { calendarManifest }                from '../../../../calendar/manifest.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
 import { botDoorChecks } from '../../v2/botRungs.js';                                            // the bot door's checks, declared once
@@ -1267,26 +1269,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // so we expose a setter the caller wires post-construction.
     inviteAttendee: (webid, snapshot) => inviteAttendeeRef(webid, snapshot),
   });
-
-  // v0.7. — caller (main.js) wires the pod writer on sign-in via
-  // this setter; calendar's .ics feed then write-throughs to
-  // <pod>/onderling/calendar/feed.ics.
-  const setCalendarPodWriter = (writer) => calendarStore.setPodWriter(writer);
-  // v0.7. — surface pod-write success / failure as notification
-  // events so /logs + matching threads pick them up.
-  if (typeof calendarStore.setPodEventSink === 'function') {
-    calendarStore.setPodEventSink((event) => {
-      publishEvent({
-        app:  'calendar',
-        type: event.kind === 'pod-write-error' ? 'notification' : 'item-changed',
-        payload: {
-          message: event.kind === 'pod-write-ok'
-            ? `📤 pod write OK: ${event.url}`
-            : `❌ pod write failed (${event.status ?? 'no status'}): ${event.error}`,
-        },
-      });
-    });
-  }
 
   /* ─────────── L3 — household via the uniform route + wireSkill (the DEFAULT, legacy retired) ───────────
    * The dissolved-onto-CircleItemStore cores in `v2/householdApp.js` are registered on a DEDICATED
@@ -4014,6 +3996,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
   let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  // A person's OWN appointments (of no circle): the same ops over their own-devices store, under an own Agenda — made
+  // on first use (the shell hands the store; on web and mobile it is durable, so they come back after a restart).
+  let ownCalendar = null;
+  let ownCalendarStore = null;
+  let ownCalendarReady = null;
   let circleTasks = null;      // the bot's chores over the circle store, made on first use
   /**
    * A chores read for a door's person: each chore's holder, named when the household's names setting lets this person
@@ -4837,8 +4824,30 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: false, error: tr('circle.calendar.not_yours', { title: snap.event.title ?? '' }), refusal: refuse('op-rule', 'not-yours') };
       }
     }
+    // A person's node (`opts.personalCalendar`, web and mobile): a call without a circle is their OWN appointment — an
+    // item in their own-devices store, under an own Agenda, served by the same ops as a circle's.
+    if (appOrigin === 'calendar' && opts.personalCalendar && !args?.circleId && typeof opts.ownStore === 'function') {
+      ownCalendarReady ??= (async () => {
+        ownCalendarStore = await opts.ownStore();
+        const tr = typeof opts.t === 'function' ? opts.t : (k) => k;
+        const lists = makeCircleLists({ storeFor: () => ownCalendarStore, manifests: [calendarManifest] });
+        const containers = await lists.listContainers(OWN_DEVICES_SCOPE);
+        if (!containers.some((c) => c.defaultChild === 'calendar-event')) {
+          await lists.createList(OWN_DEVICES_SCOPE, tr('circle.lists.template.schedule'), 'me', { defaultChild: 'calendar-event' });
+        }
+      })();
+      await ownCalendarReady;
+      const ops = (ownCalendar ??= makeCircleCalendarOps({
+        storeFor: () => ownCalendarStore,
+        activeCircle: () => OWN_DEVICES_SCOPE,
+        t: typeof opts.t === 'function' ? opts.t : (k) => k,
+        localActor: 'me',
+      }));
+      const handler = ops[opId];
+      return handler ? handler(args ?? {}) : { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
+    }
     // A person's node (`opts.personalCalendar`, web and mobile): a call naming a circle reads and writes that circle's
-    // store; a call without one stays on the person's own calendar below.
+    // store; a call without one (and no own store handed in) stays on the person's own calendar below.
     if (appOrigin === 'calendar' && opts.calendarInCircle && !(opts.personalCalendar && !args?.circleId)) {
       const ops = (circleCalendar ??= makeCircleCalendarOps({
         storeFor: (circleId) => householdService.stores.getStore(circleId),
@@ -6044,7 +6053,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // v0.7. — caller wires the pod-writer on sign-in / clears on
     // sign-out so calendar's .ics feed writes-through to the user's
     // pod under <pod>/onderling/calendar/feed.ics.
-    setCalendarPodWriter,
     // N5 — caller wires the folio Drive's real-pod source on sign-in
     // (a PodClient + container) / clears on sign-out.  Lights up the
     // "My pod" toggle in the circle Folio browser.  Pass null to detach.

@@ -86,6 +86,7 @@ import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../src/v2/intentionRunner.js';
 import { createChangeFeed } from '../src/v2/changeFeed.js';
+import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { seedAnnounceRows, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
 import { moveOverviewSwitchesToRows } from '../src/v2/weekOverviewRows.js';
 import { createAnnouncer } from '../src/v2/announcements.js';
@@ -250,6 +251,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
 // only readable once the agent is up, so this reads the install's own input; the door below reads the record.)
 const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function';
 const circleWrite = { fn: null };
+const ownStoreOnDisk = { ref: null };
 const itemLanded = { fn: null };
 // What a write is made for while a planned row runs (`{ intention: <row> }`), ambient across the row's awaits: the
 // stores stamp it on what the row writes, and no host's change feed hands such a write on.
@@ -262,6 +264,9 @@ const agent = await createRealHouseholdAgent({
   onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
   writeOrigin: () => writeOrigin.getStore() ?? null,
   ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
+  // the person's own store, sealed on disk (the own-devices scope): ONE per node — the calendar's own appointments
+  // and the planned book read the same one, and it reaches the person's other devices
+  ownStore: () => (ownStoreOnDisk.ref ??= (async () => createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }))()),
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
@@ -754,6 +759,8 @@ if (relayUrl) {
     for (const c of hiddenChanged ?? []) walkLog({ kind: 'contact-hidden', contactId: String(c.webid).slice(0, 12), hidden: c.hidden });
   });
   kick(agent.personKeySync, 'person-key', 2500);
+  // the person's own store: what a sibling wrote while this box was off
+  kick(agent.ownStoreSync, 'own-store', 2500);
   // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and
   // at boot by asking, as both shells do. (Found by the shell-seams guard on its first run, 2026-09-19.)
   setTimeout(() => {
@@ -943,7 +950,7 @@ if (tgToken || inboxDoor.bridge) {
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
   const boxTz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // ...and the rows in the stores of the circles it holds (a circle row runs only by the runner's rule, below)
-  const planned = createIntentionBook({ store: createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }), circles: () => agent.heldCircleStores(), actor: 'host' });
+  const planned = createIntentionBook({ store: await agent.ownStore(), circles: () => agent.heldCircleStores(), actor: 'host' });
   await planned.load();
   // What a change tells the others it concerns (a new, moved or cancelled appointment; a chore given): at once, after
   // the op, through the door — held through a person's quiet hours and said in their next message.
@@ -1153,6 +1160,7 @@ if (tgToken || inboxDoor.bridge) {
   const heldStores = new Map();   // circle id → its store, read again when a circle is new here
   const changeFeed = createChangeFeed({
     storeFor: async (circleId) => {
+      if (circleId === OWN_DEVICES_SCOPE) return agent.ownStore();
       if (!heldStores.has(circleId)) for (const c of await agent.heldCircleStores()) heldStores.set(c.scope, c.store);
       return heldStores.get(circleId) ?? null;
     },

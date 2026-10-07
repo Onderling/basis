@@ -168,7 +168,11 @@ does is a job on its tick (`apps/basis/src/v2/hostTick.js`) — a name, a period
 never two runs of one job at once, one job's failure never stopping another's (`lint-host-tick` refuses an interval
 beside it). The clock has no powers of its own: it only says *when to ask*; what is due is each job's own projection,
 and what it does goes through the same calls a tap would. Today the box's jobs are the reminders, the nightly export,
-the model watch, the unlocked-key sweep, and planned work.
+the model watch, the unlocked-key sweep, and planned work. A person's own app has a clock too (`src/v2/personClock.js`, web and
+mobile): the same tick with one job, planned work over the person's own rows, whose timer is the foreground cadence
+(`foregroundTimers`, from `@onderling/online-cadence`) — it ticks while the app is in front and stops behind it. A phone
+does not keep a loop alive in the background, so the app PAINTS what came due while it is open (the person's week
+overview is a card that says so); delivering on time is the work of an always-on device of theirs.
 
 **Planned work is a row, not a timer.** What someone wants done later is an `intention` item — a waist call
 (`op`, `appOrigin`, `args`) to run AS a person (`actsAs`) when a trigger fires (`{ at }` once; `{ every: 'day'|'week',

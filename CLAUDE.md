@@ -141,6 +141,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Check whether it already exists — the locale file is the fastest index.** Grep
   `circle.en.json` for the word a *user* would see before adding any small closed vocabulary. Duplicates
   break nothing, so nothing catches them. → [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
+  The same for anything that sends, holds, fans, syncs, serves or wakes: find your verb in
+  [`carrying-index.md`](docs/conventions/carrying-index.md) first — the neighbour is usually there.
 - **SEARCH before you BUILD — and before you CONCLUDE.** Before adding a cross-cutting concern (retention,
   logging, an emitter, a per-class table, any shared vocabulary) grep the WHOLE repo for the *concept* — not
   the exact name you have in mind — or send an Explore agent "does X already exist?". These almost always

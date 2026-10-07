@@ -25,6 +25,8 @@
     "@onderling/core": "file:../../packages/core",
     "@onderling/kring-host": "file:../../packages/kring-host",
     "@onderling/local-store": "file:../../packages/local-store",
+    "@onderling/online-cadence": "file:../../packages/online-cadence",
+    "@onderling/params": "file:../../packages/params",
     "@onderling/manifest-host": "file:../../packages/manifest-host",
     "@onderling/oidc-session": "file:../../packages/oidc-session",
     "@onderling/oidc-session-rn": "file:../../packages/oidc-session-rn",

@@ -29,7 +29,10 @@ describe('the Advanced surface reaches every op with no declared screen', () => 
   });
 
   it('lists EVERY basis op that declares no door of its own', () => {
+    // an `internal` op is reached by the host itself (the person's clock runs `personWeekOverview`), never by a
+    // person, so it is no door's business — the same rule that keeps it out of coverage and the drawer
     const doorless = basisManifest.operations
+      .filter((o) => !o?.surfaces?.internal)
       .filter((o) => !o?.surfaces?.ui && !o?.surfaces?.page && !o?.surfaces?.attach)
       .map((o) => o.id);
     const missing = doorless.filter((id) => !listed.has(id));

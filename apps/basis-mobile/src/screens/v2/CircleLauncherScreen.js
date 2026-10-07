@@ -30,6 +30,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // peer, so it is loaded defensively — a shell without it keeps foreground-return detection and simply loses
 // the in-foreground Wi-Fi-switch case.
 import { subscribeToNetworkChange as subscribeAppState, combineSources } from '@onderling/react-native';
+import { createPersonClock } from '../../../../basis/src/v2/personClock.js';
 import {
   loadCircles, circleSourcesFromAgent, makeResolvingCallSkill,
   loadCircleItems, quickCreateCircle, setActiveCircle, normalizeCircleMembers,
@@ -520,6 +521,8 @@ export default function CircleLauncherScreen({
   // circle am I in" at CALL time, and an effect that mounts once would otherwise hold whichever circle
   // was open when it ran (none, at boot: every list op answered "open a circle first").
   const selectedIdRef = useRef(null);
+  // the person's clock (a promise of it, once the agent is up): their own planned rows while the app is in front
+  const personClockRef = useRef(null);
   useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
   // M3 — sub-view within the launcher: 'list' | 'availability' | 'detail'
   // | 'settings' | 'override'.  `selected` carries the active circle for
@@ -878,7 +881,16 @@ export default function CircleLauncherScreen({
       // The camera IS this platform's answer for `scanQr`; the modal's own parser decides what a code
       // means. An invite routes into the join wizard, as a scan from anywhere else on this screen does.
       openQrScanner: () => setJoinScanOpen(true),
+      // the person's clock shows them a card (their week): this platform's alert, until they close it
+      showPersonCard: (card) => Alert.alert(card.title, [...(card.lines?.length ? card.lines : [t('circle.profile.planned_none')]), '', card.note].join('\n'), [{ text: t('circle.profile.week_card_close') }]),
     }));
+    // THE PERSON'S CLOCK: their own planned rows (their week on Saturday), run while the app is in front — it stops in the
+    // background (the OS decides there; an always-on device of theirs delivers on time)
+    if (!personClockRef.current) {
+      personClockRef.current = createPersonClock({ agent, log: eventLog, AppState })
+        .then(async (c) => { await c.start(); return c; })
+        .catch((e) => { console.warn('[person-clock] not started:', e?.message ?? e); return null; });
+    }
   }, [bundle, eventLog, podAuth, sessionRef, t]);
 
   const overrideStore     = useMemo(() => makeMemberOverrideStoreRN(AsyncStorage), []);
@@ -1686,7 +1698,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}

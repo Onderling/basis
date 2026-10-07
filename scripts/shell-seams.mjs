@@ -67,6 +67,9 @@ export const SEAMS = Object.freeze([
   // The person's own store rides between their own devices (signed by the device, sealed to the person); what a
   // sibling wrote while this device was off is asked for on connect — every shell that holds the person's store.
   { id: 'own-store-catch-up', pattern: /ownStoreSync\??\.requestFromSiblings\(|kick\(agent\.ownStoreSync/, why: 'an appointment added on the phone while the laptop was off is on the laptop when it comes back' },
+  // A person's device runs its OWN planned rows (their week on Saturday) while the app is in front: one host tick, its
+  // timer the foreground cadence. The box keeps its own clock (`host-tick`).
+  { id: 'person-clock', pattern: /createPersonClock\(/, shells: ['web', 'mobile'], why: 'a person\'s own planned rows (their week overview) run on their phone and in their browser while the app is open' },
   { id: 'own-devices-store', pattern: /createOwnDevicesStore\(|lazyOwnStore\(/, shells: ['web', 'mobile', 'box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door

@@ -56,6 +56,17 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   triggered it and add *that* package's `node_modules` — provided it has no RN native modules.
 
 - **New workspace dep needs its `node_modules` symlink materialized.**
+  *(2026-10-07: `@onderling/online-cadence` added to `apps/basis` (`workspace:*`) and `apps/basis-mobile` (`file:`) —
+  the person's clock imports its plain ticker as `@onderling/online-cadence/cadence`, never the package index, which
+  re-exports React Native background helpers. Links: `apps/{basis,basis-mobile}/node_modules/@onderling/online-cadence
+  → ../../../../packages/online-cadence`. The cadence imports `@onderling/params`; basis-mobile DECLARES it too
+  (`file:`), so the link exists in the app's own `node_modules` (relink-workspace makes it; EAS's `npm ci` in the
+  app dir installs it) rather than living only in the cadence's nested `node_modules`, which EAS strips.)*
+  **And the lockfile:** each app has its OWN `pnpm-lock.yaml`, and CI installs with `--frozen-lockfile` — a dep added to
+  a `package.json` fails every job in ~25 s (`ERR_PNPM_OUTDATED_LOCKFILE`). Regenerate with the pinned pnpm
+  (`pnpm install --lockfile-only`, which writes no `node_modules`) and commit ONLY the lockfiles of the packages you
+  changed: the same run re-resolves unrelated ones (2026-10-07 it moved `openai` 7.10 → 6.49 in four other packages) —
+  restore those.
   This repo has NO root hoisting: each package's `file:` deps live as symlinks in *its own*
   `node_modules`. Adding a `@onderling/*` dep to a package's `package.json` is not enough for a fresh
   checkout that doesn't re-run install — the symlink must exist. (2026-07-10) wired

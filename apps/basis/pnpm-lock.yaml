@@ -84,6 +84,9 @@ importers:
       '@onderling/oidc-session':
         specifier: workspace:*
         version: link:../../packages/oidc-session
+      '@onderling/online-cadence':
+        specifier: workspace:*
+        version: link:../../packages/online-cadence
       '@onderling/pod-client':
         specifier: workspace:*
         version: link:../../packages/pod-client

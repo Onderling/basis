@@ -137,6 +137,7 @@ export function buildMobileLocalBuiltins({
   agent, catalogue, callSkill, t,
   eventLog, openLogsPanel, openQrScanner,
   openFilePicker,
+  showPersonCard,   // the person's clock: how this platform shows them a card (their week)
   // Media mobile twin (2026-07) — the sealed-media seams. All optional:
   // absent gateway ⇒ the shared embed-file builtin keeps its legacy inline
   // file-card path (honest degradation, identical to web — no sealer in
@@ -199,6 +200,7 @@ export function buildMobileLocalBuiltins({
     openLogsPanel,
     openQrScanner,
     openFilePicker,
+    showPersonCard,
     // Media mobile twin (2026-07) — the sealed-media deps ride the same
     // injection route every other seam takes.  encodeImage defaults to the
     // identity-shaped adapter: the RN picker already resized + thumbnailed,

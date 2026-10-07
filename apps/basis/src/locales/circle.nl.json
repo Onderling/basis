@@ -5397,6 +5397,30 @@
       "text": "Gepland",
       "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
     },
+    "week_card_title": {
+      "text": "Je week",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_card_note": {
+      "text": "Je ziet dit omdat de app open is — een telefoon maakt je er niet voor wakker.",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_switch": {
+      "text": "Weekoverzicht op zaterdag om 9:00 — je ziet het als de app open is",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_on": {
+      "text": "Aan",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_off": {
+      "text": "Uit",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
+    "week_card_close": {
+      "text": "Sluiten",
+      "doc": "Mij → Gepland: the person's own week overview — a card of their coming week on Saturday morning, shown when the app is open (the phone paints, it does not wake)."
+    },
     "planned_loading": {
       "text": "Even kijken wat er aankomt…",
       "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."

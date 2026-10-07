@@ -7,26 +7,9 @@
  * it resumes. On web the page's visibility is the app state. Its one job: the intentions runner over the person's OWN
  * rows (their own store — never a circle's: a circle row is run by a host that may act for its author).
  */
-import { createActiveCadence } from '@onderling/online-cadence/cadence';
-import { createHostTick } from './hostTick.js';
+import { createHostTick, foregroundTimers } from './hostTick.js';
 import { createIntentionBook } from './intentionBook.js';
 import { createIntentionRunner } from './intentionRunner.js';
-
-/**
- * The host tick's timers, but only while the app is in front: `setInterval` starts a foreground cadence, `clearInterval`
- * stops it.
- * @param {{AppState: {currentState?: string, addEventListener: Function}}} a
- */
-export function foregroundTimers({ AppState }) {
-  return {
-    setInterval(fn, ms) {
-      const cadence = createActiveCadence({ runOnce: async () => { fn(); }, getPollIntervalMs: () => ms, AppState });
-      cadence.start();
-      return cadence;
-    },
-    clearInterval(cadence) { cadence?.stop?.(); },
-  };
-}
 
 /** The page's visibility as an app state: 'active' when it can be seen, 'background' when it cannot. */
 export function webAppState(doc = globalThis.document) {
@@ -47,13 +30,15 @@ export function webAppState(doc = globalThis.document) {
  * @param {object} a
  * @param {{ownStore: () => Promise<object>, callSkill: Function, identity?: object}} a.agent
  * @param {{append: Function, query: Function}} a.log   the device log (the runner's done-marks)
- * @param {string} a.tz
+ * @param {string} [a.tz]   the zone wall-clock triggers are read in (default: the device's)
  * @param {object} a.AppState   React Native's AppState, or `webAppState()`
  * @param {(o: object) => Promise<object>} [a.run]   how a due row runs (default: the op through the person's own agent)
  * @param {(e: object) => void} [a.onFired]
  * @param {(e: object) => void} [a.onError]
  */
-export async function createPersonClock({ agent, log, tz, AppState, run = null, onFired = null, onError = null }) {
+export async function createPersonClock({ agent, log, tz = null, AppState, run = null, onFired = null, onError = null }) {
+  // the device's zone, read here (a phone screen does not reach for Intl itself)
+  if (!tz) { try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { tz = 'UTC'; } }
   const store = await agent.ownStore();
   const book = createIntentionBook({ store, actor: agent.identity?.chat?.pubKey ?? 'me' });
   await book.load();
@@ -65,3 +50,6 @@ export async function createPersonClock({ agent, log, tz, AppState, run = null, 
   tick.add('intentions', { every: 60_000, run: () => runner.pass() });
   return { tick, book, runner, start: () => tick.start(), stop: () => tick.stop() };
 }
+
+// the foreground timer lives with the clock it drives
+export { foregroundTimers } from './hostTick.js';

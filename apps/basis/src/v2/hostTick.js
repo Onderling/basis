@@ -11,6 +11,7 @@
  * shells will tick on foreground. It is the clock adapter of the pending-work design: what is due is decided by the
  * jobs' own projections; the tick only says when to ask.
  */
+import { createActiveCadence } from '@onderling/online-cadence/cadence';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** How often the host asks its jobs whether they are due. A minute: the finest any job needs (a reminder 5 minutes ahead). */
@@ -80,5 +81,21 @@ export function createHostTick({ every = HOST_TICK_MS, now = Date.now, timers = 
     stop() { if (handle) { timers.clearInterval(handle); handle = null; } },
     /** The jobs on the clock, in order — for the walk log at boot. */
     names() { return jobs.map((j) => j.name); },
+  };
+}
+
+/**
+ * The host tick's timers, but only while the app is in front: `setInterval` starts a foreground cadence, `clearInterval`
+ * stops it.
+ * @param {{AppState: {currentState?: string, addEventListener: Function}}} a
+ */
+export function foregroundTimers({ AppState }) {
+  return {
+    setInterval(fn, ms) {
+      const cadence = createActiveCadence({ runOnce: async () => { fn(); }, getPollIntervalMs: () => ms, AppState });
+      cadence.start();
+      return cadence;
+    },
+    clearInterval(cadence) { cadence?.stop?.(); },
   };
 }

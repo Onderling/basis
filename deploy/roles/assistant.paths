@@ -37,6 +37,7 @@ packages/notifier/
 packages/notify-envelope/
 packages/offering-match/
 packages/oidc-session/
+packages/online-cadence/
 packages/params/
 packages/pod-client/
 packages/pod-onboarding/

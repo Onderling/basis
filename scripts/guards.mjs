@@ -10,6 +10,7 @@
  * fitness suites run with their test commands; `/health` (wave 2) will report across all tiers.
  */
 import { execSync, spawnSync } from 'node:child_process';
+import { untrackedSource } from './untracked-source.mjs';
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,4 +41,13 @@ for (const r of results) {
   if (!r.ok) { red++; console.log(r.out.split('\n').map((l) => '   ' + l).join('\n')); }
 }
 console.log(`──────────────────────────────────── ${results.length - red}/${results.length} green ──`);
+// A guard reading `git ls-files` cannot see a file that is not added yet — say so, or a green here is a green of the
+// tracked tree only (a red then appears a PR later). `git add -N <file>` is enough for the guards to see it.
+let untracked = [];
+try { untracked = untrackedSource(execSync('git ls-files --others --exclude-standard', { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean)); } catch { /* not a git tree */ }
+if (untracked.length) {
+  console.log(`⚠ ${untracked.length} untracked source file(s) the guards did not see — \`git add -N\` them and run again:`);
+  for (const f of untracked.slice(0, 10)) console.log(`   ${f}`);
+  if (untracked.length > 10) console.log(`   … and ${untracked.length - 10} more`);
+}
 process.exit(red ? 1 : 0);

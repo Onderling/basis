@@ -3346,10 +3346,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!membershipRail || typeof membershipRail[fn] !== 'function') continue;
       const raw = membershipRail[fn].bind(membershipRail);
       membershipRail[fn] = async (...a) => {
-        const r = await raw(...a);
         const cid = typeof a[0] === 'string' ? a[0] : (a[0]?.circleId ?? null);   // (circleId, …) on all three
+        // a departure landing here: the admins as they were BEFORE it (did it empty them? — see retellDeparture)
+        const adminsBefore = fn === 'ingest' && cid && isDeparture(a[1]) ? await adminsOf(cid).catch(() => null) : null;
+        const r = await raw(...a);
         if (cid) rosterReads.invalidate(cid); else rosterReads.invalidateAll();
-        if (fn === 'ingest' && r?.ok && !r.existed) retellDeparture(cid, a[1]);
+        if (fn === 'ingest' && r?.ok && !r.existed) retellDeparture(cid, a[1], adminsBefore);
         return r;
       };
     }
@@ -3358,18 +3360,32 @@ export async function createRealHouseholdAgent(opts = {}) {
     // fanning to them, for good (L128, seen on CI). So an ADMIN who lands someone else's leave or evict tells the circle
     // again: the same signed statement, the same message id (every rail dedupes it), the fold untouched. Once per
     // statement — on its first landing here — and only by admins, so a circle hears it at most once more per admin.
-    function retellDeparture(circleId, statement) {
+    // One case the admins cannot cover: the LAST admin leaving. The fold then appoints a caretaker, but only where the
+    // leave landed — a caretaker whose copy was lost never learns it is admin, and the members who landed it are not
+    // admins. So ANY member who lands a departure that EMPTIED the admin set (every admin before it is gone after) tells
+    // it again too: a local, exact condition, for a rare event, bounded by the circle's size and deduped by the id.
+    function isDeparture(statement) {
       const kind = statement?.body?.kind;
-      if (!circleId || (kind !== 'leave' && kind !== 'evict') || !membershipEmit) return;
       const author = statement?.body?.payload?.authorRef ?? null;
-      if (!author || author === chatId.pubKey) return;
+      return (kind === 'leave' || kind === 'evict') && Boolean(author) && author !== chatId.pubKey;
+    }
+    async function adminsOf(circleId) {
+      const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
+      return rows.filter((m) => m?.role === 'admin' && m?.webid).map((m) => m.webid);
+    }
+    function retellDeparture(circleId, statement, adminsBefore = null) {
+      if (!circleId || !isDeparture(statement) || !membershipEmit) return;
+      const kind = statement.body.kind;
       (async () => {
         const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
-        if (rows.find((m) => m?.webid === chatId.pubKey)?.role !== 'admin') return;
+        const amAdmin = rows.find((m) => m?.webid === chatId.pubKey)?.role === 'admin';
+        const present = new Set(rows.map((m) => m?.webid));
+        const emptied = Array.isArray(adminsBefore) && adminsBefore.length > 0 && adminsBefore.every((a) => !present.has(a));
+        if (!amAdmin && !emptied) return;
         const r = await callSkill('stoop', 'broadcastCircleMembership', {
           groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
         });
-        console.info(`[membership-fan] retold a ${kind} in ${String(circleId).slice(0, 8)} as its admin: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`);
+        console.info(`[membership-fan] retold a ${kind} in ${String(circleId).slice(0, 8)} ${amAdmin ? 'as its admin' : 'as the departure emptied its admins'}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`);
       })().catch(() => { /* best-effort: the departed's own copy and catch-up remain */ });
     }
     membershipEmit = makeMembershipEmitter({

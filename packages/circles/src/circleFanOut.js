@@ -241,14 +241,14 @@ export function createCircleFanOut({
     // broadcast has none, so synthesise `{ subtype: kind, ...extras }` — the same shape the
     // chat.send fallback would produce as the receiver's payload (routed by `subtype`).
     const wire = envelope ?? { subtype: kind, ...extras };
-    const { sent, attempted, errors } = reliableSend
+    const { sent, attempted, errors, outcomes } = reliableSend
       ? await fanOutViaReliableSend({
         members: fanTargets, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
         allowFallback: allowAddressFallback,
       })
       : await fanOutToMembers({ members: fanTargets, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
     if (metric) metrics?.record?.(metric);
-    return { sent, attempted, errors };
+    return { sent, attempted, errors, ...(outcomes ? { outcomes } : {}) };
   }
 
   return broadcastToCircle;

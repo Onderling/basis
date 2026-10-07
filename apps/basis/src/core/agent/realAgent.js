@@ -1270,26 +1270,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     inviteAttendee: (webid, snapshot) => inviteAttendeeRef(webid, snapshot),
   });
 
-  // v0.7. — caller (main.js) wires the pod writer on sign-in via
-  // this setter; calendar's .ics feed then write-throughs to
-  // <pod>/onderling/calendar/feed.ics.
-  const setCalendarPodWriter = (writer) => calendarStore.setPodWriter(writer);
-  // v0.7. — surface pod-write success / failure as notification
-  // events so /logs + matching threads pick them up.
-  if (typeof calendarStore.setPodEventSink === 'function') {
-    calendarStore.setPodEventSink((event) => {
-      publishEvent({
-        app:  'calendar',
-        type: event.kind === 'pod-write-error' ? 'notification' : 'item-changed',
-        payload: {
-          message: event.kind === 'pod-write-ok'
-            ? `📤 pod write OK: ${event.url}`
-            : `❌ pod write failed (${event.status ?? 'no status'}): ${event.error}`,
-        },
-      });
-    });
-  }
-
   /* ─────────── L3 — household via the uniform route + wireSkill (the DEFAULT, legacy retired) ───────────
    * The dissolved-onto-CircleItemStore cores in `v2/householdApp.js` are registered on a DEDICATED
    * in-process household agent via `wireSkill(core, householdOp, { storeFor })` — the same
@@ -6073,7 +6053,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // v0.7. — caller wires the pod-writer on sign-in / clears on
     // sign-out so calendar's .ics feed writes-through to the user's
     // pod under <pod>/onderling/calendar/feed.ics.
-    setCalendarPodWriter,
     // N5 — caller wires the folio Drive's real-pod source on sign-in
     // (a PodClient + container) / clears on sign-out.  Lights up the
     // "My pod" toggle in the circle Folio browser.  Pass null to detach.

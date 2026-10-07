@@ -25,7 +25,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
+    'connect-screen': 'write', 'agenda-link': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
   operations: [
     {
@@ -298,6 +298,15 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       params: [{ name: 'mode', kind: 'string', required: false }],
       surfaces: { slash: { command: '/weergave', body: 'argline' } },
+    },
+    {
+      // the person's agenda as a link for a calendar app: always a NEW one (the old goes dark), to their private chat only
+      id:     'assistant-agenda-link',
+      verb:   'agenda-link',
+      visibility: 'authenticated',
+      writes: { scope: 'device' },
+      params: [],
+      surfaces: { slash: { command: '/agenda-link', body: 'none' } },
     },
     {
       // A person connects a screen (their own app, in a browser) to act through: a one-time link, ten minutes, for

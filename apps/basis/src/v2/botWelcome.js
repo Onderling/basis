@@ -80,6 +80,7 @@ export const WELCOME_SAYS = Object.freeze({
   "assistant-settings": "welcome_admin",
 });
 export const WELCOME_LEAVES = Object.freeze({
+  'assistant-agenda-link': "off unless the admin switches it on (/huishouden agenda on); asked while off, it says so",
   'assistant-planned': "asked when wanted ('wat ga je me sturen?'); /help lists it — the reminders line says when reminders come",
   entryReminders: "asked in words ('herinner iedereen ook de avond ervoor aan de tandarts'); the reminders line says when reminders come",
   remindMe: "asked in words ('herinner me een uur van tevoren aan de tandarts'); the reminders line says how to change your own",

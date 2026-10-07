@@ -3349,8 +3349,28 @@ export async function createRealHouseholdAgent(opts = {}) {
         const r = await raw(...a);
         const cid = typeof a[0] === 'string' ? a[0] : (a[0]?.circleId ?? null);   // (circleId, …) on all three
         if (cid) rosterReads.invalidate(cid); else rosterReads.invalidateAll();
+        if (fn === 'ingest' && r?.ok && !r.existed) retellDeparture(cid, a[1]);
         return r;
       };
+    }
+    // A DEPARTURE IS TOLD ONCE BY THE ONE WHO LEAVES — and a copy to one member can be lost (a hold that never meets
+    // the recipient's presence, a send into a reconnect): that member then keeps the departed on their roster, and keeps
+    // fanning to them, for good (L128, seen on CI). So an ADMIN who lands someone else's leave or evict tells the circle
+    // again: the same signed statement, the same message id (every rail dedupes it), the fold untouched. Once per
+    // statement — on its first landing here — and only by admins, so a circle hears it at most once more per admin.
+    function retellDeparture(circleId, statement) {
+      const kind = statement?.body?.kind;
+      if (!circleId || (kind !== 'leave' && kind !== 'evict') || !membershipEmit) return;
+      const author = statement?.body?.payload?.authorRef ?? null;
+      if (!author || author === chatId.pubKey) return;
+      (async () => {
+        const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
+        if (rows.find((m) => m?.webid === chatId.pubKey)?.role !== 'admin') return;
+        const r = await callSkill('stoop', 'broadcastCircleMembership', {
+          groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+        });
+        console.info(`[membership-fan] retold a ${kind} in ${String(circleId).slice(0, 8)} as its admin: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`);
+      })().catch(() => { /* best-effort: the departed's own copy and catch-up remain */ });
     }
     membershipEmit = makeMembershipEmitter({
       rail: membershipRail,

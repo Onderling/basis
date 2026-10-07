@@ -124,7 +124,7 @@ function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = 
 }
 
 /** The apps whose `list` a cross-circle items block may resolve (first that answers the noun). */
-const ITEM_MANIFESTS = Object.freeze([
+export const ITEM_MANIFESTS = Object.freeze([
   { appOrigin: 'calendar', manifest: calendarManifest },
   { appOrigin: 'tasks', manifest: tasksManifest },
   { appOrigin: 'household', manifest: householdManifest },

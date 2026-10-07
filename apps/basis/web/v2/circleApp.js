@@ -25,6 +25,7 @@ import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
+import { plannedForMe, plannedLines } from '../../src/v2/plannedForMe.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -4143,12 +4144,20 @@ async function showMij() {
   let profile = {};
   let geocodeResult = null;
   let busy = false;
+  // Gepland: what is coming for me, wherever it lives — read here, on this device (no bot); null while it loads
+  let planned = null;
 
   async function load() {
     try {
       const prof = await rawCallSkill('stoop', 'getMyProfile', {}).catch(() => null);
       profile = prof?.entry ?? {};
     } catch { /* keep defaults */ }
+    rerender();
+    try {
+      const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      const r = await plannedForMe({ callSkill: rawCallSkill, me });
+      planned = plannedLines(r.items, { t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: currentLang() });
+    } catch { planned = []; }
     rerender();
   }
 
@@ -4161,6 +4170,7 @@ async function showMij() {
 
   const rerender = () => renderCircleProfile(rootEl, {
     profile, geocodeResult, busy, t,
+    plannedLines: planned,
     // the projected PAGE surface drives the header label (labelKey via t).
     profilePage,
     onSaveProfile: async ({ handle, displayName }) => {

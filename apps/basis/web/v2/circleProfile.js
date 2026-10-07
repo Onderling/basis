@@ -30,6 +30,8 @@ export function renderCircleProfile(container, {
   // Fold-in phase C — open the "Mij → persona's" surface (where offerings live now).
   // Absent ⇒ the pointer renders as plain text (older callers / tests).
   onOpenMij,
+  // Gepland's lines (shared `plannedLines`); null while they load; absent = the shell does not show Gepland
+  plannedLines = undefined,
   onGeocode,
   onSaveLocation,
   onClearLocation,
@@ -99,6 +101,29 @@ export function renderCircleProfile(container, {
     moved.textContent = tr('circle.profile.offerings_moved');
   }
   container.appendChild(moved);
+
+  // ── Gepland: what is coming for me, wherever it lives (the shell hands the lines; null while they load) ─────
+  if (plannedLines !== undefined) {
+    const planned = section(tr('circle.profile.planned_title'));
+    planned.classList.add('cc-profile__planned');
+    if (plannedLines === null || !Array.isArray(plannedLines) || plannedLines.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'cc-profile__planned-empty';
+      p.textContent = tr(plannedLines === null ? 'circle.profile.planned_loading' : 'circle.profile.planned_none');
+      planned.appendChild(p);
+    } else {
+      const ul = document.createElement('ul');
+      ul.className = 'cc-profile__planned-list';
+      for (const line of plannedLines) {
+        const li = document.createElement('li');
+        li.className = 'cc-profile__planned-item';
+        li.textContent = line;
+        ul.appendChild(li);
+      }
+      planned.appendChild(ul);
+    }
+    container.appendChild(planned);
+  }
 
   // ── location ──────────────────────────────────────────────────────────────
   const locSection = section(tr('circle.profile.location'));

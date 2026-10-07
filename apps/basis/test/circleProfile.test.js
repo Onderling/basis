@@ -114,3 +114,18 @@ describe('renderCircleProfile — share my contact (2026-09-19)', () => {
     expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__share-contact')).toBeNull();
   });
 });
+
+describe('renderCircleProfile — Gepland (what is coming for me)', () => {
+  it('while loading says so; with nothing says so; with lines lists them', () => {
+    const loading = renderCircleProfile(document.createElement('div'), { profile: {}, t, plannedLines: null });
+    expect(loading.querySelector('.cc-profile__planned').textContent).toContain('circle.profile.planned_loading');
+    const none = renderCircleProfile(document.createElement('div'), { profile: {}, t, plannedLines: [] });
+    expect(none.querySelector('.cc-profile__planned').textContent).toContain('circle.profile.planned_none');
+    const some = renderCircleProfile(document.createElement('div'), { profile: {}, t, plannedLines: ['do 8 14:00 · tandarts · Huis', 'vr 9 · vuilnis'] });
+    expect([...some.querySelectorAll('.cc-profile__planned-item')].map((li) => li.textContent)).toEqual(['do 8 14:00 · tandarts · Huis', 'vr 9 · vuilnis']);
+  });
+
+  it('a shell that hands no lines paints no section (it does not know Gepland yet)', () => {
+    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__planned')).toBeNull();
+  });
+});

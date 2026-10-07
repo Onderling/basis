@@ -191,7 +191,7 @@ describe('two hosts holding one circle row', () => {
 });
 
 describe('event rows, on a change', () => {
-  const eventRow = { trigger: { event: { kind: 'added', type: 'calendar-event' } }, op: 'announceChange', appOrigin: 'assistant', args: {}, actsAs: 'household', label: 'announce' };
+  const eventRow = { trigger: { event: { kind: 'added', type: 'calendar-event', circleId: 'c1' } }, op: 'announceChange', appOrigin: 'assistant', args: {}, actsAs: 'household', label: 'announce' };
   const appt = { id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-12T12:00:00.000Z', clock: 1 };
 
   it('a change fires the matching rows once, through the same run, with the change in its args', async () => {
@@ -228,7 +228,7 @@ describe('what a fired row writes', () => {
       withOrigin: (origin, fn) => running.run(origin, fn),
       run: async () => { await Promise.resolve(); seen.push(running.getStore() ?? null); return { ok: true }; },
     });
-    const row = await book.intend({ trigger: { event: { kind: 'added', type: 'calendar-event' } }, op: 'announceChange', appOrigin: 'assistant', args: {}, actsAs: 'household' });
+    const row = await book.intend({ trigger: { event: { kind: 'added', type: 'calendar-event', circleId: 'c1' } }, op: 'announceChange', appOrigin: 'assistant', args: {}, actsAs: 'household' });
     await runner.onChange({ circleId: 'c1', before: null, after: { id: 'e1', type: 'calendar-event', clock: 1 } });
     expect(seen).toEqual([{ intention: row.id }]);
     expect(running.getStore(), 'outside the run there is none').toBeUndefined();

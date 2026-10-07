@@ -21,6 +21,7 @@
  *     Event rows have no moments in time; time rows never fire on a change.
  */
 import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
+import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 
 const DAY = 24 * 3_600_000;
 const WEEKDAYS = Object.freeze(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
@@ -144,7 +145,8 @@ export function eventOccurrences({ rows, change, done = new Set() }) {
     const ev = row.trigger?.event;
     if (!ev || typeof ev !== 'object') continue;
     if (ev.type && ev.type !== after.type) continue;
-    if (ev.circleId && ev.circleId !== change.circleId) continue;
+    // a household-level row names its circle; a row that names none is a person's own, over their own scope only
+    if ((ev.circleId ?? OWN_DEVICES_SCOPE) !== change.circleId) continue;
     if (ev.kind === 'added') { if (before) continue; }
     else if (ev.kind === 'changed' || (ev.kind === 'any' && before)) {
       if (!before) continue;

@@ -30,6 +30,7 @@ far end — which is usually the case. Duplicate vocabularies are nearly always 
 | **Circle templates** — the policy axes a new circle starts from | `apps/basis/src/v2/kringTemplates.js` | template seeds, user overrides per key |
 | **Action label maps** — action id → locale key | beside the logic that produces the actions | frozen + a test asserting exact membership |
 | **Item types** | `packages/item-types/` | schema registry |
+| **Reminder rules** — `morning` · `evening-before` · `before:<min>` · `at:<HH:MM>`, and each type's time anchor | `packages/item-types/src/reminderRules.js` (`REMINDER_RULE_KINDS`, `parseReminderRule`, `TIME_ANCHORS`) | `lint-duplicate-vocab`; `reminderRules.test.js` pins the four |
 
 Two quick greps that answer "does this already exist":
 

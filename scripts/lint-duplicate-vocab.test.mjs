@@ -35,6 +35,7 @@ describe('lint-duplicate-vocab', () => {
   it('normalises computed enum keys to their last segment', () => {
     expect(normKey('[RETAIN.AUDIT]')).toBe('audit');
     expect(normKey('short')).toBe('short');
+    expect(normKey("'evening-before'"), 'a quoted key with a hyphen is the word, not its quotes').toBe('evening-before');
     expect(normKey("'chat'")).toBe('chat');
   });
 

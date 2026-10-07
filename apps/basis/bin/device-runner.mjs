@@ -1200,10 +1200,12 @@ if (tgToken || inboxDoor.bridge) {
   if (isFunctionProfile) {
     const reminderTick = createReminderTick({
       sources: () => agent.reminderSources(), users: botUsers, threads, reach, t,
+      // what was said: a done-mark per occurrence on the device log (sealed, kept across restarts)
+      log: deviceLog,
       tz: boxTz,
       settings: reminderSettings,
       // the walk log keeps that a reminder went out (to whom, as the last digits; how many things) — never its words
-      onSent: (e) => walkLog({ kind: 'reminder', ...(e.at ? { ts: e.at } : {}), to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}), ...(Array.isArray(e.what) ? { what: e.what.map((w) => ({ kind: w.kind, id: String(w.id).slice(-6), slot: w.slot })) } : {}) }),
+      onSent: (e) => walkLog({ kind: 'reminder', ...(e.at ? { ts: e.at } : {}), to: String(e.personId).slice(-4), items: e.items, ok: e.ok, ...(e.reason ? { reason: e.reason } : {}), ...(Array.isArray(e.what) ? { what: e.what.map((w) => ({ kind: w.kind, id: String(w.id).slice(-6), slot: w.slot, ...(w.rule ? { rule: w.rule } : {}) })) } : {}) }),
     });
     hostTick.add('reminders', { every: reminderTick.every, run: () => reminderTick.pass() });
     // Planned work: each due row through the door AS its person (the gate, the role, the names apply), once. The switch

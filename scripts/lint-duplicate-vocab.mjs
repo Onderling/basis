@@ -24,6 +24,11 @@ export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
  */
 export const VOCABULARIES = [
   {
+    name: 'reminder-rule-kinds',
+    home: 'packages/item-types/src/reminderRules.js',
+    keys: ['at', 'before', 'evening-before', 'morning'],   // the closed reminder rules: a fifth needs a journey
+  },
+  {
     name: 'retention-classes',
     home: 'packages/item-store/src/entryKinds.js',
     keys: ['audit', 'chat', 'named', 'record', 'short'],   // the RETAIN classes (the home's literal keys — computed-key TABLES over them are references, not copies)
@@ -59,9 +64,9 @@ export function sourceFiles(root = ROOT) {
   return out;
 }
 
-/** Normalise a key token: bare `short` → `short`; computed `[RETAIN.SHORT]` → `short`. */
+/** Normalise a key token: bare `short` → `short`; computed `[RETAIN.SHORT]` → `short`; quoted `'evening-before'` → `evening-before`. */
 export function normKey(raw) {
-  const m = raw.match(/^\[?\s*['"]?([A-Za-z0-9_$.]+)['"]?\s*\]?$/);
+  const m = raw.match(/^\[?\s*['"]?([A-Za-z0-9_$.-]+)['"]?\s*\]?$/);
   if (!m) return raw.toLowerCase();
   const parts = m[1].split('.');
   return parts[parts.length - 1].toLowerCase();

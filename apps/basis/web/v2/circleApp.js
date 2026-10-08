@@ -20,8 +20,7 @@
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
-import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
-import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
+import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../src/v2/companionGrant.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
@@ -113,7 +112,7 @@ import { runConfirmGate } from '../../src/v2/confirmGate.js';
 import { renderConfirmDialog } from './confirmDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -126,6 +125,7 @@ import {
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
+import { ceremonyOutcomeText } from '../../src/v2/ceremonyOutcome.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
@@ -171,7 +171,7 @@ import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
   createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
-import { createFallbackOffer } from '../../src/v2/addressFallback.js';
+import { createFallbackOffer, fallbackOfferStateIo } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/stoop';
 import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 // P1.7 — the VIEWER's own narrowing of the conversation (kinds × people/agents), device-local per
@@ -325,7 +325,7 @@ import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '../../src/v2/paramsManifest.js';
 import { CONNECTION_MANIFESTS } from '../../src/v2/connectionManifests.js';
 import { householdManifest } from '../../../household/manifest.js';
-import { deviceDelegationsOf } from '@onderling/agent-registry';
+import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
@@ -1428,6 +1428,9 @@ let podChatCatchUpShell = null;      // pod-only circles' statement read-back (t
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
 let circleAuthedFetch = null;
 let circleOwnerWebId = null;   // signed-in webid — owner of the ACP grants for sealed circles
+// S6.4 — the active circle's noticeboard reloader, so a stoop:attachment-fetched
+// event (recipient's full bytes arrived) can refresh whatever board is on screen.
+let noticeboardRefreshHook = null;
 
 // ── Phase 5 — circle bot in the circle composer ───────────────────────────────────────────────────
 // Mirrors mobile CircleLauncherScreen on the SHARED engine: createCircleDispatch (gate→interpret→
@@ -1499,6 +1502,8 @@ const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
 // recorded in DECISIONS-FOR-REVIEW. After showing we arm the cooldown (`decline()`), so the offer repeats
 // at most once per cooldown while the problem persists — informative, not nagging.
 const fallbackOffer = createFallbackOffer({
+  // Its memory across restarts: a declined offer stays declined for its cooldown, not until the next reload.
+  io: fallbackOfferStateIo(sealedKeyValue(globalThis.localStorage, { name: 'the fallback offer' })),
   onOffer: () => {
     // One-tap accept: the button flips the setting IN the bubble. The cooldown still arms on showing
     // (`decline()`), so an ignored offer stays quiet for a week; a tapped one clears the evidence instead.
@@ -2315,6 +2320,8 @@ function buildCircleBot(agent) {
     // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
     sealFor: agent.contactSeal?.sealFor ?? null,
     openFor: agent.contactSeal?.openFor ?? null,
+    // a turn to a bot my identity is linked to (`/koppel`) carries this device's statement over it
+    authFor: agent.linkedTurnAuth ?? null,
     // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
     selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
     localActor: LOCAL_ACTOR,
@@ -4472,7 +4479,7 @@ function ensurePagePanel() {
 async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
-  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = [];
+  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
@@ -4493,6 +4500,7 @@ async function showMyData() {
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
   // The replace ceremony: retire every other device in one act, after a restore.
   const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
+  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => showMyData() });
   // "Make this device my primary contact address": announce this device's address in every circle with the
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
@@ -4581,7 +4589,15 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+    // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
+    // rows come from the node itself and the shared projection; the grant is one op through the waist.
+    companions,
+    companionsPending,
+    onOpenCompanionGrant: (node) => loadCompanionGrantPicker({ callSkill: rawCallSkill, node, t }),
+    onGrantCompanion: async (args) => companionGrantText(await rawCallSkill('household', 'grantCompanion', args).catch(() => null), t),
+    onLoadCompanionGrants: (node) => loadCompanionGrantRows({ callSkill: rawCallSkill, node, t }),
+    onRevokeCompanionGrant: async ({ node, to }) => companionRevokeText(await rawCallSkill('household', 'revokeCompanionGrant', { node, to }).catch(() => null), t),
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -4682,6 +4698,10 @@ async function showMyData() {
   // tombstones shown struck — the revoke door acts on the live ones.
   devices = Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
     .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true }));
+  // the nodes this person claimed (their own list; each node keeps its owner itself)
+  companions = Object.values(ownedNodesOf({ properties: profProps?.properties ?? {} }))
+    .map((n) => ({ node: n.address, short: n.label || `${n.address.slice(0, 8)}…` }));
+  companionsPending = pendingRevokeLine({ properties: profProps?.properties ?? {} }, t);
   dataLocation = loc ?? {};
   podStatus = status ?? {};
   // Prefer the real Solid session over the (aspirational) stoop op — read through the waist, so the
@@ -5297,7 +5317,14 @@ function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
 function showReplaceDeviceFlow({ onClosed } = {}) {
   return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
 }
-function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) {
+/** Claim a companion node: paste the line it printed; this device signs the claim. */
+function showClaimCompanionFlow({ onClosed } = {}) {
+  return showDeviceCeremonyFlow({
+    flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed,
+    inputName: 'claim', placeholderKey: 'circle.companionClaim.placeholder', rows: 2,
+  });
+}
+function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3 } = {}) {
   // THE DEVICE CEREMONIES, as their declared flows: revoke ONE device (the My-data device row that
   // opened this names it) or REPLACE — retire every other device. Both run on THIS device; the phrase
   // is the proof; the one pause paints only the phrase. The fold does the enforcement everywhere.
@@ -5320,8 +5347,8 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
       p.textContent = t(`circle.${keyPrefix}.body`);
       card.appendChild(p);
       const input = document.createElement('textarea');
-      input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false;
-      input.placeholder = t('circle.enroll.mnemonic_placeholder');
+      input.rows = rows; input.autocomplete = 'off'; input.spellcheck = false;
+      input.placeholder = t(placeholderKey);
       input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
       card.appendChild(input);
       const go = document.createElement('button');
@@ -5329,7 +5356,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
       go.className = 'cc-btn cc-btn--primary';
       go.textContent = t(`circle.${keyPrefix}.submit`);
       go.addEventListener('click', () => {
-        runner.resume(FLOW, inst, { input: { mnemonic: input.value, ...(deviceId ? { deviceId } : {}) } })
+        runner.resume(FLOW, inst, { input: { [inputName]: input.value, ...(deviceId ? { deviceId } : {}) } })
           .then((r) => { inst = r; paint(); }).catch(() => done());
       });
       card.appendChild(go);
@@ -5345,11 +5372,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
 
     const outcome = inst?.steps?.ceremony?.outcome;
     const msg = document.createElement('p');
-    msg.textContent = outcome === 'ok'
-      ? t(`circle.${keyPrefix}.done`)
-      : (outcome === 'wrong-phrase' || outcome === 'invalid-phrase')
-        ? t('circle.enroll.invalid_phrase')
-        : (inst?.steps?.ceremony?.out?.error ?? t(`circle.${keyPrefix}.failed`));
+    msg.textContent = ceremonyOutcomeText({ keyPrefix, outcome, out: inst?.steps?.ceremony?.out, t });
     card.appendChild(msg);
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -5357,7 +5380,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
     btn.textContent = outcome === 'ok' ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
       if (outcome === 'ok') return done();
-      close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed });
+      close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
     });
     card.appendChild(btn);
     if (outcome !== 'ok') {
@@ -6315,6 +6338,8 @@ function showCircle(id, circle, policy) {
   }
   const shortWebid = (w) => (typeof w === 'string' && w ? (w.split(/[/#]/).filter(Boolean).pop() || w).slice(0, 18) : '');
 
+  // S6.4 — point the global attachment-fetched hook at THIS circle's reloader.
+  noticeboardRefreshHook = loadNoticeboard;
 
   async function loadNoticeboard() {
     try {
@@ -7834,6 +7859,8 @@ async function showAdmin(id) {
     resolvePicture: circlePictureResolver(id),
     viewerWebid: myWebid,
     onBack: () => showDetail(id),
+    // A member's own row offers LEAVING (the shared decision): the same leave the circle's tile menu runs, with its confirm.
+    onLeave: () => onLeaveCircle(id, circlesCache.find((c) => c?.id === id) ?? { id }),
     // Make a member an admin, or step an admin back down. The op's `ui.confirm` declaration is what
     // puts a confirmation in front of it (the SAME gate the chat path runs — `runConfirmGate` with the
     // web dialog as presenter), carrying the consequence THIS change has: an ordinary demotion, a
@@ -7938,6 +7965,9 @@ async function showSettings(id) {
   // wired setPolicy enactor) the apply-on-approval; approvals cross devices because the events fan.
   let myWebid = '';
   try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  // The roster, for one question: may THIS viewer's Save count? (an admin's statement is folded, a member's dropped)
+  let settingsRoster = [];
+  try { const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
@@ -7983,6 +8013,7 @@ async function showSettings(id) {
   const settingsPage = pageForOp(basisManifest, 'settings');
 
   const rerender = () => renderCircleSettings(rootEl, {
+    saveControl: policySaveControlFor({ members: settingsRoster, myRef: myWebid }),
     policy: working,
     t,
     // Display theme — the SAME per-device preference "Mijn gegevens" shows, surfaced here too because this
@@ -8398,6 +8429,10 @@ async function boot() {
         .then((r) => { if (!r?.ok && r?.error) console.warn('[circleApp] attachStoopPod:', r.error); })
         .catch(() => { /* best-effort; stays local-first */ });
     }
+    // S6.4 — refresh the on-screen noticeboard when a recipient's requested
+    // attachment bytes land (stoop:attachment-fetched). Subscribed once; the hook
+    // points at the active circle's loader.
+    try { agent.onStoopEvent?.('stoop:attachment-fetched', () => { try { noticeboardRefreshHook?.(); } catch { /* */ } }); } catch { /* */ }
     if (typeof agent?.callSkill === 'function') {
       // Calendar cross-peer fan-out — wrap the bare callSkill so a successful
       // calendar dispatch (schedule/RSVP) fans its invite/RSVP envelopes out
@@ -8622,13 +8657,13 @@ async function boot() {
           ? agent.sendPeerMessage(addr, env)
           : Promise.reject(new Error('agent.sendPeerMessage unavailable'));
 
-      // A bot's `/koppel` link (the identity link): the sheet it opens, told when the bot's statement lands
+      // A bot's `/koppel` link (the identity link): the sheet it opens, told when the bot's statement lands — the
+      // statement itself rides the lane table (`agent.identityLinks`), which makes the bot a contact in the book
       let identityLinkSheet = null;
-      const identityLinkViewFor = (link) => createIdentityLinkView({ link, personKey: agent.identity?.chat?.pubKey ?? agent.pubKey, signOffer: (o) => agent.signLinkOffer(o), storage: window.localStorage });
+      const identityLinkViewFor = (link) => agent.identityLinks?.view(link) ?? { bot: { ok: false } };
+      agent.identityLinks?.onLinked?.((e) => { if (!e?.unlinked) identityLinkSheet?.linked(); });
       const peerMessageRouter = makePeerRouter({
         handlers: {
-          // the household bot's statement that this person's Basis identity is linked to their row there (or unlinked)
-          [IDENTITY_LINK_SUBTYPE]: (from, payload) => { if (identityLinkViewFor('').received(from, payload) && !payload?.unlinked) identityLinkSheet?.linked(); },
           // The five signed lanes and the personal ones, from the ONE table every shell builds
           // (`buildCircleLanes`). What stays below is what only THIS shell can answer: bubbles,
           // wizard stashes, the nearby room, and the threads it paints.

@@ -167,6 +167,7 @@ import { GroupAuthVerifier }                 from './GroupAuthVerifier.js';
 import { PushTokenRegistry }                 from './push/PushTokenRegistry.js';
 import { envelopeSuppressesWake }            from './push/wakePayload.js';
 import { mountBlobGate }                     from './blobGateMount.js';
+import { mountFeedForward, createFeedSeat }  from './feedForward.js';
 import { logHop }                            from './verbose.js';
 
 const DEFAULT_PORT             = 8787;
@@ -304,6 +305,10 @@ const MIME = {
  *   env wiring).  When absent, NOTHING changes: no routes are added and
  *   the HTTP handler behaves byte-identically to a relay without this
  *   feature.
+ * @param {boolean|object} [opts.feeds=false]
+ *   Serve a person's agenda link, `GET /feed/<node>/<id>.<k>.ics`, by forwarding it to that node over its live
+ *   session (`feed.serve`) and passing the answer on — holding nothing (`./feedForward.js`). `true`, or
+ *   `{ timeoutMs?, maxInFlight?, maxPerNode?, refusedTtlMs?, missFloorMs? }`. Off ⇒ no route, no seat; the relay is byte-identical.
  * @returns {Promise<{
  *   httpServer: import('node:http').Server | import('node:https').Server,
  *   wss: WebSocketServer,
@@ -347,6 +352,8 @@ export async function startRelay(opts = {}) {
     // Peer discovery — the connected-address list, broadcast on every connect/disconnect and served on
     // request. OFF by default (see the header); an operator turns it on knowingly and discloses it.
     peerDiscovery             = false,
+    // A person's agenda link, forwarded to the node that holds it (off by default — the boot doors turn it on).
+    feeds                     = false,
   } = opts;
 
   const effectiveQueueCapTotal = queueCapTotal ?? (queueCap * DEFAULT_QUEUE_CAP_RATIO);
@@ -611,6 +618,31 @@ export async function startRelay(opts = {}) {
       })
       .catch((err) => logLine(`[relay] push-threw   ${shortId(address)}  ${err?.message ?? err}`));
   };
+
+  // ── The seat: the relay's own agent, asking a node for a link's file (`./feedForward.js`) ──────────
+  // Its wire is this routing table, live sockets only: what it sends is never held for an offline address and never
+  // wakes anyone, and nothing it sends or receives is logged. Off unless `feeds` is set.
+  const feedSeat = feeds
+    ? await createFeedSeat({
+      ...(feeds && typeof feeds === 'object' && feeds.refusedTtlMs != null ? { refusedTtlMs: feeds.refusedTtlMs } : {}),
+      deliver: (to, envelope) => {
+        const socket = clients.get(to);
+        if (socket && socket.readyState === 1) { try { socket.send(ForwardQueue.messageFrame(envelope)); } catch { /* raced a close */ } }
+      },
+    })
+    : null;
+  if (feedSeat) {
+    const o = (feeds && typeof feeds === 'object') ? feeds : {};
+    mountFeedForward(httpServer, {
+      serve: (node, link) => feedSeat.serve(node, link, o.timeoutMs != null ? { timeoutMs: o.timeoutMs } : {}),
+      isPresent: (node) => clients.get(node)?.readyState === 1,
+      isRefused: (node) => feedSeat.isRefused(node),
+      ...(o.timeoutMs != null ? { timeoutMs: o.timeoutMs } : {}),
+      ...(o.maxInFlight != null ? { maxInFlight: o.maxInFlight } : {}),
+      ...(o.maxPerNode != null ? { maxPerNode: o.maxPerNode } : {}),
+      ...(o.missFloorMs != null ? { missFloorMs: o.missFloorMs } : {}),
+    });
+  }
 
   wss.on('connection', (socket) => {
     // G13 — ONE socket may own SEVERAL addresses: a device presents a different address per circle, and
@@ -885,6 +917,10 @@ export async function startRelay(opts = {}) {
         // limits) at `refuseUnboundSender` above.
         if (refuseUnboundSender(envelope, 'send')) return;
 
+        // An answer for the relay's own seat (a node answering a link): handed to it, and to nothing else — not the
+        // log, not the hold, not a quota.
+        if (feedSeat && to === feedSeat.address) { feedSeat.receive(envelope); return; }
+
         // Phase 2A — enforce per-group msgsPerDay quota when the sender
         // is registered to a group with a quota.  Open-mode senders and
         // group-less registrations are unaffected.
@@ -1105,6 +1141,7 @@ export async function startRelay(opts = {}) {
 
   async function stop() {
     clearInterval(evictTimer);
+    if (feedSeat) await feedSeat.stop();
     for (const [, s] of clients) { try { s.close(); } catch {} }
     clients.clear();
     await new Promise(r => wss.close(() => r()));
@@ -1117,6 +1154,8 @@ export async function startRelay(opts = {}) {
     // Only present when `blobGate` was configured — the no-blobGate return
     // shape stays exactly as before.
     ...(blobGateMount ? { blobGate: blobGateMount } : {}),
+    // Only present when `feeds` was configured: the seat's address (the key a node sees the relay's asks come from).
+    ...(feedSeat ? { feeds: { seatAddress: feedSeat.address } } : {}),
   };
 }
 

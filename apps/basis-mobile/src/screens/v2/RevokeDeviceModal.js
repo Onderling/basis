@@ -10,15 +10,17 @@ import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { ceremonyOutcomeText } from '../../../../basis/src/v2/ceremonyOutcome.js';
 
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
 /**
- * One modal for both device ceremonies (they share a shape — the phrase is the proof, one step, one
- * outcome): `flowId: 'revoke-device'` retires ONE device named by `deviceId`; `flowId: 'replace-device'`
- * retires every other device (the restore wizard's "this is my phone now"). `keyPrefix` picks the copy.
+ * One modal for the one-step device ceremonies (they share a shape — one thing typed, one step, one outcome):
+ * `flowId: 'revoke-device'` retires ONE device named by `deviceId`; `flowId: 'replace-device'` retires every other
+ * device (the restore wizard's "this is my phone now"); `flowId: 'claim-companion'` makes the person the owner of a
+ * companion node (`inputName: 'claim'`, the line the node prints). `keyPrefix` picks the copy.
  */
-export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClose, flowId = 'revoke-device', keyPrefix = 'revoke' }) {
+export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClose, flowId = 'revoke-device', keyPrefix = 'revoke', inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder' }) {
   const FLOW = householdManifest.flows.find((f) => f.id === flowId);
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -45,7 +47,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
   const submit = () => {
     const runner = runnerRef.current;
     if (!runner || !inst) return;
-    runner.resume(FLOW, inst, { input: { mnemonic: phrase, ...(deviceId ? { deviceId } : {}) } })
+    runner.resume(FLOW, inst, { input: { [inputName]: phrase, ...(deviceId ? { deviceId } : {}) } })
       .then((r) => setInst(r))
       .catch(() => finish());
   };
@@ -60,7 +62,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
               <Text style={styles.body}>{t(`circle.${keyPrefix}.body`)}</Text>
               <TextInput
                 style={styles.input}
-                placeholder={t('circle.enroll.mnemonic_placeholder')}
+                placeholder={t(placeholderKey)}
                 placeholderTextColor={theme.color.inkSoft}
                 multiline autoCapitalize="none" autoCorrect={false} autoComplete="off"
                 value={phrase} onChangeText={setPhrase}
@@ -78,11 +80,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
           ) : view ? (
             <View>
               <Text style={styles.body}>
-                {outcome === 'ok'
-                  ? t(`circle.${keyPrefix}.done`)
-                  : (outcome === 'wrong-phrase' || outcome === 'invalid-phrase')
-                    ? t('circle.enroll.invalid_phrase')
-                    : (inst?.steps?.ceremony?.out?.error ?? t(`circle.${keyPrefix}.failed`))}
+                {ceremonyOutcomeText({ keyPrefix, outcome, out: inst?.steps?.ceremony?.out, t })}
               </Text>
               <View style={styles.row}>
                 {outcome !== 'ok' ? (

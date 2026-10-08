@@ -4405,6 +4405,78 @@
       "text": "Zeg welke afspraak of welk klusje, en wanneer — bijvoorbeeld: herinner me een uur van tevoren aan de tandarts.",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
+    "remind_everyone_set": {
+      "text": "Ik herinner iedereen {{when}}: {{text}}.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_today": {
+      "text": "vandaag om {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_tomorrow": {
+      "text": "morgen om {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_usage": {
+      "text": "Zeg hoe laat en wat — bijvoorbeeld: herinner iedereen om 19:45: eten.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_failed": {
+      "text": "Dat lukte niet: de herinnering voor iedereen is niet bewaard.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_me_at_set": {
+      "text": "Ik herinner je {{when}}: {{text}}. Weg ermee: /schrap.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_at_usage": {
+      "text": "Zeg wanneer en wat — bijvoorbeeld: herinner me over 10 minuten dat ik de gootsteen ontstop, of: herinner me morgen om 8:00: vuilnis.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_not_yours": {
+      "text": "Ik herinner alleen jou zelf, of iedereen in huis — nooit iemand anders namens jou.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_at_day": {
+      "text": "{{day}} om {{time}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "announce_mine": {
+      "text": "Herinnering: {{title}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_me": {
+      "text": "herinnering \"{{text}}\" (weg: /schrap {{n}})",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_everyone": {
+      "text": "herinnering voor iedereen: \"{{text}}\"",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_done": {
+      "text": "Weg: de herinnering \"{{text}}\".",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_none": {
+      "text": "Je hebt geen eigen herinneringen staan.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_usage": {
+      "text": "Welke? {{items}} — /schrap met het nummer of een woord ervan.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_not_found": {
+      "text": "Geen eigen herinnering met \"{{which}}\". Je hebt: {{items}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_which": {
+      "text": "Welke bedoel je? {{items}} — /schrap met het nummer.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "announce_say": {
+      "text": "Herinnering voor iedereen: {{title}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
     "overview_on": {
       "text": "Het weekoverzicht staat aan (zondag 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4470,12 +4542,36 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
+      "text": "Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
       "text": "Herinneringen staan voor dit huishouden uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_rule": {
+      "text": "Herinneringen: {{rules}}. Anders voor jou: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_morning": {
+      "text": "om {{time}} alles van die dag (klusjes en afspraken)",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_evening": {
+      "text": "de avond ervoor om {{time}} bij een afspraak vóór {{until}}",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_before": {
+      "text": "{{n}} minuten voor iets met een tijd",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_at": {
+      "text": "om {{time}} op de dag zelf",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_none": {
+      "text": "Herinneringen: het huishouden stuurt er geen. Zelf aanzetten: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
     },
     "welcome_overview": {
       "text": "Wil je elke zondag om 18:00 een weekoverzicht? Zet het aan met /overzicht aan.",
@@ -4653,6 +4749,10 @@
     "agenda_link_none_here": "Dit huishouden heeft geen agenda-link.",
     "agenda_link_failed": "De agenda-link kon ik nu niet maken. Probeer het straks nog eens.",
     "agenda_calendar_name": "Huishouden",
+    "agenda_grant_ended": {
+      "text": "De companion geeft me geen toegang meer tot de agenda-bestanden (de toegang is ingetrokken). De agenda-links zijn uit — tot de eigenaar van de companion opnieuw toegang geeft.",
+      "doc": "To the bot's admin, once, when the household companion refuses the token the bot presented (its owner revoked the grant). Not repeated until a new grant arrives."
+    },
     "menu_head": "Je instellingen (tik om te wijzigen):",
     "menu_household": "Voor het hele huishouden:",
     "menu_on_screen": "Je instellingen staan op je gekoppelde scherm. Een ander scherm koppelen: /scherm.",
@@ -4709,7 +4809,6 @@
     "screen_confirm_none": "Geen van deze",
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
     "reminder_chore_soon": "Zo meteen: {{text}}, om {{time}}.",
-    "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, {{lead}} minuten van tevoren, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
     "value_lead_min": "{{n}} minuten",
     "value_lead_off": "geen",
@@ -4790,8 +4889,9 @@
           "assistant-forget": "ons gesprek nu vergeten (wat je op een lijst zette, blijft)",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",
           "assistant-circles": "de kringen waar de bot in zit",
-          "remindMe": "een eigen herinnering voor één afspraak of klusje",
-          "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)"
+          "remindMe": "een eigen herinnering: op een tijd (\"over 10 minuten: …\"), voor een afspraak of klusje, of één voor iedereen",
+          "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)",
+          "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)"
         }
       }
     },
@@ -4834,7 +4934,7 @@
     "export_key_mismatch": "De twee wachtwoorden zijn niet gelijk. Niets gevraagd, niets veranderd.",
     "link_open_app": "Open deze link in je Basis-app om je identiteit aan deze bot te koppelen: {{link}}\nJe app toont daarna een regel om hier te plakken.",
     "link_not_private": "Dat telt alleen in je eigen chat met de bot.",
-    "link_question": "Een Basis-app wil zich aan jou koppelen: berichten van die app tellen dan als jou, en de bot kent je Basis-identiteit. Kies de code die je app toont.",
+    "link_question": "Een Basis-app wil zich aan jou koppelen: berichten van je Basis-apps (elk apparaat van je, behalve een dat je intrekt) tellen dan als jou, en de bot kent je Basis-identiteit. Kies de code die je app toont.",
     "kring_usage": "Plak de uitnodiging van een kring achter /kring. Uit een kring: /kring los <naam>.",
     "kring_question": "De bot gaat in de kring “{{name}}”.\nRegels: {{rules}}\n\nDe bot bewaart dan de gegevens van die kring op dit apparaat, en leden van die kring kunnen hem vragen stellen. De kring ziet dat het jouw bot is: hij heet daar @{{handle}}. Doen? (/kring ja {{id}} of /kring nee {{id}})",
     "kring_no_rules": "geen regels gezet",
@@ -4853,13 +4953,17 @@
     "kringen_none": "De bot zit in geen enkele kring.",
     "kringen_list": "De bot zit in:\n{{list}}",
     "kring_not_here": "Dat kan niet in een kring: herinneringen, het weekoverzicht en je instellingen regel je in je eigen gesprek met de bot.",
-    "link_already": "Deze Basis-app is al aan jou gekoppeld.",
+    "link_already": "Deze Basis-identiteit is al aan jou gekoppeld.",
     "link_asked": "Kies hieronder de code die je app toont.",
     "link_another_bot": "Die koppelregel is voor een andere bot. Niets gevraagd.",
     "link_key_taken": "Die Basis-identiteit hoort al bij iemand anders hier. Niets gevraagd.",
-    "link_row_has_key": "Je bent al aan een andere Basis-app gekoppeld. Gebruik eerst /ontkoppel.",
+    "link_row_has_key": "Je bent al aan een andere Basis-identiteit gekoppeld. Gebruik eerst /ontkoppel.",
     "link_not_an_offer": "Dat is geen koppelregel uit je Basis-app.",
-    "link_done": "Gekoppeld: berichten van je Basis-app tellen nu als jou. /ontkoppel maakt het ongedaan.",
+    "link_revoked": "Die koppelregel komt van een apparaat dat je hebt ingetrokken. Maak er een op een ander apparaat.",
+    "link_stale": "Die koppelregel is te oud (of een klok staat verkeerd). Maak een nieuwe in de app.",
+    "companion_set": "Je companion staat ingesteld: agenda-links komen daarvandaan zodra je me de agenda-bestanden daar hebt gegeven.",
+    "companion_not_one": "Dat is geen kaartje van een companion (er staat niet op waar agenda-links vandaan komen).",
+    "link_done": "Gekoppeld: berichten van je Basis-apps tellen nu als jou; een apparaat dat je in de app intrekt telt niet meer. /ontkoppel maakt het ongedaan.",
     "link_declined": "Niet gekoppeld.",
     "link_nothing": "Er wacht geen koppeling op een code.",
     "link_failed": "Koppelen lukte niet.",
@@ -4872,6 +4976,10 @@
     }
   },
   "op": {
+    "admin_only": {
+      "text": "Alleen een beheerder van deze kring kan dit.",
+      "doc": "A ⋯ menu entry reserved for the circle's admins, shown greyed to a member with this sentence beside it (invite keeps its own, more specific one). Names the role, never the people who hold it."
+    },
     "not_in_this_circle": {
       "text": "Dat kan niet in deze kring — die app doet hier niet mee. Een beheerder kan dat aanzetten in de instellingen.",
       "doc": "Said when a person invokes an op whose APP this circle does not compose. It used to answer \"I couldn't turn that into an action\", which blames the person for the circle's configuration. Names what is wrong AND who can change it, because a refusal a person cannot act on is only slightly better than silence."
@@ -6908,6 +7016,57 @@
     "done": "Apparaat ingetrokken. Elke kring weigert nu zijn sleutels.",
     "failed": "Intrekken is mislukt."
   },
+  "companionClaim": {
+    "title": "Een companion claimen",
+    "ceremony": "Companion wordt geclaimd",
+    "body": "Plak de regel die je companion in zijn log toont, na 'Claim:' (code@adres). Hij wordt van jou: elk apparaat van je kan hem beheren, een ingetrokken apparaat niet.",
+    "placeholder": "ABCD-EFGH@…",
+    "submit": "Claimen",
+    "button": "Companion claimen",
+    "done": "Deze companion is nu van jou. Elk apparaat van je kan hem beheren.",
+    "failed": "Claimen lukte niet.",
+    "outcome_bad_claim": "Dat is geen claim-regel. Kopieer alles na 'Claim:' — de code, de @ en het adres.",
+    "outcome_no_device_key": "Dit apparaat heeft nog geen eigen apparaatsleutel. Open de app opnieuw en probeer het nog eens.",
+    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met de relay verbonden?",
+    "outcome_already_owned": "Deze companion heeft al een eigenaar.",
+    "outcome_invalid_code": "De code klopt niet of is verlopen. Haal de nieuwste regel uit het log (elke tien minuten een nieuwe).",
+    "outcome_stale": "De klok van dit apparaat loopt meer dan vijf minuten anders dan die van de companion. Zet de tijd van je apparaat goed en probeer het opnieuw.",
+    "outcome_unsigned": "De companion nam de ondertekening van dit apparaat niet aan."
+  },
+  "companionGrant": {
+    "nodes": "Mijn agents",
+    "node_row": "Companion {{short}}",
+    "give": "Toegang geven",
+    "to_label": "Aan wie",
+    "to_none": "Nog niemand om toegang aan te geven. Voeg eerst de bot toe als contact (zijn kaartje), of koppel hem met /koppel.",
+    "may_do": "Mag:",
+    "loading": "Even vragen wat deze companion kan geven…",
+    "confirm": "Toegang geven",
+    "nothing_ticked": "Vink aan wat het mag.",
+    "family_agenda_files": "agenda-bestanden plaatsen",
+    "done": "Toegang gegeven. De companion stuurt het door; het geldt tot je het intrekt (na een jaar opnieuw aanvinken).",
+    "failed": "Toegang geven lukte niet.",
+    "outcome_not_owned": "Deze companion staat niet op jouw naam. Claim hem eerst.",
+    "outcome_no_device_key": "Dit apparaat heeft nog geen eigen apparaatsleutel. Open de app opnieuw en probeer het nog eens.",
+    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met de relay verbonden?",
+    "outcome_forbidden": "De companion nam de ondertekening van dit apparaat niet aan.",
+    "outcome_stale": "De klok van dit apparaat loopt meer dan vijf minuten anders dan die van de companion. Zet de tijd van je apparaat goed en probeer het opnieuw.",
+    "outcome_unknown_family": "Dat kan deze companion niet geven.",
+    "outcome_bad_target": "Aan die ontvanger kan de companion geen toegang geven.",
+    "outcome_bad_args": "Kies aan wie, en vink aan wat het mag.",
+    "outcome_gate_off": "Deze companion draait zonder toegangscontrole en geeft dus geen toegang.",
+    "outcome_not_bot_admin": "Alleen de beheerder van de bot kan hem je companion geven. Vraag die het vanuit zijn eigen app te doen.",
+    "outcome_bot_unreachable": "De bot antwoordt niet. Draait hij, en is hij met de relay verbonden?",
+    "outcome_bot_refused": "De bot nam je companion niet aan. Koppel je Basis-app opnieuw aan hem (/koppel) en probeer het nog eens.",
+    "granted": "Toegang gegeven aan",
+    "may": "mag: {{what}}",
+    "revoke": "intrekken",
+    "revoked": "Ingetrokken. Wat het hier nog probeert, weigert de companion.",
+    "pending": {
+      "text": "Intrekken onderweg bij {{count}} companion(s)",
+      "doc": "My data → Mijn agents: revokes of a deleted contact that did not reach a node yet (it was away); told when it answers again."
+    }
+  },
   "wizard": {
     "recovery": {
       "after_restore_hint": {
@@ -8279,12 +8438,17 @@
   "identityLink": {
     "title": "Koppel je Basis aan een bot",
     "which_bot": "Deze link komt van de bot {{bot}}.",
-    "means": "Na het koppelen tellen berichten van deze app als jij bij die bot, en kent de bot je Basis-identiteit. Er wordt niets anders gedeeld.",
+    "means": "Na het koppelen tellen berichten van je Basis-apps als jou bij die bot (elk apparaat van je; een dat je intrekt telt niet meer), en kent de bot je Basis-identiteit. Verder wordt niets gedeeld. De bot staat daarna bij je contacten.",
     "make": "Maak de koppelregel",
     "paste_this": "Plak deze regel in je eigen chat met {{bot}}:",
     "copy": "Kopieer",
+    "share": "Delen",
     "code": "De bot vraagt daarna welke code je app toont. Kies deze:",
     "waiting": "Wachten op de bot…",
+    "no_device_key": "Dit apparaat kan nog geen koppelregel maken (het heeft nog geen eigen apparaatsleutel). Open de app opnieuw en probeer het nog eens.",
+    "paste_link": "Plak de link die de bot je stuurde (begint met https:// en bevat #koppel-bot=).",
+    "not_a_link": "Dat is geen link uit /koppel van een bot.",
+    "open": "Een bot koppelen",
     "linked": "Gekoppeld aan {{bot}}. In de chat zegt /ontkoppel het weer op.",
     "close": "Sluiten"
   },

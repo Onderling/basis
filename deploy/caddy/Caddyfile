@@ -35,19 +35,26 @@
 # SAME public domain under `/manage` — a separate `handle` so it routes to the
 # companion (its manage HTTP port, internal 8790) while everything else falls
 # through to the relay. `handle` blocks are mutually exclusive + matched in order.
-# Requires the companion booted with COMPANION_MANAGE_OWNER_PUBKEY +
-# COMPANION_MANAGE_HTTP_PORT=8790 + COMPANION_MANAGE_HTTP_HOST=0.0.0.0 (the
-# docker-compose.tls.yml overlay wires that when you set the owner pubkey).
+# Requires the companion booted with COMPANION_MANAGE_HTTP_PORT=8790 +
+# COMPANION_MANAGE_HTTP_HOST=0.0.0.0 (the docker-compose.tls.yml overlay wires that).
+# Its owner claims it with the code in its log.
 {$RELAY_DOMAIN} {
 	handle /manage* {
 		reverse_proxy companion:8790
 	}
-	# a person's agenda link (`/feed/<id>.<k>.ics`): the companion's owner (a household bot) puts the sealed file, the
-	# companion opens it with the key the link carries. The path IS the key: this site block keeps no access log (no
-	# `log` directive) — if one is ever added, `log_skip` must stay in this handle (checked by the companion's tests).
+	# a person's agenda link. The companion's owner (a household bot) puts the sealed file; a link opens it with the key
+	# it carries. Two forms, while the companion moves off this box to the household's tablet:
+	#   /feed/<node>/<id>.<k>.ics → the RELAY, which forwards it to that node over its live session and holds nothing;
+	#   /feed/<id>.<k>.ics        → the companion on this box, which opens it itself (until it moves; then 404).
+	# The path IS the key: this site block keeps no access log (no `log` directive) — if one is ever added, `log_skip`
+	# must stay in this handle, which covers both forms (checked by the companion's tests).
 	handle /feed/* {
 		log_skip
-		reverse_proxy companion:8790
+		@viaRelay path_regexp ^/feed/[A-Za-z0-9_-]{43}/[^/]+$
+		route {
+			reverse_proxy @viaRelay relay:8787
+			reverse_proxy companion:8790
+		}
 	}
 	handle {
 		reverse_proxy relay:8787

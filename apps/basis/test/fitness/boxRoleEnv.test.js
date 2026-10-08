@@ -37,6 +37,10 @@ describe('the assistant container\'s environment', () => {
     expect(missing).toEqual([]);
   });
 
+  it('a household bot\'s companion is never configured: its admin hands it over from their app (no seeded card)', () => {
+    expect(readByRunner.has('ONDERLING_SEEDED_CONTACT_CARD')).toBe(false);
+  });
+
   it('every variable the role passes is read — by the runner, or where the list says', () => {
     const unread = [...passed].filter((v) => !readByRunner.has(v) && !READ_ELSEWHERE[v]);
     expect(unread).toEqual([]);

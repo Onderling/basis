@@ -312,6 +312,18 @@ export class MemberMap extends Emitter {
       // A message to a contact rides these before any kring's relay; two people who share no kring
       // have no other route. The same whitelist lesson as `peerAddr` above: named here or dropped.
       points:      Array.isArray(m.points) ? m.points.filter((u) => typeof u === 'string' && u) : [],
+      // serves: for a NODE (a household's companion), the public https address its agenda links are served at — from
+      // its card. A household bot builds a person's link from it (`feedCompanion.js`). Same whitelist lesson.
+      serves:      (typeof m.serves === 'string' && /^https?:\/\/[^\s]+$/.test(m.serves)) ? m.serves : null,
+      // The identity link (`/koppel`), one field per side — the same whitelist lesson as `serves`: named here or dropped.
+      //   linkedRoot: on a HOUSEHOLD BOT's row for a person admitted through a keyless door — the owner ROOT their Basis
+      //     identity is linked to. A turn from their app is theirs when a device statement chains to it.
+      //   linkedRow: on a PERSON's row for a household bot — the row their identity is linked to there. It marks the bot
+      //     as one their app speaks to as them (its turns carry a device statement, a device revoke reaches it).
+      linkedRoot:  (typeof m.linkedRoot === 'string' && m.linkedRoot) ? m.linkedRoot : null,
+      linkedRow:   (typeof m.linkedRow === 'string' && m.linkedRow) ? m.linkedRow : null,
+      //   linkedAt: when `linkedRow` last changed (linked or unlinked) — a person's devices take the newer one.
+      linkedAt:    Number.isFinite(m.linkedAt) ? m.linkedAt : null,
       // personKey: the contact's CURRENT rotating person key `{version, pubKey, linkKeyPub?}` — from their card, or a
       // pulled chain (2026-09-16). What a direct message to them is sealed to; `linkKeyPub` is the PINNED public half
       // of the key that vouches for their rotations (never replaced once set). Same whitelist lesson: named here or dropped.

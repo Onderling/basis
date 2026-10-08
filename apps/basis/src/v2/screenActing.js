@@ -28,10 +28,16 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.assistant-forget',
   // …and the household in their own app: an invite to their key, asked for in the private chat
   'assistant.assistant-inapp',
+  // the household's companion is handed over from the admin's own app (a device statement over the card), never a screen
+  'assistant.assistant-companion',
   // the planned Sunday overview is sent by the host's runner, as the person whose row it is — not a button
   'assistant.sendWeekOverview',
   // …and what a change tells others is the host's own act, as the household — never a person's button
   'assistant.announceChange',
+  // a greeting is a line typed in the chat, answered there — not a button
+  'assistant.assistant-hello',
+  // a reminder a person set is said by the host's runner, as them, at its moment — not a button
+  'assistant.sayReminder',
 ]);
 
 /**

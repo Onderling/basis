@@ -196,4 +196,74 @@ describe('renderCircleMyData', () => {
     el.querySelector('.cc-mydata__back').click();
     expect(onBack).toHaveBeenCalled();
   });
+
+  it('my agents: a row per owned node; giving access asks the node, picks who, ticks what, and says how it ended', async () => {
+    const opened = []; const granted = [];
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }],
+      onOpenCompanionGrant: async (node) => { opened.push(node); return { ok: true, targets: [{ key: 'B'.repeat(43), label: 'Huishoudbot' }], choices: [{ id: 'agenda-files', label: 'agenda-bestanden plaatsen' }] }; },
+      onGrantCompanion: async (args) => { granted.push(args); return 'gegeven'; },
+    });
+    expect(el.querySelector('.cc-mydata__companion-name').textContent).toContain('NNNNNNNN');
+    el.querySelector('.cc-mydata__companion-give').click();
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(opened).toEqual(['N'.repeat(43)]);
+    expect([...el.querySelectorAll('.cc-mydata__companion-to option')].map((o) => o.textContent)).toEqual(['Huishoudbot']);
+    // nothing ticked: nothing granted
+    el.querySelector('.cc-mydata__companion-confirm').click();
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(granted).toEqual([]);
+    el.querySelector('.cc-mydata__companion-family').checked = true;
+    el.querySelector('.cc-mydata__companion-confirm').click();
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(granted).toEqual([{ node: 'N'.repeat(43), to: 'B'.repeat(43), families: ['agenda-files'] }]);
+    expect(el.querySelector('.cc-mydata__companion-note').textContent).toBe('gegeven');
+  });
+
+  it('my agents: a node that cannot be asked says why; no one to grant to says how to add the bot', async () => {
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'a' }, { node: 'M'.repeat(43), short: 'b' }],
+      onOpenCompanionGrant: async (node) => (node.startsWith('N') ? { ok: false, message: 'antwoordt niet' } : { ok: true, targets: [], choices: [] }),
+      onGrantCompanion: async () => '',
+    });
+    const [a, b] = el.querySelectorAll('.cc-mydata__companion-give');
+    a.click(); b.click();
+    await new Promise((r) => { setTimeout(r, 0); });
+    const notes = [...el.querySelectorAll('.cc-mydata__companion-note')].map((n) => n.textContent);
+    expect(notes).toEqual(['antwoordt niet', 'circle.companionGrant.to_none']);
+    expect(renderCircleMyData(document.createElement('div'), { t }).querySelector('.cc-mydata__companion')).toBeNull();
+  });
+
+  it('my agents: one line per agent the node granted — what it may, and "intrekken", which revokes and reads again', async () => {
+    let held = [{ to: 'B'.repeat(43), label: 'Huishoudbot', may: 'mag: agenda-bestanden plaatsen' }];
+    const revoked = [];
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }],
+      onOpenCompanionGrant: async () => ({ ok: true, targets: [], choices: [] }),
+      onGrantCompanion: async () => '',
+      onLoadCompanionGrants: async () => ({ ok: true, rows: held }),
+      onRevokeCompanionGrant: async (a) => { revoked.push(a); held = []; return 'ingetrokken'; },
+    });
+    await new Promise((r) => { setTimeout(r, 0); });
+    const line = el.querySelector('.cc-mydata__companion-holder');
+    expect(line.textContent).toContain('Huishoudbot');
+    expect(line.textContent).toContain('mag: agenda-bestanden plaatsen');
+    line.querySelector('.cc-mydata__companion-revoke').click();
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(revoked).toEqual([{ node: 'N'.repeat(43), to: 'B'.repeat(43) }]);
+    expect(el.querySelector('.cc-mydata__companion-holder')).toBeNull();
+    expect(el.querySelector('.cc-mydata__companion-holders').textContent).toContain('ingetrokken');
+  });
+
+  it('my agents: while revokes are on their way, the section says so', () => {
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'a' }], companionsPending: 'onderweg bij 1',
+      onOpenCompanionGrant: async () => ({ ok: true, targets: [], choices: [] }), onGrantCompanion: async () => '',
+    });
+    expect(el.querySelector('.cc-mydata__companion-pending').textContent).toBe('onderweg bij 1');
+    const none = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'a' }], onOpenCompanionGrant: async () => ({}), onGrantCompanion: async () => '',
+    });
+    expect(none.querySelector('.cc-mydata__companion-pending')).toBeNull();
+  });
 });

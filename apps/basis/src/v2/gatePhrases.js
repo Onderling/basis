@@ -6,7 +6,7 @@
  *   - words are literal (case aside); punctuation written against a word stays against it ("{person}:");
  *   - `(a|b|c d)` is an alternation of literal phrases; `( … )?` makes it optional;
  *   - `{slot}` is typed: `{list}` one of the household's list words (with -lijst / -lijstje / list allowed), `{person}`
- *     one word, `{day}` / `{time}` what the bounded date reader reads, `{any}` a gap that captures nothing, and any
+ *     one word, `{day}` / `{time}` what the bounded date reader reads, `{span}` a span from now ("over 10 minuten"), `{any}` a gap that captures nothing, and any
  *     other declared text slot (`{item}`, `{items}`, `{text}`, `{name}`, `{title}`) some words;
  *   - the whole line must match; trailing ".!?" is allowed.
  * A template it cannot read throws at compile time: a typo in a translation must not silently never match.
@@ -14,7 +14,9 @@
 
 const TEXT_SLOTS = new Set(['item', 'items', 'text', 'name', 'title', 'what', 'shop']);
 const DAY_RE = '(?:volgende week|next week)\\s+(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|overmorgen|the day after tomorrow|morgen|tomorrow|vandaag|today|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|monday|tuesday|wednesday|thursday|friday|saturday|sunday';
-const TIME_RE = '(?:om\\s+half\\s+\\d{1,2}(?:\\s+uur)?|(?:om\\s+|at\\s+)?\\d{1,2}[:.]\\d{2}(?:\\s+uur)?|(?:om|at)\\s+\\d{1,2}(?:\\s*(?:am|pm))?(?:\\s+uur)?)';
+const TIME_RE = '(?:om\\s+half\\s+\\d{1,2}(?:\\s+uur)?|(?:om\\s+|at\\s+)?\\d{1,2}[:.]\\d{2}(?:\\s*(?:am|pm)|\\s+uur)?|(?:om|at)\\s+\\d{1,2}(?:\\s*(?:am|pm))?(?:\\s+uur)?)';
+// a span from now: "over 10 minuten", "in 10 minutes", "over een uur"
+const SPAN_RE = '(?:over|in)\\s+(?:\\d{1,3}\\s*(?:minuten|minuut|min|minutes|minute)|(?:een|an|1)\\s+(?:uur|hour))';
 const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const phrase = (p) => p.trim().split(/\s+/).map(esc).join('\\s+');
 
@@ -38,6 +40,7 @@ export function compilePhrase(template, slots = {}) {
     if (name === 'person') { names.push('person'); return '(?<person>[^\\s:,]+)'; }
     if (name === 'day') { names.push('day'); return `(?<day>${DAY_RE})`; }
     if (name === 'time') { names.push('time'); return `(?<time>${TIME_RE})`; }
+    if (name === 'span') { names.push('span'); return `(?<span>${SPAN_RE})`; }
     if (TEXT_SLOTS.has(name)) {
       if (names.includes(name)) bad(`slot {${name}} twice`);
       names.push(name);

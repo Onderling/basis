@@ -49,22 +49,32 @@ Reaching the relay from a role on the same box works by its public name (`wss://
 2026-09-18 from inside a container: 8/8 smoke); the internal name `ws://relay:8787` also connects but is
 the URL the device would then ADVERTISE on its contact card, which nobody outside can dial — use the public name.
 
-## A household's agenda links (the companion serves them)
+## A household's agenda links (the companion serves them, through the relay)
 
 A household bot can give each person their agenda as a link for a calendar app (`/agenda-link`, behind the admin's
-`/huishouden agenda on`). The files are served by a **companion on the public relay's box** (the `companion` role,
-`/feed/*` in `relay.caddy`); the bot puts each person's file there, sealed to a key only their link carries, and the
-companion keeps the ciphertext only. Pairing the two is a one-time step:
+`/huishouden agenda on`). The files are kept by the household's **companion**, sealed to a key only each link carries
+(it holds ciphertext only); the bot puts each person's file there. The companion needs no public port: the link is
+`https://<relay-domain>/feed/<companion address>/<id>.<k>.ics`, and the **relay** forwards it to the companion over the
+companion's own connection and passes the answer on, holding nothing (`relay.caddy` sends that form to the relay, with
+no access log). The companion will run on the household's tablet beside the bot; until it moves, the `companion` role
+on the public box is a test instance, and its own older `/feed/<id>.<k>.ics` route still answers through Caddy.
 
-1. **The bot's address.** On the household's box: `docker compose -p onderling logs assistant | grep -m1 'address '`.
-2. **The companion, owned by the bot.** On the public box, in `.env`: `COMPANION_MANAGE_OWNER_PUBKEY=<the bot's
-   address>` and `COMPANION_FEEDS=on`; add `companion@<repo>` to `ROLES` in `box.conf` if it is not there; then
-   `FORCE=1 /opt/onderling/repos/<repo>/deploy/box/update.sh`. Its address:
-   `docker compose -p onderling logs companion | grep -m1 'Host agent'`.
-3. **The bot, told where.** On the household's box, in `.env`: `ONDERLING_FEED_COMPANION=<the companion's address>`
-   and `ONDERLING_FEED_BASE_URL=https://<relay-domain>`; then `FORCE=1 …/update.sh`.
-4. **Check:** `curl -s -o /dev/null -w '%{http_code}\n' https://<relay-domain>/feed/x.y.ics` answers `404` (the
-   route is there, nothing is served without a link). Then in Telegram: `/huishouden agenda on`, `/agenda-link`.
+The bot learns where from the companion's **contact card** (its address, and `serves`: where its links are served),
+never from configuration: the person linked as the bot's admin hands it over from their app. Nothing is set on the box
+beyond starting the roles (`companion@<repo>` and the assistant in `ROLES`; the role runs the companion with its agenda
+files on and says its public address from `$RELAY_DOMAIN`). Step 0, from the admin's app:
+
+1. **Link your app to the bot.** In your private chat with the bot: `/koppel`. Open the link it sends, tap "Maak de
+   koppelregel", paste the line into the chat and pick the code your app shows. The bot is now a contact in your app,
+   and your app's messages to it count as you — from every device of yours, not from one you revoke.
+2. **Claim the companion.** Its claim line (ten minutes, then a new one) is in
+   `docker compose -p onderling logs companion | grep 'Claim:' | tail -1`; paste it under My data → "Companion claimen".
+3. **Give the bot the agenda files.** Under My data → "Mijn agents", at the companion: "Toegang geven", pick the bot,
+   tick "agenda-bestanden plaatsen". In that one act your app hands the bot the companion's card and the companion gives
+   the bot its access. Only the bot's admin can do this; a member's app is refused.
+4. **Check:** `curl -s -o /dev/null -w '%{http_code}\n' https://<relay-domain>/feed/<companion address>/xxxxxxxxxxxxxxxxxxxxxx.yyyyyyyyyyyyyyyyyyyyyy.ics`
+   answers `404` after a second (the route is there; nothing is served without a link, and a miss takes as long whether
+   the companion is connected or not). Then in Telegram: `/huishouden agenda on`, `/agenda-link`.
 
 Whoever holds a person's link reads that person's agenda, and the calendar service it is pasted into keeps it
 readable — the bot says so when it sends the link. `/agenda-link` again makes a new link (the old one stops),

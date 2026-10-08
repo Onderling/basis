@@ -2398,8 +2398,15 @@ export async function createSecureAgent(opts = {}) {
     if (!sel?.transport) throw new Error(`secure-agent: no route to ${String(addr).slice(0, 16)}…`);
     await _handshakeOverRoute(addr, sel, opts);
     const task = invokeAgentSkill(agent, addr, skillId, Parts.wrap(input), { ...opts, _overrideTransport: sel.transport });
-    const result = await task.done();
-    if (result.state === 'failed') throw new Error(result.error ?? `Skill "${skillId}" failed`);
+    let result;
+    try { result = await task.done(); } catch (err) { result = { state: 'failed', error: err?.message ?? String(err) }; }
+    if (result.state === 'failed') {
+      // No answer at all: the peer may have RESTARTED and forgotten our key (a node keeps its peers' keys in memory),
+      // so everything we send it is dropped unread — and since we already said hello, we never would again. Forget
+      // that we did: the next call announces us once more, and a peer that is back answers it.
+      if (/Timeout waiting for reply/i.test(String(result.error ?? ''))) helloedPeers.delete(helloKey(addr, null));
+      throw new Error(result.error ?? `Skill "${skillId}" failed`);
+    }
     return result.parts;
   }
 

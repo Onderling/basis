@@ -377,7 +377,9 @@ async function sendFile(args, {
   if (typeof openFilePicker !== 'function') {
     return { ok: false, error: t('sendFile.no_picker') };
   }
-  if (typeof agent?.sendPeerMessage !== 'function' || agent.peer?.status !== 'connected') {
+  // whichever route is up — NKN or the relay (the agent's own answer); a file to a contact is not NKN's alone
+  const reachable = typeof agent?.isPeerReachable === 'function' ? agent.isPeerReachable() : agent?.peer?.status === 'connected';
+  if (typeof agent?.sendPeerMessage !== 'function' || !reachable) {
     return { ok: false, error: t('sendFile.not_connected') };
   }
 

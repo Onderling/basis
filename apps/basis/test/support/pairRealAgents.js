@@ -305,6 +305,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card }); },
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,
+        authFor: agent.linkedTurnAuth ?? null,          // a turn to a linked bot carries this device's statement, as the shells compose it
         localActor: pubKey,
         fanToOwnDevices: agent.contactTurnFan,
         // the pair roster (L105), composed as both shells do. A walk of the CARD-ONLY path (the chain pull after a
@@ -444,6 +445,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ...(agent.primaryDevice?.handlers ?? {}),
     // Siblings follow a circle — the join AND the leave (2026-09-21/22), the same entries the lane table spreads.
     ...(agent.circleFollowSync?.handlers ?? {}),
+    // A household bot's identity-link statement → a contact row (the lane table's entry, every shell).
+    ...(agent.identityLinks?.handlers ?? {}),
     // The contact thread, when a walk asked for it — the same three registrations both shells make:
     // a bot's reply, a person's DM, and a turn one of MY OWN devices carried here. All three land in
     // the durable thread through the channel, which is what makes `contactTurns` a real read of the

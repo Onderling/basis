@@ -79,7 +79,7 @@ if (process.env.QUEUE_DB) {
   forwardStore = new SqliteForwardStore({ path: process.env.QUEUE_DB, Database });
 }
 
-const { tls } = await startRelay({
+const { tls, feeds: feedInfo } = await startRelay({
   port, host,
   tlsCert, tlsKey,
   serveStaticDir: staticDir,
@@ -88,6 +88,8 @@ const { tls } = await startRelay({
   ...(pushTokenRegistry ? { pushTokenRegistry } : {}),
   forwardStore,
   peerDiscovery: process.env.PEER_DISCOVERY === '1',
+  // a person's agenda link, GET /feed/<node>/<id>.<k>.ics, forwarded to the node that holds it; nothing held here
+  feeds: true,
   log: true,
 });
 
@@ -101,6 +103,7 @@ console.log('  ─────────────────────�
 console.log(`  Local:    ${scheme}://localhost:${port}`);
 console.log(`  Peers:    ${process.env.PEER_DISCOVERY === '1' ? 'discovery ON — the connected-address list is broadcast to every client; disclose it' : 'discovery off (default) — no address list leaves this relay'}`);
 console.log(`  Push:     ${pushSender ? `expo wake enabled${process.env.PUSH_TOKENS_DB ? ` (tokens: ${process.env.PUSH_TOKENS_DB})` : ' (tokens: memory — lost on restart)'}` : 'off (no wake, no provider contact)'}`);
+console.log(`  Feeds:    /feed/<node>/… forwarded to the node over its session — nothing held, nothing logged; seat ${feedInfo?.seatAddress ?? '—'} (README: the seat)`);
 if (lanIp) {
   console.log(`  Network:  ${scheme}://${lanIp}:${port}`);
   console.log(`  Relay WS: ${wsScheme}://${lanIp}:${port}`);

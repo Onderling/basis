@@ -21,7 +21,7 @@ import { createOwnDevicesStore } from '../../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../../src/v2/intentionBook.js';
 import { createIntentionRunner } from '../../src/v2/intentionRunner.js';
 import { createChangeFeed } from '../../src/v2/changeFeed.js';
-import { seedAnnounceRows, HOST_CALL } from '../../src/v2/announceRows.js';
+import { seedAnnounceRows, runRowThroughDoor } from '../../src/v2/announceRows.js';
 import { createCircleRowGate } from '../../src/v2/circleRowGate.js';
 import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
 
@@ -30,8 +30,9 @@ import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
  * @param {Function} a.t
  * @param {string} a.tz
  * @param {Array<{id: string, name: string, role: string}>} a.people
+ * @param {() => number} [a.now]  the box's clock (the door's and the runner's)
  */
-export async function bootAnnouncingBox({ t, tz, people }) {
+export async function bootAnnouncingBox({ t, tz, people, now = Date.now }) {
   const dir = await mkdtemp(path.join(tmpdir(), 'announcing-box-'));
   const pass = randomBytes(32).toString('base64url');
   await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });
@@ -52,28 +53,37 @@ export async function bootAnnouncingBox({ t, tz, people }) {
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
   await threads.load();
   const sent = [];
+  const fired = [];
   const log = new EventLog({ initial: [], muted: [] });
   const announcer = createAnnouncer({
-    users: { list: async () => people.map((p) => ({ id: p.id, role: p.role })) }, threads, t, tz, quiet: () => null,
+    users: { list: async () => people.map((p) => ({ id: p.id, role: p.role })) }, threads, t, tz, quiet: () => null, now,
     reach: { sendToPerson: async (id, m) => { sent.push({ id, text: m.text }); return { ok: true }; } }, log,
   });
-  const door = withAssistantOps({ callSkill: own, threads, t, announcer });
   // the box's planned work: the household's announce rows, run on a change, as the host
   const hostRef = agent.identity?.chat?.pubKey;
   const book = createIntentionBook({
     store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: () => agent.heldCircleStores(), actor: 'host',
     signerFor: async (circleId) => ({ identity: await agent.circleIdentityFor(circleId), ref: hostRef }),
   });
+  // the door writes into the same book (a reminder for everyone is a household row in the household's circle)
+  const door = withAssistantOps({ callSkill: own, threads, t, announcer, now, intentions: {
+    book, tz, householdScope: agent.householdCircleId,
+    // `/gepland` reads what is coming from the household's items and its people
+    sources: () => agent.reminderSources(), users: async () => people.map((p) => ({ id: p.id, role: p.role })),
+  } });
   const seeded = await seedAnnounceRows(book, agent.householdCircleId);
   const gate = createCircleRowGate({
     hostRef, circleKeyFor: (circleId) => agent.circleIdentityFor(circleId),
     rosterBinding: rosterBindingVerifier(own), people: async () => people.map((p) => ({ id: p.id })),
   });
   const runner = createIntentionRunner({
-    book, log, tz, claimAs: 'box',
+    book, log, tz, claimAs: 'box', now,
+    // what ran, was held back or refused (a test reads why a row did not run)
+    onFired: (e) => fired.push(e),
     // the box's own rule: a signed row, the key bound, acting as its author or as the household signed by the box
     mayRun: (o, scope, row) => gate.mayRun(o, scope, row),
-    run: (o) => door(o.appOrigin, o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true }),
+    // the box's own hand-over: a household row as the host, a person's row as that person
+    run: runRowThroughDoor({ door, callerFor: (actsAs) => gate.callerFor(actsAs) }),
   });
   const feed = createChangeFeed({ storeFor: async (id) => (await agent.heldCircleStores()).find((c) => c.scope === id)?.store ?? null, consumers: [(c, o) => runner.onChange(c, o)] });
   await feed.seedAll((await agent.heldCircleStores()).map((c) => c.scope));
@@ -81,5 +91,5 @@ export async function bootAnnouncingBox({ t, tz, people }) {
   circleWrite.fn = (circleId, item, removedId) => pending.push(removedId ? feed.removed(circleId, removedId) : feed.own(circleId, item));
   /** Every change made so far has been handed to the rows (and told). */
   const settled = async () => { while (pending.length) await pending.shift(); };
-  return { dir, agent, own, door, sent, settled, seeded, book };
+  return { dir, agent, own, door, sent, settled, seeded, book, runner, threads, fired };
 }

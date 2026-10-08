@@ -243,7 +243,7 @@ export function renderCircleView(container, {
     header.appendChild(toggle);
   }
 
-  const moreActions = collectMoreActions(more, tr, policy, availability);
+  const moreActions = collectMoreActions(more, tr, policy, availability, viewerIsAdmin);
   if (moreActions.length > 0) {
     const moreBtn = document.createElement('button');
     moreBtn.type = 'button';
@@ -276,6 +276,13 @@ export function renderCircleView(container, {
       item.textContent = a.label;
       // greyed by the one fold: shown, and not runnable — the op exists here, this member may not do it
       if (a.disabled) item.disabled = true;
+      if (a.reason) {
+        item.title = a.reason;
+        const why = document.createElement('small');
+        why.className = 'circle-view__more-reason';
+        why.textContent = a.reason;
+        item.append(document.createElement('br'), why);
+      }
       item.addEventListener('click', () => {
         menu.classList.remove('is-open');
         if (!a.disabled) a.run();
@@ -1289,13 +1296,18 @@ function pickKindLabel(row) {
 // AND (b) the host wired a `more[id]` callback for it.  Keyed by the projected
 // action id, so the host's `more` object keys match the manifest ids directly
 // (the mobile shell projects the SAME roster → web ≡ mobile by construction).
-function collectMoreActions(more, tr, policy, availability = null) {
+function collectMoreActions(more, tr, policy, availability = null, viewerIsAdmin = false) {
   if (!more || typeof more !== 'object') return [];
   const out = [];
-  for (const action of circleActions(basisManifest, { policy, platform: 'web', availability })) {
+  for (const action of circleActions(basisManifest, { policy, platform: 'web', availability, isAdmin: viewerIsAdmin })) {
     const fn = more[action.id];
     if (typeof fn === 'function') {
-      out.push({ id: action.id, label: tr(action.labelKey), run: fn, ...(action.disabled ? { disabled: true } : {}) });
+      out.push({
+        id: action.id, label: tr(action.labelKey), run: fn,
+        ...(action.disabled ? { disabled: true } : {}),
+        // why it is greyed (an admin-only entry for a member) — said beside it, not left to a dead click
+        ...(action.reasonKey ? { reason: tr(action.reasonKey) } : {}),
+      });
     }
   }
   return out;

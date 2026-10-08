@@ -43,7 +43,12 @@ export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircle
 export {
   deriveDeviceSeed, deviceDelegationPubKey, deviceDelegationMessage,
   signDeviceDelegation, verifyDeviceDelegation, ownerRootFingerprint, firstDeviceIdFor,
+  deviceRevocationMessage, signDeviceRevocation, verifyDeviceRevocation,
 } from './identity/deviceDelegation.js';
+export {
+  signDeviceStatement, verifyDeviceStatement, deviceStatementMessage, argsHashOf, createNonceWindow,
+  DEVICE_STATEMENT_WINDOW_MS, STATEMENT_DOMAINS,
+} from './identity/deviceStatement.js';
 export {
   CIRCLE_ADDRESS_ANNOUNCE_KIND, circleAddressAnnouncement, ownCircleAddressAnnouncement,
   ownCircleAddressAnnouncementFromSeed, verifyCircleAddressAnnouncement,

@@ -118,15 +118,12 @@ test('task-handoff — A adds a task, B claims it', async ({ browser }) => {
     const res = await H.pair(A, B, { name: 'Peer Circle' });
     test.skip(!res.joinerHasTile, 'B never joined — pairing precondition');
 
-    // Tasks is CIRCLE policy (default OFF). The ADMIN turns it on; the change fans out to members as a
-    // PENDING policy, and a member ADOPTS it by opening settings — where the app shows the incoming
-    // document and asks them to apply it. So both peers act, but they act differently: A decides, B
-    // consents. `enableFeature` handles the member half (see its conflict-resolution step).
+    // Tasks is CIRCLE policy (default OFF). The ADMIN (A) turns it on; the policy reaches B over the governance lane
+    // (a member's own Save is greyed — every other device would drop a member's statement), so only A presses Save.
     await H.reopenCircle(A.page, /peer.?circle/i);
     await H.enableFeature(A.page, 'tasks');
     await H.reopenCircle(A.page, /peer.?circle/i);
-    await H.reopenCircle(B.page, /peer.?circle/i);
-    await H.enableFeature(B.page, 'tasks');
+    await B.page.waitForTimeout(3500);   // the policy crosses the lane
     await H.reopenCircle(B.page, /peer.?circle/i);
 
     await H.addTask(A.page, 'verf kopen');

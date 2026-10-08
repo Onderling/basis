@@ -308,6 +308,9 @@ export function buildCircleLanes({
     ...(agent.circleFollowSync?.handlers ?? {}),
     // A contact pulls my person-key chain after a rotation; a reply lands on the contact book once it verifies.
     ...(agent.personKeyChain?.handlers ?? {}),
+    // A household bot says my identity is linked to my row there (`/koppel`), or no longer: the bot becomes (or stops
+    // being) a linked contact in my book, which carries to my other devices. Entries only — the agent owns the check.
+    ...(agent.identityLinks?.handlers ?? {}),
   };
 
   return {

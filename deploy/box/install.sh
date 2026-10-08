@@ -117,9 +117,8 @@ POD_DOMAIN=$POD_DOMAIN
 ACME_EMAIL=$ACME_EMAIL
 # pod: WAC (default) or ACP — decide before first boot (runbook B6): @css:config/file-acp.json
 CSS_CONFIG=
-# companion: the relay it dials (empty = this box's own relay) and your device's pubKey for the online /manage page (empty = off)
+# companion: the relay it dials (empty = this box's own relay); its owner CLAIMS it with the code in its log
 COMPANION_RELAY_URL=$COMPANION_RELAY_URL
-COMPANION_MANAGE_OWNER_PUBKEY=
 # personal: the assistant's Telegram bot + who may talk to it
 TG_BOT_TOKEN=$TG_BOT_TOKEN
 TG_ALLOWED_CHAT_IDS=$TG_ALLOWED_CHAT_IDS

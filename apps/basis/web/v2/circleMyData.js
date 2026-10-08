@@ -30,8 +30,22 @@ export function renderCircleMyData(container, {
   onExportRecovery,
   onImportRecovery,
   onReplaceDevice,
+  // Become the owner of a companion node (the claim it printed), signed by this device.
+  onClaimCompanion,
   devices = [],
   onRevokeDevice,
+  // The nodes this person owns (a companion they claimed): `[{node, short}]`. `onOpenCompanionGrant(node)` reads what
+  // the picker shows (`loadCompanionGrantPicker`: `{ok, targets, choices}` or `{ok: false, message}`);
+  // `onGrantCompanion({node, to, families})` grants and resolves to the line to show. Absent ⇒ the section is omitted.
+  companions = [],
+  // "intrekken onderweg bij n companion(s)" while a deleted contact's revokes have not reached every node; null = none
+  companionsPending = null,
+  onOpenCompanionGrant = null,
+  onGrantCompanion = null,
+  // Who the node granted, as lines under it: `onLoadCompanionGrants(node)` → `{ok, rows: [{to, label, may}]}` or
+  // `{ok: false, message}`; `onRevokeCompanionGrant({node, to})` revokes and resolves to the line to show.
+  onLoadCompanionGrants = null,
+  onRevokeCompanionGrant = null,
   // What THIS device keeps of what the owner's devices sync (sync-policy §11): `{ silos: {chat,tasks,contacts}: bool,
   // fileBytes: 'full'|'description', kringenOff: Set<string>, kringen: [{id, name}] }` + `onSetSync({ silo?, value?, fileBytes?, kringId?, on? })`.
   syncSelection = null,
@@ -205,6 +219,8 @@ export function renderCircleMyData(container, {
     ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
     // The replace ceremony: after a restore, retire every other device in one act.
     ['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice],
+    // A companion node of your own: claim it with the line it prints in its log.
+    ['cc-mydata__claim-companion', 'circle.companionClaim.button', onClaimCompanion],
     // The member's choice of which device others deliver to first (their primary contact address).
     ['cc-mydata__primary', 'circle.mydata.make_primary', onMakePrimary],
   ].filter(([, , fn]) => typeof fn === 'function');
@@ -242,6 +258,145 @@ export function renderCircleMyData(container, {
         b.addEventListener('click', () => onRevokeDevice(d.deviceId));
         row.appendChild(b);
       }
+      sec.appendChild(row);
+    }
+    container.appendChild(sec);
+  }
+
+  // ── my agents: the nodes I own, and what another agent may do there ────────────────────────────────
+  // One row per node; "give access" asks the node what it can give (its families), then a pick of who (a contact, a
+  // linked bot) and the ticks. The node mints the tokens; nothing here decides what a family is.
+  if (typeof onOpenCompanionGrant === 'function' && typeof onGrantCompanion === 'function' && Array.isArray(companions) && companions.length) {
+    const sec = section(tr('circle.companionGrant.nodes'));
+    if (companionsPending) {
+      const p = document.createElement('p');
+      p.className = 'cc-mydata__companion-pending';
+      p.style.cssText = 'font-size:.9em;opacity:.8;margin:.2rem 0;';
+      p.textContent = companionsPending;
+      sec.appendChild(p);
+    }
+    for (const c of companions) {
+      const row = document.createElement('div');
+      row.className = 'cc-mydata__companion';
+      row.style.cssText = 'padding:.35rem 0;';
+      const head = document.createElement('div');
+      head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;';
+      const name = document.createElement('span');
+      name.className = 'cc-mydata__companion-name';
+      name.textContent = tr('circle.companionGrant.node_row', { short: c.short });
+      const give = document.createElement('button');
+      give.type = 'button';
+      give.className = 'cc-mydata__companion-give';
+      give.textContent = tr('circle.companionGrant.give');
+      head.append(name, give);
+      row.appendChild(head);
+      // who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken"
+      const holders = document.createElement('div');
+      holders.className = 'cc-mydata__companion-holders';
+      holders.style.cssText = 'font-size:.9em;';
+      row.appendChild(holders);
+      const paintHolders = async (said = null) => {
+        if (typeof onLoadCompanionGrants !== 'function') return;
+        const r = await onLoadCompanionGrants(c.node);
+        holders.innerHTML = '';
+        if (said) {
+          const p = document.createElement('p');
+          p.style.cssText = 'opacity:.8;margin:.2rem 0;';
+          p.textContent = said;
+          holders.appendChild(p);
+        }
+        if (!r?.ok) {
+          const p = document.createElement('p');
+          p.style.cssText = 'opacity:.75;margin:.2rem 0;';
+          p.textContent = r?.message ?? '';
+          holders.appendChild(p);
+          return;
+        }
+        for (const h of r.rows) {
+          const line = document.createElement('div');
+          line.className = 'cc-mydata__companion-holder';
+          line.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.1rem 0;';
+          const what = document.createElement('span');
+          what.textContent = `${h.label} — ${h.may}`;
+          const rev = document.createElement('button');
+          rev.type = 'button';
+          rev.className = 'cc-mydata__companion-revoke';
+          rev.textContent = tr('circle.companionGrant.revoke');
+          rev.addEventListener('click', async () => {
+            rev.disabled = true;
+            const line2 = typeof onRevokeCompanionGrant === 'function' ? await onRevokeCompanionGrant({ node: c.node, to: h.to }) : null;
+            await paintHolders(line2);
+          });
+          line.append(what, rev);
+          holders.appendChild(line);
+        }
+      };
+      paintHolders();
+      const panel = document.createElement('div');
+      panel.className = 'cc-mydata__companion-panel';
+      panel.hidden = true;
+      row.appendChild(panel);
+      const say = (text) => {
+        const p = document.createElement('p');
+        p.className = 'cc-mydata__companion-note';
+        p.style.cssText = 'font-size:.9em;opacity:.8;';
+        p.textContent = text;
+        panel.appendChild(p);
+      };
+      give.addEventListener('click', async () => {
+        panel.hidden = false;
+        panel.innerHTML = '';
+        say(tr('circle.companionGrant.loading'));
+        const picker = await onOpenCompanionGrant(c.node);
+        panel.innerHTML = '';
+        if (!picker?.ok) { say(picker?.message ?? tr('circle.companionGrant.failed')); return; }
+        if (!picker.targets.length) { say(tr('circle.companionGrant.to_none')); return; }
+        const toLabel = document.createElement('label');
+        toLabel.style.cssText = 'display:block;margin:.3rem 0;';
+        toLabel.textContent = tr('circle.companionGrant.to_label');
+        const to = document.createElement('select');
+        to.className = 'cc-mydata__companion-to';
+        to.style.cssText = 'display:block;width:100%;';
+        for (const tg of picker.targets) {
+          const o = document.createElement('option');
+          o.value = tg.key;
+          o.textContent = tg.label;
+          to.appendChild(o);
+        }
+        toLabel.appendChild(to);
+        panel.appendChild(toLabel);
+        const may = document.createElement('div');
+        may.textContent = tr('circle.companionGrant.may_do');
+        may.style.cssText = 'font-weight:600;margin:.3rem 0 .2rem;';
+        panel.appendChild(may);
+        const boxes = picker.choices.map((ch) => {
+          const line = document.createElement('label');
+          line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = ch.id;
+          cb.className = 'cc-mydata__companion-family';
+          const txt = document.createElement('span');
+          txt.textContent = ch.label;
+          line.append(cb, txt);
+          panel.appendChild(line);
+          return cb;
+        });
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = 'cc-mydata__companion-confirm';
+        confirm.textContent = tr('circle.companionGrant.confirm');
+        panel.appendChild(confirm);
+        confirm.addEventListener('click', async () => {
+          const families = boxes.filter((b) => b.checked).map((b) => b.value);
+          if (!families.length) { say(tr('circle.companionGrant.nothing_ticked')); return; }
+          confirm.disabled = true;
+          const line = await onGrantCompanion({ node: c.node, to: to.value, families });
+          panel.innerHTML = '';
+          say(line);
+          paintHolders();
+        });
+      });
       sec.appendChild(row);
     }
     container.appendChild(sec);

@@ -13,6 +13,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import {
   CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, DEFAULT_CIRCLE_ORIGINS,
@@ -44,6 +45,7 @@ import { basisManifest } from '../../../../basis/src/index.js';
 import { resolveControlEnablement, settingsControlsFromManifest } from '../../../../basis/src/v2/circleSettingsControls.js';
 import { isAdvancedSetting } from '../../../../basis/src/v2/alphaSurface.js';
 import { settingsChangeNeedsProposal } from '../../../../basis/src/v2/circlePolicy.js';
+import { policySaveControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
 
 // Phase 4 §9 — the Connection & transport controls, read once from the static basisManifest.
 const SETTINGS_CONTROLS = settingsControlsFromManifest(basisManifest);
@@ -94,9 +96,26 @@ export default function CircleSettingsScreen({
   onControl,
 }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: the back link under it could not be tapped
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [working, setWorking] = useState(null);
   const [expanded, setExpanded] = useState({});
+  // May THIS viewer's Save count? The policy is the admins' (a member's statement is dropped by every other device):
+  // the roster + who I am, read once; until they answer, Save waits greyed (fail closed).
+  const [saveRoster, setSaveRoster] = useState({ members: [], myRef: '' });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (typeof callSkill !== 'function' || !circleId) return;
+      const [mem, who] = await Promise.all([
+        callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null),
+        callSkill('stoop', 'whoAmI', {}).catch(() => null),
+      ]);
+      if (alive) setSaveRoster({ members: Array.isArray(mem?.members) ? mem.members : [], myRef: who?.webid ?? who?.webId ?? '' });
+    })();
+    return () => { alive = false; };
+  }, [callSkill, circleId]);
+  const saveControl = policySaveControlFor(saveRoster);
   // the alpha's "Geavanceerd" fold (alphaSurface.js ADVANCED_SETTINGS) — closed until tapped; web parity
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [guidedOpen, setGuidedOpen] = useState(false);   // Theme B — guided-setup chatbot modal
@@ -656,7 +675,9 @@ export default function CircleSettingsScreen({
         ) : null}
       </ScrollView>
 
-      <Pressable style={styles.save} onPress={onSave} accessibilityRole="button" testID="circle-settings-save">
+      {saveControl.disabled && saveControl.reasonKey ? <Text style={styles.saveReason}>{t(saveControl.reasonKey)}</Text> : null}
+      <Pressable style={[styles.save, saveControl.disabled ? { opacity: 0.45 } : null]} onPress={onSave} disabled={saveControl.disabled}
+        accessibilityRole="button" accessibilityState={{ disabled: saveControl.disabled }} testID="circle-settings-save">
         <Text style={styles.saveText}>
           {consensusActive ? t('circle.settings.send_proposal') : t('circle.settings.save')}
         </Text>
@@ -702,10 +723,10 @@ function verbLabel(atom) {
   return v && v !== k ? v : atom;
 }
 
-const makeStyles = (theme) => StyleSheet.create({
+const makeStyles = (theme, insets) => StyleSheet.create({
   advancedToggle: { paddingVertical: 10, marginTop: 14 },
   advancedToggleText: { fontWeight: '600', color: theme.color.inkSoft },
-  page:        { flex: 1, paddingHorizontal: 16, paddingTop: 12, backgroundColor: theme.color.paper },
+  page:        { flex: 1, paddingHorizontal: 16, paddingTop: 12 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   bar:         { flexDirection: 'row', alignItems: 'center', minHeight: 22 },
   back:        { fontSize: 13, color: theme.color.inkSoft },
   title:       { fontSize: 24, fontWeight: '600', fontFamily: theme.font.serif, color: theme.color.ink, marginVertical: 10 },
@@ -729,6 +750,7 @@ const makeStyles = (theme) => StyleSheet.create({
   hintText:    { fontSize: 11, color: theme.color.inkSoft, marginTop: 2 },
   muted:       { color: theme.color.inkSoft, fontStyle: 'italic', paddingVertical: 10 },
   save:        { marginTop: 8, marginBottom: 12, padding: 13, borderRadius: 8, backgroundColor: theme.color.accent, alignItems: 'center' },
+  saveReason:  { fontSize: 12, color: theme.color.inkSoft, textAlign: 'center', marginBottom: 6 },
   saveText:    { color: theme.color.white, fontSize: 15, fontWeight: '700' },
   guided:      { marginTop: 4, marginBottom: 4, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.color.accent, backgroundColor: theme.color.card, alignItems: 'center' },
   guidedText:  { color: theme.color.accent, fontSize: 14, fontWeight: '600' },

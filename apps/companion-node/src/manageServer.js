@@ -12,8 +12,8 @@
 //      POST /manage/api/<op>. The node dispatches that op IN-PROCESS as the owner.
 //
 // Security: the HTTP API dispatches ONLY the whitelisted management ops, only for
-// an approved session, always with `from = ownerPubKey` — so it is exactly the
-// same owner-gated surface as the relay path, no new privilege. The owner key
+// an approved session, as an in-process `manageSession` the owner's device approved
+// (`manage.approvePairing`, statement-signed) — the same ops, no new privilege. The owner key
 // never leaves the node; the browser only ever holds a revocable session token.
 import http from 'node:http';
 import { parseFeedPath } from './feedShelf.js';
@@ -81,7 +81,7 @@ tok()?dash():pair();
  * Start the /manage HTTP server.
  * @param {object} o
  * @param {import('@onderling/core').Agent} o.agent           the node's agent (holds the ops as skills)
- * @param {string}   o.ownerPubKey                          management authority — ops dispatch as THIS identity
+ * @param {() => string|null} o.ownerPubKey               the owner root, read per call (unclaimed: the API answers nothing)
  * @param {string[]} o.allowedOps                           the ONLY ops the HTTP API may dispatch
  * @param {number}   [o.port=0]                             0 → OS-assigned
  * @param {string}   [o.host='127.0.0.1']
@@ -125,13 +125,15 @@ export function startManageServer({ agent, ownerPubKey, allowedOps, port = 0, ho
     if (req.method === 'POST' && p.startsWith('/manage/api/')) {
       const t = bearer(req);
       if (!t || !sessions.has(t)) return json(res, 401, { error: 'unauthorized' });
+      const owner = ownerPubKey();
+      if (!owner) return json(res, 401, { error: 'unauthorized' });
       const op = p.slice('/manage/api/'.length);
       const def = allow.has(op) ? agent.skills.get(op) : null;
       if (!def) return json(res, 404, { error: 'unknown-op' });
       const body = await readBody(req);
       const parts = body?.data ? [{ type: 'DataPart', data: body.data }] : [];
       try {
-        const result = await def.handler({ parts, from: ownerPubKey, agent, envelope: null });
+        const result = await def.handler({ parts, from: null, manageSession: true, agent, envelope: null });
         return json(res, 200, result ?? {});
       } catch (e) { return json(res, 500, { error: String(e?.message ?? e) }); }
     }

@@ -64,7 +64,8 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
-import { createIdentityLink } from '../src/v2/botIdentityLink.js';
+import { createIdentityLink, createLinkTombstones, linkedCompanionSkill } from '../src/v2/botIdentityLink.js';
+import { IDENTITY_LINK_REVOKE_SUBTYPE, LINKED_COMPANION_OP } from '../src/v2/identityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
 import { composeCircleRunner } from '../src/telegram/circleRunner.js';
@@ -89,7 +90,7 @@ import { createChangeFeed } from '../src/v2/changeFeed.js';
 import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { exportDirFiles } from '../src/v2/exportDirFiles.js';
 import { createExportRequestJob } from '../src/v2/exportRequest.js';
-import { seedAnnounceRows, isAnnounceRow, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
+import { seedAnnounceRows, isAnnounceRow, runRowThroughDoor } from '../src/v2/announceRows.js';
 import { createCircleRowGate } from '../src/v2/circleRowGate.js';
 import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
 import { moveOverviewSwitchesToRows, switchWeekOverview } from '../src/v2/weekOverviewRows.js';
@@ -100,11 +101,14 @@ import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createBotFeeds } from '../src/v2/botFeeds.js';
+import { loadFeedCompanion } from '../src/v2/feedCompanion.js';
+import { createCompanionGrants, COMPANION_GRANT_SUBTYPE } from '../src/v2/companionGrant.js';
 import { DataPart, Parts } from '@onderling/core';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom, CALENDAR_FEED_KEY, calendarFeedFrom } from '../src/v2/botSettings.js';
 import { REMINDER_RULES_KEY, reminderRulesFrom, leadOf } from '../src/v2/reminderWords.js';
-import { ensureHouseholdLists, householdBotApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -156,6 +160,12 @@ const relayUrl = (process.env.ONDERLING_RELAY_URL ?? '').trim();
 const appUrl   = (process.env.BASIS_APP_URL ?? '').trim();
 // A screen's offer (`/scherm`) arrives on the peer router, which is up before the door that answers it exists.
 const screenOffer = { handle: null };
+// …and so does a companion's grant (its owner let this bot put agenda files there), before the bot keeps grants.
+const companionGrantDoor = { accept: null };
+// …and a linked person's device revocation (the root's tombstone), before the identity link that keeps it exists; the
+// inbox door, composed early too, checks a linked person's turn with the same identity link, once it is there.
+const linkRevokeDoor = { handle: null };
+const linkedTurn = { verify: null };
 
 /** The vault key: the environment if set, else one generated once beside the vault — the machine that
  *  runs unattended holds it, which is the same trust as the disk the vault itself is on. */
@@ -270,7 +280,10 @@ const agent = await createRealHouseholdAgent({
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
   onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
   writeOrigin: () => writeOrigin.getStore() ?? null,
-  ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
+  ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true,
+    // other agents' calls: a screen's (each demands a token), and the one call a linked person's app makes without a
+    // token — its device statement is the authority, checked by the identity link before anything (`identity-link.companion`)
+    acceptPeerSkillCalls: { ...SCREEN_CALL_BUDGET, alsoSkills: [LINKED_COMPANION_OP] } } : {}),
   // the person's own store, sealed on disk (the own-devices scope): ONE per node — the calendar's own appointments
   // and the planned book read the same one, and it reaches the person's other devices
   ownStore: () => (ownStoreOnDisk.ref ??= (async () => createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }))()),
@@ -296,6 +309,8 @@ const agent = await createRealHouseholdAgent({
 try { deviceLog.setRetention(retentionFromDays(agent.getParamValue?.('retention.chatDays'))); } catch { /* the defaults stand */ }
 // `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
 const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
+// A household bot's companion is not configured here: the person linked as its admin hands it the companion's card
+// from their app, in the same act as granting it the agenda files there (`identity-link.companion`, below).
 
 // The walk log — one JSON line per event, so a run can be read afterwards rather than retold.
 // `--walk-log` names a FILE (stamped before its extension) or a DIRECTORY (a trailing slash, or one that
@@ -436,6 +451,8 @@ if (relayUrl) {
   });
   contactChannel = createContactThreadChannel({
     pair: pairRoster,
+    // a turn to a bot this person's identity is linked to (`/koppel`) carries this device's statement over it
+    authFor: agent.linkedTurnAuth ?? null,
     sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
@@ -564,7 +581,7 @@ if (relayUrl) {
     const landed = landTurn(m);
     Promise.resolve(landed).then((r) => {
       if (r?.deduped) return;
-      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId });
+      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId, ...(m.auth ? { auth: m.auth } : {}) });
     }).catch(() => {});
   };
 
@@ -653,6 +670,10 @@ if (relayUrl) {
       [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
       // a screen waiting for its grant says it is there: nothing to do — its message alone releases what was held for it
       [SCREEN_WAITING_SUBTYPE]: () => {},
+      // a companion's owner granted this bot ops there: the companion sends the tokens; kept only from a companion contact
+      [COMPANION_GRANT_SUBTYPE]: (from, payload) => companionGrantDoor.accept?.(from, payload),
+      // a linked person revoked one of their devices: the root's tombstone, which any party may deliver
+      [IDENTITY_LINK_REVOKE_SUBTYPE]: (from, payload) => linkRevokeDoor.handle?.(payload),
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -796,7 +817,11 @@ if (String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function') {
 }
 // The bot's inbox door follows the profile: a person's node never answers its inbox.
 if (contactChannel) {
-  inboxDoor = await createInboxDoor({ profileKind: () => agent.profileKind(), sendTurn: (turn) => contactChannel.sendTurn(turn) });
+  inboxDoor = await createInboxDoor({
+    profileKind: () => agent.profileKind(), sendTurn: (turn) => contactChannel.sendTurn(turn),
+    // a turn from a person whose Basis identity is linked to a row here: the root its device statement chains to
+    linkedRootOf: (turn) => linkedTurn.verify?.(turn) ?? null,
+  });
 }
 
 // ── The host's one clock: every timed thing this box does is a job on it, started in the order added ──────────
@@ -948,20 +973,49 @@ if (tgToken || inboxDoor.bridge) {
   });
   // A household bot's people connect screens (`/scherm`): the grant is their role column, each token acting as them.
   const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
-  // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file. Wired
-  // when the box knows the companion (its address, as `COMPANION_MANAGE_OWNER_PUBKEY` there names this bot) and the
-  // public address it is served at; off in the household until the admin switches it on.
-  const feedCompanion = process.env.ONDERLING_FEED_COMPANION || '';
-  const feedBase = process.env.ONDERLING_FEED_BASE_URL || '';
-  const companionCall = async (skill, data) => Parts.data(await agent.sa.peer.invoke(feedCompanion, skill, [DataPart(data)])) ?? null;
-  const feeds = isFunctionProfile && feedCompanion && feedBase ? createBotFeeds({
+  /** A line in the admin's private chat (no admin yet: nobody to tell). */
+  const tellAdmin = async (text) => {
+    const admin = (await botUsers.list()).find((u) => u.role === 'admin');
+    if (admin) await reach.sendToPerson(admin.id, { text });
+  };
+  // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file, through
+  // the relay. WHICH companion and where its links are served comes from the contact the bot holds (its card), read
+  // each time — no companion among its contacts, no link; off in the household until the admin switches it on.
+  // What it may do THERE is the grant the companion's owner gave it from their app: one token per op, delivered over the
+  // relay, kept per companion (`companionGrant.js`, sealed on disk) and presented on every call — the companion's gate
+  // checks it, revocation first. The key it calls with is the tokens' subject.
+  const companionGrants = isFunctionProfile ? createCompanionGrants({
+    vault: new VaultNodeFs(path.join(dataDir, 'companion-grants.json'), vaultPassphrase()),
+    self: () => agent.identity?.chat?.pubKey ?? null,
+    callSkill,
+  }) : null;
+  if (companionGrants) {
+    companionGrantDoor.accept = async (from, payload) => {
+      const r = await companionGrants.accept(from, payload).catch(() => ({ ok: false, reason: 'error' }));
+      walkLog({ kind: 'companion-grant', from: String(from).slice(0, 12), ok: r.ok, ...(r.ok ? { ops: r.ops } : { reason: r.reason }) });
+    };
+  }
+  const companionCall = async (node, skill, data) => {
+    const token = await companionGrants?.tokenFor(node, skill).catch(() => null) ?? null;
+    try {
+      return Parts.data(await agent.sa.peer.invoke(node, skill, [DataPart(data)], token ? { token } : {})) ?? null;
+    } catch (err) {
+      walkLog({ kind: 'companion-call', op: skill, ok: false, presented: !!token, error: String(err?.message ?? err).slice(0, 120) });
+      // the companion's gate refused the grant it presented (its owner revoked it): drop it, and tell the admin — once
+      const r = companionGrants ? await companionGrants.refused(node, token, err).catch(() => null) : null;
+      if (r?.dropped) walkLog({ kind: 'companion-grant-ended', from: String(node).slice(0, 12) });
+      if (r?.tell) await tellAdmin(t('circle.bot.agenda_grant_ended')).catch(() => {});
+      throw err;
+    }
+  };
+  const feeds = isFunctionProfile ? createBotFeeds({
     threads,
     events: async () => (await agent.reminderSources())?.events ?? [],
     people: () => botUsers.list(),
     calendarName: async () => t('circle.bot.agenda_calendar_name'),
-    put: (id, envelope) => companionCall('feed.put', { id, envelope }),
-    drop: (id) => companionCall('feed.drop', { id }),
-    base: feedBase,
+    companion: () => loadFeedCompanion({ callSkill }),
+    put: (node, id, envelope) => companionCall(node, 'feed.put', { id, envelope }),
+    drop: (node, id) => companionCall(node, 'feed.drop', { id }),
   }) : null;
   // The host's planned work (the own-devices store): its own rows and those of the people it is the device for — the
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.
@@ -1036,9 +1090,12 @@ if (tgToken || inboxDoor.bridge) {
     tell: (viewPubKey, o) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_STEP_UP_SUBTYPE, ...o }),
   }) : null;
   // A Telegram person links their Basis identity (`/koppel`): their app offers, their private chat confirms by the code.
-  // Identity only: a turn signed by that key is their row. The bot's statement goes to the app's key.
+  // Identity only: the row records their ROOT, and a turn from their app is theirs when a device statement chains to
+  // it — not from a device the root revoked (its tombstone, kept here on disk). The bot's statement goes to the app.
+  const linkTombstones = isFunctionProfile ? createLinkTombstones({ vault: new VaultNodeFs(path.join(dataDir, 'identity-link-tombstones.json'), vaultPassphrase()) }) : null;
+  await linkTombstones?.load();
   const identityLink = isFunctionProfile ? createIdentityLink({
-    users: botUsers,
+    users: botUsers, tombstones: linkTombstones,
     botAddress: () => agent.identity?.chat?.pubKey ?? null,
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
@@ -1134,6 +1191,8 @@ if (tgToken || inboxDoor.bridge) {
     announcer,
     intentions: {
       book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz,
+      // a reminder for everyone is a household row in the household's own circle (signed by this box, like the announce rows)
+      householdScope: agent.householdCircleId ?? null,
       // `/gepland` reads what is coming from the household's items and its people
       sources: () => agent.reminderSources(), users: () => botUsers.list(),
     },
@@ -1198,6 +1257,16 @@ if (tgToken || inboxDoor.bridge) {
     },
   });
   doorCallRef.fn = doorCall;
+  if (identityLink) {
+    linkedTurn.verify = (turn) => identityLink.verifyTurn(turn);
+    linkRevokeDoor.handle = async (payload) => {
+      const r = await identityLink.revoked(payload?.revocation).catch(() => ({ ok: false, reason: 'error' }));
+      walkLog({ kind: 'identity-link-revoke', ok: r.ok, ...(r.ok ? {} : { reason: r.reason }) });
+    };
+    // the linked admin's app hands the bot its companion (in the same act as its grant there): one call, a device
+    // statement over the card, through this door's own call as the linked row — a member is refused there
+    agent.exposeToPeers([linkedCompanionSkill({ link: identityLink, doorCall, id: LINKED_COMPANION_OP, log: walkLog })]);
+  }
   // ONE place this box hears that an item it holds changed — its own write or a member's that landed — handed to each
   // consumer with the item before and after: the screens' nudge, the planned work's event rows.
   const changeConsumers = [];
@@ -1280,7 +1349,8 @@ if (tgToken || inboxDoor.bridge) {
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
       basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
       // `/help` for a person: their language, grouped, the admin's commands last (their level on the bot's map)
-      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp }),
+      // …and when the bot reminds, in the welcome's own line (the household's rules as they stand)
+      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules } }),
     } : {}),
   });
   await tgRunner.start();
@@ -1331,12 +1401,7 @@ if (tgToken || inboxDoor.bridge) {
       mayRun: (o, scope, row) => circleRows.mayRun(o, scope, row),
       // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that
       // person, through their own column of the door
-      run: async (o) => {
-        if (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS) return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true });
-        // as the person, through their own column of the door (a member's key maps to the row of the person it names)
-        const as = (await circleRows.callerFor(o.actsAs)) ?? o.actsAs;
-        return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: as, threadId: as });
-      },
+      run: runRowThroughDoor({ door: doorCall, callerFor: (actsAs) => circleRows.callerFor(actsAs) }),
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });
@@ -1347,10 +1412,7 @@ if (tgToken || inboxDoor.bridge) {
     if (built?.listModels) {
       modelWatch.ref = createModelWatch({
         listModels: built.listModels, model: built.model, fallback: built.fallbackModel, t,
-        tellAdmin: async (text) => {
-          const admin = (await botUsers.list()).find((u) => u.role === 'admin');
-          if (admin) await reach.sendToPerson(admin.id, { text });
-        },
+        tellAdmin,
         log: walkLog,
       });
       hostTick.add('model-watch', { every: MODEL_WATCH_EVERY_MS, run: () => modelWatch.ref.check() });
@@ -1386,7 +1448,7 @@ console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
-// the address another node names this one by — e.g. the household's companion, whose owner it is (COMPANION_MANAGE_OWNER_PUBKEY)
+// the address another node names this one by — e.g. the household's companion, when its owner grants this bot a place there
 console.log(`  address   ${agent.identity?.chat?.pubKey ?? '—'}`);
 if (card?.payload) {
   console.log('\n  This device as a contact — hand this to whoever should be able to write to you:\n');

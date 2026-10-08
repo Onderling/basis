@@ -17,6 +17,8 @@ const OWNER_ONLY = [
   'revealOwnerPhrase', 'grantSurface', 'revokeSurface', 'listSurfaceGrants', 'buildEnrollOffer', 'enrollDevice',
   'replaceDevice', 'revokeDevice', 'exportRecoveryFile', 'listRecoveryCircles', 'importRecoveryFile',
   'restoreStatus', 'restoreSource', 'restoreIntent', 'restoreOwnerPhrase',
+  // a node the person owns: claiming it, and what it lets another agent do there (a bot's admin, its model, never)
+  'claimCompanion', 'companionGrantChoices', 'grantCompanion', 'companionGrantList', 'revokeCompanionGrant',
 ];
 
 const nodes = [];

@@ -64,7 +64,11 @@ describe('circle admin panel — the role control appears for an admin, and only
     const el = renderCircleAdminPanel(mount(), { t, members: [ann, bob, cara], viewerWebid: 'w-bob' });
     expect(rowsOf(el)).toHaveLength(3);
     expect(el.querySelectorAll('.cc-admin__member-role-set')).toHaveLength(0);
-    expect(el.querySelectorAll('.cc-admin__member-remove')).toHaveLength(3);   // the panel is otherwise intact
+    // …and tells the member the truth about the rest: Remove greyed on the others' rows, LEAVE on their own.
+    const removes = [...el.querySelectorAll('.cc-admin__member-remove')];
+    expect(removes).toHaveLength(2);
+    expect(removes.every((b) => b.disabled)).toBe(true);
+    expect(el.querySelectorAll('.cc-admin__member-leave')).toHaveLength(1);
   });
 
   it('a panel with no viewer resolved yet paints none — absence refuses', () => {

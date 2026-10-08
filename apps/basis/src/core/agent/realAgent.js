@@ -24,14 +24,16 @@
  */
 
 import {
-  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
+  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
+  signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
   deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
+import { parseCompanionClaim } from '../../v2/companionClaim.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -122,7 +124,8 @@ import {
   ROSTER_SEED_SUBTYPES, buildRosterSeedRequest, makeRosterSeedServer, makeRosterSeedReceiver,
 } from '../../v2/rosterSeed.js';
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
-import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
+import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';
+import { COMPANION_GRANT_OUTCOMES } from '../../v2/companionGrant.js';   // the words a grant to a node's agent ends on   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -164,6 +167,7 @@ import {
   removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
   deviceDelegationOf, deviceDelegationsOf, profileHasOtherDevices, setDeviceDelegation as registrySetDeviceDelegation,
+  ownedNodesOf, setOwnedNode, addPendingRevokes, clearPendingRevoke, pendingRevokesOf,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -245,7 +249,8 @@ import { mergeManifests }                  from '../../manifestMerge.js';       
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
-import { linkOfferMessage } from '../../v2/identityLink.js';                    // the one message signLinkOffer signs
+import { linkOfferMessage, encodeLinkOffer, linkedBotsOf, LINK_OPS, LINKED_COMPANION_OP, IDENTITY_LINK_REVOKE_SUBTYPE } from '../../v2/identityLink.js';   // the identity link's offer, turns and revokes
+import { createIdentityLinks }        from '../../v2/identityLinkView.js';   // the bot's statement → a contact row
 import { makeCircleCalendarOps }           from '../../v2/circleCalendarOps.js';
 import { createOwnDevicesStore }           from '../../v2/ownDevicesStore.js';                   // a person's own appointments, when the shell hands no store
 import { makeCircleLists }                 from '@onderling/kring-host/circleLists';             // a person's own Agenda in their own store
@@ -2217,6 +2222,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawStoop('setContactPersona', {
         webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
       }),
+      // …and a newer identity link to a household bot (or its undoing), by the same rule
+      setLinked: (webid, linkedRow, linkedAt) => rawStoop('addContact', { webid, linkedRow, linkedAt }),
     },
     onLanded: () => savePeerBindings(),
   });
@@ -2868,13 +2875,213 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (migrated) selfEnrolledThisSession = true;
         } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
       }
+      // Every node the person owns (a companion) hears of it too — the root's own tombstone, so the revoked device
+      // stops managing it; the person revokes once. Best-effort per node: one that is away hears it next time.
+      const nodesTold = await tellOwnedNodesRevoked(root, deviceId);
+      // …and every household bot the person's identity is linked to (the same tombstone): from then on that device's
+      // turns there are a stranger's. Sent held-forward: a bot that is away hears it when it is back.
+      const botsTold = await tellLinkedBotsRevoked(root, deviceId);
       return [DataPart({
-        ok: true, deviceId, known, revokedIn, circles: revokedIn.length,
+        ok: true, deviceId, known, revokedIn, circles: revokedIn.length, nodesTold, botsTold,
         ...(personKeyVersion ? { personKeyVersion } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'private' });   // retires a device's keys everywhere: owner-only, phrase-proven
+
+  /* ─── The nodes a person OWNS (a companion): claimed with the code the node printed ─────────────────
+   * A node is managed by a statement signed with a DEVICE's delegation key, its root-signed delegation alongside
+   * (`signDeviceStatement`): the node checks the chain to the owner root it recorded at the claim, so every device of
+   * the person manages it and a revoked one does not. The profile key, which every device holds, is not used. */
+  const invokeNode = async (node, op, data) => {
+    const peer = secureAgentRef.current?.peer;
+    if (typeof peer?.invoke !== 'function') return null;
+    try {
+      const res = await Promise.race([
+        peer.invoke(node, op, [DataPart(data)]),
+        new Promise((r) => { setTimeout(() => r(null), 15_000); }),
+      ]);
+      // a node that answers is THERE: whatever it is still owed (a revoke that did not reach it) goes now
+      if (res && op !== 'grants.revoke') queueMicrotask(() => { retryPendingRevokes(node).catch(() => {}); });
+      return res ? (Parts.data(res) ?? null) : null;
+    } catch { return null; }
+  };
+  /** A statement by THIS DEVICE for a party outside the person's devices (its delegation key; the delegation beside it). */
+  const deviceStatementFor = async (domain, node, op, args = {}) => {
+    const signer = await grantsSignerPromise;
+    const delegation = enrolledDevice?.record ?? null;
+    if (!signer?.identity || !delegation) return null;
+    return signDeviceStatement({ domain, node, op, args, delegation, sign: (m) => signer.identity.sign(m) });
+  };
+  /** A management call to a node this person owns, signed by this device. Null when this device cannot sign. */
+  const signedForNode = async (node, op, args = {}) => {
+    const auth = await deviceStatementFor(STATEMENT_DOMAINS.COMPANION_MANAGE, node, op, args);
+    return auth ? { ...args, auth } : null;
+  };
+  /** Is this address a household bot the person's identity is linked to (`/koppel`) — a contact row marked so? */
+  const isLinkedBot = async (address) => {
+    if (typeof address !== 'string' || !address) return false;
+    try { return linkedBotsOf(await rawContacts()).includes(address); } catch { return false; }
+  };
+  /**
+   * A household bot's identity-link offer, made by THIS DEVICE (`/koppel`): a statement by its delegation key for that bot
+   * (op `link`, the chat identity as its argument; the root-signed delegation beside it), and the chat key's signature
+   * over the same nonce — ONLY that message (domain-separated by `linkOfferMessage`, built here, never handed in). The
+   * bot records the ROOT the delegation chains to. Null when this device has no delegation to sign with.
+   */
+  const signLinkOffer = async ({ botAddress } = {}) => {
+    if (typeof botAddress !== 'string' || !botAddress) return null;
+    const statement = await deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, botAddress, LINK_OPS.LINK, { w: chatId.pubKey });
+    if (!statement) return null;
+    const webidSig = b64encode(chatId.sign(linkOfferMessage({ k: chatId.pubKey, b: botAddress, n: statement.nonce })));
+    return encodeLinkOffer({ statement, webid: chatId.pubKey, webidSig });
+  };
+  // The bot's statement becomes a contact row, through the waist (so it carries to the person's other devices).
+  const identityLinks = createIdentityLinks({
+    signOffer: signLinkOffer,
+    selfRoot: () => enrolledDevice?.record?.by ?? null,
+    callSkill: (app, op, args) => callSkill(app, op, args),
+  });
+  /** Every linked bot hears a device's revocation — the root's own tombstone, which the bot verifies itself. */
+  async function tellLinkedBotsRevoked(root, deviceId) {
+    let bots = [];
+    try { bots = linkedBotsOf(await rawContacts()); } catch { bots = []; }
+    if (!bots.length) return 0;
+    const revocation = signDeviceRevocation(root.secret, { profileId: 'default', deviceId });
+    const sent = await Promise.all(bots.map((bot) => Promise.resolve()
+      .then(() => secureAgentRef.current?.peer?.sendTo(bot, { subtype: IDENTITY_LINK_REVOKE_SUBTYPE, revocation }, { guarantee: 'hold-forward' }))
+      .then(() => true, () => false)));
+    return sent.filter(Boolean).length;
+  }
+  async function tellOwnedNodesRevoked(root, deviceId) {
+    let nodes = [];
+    try { nodes = Object.keys(ownedNodesOf(await agentsRegistryRef?.lookup?.('default'))); } catch { nodes = []; }
+    if (!nodes.length) return 0;
+    const revocation = signDeviceRevocation(root.secret, { profileId: 'default', deviceId });
+    const told = await Promise.all(nodes.map((node) => invokeNode(node, 'manage.revokeDevice', { revocation })));
+    return told.filter((r) => r?.ok === true).length;
+  }
+  hostAgent.register('claimCompanion', async ({ parts }) => {
+    const claim = parseCompanionClaim(parts?.[0]?.data?.claim);
+    if (!claim) return [DataPart({ ok: false, outcome: 'bad-claim' })];
+    const data = await signedForNode(claim.node, 'manage.claimOwner', { code: claim.code });
+    if (!data) return [DataPart({ ok: false, outcome: 'no-device-key' })];
+    const res = await invokeNode(claim.node, 'manage.claimOwner', data);
+    if (!res) return [DataPart({ ok: false, outcome: 'unreachable' })];
+    if (res.ok !== true) {
+      const outcome = ['already-owned', 'invalid-code', 'stale', 'unsigned'].includes(res.error) ? res.error : 'unsigned';
+      return [DataPart({ ok: false, outcome })];
+    }
+    // the person's own list of the nodes they own: every device manages them, and each hears of a revoked device
+    try {
+      const cur = await agentsRegistryRef?.lookup?.('default');
+      if (cur) {
+        await agentsRegistryRef.register({
+          ...cur, properties: setOwnedNode(cur.properties ?? {}, { address: claim.node, claimedAt: new Date().toISOString() }),
+        });
+      }
+    } catch (err) { console.warn('[claimCompanion] the node is yours, but this device could not write it down:', err?.message ?? err); }
+    return [DataPart({ ok: true, outcome: 'ok', node: claim.node })];
+  }, { visibility: 'private' });   // makes this person a node's owner: owner-only
+
+  /* ─── What a node the person owns lets ANOTHER agent do there (a household bot putting agenda files) ──────────────
+   * Granted by FAMILY, never by op: the node names its families and maps each to its ops itself; it mints one token per
+   * op to the agent's key and delivers them over the relay. Both ops sign a statement with THIS device's delegation key
+   * — only for a node the person's own list says they own — and are never delegable (renderA2A's withhold list). */
+  const ownedNode = async (node) => {
+    if (typeof node !== 'string' || !node) return false;
+    try { return Object.prototype.hasOwnProperty.call(ownedNodesOf(await agentsRegistryRef?.lookup?.('default')), node); } catch { return false; }
+  };
+  /** Ask a node the person owns `op`, signed by this device: `{res}` or `{outcome}` naming why it was not asked/answered. */
+  const askOwnedNode = async (node, op, args) => {
+    if (!(await ownedNode(node))) return { outcome: 'not-owned' };
+    const data = await signedForNode(node, op, args);
+    if (!data) return { outcome: 'no-device-key' };
+    const res = await invokeNode(node, op, data);
+    return res ? { res } : { outcome: 'unreachable' };
+  };
+  hostAgent.register('companionGrantChoices', async ({ parts }) => {
+    const { node } = parts?.[0]?.data ?? {};
+    const { res, outcome } = await askOwnedNode(node, 'grants.families', {});
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true || !Array.isArray(res.families)) return [DataPart({ ok: false, outcome: res.error === 'stale' ? 'stale' : 'forbidden' })];
+    return [DataPart({ ok: true, outcome: 'ok', families: res.families.filter((f) => typeof f === 'string') })];
+  }, { visibility: 'private' });   // signs for the person's node: owner-only
+  hostAgent.register('grantCompanion', async ({ parts }) => {
+    const { node, to, families } = parts?.[0]?.data ?? {};
+    if (typeof to !== 'string' || !to || !Array.isArray(families) || families.length === 0) return [DataPart({ ok: false, outcome: 'bad-args' })];
+    // A household bot the person's identity is linked to is handed the companion FIRST, in the same act: the node's own
+    // card, through the bot's one linked-app call, with this device's statement over exactly that card. The bot takes it
+    // only from the person linked as its ADMIN (its door's gate decides, as for a typed line), and keeps a grant only from
+    // a companion it holds as a contact — so the card goes before the tokens, and a refusal stops here.
+    if (await isLinkedBot(to)) {
+      const { res: asked, outcome: away } = await askOwnedNode(node, 'node.card', {});
+      if (!asked) return [DataPart({ ok: false, outcome: away })];
+      if (asked.ok !== true || typeof asked.card !== 'string') return [DataPart({ ok: false, outcome: asked.error === 'stale' ? 'stale' : 'forbidden' })];
+      const auth = await deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, to, LINK_OPS.COMPANION, { card: asked.card });
+      if (!auth) return [DataPart({ ok: false, outcome: 'no-device-key' })];
+      const handed = await invokeNode(to, LINKED_COMPANION_OP, { card: asked.card, auth });
+      if (!handed) return [DataPart({ ok: false, outcome: 'bot-unreachable' })];
+      if (handed.ok !== true) {
+        const why = { 'not-admin': 'not-bot-admin', stale: 'stale' }[handed.error] ?? 'bot-refused';
+        return [DataPart({ ok: false, outcome: why })];
+      }
+    }
+    const { res, outcome } = await askOwnedNode(node, 'grants.mint', { to, families });
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true) {
+      return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    }
+    return [DataPart({ ok: true, outcome: 'ok', ops: res.ops ?? [], delivery: res.delivery ?? null })];
+  }, { visibility: 'private' });   // hands another agent standing authority on the person's node: owner-only
+  hostAgent.register('companionGrantList', async ({ parts }) => {
+    const { node } = parts?.[0]?.data ?? {};
+    const { res, outcome } = await askOwnedNode(node, 'grants.list', {});
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true || !Array.isArray(res.grants)) return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    const grants = res.grants.filter((g) => typeof g?.to === 'string').map((g) => ({ to: g.to, families: Array.isArray(g.families) ? g.families.filter((f) => typeof f === 'string') : [] }));
+    return [DataPart({ ok: true, outcome: 'ok', grants })];
+  }, { visibility: 'private' });   // signs for the person's node: owner-only
+  /* Revokes OWED to a node (a contact deleted while the node was away): kept on the node's record in the person's own
+   * registry (sealed, carried, restored with it), told at the next connect and whenever the node answers again. */
+  const ownProfile = async () => { try { return await agentsRegistryRef?.lookup?.('default'); } catch { return null; } };
+  const writeOwnProperties = async (fn) => {
+    const cur = await ownProfile();
+    if (!cur || !agentsRegistryRef?.register) return false;
+    await agentsRegistryRef.register({ ...cur, properties: fn(cur.properties ?? {}) });
+    return true;
+  };
+  let retrying = null;
+  /** Tell the nodes what they are owed (one node, or all); a node that answers clears its debt. */
+  function retryPendingRevokes(onlyNode = null) {
+    if (retrying) return retrying.then(() => (onlyNode ? null : retryPendingRevokes()));
+    retrying = (async () => {
+      const owed = pendingRevokesOf(await ownProfile()).filter((p) => !onlyNode || p.node === onlyNode);
+      for (const { node, key } of owed) {
+        const { res } = await askOwnedNode(node, 'grants.revoke', { to: key });
+        // told (or nothing to tell: a key the node does not take) — no longer owed; away, a clock off: kept
+        if (res?.ok === true || res?.error === 'bad-target') await writeOwnProperties((p) => clearPendingRevoke(p, node, key));
+      }
+    })().finally(() => { retrying = null; });
+    return retrying;
+  }
+  hostAgent.register('revokeCompanionGrant', async ({ parts }) => {
+    const { node, to } = parts?.[0]?.data ?? {};
+    if (typeof to !== 'string' || !to) return [DataPart({ ok: false, outcome: 'bad-args' })];
+    if (node == null) {
+      // every node the person owns (a contact deleted): OWED first, on the person's record, then told in the
+      // background — the delete never waits on a node, and one that is away is told when it is back
+      const nodes = Object.keys(ownedNodesOf(await ownProfile()));
+      if (nodes.length) await writeOwnProperties((p) => addPendingRevokes(p, [to]));
+      if (nodes.length) retryPendingRevokes().catch(() => {});
+      return [DataPart({ ok: true, outcome: 'pending', pending: nodes.length })];
+    }
+    // one node, from its row on My data: the person is looking at it, so the answer is waited for
+    const { res, outcome } = await askOwnedNode(node, 'grants.revoke', { to });
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true) return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    return [DataPart({ ok: true, outcome: 'ok', revoked: Number(res.revoked) || 0, dropped: Number(res.dropped) || 0 })];
+  }, { visibility: 'private' });   // ends another agent's authority on the person's node: owner-only
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),
@@ -6301,9 +6508,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // activates the already-built pod-routing write-through). Pass {podRoot, webid, fetch}.
     attachStoopPod: (opts) => (typeof stoopAgent?.attachPod === 'function' ? stoopAgent.attachPod(opts) : Promise.resolve({ ok: false })),
     detachStoopPod: () => stoopAgent?.detachPod?.(),
-    // Subscribe to events the inner stoop agent emits. The stoop agent extends core.Emitter (on/off). Returns an
-    // unsubscribe fn; a no-op when stoop isn't composed. (Its one former event, the attachment-fetched notice of the
-    // removed attachment fetch route, is gone with that route.)
+    // S6.4 — subscribe to events the inner stoop agent emits (e.g.
+    // 'stoop:attachment-fetched' when a recipient's requested attachment bytes
+    // arrive over the 1:1 channel). The stoop agent extends core.Emitter
+    // (on/off). Returns an unsubscribe fn; a no-op when stoop isn't composed.
     onStoopEvent: (event, handler) => {
       const a = stoopAgent?.bundle?.agent;
       if (!a || typeof a.on !== 'function' || typeof handler !== 'function') return () => {};
@@ -6316,12 +6524,20 @@ export async function createRealHouseholdAgent(opts = {}) {
       host: { pubKey: hostId.pubKey, stableId: hostId.stableId },
       chat: { pubKey: chatId.pubKey, stableId: chatId.stableId },
     },
+    /** A household bot's identity-link offer, made by this device (`/koppel`) — `{offer, nonce, root}`, or null. */
+    signLinkOffer,
     /**
-     * Sign a household bot's identity-link offer with this person's chat key — ONLY that message (domain-separated by
-     * `linkOfferMessage`, built here, never handed in), so this cannot sign anything else. The bot verifies it with the
-     * key the offer names: proof that this app holds the key it offers.
+     * The proof a turn to a household bot the person's identity is linked to carries: THIS device's statement over
+     * exactly that turn (its words, its message id) — the bot accepts it as the person only by it. Null for anyone else
+     * (a statement names this device's root and id, which no other contact is shown). The contact channel's `authFor`.
+     * @param {string} peerAddr
+     * @param {{text: string, messageId: string}} turn
      */
-    signLinkOffer: ({ botAddress, nonce }) => b64encode(chatId.sign(linkOfferMessage({ k: chatId.pubKey, b: botAddress, n: nonce }))),
+    linkedTurnAuth: async (peerAddr, { text, messageId } = {}) => (
+      (await isLinkedBot(peerAddr)) ? deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, peerAddr, LINK_OPS.TURN, { text, messageId }) : null
+    ),
+    /** The person's identity links: the offer's view, the bot's statement → a contact row (every shell spreads `handlers`). */
+    identityLinks,
     /** Whether this install is an ENROLLED device (a delegation under the owner root) — read by a
      *  headless operator command that must refuse to enrol an install twice. */
     // ENROLLED means "by a ceremony" — the delegation the first device mints for itself at first boot (2026-09-16) does
@@ -6617,8 +6833,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (typeof console !== 'undefined') console.warn('[realAgent] rendezvous enable failed (continuing without direct WebRTC):', err?.message ?? err);
         }
       }
+      // revokes owed to a node the person owns (a contact deleted while it was away): told now that this device is on
+      retryPendingRevokes().catch(() => {});
       return sa.peer;
     },
+    /** Tell the person's nodes the revokes they are still owed (the connect and a node's answer do this themselves). */
+    retryPendingCompanionRevokes: () => retryPendingRevokes(),
 
     /**
      * Fire-and-forget cross-peer send.  Auto-HI on first contact,

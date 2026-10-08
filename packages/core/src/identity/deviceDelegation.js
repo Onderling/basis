@@ -140,3 +140,49 @@ export function verifyDeviceDelegation(record, ownerPubKey = null) {
   try { return AgentIdentity.verify(deviceDelegationMessage(profileId, deviceId, pubKey), sig, by); }
   catch { return false; }
 }
+
+/** The canonical statement the owner root signs to retire a device. Deterministic; binds profile + device. */
+export function deviceRevocationMessage(profileId, deviceId) {
+  return `onderling-device-revocation-v1|${String(profileId)}|${String(deviceId)}`;
+}
+
+/**
+ * Mint the root-signed REVOCATION of a device — the tombstone a party outside the person's own devices can check
+ * (a companion the person owns): the registry's `{revoked: true}` mark is the person's own bookkeeping and signs
+ * nothing. Minted at the revoke ceremony, where the phrase (and so the root secret) is transiently present.
+ * @param {Uint8Array} rootSecret
+ * @param {{profileId: string, deviceId: string}} a
+ * @returns {{profileId:string, deviceId:string, by:string, sig:string}}
+ */
+export function signDeviceRevocation(rootSecret, { profileId, deviceId } = {}) {
+  if (!(rootSecret instanceof Uint8Array) || rootSecret.length !== 32) {
+    throw new Error('signDeviceRevocation: rootSecret must be a 32-byte Uint8Array');
+  }
+  if (!profileId || !deviceId) throw new Error('signDeviceRevocation: profileId and deviceId are required');
+  const kp = nacl.sign.keyPair.fromSeed(rootSecret);
+  const msg = new TextEncoder().encode(deviceRevocationMessage(profileId, deviceId));
+  return {
+    profileId: String(profileId),
+    deviceId:  String(deviceId),
+    by:        b64encode(kp.publicKey),
+    sig:       b64encode(nacl.sign.detached(msg, kp.secretKey)),
+  };
+}
+
+/**
+ * Verify a revocation: the signature must cover the statement and verify under `by` — and, when the caller knows
+ * the owner's root pubKey, `by` must BE it. Deny-by-default.
+ * @param {{profileId:string, deviceId:string, by:string, sig:string}} record
+ * @param {string} [ownerPubKey]
+ * @returns {boolean}
+ */
+export function verifyDeviceRevocation(record, ownerPubKey = null) {
+  if (!record || typeof record !== 'object') return false;
+  const { profileId, deviceId, by, sig } = record;
+  for (const v of [profileId, deviceId, by, sig]) {
+    if (typeof v !== 'string' || v.length === 0) return false;
+  }
+  if (ownerPubKey != null && by !== ownerPubKey) return false;
+  try { return AgentIdentity.verify(deviceRevocationMessage(profileId, deviceId), sig, by); }
+  catch { return false; }
+}

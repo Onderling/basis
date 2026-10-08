@@ -1190,6 +1190,9 @@ function validateView(v, path, manifest, errors, idSet, strict = false) {
  * @param {Set<string>} idSet
  * @param {boolean} [strict=false]
  */
+/** The roles a nav item may be reserved for (`item.role`). */
+export const NAV_ROLES = Object.freeze(['admin']);
+
 function validateNavItem(item, path, manifest, errors, idSet, strict = false) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     errors.push({ path, message: 'nav item must be an object' });
@@ -1219,6 +1222,11 @@ function validateNavItem(item, path, manifest, errors, idSet, strict = false) {
         message: `nav item.${field} must be a non-empty array of non-empty strings if present`,
       });
     }
+  }
+  // `role` — who the entry is for (detail-bar actions). A projector GREYS it for anyone else; the op or screen
+  // behind it keeps its own refusal. Only roles a circle actually has are allowed.
+  if (item.role !== undefined && !NAV_ROLES.includes(item.role)) {
+    errors.push({ path: `${path}/role`, message: `nav item.role must be one of ${NAV_ROLES.join(', ')} if present` });
   }
   const target = item.target;
   if (!target || typeof target !== 'object' || Array.isArray(target)) {

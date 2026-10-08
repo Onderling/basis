@@ -38,7 +38,7 @@ import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
   setDeliverySettingsChangedHook,
-  createFallbackOffer, setAddressFallbackReportHook,
+  createFallbackOffer, fallbackOfferStateIo, setAddressFallbackReportHook,
   // #36 — the retention choice comes from the parameter register, applied to the shared EventLog at boot.
   retentionFromDays,
 } from '@onderling-app/basis';
@@ -65,7 +65,7 @@ import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
 import { createHistoryPodMedium } from '../basis/src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../basis/src/v2/registryCarrier.js';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
-import { sealedLocalBackend } from '../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
+import { sealedLocalBackend, sealedKeyValue } from '../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { backendSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
@@ -195,6 +195,8 @@ export default function App() {
   const fallbackOfferRef = useRef(null);
   if (!fallbackOfferRef.current) {
     fallbackOfferRef.current = createFallbackOffer({
+      // Its memory across restarts: a declined offer stays declined for its cooldown, not until the next boot.
+      io: fallbackOfferStateIo(sealedKeyValue(AsyncStorage, { name: 'the fallback offer' })),
       onOffer: (payload) => {
         const sink = circleBotSinkRef.current;
         if (sink) { sink(payload); fallbackOfferRef.current.decline(); }

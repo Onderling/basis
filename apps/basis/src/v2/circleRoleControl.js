@@ -152,3 +152,59 @@ export function roleChangeConfirm({ control, name, t } = {}) {
   const tr = translatorOr(t, 'circleRoleControl.js');
   return confirmRequestForOp(SET_MEMBER_ROLE_OP, { t: tr, message: tr(control.confirmKey, { name }) });
 }
+
+/** The sentence a greyed admin-only action says (one general key, shared with the ⋯ menu's admin-only entries). */
+const ADMIN_ONLY_KEY = 'circle.op.admin_only';
+
+/**
+ * What the admin panel's per-row action is for THIS viewer — the same viewer reading `roleControlFor` uses.
+ *
+ * The gate is the skill (`removeMember` refuses a member); this only makes the panel say what the gate will answer:
+ *   · an admin: `remove`, enabled;
+ *   · a member, someone else's row (the admin's included): `remove`, GREYED with the reason — never hidden;
+ *   · a member, their OWN row: `leave` — leaving is a member's own act, not a removal — enabled, labelled "Leave circle";
+ *   · a viewer the roster does not know yet: greyed (fail closed until it answers).
+ *
+ * @param {object} a  `{ members, member, myRef }` as for `roleControlFor`
+ * @returns {{kind: 'remove'|'leave', disabled: boolean, reasonKey?: string, labelKey: string}}
+ */
+export function removeControlFor({ members, member, myRef } = {}) {
+  const list = rows(members);
+  const targetRef = refOf(member);
+  const REMOVE = { kind: 'remove', labelKey: 'circle.admin.remove' };
+  const greyed = { ...REMOVE, disabled: true, reasonKey: ADMIN_ONLY_KEY };
+  if (typeof myRef !== 'string' || !myRef || !targetRef) return greyed;
+  const me = list.find((m) => refOf(m) === myRef);
+  if (isAdminRow(me)) return { ...REMOVE, disabled: false };
+  if (me && targetRef === myRef) return { kind: 'leave', labelKey: 'circle.tile.menu.leave', disabled: false };
+  return greyed;
+}
+
+/**
+ * Whether this viewer may post the circle's announcement — `postAnnouncement` refuses a member, so the panel greys
+ * Post for one (with the reason), and for a viewer the roster does not know yet.
+ * @param {object} a  `{ members, myRef }`
+ * @returns {{disabled: boolean, reasonKey?: string}}
+ */
+export function announceControlFor({ members, myRef } = {}) {
+  return adminOnlyControl({ members, myRef });
+}
+
+/**
+ * Whether this viewer's Save in Circle settings would count. The circle policy travels the governance lane as an
+ * ADMIN's signed statement and every device folds only admins' (`foldPolicyUpdates`), so a member's Save would change
+ * their own copy and be dropped everywhere else — the circle quietly split. Greyed for a member, with the reason; the
+ * fields stay readable.
+ * @param {object} a  `{ members, myRef }`
+ * @returns {{disabled: boolean, reasonKey?: string}}
+ */
+export function policySaveControlFor({ members, myRef } = {}) {
+  return adminOnlyControl({ members, myRef });
+}
+
+/** The one admin-only answer the panel's announcement and the settings' Save share (fail closed on an unknown viewer). */
+function adminOnlyControl({ members, myRef } = {}) {
+  if (typeof myRef !== 'string' || !myRef) return { disabled: true, reasonKey: ADMIN_ONLY_KEY };
+  const me = rows(members).find((m) => refOf(m) === myRef);
+  return isAdminRow(me) ? { disabled: false } : { disabled: true, reasonKey: ADMIN_ONLY_KEY };
+}

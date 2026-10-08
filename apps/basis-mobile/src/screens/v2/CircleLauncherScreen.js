@@ -291,6 +291,7 @@ import { bindCircleGovernance, openPolicyProposals } from '../../../../basis/src
 import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
+import { launcherListPaint } from './launcherListPaint.js';
 
 // B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
 // Unset → no provider → the LLM branch
@@ -516,6 +517,9 @@ export default function CircleLauncherScreen({
   // The persona the Me tab's pointers open (the general one — there is no circle context here).
   const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Whether the list has had a real answer: "No circles yet." is said only then, never in "not known yet" (see
+  // `launcherListPaint`).
+  const [launcherSettled, setLauncherSettled] = useState(false);
   const [selected, setSelected] = useState(null);
   // The OPEN circle, readable from a closure that outlives a render — the mounted waist ops need "which
   // circle am I in" at CALL time, and an effect that mounts once would otherwise hold whichever circle
@@ -1270,24 +1274,27 @@ export default function CircleLauncherScreen({
     } catch { setShareContacts([]); }
   }, [bundle]);
 
-  // The stoop store hydrates from AsyncStorage a beat AFTER the agent bundle is
-  // ready, so the first load can race ahead of it and return 0 circles (the
-  // persisted ones look "lost" until the next manual reload). Retry a few times
-  // while empty so saved circles surface on their own. Bounded so a genuinely
-  // empty account doesn't spin; any real load (≥1 circle) stops it immediately.
+  // The first load WITH the agent bundle is the answer: stoop's store is loaded inside the agent's boot, which the
+  // bundle awaits — instrumented on a phone (2026-10-08): the store loaded, then the first load with the bundle listed
+  // the circle at once. (A comment here used to say the store hydrated "a beat after" the bundle and retried boot on a
+  // timer; it no longer does.) Before the bundle exists there is no answer yet, so nothing is settled.
+  // A circle arriving from ELSEWHERE (`circlesRevision`, e.g. a join through an invite link) may still take a beat to
+  // reach the store, so that path keeps a short, bounded retry while the list is empty.
+  const bootLoadedRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     let tries = 0;
+    const afterJoin = bootLoadedRef.current;   // a re-run after the first answer is a circle arriving from elsewhere
     const tick = async () => {
       const n = await load();
-      if (!cancelled && n === 0 && resolveSkill && (tries += 1) < 5) {
+      if (cancelled) return;
+      if (resolveSkill) { setLauncherSettled(true); bootLoadedRef.current = true; }
+      if (afterJoin && n === 0 && resolveSkill && (tries += 1) < 5) {
         setTimeout(() => { if (!cancelled) tick(); }, 1200);
       }
     };
     tick();
     return () => { cancelled = true; };
-    // `circlesRevision` re-runs this when a circle arrives from elsewhere — the retry-while-empty loop is
-    // exactly the right shape for it, since a just-joined circle may take a beat to reach the store.
   }, [load, resolveSkill, circlesRevision]);
 
   // refresh per-circle pending proposal counts whenever the
@@ -1479,7 +1486,7 @@ export default function CircleLauncherScreen({
     refreshMutedMap();
   }, [overrideStore, refreshMutedMap]);
 
-  const onLeaveCircle = useCallback((cid, circle) => {
+  const onLeaveCircle = useCallback((cid, circle, onLeft = null) => {
     const name = circle?.name ?? cid;
     Alert.alert(
       t('circle.tile.menu.leave'),
@@ -1513,6 +1520,7 @@ export default function CircleLauncherScreen({
               if (cur[cid]) setPinnedMap(await pinStore.toggle(cid));
             } catch { /* tolerate */ }
             load();
+            onLeft?.();   // a caller inside the circle (the admin panel) goes back to the list
           },
         },
       ],
@@ -1800,6 +1808,8 @@ export default function CircleLauncherScreen({
         groupId={selected.id}
         resolvePicture={circlePictureResolver(selected.id)}
         onBack={() => setView('detail')}
+        // a member's own row offers LEAVING (the shared decision): the same leave the tile menu runs, with its confirm
+        onLeave={() => onLeaveCircle(selected.id, selected, () => setView('list'))}
       />
     );
   }
@@ -2054,6 +2064,7 @@ export default function CircleLauncherScreen({
         eventLog={eventLog}
         circles={circles}
         recipeStore={recipeStore}
+        onStoopEvent={bundle?.onStoopEvent}
         emitMemberProps={bundle?.emitMemberProps}
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}
@@ -2138,6 +2149,7 @@ export default function CircleLauncherScreen({
     );
   }
 
+  const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
     <WithTabBar active="circles" onSelect={onTab} badges={tabBadges}>
       <View style={styles.page} testID="circle-launcher">
@@ -2151,7 +2163,7 @@ export default function CircleLauncherScreen({
             And reloads are common exactly where the miss was seen: joining from an invite link bumps
             `circlesRevision`, and the boot retry re-runs `load()` up to five times.
             So the placeholder is for an EMPTY list only — a refresh now repaints in place. */}
-        {loading && circles.length === 0 ? (
+        {listPaint === 'loading' ? (
           <Text style={styles.muted}>{t('circle.loading')}</Text>
         ) : (
           <ScrollView
@@ -2177,7 +2189,7 @@ export default function CircleLauncherScreen({
                 {t('circle.boot_failed', { reason: String(bootError) })}
               </Text>
             ) : null}
-            {circles.length === 0 && !bootError ? (
+            {listPaint === 'empty' ? (
               <Text style={styles.muted}>{t('circle.empty')}</Text>
             ) : (
               renderLauncherGroups(bySight.shown, {
@@ -2561,7 +2573,7 @@ function CircleDetail({
   readMembershipStatements = null,
   eventLog,
   circles = [],
-  recipeStore = null, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, onStoopEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -4007,7 +4019,7 @@ function CircleDetail({
               host-wired handler; each shell wires its own mechanism for a
               destination (e.g. `contacts` → setScreenPanel here, openCircleScreenPanel
               on web — the doorgeefluik model).  web ≡ mobile by construction. */}
-          {circleActionsMobile(basisManifest, { policy, availability: circleAvailability })
+          {circleActionsMobile(basisManifest, { policy, availability: circleAvailability, isAdmin: mandateViewer.isAdmin })
             .filter((action) => action.id !== 'back')
             .map((action) => {
               const handlers = {
@@ -4028,6 +4040,8 @@ function CircleDetail({
                   testID={`circle-detail-${token}`}
                 >
                   <Text style={styles.moreItemText}>{t(action.labelKey)}</Text>
+                  {/* why it is greyed (an admin-only entry for a member) — said beside it, not left to a dead tap */}
+                  {action.reasonKey ? <Text style={styles.moreItemReason}>{t(action.reasonKey)}</Text> : null}
                 </Pressable>
               );
             })}
@@ -4101,7 +4115,7 @@ function CircleDetail({
         ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
-          <CircleNoticeboard callSkill={stoopCall} media={circleMedia}
+          <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}
@@ -4435,7 +4449,8 @@ function CircleDetail({
         {/* The "+" menu — the projected entries, in the composer, exactly as web paints them. Rendered
             ABOVE the row so it opens upward like the web dropdown; absent entirely when this circle
             offers nothing that works. */}
-        {chatComposerVisible(activeTab) ? (<>   {/* the composer is the conversation's — hidden under Leden and the other tabs */}
+        {chatComposerVisible(activeTab) ? (<>
+        {/* the composer is the conversation's — hidden under Leden and the other tabs */}
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (
@@ -5676,6 +5691,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   moreMenu:       { borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, padding: 4, marginTop: 4, marginBottom: 4 },
   moreItem:       { paddingVertical: 9, paddingHorizontal: 12 },
   moreItemText:   { fontSize: 13, color: theme.color.ink },
+  moreItemReason: { fontSize: 11, color: theme.color.inkSoft, marginTop: 2 },
   // Bulletin restyle — the CONVERSATION stream is ONE bot card (mirror of onderling.org's
   // .chatbox / web's circle-view__chat-card). The header strip + the bordered scroll
   // are stacked siblings sharing a 2px-ink frame so they read as one card.

@@ -8,6 +8,8 @@
  * anyone else), and the announcer decides who hears what — never the one who made the change.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 /** The door's op the rows call. */
 export const ANNOUNCE_OP = 'announceChange';
 /** Whom an announce row acts as: the household itself (the host), never a person. */
@@ -24,8 +26,26 @@ export const ANNOUNCE_ROWS = Object.freeze([
   Object.freeze({ label: 'announce-chores', trigger: Object.freeze({ event: Object.freeze({ kind: 'any', type: 'task' }) }), args: Object.freeze({ kinds: Object.freeze(['given', 'moved']) }) }),
 ]);
 
-/** Is this an announce row (whatever its state)? */
-export const isAnnounceRow = (row) => row?.op === ANNOUNCE_OP && row?.actsAs === HOUSEHOLD_ACTS_AS;
+/** Is this one of the household's announce rows — a kind of change it tells (whatever its state)? */
+export const isAnnounceRow = (row) => row?.op === ANNOUNCE_OP && row?.actsAs === HOUSEHOLD_ACTS_AS && ANNOUNCE_ROWS.some((spec) => spec.label === row.label);
+
+/**
+ * A reminder for everyone ("herinner iedereen om 19:45: eten"): a timed household row whose op is the announcer, with the
+ * words to say (`args.say`). It acts as the household like the announce rows, and is said to everyone at its moment.
+ */
+export const REMIND_EVERYONE_LABEL = 'remind-everyone';
+/**
+ * A reminder of one's own at a time ("herinner me over 10 minuten: …"): a timed row acting as the PERSON, on the host's
+ * own store (where a Telegram-only person's rows live), whose op says the words in their private chat.
+ */
+export const REMIND_ME_LABEL = 'remind-me';
+/** The door's op a reminder of one's own runs at its moment (the host's runner calls it, as the person). */
+export const SAY_REMINDER_OP = 'sayReminder';
+/**
+ * How long after its moment a timed reminder (one's own, or for everyone) may still be said (a box that was off): after
+ * that it is skipped.
+ */
+export const TIMED_REMINDER_WINDOW_MIN = param({ key: 'assistant.timedReminderWindowMinutes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
 
 /**
  * Write the household's announce rows once, into the circle store named by `scope`, each watching THAT circle only: a
@@ -52,4 +72,20 @@ export async function seedAnnounceRows(book, scope) {
     made += 1;
   }
   return made;
+}
+
+/**
+ * How a host's runner hands a due row to its door — ONE composition for the box and its tests: the household's announce
+ * rows (and its reminders for everyone) run as the host itself (only that op ever carries the host's mark); a person's row
+ * as that person, through their own column of the door.
+ * @param {{door: (app: string, op: string, args: object, ctx: object) => Promise<any>, callerFor?: (actsAs: string) => Promise<string|null>}} a
+ * @returns {(o: {op: string, appOrigin?: string, actsAs: string, args?: object, id: string}) => Promise<any>}
+ */
+export function runRowThroughDoor({ door, callerFor = async () => null }) {
+  return async (o) => {
+    if (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS) return door(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true });
+    // as the person, through their own column of the door (a member's key maps to the row of the person it names)
+    const as = (await callerFor(o.actsAs)) ?? o.actsAs;
+    return door(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: as, threadId: as });
+  };
 }

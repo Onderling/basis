@@ -4405,6 +4405,78 @@
       "text": "Say which appointment or chore, and when — for example: remind me an hour before the dentist.",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
+    "remind_everyone_set": {
+      "text": "I'll remind everyone {{when}}: {{text}}.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_today": {
+      "text": "today at {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_tomorrow": {
+      "text": "tomorrow at {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_usage": {
+      "text": "Say when and what — for example: remind everyone at 19:45: dinner.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_failed": {
+      "text": "That didn't work: the reminder for everyone was not saved.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_me_at_set": {
+      "text": "I'll remind you {{when}}: {{text}}. To drop it: /schrap.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_at_usage": {
+      "text": "Say when and what — for example: remind me in 10 minutes to check the oven, or: remind me tomorrow at 8:00: bins.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_not_yours": {
+      "text": "I only remind you yourself, or everyone in the household — never someone else on your behalf.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_at_day": {
+      "text": "{{day}} at {{time}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "announce_mine": {
+      "text": "Reminder: {{title}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_me": {
+      "text": "reminder \"{{text}}\" (to drop it: /schrap {{n}})",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_everyone": {
+      "text": "reminder for everyone: \"{{text}}\"",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_done": {
+      "text": "Dropped: the reminder \"{{text}}\".",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_none": {
+      "text": "You have no reminders of your own set.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_usage": {
+      "text": "Which one? {{items}} — /schrap with its number or a word of it.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_not_found": {
+      "text": "No reminder of yours with \"{{which}}\". You have: {{items}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_which": {
+      "text": "Which one do you mean? {{items}} — /schrap with its number.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "announce_say": {
+      "text": "Reminder for everyone: {{title}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
     "overview_on": {
       "text": "The weekly overview is on (Sunday 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4470,12 +4542,36 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "When something has a date, I remind you: at 08:00 everything of that day, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
+      "text": "Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
       "text": "Reminders are off for this household.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_rule": {
+      "text": "Reminders: {{rules}}. Your own way: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_morning": {
+      "text": "at {{time}} everything of that day (chores and appointments)",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_evening": {
+      "text": "the evening before at {{time}} for an appointment before {{until}}",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_before": {
+      "text": "{{n}} minutes before anything with a time",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_at": {
+      "text": "at {{time}} on the day itself",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_none": {
+      "text": "Reminders: the household sends none. Your own: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
     },
     "welcome_overview": {
       "text": "Want a weekly overview, Sundays at 18:00? Switch it on with /overzicht aan.",
@@ -4653,6 +4749,10 @@
     "agenda_link_none_here": "This household has no agenda link.",
     "agenda_link_failed": "I could not make the agenda link just now. Please try again later.",
     "agenda_calendar_name": "Household",
+    "agenda_grant_ended": {
+      "text": "The companion no longer lets me place the agenda files (the access was revoked). The agenda links are off — until the companion's owner gives access again.",
+      "doc": "To the bot's admin, once, when the household companion refuses the token the bot presented (its owner revoked the grant). Not repeated until a new grant arrives."
+    },
     "menu_head": "Your settings (tap to change):",
     "menu_household": "For the whole household:",
     "menu_on_screen": "Your settings are on your connected screen. To connect another screen: /scherm.",
@@ -4709,7 +4809,6 @@
     "screen_confirm_none": "None of these",
     "reminder_event_soon": "Soon: {{title}}, {{time}}.",
     "reminder_chore_soon": "Coming up: {{text}}, at {{time}}.",
-    "welcome_reminders_on_lead": "When something has a date, I remind you: at 08:00 everything of that day, {{lead}} minutes before it, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
     "menu_lead": "Reminder beforehand",
     "value_lead_min": "{{n}} minutes",
     "value_lead_off": "none",
@@ -4790,8 +4889,9 @@
           "assistant-forget": "forget our conversation now (what you put on a list stays)",
           "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",
           "assistant-circles": "the circles the bot is in",
-          "remindMe": "your own reminder for one appointment or chore",
-          "assistant-planned": "what I will send you this week (reminders, the week overview)"
+          "remindMe": "a reminder of your own: at a time (\"in 10 minutes: …\"), for an appointment or chore, or one for everyone",
+          "assistant-planned": "what I will send you this week (reminders, the week overview)",
+          "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)"
         }
       }
     },
@@ -4834,7 +4934,7 @@
     "export_key_mismatch": "The two passphrases do not match. Nothing asked, nothing changed.",
     "link_open_app": "Open this link in your Basis app to link your identity to this bot: {{link}}\nYour app then shows a line to paste here.",
     "link_not_private": "That only counts in your own chat with the bot.",
-    "link_question": "A Basis app wants to link to you: messages from that app then count as you, and the bot knows your Basis identity. Pick the code your app shows.",
+    "link_question": "A Basis app wants to link to you: messages from your Basis apps (every device of yours, except one you revoke) then count as you, and the bot knows your Basis identity. Pick the code your app shows.",
     "kring_usage": "Paste a circle's invite after /kring. Out of a circle: /kring los <name>.",
     "kring_question": "The bot joins the circle “{{name}}”.\nRules: {{rules}}\n\nThe bot then keeps that circle's data on this device, and members of that circle can ask it things. The circle sees it is your bot: it is @{{handle}} there. Go ahead? (/kring ja {{id}} or /kring nee {{id}})",
     "kring_no_rules": "no rules set",
@@ -4853,13 +4953,17 @@
     "kringen_none": "The bot is in no circle.",
     "kringen_list": "The bot is in:\n{{list}}",
     "kring_not_here": "Not in a circle: reminders, the week's overview and your settings are in your own chat with the bot.",
-    "link_already": "This Basis app is already linked to you.",
+    "link_already": "This Basis identity is already linked to you.",
     "link_asked": "Pick the code your app shows below.",
     "link_another_bot": "That link line is for another bot. Nothing asked.",
     "link_key_taken": "That Basis identity already belongs to someone else here. Nothing asked.",
-    "link_row_has_key": "You are already linked to another Basis app. Use /ontkoppel first.",
+    "link_row_has_key": "You are already linked to another Basis identity. Use /ontkoppel first.",
     "link_not_an_offer": "That is not a link line from your Basis app.",
-    "link_done": "Linked: messages from your Basis app now count as you. /ontkoppel undoes it.",
+    "link_revoked": "That link line comes from a device you revoked. Make one on another device.",
+    "link_stale": "That link line is too old (or a clock is off). Make a new one in the app.",
+    "companion_set": "Your companion is set: agenda links are served from it once you have granted me its agenda files.",
+    "companion_not_one": "That is not a companion's card (it does not say where agenda links are served).",
+    "link_done": "Linked: messages from your Basis apps now count as you; a device you revoke in the app stops counting. /ontkoppel undoes it.",
     "link_declined": "Not linked.",
     "link_nothing": "No link is waiting for a code.",
     "link_failed": "Linking did not work.",
@@ -4872,6 +4976,10 @@
     }
   },
   "op": {
+    "admin_only": {
+      "text": "Only an admin of this circle can do this.",
+      "doc": "A ⋯ menu entry reserved for the circle's admins, shown greyed to a member with this sentence beside it (invite keeps its own, more specific one). Names the role, never the people who hold it."
+    },
     "not_in_this_circle": {
       "text": "That is not something this circle does — the app it belongs to is not switched on here. An admin can turn it on in the settings.",
       "doc": "Said when a person invokes an op whose APP this circle does not compose. It used to answer \"I couldn't turn that into an action\", which blames the person for the circle's configuration. Names what is wrong AND who can change it, because a refusal a person cannot act on is only slightly better than silence."
@@ -6908,6 +7016,57 @@
     "done": "Device removed. Every circle now refuses its keys.",
     "failed": "Removing failed."
   },
+  "companionClaim": {
+    "title": "Claim a companion",
+    "ceremony": "Claiming the companion",
+    "body": "Paste the line your companion shows in its log, after 'Claim:' (code@address). It becomes yours: every device of yours can manage it, a revoked device cannot.",
+    "placeholder": "ABCD-EFGH@…",
+    "submit": "Claim",
+    "button": "Claim a companion",
+    "done": "This companion is yours now. Every device of yours can manage it.",
+    "failed": "Claiming did not work.",
+    "outcome_bad_claim": "That is not a claim line. Copy everything after 'Claim:' — the code, the @ and the address.",
+    "outcome_no_device_key": "This device has no device key of its own yet. Open the app again and try once more.",
+    "outcome_unreachable": "The companion does not answer. Is it running and connected to the relay?",
+    "outcome_already_owned": "This companion already has an owner.",
+    "outcome_invalid_code": "The code is wrong or has expired. Take the newest line from the log (a new one every ten minutes).",
+    "outcome_stale": "This device's clock is more than five minutes off the companion's. Set your device's time right and try again.",
+    "outcome_unsigned": "The companion did not accept this device's signature."
+  },
+  "companionGrant": {
+    "nodes": "My agents",
+    "node_row": "Companion {{short}}",
+    "give": "Give access",
+    "to_label": "To whom",
+    "to_none": "Nobody to give access to yet. First add the bot as a contact (its card), or link it with /koppel.",
+    "may_do": "May:",
+    "loading": "Asking what this companion can give…",
+    "confirm": "Give access",
+    "nothing_ticked": "Tick what it may do.",
+    "family_agenda_files": "place agenda files",
+    "done": "Access given. The companion passes it on; it holds until you revoke it (tick it again after a year).",
+    "failed": "Giving access did not work.",
+    "outcome_not_owned": "This companion is not yours. Claim it first.",
+    "outcome_no_device_key": "This device has no device key of its own yet. Reopen the app and try again.",
+    "outcome_unreachable": "The companion does not answer. Is it on and connected to the relay?",
+    "outcome_forbidden": "The companion did not accept this device's signature.",
+    "outcome_stale": "This device's clock is more than five minutes off from the companion's. Set your device's time and try again.",
+    "outcome_unknown_family": "This companion cannot give that.",
+    "outcome_bad_target": "The companion cannot give access to that recipient.",
+    "outcome_bad_args": "Choose to whom, and tick what it may do.",
+    "outcome_gate_off": "This companion runs without its access check, so it gives no access.",
+    "outcome_not_bot_admin": "Only the bot's admin can give it your companion. Ask them to grant it from their app.",
+    "outcome_bot_unreachable": "The bot does not answer. Is it running and connected to the relay?",
+    "outcome_bot_refused": "The bot did not take your companion. Link your Basis app to it again (/koppel) and try once more.",
+    "granted": "Access given to",
+    "may": "may: {{what}}",
+    "revoke": "revoke",
+    "revoked": "Revoked. The companion refuses whatever it tries here from now on.",
+    "pending": {
+      "text": "Revoking — on its way to {{count}} companion(s)",
+      "doc": "My data → Mijn agents: revokes of a deleted contact that did not reach a node yet (it was away); told when it answers again."
+    }
+  },
   "wizard": {
     "recovery": {
       "after_restore_hint": {
@@ -8279,12 +8438,17 @@
   "identityLink": {
     "title": "Link your Basis to a bot",
     "which_bot": "This link comes from the bot {{bot}}.",
-    "means": "Once linked, messages from this app count as you with that bot, and the bot knows your Basis identity. Nothing else is shared.",
+    "means": "Once linked, messages from your Basis apps count as you with that bot (every device of yours; one you revoke stops counting), and the bot knows your Basis identity. Nothing else is shared. The bot then appears in your contacts.",
     "make": "Make the link line",
     "paste_this": "Paste this line into your own chat with {{bot}}:",
     "copy": "Copy",
+    "share": "Share",
     "code": "The bot then asks which code your app shows. Pick this one:",
     "waiting": "Waiting for the bot…",
+    "no_device_key": "This device cannot make a link line yet (it has no device key of its own). Open the app again and try once more.",
+    "paste_link": "Paste the link the bot sent you (it starts with https:// and contains #koppel-bot=).",
+    "not_a_link": "That is not a link from a bot's /koppel.",
+    "open": "Link a bot",
     "linked": "Linked to {{bot}}. In the chat, /ontkoppel undoes it.",
     "close": "Close"
   },

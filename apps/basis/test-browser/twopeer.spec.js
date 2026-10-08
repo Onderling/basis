@@ -112,7 +112,12 @@ async function enableTasks(page) {
     ok = true;
   }
   const save = page.locator('.circle-settings__save');
-  if (await save.count()) { await save.first().click(); await page.waitForTimeout(1800); }
+  // A MEMBER's Save is greyed (the policy is the admins'; a member's statement is dropped by every other device): the
+  // feature reaches a member over the governance lane from the admin's save, so there is nothing for them to press.
+  if (await save.count()) {
+    if (!(await save.first().isEnabled())) return false;   // greyed: this viewer is not an admin — nothing was saved
+    await save.first().click(); await page.waitForTimeout(1800);
+  }
   return ok;
 }
 
@@ -246,11 +251,11 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
 
   if (!bHasCircle) { log('COLLAB', 'SKIPPED', 'B did not join — nothing to collaborate on'); await teardown(A, B); return; }
 
-  // Ensure both are in the circle chat, and B has tasks enabled (so its Taken tab renders).
+  // Tasks are circle POLICY: the ADMIN (A) switched them on when she made the circle (above), and B receives that policy
+  // over the governance lane — a member's own Save is greyed (every other device would drop it), so it is not B's to press.
   await gotoCircles(a); await openCircleMatching(a, /peer.?circle/i); await toChat(a);
+  await b.waitForTimeout(3500);   // the policy crosses the lane
   await gotoCircles(b); await openCircleMatching(b, /peer.?circle/i); await toChat(b);
-  const tasksOnB = await enableTasks(b);
-  console.log('B tasks enabled:', tasksOnB);
   await gotoCircles(b); await openCircleMatching(b, /peer.?circle/i); await toChat(b);
 
   // ── Step 4a: A sends a chat message → B receives ──────────────────────────

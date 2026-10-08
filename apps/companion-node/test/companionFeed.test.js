@@ -4,14 +4,16 @@
  * The owner (a household bot) puts a file sealed to a key only the link carries; the companion keeps the ciphertext
  * under the hash of the link's id and nothing else; `GET /feed/<id>.<k>.ics` opens it with the key from the path. A
  * non-owner's put is refused; an unknown id, a wrong key and a dropped file are ONE identical 404; nothing at rest
- * holds the agenda, the id or the key; Caddy keeps no log of the path.
+ * holds the agenda, the id or the key; Caddy keeps no log of the path. A put takes a token the owner granted.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Agent, AgentIdentity, Parts } from '@onderling/core';
+import { Agent, AgentIdentity, Parts, Bootstrap } from '@onderling/core';
+import { ownerDevice } from './support/ownerDevice.js';
+import { grantAgendaFiles } from './support/grantAgendaFiles.js';
 import { randomKey, sealForLink } from '@onderling/blob-gateway';
 import { VaultMemory } from '@onderling/vault';
 import { RelayTransport } from '@onderling/transports';
@@ -61,6 +63,30 @@ describe('the feed shelf', () => {
     expect((await shelf.put('short', sealed(k))).ok).toBe(false);
   });
 
+  it('each file keeps who put it — beside the ciphertext, never the id or key — and that putter\'s files drop together', async () => {
+    const bucket = makeDevBlobBucket();
+    const shelf = createFeedShelf({ bucket });
+    const ann = 'A'.repeat(43); const bob = 'B'.repeat(43);
+    const [a1, a2, b1] = [newId(), newId(), newId()]; const k = randomKey();
+    for (const [id, by] of [[a1, ann], [a2, ann], [b1, bob]]) expect(await shelf.put(id, sealed(k), { by })).toEqual({ ok: true });
+    const atRest = JSON.stringify([...bucket.store.entries()]);
+    expect(atRest).toContain(ann);
+    for (const secret of [a1, a2, b1, k, 'Tandarts']) expect(atRest).not.toContain(secret);
+    // replaced by the same putter: still one file
+    await shelf.put(a1, sealed(k, ICS.replace('Tandarts', 'Kapper')), { by: ann });
+    expect(await shelf.open(a1, k)).toContain('Kapper');
+    expect(await shelf.dropAllBy(ann)).toBe(2);
+    expect(await shelf.open(a1, k)).toBeNull();
+    expect(await shelf.open(a2, k)).toBeNull();
+    expect(await shelf.open(b1, k), 'another putter\'s file stays').toBe(ICS);
+    expect(await shelf.dropAllBy(ann), 'nothing left').toBe(0);
+    // a file another agent has since replaced is not the revoked one's to lose
+    await shelf.put(a2, sealed(k), { by: ann });
+    await shelf.put(a2, sealed(k), { by: bob });
+    expect(await shelf.dropAllBy(ann)).toBe(0);
+    expect(await shelf.open(a2, k)).toBe(ICS);
+  });
+
   it('the file bucket on disk holds ciphertext only', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'feed-shelf-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
@@ -83,11 +109,13 @@ describe('the feed shelf', () => {
 });
 
 describe('the companion serves the owner\'s agenda files', () => {
-  it('the owner puts, the link opens it; a non-owner is refused; every miss is one identical 404', async () => {
-    const owner = await AgentIdentity.generate(new VaultMemory());
+  it('the granted bot puts, the link opens it; an agent without the grant is refused; every miss is one identical 404', async () => {
+    // the owner's device grants the bot (a node composed already claimed by that person's root)
+    const root = Bootstrap.create().bootstrap;
+    const ownersDevice = ownerDevice(root, 'phone');
     const host = await startCompanionNode({
-      identityVault: new VaultMemory(), gate: false,
-      management: true, managementOwnerPubKey: owner.pubKey, manageHttp: true,
+      identityVault: new VaultMemory(),
+      management: true, claimedOwner: { root: ownersDevice.delegation.by }, manageHttp: true,
       feeds: true, feedBucket: makeDevBlobBucket(),
     });
     cleanups.push(() => host.stop());
@@ -101,15 +129,16 @@ describe('the companion serves the owner\'s agenda files', () => {
     expect(none.status).toBe(404);
     expect(none.body).toBe(nowhere.body);
 
-    // a non-owner's put is refused, and leaves nothing
+    // a put without the grant is refused, and leaves nothing
     const stranger = await device(host);
-    const refused = Parts.data(await stranger.invoke(host.agent.address, 'feed.put', { id, envelope: sealed(k) }));
-    expect(refused).toEqual({ ok: false, error: 'forbidden' });
+    await expect(stranger.invoke(host.agent.address, 'feed.put', { id, envelope: sealed(k) })).rejects.toThrow(/token/i);
     expect(await host.feeds.open(id, k)).toBeNull();
 
-    // the owner's put; the link opens it
-    const bot = await device(host, owner);
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', { id, envelope: sealed(k) }))).toEqual({ ok: true });
+    // the granted bot's put; the link opens it
+    const bot = await device(host);
+    const tokens = await grantAgendaFiles(host, ownersDevice, bot);
+    const put = { id, envelope: sealed(k) };
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', put, { token: tokens.put }))).toEqual({ ok: true });
     const hit = await get(`/feed/${id}.${k}.ics`);
     expect(hit.status).toBe(200);
     expect(hit.type).toMatch(/^text\/calendar/);
@@ -124,23 +153,39 @@ describe('the companion serves the owner\'s agenda files', () => {
       expect(r.body, miss).toBe(nowhere.body);
     }
 
-    // a non-owner cannot drop it; the owner can, and the link is dark
-    expect(Parts.data(await stranger.invoke(host.agent.address, 'feed.drop', { id }))).toEqual({ ok: false, error: 'forbidden' });
+    // an agent without the grant cannot drop it; the bot can, and the link is dark
+    await expect(stranger.invoke(host.agent.address, 'feed.drop', { id })).rejects.toThrow(/token/i);
     expect((await get(`/feed/${id}.${k}.ics`)).status).toBe(200);
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.drop', { id }))).toEqual({ ok: true });
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.drop', { id }, { token: tokens.drop }))).toEqual({ ok: true });
     expect((await get(`/feed/${id}.${k}.ics`)).body).toBe(nowhere.body);
   }, 30_000);
 });
 
 describe('Caddy in front of it keeps no log of the path', () => {
-  // the path carries the key: the /feed handle skips the access log, in both front configs, and goes to the companion
+  // the path carries the key: the /feed handle skips the access log, in both front configs, for BOTH forms of the link —
+  // `/feed/<node>/<id>.<k>.ics` to the relay (which forwards it to the node), `/feed/<id>.<k>.ics` to this companion
+  /** The body of `handle /feed/* { … }`, nested blocks and all. */
+  const feedHandle = (text) => {
+    const at = text.indexOf('handle /feed/* {');
+    if (at < 0) return '';
+    let depth = 0;
+    for (let i = text.indexOf('{', at); i < text.length; i += 1) {
+      if (text[i] === '{') depth += 1;
+      if (text[i] === '}' && (depth -= 1) === 0) return text.slice(at, i + 1);
+    }
+    return '';
+  };
   for (const rel of ['../../../deploy/roles/relay.caddy', '../../../deploy/caddy/Caddyfile']) {
     it(rel.split('/deploy/')[1], () => {
       const text = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
-      const block = /handle \/feed\/\* \{([^}]*)\}/.exec(text)?.[1] ?? '';
+      const block = feedHandle(text);
       expect(block, 'a /feed handle').not.toBe('');
-      expect(block).toMatch(/\blog_skip\b/);
-      expect(block).toMatch(/reverse_proxy companion:8790/);
+      expect(block).toMatch(/^\s*log_skip\s*$/m);
+      // the relay's form: a node (an address) then the file, to the relay — matched before the companion's catch-all
+      expect(block).toMatch(/@viaRelay path_regexp \^\/feed\/\[A-Za-z0-9_-\]\{43\}\/\[\^\/\]\+\$/);
+      expect(block).toMatch(/route \{\s*reverse_proxy @viaRelay relay:8787\s*reverse_proxy companion:8790\s*\}/);
+      // and no access log anywhere in the site
+      expect(text).not.toMatch(/^\s*log\s*(\{|$)/m);
     });
   }
 });

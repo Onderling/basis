@@ -47,7 +47,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
-import { deviceDelegationsOf } from '@onderling/agent-registry';
+import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
+// MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
+import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
@@ -87,6 +89,25 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [metrics, setMetrics] = useState({});
   const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
+  const [companions, setCompanions] = useState([]);    // the nodes this person owns: [{node, short}]
+  const [companionsPending, setCompanionsPending] = useState(null);   // "intrekken onderweg bij n companion(s)", or null
+  // the open grant on one node: {node, picker (null while asked), to, picked: family ids, line (how it ended)}
+  const [grant, setGrant] = useState(null);
+  // who each node granted: { [node]: {ok, rows: [{to, label, may}]} | {ok: false, message}, said?: string }
+  const [holders, setHolders] = useState({});
+  const loadHolders = useCallback(async (node, said = null) => {
+    const r = await loadCompanionGrantRows({ callSkill, node, t }).catch(() => null);
+    setHolders((h) => ({ ...h, [node]: { ...(r ?? { ok: false, message: t('circle.companionGrant.failed') }), said } }));
+  }, [callSkill]);
+  useEffect(() => { for (const c of companions) loadHolders(c.node); }, [companions, loadHolders]);
+  // THE IDENTITY LINK (`/koppel`) — this person's Basis identity linked to their row on a household bot: the link the
+  // bot sent, pasted here; the shared view says which bot and makes the line (this device's statement) and the code;
+  // the bot's statement makes the bot a contact (the agent's lane entry), and "linked" is said here when it lands.
+  // {text, view, made, linked} | null. Web parity: the `#koppel-bot=` sheet (identityLinkSheet.js).
+  const [botLink, setBotLink] = useState(null);
+  useEffect(() => agent?.identityLinks?.onLinked?.((e) => {
+    if (!e?.unlinked) setBotLink((b) => (b?.view?.bot?.ok && b.view.bot.botAddress === e.bot ? { ...b, linked: true } : b));
+  }), [agent]);
   const [connections, setConnections] = useState([]);  // paired views ("gekoppelde apparaten")
   const [offerText, setOfferText] = useState('');      // the pasted onderling-connect:// code
   const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
@@ -246,6 +267,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     // The enrolled-devices list (add-a-device bookkeeping) — one row per registry delegation.
     setDevices(Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
       .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true })));
+    // the nodes this person claimed (their own list; each node keeps its owner itself)
+    setCompanions(Object.values(ownedNodesOf({ properties: profProps?.properties ?? {} }))
+      .map((n) => ({ node: n.address, short: n.label || `${n.address.slice(0, 8)}…` })));
+    setCompanionsPending(pendingRevokeLine({ properties: profProps?.properties ?? {} }, t));
     // The paired views. A read, never an authority: the grants live in the agent's durable
     // registry and the acting door reads THAT, so a stale list can only look stale.
     const conns = await callSkill('household', 'listSurfaceGrants', {}).catch(() => null);
@@ -432,6 +457,64 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
         </Pressable>
+        {/* A companion node of your own: claim it with the line it prints in its log. */}
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
+          <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
+        </Pressable>
+        {/* A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. */}
+        {agent?.identityLinks ? (
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
+            <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
+          </Pressable>
+        ) : null}
+        {botLink ? (
+          <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
+            {!botLink.view?.bot?.ok ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
+                <TextInput
+                  style={styles.relayInput}
+                  value={botLink.text}
+                  onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  testID="mydata-link-bot-input"
+                />
+                {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
+              </View>
+            ) : null}
+            {botLink.view?.bot?.ok && !botLink.made ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
+                <Pressable
+                  style={styles.action}
+                  testID="mydata-link-bot-make"
+                  onPress={async () => {
+                    const made = await botLink.view.offer().catch(() => ({ ok: false }));
+                    setBotLink((b) => ({ ...b, made }));
+                  }}
+                >
+                  <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
+            {botLink.made?.ok && !botLink.linked ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
+                <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
+                <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
+                  <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
+                </Pressable>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
+                <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
+              </View>
+            ) : null}
+            {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
+          </View>
+        ) : null}
         {/* The member's choice of which device others deliver to first — their primary contact address. */}
         <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
@@ -454,6 +537,91 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
               )}
             </View>
           ))}
+        </Section>
+      )}
+
+      {/* MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there: "give
+          access" asks the node what it can give, then who (a contact — a bot linked above is one) and the ticks. Web
+          parity: circleMyData.js. */}
+      {companions.length > 0 && (
+        <Section title={t('circle.companionGrant.nodes')}>
+          {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}
+          {companions.map((c) => {
+            const open = grant?.node === c.node ? grant : null;
+            const picker = open?.picker ?? null;
+            return (
+              <View key={c.node} style={{ paddingVertical: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.privacyBody}>{t('circle.companionGrant.node_row', { short: c.short })}</Text>
+                  <Pressable
+                    testID={`mydata-companion-give-${c.node.slice(0, 8)}`}
+                    onPress={async () => {
+                      setGrant({ node: c.node, picker: null, to: null, picked: [], line: null });
+                      const p = await loadCompanionGrantPicker({ callSkill, node: c.node, t });
+                      setGrant({ node: c.node, picker: p, to: p.ok ? (p.targets[0]?.key ?? null) : null, picked: [], line: null });
+                    }}
+                  >
+                    <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.give')}</Text>
+                  </Pressable>
+                </View>
+                {/* who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken" */}
+                {holders[c.node]?.said ? <Text style={styles.privacyBody}>{holders[c.node].said}</Text> : null}
+                {holders[c.node] && !holders[c.node].ok && <Text style={styles.privacyBody}>{holders[c.node].message}</Text>}
+                {(holders[c.node]?.rows ?? []).map((h) => (
+                  <View key={h.to} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 }}>
+                    <Text style={[styles.privacyBody, { flex: 1, paddingRight: 8 }]}>{`${h.label} — ${h.may}`}</Text>
+                    <Pressable
+                      testID={`mydata-companion-revoke-${h.to.slice(0, 8)}`}
+                      onPress={async () => {
+                        const r = await callSkill('household', 'revokeCompanionGrant', { node: c.node, to: h.to }).catch(() => null);
+                        loadHolders(c.node, companionRevokeText(r, t));
+                      }}
+                    >
+                      <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.revoke')}</Text>
+                    </Pressable>
+                  </View>
+                ))}
+                {open && !picker && <Text style={styles.privacyBody}>{t('circle.companionGrant.loading')}</Text>}
+                {open && open.line && <Text style={styles.privacyBody} testID="mydata-companion-line">{open.line}</Text>}
+                {open && picker && !open.line && !picker.ok && <Text style={styles.privacyBody}>{picker.message}</Text>}
+                {open && picker?.ok && !open.line && picker.targets.length === 0 && (
+                  <Text style={styles.privacyBody}>{t('circle.companionGrant.to_none')}</Text>
+                )}
+                {open && picker?.ok && !open.line && picker.targets.length > 0 && (
+                  <View>
+                    <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.to_label')}</Text>
+                    {picker.targets.map((tg) => (
+                      <Pressable key={tg.key} testID={`mydata-companion-to-${tg.key.slice(0, 8)}`} onPress={() => setGrant({ ...open, to: tg.key })}>
+                        <Text style={styles.privacyBody}>{(open.to === tg.key ? '◉ ' : '○ ') + tg.label}</Text>
+                      </Pressable>
+                    ))}
+                    <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.may_do')}</Text>
+                    {picker.choices.map((ch) => (
+                      <Pressable
+                        key={ch.id}
+                        testID={`mydata-companion-family-${ch.id}`}
+                        onPress={() => setGrant({ ...open, picked: open.picked.includes(ch.id) ? open.picked.filter((x) => x !== ch.id) : [...open.picked, ch.id] })}
+                      >
+                        <Text style={styles.privacyBody}>{(open.picked.includes(ch.id) ? '☑ ' : '☐ ') + ch.label}</Text>
+                      </Pressable>
+                    ))}
+                    <Pressable
+                      testID="mydata-companion-confirm"
+                      onPress={async () => {
+                        if (!open.to || open.picked.length === 0) { setGrant({ ...open, note: t('circle.companionGrant.nothing_ticked') }); return; }
+                        const r = await callSkill('household', 'grantCompanion', { node: c.node, to: open.to, families: open.picked }).catch(() => null);
+                        setGrant({ ...open, line: companionGrantText(r, t) });
+                        loadHolders(c.node);
+                      }}
+                    >
+                      <Text style={styles.actionLabel}>{t('circle.companionGrant.confirm')}</Text>
+                    </Pressable>
+                    {open.note ? <Text style={styles.privacyBody}>{open.note}</Text> : null}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </Section>
       )}
 
@@ -784,6 +952,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       )}
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
       <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
+      <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
+        placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />
       <RevokeDeviceModal
         visible={!!revokeTarget}
         deviceId={revokeTarget}

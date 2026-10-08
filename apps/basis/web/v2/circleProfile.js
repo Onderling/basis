@@ -20,6 +20,8 @@
  */
 import { pageLabel } from '../../src/v2/pageProjection.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { MIJ_OVERVIEW_TITLE_KEY } from '../../src/v2/mijOverview.js';
+import { renderCircleScreen } from './circleScreen.js';
 
 export function renderCircleProfile(container, {
   profile = {},
@@ -30,8 +32,11 @@ export function renderCircleProfile(container, {
   // Fold-in phase C — open the "Mij → persona's" surface (where offerings live now).
   // Absent ⇒ the pointer renders as plain text (older callers / tests).
   onOpenMij,
-  // Gepland's lines (shared `plannedLines`); null while they load; absent = the shell does not show Gepland
+  // Mijn overzicht, top: Gepland's lines (shared `plannedLines`); null while they load; absent = no Gepland rows
   plannedLines = undefined,
+  // Mijn overzicht, below: the shared overview's materialized blocks (`mijOverviewBlocks`), drawn by the screen's own
+  // block painter; null while they load; absent = no blocks. Neither given = no section.
+  overviewBlocks = undefined,
   // the person's own week overview: `{ on, onToggle }` (absent = no switch; on null while it loads)
   weekOverview = undefined,
   onGeocode,
@@ -104,43 +109,55 @@ export function renderCircleProfile(container, {
   }
   container.appendChild(moved);
 
-  // ── Gepland: what is coming for me, wherever it lives (the shell hands the lines; null while they load) ─────
-  if (plannedLines !== undefined) {
-    const planned = section(tr('circle.profile.planned_title'));
-    planned.classList.add('cc-profile__planned');
-    if (plannedLines === null || !Array.isArray(plannedLines) || plannedLines.length === 0) {
-      const p = document.createElement('p');
-      p.className = 'cc-profile__planned-empty';
-      p.textContent = tr(plannedLines === null ? 'circle.profile.planned_loading' : 'circle.profile.planned_none');
-      planned.appendChild(p);
-    } else {
-      const ul = document.createElement('ul');
-      ul.className = 'cc-profile__planned-list';
-      for (const line of plannedLines) {
-        const li = document.createElement('li');
-        li.className = 'cc-profile__planned-item';
-        li.textContent = line;
-        ul.appendChild(li);
+  // ── Mijn overzicht — ONE section: Gepland's rows on top (what is coming for me, wherever it lives; the shell hands
+  // the lines, null while they load) with the week-overview switch beside them, then "Mijn dingen" (my chores across
+  // every circle, the shared block, drawn by the screen's own block painter). Read-only: no screens manager. ────────
+  if (plannedLines !== undefined || overviewBlocks !== undefined) {
+    const overview = section(tr(MIJ_OVERVIEW_TITLE_KEY));
+    overview.classList.add('cc-profile__overview');
+    if (plannedLines !== undefined) {
+      const planned = document.createElement('div');
+      planned.className = 'cc-profile__planned';
+      if (plannedLines === null || !Array.isArray(plannedLines) || plannedLines.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'cc-profile__planned-empty';
+        p.textContent = tr(plannedLines === null ? 'circle.profile.planned_loading' : 'circle.profile.planned_none');
+        planned.appendChild(p);
+      } else {
+        const ul = document.createElement('ul');
+        ul.className = 'cc-profile__planned-list';
+        for (const line of plannedLines) {
+          const li = document.createElement('li');
+          li.className = 'cc-profile__planned-item';
+          li.textContent = line;
+          ul.appendChild(li);
+        }
+        planned.appendChild(ul);
       }
-      planned.appendChild(ul);
+      if (weekOverview) {
+        const row = document.createElement('div');
+        row.className = 'cc-profile__week';
+        const label = document.createElement('span');
+        label.className = 'cc-profile__week-label';
+        label.textContent = tr('circle.profile.week_switch');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cc-profile__week-toggle cc-btn';
+        btn.dataset.on = weekOverview.on ? 'true' : 'false';
+        btn.disabled = weekOverview.on === null;
+        btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
+        btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
+        row.append(label, btn);
+        planned.appendChild(row);
+      }
+      overview.appendChild(planned);
     }
-    if (weekOverview) {
-      const row = document.createElement('div');
-      row.className = 'cc-profile__week';
-      const label = document.createElement('span');
-      label.className = 'cc-profile__week-label';
-      label.textContent = tr('circle.profile.week_switch');
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'cc-profile__week-toggle cc-btn';
-      btn.dataset.on = weekOverview.on ? 'true' : 'false';
-      btn.disabled = weekOverview.on === null;
-      btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
-      btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
-      row.append(label, btn);
-      planned.appendChild(row);
+    if (overviewBlocks !== undefined) {
+      const body = document.createElement('div');
+      overview.appendChild(body);
+      renderCircleScreen(body, { blocks: overviewBlocks, t: tr });
     }
-    container.appendChild(planned);
+    container.appendChild(overview);
   }
 
   // ── location ──────────────────────────────────────────────────────────────

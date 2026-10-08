@@ -24,6 +24,8 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isOwnTelegramChat } from './doorBridges.js';
 import { cachedShare } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
+import { readDayAndTime } from '../forms/parseDate.js';
+import { replyLine } from './replyLine.js';
 
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
@@ -102,7 +104,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     // before any app is handed the call, so a screen that skips its own confirm changes nothing. The host gate first: a
     // screen whose person may not do it is refused, not asked about.
     if (ctx?.via === 'screen' && stepUpOf(app, op) === 'private-door') {
-      const refused = caller && typeof refusal === 'function' ? await refusal(op, caller, app === 'assistant' ? levelOf(op) : undefined) : null;
+      const refused = caller && typeof refusal === 'function' ? await refusal(`${app}.${op}`, caller, app === 'assistant' ? levelOf(op) : undefined) : null;
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
       return holdForYes(caller, app, op, args, ctx);
     }
@@ -116,7 +118,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return announcer.forChange(args?.change, { kinds: Array.isArray(args?.kinds) ? args.kinds : null });
     }
     if (caller && typeof refusal === 'function') {
-      const refused = await refusal(op, caller, levelOf(op));
+      const refused = await refusal(`assistant.${op}`, caller, levelOf(op));
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
@@ -172,7 +174,10 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         threads.setMode(threadId, mode);
         return { ok: true, message: tp(`circle.bot.memory_${mode}`) };
       }
-      if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx, tp) };
+      if (op === 'weekOverview') {
+        const day = String(args?.day ?? args?._match ?? '').trim();
+        return day ? dayOverview(day, ctx, tp) : { ok: true, message: await weekOverviewText(ctx, tp) };
+      }
       // the planned overview: sent to the person's own door, as them — and not in their quiet hours ("not yet": the
       // runner keeps it due until the day is over)
       if (op === WEEK_OVERVIEW_OP) {
@@ -539,6 +544,30 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return [tp('circle.bot.overview_head'), ...(lines.length ? lines : [tp('circle.bot.overview_none')])].join('\n');
   }
 
+  /**
+   * One day of the week overview ("wie is er zaterdag", `/week zaterdag`), asked as the person: that day's appointments
+   * with who comes, and the chores due that day with who does them — read through the gate as them, so the people in
+   * it are as the household's names setting lets them see ("iemand" for one they may not name, never an id). The day is
+   * a date, or a day word read on the household's clock. Worded where every reply is (`replyLine`).
+   */
+  async function dayOverview(words, ctx, tp = t) {
+    const iso = /^\d{4}-\d{2}-\d{2}/.exec(words)?.[0] ?? readDayAndTime(words)?.day ?? null;
+    if (!iso) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.day_unread', { day: words }) } };
+    const pad = (n) => String(n).padStart(2, '0');
+    const dayOf = (at) => { const d = new Date(at); return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const [y, m, d] = iso.split('-').map(Number);
+    // the agenda's read runs from now: as many days as reach the end of the day asked about
+    const days = Math.max(1, Math.ceil((new Date(y, m - 1, d + 1).getTime() - now()) / 86_400_000));
+    const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
+    const asThem = (a, o, x) => callSkill(a, o, x, ctx).catch(() => null);
+    const events = itemsOf(await asThem('calendar', 'listEvents', { days })).filter((e) => dayOf(e?.startsAt) === iso)
+      .map((e) => ({ id: e.id, title: e.title ?? e.label, startsAt: e.startsAt, ...(e.comes ? { comes: e.comes } : {}), ...(e.everyone ? { everyone: true } : {}) }));
+    const chores = itemsOf(await asThem('tasks', 'listOpen', {})).filter((c) => c?.dueAt && dayOf(c.dueAt) === iso)
+      .map((c) => ({ id: c.id, text: c.text ?? c.title, dueAt: c.dueAt, heldBy: Array.isArray(c.heldBy) ? c.heldBy : [], ...(c.yours ? { yours: true } : {}) }));
+    const read = { ok: true, day: iso, events, chores };
+    return { ...read, message: replyLine(read, { opId: 'weekOverview', t: tp }) };
+  }
+
   /** A number in the person's language ("3.000" in Dutch, "3,000" in English). */
   function countIn(lang) { return (n) => new Intl.NumberFormat(lang === 'en' ? 'en-GB' : 'nl-NL').format(n); }
   async function userParam(key) { return ((await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? []).find((p) => p.key === key)?.value; }
@@ -634,7 +663,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function menuOp(person, caller, ctx = {}) {
     if (!person) return { ok: false, error: 'no-thread' };
     const tp = personT(person);
-    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(opId, caller, levelOf(opId)));
+    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(`assistant.${opId}`, caller, levelOf(opId)));
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     // asked from a screen: the screen paints the buttons, whatever the person's chat view is
     const view = ctx?.via === 'screen' ? 'inline' : (row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person));

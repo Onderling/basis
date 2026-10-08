@@ -26,6 +26,7 @@ import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
 import { plannedForMe, plannedLines } from '../../src/v2/plannedForMe.js';
+import { mijOverviewBlocks } from '../../src/v2/mijOverview.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -4155,6 +4156,8 @@ async function showMij() {
   // Gepland: what is coming for me, wherever it lives — read here, on this device (no bot); null while it loads
   let planned = null;
   let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
+  // Mijn overzicht, below Gepland: my chores across every circle (the shared block); null while it loads
+  let overview = null;
 
   async function load() {
     try {
@@ -4164,6 +4167,8 @@ async function showMij() {
     rerender();
     try {
       const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      // the overview beside Gepland, not waiting on it (a block that fails says so under its own title)
+      mijOverviewBlocks({ callSkill: rawCallSkill, me }).then((blocks) => { overview = blocks; rerender(); });
       const r = await plannedForMe({ callSkill: rawCallSkill, me });
       planned = plannedLines(r.items, { t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: currentLang() });
       // the person's own week overview: a row in their own store, switched here
@@ -4192,6 +4197,7 @@ async function showMij() {
   const rerender = () => renderCircleProfile(rootEl, {
     profile, geocodeResult, busy, t,
     plannedLines: planned,
+    overviewBlocks: overview,
     weekOverview,
     // the projected PAGE surface drives the header label (labelKey via t).
     profilePage,

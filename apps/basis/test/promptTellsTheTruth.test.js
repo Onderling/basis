@@ -13,7 +13,7 @@ const prompt = HOUSEHOLD_TEMPLATE.promptLines.join('\n');
 
 describe('the household prompt tells the model the truth', () => {
   it('who makes and removes lists: as the gate says', () => {
-    expect(BOT_OP_MAP.member).toEqual(expect.arrayContaining(['createList', 'removeList', 'restoreList']));
+    expect(BOT_OP_MAP.member).toEqual(expect.arrayContaining(['lists.createList', 'lists.removeList', 'lists.restoreList']));
     expect(prompt).not.toMatch(/alleen de beheerder (maakt|verwijdert)[^.]*lijst/i);
   });
   it('never a promise to change how the bot works', () => {

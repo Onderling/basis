@@ -54,11 +54,12 @@ export const assistantManifest = {
       id:     'weekOverview',
       verb:   'week-overview',
       // a person's week, asked as that person (the gate, the role and the names ceiling apply): their open chores, the
-      // coming appointments, how many open on the shopping list, how many chores nobody holds
-      params: [],
+      // coming appointments, how many open on the shopping list, how many chores nobody holds. With a `day` ("zaterdag",
+      // "morgen", a date): that day only — its appointments with who comes, its chores with who does them
+      params: [{ name: 'day', kind: 'string' }],
       surfaces: {
-        slash: { command: '/week', body: 'none' },
-        chat:  { reply: 'text', hint: "This member's week: their own chores, the appointments, what is open on the shopping list." },
+        slash: { command: '/week', body: 'argline' },
+        chat:  { reply: 'text', hint: "This member's week: their own chores, the appointments, what is open on the shopping list. day = one day (a day word or a date): that day's appointments with who comes and its chores with who does them (\"who is in on Saturday\" → day: Saturday)." },
       },
     },
     {

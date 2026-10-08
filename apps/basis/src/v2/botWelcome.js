@@ -93,6 +93,7 @@ export const WELCOME_LEAVES = Object.freeze({
   editEntry: "a refinement of the lists line; /help has it",
   completeTask: "part of the chores line (\"de ramen zijn klaar\")",
   listMine: "part of the chores line; /help has it",
+  listOpen: "asked in words ('wie doet de lamp?'), part of the chores line; /help has it",
   removeTask: "an admin (or flat) chore tool; /help and the screen have it",
   reassignTask: "an admin (or flat) chore tool; /help and the screen have it",
   editTask: "an admin (or flat) chore tool; /help and the screen have it",

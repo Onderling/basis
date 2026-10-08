@@ -138,6 +138,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {
         ok: true, itemId: made.id ?? null, kind: made.type ?? null,
+        // what was put on which list: the door words it (`replyLine`), folding several adds into one line
+        entry: text, list: target.text ?? ref,
         message: t('circle.lists.added', { text, name: target.text ?? ref }),
       };
     },
@@ -158,14 +160,14 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       const { circleId, entry } = at;
-      if (entry.type === 'task') return { ok: true, itemId: entry.id, kind: 'task', already: true, message: t('circle.lists.chore_already', { text: entry.text ?? '' }) };
+      if (entry.type === 'task') return { ok: true, itemId: entry.id, kind: 'task', already: true, entry: entry.text ?? '', message: t('circle.lists.chore_already', { text: entry.text ?? '' }) };
       if (entry.type !== 'list-item') return { ok: false, error: t('circle.lists.not_a_line', { text: entry.text ?? '' }) };
       // the item as stored (the tree's rows are projections), every field kept, the type changed
       const store = svc.storeFor(circleId);
       const stored = await store.get(entry.id);
       if (!stored) return { ok: false, error: t('circle.lists.not_there', { item: entry.text ?? '' }), code: 'not-found' };
       await store.put({ ...stored, type: 'task' }, { by: ctx?.caller ?? localActor });
-      return { ok: true, itemId: entry.id, kind: 'task', message: t('circle.lists.chore_made', { text: entry.text ?? '' }) };
+      return { ok: true, itemId: entry.id, kind: 'task', entry: entry.text ?? '', message: t('circle.lists.chore_made', { text: entry.text ?? '' }) };
     },
 
     /**
@@ -200,7 +202,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       if (at.entry.type === 'task' && typeof completeChore === 'function') return completeChore({ circleId: at.circleId, entry: at.entry, ctx });
       await svc.markDone(at.circleId, at.entry.id, localActor);
       // the reply names what was ticked — the entry found, not the words it was asked by
-      return { ok: true, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
+      return { ok: true, entry: at.entry.text ?? '', list: at.target?.text ?? null, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
     },
 
     listEntries: async (args) => {
@@ -312,7 +314,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
       await svc.remove(at.circleId, at.entry.id);
-      return { ok: true, message: t('circle.lists.removed', { text: at.entry.text ?? '', name: at.target.text ?? '' }) };
+      return { ok: true, entry: at.entry.text ?? '', list: at.target.text ?? '', message: t('circle.lists.removed', { text: at.entry.text ?? '', name: at.target.text ?? '' }) };
     },
 
     editEntry: async (args, ctx) => {

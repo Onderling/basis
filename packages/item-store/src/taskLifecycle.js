@@ -63,7 +63,7 @@ import {
 } from './errors.js';
 // Shared ctx plumbing (actor/gate/emit/ref-resolution) lives ONCE in taskCtx.js
 // and is reused by both this module and taskCrud.js — no duplicated gate logic.
-import { requireActor, gate, emit, resolveById } from './taskCtx.js';
+import { requireActor, gate, emit, resolveById, personOf } from './taskCtx.js';
 // Structural subtask edge — the item-store CONTAINMENT model (the same tree treeOf renders and
 // shareContainerTree walks), reused rather than tasks-v0's immutable `parentTaskId` field.
 import { addChildTo } from './containerOps.js';
@@ -218,19 +218,6 @@ async function assertDepsClosed(store, item) {
   }
 }
 
-/**
- * The person a verb records: `ctx.onBehalfOf` when the authority acts for someone, else the authority
- * itself. A present-but-empty or non-string `onBehalfOf` is a caller bug, refused rather than ignored.
- * The gate and the write's `by` keep reading the authority; only what the item SAYS about who did it
- * (the claimant, `completedBy`, a review entry's `by`) reads the person.
- */
-function personOf(ctx, actor, verb) {
-  if (ctx.onBehalfOf === undefined || ctx.onBehalfOf === null) return actor;
-  if (typeof ctx.onBehalfOf !== 'string' || ctx.onBehalfOf.length === 0) {
-    throw new TypeError(`${verb}: ctx.onBehalfOf must be a non-empty string when given`);
-  }
-  return ctx.onBehalfOf;
-}
 
 /** Who completed it, as the item records it: the person, and the display name only when it is theirs. */
 function completedByOf(ctx, actor) {
@@ -312,7 +299,7 @@ export async function claim(store, id, ctx = {}) {
       }));
     }
   }
-  const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
+  const res = await store.putIfMatch(updated, { by: personOf(ctx, actor, 'write'), expectedEtag: ctx.expectedEtag });
   // CAS conflict → someone else claimed between our read and our write. Re-map
   // to ItemStore's contract; `res.current` is the re-read winner.
   if (res && res.error === 'conflict') {
@@ -371,7 +358,7 @@ export async function confirmClaim(store, id, ctx = {}) {
   } else {
     delete updated.confirmedSig;               // a re-confirmation without a signer clears any stale signature
   }
-  const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
+  const res = await store.putIfMatch(updated, { by: personOf(ctx, actor, 'write'), expectedEtag: ctx.expectedEtag });
   if (res && res.error === 'conflict') return res;
   // Confirmation is the moment PROVISIONAL becomes real: commit the confirmed claimant's optimistic subtree
   // and discard any losing claimant's (§2.5).
@@ -455,7 +442,7 @@ export async function reassign(store, id, newAssignee, ctx = {}) {
     delete updated.confirmedBy;
     updated.claimReleasedAt = at;
   }
-  const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
+  const res = await store.putIfMatch(updated, { by: personOf(ctx, actor, 'write'), expectedEtag: ctx.expectedEtag });
   if (res && res.error === 'conflict') return res;
   emit(ctx, newAssignee ? 'item-claimed' : 'item-updated', res);
   return res;
@@ -500,7 +487,7 @@ export async function markComplete(store, refs, ctx = {}) {
       completedAt: at,
       ...completedByOf(ctx, actor),
     };
-    const res = await store.put(updated, { by: actor });
+    const res = await store.put(updated, { by: personOf(ctx, actor, 'write') });
     completed.push(res);
     emit(ctx, 'item-completed', res);
   }
@@ -534,7 +521,7 @@ export async function submit(store, id, args, ctx = {}) {
     reviewLog,
     ...(deliverable ? { deliverable } : {}),
   };
-  const res = await store.put(updated, { by: actor });
+  const res = await store.put(updated, { by: personOf(ctx, actor, 'write') });
   emit(ctx, 'item-submitted', res);
   return res;
 }
@@ -572,7 +559,7 @@ export async function approve(store, id, args, ctx = {}) {
     completedAt: at,
     ...completedByOf(ctx, actor),
   };
-  const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
+  const res = await store.putIfMatch(updated, { by: personOf(ctx, actor, 'write'), expectedEtag: ctx.expectedEtag });
   if (res && res.error === 'conflict') return res;
   emit(ctx, 'item-completed', res);
   return res;
@@ -602,7 +589,7 @@ export async function reject(store, id, args, ctx = {}) {
 
   const at = Date.now();
   const reviewLog = appendReview(current.reviewLog, { at, by: personOf(ctx, actor, 'reject'), decision: 'reject', note: args.note });
-  const res = await store.put({ ...current, reviewLog }, { by: actor });
+  const res = await store.put({ ...current, reviewLog }, { by: personOf(ctx, actor, 'write') });
   emit(ctx, 'item-rejected', res);
   return res;
 }
@@ -666,7 +653,7 @@ export async function revoke(store, id, args, ctx = {}) {
     delete updated.confirmedBy;
     updated.claimReleasedAt = at;
   }
-  const res = await store.put(updated, { by: actor });
+  const res = await store.put(updated, { by: personOf(ctx, actor, 'write') });
   emit(ctx, 'item-revoked', { item: res, previousAssignee, reason: args.reason });
   return res;
 }
@@ -742,7 +729,7 @@ export async function spawnSubtask(store, parentId, args = {}, ctx = {}) {
       ...(args.visibility       !== undefined ? { visibility:       args.visibility }       : {}),
       ...(args.definitionOfDone !== undefined ? { definitionOfDone: args.definitionOfDone } : {}),
       ...(args.approval         !== undefined ? { approval:         args.approval }         : {}),
-    }, { by: actor });
+    }, { by: personOf(ctx, actor, 'write') });
     emit(ctx, 'subtask-spawned-provisional', { task: child, parentId, depth });
     return { queued: false, provisional: true, task: child, depth };
   }

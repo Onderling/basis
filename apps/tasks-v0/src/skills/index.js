@@ -43,6 +43,7 @@ import { wireSkill } from '@onderling/sdk';
 // legacy `assignee` mirror for single-owner items) + the not-full claimable test.
 import { assigneesOf, isAssigneesFull, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { computeStatus, effectiveStatus, unmetDeps, detectCycle } from '../dag.js';
+import { taskHasWords } from '../taskWords.js';
 import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
@@ -306,8 +307,9 @@ async function getTaskSnapshotCore(circle, a, ctx) {
 }
 
 /**
- * listOpen({type?, requiredSkill?, assignee?, status?})
- * Returns items + computed `status` (ready/waiting/blocked).
+ * listOpen({type?, requiredSkill?, assignee?, status?, text?})
+ * Returns items + computed `status` (ready/waiting/blocked). `text`: only the tasks whose words hold these words
+ * ("wie doet de lamp" → the open tasks with "lamp").
  */
 async function listOpenCore(circle, a, ctx) {
   if (!circle) return { error: 'circleId required' };
@@ -336,8 +338,10 @@ async function listOpenCore(circle, a, ctx) {
     status:   effectiveStatus(t, open, closed),
     openDeps: unmetDeps(t, open, closed),
   }));
-  const filtered = a.status ? items.filter((t) => t.status === a.status) : items;
-  return { items: decorateWithLastSync(filtered), _sync: simulateSync() };
+  const byStatus = a.status ? items.filter((t) => t.status === a.status) : items;
+  const filtered = a.text ? byStatus.filter((t) => taskHasWords(t, a.text)) : byStatus;
+  // the words it read for, handed back (what a reply is worded by)
+  return { items: decorateWithLastSync(filtered), ...(a.text ? { text: String(a.text).trim() } : {}), _sync: simulateSync() };
 }
 
 /**
@@ -566,7 +570,7 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
     }),
 
     wire('listOpen', {
-      description: 'List open tasks with computed status; filters: type/requiredSkill/assignee/status.',
+      description: 'List open tasks with computed status; filters: type/requiredSkill/assignee/status/text.',
       visibility:  'authenticated',
     }),
 

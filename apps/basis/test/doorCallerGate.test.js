@@ -52,10 +52,15 @@ describe('the door caller gate', () => {
     await agent.setDoorCaller('telegram:111', 'member');
     const added = await agent.callSkill('tasks', 'addTask', { text: 'fietsband plakken' }, { caller: 'telegram:111' });
     expect(added?.error, JSON.stringify(added)).toBeUndefined();
-    const mine = await agent.callSkill('tasks', 'listMine', {}, { caller: 'telegram:111' });
-    const row = (mine?.items ?? []).find((t) => (t.text ?? t.title) === 'fietsband plakken');
-    expect(row, JSON.stringify(mine)).toBeTruthy();
+    // the record, as the host reads it: the person is its actor
+    const all = await agent.callSkill('tasks', 'listOpen', {});
+    const row = (all?.items ?? []).find((t) => (t.text ?? t.title) === 'fietsband plakken');
+    expect(row, JSON.stringify(all)).toBeTruthy();
     expect(row.actor).toBe('telegram:111');
+    // …and the person's own read of it carries the task, never anyone's id (the people reads' names ceiling)
+    const mine = await agent.callSkill('tasks', 'listMine', {}, { caller: 'telegram:111' });
+    expect((mine?.items ?? []).some((t) => (t.text ?? t.title) === 'fietsband plakken'), JSON.stringify(mine)).toBe(true);
+    expect(JSON.stringify(mine)).not.toContain('telegram:111');
     // a stranger adds nothing
     const refused = await agent.callSkill('tasks', 'addTask', { text: 'nope' }, { caller: 'telegram:999' });
     expect(refused).toMatchObject({ ok: false });

@@ -91,6 +91,12 @@ export function listsGateRules(_locale, lists = []) {
 
 /** What each of the household's word rules does, in order (the first that builds a command wins). */
 const GATE_RULES = [
+  // "wat moet Bob doen" / "welke klusjes heeft Ann": someone's own chores, by their name — before the list read, which
+  // would take "klusjes" for the list; "ik", "je" and the like name nobody (the plain rule below, or the model)
+  { id: 'tasks.listMine.who', name: 'tasks:listMine(who)', build: (m) => {
+    const who = String(m.person ?? '').replace(/[.!?]+$/, '');
+    return who && !NOT_A_PERSON.has(who.toLowerCase()) ? { opId: 'listMine', args: { who } } : null;
+  } },
   { id: 'lists.addToList.named', name: 'lists:addToList(named-list)', build: (m, _t, { listFor }) => {
     const list = listFor(m.list);
     const items = splitItems(m.items);
@@ -106,8 +112,17 @@ const GATE_RULES = [
   // at a shop: the general list and the shop's own lists; a shop no list mentions is the model's ("ik ben bij de tandarts")
   { id: 'lists.shopVisit', name: 'lists:shopVisit(at-shop)', build: (m, _t, { shopping }) => (m.shop && !/\b(?:geweest|been)\b/i.test(m.shop) ? { opId: 'shopVisit', args: { shop: m.shop.replace(/[.!?]+$/, '').trim(), ...(shopping ? { general: shopping } : {}) }, fallback: 'model' } : null) },
   { id: 'tasks.listMine', name: 'tasks:listMine(read)', build: () => ({ opId: 'listMine', args: {} }) },
+  // "wie doet de lamp": the chores' open read with the words — who holds each and when. "wie doet mee", "wie doet wat",
+  // a day in the words: talk, or a day's question — the model's
+  { id: 'tasks.listOpen.words', name: 'tasks:listOpen(who-does)', build: (m) => {
+    const what = String(m.item ?? '').replace(/[.!?]+$/, '').trim();
+    if (!what || NOT_A_THING.test(what) || readDayAndTime(what)) return null;
+    return { opId: 'listOpen', args: { text: what }, appOrigin: 'tasks' };
+  } },
   // the person's week overview — by rule, so the model does not summarise the week itself
   { id: 'assistant.weekOverview', name: 'assistant:weekOverview(read)', build: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
+  // "wie is er zaterdag" / "wat is er morgen": one day of it — its appointments with who comes, its chores with who does them
+  { id: 'assistant.weekOverview.day', name: 'assistant:weekOverview(day)', build: (m) => (m.day ? { opId: 'weekOverview', args: { day: m.day }, appOrigin: 'assistant' } : null) },
   // mostly a reply to the bot's own reminder, so it works without a model; the waist finds the one item (or asks),
   // and a chore's tick is the chore's own verb underneath
   { id: 'lists.markListItemDone.stated', name: 'lists:markListItemDone(stated)', build: (m) => ({ opId: 'markListItemDone', args: { item: m.item } }) },
@@ -160,8 +175,10 @@ const GATE_RULES = [
 export const GATE_RULE_IDS = Object.freeze(GATE_RULES.map((r) => r.id));
 
 
-const NOT_A_THING = /^(?:mee|het|dat|dit|niks|niets|wat|ook|even|it|that|this|nothing)\b/i;
+const NOT_A_THING = /^(?:mee|het|dat|dit|niks|niets|wat|ook|even|it|that|this|nothing|what)\b/i;
 const PERSON_WORDS = new Set(['ik', 'je', 'jij', 'we', 'wij', 'hij', 'zij', 'ze', 'u', 'jullie', 'mij', 'me', 'i', 'you', 'he', 'she', 'they', 'my', 'mijn']);
+/** Words in a "who" slot that name nobody the bot could know: the person words, and the like. */
+const NOT_A_PERSON = new Set([...PERSON_WORDS, 'it', 'het', 'dat', 'dit', 'er', 'iemand', 'niemand', 'iedereen', 'someone', 'nobody', 'everyone', 'everybody', 'we']);
 /** The words of `lower` as they were typed in `original` (the reader lowercases). */
 const caseOf = (original, lower) => { const i = original.toLowerCase().indexOf(lower); return i >= 0 ? original.slice(i, i + lower.length) : lower; };
 // A chore that says WHO ("voor mij", "voor Bert") or WHEN (a day word): the who-and-when rule reads it when it can

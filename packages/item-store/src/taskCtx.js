@@ -22,6 +22,23 @@ export function requireActor(ctx) {
 }
 
 /**
+ * The person a verb records: `ctx.onBehalfOf` when the authority acts for someone, else the authority
+ * itself. A present-but-empty or non-string `onBehalfOf` is a caller bug, refused rather than ignored.
+ * The GATE reads the authority (`ctx.actor`); what the item says about who did it — the claimant,
+ * `completedBy`, a review entry's `by`, and the store's `updatedBy`/`createdBy` (the write's `by`) — reads
+ * the person. `updatedBy` is no authority fact: the causal merge uses it only as the concurrency tiebreak,
+ * and a claim's authority is `confirmedBy`/`confirmedSig`/`claimSeq`; a host serving several people through
+ * one key must not appear as the writer of every change (the announcer would tell a claimer their own claim).
+ */
+export function personOf(ctx, actor, verb) {
+  if (ctx.onBehalfOf === undefined || ctx.onBehalfOf === null) return actor;
+  if (typeof ctx.onBehalfOf !== 'string' || ctx.onBehalfOf.length === 0) {
+    throw new TypeError(`${verb}: ctx.onBehalfOf must be a non-empty string when given`);
+  }
+  return ctx.onBehalfOf;
+}
+
+/**
  * Role-policy gate — parity with `ItemStore#gate`. `ctx.rolePolicy` is the same
  * `RolePolicy` shape (a bag of `can*` predicates); a missing policy or missing
  * predicate = allow (the no-op default). `false` becomes a thrown

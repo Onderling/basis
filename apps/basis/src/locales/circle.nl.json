@@ -637,16 +637,16 @@
       "doc": "A household bot's calendar reply."
     },
     "added": {
-      "text": "Afspraak gezet: {{title}} ({{when}}).",
-      "doc": "A household bot's calendar reply."
+      "text": "Afspraak '{{title}}' staat op {{when}}.",
+      "doc": "A household bot's reply when an appointment is set: its title and when (the day and time in the person's date language)."
     },
     "no_event": {
       "text": "Die afspraak ken ik niet.",
       "doc": "A household bot's calendar reply."
     },
     "cancelled": {
-      "text": "Afspraak geschrapt: {{title}}, {{when}}.",
-      "doc": "A household bot's calendar reply."
+      "text": "Afspraak '{{title}}' ({{when}}) is geschrapt.",
+      "doc": "A household bot's reply when an appointment is cancelled: its title and when."
     },
     "rsvp_accepted": {
       "text": "Je komt: {{title}}, {{when}}.",
@@ -3715,8 +3715,8 @@
       "doc": "The composable lists feature, spoken from the waist."
     },
     "added": {
-      "text": "\"{{text}}\" toegevoegd aan {{name}}.",
-      "doc": "The composable lists feature, spoken from the waist."
+      "text": "Op de lijst {{name}}: {{text}}.",
+      "doc": "The line a person reads after things were put on a list: the list, and what was put on it (several in one turn are one line, comma-separated)."
     },
     "no_circle": {
       "text": "Open eerst een kring.",
@@ -3757,8 +3757,8 @@
       "doc": "A lists reply in the chat."
     },
     "removed": {
-      "text": "\"{{text}}\" is van {{name}} gehaald.",
-      "doc": "A lists reply in the chat."
+      "text": "Van {{name}} gehaald: {{text}}.",
+      "doc": "The line a person reads after things were taken off a list: the list, and what (several in one turn are one line)."
     },
     "edited": {
       "text": "Aangepast op {{name}}: \"{{text}}\".",
@@ -7872,14 +7872,6 @@
       "text": "Namen zijn hier niet zichtbaar: je kunt een klusje alleen jezelf geven.",
       "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
     },
-    "given_to": {
-      "text": "Voor {{name}}.",
-      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
-    },
-    "given": {
-      "text": "Toegewezen.",
-      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
-    },
     "blocked_one": {
       "text": "🔒 Nog niet af te ronden: 1 deeltaak staat nog open ({{deps}}). Rond die eerst af.",
       "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
@@ -8353,6 +8345,40 @@
     "brief": {
       "text": "{{count}} open dingen in het huishouden",
       "doc": "The morning brief's household slot (/brief)."
+    }
+  },
+  "reply": {
+    "date_locale": {
+      "text": "nl-NL",
+      "doc": "Not words: the date language (a BCP 47 tag) the days and times in this language's replies are written in — \"vr 9 okt\" / \"Fri 9 Oct\"."
+    },
+    "chore_claimed": {
+      "text": "Klusje '{{title}}' is opgepakt{{when}}.",
+      "doc": "A chore was taken by the person who asked (or given to themselves). Said so that it reads right for everyone who sees it. {{when}}: the chore's day as \", vr 9 okt\", or empty."
+    },
+    "chore_theirs": {
+      "text": "Klusje '{{title}}' is van {{name}}{{when}}.",
+      "doc": "A chore was given to someone, by the name the person used (only where names may be seen). {{when}}: the chore's day as \", vr 9 okt\", or empty."
+    },
+    "chore_given": {
+      "text": "Klusje '{{title}}' is toegewezen{{when}}.",
+      "doc": "A chore was given to someone whose name this person may not see. {{when}}: the chore's day as \", vr 9 okt\", or empty."
+    },
+    "chore_open": {
+      "text": "Klusje '{{title}}' is van niemand meer.",
+      "doc": "A chore was taken away from whoever held it, and given to no one."
+    },
+    "chore_due": {
+      "text": "Klusje '{{title}}' staat op {{when}}.",
+      "doc": "A chore with a day and nobody holding it yet: its day."
+    },
+    "chore_removed": {
+      "text": "Klusje '{{title}}' is weggehaald.",
+      "doc": "A chore was removed."
+    },
+    "chore_edited": {
+      "text": "Klusje '{{title}}' is aangepast.",
+      "doc": "A chore was changed; its words as they are now."
     }
   }
 }

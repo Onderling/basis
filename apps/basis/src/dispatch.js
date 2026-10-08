@@ -86,6 +86,8 @@ export async function runDispatch(ready, callSkill) {
       payload,
       shape:    replyShape,
       threadId: threadId ?? null,
+      // the op that answered: what a painter words the answer by (`replyLine`'s families), on every shell alike
+      opId,
     };
   } catch (err) {
     return {

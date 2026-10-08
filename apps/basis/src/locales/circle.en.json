@@ -637,16 +637,16 @@
       "doc": "A household bot's calendar reply."
     },
     "added": {
-      "text": "Appointment set: {{title}} ({{when}}).",
-      "doc": "A household bot's calendar reply."
+      "text": "Appointment '{{title}}' is on {{when}}.",
+      "doc": "A household bot's reply when an appointment is set: its title and when (the day and time in the person's date language)."
     },
     "no_event": {
       "text": "I do not know that appointment.",
       "doc": "A household bot's calendar reply."
     },
     "cancelled": {
-      "text": "Appointment cancelled: {{title}}, {{when}}.",
-      "doc": "A household bot's calendar reply."
+      "text": "Appointment '{{title}}' ({{when}}) is cancelled.",
+      "doc": "A household bot's reply when an appointment is cancelled: its title and when."
     },
     "rsvp_accepted": {
       "text": "You are coming: {{title}}, {{when}}.",
@@ -3715,8 +3715,8 @@
       "doc": "The composable lists feature, spoken from the waist."
     },
     "added": {
-      "text": "Added \"{{text}}\" to {{name}}.",
-      "doc": "The composable lists feature, spoken from the waist."
+      "text": "Added to {{name}}: {{text}}.",
+      "doc": "The line a person reads after things were put on a list: the list, and what was put on it (several in one turn are one line, comma-separated)."
     },
     "no_circle": {
       "text": "Open a circle first.",
@@ -3757,8 +3757,8 @@
       "doc": "A lists reply in the chat."
     },
     "removed": {
-      "text": "Took \"{{text}}\" off {{name}}.",
-      "doc": "A lists reply in the chat."
+      "text": "Taken off {{name}}: {{text}}.",
+      "doc": "The line a person reads after things were taken off a list: the list, and what (several in one turn are one line)."
     },
     "edited": {
       "text": "Changed on {{name}}: \"{{text}}\".",
@@ -7872,14 +7872,6 @@
       "text": "Names are not visible here: you can only give a chore to yourself.",
       "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
     },
-    "given_to": {
-      "text": "For {{name}}.",
-      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
-    },
-    "given": {
-      "text": "Assigned.",
-      "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
-    },
     "blocked_one": {
       "text": "🔒 Blocked: 1 open sub-task ({{deps}}). Close it first.",
       "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
@@ -8353,6 +8345,40 @@
     "brief": {
       "text": "{{count}} open household items",
       "doc": "The morning brief's household slot (/brief)."
+    }
+  },
+  "reply": {
+    "date_locale": {
+      "text": "en-GB",
+      "doc": "Not words: the date language (a BCP 47 tag) the days and times in this language's replies are written in — \"vr 9 okt\" / \"Fri 9 Oct\"."
+    },
+    "chore_claimed": {
+      "text": "Chore '{{title}}' is taken{{when}}.",
+      "doc": "A chore was taken by the person who asked (or given to themselves). Said so that it reads right for everyone who sees it. {{when}}: the chore's day as \", vr 9 okt\", or empty."
+    },
+    "chore_theirs": {
+      "text": "Chore '{{title}}' is {{name}}'s{{when}}.",
+      "doc": "A chore was given to someone, by the name the person used (only where names may be seen). {{when}}: the chore's day as \", vr 9 okt\", or empty."
+    },
+    "chore_given": {
+      "text": "Chore '{{title}}' is assigned{{when}}.",
+      "doc": "A chore was given to someone whose name this person may not see. {{when}}: the chore's day as \", vr 9 okt\", or empty."
+    },
+    "chore_open": {
+      "text": "Chore '{{title}}' is nobody's now.",
+      "doc": "A chore was taken away from whoever held it, and given to no one."
+    },
+    "chore_due": {
+      "text": "Chore '{{title}}' is on {{when}}.",
+      "doc": "A chore with a day and nobody holding it yet: its day."
+    },
+    "chore_removed": {
+      "text": "Chore '{{title}}' is removed.",
+      "doc": "A chore was removed."
+    },
+    "chore_edited": {
+      "text": "Chore '{{title}}' is changed.",
+      "doc": "A chore was changed; its words as they are now."
     }
   }
 }

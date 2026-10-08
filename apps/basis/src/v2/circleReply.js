@@ -1,12 +1,14 @@
 // basis v2 — shared one-line circle-bubble text from a runDispatch reply (web + mobile).
 
 import { translatorOr } from '../locales/translatorOr.js';
+import { replyLine } from './replyLine.js';
 //
 // The circle stream renders plain chat bubbles (no rich cards), so a dispatched command surfaces as a
 // one-line confirmation; the real effect (task added/completed, …) propagates through the substrate to
 // all members. Unifies web's `circleReplyText` and mobile's `circleReplyText`, which had drifted (web
 // showed `✓ <label>` for EVERYTHING — add and complete were indistinguishable; mobile showed the raw
-// payload text or "Done."). Now the op's VERB selects an Added:/Completed: phrasing.
+// payload text or "Done."). Now the op's VERB selects an Added:/Completed: phrasing; an op of the household families
+// (`replyLine.js`, read from the reply's `opId`) reads the line the household bot says for it.
 //
 // `circle.bot.*` locale keys (added, completed, ok, failed, listed, done) must exist in both bundles.
 
@@ -26,6 +28,10 @@ export function circleReplyText(reply, { verb, t } = {}) {
   const p = (p0 && typeof p0 === 'object' && p0.via === 'generic' && p0.result && typeof p0.result === 'object')
     ? p0.result
     : p0;
+  // An op of the families the household bot words (`replyLine`): the same line here as on the bot — web, mobile and
+  // the box read one table. Any other op keeps the bubble below.
+  const line = reply?.opId ? replyLine(p, { opId: reply.opId, t: tr }) : null;
+  if (line) return line;
   // The human label of the affected item, across the shapes the apps return (`body` = the generic note field).
   const label = (p && typeof p === 'object')
     ? (p.task?.text ?? p.title ?? p.text ?? p.item?.label ?? p.item?.body ?? p.body ?? p.name ?? null)

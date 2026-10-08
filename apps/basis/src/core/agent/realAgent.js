@@ -31,6 +31,7 @@ import {
   deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
+import { replyLine } from '../../v2/replyLine.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -4240,13 +4241,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the claim path, the host vouching for the person the chore is for
       const claimed = await callSkill('tasks', 'claimTask', { id: made.itemId, actor: who, ...(rest.circleId ? { circleId: rest.circleId } : {}) });
       if (claimed?.ok === false) return claimed;
-      // the reply names the one who got it only where names may be seen; to someone else it says it was given
-      if (who !== caller && who !== 'me') {
-        const given = whoName ? tr('circle.tasks.given_to', { name: whoName }) : tr('circle.tasks.given');
-        return { ...made, message: `${made.message ?? ''} ${given}`.trim() };
-      }
     }
-    return made;
+    // The chore, who holds it and its day — the reply names the one who got it only where names may be seen; to
+    // someone else it says it was given. One line, worded where every reply is (`replyLine`).
+    const dueAt = typeof due === 'string' && due.trim() ? (parseCalendarDate(due.trim()) ?? null) : null;
+    const holder = !who ? null : (who === caller || who === 'me') ? 'self' : (whoName ? 'named' : 'given');
+    const chore = { title: made.entry ?? rest.text ?? null, holder, ...(holder === 'named' ? { name: whoName } : {}), ...(dueAt ? { dueAt } : {}) };
+    if (!chore.title) return made;
+    const done = { ...made, chore };
+    return { ...done, message: replyLine(done, { opId, t: tr }) ?? made.message };
   }
 
   const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
@@ -5231,7 +5234,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       const title = (opId === 'editTask' && (args?.text || args?.title)) || task?.text || task?.title || named || args?.id || '';
       const key = WORDED_BY_DOOR[opId];
       const message = typeof opts.t === 'function' ? opts.t(`circle.tasks.reply.${key}`, { title, note: '' }) : `✓ ${key}: ${title}`;
-      return { ok: true, message, ...(task ? { task: { ...task, type: 'task', state: _statusToChatState(task.status, task) } } : {}), ...(args?.id ? { itemId: args.id } : {}), _sync: simulateSync() };
+      // the chore's words, and who it went to as the person named them: the door words the line (`replyLine`)
+      const to = opId === 'reassignTask' && typeof args?.newAssignee === 'string' && args.newAssignee.trim() ? { to: args.newAssignee.trim() } : {};
+      return { ok: true, message, title, ...to, ...(task ? { task: { ...task, type: 'task', state: _statusToChatState(task.status, task) } } : {}), ...(args?.id ? { itemId: args.id } : {}), _sync: simulateSync() };
     }
     if (verbMap[opId] && task) {
       const title = task.text || task.title || named || task.id;

@@ -89,10 +89,11 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const same = (await eventsOf(circleId)).find((e) => e.state !== 'cancelled' && !e.completedAt
         && String(e.title ?? '').trim().toLowerCase() === String(event.title ?? '').trim().toLowerCase()
         && new Date(e.startsAt).getTime() === new Date(event.startsAt).getTime());
-      if (same) return { ok: true, duplicate: true, itemId: same.id, message: t('circle.calendar.already_there', { title: same.title, when: stamp(same) }) };
+      // the appointment and when: the door words it in the person's date language (`replyLine`)
+      if (same) return { ok: true, duplicate: true, itemId: same.id, title: same.title, startsAt: same.startsAt, message: t('circle.calendar.already_there', { title: same.title, when: stamp(same) }) };
       // The Agenda's child, with the event's own id; `text` so the list shows it as an entry too.
       const made = await addChildTo(storeFor(circleId), agenda.id, { ...event, text: event.title, completedAt: null, createdBy: who(args), ...(reminders ? { reminders } : {}) });
-      return { ok: true, itemId: made?.id ?? event.id, message: t('circle.calendar.added', { title: event.title, when: stamp(event) }) };
+      return { ok: true, itemId: made?.id ?? event.id, title: event.title, startsAt: event.startsAt, message: t('circle.calendar.added', { title: event.title, when: stamp(event) }) };
     },
 
     listEvents: async (args) => {
@@ -137,7 +138,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
       await storeFor(circleId).put({ ...event, state: 'cancelled' }, { by: who(args) });
-      return { ok: true, message: t('circle.calendar.cancelled', { title: event.title, when: stamp(event) }) };
+      return { ok: true, title: event.title, startsAt: event.startsAt, message: t('circle.calendar.cancelled', { title: event.title, when: stamp(event) }) };
     },
 
     ...Object.fromEntries(Object.entries(RSVP).map(([op, response]) => [op, async (args) => {
@@ -146,7 +147,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       if (!event) return missing(among);
       await storeFor(circleId).put(rsvpEvent(event, who(args), response), { by: who(args) });
       // the reply names the appointment answered, and when
-      return { ok: true, message: t(`circle.calendar.rsvp_${response}`, { title: event.title, when: stamp(event) }) };
+      return { ok: true, title: event.title, startsAt: event.startsAt, message: t(`circle.calendar.rsvp_${response}`, { title: event.title, when: stamp(event) }) };
     }])),
   };
 }

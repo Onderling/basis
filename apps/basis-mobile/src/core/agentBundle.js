@@ -63,10 +63,7 @@ import { readNearbyFace, readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { resolveRelayUrl, asyncStorageRelayIo, relayDefaultFrom } from '../../../basis/src/v2/relayPref.js';
-
-// The default relay — the public one, unless the build blanks it (EXPO_PUBLIC_CIRCLE_RELAY_DEFAULT='' — a hermetic test build).
-export const RELAY_DEFAULT = relayDefaultFrom(process.env.EXPO_PUBLIC_CIRCLE_RELAY_DEFAULT);
+import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 import { registerCircleAddressesOnRelays } from '../../../basis/src/v2/circleAddressRegistration.js';
 import { makeCircleReachable } from '../../../basis/src/v2/householdRosterPairing.js';
 import { pullCircleLanes } from '../../../basis/src/v2/circleLanes.js';
@@ -109,10 +106,9 @@ export async function resolveBootRelayUrls() {
   const stored = await resolveMobileRelayUrl();
   try {
     const points = await loadConnectionPoints();
-    // nothing saved and nothing recorded: the public relay (the LAST candidate), never none
-    return bootRelayUrls({ stored, list: points.list(), fallback: RELAY_DEFAULT });
+    return bootRelayUrls({ stored, list: points.list() });
   } catch {
-    return [stored || RELAY_DEFAULT].filter(Boolean);      // no points store ⇒ the saved relay, else the default (none if blanked)
+    return stored ? [stored] : [];      // no points store ⇒ exactly the previous behaviour
   }
 }
 

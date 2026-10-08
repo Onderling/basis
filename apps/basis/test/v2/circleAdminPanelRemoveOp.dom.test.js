@@ -27,7 +27,7 @@ describe('circle admin panel — remove member → removeMember op', () => {
 
   it('clicking remove dispatches removeMember with the clicked member’s webid + stableId', () => {
     const rawCallSkill = vi.fn(async () => ({ ok: true }));
-    const el = renderCircleAdminPanel(mount(), { t, members, onRemove: dispatchRemove(rawCallSkill) });
+    const el = renderCircleAdminPanel(mount(), { t, members, viewerWebid: 'w-admin', onRemove: dispatchRemove(rawCallSkill) });   // as the ADMIN
 
     // Click the remove button on the SECOND member (Bob) — not the admin, not Cara.
     const rows = el.querySelectorAll('.cc-admin__member');
@@ -42,7 +42,7 @@ describe('circle admin panel — remove member → removeMember op', () => {
 
   it('routes the op to the exact row clicked (Cara, not Bob)', () => {
     const rawCallSkill = vi.fn(async () => ({ ok: true }));
-    const el = renderCircleAdminPanel(mount(), { t, members, onRemove: dispatchRemove(rawCallSkill) });
+    const el = renderCircleAdminPanel(mount(), { t, members, viewerWebid: 'w-admin', onRemove: dispatchRemove(rawCallSkill) });   // as the ADMIN
     el.querySelectorAll('.cc-admin__member')[2].querySelector('.cc-admin__member-remove').click();
     expect(rawCallSkill).toHaveBeenCalledWith('stoop', 'removeMember', {
       groupId: circleId, memberWebid: 'w-cara', memberStableId: 's-cara',

@@ -22,7 +22,7 @@ import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHyg
 import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
 // decision (web ≡ mobile); the screen paints it and works nothing out for itself.
-import { roleControlFor, roleChangeConfirm } from '../../../../basis/src/v2/circleRoleControl.js';
+import { roleControlFor, roleChangeConfirm, removeControlFor, announceControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
 // The confirm the op declares, run through the SAME gate the chat path uses — Alert.alert is only
 // this platform's presenter.
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
@@ -30,7 +30,7 @@ import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 import FaceView from './FaceView.js';
 
-export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, resolvePicture = null }) {
+export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the back link under it could not be tapped
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -148,14 +148,41 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
                 </Pressable>
               ) : null;
             })()}
-            <Pressable style={styles.secondary} onPress={() => remove(m)}><Text style={styles.secondaryText}>{t('circle.admin.remove')}</Text></Pressable>
+            {(() => {
+              // What the row's action IS for this viewer (one shared decision): an admin removes; a member's own row is
+              // LEAVING; someone else's row is greyed for a member, with the reason — the skill would refuse it anyway.
+              const rc = removeControlFor({ members, member: m, myRef: myWebid });
+              return (
+                <Pressable
+                  style={[styles.secondary, rc.disabled ? { opacity: 0.45 } : null]}
+                  disabled={rc.disabled}
+                  accessibilityState={{ disabled: rc.disabled }}
+                  accessibilityHint={rc.reasonKey ? t(rc.reasonKey) : undefined}
+                  onPress={() => (rc.kind === 'leave' ? onLeave?.() : remove(m))}
+                  testID={`admin-${rc.kind}-${m.webid}`}
+                >
+                  <Text style={styles.secondaryText}>{t(rc.labelKey)}</Text>
+                </Pressable>
+              );
+            })()}
           </View>
         ))}
       </Section>
 
       <Section title={t('circle.admin.announce')}>
-        <TextInput style={styles.area} value={announce} onChangeText={setAnnounce} placeholder={t('circle.admin.announce_placeholder')} placeholderTextColor={theme.color.inkSoft} multiline testID="admin-announce" />
-        <Pressable style={styles.primary} onPress={postAnnounce} testID="admin-announce-post"><Text style={styles.primaryText}>{t('circle.admin.announce_post')}</Text></Pressable>
+        {(() => {
+          // Posting the circle's announcement is the admin's (the skill refuses a member): greyed for anyone else, with why.
+          const ann = announceControlFor({ members, myRef: myWebid });
+          return (
+            <>
+              <TextInput style={styles.area} value={announce} onChangeText={setAnnounce} editable={!ann.disabled}
+                placeholder={t(ann.reasonKey ?? 'circle.admin.announce_placeholder')} placeholderTextColor={theme.color.inkSoft} multiline testID="admin-announce" />
+              <Pressable style={[styles.primary, ann.disabled ? { opacity: 0.45 } : null]} disabled={ann.disabled} onPress={postAnnounce} testID="admin-announce-post">
+                <Text style={styles.primaryText}>{t('circle.admin.announce_post')}</Text>
+              </Pressable>
+            </>
+          );
+        })()}
       </Section>
 
       {/* reports moved to the §8 governance "Decisions" Reports section — see the header note */}

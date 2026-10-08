@@ -9,8 +9,9 @@ const t = (k) => k;
 describe('renderCircleAdminPanel', () => {
   it('lists members with role badges + a remove action', () => {
     const onRemove = vi.fn();
+    // As the ADMIN: for anyone else Remove is greyed (adminPanelPerViewer.test.js).
     const el = renderCircleAdminPanel(document.createElement('div'), {
-      t, onRemove,
+      t, onRemove, viewerWebid: 'w-admin',
       members: [
         { webid: 'w-admin', displayName: 'Ann', role: 'admin' },
         { webid: 'w-bob', handle: 'bob', role: 'member' },
@@ -32,7 +33,8 @@ describe('renderCircleAdminPanel', () => {
 
   it('posts an announcement (trimmed) + clears the box', () => {
     const onAnnounce = vi.fn();
-    const el = renderCircleAdminPanel(document.createElement('div'), { t, members: [], onAnnounce });
+    // As the ADMIN: for anyone else Post is greyed (adminPanelPerViewer.test.js).
+    const el = renderCircleAdminPanel(document.createElement('div'), { t, members: [{ webid: 'w-admin', role: 'admin' }], viewerWebid: 'w-admin', onAnnounce });
     const area = el.querySelector('.cc-admin__announce-input');
     area.value = '  street party saturday  ';
     el.querySelector('.cc-admin__announce').dispatchEvent(new Event('submit'));

@@ -114,7 +114,7 @@ import { runConfirmGate } from '../../src/v2/confirmGate.js';
 import { renderConfirmDialog } from './confirmDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
-import { roleChangeConfirm } from '../../src/v2/circleRoleControl.js';
+import { roleChangeConfirm, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
@@ -7866,6 +7866,8 @@ async function showAdmin(id) {
     resolvePicture: circlePictureResolver(id),
     viewerWebid: myWebid,
     onBack: () => showDetail(id),
+    // A member's own row offers LEAVING (the shared decision): the same leave the circle's tile menu runs, with its confirm.
+    onLeave: () => onLeaveCircle(id, circlesCache.find((c) => c?.id === id) ?? { id }),
     // Make a member an admin, or step an admin back down. The op's `ui.confirm` declaration is what
     // puts a confirmation in front of it (the SAME gate the chat path runs — `runConfirmGate` with the
     // web dialog as presenter), carrying the consequence THIS change has: an ordinary demotion, a
@@ -7970,6 +7972,9 @@ async function showSettings(id) {
   // wired setPolicy enactor) the apply-on-approval; approvals cross devices because the events fan.
   let myWebid = '';
   try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  // The roster, for one question: may THIS viewer's Save count? (an admin's statement is folded, a member's dropped)
+  let settingsRoster = [];
+  try { const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
@@ -8015,6 +8020,7 @@ async function showSettings(id) {
   const settingsPage = pageForOp(basisManifest, 'settings');
 
   const rerender = () => renderCircleSettings(rootEl, {
+    saveControl: policySaveControlFor({ members: settingsRoster, myRef: myWebid }),
     policy: working,
     t,
     // Display theme — the SAME per-device preference "Mijn gegevens" shows, surfaced here too because this

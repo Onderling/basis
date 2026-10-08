@@ -58,7 +58,7 @@ export { SETTINGS_ENUM_AXES as ENUM_AXES } from '../../src/v2/circlePolicy.js';
  * @param {string} [args.note]
  */
 export function renderCircleSettings(container, {
-  policy, t, onChange, onBack, onSave, saveLabel, note,
+  policy, t, onChange, onBack, onSave, saveLabel, note, saveControl = null,
   // Display theme — surfaced HERE as well as in "Mijn gegevens", where nobody looked for it (2026-07-22
   // demo feedback). Same shared renderer, so the two can't drift; absent deps ⇒ the block is simply omitted.
   themePref, onSetTheme,
@@ -344,8 +344,20 @@ export function renderCircleSettings(container, {
   save.type = 'button';
   save.className = 'circle-settings__save';
   save.textContent = saveLabel || tr('circle.settings.save');
-  save.addEventListener('click', () => { if (typeof onSave === 'function') onSave(); });
+  // The policy is the admins' (a member's statement is dropped by every other device): Save is greyed for anyone
+  // else, with why — the fields stay readable.
+  if (saveControl?.disabled) {
+    save.disabled = true;
+    if (saveControl.reasonKey) save.title = tr(saveControl.reasonKey);
+  }
+  save.addEventListener('click', () => { if (!saveControl?.disabled && typeof onSave === 'function') onSave(); });
   container.appendChild(save);
+  if (saveControl?.disabled && saveControl.reasonKey) {
+    const why = document.createElement('p');
+    why.className = 'circle-settings__save-reason';
+    why.textContent = tr(saveControl.reasonKey);
+    container.appendChild(why);
+  }
 
   // Per-DEVICE display preference — after the save button on purpose: it is not part of the policy document
   // and applies instantly, so it must not read as something the Save button commits.

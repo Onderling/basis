@@ -56,7 +56,6 @@ import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
-import { DEFAULT_RELAY_URL } from '../src/v2/relayPref.js';   // named in the banner only — a headless node dials what its operator set
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
 import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
@@ -1452,7 +1451,7 @@ const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null)
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
-console.log(`  wire      ${relayUrl || `LOCAL ONLY — no relay set (a person's device would use ${DEFAULT_RELAY_URL}; the box dials only ONDERLING_RELAY_URL)`}`);
+console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
 // the address another node names this one by — e.g. the household's companion, when its owner grants this bot a place there
 console.log(`  address   ${agent.identity?.chat?.pubKey ?? '—'}`);

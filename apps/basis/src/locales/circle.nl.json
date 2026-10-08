@@ -4362,11 +4362,11 @@
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_morning": {
-      "text": "'s ochtends (08:00)",
+      "text": "'s ochtends ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_evening": {
-      "text": "de avond ervoor (19:00)",
+      "text": "de avond ervoor ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_before": {

@@ -16,14 +16,16 @@ describe('alphaSurface', () => {
   it('both shells project the same alpha tabs, in manifest order, without the hidden ones', () => {
     const web = circleTabs(basisManifest).map((t) => t.id);
     const mobile = circleTabsMobile(basisManifest).map((t) => t.id);
-    // the Schermen tab is back (Frits 2026-10-05: "Mijn agenda" across circles lives there), after Kringen
-    expect(web).toEqual(['circles', 'screens', 'contacten', 'mij']);
+    // Schermen is hidden again (Frits 2026-10-06): its two cross-circle blocks live on Mij as "Mijn overzicht"
+    expect(web).toEqual(['circles', 'contacten', 'mij']);
+    expect(web).not.toContain('screens');
+    expect(isAlphaTab('screens')).toBe(false);
     expect(mobile).toEqual(web);
     for (const id of HIDDEN_TABS) { expect(web).not.toContain(id); expect(isAlphaTab(id)).toBe(false); }
   });
 
   it('alphaTabs keeps order and drops unknowns; a hidden tab lands on the circles list', () => {
-    expect(alphaTabs([{ id: 'nearby' }, { id: 'mij' }, { id: 'circles' }]).map((t) => t.id)).toEqual(['mij', 'circles']);
+    expect(alphaTabs([{ id: 'nearby' }, { id: 'screens' }, { id: 'mij' }, { id: 'circles' }]).map((t) => t.id)).toEqual(['mij', 'circles']);
     expect(alphaTabs(null)).toEqual([]);
     expect(ALPHA_FALLBACK_TAB).toBe('circles');
   });

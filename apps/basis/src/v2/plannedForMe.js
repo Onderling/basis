@@ -14,7 +14,7 @@ const DAY = 86_400_000;
 const ms = (v) => { const n = typeof v === 'number' ? v : Date.parse(v ?? ''); return Number.isFinite(n) ? n : NaN; };
 
 /** The circles I am in, as `{id, name}` (the list answers ids or rows). */
-async function myCircles(callSkill) {
+export async function myCircles(callSkill) {
   const r = await callSkill('stoop', 'listMyCircles', {}).catch(() => null);
   return (r?.circles ?? []).map((c) => (typeof c === 'string' ? { id: c, name: '' } : { id: c?.groupId ?? c?.id, name: c?.name ?? c?.groupName ?? '' })).filter((c) => typeof c.id === 'string' && c.id);
 }

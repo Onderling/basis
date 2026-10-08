@@ -106,6 +106,12 @@ function scrollRowIntoView(el) {
   }
 }
 
+// A block that carries its own title (`titleKey` — the Mij overview's "Mijn dingen" / "Mijn agenda") is called by it;
+// any other block by its type, as before.
+function blockName(block, tr) {
+  return block.titleKey ? tr(block.titleKey) : block.type;
+}
+
 function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
   const section = document.createElement('section');
   section.className = `circle-screen__block circle-screen__block--${block.type}`;
@@ -118,13 +124,13 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
 
   if (block.status === 'error') {
     section.classList.add('circle-screen__block--error');
-    section.textContent = tr('circle.screen.block_error', { type: block.type })
+    section.textContent = tr('circle.screen.block_error', { type: blockName(block, tr) })
       + (block.error ? ` — ${block.error}` : '');
     return section;
   }
   if (block.status === 'empty') {
     section.classList.add('circle-screen__block--empty');
-    section.textContent = tr('circle.screen.block_empty', { type: block.type });
+    section.textContent = tr('circle.screen.block_empty', { type: blockName(block, tr) });
     return section;
   }
 
@@ -236,7 +242,7 @@ function renderNoticeboard(section, block, tr) {
 function renderAgenda(section, block, tr, highlightRef) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
-  title.textContent = tr('circle.recipe.block.calendar');
+  title.textContent = tr(block.titleKey ?? 'circle.recipe.block.calendar');
   section.appendChild(title);
 
   const list = document.createElement('ul');
@@ -270,7 +276,7 @@ function renderAgenda(section, block, tr, highlightRef) {
 function renderItems(section, block, tr) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
-  title.textContent = tr(`circle.screen.items_title.${block.content?.noun ?? ''}`);
+  title.textContent = tr(block.titleKey ?? `circle.screen.items_title.${block.content?.noun ?? ''}`);
   section.appendChild(title);
   const list = document.createElement('ul');
   list.className = 'circle-screen__items-list';
@@ -295,7 +301,7 @@ function renderItems(section, block, tr) {
 function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
-  title.textContent = tr('circle.recipe.block.tasks');
+  title.textContent = tr(block.titleKey ?? 'circle.recipe.block.tasks');
   section.appendChild(title);
 
   const list = document.createElement('ul');

@@ -20,6 +20,8 @@
  */
 import { pageLabel } from '../../src/v2/pageProjection.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { MIJ_OVERVIEW_TITLE_KEY } from '../../src/v2/mijOverview.js';
+import { renderCircleScreen } from './circleScreen.js';
 
 export function renderCircleProfile(container, {
   profile = {},
@@ -32,6 +34,9 @@ export function renderCircleProfile(container, {
   onOpenMij,
   // Gepland's lines (shared `plannedLines`); null while they load; absent = the shell does not show Gepland
   plannedLines = undefined,
+  // Mijn overzicht: the shared overview's materialized blocks (`mijOverviewBlocks`), drawn by the screen's own block
+  // painter; null while they load; absent = the shell does not show it
+  overviewBlocks = undefined,
   // the person's own week overview: `{ on, onToggle }` (absent = no switch; on null while it loads)
   weekOverview = undefined,
   onGeocode,
@@ -103,6 +108,16 @@ export function renderCircleProfile(container, {
     moved.textContent = tr('circle.profile.offerings_moved');
   }
   container.appendChild(moved);
+
+  // ── Mijn overzicht: my chores and my appointments across every circle — read-only, no screens manager ────────
+  if (overviewBlocks !== undefined) {
+    const overview = section(tr(MIJ_OVERVIEW_TITLE_KEY));
+    overview.classList.add('cc-profile__overview');
+    const body = document.createElement('div');
+    overview.appendChild(body);
+    renderCircleScreen(body, { blocks: overviewBlocks, t: tr });
+    container.appendChild(overview);
+  }
 
   // ── Gepland: what is coming for me, wherever it lives (the shell hands the lines; null while they load) ─────
   if (plannedLines !== undefined) {

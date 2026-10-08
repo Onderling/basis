@@ -13,8 +13,9 @@ that mechanism (or extend it, and update its row). If two rows almost fit, that 
 building a third.
 
 **"Used today by"** names a PRODUCTION file that reaches the mechanism (not a test, not a demo). A row with no such file
-says **inert** — built, tested, reached by nothing. An inert row is a finding: adopt it, or retire it with a decision
-line. It is never deleted quietly. (Measured 2026-10-07 by a sweep of the code. A guard that holds this table to the
+says **inert** — built, tested, reached by nothing. An inert row is kept: its PURPOSE is written beside it (what future
+need it serves), so the next builder adopts it instead of building a second one. It is never deleted quietly (Frits,
+2026-10-09: think about the purpose, never retire). (Measured 2026-10-07 by a sweep of the code. A guard that holds this table to the
 code is the next step.)
 
 **The base the rows ride on.** Almost every row between agents goes out through one send:
@@ -77,16 +78,20 @@ addresses, sizes, timing and ciphertext — never content.
 
 ## Inert — built, reached by nothing in production (measured 2026-10-07; all KEPT, Frits 2026-10-07 — before building something like them, use these)
 
-| What it would do | Mechanism | Lives in | Only reached by |
-|---|---|---|---|
-| pub/sub for skills | `SkillsPubSub` | `packages/core/src/SkillsPubSub.js` | the core index re-export |
-| stream a task's output | streaming | `packages/core/src/protocol/streaming.js` | the core index re-export |
-| go through a third agent | the hop tunnel | `packages/core/src/routing/hopTunnel.js`, `callWithHop.js` | `mesh-demo`, `sdk-smoke` (its seal, `security/tunnelSeal.js`, is live: task exchange, `tunnelReceiveSealed`, the link seal) |
-| fetch from several recipients at once | the relay's multi-recipient queue | `packages/relay/src/MultiRecipientQueue.js` | no client sends `multi-request` |
-| drop sealed mail for an away owner at a companion | the sealed inbox | `apps/companion-node/src/sealedInbox.js` | tests (`boot.js` never turns it on) |
-| serve the photo edge over HTTP | the blob gate's HTTP mount | `blob-gateway/httpGate.js`, `relay/blobGateMount.js`, companion `mediaEdge.js` | tests (no shipped boot passes a `blobGate`) |
-| carry items the old way | the secure-mesh envelope adapter | `apps/basis/src/core/sync/secureMeshEnvelopeAdapter.js` | half: its SEND is superseded (task and noticeboard writes go through the task lane), its INBOUND handler is still wired in `realAgent.js` — a retire candidate; probe what still arrives through it first |
-| BLE, MQTT transports | the transports | `@onderling/transports` | `mesh-demo` (basis builds them with `ble: false`) |
+| What it would do | Mechanism | Lives in | Only reached by | Its purpose — the need it is kept for |
+|---|---|---|---|---|
+| pub/sub for skills | `SkillsPubSub` | `packages/core/src/SkillsPubSub.js` | the core index re-export | a person's own feed of what changed for them across circles, without polling — the per-person feed topic the household-in-your-own-app design settled on (served by the person's companion) |
+| stream a task's output | streaming | `packages/core/src/protocol/streaming.js` | the core index re-export | an answer that arrives in pieces: a model's long reply shown as it is written, or a large export/restore read in chunks instead of one message |
+| go through a third agent | the hop tunnel | `packages/core/src/routing/hopTunnel.js`, `callWithHop.js` | `mesh-demo`, `sdk-smoke` (its seal, `security/tunnelSeal.js`, is live: task exchange, `tunnelReceiveSealed`, the link seal) | reach someone through a friend when no relay is shared — two households on different relays, or a phone that only its owner's companion can see |
+| fetch from several recipients at once | the relay's multi-recipient queue | `packages/relay/src/MultiRecipientQueue.js` | no client sends `multi-request` | one fetch for many addresses after being away — a device or a companion catching up on every circle address it holds in one round trip |
+| drop sealed mail for an away owner at a companion | the sealed inbox | `apps/companion-node/src/sealedInbox.js` | tests (`boot.js` never turns it on) | mail for an owner whose phone is off, held by their own always-on companion — live once companions run beside the bot on the household's tablet |
+| serve the photo edge over HTTP | the blob gate's HTTP mount | `blob-gateway/httpGate.js`, `relay/blobGateMount.js`, companion `mediaEdge.js` | tests (no shipped boot passes a `blobGate`) | a file or photo at a link a program without a key can open (as the agenda link is) — sending a file to a contact once the media edge is deployed |
+| carry items the old way | the secure-mesh envelope adapter | `apps/basis/src/core/sync/secureMeshEnvelopeAdapter.js` | half: its SEND is superseded (task and noticeboard writes go through the task lane), its INBOUND handler is still wired in `realAgent.js` | the carry for an item type that is not on the task lane — a third party's own data type plugging in before it has a lane of its own; with notify-envelope's pending-upload queue, a real Solid pod behind a writer that is offline |
+| BLE, MQTT transports | the transports | `@onderling/transports` | `mesh-demo` (basis builds them with `ble: false`) | BLE: two phones in one room with no network at all (the nearby room without Wi-Fi). MQTT: a household's own broker, or small devices (a sensor, a doorbell) as peers |
+
+**Which goes live first:** the sealed inbox and the pub/sub feed — both arrive with the companion beside the bot on the
+household's tablet (the inbox holds mail for an away owner; the feed carries "what changed for me"). The rest wait for
+the need named beside them.
 
 **Transports actually built by the shells:** the relay WebSocket everywhere; NKN on web (when its script loads) and
 mobile, never on the box; WebRTC rendezvous on web and mobile; mDNS on mobile (browse by default) and on a companion

@@ -148,7 +148,8 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
           : planned.map((line, i) => <Text key={`${i}-${line}`} style={styles.plannedItem} testID="profile-planned-item">{line}</Text>)}
         {weekOn !== undefined ? (
           <View style={styles.weekRow}>
-            <Text style={styles.muted}>{t('circle.profile.week_switch')}</Text>
+            {/* The label wraps; the switch keeps its place on the screen (a long label pushed it off the edge). */}
+            <Text style={[styles.muted, styles.weekLabel]}>{t('circle.profile.week_switch')}</Text>
             <Pressable
               testID="profile-week-toggle"
               accessibilityRole="switch"
@@ -269,6 +270,7 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   locCurrent: { fontSize: 14, color: theme.color.ink },
   plannedItem: { fontSize: 14, color: theme.color.ink },
   weekRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
+  weekLabel: { flex: 1 },
   weekToggle: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radius ?? 6, borderWidth: 1, borderColor: theme.color.ink },
   weekToggleText: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
   locResult: { flex: 1, fontSize: 14, color: theme.color.ink },

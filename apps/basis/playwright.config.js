@@ -56,10 +56,11 @@ const NO_RELAY_BASE_URL = `http://localhost:${NO_RELAY_PORT}`;
 const RELAY_SPECS = /(journeys|matrix|twopeer|two-relays|feedback-path-box|screen-connect-box|screen-admin-box|screen-admin-settings-box|screen-telegram-launch-box|screen-two-tabs-box|screen-buttons-box|screen-member-box|screen-export-key-box|identity-link-app|household-in-app-box|walk-[a-z0-9-]+)\.spec\.js$/;
 
 
-/* Hermetic: no browser under test may reach the production hosts (the public relay above all). Chromium resolves
- * *.onderling.org to nothing, so a dial fails at once instead of reaching production — whatever a spec or the app's
- * own defaults try. Local servers (127.0.0.1 / localhost) are untouched. */
-const HERMETIC_LAUNCH = { args: ['--host-resolver-rules=MAP onderling.org ~NOTFOUND, MAP *.onderling.org ~NOTFOUND'] };
+/* Hermetic: no browser under test may reach ANY host but this machine — the public relay above all, and any other
+ * wss/https a spec or the app's own defaults might dial. Chromium resolves every name except localhost/127.0.0.1 to
+ * nothing, so such a dial fails at once (net::ERR_NAME_NOT_RESOLVED, loud in the console) instead of reaching
+ * production or the internet. Local servers (the dev servers, the relay fixture) are untouched. */
+const HERMETIC_LAUNCH = { args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1'] };
 
 export default defineConfig({
   testDir: './test-browser',

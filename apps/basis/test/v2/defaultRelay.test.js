@@ -58,9 +58,9 @@ describe('who dials it', () => {
     }
   });
 
-  it('no browser under test can resolve the production hosts (both projects)', () => {
+  it('no browser under test can resolve any host but this machine (both projects)', () => {
     const cfg = read('../../playwright.config.js');
-    expect(cfg).toMatch(/MAP \*\.onderling\.org ~NOTFOUND/);
+    expect(cfg).toMatch(/MAP \* ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127\.0\.0\.1/);
     expect(cfg.match(/launchOptions: HERMETIC_LAUNCH/g)?.length ?? 0).toBe(2);
   });
 

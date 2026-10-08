@@ -1,6 +1,7 @@
 export { createTasksAgent } from './Agent.js';
 export { buildStandardRolePolicy, STANDARD_ROLE_TABLE } from './rolePolicy.js';
 export { computeStatus, detectCycle } from './dag.js';
+export { taskHasWords } from './taskWords.js';
 export { buildSkills } from './skills/index.js';
 
 // tasks-v0 as a `@onderling/manifest-host`

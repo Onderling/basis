@@ -18,7 +18,7 @@ import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 const nodes = [];
 afterAll(() => teardown(nodes));
 
-const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-planned'];
+const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'listOpen', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-planned'];
 const ADMIN_EXTRA = ['reassignTask', 'removeTask', 'editTask'];
 
 describe('the bot\'s slim map', () => {
@@ -51,6 +51,13 @@ describe('the bot\'s slim map', () => {
     // and the app switch is no one's: a household bot's plugins are its template's
     expect(menu('admin')).not.toContain('assistant-apps');
     expect(menu('member')).toContain('assistant-reminders');
+  });
+
+  it('household is the template, not an app on the bot: its own `listOpen` never reaches a tool — the chores\' does', () => {
+    const { catalogue: withHousehold } = composeAssistantCatalogue({ apps: ['household', 'lists', 'tasks', 'calendar'], slim: true });
+    const open = [...withHousehold.opsById.values()].filter((e) => e?.op?.id === 'listOpen');
+    expect(open.map((e) => e.appOrigin)).toEqual(['tasks']);
+    expect([...withHousehold.opsById.values()].filter((e) => e?.appOrigin === 'household')).toEqual([]);
   });
 
   it('each op has its level; an op off the map has none', () => {

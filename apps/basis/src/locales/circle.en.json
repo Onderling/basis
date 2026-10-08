@@ -4737,12 +4737,13 @@
           "entryReminders": "the reminders everyone gets for one appointment or chore (60 · morning · evening · also … · usual)"
         },
         "tasks": {
-          "listMine": "your own chores",
+          "listMine": "your own chores, or someone else's (or say: what does Bob have to do)",
           "claimTask": "take on a chore (or say: I'll do the windows)",
           "completeTask": "report a chore done (or say: windows are done)",
           "editTask": "change a chore",
           "removeTask": "remove a chore",
-          "reassignTask": "give a chore to someone else"
+          "reassignTask": "give a chore to someone else",
+          "listOpen": "who does a chore, and when (or say: who does the lamp)"
         },
         "calendar": {
           "addEvent": "make an appointment (or say: dentist tomorrow at 10)",
@@ -4754,7 +4755,7 @@
         },
         "assistant": {
           "assistant-people": "who is in this household",
-          "weekOverview": "your week: chores, appointments, shopping",
+          "weekOverview": "your week: chores, appointments, shopping — or one day (or say: who is in on Saturday)",
           "assistant-menu": "your settings, with buttons",
           "assistant-reminders": "reminders on or off, or when (60 · morning · evening · also …)",
           "assistant-overview": "the Sunday overview on or off",
@@ -4864,7 +4865,11 @@
     "link_failed": "Linking did not work.",
     "unlink_done": "Unlinked: messages from that Basis app no longer count as you, and its screens are disconnected.",
     "unlink_nothing": "No Basis app is linked to you.",
-    "users_linked": "linked app: yes"
+    "users_linked": "linked app: yes",
+    "day_unread": {
+      "text": "Which day do you mean by '{{day}}'? Say for example 'Saturday' or 'tomorrow'.",
+      "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    }
   },
   "op": {
     "not_in_this_circle": {
@@ -8153,6 +8158,10 @@
         "text": "✓ Circle \"{{circle}}\" created. It shows in /circles as \"pending\"; it becomes fully active once more than one circle at a time is supported.",
         "doc": "Confirmation of /circle-new."
       }
+    },
+    "names_hidden_read": {
+      "text": "Names are not visible here: you can only ask for your own chores.",
+      "doc": "A household bot's reply when someone asks for another person's chores by name and the household's names setting does not let them see names."
     }
   },
   "refusal": {
@@ -8379,6 +8388,78 @@
     "chore_edited": {
       "text": "Chore '{{title}}' is changed.",
       "doc": "A chore was changed; its words as they are now."
+    },
+    "who_held": {
+      "text": "Chore '{{title}}' is held by {{who}}{{when}}.",
+      "doc": "Who does a chore (\"wie doet de lamp\"): the one chore the words fit, who holds it and its day. {{who}}: the holders as the reader may see them (\"jou\", a name, \"iemand\"); {{when}}: \", za 10 okt\" or empty."
+    },
+    "who_open": {
+      "text": "Chore '{{title}}' has nobody yet{{when}}.",
+      "doc": "Who does a chore: the one chore the words fit, and nobody holds it. {{when}}: \", za 10 okt\" or empty."
+    },
+    "who_none": {
+      "text": "There is no open chore with '{{text}}'.",
+      "doc": "Who does a chore: no open chore holds the words the person used."
+    },
+    "who_several": {
+      "text": "{{count}} chores with '{{text}}': {{chores}}.",
+      "doc": "Who does a chore: several open chores hold the words; {{chores}} is one row each (who_row_held / who_row_open), joined by \"; \"."
+    },
+    "who_row_held": {
+      "text": "{{title}} ({{who}}{{when}})",
+      "doc": "One chore in the several-chores line: its words, who holds it and its day (\", za 10 okt\" or empty)."
+    },
+    "who_row_open": {
+      "text": "{{title}} (nobody yet{{when}})",
+      "doc": "One chore in the several-chores line that nobody holds; its day as \", za 10 okt\" or empty."
+    },
+    "who_you": {
+      "text": "you",
+      "doc": "The reader themselves among the people of a chore or an appointment (\"is van jou\")."
+    },
+    "who_someone": {
+      "text": "someone",
+      "doc": "A person the reader may not name (the household's names setting): never their id."
+    },
+    "who_everyone": {
+      "text": "everyone",
+      "doc": "An appointment that names nobody: it is for the whole household."
+    },
+    "who_nobody": {
+      "text": "nobody yet",
+      "doc": "A chore on a day that nobody holds yet."
+    },
+    "mine_list": {
+      "text": "{{name}} does: {{chores}}.",
+      "doc": "Someone else's open chores (\"wat moet Bob doen\"), by the name asked. {{chores}}: one row each (mine_row / mine_row_due), joined by \"; \"."
+    },
+    "mine_none": {
+      "text": "{{name}} has no open chores.",
+      "doc": "Someone else's open chores: they hold none."
+    },
+    "mine_row": {
+      "text": "{{title}}",
+      "doc": "One chore in someone's chores line, without a day."
+    },
+    "mine_row_due": {
+      "text": "{{title}} ({{when}})",
+      "doc": "One chore in someone's chores line, with its day (\"za 10 okt\")."
+    },
+    "day_head": {
+      "text": "On {{when}}:",
+      "doc": "One day's read (\"wie is er zaterdag\"): its first line, the day as \"za 10 okt\"."
+    },
+    "day_event": {
+      "text": "• {{time}} {{title}} — {{who}}",
+      "doc": "One appointment that day: its time, its title and who comes (\"iedereen\" when it names nobody)."
+    },
+    "day_chore": {
+      "text": "• chore {{title}} — {{who}}",
+      "doc": "One chore due that day and who does it (\"nog niemand\" when nobody holds it)."
+    },
+    "day_none": {
+      "text": "Nothing on {{when}}.",
+      "doc": "One day's read: no appointments and no chores that day."
     }
   }
 }

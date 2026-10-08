@@ -14,6 +14,23 @@
       "zet melk op de schuur"
     ]
   },
+  "tasks.listMine.who": {
+    "doc": "Someone else's open chores, by the name the person uses for them (\"what does Bob have to do\").",
+    "patterns": [
+      "wat moet {person} (nog)? doen",
+      "welke (taken|klusjes) heeft {person} (nog)?"
+    ],
+    "examples": [
+      "wat moet Bob nog doen",
+      "Wat moet Ann doen?",
+      "welke klusjes heeft Ann"
+    ],
+    "not": [
+      "wat moet ik nog doen",
+      "wat moet je doen",
+      "wat moet de kat doen"
+    ]
+  },
   "lists.listEntries.named": {
     "doc": "Read what is on a list the household names (the agenda reads its appointments).",
     "patterns": [
@@ -43,6 +60,23 @@
       "wat moet ik doen met de melk dan"
     ]
   },
+  "tasks.listOpen.words": {
+    "doc": "Who does a chore, and when: the open chores whose words hold the words said (\"who does the lamp\").",
+    "patterns": [
+      "wie doet (de|het|er)? {item}",
+      "wie (gaat|moet) (de|het)? {item} doen"
+    ],
+    "examples": [
+      "wie doet de lamp",
+      "Wie doet de lamp?",
+      "wie gaat de ramen doen"
+    ],
+    "not": [
+      "wie doet mee",
+      "wie doet wat",
+      "wie doet er zaterdag wat"
+    ]
+  },
   "assistant.weekOverview": {
     "doc": "The person's week: their chores, the appointments, what is open.",
     "patterns": [
@@ -56,6 +90,24 @@
     ],
     "not": [
       "wat staat er op de boodschappen"
+    ]
+  },
+  "assistant.weekOverview.day": {
+    "doc": "One day of the person's week: that day's appointments with who comes, and its chores with who does them.",
+    "patterns": [
+      "wie (is|zijn) er {day} (thuis)?",
+      "wat (is|staat) er (op|voor)? {day} (op de agenda|te doen)?",
+      "wat gebeurt er {day}"
+    ],
+    "examples": [
+      "wie is er zaterdag",
+      "Wat is er morgen?",
+      "wat staat er vrijdag",
+      "wie is er volgende week maandag thuis"
+    ],
+    "not": [
+      "wat staat er deze week",
+      "wie is er"
     ]
   },
   "lists.markListItemDone.stated": {

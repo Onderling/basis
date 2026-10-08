@@ -12,6 +12,22 @@
       "add a comment to the agenda later please"
     ]
   },
+  "tasks.listMine.who": {
+    "doc": "Someone else's open chores, by the name the person uses for them (\"what does Bob have to do\").",
+    "patterns": [
+      "what does {person} (still)? have to do",
+      "what (tasks|chores) does {person} (still)? have"
+    ],
+    "examples": [
+      "what does Bob still have to do",
+      "What does Ann have to do?",
+      "what chores does Ann have"
+    ],
+    "not": [
+      "what do i still have to do",
+      "what does it have to do"
+    ]
+  },
   "lists.listEntries.named": {
     "doc": "Read what is on a list the household names (the agenda reads its appointments).",
     "patterns": [
@@ -39,6 +55,20 @@
       "what do i do with the milk"
     ]
   },
+  "tasks.listOpen.words": {
+    "doc": "Who does a chore, and when: the open chores whose words hold the words said (\"who does the lamp\").",
+    "patterns": [
+      "who (does|is doing|will do|takes) (the)? {item}"
+    ],
+    "examples": [
+      "who does the lamp",
+      "Who is doing the windows?"
+    ],
+    "not": [
+      "who does what",
+      "who does it"
+    ]
+  },
   "assistant.weekOverview": {
     "doc": "The person's week: their chores, the appointments, what is open.",
     "patterns": [
@@ -49,6 +79,23 @@
     ],
     "not": [
       "what's on the shopping list"
+    ]
+  },
+  "assistant.weekOverview.day": {
+    "doc": "One day of the person's week: that day's appointments with who comes, and its chores with who does them.",
+    "patterns": [
+      "who is (in|home|around|there)? (on)? {day}",
+      "(what's|what is) (on)? {day}",
+      "what (happens|is happening) {day}"
+    ],
+    "examples": [
+      "who is in on saturday",
+      "What's on tomorrow?",
+      "who is home friday"
+    ],
+    "not": [
+      "what's on this week",
+      "who is in"
     ]
   },
   "lists.markListItemDone.stated": {

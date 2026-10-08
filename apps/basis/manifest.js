@@ -908,8 +908,8 @@ export const basisManifest = {
    */
   actions: [
     { id: 'back',     labelKey: 'circle.back',                 target: { kind: 'nav', to: 'back' } },
-    { id: 'invite',   labelKey: 'circle.invite.menu',          target: { kind: 'nav', to: 'invite' } },
-    { id: 'settings', labelKey: 'circle.settings.title',       target: { kind: 'op',  opId: 'settings' } },
+    { id: 'invite',   labelKey: 'circle.invite.menu',          target: { kind: 'nav', to: 'invite' },     role: 'admin' },
+    { id: 'settings', labelKey: 'circle.settings.title',       target: { kind: 'op',  opId: 'settings' }, role: 'admin' },
     { id: 'lists',    labelKey: 'circle.lists.title',          target: { kind: 'nav', to: 'lists' } },
     { id: 'contacts', labelKey: 'circle.screen.open.contacts', target: { kind: 'nav', to: 'contacts' } },
     { id: 'override', labelKey: 'circle.override.title',       target: { kind: 'nav', to: 'override' } },
@@ -919,7 +919,7 @@ export const basisManifest = {
     { id: 'files',    labelKey: 'circle.folio.title',          target: { kind: 'nav', to: 'files' },    requires: ['lists', 'notes'] },
     { id: 'rules',    labelKey: 'circle.rules.title',          target: { kind: 'nav', to: 'rules' },     requires: ['houseRules'] },
     { id: 'recipes',  labelKey: 'circle.recipe.editor.book_title', target: { kind: 'nav', to: 'recipes' } },
-    { id: 'admin',    labelKey: 'circle.admin.title',          target: { kind: 'nav', to: 'admin' } },
+    { id: 'admin',    labelKey: 'circle.admin.title',          target: { kind: 'nav', to: 'admin' },      role: 'admin' },
     { id: 'governance', labelKey: 'circle.governance.title',   target: { kind: 'nav', to: 'governance' } },
     { id: 'share',    labelKey: 'circle.share.screen_title',   target: { kind: 'nav', to: 'share' },     platforms: ['mobile'] },
   ],

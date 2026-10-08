@@ -853,6 +853,7 @@ function buildAction(action) {
       out[field] = [...v];
     }
   }
+  if (typeof action.role === 'string' && action.role !== '') out.role = action.role;   // who the entry is for
   return out;
 }
 

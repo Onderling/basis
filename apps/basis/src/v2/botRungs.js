@@ -18,7 +18,8 @@ export const BOT_DOOR_RUNGS = Object.freeze(['tier', 'door-map', 'door-role']);
  *        null when it is not on this door; absent → every op is on it
  * @param {(role: string|null, opId: string) => boolean} [a.roleAllows]  the door's narrowing of a role (an observer reads)
  * @param {(caller: string) => (string|null)} [a.roleOf]  the role the door gave this caller
- * @returns {Array<(input: {opId: string, caller: string, visibility?: string}) => Promise<object|null>>}
+ * @returns {Array<(input: {opId: string, caller: string, visibility?: string}) => Promise<object|null>>}  `opId` qualified
+ *          with its app (`tasks.listOpen`): the map and the role decide on the op the call reaches, never its bare id
  */
 export function botDoorChecks({ checkCaller, opLevel = null, roleAllows = null, roleOf = () => null }) {
   const levelOf = (opId) => (typeof opLevel === 'function' ? opLevel(opId) : undefined);
@@ -29,7 +30,9 @@ export function botDoorChecks({ checkCaller, opLevel = null, roleAllows = null, 
       // the role check below says who may
       const level = visibility ?? (mapped === 'by-role' ? 'authenticated' : mapped) ?? 'authenticated';
       try {
-        await checkCaller({ callerId: caller, skillId: opId, skill: { id: opId, visibility: level, enabled: true }, unknownAs: 'public' });
+        // the host's skill registry speaks an op's own id (a host skill is judged by its own visibility)
+        const skillId = String(opId ?? '').slice(String(opId ?? '').indexOf('.') + 1);
+        await checkCaller({ callerId: caller, skillId, skill: { id: skillId, visibility: level, enabled: true }, unknownAs: 'public' });
         return null;
       } catch (e) { return refuse('tier', e?.code ?? 'refused'); }
     },

@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
@@ -22,7 +23,8 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const peerGraph = bundle?.peerGraph ?? null;
   const callSkill = bundle?.callSkill ?? null;
   const [contacts, setContacts] = useState([]);
@@ -172,8 +174,8 @@ function rosterMeta(c) {
   return bits.join(' · ');
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  wrap: { flex: 1, padding: 16, backgroundColor: theme.color.paper },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   add: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent },

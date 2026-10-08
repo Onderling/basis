@@ -6,12 +6,14 @@
  */
 
 import { botOpLevel } from './botOpMap.js';
+import { reminderRuleLine } from './botReminders.js';
+import { HOUSEHOLD_RULES_DEFAULT } from './botSettings.js';
 
 const SECTION_OF = { lists: 'lists', tasks: 'chores', calendar: 'agenda', assistant: 'you' };
 const ORDER = ['lists', 'chores', 'agenda', 'you', 'admin'];
 
 /** Is this op the admin's on the bot: the assistant's own by its visibility, the rest by their level on the bot's map. */
-export const isAdminOp = (entry) => (entry?.appOrigin === 'assistant' ? entry?.op?.visibility === 'trusted' : botOpLevel(entry?.op?.id) === 'trusted');
+export const isAdminOp = (entry) => (entry?.appOrigin === 'assistant' ? entry?.op?.visibility === 'trusted' : botOpLevel(`${entry?.appOrigin}.${entry?.op?.id}`) === 'trusted');
 
 /** The person's commands by section, in `/help`'s order: `[section, entries]`, empty sections left out. */
 function botHelpGroups(commandMenu, opsById, isAdmin = isAdminOp) {
@@ -33,10 +35,16 @@ export const botHelpOrder = (commandMenu, opsById) => botHelpGroups(commandMenu,
  * @param {{get: Function}} a.opsById  the catalogue's op entries
  * @param {(entry: object) => boolean} [a.isAdmin]  is this op the admin's (default: their level on the bot's map)
  * @param {(key: string, params?: object) => string} a.t  the person's translator
+ * @param {{on?: boolean, rules?: string[]}} [a.reminders]  the household's reminders as they stand: when given, a person
+ *        who has `/herinneringen` reads when the bot reminds (the welcome's own line) under their own commands
  * @returns {string[]} the lines, sections with their heading
  */
-export function botHelpLines({ commandMenu, opsById, isAdmin = isAdminOp, t }) {
+export function botHelpLines({ commandMenu, opsById, isAdmin = isAdminOp, t, reminders = null }) {
   const out = [];
+  const remindable = reminders && (commandMenu ?? []).some((e) => opsById?.get?.(e.opId)?.op?.id === 'assistant-reminders');
+  const remindLine = !remindable ? null
+    : reminders.on === false ? t('circle.bot.welcome_reminders_off')
+      : reminderRuleLine({ rules: Array.isArray(reminders.rules) ? reminders.rules : HOUSEHOLD_RULES_DEFAULT, t });
   for (const [s, rows] of botHelpGroups(commandMenu, opsById, isAdmin)) {
     if (out.length) out.push('');
     out.push(`${t(`circle.bot.help.sections.${s}`)}:`, ...rows.map((e) => {
@@ -45,6 +53,7 @@ export function botHelpLines({ commandMenu, opsById, isAdmin = isAdminOp, t }) {
       const line = t(key);
       return line && line !== key ? `${e.command} — ${line}` : e.command;
     }));
+    if (s === 'you' && remindLine) out.push(remindLine);
   }
   return out;
 }

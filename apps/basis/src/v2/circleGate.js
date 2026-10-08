@@ -27,6 +27,7 @@ import { calendarManifest } from '../../../calendar/manifest.js';
 import { CIRCLE_GATE_TRAIL, DEFAULT_GATE_LOCALE } from './circleGateLexicon.js';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { compileGateWords, GATE_WORDS } from './gateWords.js';
+import { compilePhrase } from './gatePhrases.js';
 
 /**
  * Token-gate rules for the circle bot, projected from the circle apps' manifests.
@@ -66,7 +67,7 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
  * @param {string} [_locale]
  * @param {Array<{name: string, aliases?: string[], defaultChild?: string|null}>} lists  the template's lists
  */
-export function listsGateRules(_locale, lists = []) {
+export function listsGateRules(_locale, lists = [], { greeting = true } = {}) {
   const byWord = new Map();
   for (const l of lists) for (const w of [l.name, ...(l.aliases ?? [])]) if (w) byWord.set(String(w).toLowerCase(), l.name);
   const holdsEvents = new Set(lists.filter((l) => l.defaultChild === 'calendar-event').map((l) => l.name));
@@ -80,17 +81,47 @@ export function listsGateRules(_locale, lists = []) {
   // The WORDS are the locale files' (gate.<lang>.json: patterns, examples, what must not match); the household bot
   // understands its languages side by side. What each rule DOES stays here, keyed by the entry's id.
   const compiled = compileGateWords(GATE_WORDS, { list: [...byWord.keys()] });
-  return GATE_RULES.map(({ id, name, build }) => {
+  // a door without its own ops (a circle the bot joined) has no greeting to say: its greetings stay the model's
+  return GATE_RULES.filter((r) => greeting || r.id !== GREETING_RULE).map(({ id, name, build, clean }) => {
     const forms = compiled.get(id) ?? [];
-    const slotsOf = (text) => { for (const f of forms) { const m = f.match(text); if (m) return m; } return null; };
+    // a rule may read the line cleaned first (a greeting: its punctuation and emoji are not words)
+    const slotsOf = (text) => { const s = typeof clean === 'function' ? clean(text) : text; for (const f of forms) { const m = f.match(s); if (m) return m; } return null; };
     const command = (text) => { const m = slotsOf(String(text ?? '')); return m ? build(m, String(text).trim(), { listFor, holdsEvents, chores, shopping }) : null; };
     // a rule TAKES a line when it builds a command for it — its own checks included, not only its words
     return { name, test: (text) => Boolean(command(text)), command };
   });
 }
 
+/** The greeting's rule id (a door that has no greeting op leaves it out). */
+const GREETING_RULE = 'assistant.hello';
+/** A line as a greeting reads it: letters, digits and spaces — "goedemorgen 👋", "Hallo!!" are "goedemorgen", "Hallo". */
+const lettersOnly = (text) => String(text ?? '').replace(/[^\p{L}\p{N}\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
+/** Per language, the greeting's own forms: which language a greeting is in, when only one of them has it. */
+const GREETING_FORMS = Object.entries(GATE_WORDS).map(([lang, entries]) => [lang, (entries?.[GREETING_RULE]?.patterns ?? []).map((p) => compilePhrase(p))]);
+const greetingLang = (text) => {
+  const langs = GREETING_FORMS.filter(([, forms]) => forms.some((f) => f.match(text))).map(([lang]) => lang);
+  return langs.length === 1 ? langs[0] : null;
+};
+
 /** What each of the household's word rules does, in order (the first that builds a command wins). */
 const GATE_RULES = [
+  // a greeting and nothing else: the bot's greeting line, never the model ("hoi", "goedemorgen 👋", "hello"); a greeting
+  // with a request after it is that request's
+  { id: GREETING_RULE, name: 'assistant:hello(greeting)', clean: lettersOnly, build: (_m, text) => {
+    const lang = greetingLang(lettersOnly(text));
+    return { opId: 'assistant-hello', args: lang ? { lang } : {}, appOrigin: 'assistant' };
+  } },
+  // "herinner iedereen om 19:45: eten": a reminder for the whole household at a time — the household says it, to everyone
+  { id: 'assistant.remindMe.everyone', name: 'assistant:remindMe(everyone-at)', build: (m) => {
+    const text = String(m.text ?? '').replace(/[.!?]+$/, '').trim();
+    return m.time && text ? { opId: 'remindMe', args: { who: 'everyone', item: text, rules: m.time }, appOrigin: 'assistant' } : null;
+  } },
+  // "wat moet Bob doen" / "welke klusjes heeft Ann": someone's own chores, by their name — before the list read, which
+  // would take "klusjes" for the list; "ik", "je" and the like name nobody (the plain rule below, or the model)
+  { id: 'tasks.listMine.who', name: 'tasks:listMine(who)', build: (m) => {
+    const who = String(m.person ?? '').replace(/[.!?]+$/, '');
+    return who && !NOT_A_PERSON.has(who.toLowerCase()) ? { opId: 'listMine', args: { who } } : null;
+  } },
   { id: 'lists.addToList.named', name: 'lists:addToList(named-list)', build: (m, _t, { listFor }) => {
     const list = listFor(m.list);
     const items = splitItems(m.items);
@@ -106,8 +137,17 @@ const GATE_RULES = [
   // at a shop: the general list and the shop's own lists; a shop no list mentions is the model's ("ik ben bij de tandarts")
   { id: 'lists.shopVisit', name: 'lists:shopVisit(at-shop)', build: (m, _t, { shopping }) => (m.shop && !/\b(?:geweest|been)\b/i.test(m.shop) ? { opId: 'shopVisit', args: { shop: m.shop.replace(/[.!?]+$/, '').trim(), ...(shopping ? { general: shopping } : {}) }, fallback: 'model' } : null) },
   { id: 'tasks.listMine', name: 'tasks:listMine(read)', build: () => ({ opId: 'listMine', args: {} }) },
+  // "wie doet de lamp": the chores' open read with the words — who holds each and when. "wie doet mee", "wie doet wat",
+  // a day in the words: talk, or a day's question — the model's
+  { id: 'tasks.listOpen.words', name: 'tasks:listOpen(who-does)', build: (m) => {
+    const what = String(m.item ?? '').replace(/[.!?]+$/, '').trim();
+    if (!what || NOT_A_THING.test(what) || readDayAndTime(what)) return null;
+    return { opId: 'listOpen', args: { text: what }, appOrigin: 'tasks' };
+  } },
   // the person's week overview — by rule, so the model does not summarise the week itself
   { id: 'assistant.weekOverview', name: 'assistant:weekOverview(read)', build: () => ({ opId: 'weekOverview', args: {}, appOrigin: 'assistant' }) },
+  // "wie is er zaterdag" / "wat is er morgen": one day of it — its appointments with who comes, its chores with who does them
+  { id: 'assistant.weekOverview.day', name: 'assistant:weekOverview(day)', build: (m) => (m.day ? { opId: 'weekOverview', args: { day: m.day }, appOrigin: 'assistant' } : null) },
   // mostly a reply to the bot's own reminder, so it works without a model; the waist finds the one item (or asks),
   // and a chore's tick is the chore's own verb underneath
   { id: 'lists.markListItemDone.stated', name: 'lists:markListItemDone(stated)', build: (m) => ({ opId: 'markListItemDone', args: { item: m.item } }) },
@@ -160,8 +200,10 @@ const GATE_RULES = [
 export const GATE_RULE_IDS = Object.freeze(GATE_RULES.map((r) => r.id));
 
 
-const NOT_A_THING = /^(?:mee|het|dat|dit|niks|niets|wat|ook|even|it|that|this|nothing)\b/i;
+const NOT_A_THING = /^(?:mee|het|dat|dit|niks|niets|wat|ook|even|it|that|this|nothing|what)\b/i;
 const PERSON_WORDS = new Set(['ik', 'je', 'jij', 'we', 'wij', 'hij', 'zij', 'ze', 'u', 'jullie', 'mij', 'me', 'i', 'you', 'he', 'she', 'they', 'my', 'mijn']);
+/** Words in a "who" slot that name nobody the bot could know: the person words, and the like. */
+const NOT_A_PERSON = new Set([...PERSON_WORDS, 'it', 'het', 'dat', 'dit', 'er', 'iemand', 'niemand', 'iedereen', 'someone', 'nobody', 'everyone', 'everybody', 'we']);
 /** The words of `lower` as they were typed in `original` (the reader lowercases). */
 const caseOf = (original, lower) => { const i = original.toLowerCase().indexOf(lower); return i >= 0 ? original.slice(i, i + lower.length) : lower; };
 // A chore that says WHO ("voor mij", "voor Bert") or WHEN (a day word): the who-and-when rule reads it when it can

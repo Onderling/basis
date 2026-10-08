@@ -11,6 +11,7 @@
  * the chore records — who added it, who holds it, who completed it. "Mine" is the chores that person holds.
  */
 import { createTaskStore, effectiveStatus, unmetDeps, assigneesOf } from '@onderling/item-store';
+import { taskHasWords } from '@onderling-app/tasks';
 
 /**
  * @param {object} a
@@ -47,13 +48,17 @@ export function makeTasksOps({ storeFor, activeCircle, hostActor, rolePolicy = n
       return { task };
     },
 
+    /** The open chores; `assignee` — those that person holds; `text` — those whose words hold these ("wie doet de lamp"). */
     async listOpen(args = {}) {
       const ts = tasksIn(args);
       if (!ts) return NO_CIRCLE;
       const open = (await ts.listOpen({})).filter(isTask);
       const closed = await ts.listClosed();
-      const items = withStatus('assignee' in args ? open.filter((t) => assigneesOf(t).includes(args.assignee)) : open, open, closed);
-      return { items };
+      const held = 'assignee' in args ? open.filter((t) => assigneesOf(t).includes(args.assignee)) : open;
+      const words = typeof args.text === 'string' && args.text.trim() ? args.text.trim() : null;
+      const items = withStatus(words ? held.filter((t) => taskHasWords(t, words)) : held, open, closed);
+      // the words it read for, handed back: what the answer is worded by (`replyLine`)
+      return { items, ...(words ? { text: words } : {}) };
     },
 
     /** The chores the person holds; with no person, every open chore (the painting shells' "my work"). */

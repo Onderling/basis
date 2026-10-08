@@ -16,9 +16,9 @@ import { assistantManifest } from './assistantManifest.js';
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
 import { WEEK_OVERVIEW_OP, weekOverviewOn, switchWeekOverview } from './weekOverviewRows.js';
-import { ANNOUNCE_OP, HOST_CALL, ANNOUNCE_ROWS, isAnnounceRow } from './announceRows.js';
+import { ANNOUNCE_OP, HOST_CALL, ANNOUNCE_ROWS, isAnnounceRow, HOUSEHOLD_ACTS_AS, REMIND_EVERYONE_LABEL, REMIND_EVERYONE_WINDOW_MIN } from './announceRows.js';
 import { inQuiet } from './botReminders.js';
-import { wallClockInTz } from '@onderling/notifier';
+import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
 import { peopleRows } from './botPeople.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isOwnTelegramChat } from './doorBridges.js';
@@ -27,6 +27,9 @@ import { SURFACE_PREFS } from './surfacePref.js';
 import { feedCompanionOf } from './feedCompanion.js';
 import { CONTACT_SCHEME } from './contactCardLink.js';
 import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { readDayAndTime } from '../forms/parseDate.js';
+import { replyLine } from './replyLine.js';
+import { THREAD_LANGS } from './botThreads.js';
 
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
@@ -51,6 +54,39 @@ export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxIt
  *          revoke?: (who: string) => Promise<object|null>,
  *          inviteLink?: (code: string) => string|null}} [a.admin]  what the admin's ops read and change
  */
+/** The words a `who` says "the whole household" with. */
+const EVERYONE_WORDS = new Set(['everyone', 'everybody', 'all', 'iedereen', 'allemaal']);
+
+/**
+ * When a reminder for everyone is said, from its words: a clock time ("19:45", "om half 8", "at 7:45 pm" — the bounded
+ * date reader's times; today, or tomorrow when it has passed) or a span from now ("over 10 minuten", "in 10 minutes",
+ * "over een uur"). Null for anything else — never a guess.
+ * @returns {{at: number, time: string, tomorrow: boolean}|null}
+ */
+export function momentFromWords(words, { now, tz }) {
+  const w = String(words ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!w) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  const describe = (at) => {
+    const a = wallClockInTz(at, tz);
+    const n = wallClockInTz(now, tz);
+    return { at, time: `${pad(a.hour)}:${pad(a.minute)}`, tomorrow: a.year !== n.year || a.month !== n.month || a.day !== n.day };
+  };
+  const span = /^(?:over|in) (\d{1,3}) ?(?:minuten|minuut|min|minutes|minute|m)$/.exec(w);
+  if (span) return Number(span[1]) > 0 ? describe(now + Number(span[1]) * 60_000) : null;
+  if (/^(?:over|in) (?:een|an|1) (?:uur|hour)$/.test(w)) return describe(now + 3_600_000);
+  const read = readDayAndTime(`vandaag ${w}`);
+  if (!read?.time || read.rest) return null;
+  const [hour, minute] = read.time.split(':').map(Number);
+  const day = wallClockInTz(now, tz);
+  let at = utcInstantForWallClock({ year: day.year, month: day.month, day: day.day, hour, minute, tz });
+  if (at <= now) {
+    const next = new Date(Date.UTC(day.year, day.month - 1, day.day) + 86_400_000);
+    at = utcInstantForWallClock({ year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate(), hour, minute, tz });
+  }
+  return describe(at);
+}
+
 /** A switch in the door's words: "uit" is off (never "not off, so on"); a word it does not know is null. */
 const SWITCH_WORDS = Object.freeze({ on: 'on', aan: 'on', ja: 'on', yes: 'on', off: 'off', uit: 'off', nee: 'off', no: 'off' });
 const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()] ?? null;
@@ -105,7 +141,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     // before any app is handed the call, so a screen that skips its own confirm changes nothing. The host gate first: a
     // screen whose person may not do it is refused, not asked about.
     if (ctx?.via === 'screen' && stepUpOf(app, op) === 'private-door') {
-      const refused = caller && typeof refusal === 'function' ? await refusal(op, caller, app === 'assistant' ? levelOf(op) : undefined) : null;
+      const refused = caller && typeof refusal === 'function' ? await refusal(`${app}.${op}`, caller, app === 'assistant' ? levelOf(op) : undefined) : null;
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
       return holdForYes(caller, app, op, args, ctx);
     }
@@ -116,10 +152,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     // the household's announce rows: the HOST's runner calls this as itself — a person, a screen or the model never can
     if (op === ANNOUNCE_OP) {
       if (ctx?.[HOST_CALL] !== true || !announcer) return { ok: false, error: { code: 'host-only', message: t('circle.bot.admin_only') } };
+      // a reminder for everyone, at its moment: its words, to everyone
+      if (typeof args?.say === 'string') return announcer.say(args.say, { occurrence: args.occurrence ?? null });
       return announcer.forChange(args?.change, { kinds: Array.isArray(args?.kinds) ? args.kinds : null });
     }
     if (caller && typeof refusal === 'function') {
-      const refused = await refusal(op, caller, levelOf(op));
+      const refused = await refusal(`assistant.${op}`, caller, levelOf(op));
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
@@ -171,12 +209,21 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       const tp = personT(threadId);
       // a switch asked without its value: how it stands now, with a button per value (as `/instellingen` paints it)
       if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?.hours ?? args?.rules ?? args?._match)) return oneSettingOp(threadId, op);
+      // a greeting: the greeting line, in the person's fixed language, else the greeting's own, else the door's
+      if (op === 'assistant-hello') {
+        const lang = threads?.langOf?.(threadId) ?? (THREAD_LANGS.includes(args?.lang) ? args.lang : null);
+        // `greeting`: a door that has just said its welcome this turn does not say it again
+        return { ok: true, greeting: true, message: lang ? t('circle.bot.welcome', {}, lang) : t('circle.bot.welcome') };
+      }
       if (op === 'assistant-memory') {
         const mode = args?.mode ?? args?._match;
         threads.setMode(threadId, mode);
         return { ok: true, message: tp(`circle.bot.memory_${mode}`) };
       }
-      if (op === 'weekOverview') return { ok: true, message: await weekOverviewText(ctx, tp) };
+      if (op === 'weekOverview') {
+        const day = String(args?.day ?? args?._match ?? '').trim();
+        return day ? dayOverview(day, ctx, tp) : { ok: true, message: await weekOverviewText(ctx, tp) };
+      }
       // the planned overview: sent to the person's own door, as them — and not in their quiet hours ("not yet": the
       // runner keeps it due until the day is over)
       if (op === WEEK_OVERVIEW_OP) {
@@ -308,6 +355,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * calendar and the lists, read as them), written on their thread row only. "gewoon" drops their own for it.
    */
   async function remindMeOp(person, args, ctx, tp) {
+    if (EVERYONE_WORDS.has(String(args?.who ?? '').trim().toLowerCase())) return remindEveryoneOp(args, tp);
     const q = String(args?.item ?? '').trim().toLowerCase();
     const words = String(args?.rules ?? '').trim();
     const usual = /^(gewoon|normaal|usual|normal)$/i.test(words);
@@ -330,6 +378,31 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     threads.setReminderExtra(person, hit.id, layer);
     if (!layer) return { ok: true, message: tp('circle.bot.remind_me_cleared', { item: titleOf(hit) }) };
     return { ok: true, message: tp(layer.mode === 'add' ? 'circle.bot.remind_me_added' : 'circle.bot.remind_me_set', { item: titleOf(hit), rules: describeRules(layer.rules, tp) }) };
+  }
+
+  /**
+   * `remindMe` with `who: everyone`: a reminder for the whole household at a time ("herinner iedereen om 19:45: eten") —
+   * one timed row in the household's circle (the host signs it), acting as the household, whose op is the announcer: at
+   * its moment everyone hears the words, once. A time already past today is tomorrow's. It names nobody.
+   */
+  async function remindEveryoneOp(args, tp) {
+    // only a door that announces (a household bot) has an everyone to say it to
+    if (!announcer) return { ok: false, error: { code: 'unwired', message: tp('circle.bot.remind_everyone_failed') } };
+    const text = String(args?.item ?? '').trim();
+    const tz = intentions.tz ?? 'UTC';
+    const moment = momentFromWords(args?.rules, { now: now(), tz });
+    if (!text || !moment) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.remind_everyone_usage') } };
+    try {
+      await book.intend({
+        trigger: { at: new Date(moment.at).toISOString() }, op: ANNOUNCE_OP, appOrigin: 'assistant', args: { say: text },
+        actsAs: HOUSEHOLD_ACTS_AS, label: REMIND_EVERYONE_LABEL, window: REMIND_EVERYONE_WINDOW_MIN * 60_000,
+        ...(intentions.householdScope ? { scope: intentions.householdScope } : {}),
+      });
+    } catch {
+      return { ok: false, error: { code: 'not-saved', message: tp('circle.bot.remind_everyone_failed') } };
+    }
+    const when = tp(moment.tomorrow ? 'circle.bot.remind_everyone_tomorrow' : 'circle.bot.remind_everyone_today', { time: moment.time });
+    return { ok: true, message: tp('circle.bot.remind_everyone_set', { when, text }) };
   }
 
   /** The translator for a person: their fixed `/taal` language, else the door's. */
@@ -543,6 +616,30 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     return [tp('circle.bot.overview_head'), ...(lines.length ? lines : [tp('circle.bot.overview_none')])].join('\n');
   }
 
+  /**
+   * One day of the week overview ("wie is er zaterdag", `/week zaterdag`), asked as the person: that day's appointments
+   * with who comes, and the chores due that day with who does them — read through the gate as them, so the people in
+   * it are as the household's names setting lets them see ("iemand" for one they may not name, never an id). The day is
+   * a date, or a day word read on the household's clock. Worded where every reply is (`replyLine`).
+   */
+  async function dayOverview(words, ctx, tp = t) {
+    const iso = /^\d{4}-\d{2}-\d{2}/.exec(words)?.[0] ?? readDayAndTime(words)?.day ?? null;
+    if (!iso) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.day_unread', { day: words }) } };
+    const pad = (n) => String(n).padStart(2, '0');
+    const dayOf = (at) => { const d = new Date(at); return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const [y, m, d] = iso.split('-').map(Number);
+    // the agenda's read runs from now: as many days as reach the end of the day asked about
+    const days = Math.max(1, Math.ceil((new Date(y, m - 1, d + 1).getTime() - now()) / 86_400_000));
+    const itemsOf = (r) => (Array.isArray(r?.items) ? r.items : []);
+    const asThem = (a, o, x) => callSkill(a, o, x, ctx).catch(() => null);
+    const events = itemsOf(await asThem('calendar', 'listEvents', { days })).filter((e) => dayOf(e?.startsAt) === iso)
+      .map((e) => ({ id: e.id, title: e.title ?? e.label, startsAt: e.startsAt, ...(e.comes ? { comes: e.comes } : {}), ...(e.everyone ? { everyone: true } : {}) }));
+    const chores = itemsOf(await asThem('tasks', 'listOpen', {})).filter((c) => c?.dueAt && dayOf(c.dueAt) === iso)
+      .map((c) => ({ id: c.id, text: c.text ?? c.title, dueAt: c.dueAt, heldBy: Array.isArray(c.heldBy) ? c.heldBy : [], ...(c.yours ? { yours: true } : {}) }));
+    const read = { ok: true, day: iso, events, chores };
+    return { ...read, message: replyLine(read, { opId: 'weekOverview', t: tp }) };
+  }
+
   /** A number in the person's language ("3.000" in Dutch, "3,000" in English). */
   function countIn(lang) { return (n) => new Intl.NumberFormat(lang === 'en' ? 'en-GB' : 'nl-NL').format(n); }
   async function userParam(key) { return ((await callSkill('params', 'list-user-params', {}).catch(() => null))?.params ?? []).find((p) => p.key === key)?.value; }
@@ -638,7 +735,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function menuOp(person, caller, ctx = {}) {
     if (!person) return { ok: false, error: 'no-thread' };
     const tp = personT(person);
-    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(opId, caller, levelOf(opId)));
+    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(`assistant.${opId}`, caller, levelOf(opId)));
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     // asked from a screen: the screen paints the buttons, whatever the person's chat view is
     const view = ctx?.via === 'screen' ? 'inline' : (row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person));

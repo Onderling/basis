@@ -27,7 +27,7 @@ describe('at the shop', () => {
   afterAll(async () => { await agent?.stop?.().catch(() => {}); if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {}); });
 
   it('the words: "ik ben bij de Lidl" is the shop visit, with the general list; "…geweest" is not', () => {
-    expect(BOT_OP_MAP.member).toContain('shopVisit');
+    expect(BOT_OP_MAP.member).toContain('lists.shopVisit');
     expect(route('ik ben bij de Lidl')).toMatchObject({ opId: 'shopVisit', args: { shop: 'Lidl', general: 'Boodschappen' }, fallback: 'model' });
     expect(route('Ik ben nu in de Albert Heijn')).toMatchObject({ opId: 'shopVisit', args: { shop: 'Albert Heijn' } });
     expect(route("I'm at the Lidl", 'en')).toMatchObject({ opId: 'shopVisit', args: { shop: 'Lidl' } });

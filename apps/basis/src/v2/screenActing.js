@@ -34,6 +34,8 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.sendWeekOverview',
   // …and what a change tells others is the host's own act, as the household — never a person's button
   'assistant.announceChange',
+  // a greeting is a line typed in the chat, answered there — not a button
+  'assistant.assistant-hello',
 ]);
 
 /**

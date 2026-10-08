@@ -107,7 +107,8 @@ import { DataPart, Parts } from '@onderling/core';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom, CALENDAR_FEED_KEY, calendarFeedFrom } from '../src/v2/botSettings.js';
 import { REMINDER_RULES_KEY, reminderRulesFrom, leadOf } from '../src/v2/reminderWords.js';
-import { ensureHouseholdLists, householdBotApps, templateLists, botPromptLines, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { ensureHouseholdLists, householdBotApps, templateLists, loadListItems, expandAdds } from '../src/v2/householdTemplate.js';
+import { botPromptLines } from '../src/v2/botPrompt.js';
 import { botOpLevel, botRoleAllows, scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
@@ -1190,6 +1191,8 @@ if (tgToken || inboxDoor.bridge) {
     announcer,
     intentions: {
       book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz,
+      // a reminder for everyone is a household row in the household's own circle (signed by this box, like the announce rows)
+      householdScope: agent.householdCircleId ?? null,
       // `/gepland` reads what is coming from the household's items and its people
       sources: () => agent.reminderSources(), users: () => botUsers.list(),
     },
@@ -1346,7 +1349,8 @@ if (tgToken || inboxDoor.bridge) {
       // without the model (off, or not answering): what does work, for this person — the word rules and the commands
       basicHelpFor: ({ ops, t: tp }) => basicModeLines({ ops, lists: templateLists(t), t: tp ?? t }),
       // `/help` for a person: their language, grouped, the admin's commands last (their level on the bot's map)
-      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp }),
+      // …and when the bot reminds, in the welcome's own line (the household's rules as they stand)
+      helpLines: ({ commandMenu, opsById, t: tp }) => botHelpLines({ commandMenu, opsById, t: tp, reminders: { on: reminderSettings().reminders !== 'off', rules: reminderSettings().rules } }),
     } : {}),
   });
   await tgRunner.start();

@@ -13,6 +13,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import {
   CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, DEFAULT_CIRCLE_ORIGINS,
@@ -94,7 +95,8 @@ export default function CircleSettingsScreen({
   onControl,
 }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: the back link under it could not be tapped
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [working, setWorking] = useState(null);
   const [expanded, setExpanded] = useState({});
   // the alpha's "Geavanceerd" fold (alphaSurface.js ADVANCED_SETTINGS) — closed until tapped; web parity
@@ -702,10 +704,10 @@ function verbLabel(atom) {
   return v && v !== k ? v : atom;
 }
 
-const makeStyles = (theme) => StyleSheet.create({
+const makeStyles = (theme, insets) => StyleSheet.create({
   advancedToggle: { paddingVertical: 10, marginTop: 14 },
   advancedToggleText: { fontWeight: '600', color: theme.color.inkSoft },
-  page:        { flex: 1, paddingHorizontal: 16, paddingTop: 12, backgroundColor: theme.color.paper },
+  page:        { flex: 1, paddingHorizontal: 16, paddingTop: 12 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   bar:         { flexDirection: 'row', alignItems: 'center', minHeight: 22 },
   back:        { fontSize: 13, color: theme.color.inkSoft },
   title:       { fontSize: 24, fontWeight: '600', fontFamily: theme.font.serif, color: theme.color.ink, marginVertical: 10 },

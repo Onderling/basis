@@ -55,6 +55,12 @@ const NO_RELAY_BASE_URL = `http://localhost:${NO_RELAY_PORT}`;
  * `no-relay`. Matched by file so a spec belongs to exactly one project and nothing has to declare it. */
 const RELAY_SPECS = /(journeys|matrix|twopeer|two-relays|feedback-path-box|screen-connect-box|screen-admin-box|screen-admin-settings-box|screen-telegram-launch-box|screen-two-tabs-box|screen-buttons-box|screen-member-box|screen-export-key-box|identity-link-app|household-in-app-box|walk-[a-z0-9-]+)\.spec\.js$/;
 
+
+/* Hermetic: no browser under test may reach the production hosts (the public relay above all). Chromium resolves
+ * *.onderling.org to nothing, so a dial fails at once instead of reaching production — whatever a spec or the app's
+ * own defaults try. Local servers (127.0.0.1 / localhost) are untouched. */
+const HERMETIC_LAUNCH = { args: ['--host-resolver-rules=MAP onderling.org ~NOTFOUND, MAP *.onderling.org ~NOTFOUND'] };
+
 export default defineConfig({
   testDir: './test-browser',
   /* Run tests in parallel where safe; the dev server is shared. */
@@ -103,12 +109,12 @@ export default defineConfig({
     {
       name: 'relay',
       testMatch: RELAY_SPECS,
-      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL },
+      use: { ...devices['Desktop Chrome'], baseURL: BASE_URL, launchOptions: HERMETIC_LAUNCH },
     },
     {
       name: 'no-relay',
       testIgnore: RELAY_SPECS,
-      use: { ...devices['Desktop Chrome'], baseURL: NO_RELAY_BASE_URL },
+      use: { ...devices['Desktop Chrome'], baseURL: NO_RELAY_BASE_URL, launchOptions: HERMETIC_LAUNCH },
     },
   ],
   /* Boot the dev server automatically.  The reuseExistingServer flag

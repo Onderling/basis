@@ -58,6 +58,12 @@ describe('who dials it', () => {
     }
   });
 
+  it('no browser under test can resolve the production hosts (both projects)', () => {
+    const cfg = read('../../playwright.config.js');
+    expect(cfg).toMatch(/MAP \*\.onderling\.org ~NOTFOUND/);
+    expect(cfg.match(/launchOptions: HERMETIC_LAUNCH/g)?.length ?? 0).toBe(2);
+  });
+
   it('the browser tests are built with the default blanked', () => {
     expect(read('../../playwright.config.js').match(/VITE_CIRCLE_RELAY_DEFAULT: ''/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });

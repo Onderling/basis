@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
+  createFallbackOffer, fallbackOfferStateIo, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
 } from '../../src/v2/addressFallback.js';
 // (Batch 4) The SETTING's tests moved with the setting: it lives in `deliverySettings.js` as
 // `allowFallback` — the duplicate store half that lived here (a second key nothing read) retired.
@@ -152,5 +152,91 @@ describe('the offer — a route the circle may NOT use is a standing fact, not a
     offer.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
     expect(onOffer).toHaveBeenCalledTimes(1);
     expect(onOffer.mock.calls[0][0].peers).toBe(1);
+  });
+});
+
+// The shells composed the offer WITHOUT its memory: a decline (which every shell records the moment the bubble
+// shows) lived only in the running app, so each boot forgot it and the first blocked report offered again —
+// one more bubble in the circle's conversation per app start (found 2026-10-08 on a real phone, three stacked).
+// The test above proves the factory remembers when handed `state`/`save`; nothing handed them. These go
+// through the ONE io every shell now composes, over both storage shapes the shells have.
+describe('the offer — rule 2 across a restart, through the io the shells compose', () => {
+  const syncStorage = () => {   // localStorage's shape (web)
+    const m = new Map();
+    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); } };
+  };
+  const asyncStorage = () => {  // AsyncStorage's shape (mobile)
+    const m = new Map();
+    return { getItem: async (k) => (m.has(k) ? m.get(k) : null), setItem: async (k, v) => { m.set(k, String(v)); }, removeItem: async (k) => { m.delete(k); } };
+  };
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  for (const [shape, make] of [['sync (web)', syncStorage], ['async (mobile)', asyncStorage]]) {
+    it(`a shown-and-declined offer is not made again after a restart — ${shape} storage`, async () => {
+      const storage = make();
+      const first = vi.fn();
+      const a = createFallbackOffer({ onOffer: first, now: () => T0, io: fallbackOfferStateIo(storage) });
+      a.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
+      await settle();
+      expect(first).toHaveBeenCalledTimes(1);
+      a.decline();   // what every shell does once the bubble is shown
+      await settle();
+
+      // The app restarts an hour later; the same peer is still unreachable.
+      const second = vi.fn();
+      const b = createFallbackOffer({ onOffer: second, now: () => T0 + 3_600_000, io: fallbackOfferStateIo(storage) });
+      b.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
+      await settle();
+      expect(second).not.toHaveBeenCalled();
+
+      // …and after the cooldown it may ask again: still a problem, and a week is not nagging.
+      const third = vi.fn();
+      const c = createFallbackOffer({ onOffer: third, now: () => T0 + OFFER_COOLDOWN_MS + 1, io: fallbackOfferStateIo(storage) });
+      c.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
+      await settle();
+      expect(third).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  it('a report that arrives before the stored decline has been read waits for it, rather than offering', async () => {
+    const storage = syncStorage();
+    fallbackOfferStateIo(storage).save({ declinedAt: T0 });
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const slowIo = { load: async () => { await gate; return fallbackOfferStateIo(storage).load(); }, save: async () => {} };
+    const onOffer = vi.fn();
+    const offer = createFallbackOffer({ onOffer, now: () => T0 + 60_000, io: slowIo });
+    offer.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
+    await settle();
+    expect(onOffer).not.toHaveBeenCalled();
+    release();
+    await settle(); await settle();
+    expect(onOffer).not.toHaveBeenCalled();
+  });
+
+  it('reads its memory on the first REPORT, not at construction — a sealed storage cannot open it before boot', async () => {
+    // Both shells build the offer while booting, before the content key exists; a sealed read then returns the
+    // unopened value. A report only comes from a send, after boot — so that is when the memory is read.
+    const load = vi.fn(async () => null);
+    const offer = createFallbackOffer({ onOffer: vi.fn(), now: () => T0, io: { load, save: async () => {} } });
+    await settle();
+    expect(load).not.toHaveBeenCalled();
+    offer.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
+    await settle();
+    expect(load).toHaveBeenCalledTimes(1);
+    offer.report({ blocked: true, webid: 'bob', via: 'blocked-by-transport' });
+    await settle();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('a storage that refuses (no content key yet) costs the memory, never the send path', async () => {
+    const refusing = { getItem: async () => { throw new Error('no key'); }, setItem: async () => { throw new Error('no key'); } };
+    const onOffer = vi.fn();
+    const offer = createFallbackOffer({ onOffer, now: () => T0, io: fallbackOfferStateIo(refusing) });
+    offer.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
+    await settle();
+    expect(onOffer).toHaveBeenCalledTimes(1);
+    expect(() => offer.decline()).not.toThrow();
+    await settle();
   });
 });

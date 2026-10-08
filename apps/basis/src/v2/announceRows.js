@@ -8,6 +8,8 @@
  * anyone else), and the announcer decides who hears what — never the one who made the change.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 /** The door's op the rows call. */
 export const ANNOUNCE_OP = 'announceChange';
 /** Whom an announce row acts as: the household itself (the host), never a person. */
@@ -24,8 +26,16 @@ export const ANNOUNCE_ROWS = Object.freeze([
   Object.freeze({ label: 'announce-chores', trigger: Object.freeze({ event: Object.freeze({ kind: 'any', type: 'task' }) }), args: Object.freeze({ kinds: Object.freeze(['given', 'moved']) }) }),
 ]);
 
-/** Is this an announce row (whatever its state)? */
-export const isAnnounceRow = (row) => row?.op === ANNOUNCE_OP && row?.actsAs === HOUSEHOLD_ACTS_AS;
+/** Is this one of the household's announce rows — a kind of change it tells (whatever its state)? */
+export const isAnnounceRow = (row) => row?.op === ANNOUNCE_OP && row?.actsAs === HOUSEHOLD_ACTS_AS && ANNOUNCE_ROWS.some((spec) => spec.label === row.label);
+
+/**
+ * A reminder for everyone ("herinner iedereen om 19:45: eten"): a timed household row whose op is the announcer, with the
+ * words to say (`args.say`). It acts as the household like the announce rows, and is said to everyone at its moment.
+ */
+export const REMIND_EVERYONE_LABEL = 'remind-everyone';
+/** How long after its moment a reminder for everyone may still be said (a box that was off): after that it is skipped. */
+export const REMIND_EVERYONE_WINDOW_MIN = param({ key: 'assistant.remindEveryoneWindowMinutes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
 
 /**
  * Write the household's announce rows once, into the circle store named by `scope`, each watching THAT circle only: a

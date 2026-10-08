@@ -171,7 +171,7 @@ import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
   createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
-import { createFallbackOffer } from '../../src/v2/addressFallback.js';
+import { createFallbackOffer, fallbackOfferStateIo } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/stoop';
 import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 // P1.7 — the VIEWER's own narrowing of the conversation (kinds × people/agents), device-local per
@@ -1499,6 +1499,8 @@ const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
 // recorded in DECISIONS-FOR-REVIEW. After showing we arm the cooldown (`decline()`), so the offer repeats
 // at most once per cooldown while the problem persists — informative, not nagging.
 const fallbackOffer = createFallbackOffer({
+  // Its memory across restarts: a declined offer stays declined for its cooldown, not until the next reload.
+  io: fallbackOfferStateIo(sealedKeyValue(globalThis.localStorage, { name: 'the fallback offer' })),
   onOffer: () => {
     // One-tap accept: the button flips the setting IN the bubble. The cooldown still arms on showing
     // (`decline()`), so an ignored offer stays quiet for a week; a tapped one clears the evidence instead.

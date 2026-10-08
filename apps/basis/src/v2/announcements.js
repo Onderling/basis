@@ -142,6 +142,21 @@ export function createAnnouncer({ users, threads, reach, t, tz, quiet, log, now 
       return { ok: true, told: list.length };
     },
     /**
+     * Words for EVERYONE in the household, now (a reminder for everyone, at its moment): one message each, held through
+     * a person's quiet hours like any announcement, said once per occurrence. The one who asked hears it too.
+     * @param {string} text
+     * @param {{occurrence?: string|null}} [opts]  the row's occurrence (what keeps it said once)
+     */
+    async say(text, { occurrence = null } = {}) {
+      const words = String(text ?? '').trim();
+      if (!words) return { ok: false, reason: 'nothing to say' };
+      const key = occurrence ?? String(now());
+      const people = ((await users.list()) ?? []).filter((r) => r?.id);
+      const list = people.map((r) => ({ id: `announce:say:${key}:${r.id}`, personId: r.id, kind: 'say', itemId: key, itemKind: 'say', text: words, at: null }));
+      await deliver(list);
+      return { ok: true, told: list.length };
+    },
+    /**
      * A person's held announcements as lines, once their quiet hours are over — or null. The tick says them (in the
      * person's next message) and then calls `sentHeld`.
      */

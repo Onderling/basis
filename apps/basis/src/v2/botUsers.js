@@ -31,10 +31,10 @@ export function personNamed(rows, nameOrId) {
 }
 
 /**
- * A person's chat identity on the bot (the key their circles know them by), or null: the one their `/koppel` offer named
- * and signed (a door row: Telegram), or — on the inbox door — the row's own id, which IS their key (the book does not
- * repeat it as `pubKey`). It names the person in the household's circle; it is never what a turn is accepted by — a
- * linked row is found by its ROOT (`linkedRoot`), through a device statement.
+ * A person's chat key on the bot, or null: the one their `/koppel` offer named and signed (a door row: Telegram), or —
+ * on the inbox door — the row's own id (the book does not repeat it as `pubKey`). It is the person's ADDRESS — where the
+ * household's circle and its rows reach them — NEVER their identity: every device of theirs holds it, a revoked one too,
+ * so no turn is ever accepted by it. A linked row is found by its ROOT (`linkedRoot`) only, through a device statement.
  */
 export function linkedKeyOf(row) {
   if (!row || typeof row !== 'object') return null;

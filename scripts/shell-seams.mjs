@@ -52,7 +52,7 @@ export const SEAMS = Object.freeze([
   // A person's device always has a relay to dial: the public one (`relay.defaultUrl`) as the LAST boot candidate, after a
   // saved relay and a circle's recorded one. Mobile had none — no build set the env (found 2026-10-08). The box is left
   // out on purpose: a headless node dials only what its operator set, and stays local-only without it.
-  { id: 'default-relay', pattern: /fallback: DEFAULT_RELAY_URL/, shells: ['web', 'mobile'], why: 'a phone or browser with no saved relay still reaches its circles' },
+  { id: 'default-relay', pattern: /fallback: RELAY_DEFAULT/, shells: ['web', 'mobile'], why: 'a phone or browser with no saved relay still reaches its circles' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).

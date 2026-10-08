@@ -21,6 +21,7 @@
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
 import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
+import { loadCompanionGrantPicker, companionGrantText } from '../../src/v2/companionGrant.js';
 import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
@@ -126,6 +127,7 @@ import {
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
+import { ceremonyOutcomeText } from '../../src/v2/ceremonyOutcome.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
@@ -325,7 +327,7 @@ import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '../../src/v2/paramsManifest.js';
 import { CONNECTION_MANIFESTS } from '../../src/v2/connectionManifests.js';
 import { householdManifest } from '../../../household/manifest.js';
-import { deviceDelegationsOf } from '@onderling/agent-registry';
+import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
@@ -4474,7 +4476,7 @@ function ensurePagePanel() {
 async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
-  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = [];
+  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = [];
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
@@ -4495,6 +4497,7 @@ async function showMyData() {
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
   // The replace ceremony: retire every other device in one act, after a restore.
   const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
+  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => showMyData() });
   // "Make this device my primary contact address": announce this device's address in every circle with the
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
@@ -4583,7 +4586,15 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+    // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
+    // rows come from the node itself and the shared projection; the grant is one op through the waist.
+    companions,
+    onOpenCompanionGrant: (node) => loadCompanionGrantPicker({
+      callSkill: rawCallSkill, node, t,
+      linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
+    }),
+    onGrantCompanion: async (args) => companionGrantText(await rawCallSkill('household', 'grantCompanion', args).catch(() => null), t),
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -4684,6 +4695,9 @@ async function showMyData() {
   // tombstones shown struck — the revoke door acts on the live ones.
   devices = Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
     .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true }));
+  // the nodes this person claimed (their own list; each node keeps its owner itself)
+  companions = Object.values(ownedNodesOf({ properties: profProps?.properties ?? {} }))
+    .map((n) => ({ node: n.address, short: n.label || `${n.address.slice(0, 8)}…` }));
   dataLocation = loc ?? {};
   podStatus = status ?? {};
   // Prefer the real Solid session over the (aspirational) stoop op — read through the waist, so the
@@ -5299,7 +5313,14 @@ function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
 function showReplaceDeviceFlow({ onClosed } = {}) {
   return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
 }
-function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) {
+/** Claim a companion node: paste the line it printed; this device signs the claim. */
+function showClaimCompanionFlow({ onClosed } = {}) {
+  return showDeviceCeremonyFlow({
+    flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed,
+    inputName: 'claim', placeholderKey: 'circle.companionClaim.placeholder', rows: 2,
+  });
+}
+function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3 } = {}) {
   // THE DEVICE CEREMONIES, as their declared flows: revoke ONE device (the My-data device row that
   // opened this names it) or REPLACE — retire every other device. Both run on THIS device; the phrase
   // is the proof; the one pause paints only the phrase. The fold does the enforcement everywhere.
@@ -5322,8 +5343,8 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
       p.textContent = t(`circle.${keyPrefix}.body`);
       card.appendChild(p);
       const input = document.createElement('textarea');
-      input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false;
-      input.placeholder = t('circle.enroll.mnemonic_placeholder');
+      input.rows = rows; input.autocomplete = 'off'; input.spellcheck = false;
+      input.placeholder = t(placeholderKey);
       input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
       card.appendChild(input);
       const go = document.createElement('button');
@@ -5331,7 +5352,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
       go.className = 'cc-btn cc-btn--primary';
       go.textContent = t(`circle.${keyPrefix}.submit`);
       go.addEventListener('click', () => {
-        runner.resume(FLOW, inst, { input: { mnemonic: input.value, ...(deviceId ? { deviceId } : {}) } })
+        runner.resume(FLOW, inst, { input: { [inputName]: input.value, ...(deviceId ? { deviceId } : {}) } })
           .then((r) => { inst = r; paint(); }).catch(() => done());
       });
       card.appendChild(go);
@@ -5347,11 +5368,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
 
     const outcome = inst?.steps?.ceremony?.outcome;
     const msg = document.createElement('p');
-    msg.textContent = outcome === 'ok'
-      ? t(`circle.${keyPrefix}.done`)
-      : (outcome === 'wrong-phrase' || outcome === 'invalid-phrase')
-        ? t('circle.enroll.invalid_phrase')
-        : (inst?.steps?.ceremony?.out?.error ?? t(`circle.${keyPrefix}.failed`));
+    msg.textContent = ceremonyOutcomeText({ keyPrefix, outcome, out: inst?.steps?.ceremony?.out, t });
     card.appendChild(msg);
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -5359,7 +5376,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed } = {}) 
     btn.textContent = outcome === 'ok' ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
       if (outcome === 'ok') return done();
-      close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed });
+      close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
     });
     card.appendChild(btn);
     if (outcome !== 'ok') {

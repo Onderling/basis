@@ -6959,6 +6959,46 @@
     "done": "Device removed. Every circle now refuses its keys.",
     "failed": "Removing failed."
   },
+  "companionClaim": {
+    "title": "Claim a companion",
+    "ceremony": "Claiming the companion",
+    "body": "Paste the line your companion shows in its log, after 'Claim:' (code@address). It becomes yours: every device of yours can manage it, a revoked device cannot.",
+    "placeholder": "ABCD-EFGH@…",
+    "submit": "Claim",
+    "button": "Claim a companion",
+    "done": "This companion is yours now. Every device of yours can manage it.",
+    "failed": "Claiming did not work.",
+    "outcome_bad_claim": "That is not a claim line. Copy everything after 'Claim:' — the code, the @ and the address.",
+    "outcome_no_device_key": "This device has no device key of its own yet. Open the app again and try once more.",
+    "outcome_unreachable": "The companion does not answer. Is it running and connected to the relay?",
+    "outcome_already_owned": "This companion already has an owner.",
+    "outcome_invalid_code": "The code is wrong or has expired. Take the newest line from the log (a new one every ten minutes).",
+    "outcome_stale": "This device's clock is more than five minutes off the companion's. Set your device's time right and try again.",
+    "outcome_unsigned": "The companion did not accept this device's signature."
+  },
+  "companionGrant": {
+    "nodes": "My agents",
+    "node_row": "Companion {{short}}",
+    "give": "Give access",
+    "to_label": "To whom",
+    "to_none": "Nobody to give access to yet. First add the bot as a contact (its card), or link it with /koppel.",
+    "may_do": "May:",
+    "loading": "Asking what this companion can give…",
+    "confirm": "Give access",
+    "nothing_ticked": "Tick what it may do.",
+    "family_agenda_files": "place agenda files",
+    "done": "Access given. The companion passes it on; it holds until you revoke it (tick it again after a year).",
+    "failed": "Giving access did not work.",
+    "outcome_not_owned": "This companion is not yours. Claim it first.",
+    "outcome_no_device_key": "This device has no device key of its own yet. Reopen the app and try again.",
+    "outcome_unreachable": "The companion does not answer. Is it on and connected to the relay?",
+    "outcome_forbidden": "The companion did not accept this device's signature.",
+    "outcome_stale": "This device's clock is more than five minutes off from the companion's. Set your device's time and try again.",
+    "outcome_unknown_family": "This companion cannot give that.",
+    "outcome_bad_target": "The companion cannot give access to that recipient.",
+    "outcome_bad_args": "Choose to whom, and tick what it may do.",
+    "outcome_gate_off": "This companion runs without its access check, so it gives no access."
+  },
   "wizard": {
     "recovery": {
       "after_restore_hint": {

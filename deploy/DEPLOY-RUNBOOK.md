@@ -307,23 +307,17 @@ Client-side (your apps, not on the VM):
 
 The companion node can serve an owner-only web dashboard (node status · tenants ·
 revoke a grant) at **`https://<RELAY_DOMAIN>/manage`**, fronted by Caddy on the same
-domain. It is **opt-in** and **off by default**.
-
-To turn it on, set ONE variable in `deploy/.env`:
-
-```bash
-# your DEVICE's pubKey — the ONLY key allowed to manage this node.
-# (basis → your identity; or read the companion's own host key from its logs.)
-COMPANION_MANAGE_OWNER_PUBKEY=<your-device-pubkey>
-```
+domain. The node is **claimed** by its owner, never configured with one: started
+unclaimed it prints a claim code in its log (`docker compose … logs companion | grep 'Claim:' | tail -1`),
+valid ten minutes; enter it in your app and your owner root becomes the node's owner — every device of
+yours manages it from then on, a device you revoke does not.
 
 Then `docker compose … up -d` (B7). The overlay already wires the companion to serve
 on `companion:8790` (internal only — never published to the host) and Caddy to route
 `/manage` there. Auth is a **pairing flow, never a password**: open
 `https://<RELAY_DOMAIN>/manage`, it shows a code, you **approve that code from your
 phone** (basis → your companion node → approve), and the browser gets a scoped,
-revocable session token. Leave `COMPANION_MANAGE_OWNER_PUBKEY` empty and management
-stays off (the `/manage` route simply has no upstream).
+revocable session token. Until the node is claimed, every management op is refused.
 
 ### B9. Update / restart
 

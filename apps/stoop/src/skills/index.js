@@ -4651,6 +4651,9 @@ export function buildSkills({
         ...(typeof card.peerAddr === 'string' && card.peerAddr ? { peerAddr: card.peerAddr } : {}),
         // The card's relays become the contact's POINTS — where a message to them goes first.
         ...(Array.isArray(card.relays) && card.relays.length ? { points: card.relays.filter((u) => typeof u === 'string' && u) } : {}),
+        // A node's card says where its agenda links are served (a household's companion): kept, so a bot builds the link
+        // from the contact it holds.
+        ...(typeof card.serves === 'string' && /^https?:\/\//.test(card.serves) ? { serves: card.serves } : {}),
         // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
         // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
         // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable

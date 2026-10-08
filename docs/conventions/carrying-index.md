@@ -42,7 +42,7 @@ addresses, sizes, timing and ciphertext — never content.
 |---|---|---|---|---|---|
 | talk one-to-one with a contact or a bot | contact threads over the points on the contact card | `contactThreadChannel.js` | the relay: address and size; the other end: the text | `bin/device-runner.mjs`, mobile `agentBundle.js`, `src/index.js` | a circle (→ the lanes) |
 | have a bot write first (a reminder, a link sent privately) | the door's reach to a person's own chat | `doorReach.js` (`createPersonReach`) | Telegram learns the text on a Telegram door; the inbox path learns the turn | `bin/device-runner.mjs` | anything a person did not ask the bot for |
-| call a skill on another agent (an op, with a token) | task exchange (A2A-style) | `packages/core/src/protocol/taskExchange.js`, `secure-agent/peerSkillCalls.js` (`peer.invoke`) | the callee learns the op, its args and the token | `core/src/Agent.js`, the box (`bin/device-runner.mjs`), `screenView.js`, the box's agenda link through the runner (`feed.put`) | a broadcast |
+| call a skill on another agent (an op, with a token) | task exchange (A2A-style) | `packages/core/src/protocol/taskExchange.js`, `secure-agent/peerSkillCalls.js` (`peer.invoke`) | the callee learns the op, its args and the token | `core/src/Agent.js`, the box (`bin/device-runner.mjs`), `screenView.js`, the box's agenda link through the runner (`feed.put`, presenting the token its companion's owner granted it) | a broadcast |
 | let another person's agent act for me on one task | a task grant | `packages/core/src/permissions/TaskGrant.js` | the holder learns the scope | `apps/tasks-v0/src/Agent.js` (loaded by `realAgent.js`), `mandate.js`, mobile `CircleLauncherScreen.js` | standing access (→ surface grants) |
 | ask the people in the room (Nearby) | the nearby ask channel over the local network | `nearbyAskChannel.js` | any peer on the LAN: the ask's text and tags | `nearbyRoomBinding.js` (composed by the mobile shell and `src/index.js`) | anything private |
 
@@ -60,7 +60,7 @@ addresses, sizes, timing and ciphertext — never content.
 
 | I want to… | Mechanism | Lives in | Who learns what | Used today by | Not for |
 |---|---|---|---|---|---|
-| serve something at a link to a program that holds no key (a calendar app) | a link-sealed blob in the companion's bucket, opened at serve time with the key the request brings (`/feed/<id>.<k>.ics`) | `@onderling/blob-gateway` `linkSeal.js` (`sealForLink`); companion `feedShelf.js` | the companion: what it serves, while it serves it; at rest only ciphertext; whoever holds the link reads it | `companion-node/src/index.js` (when `COMPANION_FEEDS` is on); the bot's agenda link (`personFeed.js` seals it, the bot puts it) | anything an agent could fetch itself (→ the blob bucket) |
+| serve something at a link to a program that holds no key (a calendar app) | a link-sealed blob in the companion's bucket, opened at serve time with the key the request brings; the link is at the RELAY (`/feed/<node>/<id>.<k>.ics`), which forwards it to the node over its live session (`feed.serve`, the companion's one public op) and holds nothing — the companion's own `/feed/<id>.<k>.ics` route stands until it moves off the public box | `@onderling/blob-gateway` `linkSeal.js` (`sealForLink`), `linkPath.js`; companion `feedShelf.js`; relay `feedForward.js` | the companion: what it serves, while it serves it; at rest only ciphertext; the relay: the request in flight, as the proxy in front of it (no log, no store); whoever holds the link reads it | `companion-node/src/index.js` (when `COMPANION_FEEDS` is on); `relay/src/server.js` (the forward; both relay boot doors turn it on); the bot's agenda link (`personFeed.js` seals it, the bot puts it, the link built from the companion's contact: `feedCompanion.js`) | anything an agent could fetch itself (→ the blob bucket) |
 
 ## Inside one host
 
@@ -101,6 +101,9 @@ started with `--nearby`.
 
 - **The relay:** the forward queue (SQLite at `QUEUE_DB`, else memory), push tokens (SQLite at `PUSH_TOKENS_DB`, else
   memory), the blob gate's ACL (memory by default) and whatever bucket it is handed.
-- **The companion** (its config dir): `host-identity.json`; `sealed-inbox.json` when the inbox is on; `feeds/` (a
+- **The companion** (its config dir): `host-identity.json` (with the tokens it issued, which it revoked, and which an
+  agent it granted holds); `owner.json` once claimed (the owner root's public key and
+  the devices it revoked); `sealed-inbox.json` when the inbox is on; `feeds/` (a
   file bucket, ciphertext only) when feeds are on. Its media bucket and registry pseudo-pod are in memory.
-- **A device:** its outbox (the hold-forward queue), the device log, the stores — all sealed at rest on the box.
+- **A device:** its outbox (the hold-forward queue), the device log, the stores — all sealed at rest on the box; a
+  household box also keeps the grants its companions gave it (`companion-grants.json`).

@@ -900,7 +900,12 @@ if (tgToken || inboxDoor.bridge) {
     store: dataSourceRowStore(await stores.botAdmissionSource(), 'mem://basis/bot-admission/'),
   });
   // The door's admission, once: who is let in, their tier in the gate, and the role their thread's tools follow.
-  const doorAdmit = createDoorAdmit({ users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller });
+  const doorAdmit = createDoorAdmit({
+    users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller,
+    // admitted at the inbox door WITH a device statement: the person's app hears it (the identity link, made below;
+    // read at the time of the admission, never before the box is up)
+    onAdmittedWith: (row, who) => identityLink?.admittedWith(row, who),
+  });
   // Everyone in the book is in the gate from the start: the reminder tick and the Sunday overview act AS a person, and
   // after a restart nobody has written yet. A book the gate cannot take is said, not fatal (the door still tiers on the
   // next message).

@@ -149,6 +149,18 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
     },
 
     /**
+     * A person admitted at the inbox door by the card's code, WITH a device statement (the row recorded their root):
+     * the bot's statement to their app — the identity link's shape, so the app marks this bot as one it admitted with
+     * and signs every later turn to it.
+     * @param {{id: string, linkedRoot: string}} row
+     * @param {{uid: string}} who  the door's caller (on the inbox door its uid is the person's chat identity)
+     */
+    async admittedWith(row, who) {
+      if (!row?.linkedRoot || !who?.uid) return;
+      await tell(String(who.uid), { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: botAddress(), row: row.id, root: row.linkedRoot, at: now() } });
+    },
+
+    /**
      * A turn at the inbox door: the ROOT it is the person's by, or why not. Synchronous (the door's feed is): the
      * statement must be over exactly this turn — its words and its message id — for this bot, from a device that is not
      * revoked, inside the turn's window (a held turn arrives late) and not seen before. Which row that root is is the

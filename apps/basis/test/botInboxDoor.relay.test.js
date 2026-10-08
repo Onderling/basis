@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
 import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
+import { addBoxCard } from './support/addBoxCard.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
@@ -68,7 +69,8 @@ describe('the bot answers its inbox on a function profile', () => {
 
     const code = /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)?.[1];
     expect(code).toBeTruthy();
-    await send('daar ben ik', { admission: code });
+    await addBoxCard(sender, out);
+    await send(`/start ${code}`);
     const welcomed = await until(async () => ((await botSaid(sender)).length >= 2 ? true : null), { timeout: 30_000, step: 500 });
     expect(welcomed, `no welcome after the code. Runner:\n${out.slice(-1200)}`).toBe(true);
   }, 120_000);

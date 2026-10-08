@@ -164,6 +164,13 @@ describe('buildTilePreviews — unread is what OTHERS said', () => {
     const seenAt = bumpSeenAt({}, 'club', 20);   // left the circle at 20, after Bea's line
     expect(buildTilePreviews({ events, circles, seenAt, myRefs: [ME] }).club.unread).toBe(0);
   });
+  it('a line my own device wrote to me (bot, scope self) is not news', () => {
+    const events = [
+      { id: 'w', ts: 10, type: 'chat-message', circleId: 'club', actor: 'bot', payload: { text: 'Circle made!', scope: 'self' } },
+      { id: 'x', ts: 11, type: 'chat-message', circleId: 'club', actor: 'bot', payload: { text: 'Bea joined', scope: 'circle' } },
+    ];
+    expect(buildTilePreviews({ events, circles, myRefs: [ME] }).club.unread).toBe(1);   // only the circle-wide line
+  });
   it('countsAsUnread is the one decision, exported for both shells', () => {
     expect(countsAsUnread({ type: 'chat-message', actor: 'bea-pub' }, { myRefs: [ME] })).toBe(true);
     expect(countsAsUnread({ type: 'chat-message', actor: ME }, { myRefs: [ME] })).toBe(false);

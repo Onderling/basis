@@ -72,9 +72,13 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRe
 }
 
 /**
- * Does this event count toward a circle's unread badge? Only a line on the HUMAN lane — the entry-kinds dictionary
- * decides, so a system kind (roster, rules, a join, an unlisted type) never counts — and only when someone ELSE
- * wrote it. A circle you just made used to greet you with "6 unread": your own setup and your own sends.
+ * Does this event count toward a circle's unread badge? The rule: news is ANOTHER PERSON's line on the human lane.
+ *   - The HUMAN lane only — the entry-kinds dictionary decides, so a system kind (roster, rules, a join, an unlisted
+ *     type) never counts.
+ *   - Not mine: not one of `myRefs` (the shells pass 'me' and every address this person's devices speak as, so a
+ *     second device of the same person is mine too).
+ *   - Not my own device talking to me: a 'bot' line scoped to me alone (the wizard's lines, the fallback offer).
+ * A circle you just made used to greet you with "6 unread": your own setup and your own sends.
  * One decision, read by the web launcher and the mobile one alike.
  *
  * @param {object} event   a LoggedEvent
@@ -85,6 +89,7 @@ export function countsAsUnread(event, { myRefs = [] } = {}) {
   if (!event || typeof event !== 'object') return false;
   if (entryKind(event.type).lane !== LANE.HUMAN) return false;
   const actor = event.actor ?? event.payload?.actor ?? null;
+  if (actor === 'bot' && event.payload?.scope === 'self') return false;
   return !(actor && myRefs.includes(actor));
 }
 

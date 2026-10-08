@@ -26,7 +26,7 @@ describe('cancelling an appointment', () => {
   });
 
   it('a member cancels their own, not another\'s; the admin any; the admin can make it admin-only', async () => {
-    expect(BOT_OP_MAP.member).toContain('cancelEvent');
+    expect(BOT_OP_MAP.member).toContain('calendar.cancelEvent');
     dir = await mkdtemp(path.join(tmpdir(), 'bot-cancel-'));
     const pass = randomBytes(32).toString('base64url');
     await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });

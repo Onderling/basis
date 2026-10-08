@@ -104,7 +104,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     // before any app is handed the call, so a screen that skips its own confirm changes nothing. The host gate first: a
     // screen whose person may not do it is refused, not asked about.
     if (ctx?.via === 'screen' && stepUpOf(app, op) === 'private-door') {
-      const refused = caller && typeof refusal === 'function' ? await refusal(op, caller, app === 'assistant' ? levelOf(op) : undefined) : null;
+      const refused = caller && typeof refusal === 'function' ? await refusal(`${app}.${op}`, caller, app === 'assistant' ? levelOf(op) : undefined) : null;
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
       return holdForYes(caller, app, op, args, ctx);
     }
@@ -118,7 +118,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return announcer.forChange(args?.change, { kinds: Array.isArray(args?.kinds) ? args.kinds : null });
     }
     if (caller && typeof refusal === 'function') {
-      const refused = await refusal(op, caller, levelOf(op));
+      const refused = await refusal(`assistant.${op}`, caller, levelOf(op));
       // the host gate's refusal (`{layer, code}`, the one shape) rides along; the door says the admin's line
       if (refused) return { ok: false, error: { code: refused.code ?? String(refused), message: t('circle.bot.admin_only') }, refusal: refused };
     }
@@ -663,7 +663,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   async function menuOp(person, caller, ctx = {}) {
     if (!person) return { ok: false, error: 'no-thread' };
     const tp = personT(person);
-    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(opId, caller, levelOf(opId)));
+    const reaches = async (opId) => !caller || typeof refusal !== 'function' || !(await refusal(`assistant.${opId}`, caller, levelOf(opId)));
     const row = typeof admin.users === 'function' ? ((await admin.users()) ?? []).find((u) => u.id === person) : null;
     // asked from a screen: the screen paints the buttons, whatever the person's chat view is
     const view = ctx?.via === 'screen' ? 'inline' : (row && row.channel !== 'telegram' ? 'chat' : threads.viewOf(person));

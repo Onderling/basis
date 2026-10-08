@@ -147,7 +147,7 @@ describe('the families cover what the bot reaches', () => {
     expect(isReadFamily('listOpen') && isReadFamily('listMine') && isReadFamily('weekOverview')).toBe(true);
     expect(isReadFamily('addToList')).toBe(false);
     const own = (id) => id.startsWith('assistant-') || id === 'remindMe';
-    const acts = [...new Set([...BOT_OP_MAP.member, ...BOT_OP_MAP.admin])].filter((id) => !reads.has(id) && !own(id));
+    const acts = [...new Set([...BOT_OP_MAP.member, ...BOT_OP_MAP.admin].map((q) => q.slice(q.indexOf('.') + 1)))].filter((id) => !reads.has(id) && !own(id));
     expect(acts.filter((id) => !REPLY_FAMILY[id])).toEqual([]);
   });
 });

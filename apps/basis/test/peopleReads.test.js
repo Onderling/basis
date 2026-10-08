@@ -47,7 +47,7 @@ describe('the people reads', () => {
   afterAll(async () => { await names('members'); await agent?.stop?.().catch(() => {}); });
 
   it('every reader reaches the three: listOpen is on the member\'s and the observer\'s map', () => {
-    for (const op of ['listOpen', 'listMine', 'weekOverview']) {
+    for (const op of ['tasks.listOpen', 'tasks.listMine', 'assistant.weekOverview']) {
       expect(BOT_OP_MAP.member, op).toContain(op);
       expect(BOT_OP_MAP.observer, op).toContain(op);
     }

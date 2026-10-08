@@ -31,8 +31,8 @@ describe('the week overview', () => {
   });
 
   it('the coming appointments, what is on the shopping list, every open chore with who and when — asked as me', async () => {
-    expect(BOT_OP_MAP.member).toContain('weekOverview');
-    expect(BOT_OP_MAP.observer).toContain('weekOverview');
+    expect(BOT_OP_MAP.member).toContain('assistant.weekOverview');
+    expect(BOT_OP_MAP.observer).toContain('assistant.weekOverview');
     dir = await mkdtemp(path.join(tmpdir(), 'bot-overview-'));
     const pass = randomBytes(32).toString('base64url');
     await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });

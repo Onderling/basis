@@ -39,12 +39,17 @@ describe('the walk of 2026-10-08, pinned', () => {
     // A fresh install opens on the first-run welcome; the agent boots once the person starts.
     await waitFor(element(by.id('first-run-welcome'))).toBeVisible().withTimeout(90_000);
     await element(by.id('first-run-start')).tap();
-    // …then the recovery words are shown once (a throwaway identity on the emulator): confirm and go on.
-    await waitFor(element(by.id('mnemonic-create'))).toBeVisible().withTimeout(60_000);
-    await element(by.id('mnemonic-create-written')).tap();
-    // First boot: the launcher, then the help circle's tile once the agent has provisioned it.
-    await waitFor(element(by.id('circle-launcher'))).toBeVisible().withTimeout(90_000);
-    await waitFor(element(by.id(HELP_TILE)).atIndex(0)).toBeVisible().withTimeout(90_000);
+    // …then the recovery words once (a throwaway identity on the emulator): confirm and go on. They do not always come
+    // first — a build of 2026-10-09 showed the launcher, then "Save your key" OVER it a few seconds later — so confirm
+    // them whenever they appear, until the help circle's tile is on the launcher.
+    const until = Date.now() + 180_000;
+    let tile = false;
+    while (Date.now() < until && !tile) {
+      if (await isVisible(by.id('mnemonic-create'))) await element(by.id('mnemonic-create-written')).tap();
+      tile = await isVisible(by.id(HELP_TILE));
+      if (!tile) await new Promise((r) => setTimeout(r, 500));
+    }
+    if (!tile) throw new Error('first boot: the help circle never showed on the launcher (180 s)');
   });
 
   it('a PERSON\'s Hide, "What they see" and Delete are on the screen', async () => {

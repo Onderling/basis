@@ -756,8 +756,10 @@ Found writing `apps/basis-mobile/e2e/walkFixes20261008.test.js`; each cost a run
   of the view hierarchy to have window focus". Not the app. Boot the emulator first, let it settle (~3 min uptime),
   `adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS`, set the three `*_animation_scale` to 0, then
   `detox test --reuse`.
-- **A fresh install does not open on the launcher**: first `first-run-welcome` → tap `first-run-start`, then the
-  recovery words `mnemonic-create` → tap `mnemonic-create-written`. Only then `circle-launcher`.
+- **A fresh install does not open on the launcher**: first `first-run-welcome` → tap `first-run-start`, then — on some
+  builds — the recovery words `mnemonic-create` → tap `mnemonic-create-written`. Only then `circle-launcher`. A build
+  of 2026-10-09 showed the launcher FIRST and "Save your key" over it seconds later, hiding the tiles: confirm the
+  words whenever they appear, in the same loop that waits for the tile you need.
 - **`by.id(/regex/)` did not match here** (a negative lookahead, e.g. `/^circle-tile-(?!proposals-)/`, found nothing while
   the view was on screen). Use exact ids — the help circle's tile is `circle-tile-cc-help` (a product constant).
 - **`typeText` + tapping Send lost the input** (the text sat in the field, Send never took it; `replaceText` the same).

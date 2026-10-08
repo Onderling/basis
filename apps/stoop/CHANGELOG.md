@@ -1,17 +1,5 @@
 # Changelog — @onderling-app/stoop
 
-## [Unreleased] — the plaintext attachment fetch route is removed (2026-10-07)
-
-- Removed the `requestAttachment` / `getAttachmentDataUrl` skills, the
-  local-cache helpers they needed (`attachmentPath`,
-  `readAttachmentBytesB64`, `MAX_CHAT_BYTES_PER_ATT`, the unused
-  `stoop-att://` wire-ref helpers), the `post_form.picture_pending`
-  string, and chat-p2p's `attachmentSupport` option with its
-  `attachment-request` / `attachment-response` / inline-`dataB64`
-  handling. Decision: the route was superseded by the sealed-media
-  path through the blob gate (`circleStoopScope.js`), stoop stopped
-  wiring it on 2026-07-11, nothing reached it; removed 2026-10-07.
-
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 
 Media Phase 1 anti-drift tail: stoop's inline-bytes attachments now

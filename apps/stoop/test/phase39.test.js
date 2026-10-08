@@ -11,13 +11,13 @@
  * Verifies:
  *   - Attachments lib: `validateInboundAttachment` accepts the sealed pointer +
  *     REFUSES inline plaintext; `toBroadcastShape` carries the sealed line, no
- *     local `ref` / `dataB64`; helpers (freshAttachmentId / caps).
+ *     local `ref` / `dataB64`; helpers (attachmentPath / freshAttachmentId / caps).
  *   - 39.2: postRequest stores the sealed pointer on `source.attachments`; the
  *           record + broadcast carry NO plaintext bytes / `data:image` thumbnail.
  *   - 39.3: the substrate mirror copies the sealed pointer into mirrored items
  *           (no local `ref`).
  *   - 39.4: the removed plaintext byte-serving path — postRequest REFUSES inline
- *           plaintext; the requestAttachment / getAttachmentDataUrl skills are gone.
+ *           plaintext; requestAttachment still rejects an unknown item.
  *   - 39.5: sendChatMessage requires body-or-attachment, and REFUSES an inline
  *           plaintext attachment (accepts a sealed pointer).
  *   - Privacy invariant: no plaintext bytes / `data:image` thumbnail crosses the wire.
@@ -31,8 +31,10 @@ import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   validateInboundAttachment,
   toBroadcastShape,
+  attachmentPath,
   freshAttachmentId,
   MAX_NOTICEBOARD_BYTES_PER_ATT,
+  MAX_CHAT_BYTES_PER_ATT,
   MAX_ATTACHMENTS_PER_POST,
 } from '../src/lib/Attachments.js';
 import { attachSubstrateMirror } from '../src/substrateMirror.js';
@@ -99,13 +101,20 @@ describe('Phase 39 — Attachments lib (sealed)', () => {
     expect(out[0].source.type).toBe('blob');
   });
 
+  it('attachmentPath includes the right extension per mime', () => {
+    expect(attachmentPath('item-1', 'att-1', 'image/jpeg')).toMatch(/\.jpg$/);
+    expect(attachmentPath('item-1', 'att-1', 'image/png')).toMatch(/\.png$/);
+    expect(attachmentPath('item-1', 'att-1', 'image/webp')).toMatch(/\.webp$/);
+    expect(() => attachmentPath('item-1', 'att-1', 'image/gif')).toThrow();
+  });
+
   it('freshAttachmentId is unique', () => {
     const ids = new Set(Array.from({ length: 50 }, () => freshAttachmentId()));
     expect(ids.size).toBe(50);
   });
 
   it('size caps are sensible defaults', () => {
-    expect(MAX_NOTICEBOARD_BYTES_PER_ATT).toBeGreaterThan(0);
+    expect(MAX_NOTICEBOARD_BYTES_PER_ATT).toBeGreaterThan(MAX_CHAT_BYTES_PER_ATT);
     expect(MAX_ATTACHMENTS_PER_POST).toBeGreaterThanOrEqual(1);
   });
 });
@@ -193,10 +202,10 @@ describe('Phase 39.4 — plaintext byte-serving path removed', () => {
     expect(r.error).toBe('attachment-plaintext-refused');
   });
 
-  it('the plaintext fetch skills are gone (no author round-trip, no local data: URL)', async () => {
+  it('requestAttachment still rejects an unknown item', async () => {
     const bundle = await buildBundle();
-    expect(bundle.agent.skills.get('requestAttachment')).toBeFalsy();
-    expect(bundle.agent.skills.get('getAttachmentDataUrl')).toBeFalsy();
+    expect(await callSkill(bundle.agent, 'requestAttachment', { itemId: 'nope', attId: 'x' }))
+      .toEqual({ error: 'item-not-found' });
   });
 });
 

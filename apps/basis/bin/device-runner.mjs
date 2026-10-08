@@ -15,7 +15,7 @@
  * Telegram is optional and secondary. With a token present the same process also answers on Telegram,
  * which is why the personal box runs ONE process rather than two; without one it is simply a device.
  *
- *   ONDERLING_RELAY_URL=wss://relay.onderling.org node bin/device-runner.mjs --data-dir ~/.basis-device
+ *   ONDERLING_RELAY_URL=wss://<relay-domain> node bin/device-runner.mjs --data-dir ~/.basis-device
  *
  * Env:
  *   ONDERLING_RELAY_URL      the relay to dial. Absent → local-only (no wire; useful for a first boot)

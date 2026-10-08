@@ -747,3 +747,33 @@ guard they test scans the real tree; others run a guard on the tree at the same 
 aggregate red now and then (`lint-searchable-sources`, `lint-journeys-reach-users`), always green alone. `npm run
 guards` now runs `vitest run scripts/ --no-file-parallelism` (about 25 s slower). A new self-test that touches the tree
 must clean up in a `finally` and must not assume it runs alone in a plain `npx vitest run scripts/`.
+
+## Detox on the emulator: the traps of a fresh install (2026-10-08)
+
+Found writing `apps/basis-mobile/e2e/walkFixes20261008.test.js`; each cost a run.
+
+- **A cold emulator's System UI ANRs** and steals the window focus — Detox then fails every test with "Waited for the root
+  of the view hierarchy to have window focus". Not the app. Boot the emulator first, let it settle (~3 min uptime),
+  `adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS`, set the three `*_animation_scale` to 0, then
+  `detox test --reuse`.
+- **A fresh install does not open on the launcher**: first `first-run-welcome` → tap `first-run-start`, then the
+  recovery words `mnemonic-create` → tap `mnemonic-create-written`. Only then `circle-launcher`.
+- **`by.id(/regex/)` did not match here** (a negative lookahead, e.g. `/^circle-tile-(?!proposals-)/`, found nothing while
+  the view was on screen). Use exact ids — the help circle's tile is `circle-tile-cc-help` (a product constant).
+- **`typeText` + tapping Send lost the input** (the text sat in the field, Send never took it; `replaceText` the same).
+  Type the value with a trailing `\n` so the field's `onSubmitEditing` submits it — the way a person sends it.
+- **"+ Add a bot" with a plain address makes a BOT peer**, whose thread has no Hide / "What they see" / Delete (they render
+  only for a person in the contact book), and in some runs never showed up in Contacts at all. For a person, add a real card: `e2e/support/contactCard.fixture.json`, made by
+  the app's own encoder from a fixed seed (`e2e/support/makeContactCard.mjs`) and pinned by
+  `test/e2eContactCardFixture.test.js` — never a hand-written string. Adding a person opens `contact-add-sheet` first.
+- **The Contacts list does not refresh in place after an add**: open another tab and Contacts again, and poll.
+- **Typing a long code into the soft keyboard mangles it** (the ~100-character contact card came out wrong now and then,
+  so the add silently failed). Hand the app the card as a link instead: `device.openURL({ url })` takes the app's own
+  link path (`classifyQrPayload`), the way a scanned or tapped card arrives.
+- **That link path lands in a circle's conversation**, not on the launcher; step back (`device.pressBack()`) only while
+  the tab bar is missing, so Back never leaves the app.
+- **`contact-add-sheet` slides in**: Detox calls it visible mid-slide, and a tap then can land on the backdrop, which
+  cancels and adds nothing (1 run in 3 failed this way; no `addContactFromQr` in logcat). Wait ~1.5 s after it shows,
+  tap Add, and tap again while it is still up.
+- **Verify by logcat, not by guessing**: `adb logcat -d -s ReactNativeJS | grep -E "\[link\]|addContactFromQr"` shows
+  whether the link drained and whether the add ran.

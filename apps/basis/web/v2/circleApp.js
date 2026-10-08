@@ -21,7 +21,7 @@
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
 import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
-import { loadCompanionGrantPicker, companionGrantText } from '../../src/v2/companionGrant.js';
+import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../src/v2/companionGrant.js';
 import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
@@ -82,7 +82,7 @@ import { discoverPodRoot, createPodWriter } from '../../src/web/podStorage.js';
 import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { buildCircleLlmProviders } from '../../src/v2/circleLlmProviders.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
-import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
+import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl, effectiveRelayUrl, DEFAULT_RELAY_URL } from '../../src/v2/relayPref.js';
 import {
   normalizeRetentionDays, retentionFromDays, DEFAULT_RETENTION_DAYS, daysToMs,
 } from '../../src/v2/retentionPref.js';
@@ -1020,7 +1020,7 @@ async function applyRelayUrl(url) {
   // register is the authority (device-params consolidation). Same-value echoes are idempotent.
   circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'relay.url', value: saved ?? '' })
     .catch(() => { /* the cache stands */ });
-  CIRCLE_RELAY_URL = resolveRelayUrl(saved, CIRCLE_RELAY_ENV);
+  CIRCLE_RELAY_URL = effectiveRelayUrl(saved, CIRCLE_RELAY_ENV);   // cleared ⇒ back to the public relay, not none
   if (_peerAgent) {
     try { await tryConnectPeerTransport(_peerAgent, _peerRouter); }
     catch (err) { return { ok: false, error: err?.message ?? String(err), effective: CIRCLE_RELAY_URL }; }
@@ -1546,6 +1546,7 @@ let   CIRCLE_RELAY_URL      = bootRelayUrl({
       return createConnectionPoints({ initial: localStorageConnectionPointsIo().load(), save: () => {} }).list();
     } catch { return []; }
   })(),
+  fallback: DEFAULT_RELAY_URL,   // nothing saved and nothing recorded: the public relay, never none
 });
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 /**
@@ -1630,7 +1631,7 @@ function applyTransportMode(mode) {
 // drives the route × capability grey-out). transportKnown is always true here (we can read relay
 // + mode), so the private-DM grey-out is a REAL disable, not the missing-data seam.
 function currentTransportState() {
-  const relayUrl = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV) || '';
+  const relayUrl = effectiveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV) || '';
   // canWakePush: false — web has no killed-app state to wake; an open tab already receives live.
   // (The wake-nudges toggle greys with its honest why; listed in web-mobile-exceptions.)
   return { mode: readTransportMode(), relayUrl, relayConnected: !!CIRCLE_RELAY_URL, canWakePush: false };
@@ -4479,7 +4480,7 @@ function ensurePagePanel() {
 async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
-  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = [];
+  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
@@ -4593,11 +4594,17 @@ async function showMyData() {
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
+    companionsPending,
     onOpenCompanionGrant: (node) => loadCompanionGrantPicker({
       callSkill: rawCallSkill, node, t,
       linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
     }),
     onGrantCompanion: async (args) => companionGrantText(await rawCallSkill('household', 'grantCompanion', args).catch(() => null), t),
+    onLoadCompanionGrants: (node) => loadCompanionGrantRows({
+      callSkill: rawCallSkill, node, t,
+      linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
+    }),
+    onRevokeCompanionGrant: async ({ node, to }) => companionRevokeText(await rawCallSkill('household', 'revokeCompanionGrant', { node, to }).catch(() => null), t),
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -4701,6 +4708,7 @@ async function showMyData() {
   // the nodes this person claimed (their own list; each node keeps its owner itself)
   companions = Object.values(ownedNodesOf({ properties: profProps?.properties ?? {} }))
     .map((n) => ({ node: n.address, short: n.label || `${n.address.slice(0, 8)}…` }));
+  companionsPending = pendingRevokeLine({ properties: profProps?.properties ?? {} }, t);
   dataLocation = loc ?? {};
   podStatus = status ?? {};
   // Prefer the real Solid session over the (aspirational) stoop op — read through the waist, so the
@@ -4883,7 +4891,7 @@ async function showCircleInvite(circleId) {
   }
   // Scannable deep-link: a phone camera opens the hosted app with ?join=<invite> (+ the admin's current
   // relay, so one scan configures transport AND joins). showJoinCircle tolerates the raw invite too (paste).
-  const relayForLink = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
+  const relayForLink = effectiveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
   const deepLink = inviteDeepLink(location, r.uri, relayForLink);   // wherever THIS app is served (a path under a site too)
   const canvas = document.createElement('canvas');
   canvas.width = 220; canvas.height = 220;

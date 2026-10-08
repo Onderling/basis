@@ -7,6 +7,8 @@
 // agent granted, skill = the op. The node's own gate (`PolicyEngine.checkInbound`) verifies a presented token on every
 // call — its signature, that it is for this node, that the caller is its subject, its op, that this node issued it,
 // and that it is not revoked. One live grant per agent: minting again for the same agent revokes what it held before.
+// The node keeps, per agent, which tokens it holds and for which families — so the owner's app can ask what is granted
+// (one truth: the node's) and revoke an agent whole.
 //
 // The tokens go to the agent over the relay as a ONE-WAY message, the way a connected screen's grant reaches the
 // screen; the agent keeps them and presents one on every call.
@@ -57,10 +59,26 @@ export function opsForFamilies(families) {
  * @param {import('@onderling/core').Agent} a.agent             this node's agent (to deliver)
  * @param {import('@onderling/core').TokenRegistry} a.tokenRegistry  the issuer-side ledger the gate's revocation reads
  * @param {{get: Function, set: Function}} a.vault
+ * @param {(to: string) => Promise<number>} [a.onRevoked]  what else ends with an agent's grant (the files it put); how many
  */
-export function createNodeGrants({ identity, agent, tokenRegistry, vault }) {
-  const heldKey = (to) => `grant-held:${to}`;
-  const heldBy = async (to) => { try { const v = JSON.parse((await vault.get(heldKey(to))) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+export function createNodeGrants({ identity, agent, tokenRegistry, vault, onRevoked = null }) {
+  const HELD = 'grant-held:';
+  const heldKey = (to) => `${HELD}${to}`;
+  /** What an agent holds here: `{ids, families}` (empty when nothing). */
+  const heldBy = async (to) => {
+    try {
+      const v = JSON.parse((await vault.get(heldKey(to))) ?? 'null');
+      return { ids: Array.isArray(v?.ids) ? v.ids : [], families: Array.isArray(v?.families) ? v.families : [] };
+    } catch { return { ids: [], families: [] }; }
+  };
+  /** Revoke every token an agent holds here and forget its grant; how many were revoked. */
+  async function revokeAll(to) {
+    const { ids } = await heldBy(to);
+    for (const id of ids) await tokenRegistry.revoke(id);
+    if (typeof vault.delete === 'function') await vault.delete(heldKey(to));
+    else await vault.set(heldKey(to), 'null');
+    return ids.length;
+  }
 
   /** Hand the tokens to the agent over the relay: acknowledged when it answers, else one-way. `'acked'|'sent'|'failed'`. */
   async function deliver(to, tokens) {
@@ -91,9 +109,35 @@ export function createNodeGrants({ identity, agent, tokenRegistry, vault }) {
         tokens.push(token);
       }
       // one live grant per agent: what it held before stops working now
-      for (const id of await heldBy(to)) await tokenRegistry.revoke(id);
-      await vault.set(heldKey(to), JSON.stringify(tokens.map((t) => t.id)));
+      await revokeAll(to);
+      const granted = [...new Set(families)].sort();
+      await vault.set(heldKey(to), JSON.stringify({ ids: tokens.map((t) => t.id), families: granted }));
       return { ok: true, ops, delivery: await deliver(to, tokens) };
+    },
+
+    /**
+     * Revoke everything `to` holds here: the gate refuses its next call (revocation is checked before every op), and
+     * what it put goes dark (`onRevoked`).
+     * @returns {Promise<{ok: true, revoked: number, dropped: number}|{ok: false, error: 'bad-target'}>}
+     */
+    async revoke({ to }) {
+      if (typeof to !== 'string' || !AGENT_KEY.test(to)) return { ok: false, error: 'bad-target' };
+      const revoked = await revokeAll(to);
+      // its files go with it: a link the agent made outlives no grant (the same miss as any)
+      const dropped = typeof onRevoked === 'function' ? Number(await onRevoked(to)) || 0 : 0;
+      return { ok: true, revoked, dropped };
+    },
+
+    /** Who holds a grant here, and for which families: `[{to, families}]`. */
+    async list() {
+      const keys = (await vault.list()).filter((k) => k.startsWith(HELD));
+      const out = [];
+      for (const k of keys) {
+        const to = k.slice(HELD.length);
+        const { ids, families } = await heldBy(to);
+        if (ids.length) out.push({ to, families });
+      }
+      return out.sort((a, b) => a.to.localeCompare(b.to));
     },
   };
 }

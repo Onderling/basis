@@ -4701,6 +4701,10 @@
     "agenda_link_none_here": "This household has no agenda link.",
     "agenda_link_failed": "I could not make the agenda link just now. Please try again later.",
     "agenda_calendar_name": "Household",
+    "agenda_grant_ended": {
+      "text": "The companion no longer lets me place the agenda files (the access was revoked). The agenda links are off — until the companion's owner gives access again.",
+      "doc": "To the bot's admin, once, when the household companion refuses the token the bot presented (its owner revoked the grant). Not repeated until a new grant arrives."
+    },
     "menu_head": "Your settings (tap to change):",
     "menu_household": "For the whole household:",
     "menu_on_screen": "Your settings are on your connected screen. To connect another screen: /scherm.",
@@ -6997,7 +7001,15 @@
     "outcome_unknown_family": "This companion cannot give that.",
     "outcome_bad_target": "The companion cannot give access to that recipient.",
     "outcome_bad_args": "Choose to whom, and tick what it may do.",
-    "outcome_gate_off": "This companion runs without its access check, so it gives no access."
+    "outcome_gate_off": "This companion runs without its access check, so it gives no access.",
+    "granted": "Access given to",
+    "may": "may: {{what}}",
+    "revoke": "revoke",
+    "revoked": "Revoked. The companion refuses whatever it tries here from now on.",
+    "pending": {
+      "text": "Revoking — on its way to {{count}} companion(s)",
+      "doc": "My data → Mijn agents: revokes of a deleted contact that did not reach a node yet (it was away); told when it answers again."
+    }
   },
   "wizard": {
     "recovery": {

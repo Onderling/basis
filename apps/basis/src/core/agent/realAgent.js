@@ -167,7 +167,7 @@ import {
   removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
   deviceDelegationOf, deviceDelegationsOf, profileHasOtherDevices, setDeviceDelegation as registrySetDeviceDelegation,
-  ownedNodesOf, setOwnedNode,
+  ownedNodesOf, setOwnedNode, addPendingRevokes, clearPendingRevoke, pendingRevokesOf,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -2895,6 +2895,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         peer.invoke(node, op, [DataPart(data)]),
         new Promise((r) => { setTimeout(() => r(null), 15_000); }),
       ]);
+      // a node that answers is THERE: whatever it is still owed (a revoke that did not reach it) goes now
+      if (res && op !== 'grants.revoke') queueMicrotask(() => { retryPendingRevokes(node).catch(() => {}); });
       return res ? (Parts.data(res) ?? null) : null;
     } catch { return null; }
   };
@@ -2972,6 +2974,54 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return [DataPart({ ok: true, outcome: 'ok', ops: res.ops ?? [], delivery: res.delivery ?? null })];
   }, { visibility: 'private' });   // hands another agent standing authority on the person's node: owner-only
+  hostAgent.register('companionGrantList', async ({ parts }) => {
+    const { node } = parts?.[0]?.data ?? {};
+    const { res, outcome } = await askOwnedNode(node, 'grants.list', {});
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true || !Array.isArray(res.grants)) return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    const grants = res.grants.filter((g) => typeof g?.to === 'string').map((g) => ({ to: g.to, families: Array.isArray(g.families) ? g.families.filter((f) => typeof f === 'string') : [] }));
+    return [DataPart({ ok: true, outcome: 'ok', grants })];
+  }, { visibility: 'private' });   // signs for the person's node: owner-only
+  /* Revokes OWED to a node (a contact deleted while the node was away): kept on the node's record in the person's own
+   * registry (sealed, carried, restored with it), told at the next connect and whenever the node answers again. */
+  const ownProfile = async () => { try { return await agentsRegistryRef?.lookup?.('default'); } catch { return null; } };
+  const writeOwnProperties = async (fn) => {
+    const cur = await ownProfile();
+    if (!cur || !agentsRegistryRef?.register) return false;
+    await agentsRegistryRef.register({ ...cur, properties: fn(cur.properties ?? {}) });
+    return true;
+  };
+  let retrying = null;
+  /** Tell the nodes what they are owed (one node, or all); a node that answers clears its debt. */
+  function retryPendingRevokes(onlyNode = null) {
+    if (retrying) return retrying.then(() => (onlyNode ? null : retryPendingRevokes()));
+    retrying = (async () => {
+      const owed = pendingRevokesOf(await ownProfile()).filter((p) => !onlyNode || p.node === onlyNode);
+      for (const { node, key } of owed) {
+        const { res } = await askOwnedNode(node, 'grants.revoke', { to: key });
+        // told (or nothing to tell: a key the node does not take) — no longer owed; away, a clock off: kept
+        if (res?.ok === true || res?.error === 'bad-target') await writeOwnProperties((p) => clearPendingRevoke(p, node, key));
+      }
+    })().finally(() => { retrying = null; });
+    return retrying;
+  }
+  hostAgent.register('revokeCompanionGrant', async ({ parts }) => {
+    const { node, to } = parts?.[0]?.data ?? {};
+    if (typeof to !== 'string' || !to) return [DataPart({ ok: false, outcome: 'bad-args' })];
+    if (node == null) {
+      // every node the person owns (a contact deleted): OWED first, on the person's record, then told in the
+      // background — the delete never waits on a node, and one that is away is told when it is back
+      const nodes = Object.keys(ownedNodesOf(await ownProfile()));
+      if (nodes.length) await writeOwnProperties((p) => addPendingRevokes(p, [to]));
+      if (nodes.length) retryPendingRevokes().catch(() => {});
+      return [DataPart({ ok: true, outcome: 'pending', pending: nodes.length })];
+    }
+    // one node, from its row on My data: the person is looking at it, so the answer is waited for
+    const { res, outcome } = await askOwnedNode(node, 'grants.revoke', { to });
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true) return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    return [DataPart({ ok: true, outcome: 'ok', revoked: Number(res.revoked) || 0, dropped: Number(res.dropped) || 0 })];
+  }, { visibility: 'private' });   // ends another agent's authority on the person's node: owner-only
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),
@@ -6715,8 +6765,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (typeof console !== 'undefined') console.warn('[realAgent] rendezvous enable failed (continuing without direct WebRTC):', err?.message ?? err);
         }
       }
+      // revokes owed to a node the person owns (a contact deleted while it was away): told now that this device is on
+      retryPendingRevokes().catch(() => {});
       return sa.peer;
     },
+    /** Tell the person's nodes the revokes they are still owed (the connect and a node's answer do this themselves). */
+    retryPendingCompanionRevokes: () => retryPendingRevokes(),
 
     /**
      * Fire-and-forget cross-peer send.  Auto-HI on first contact,

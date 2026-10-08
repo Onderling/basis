@@ -63,6 +63,30 @@ describe('the feed shelf', () => {
     expect((await shelf.put('short', sealed(k))).ok).toBe(false);
   });
 
+  it('each file keeps who put it — beside the ciphertext, never the id or key — and that putter\'s files drop together', async () => {
+    const bucket = makeDevBlobBucket();
+    const shelf = createFeedShelf({ bucket });
+    const ann = 'A'.repeat(43); const bob = 'B'.repeat(43);
+    const [a1, a2, b1] = [newId(), newId(), newId()]; const k = randomKey();
+    for (const [id, by] of [[a1, ann], [a2, ann], [b1, bob]]) expect(await shelf.put(id, sealed(k), { by })).toEqual({ ok: true });
+    const atRest = JSON.stringify([...bucket.store.entries()]);
+    expect(atRest).toContain(ann);
+    for (const secret of [a1, a2, b1, k, 'Tandarts']) expect(atRest).not.toContain(secret);
+    // replaced by the same putter: still one file
+    await shelf.put(a1, sealed(k, ICS.replace('Tandarts', 'Kapper')), { by: ann });
+    expect(await shelf.open(a1, k)).toContain('Kapper');
+    expect(await shelf.dropAllBy(ann)).toBe(2);
+    expect(await shelf.open(a1, k)).toBeNull();
+    expect(await shelf.open(a2, k)).toBeNull();
+    expect(await shelf.open(b1, k), 'another putter\'s file stays').toBe(ICS);
+    expect(await shelf.dropAllBy(ann), 'nothing left').toBe(0);
+    // a file another agent has since replaced is not the revoked one's to lose
+    await shelf.put(a2, sealed(k), { by: ann });
+    await shelf.put(a2, sealed(k), { by: bob });
+    expect(await shelf.dropAllBy(ann)).toBe(0);
+    expect(await shelf.open(a2, k)).toBe(ICS);
+  });
+
   it('the file bucket on disk holds ciphertext only', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'feed-shelf-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));

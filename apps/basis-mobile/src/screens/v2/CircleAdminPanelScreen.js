@@ -13,6 +13,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t } from '../../core/localisation.js';
 import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
 // The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
@@ -31,7 +32,8 @@ import FaceView from './FaceView.js';
 
 export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: the back link under it could not be tapped
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [members, setMembers] = useState([]);
   const [muted, setMuted] = useState([]);
   const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
@@ -208,8 +210,8 @@ function Section({ title, children }) {
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: theme.color.paper },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  wrap: { flex: 1, paddingTop: insets?.top ?? 0, backgroundColor: theme.color.paper },
   content: { padding: 16, gap: 16, paddingBottom: 80 },
   header: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
   back: { fontSize: 13, color: theme.color.inkSoft },

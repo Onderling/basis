@@ -58,6 +58,7 @@ import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
+import { DEFAULT_RELAY_URL } from '../src/v2/relayPref.js';   // named in the banner only — a headless node dials what its operator set
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
 import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
@@ -963,6 +964,11 @@ if (tgToken || inboxDoor.bridge) {
   });
   // A household bot's people connect screens (`/scherm`): the grant is their role column, each token acting as them.
   const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
+  /** A line in the admin's private chat (no admin yet: nobody to tell). */
+  const tellAdmin = async (text) => {
+    const admin = (await botUsers.list()).find((u) => u.role === 'admin');
+    if (admin) await reach.sendToPerson(admin.id, { text });
+  };
   // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file, through
   // the relay. WHICH companion and where its links are served comes from the contact the bot holds (its card), read
   // each time — no companion among its contacts, no link; off in the household until the admin switches it on.
@@ -985,8 +991,11 @@ if (tgToken || inboxDoor.bridge) {
     try {
       return Parts.data(await agent.sa.peer.invoke(node, skill, [DataPart(data)], token ? { token } : {})) ?? null;
     } catch (err) {
-      // a refusal: where the bot will drop the grant it presented and tell its admin once (the revoke, its own step)
       walkLog({ kind: 'companion-call', op: skill, ok: false, presented: !!token, error: String(err?.message ?? err).slice(0, 120) });
+      // the companion's gate refused the grant it presented (its owner revoked it): drop it, and tell the admin — once
+      const r = companionGrants ? await companionGrants.refused(node, token, err).catch(() => null) : null;
+      if (r?.dropped) walkLog({ kind: 'companion-grant-ended', from: String(node).slice(0, 12) });
+      if (r?.tell) await tellAdmin(t('circle.bot.agenda_grant_ended')).catch(() => {});
       throw err;
     }
   };
@@ -1386,10 +1395,7 @@ if (tgToken || inboxDoor.bridge) {
     if (built?.listModels) {
       modelWatch.ref = createModelWatch({
         listModels: built.listModels, model: built.model, fallback: built.fallbackModel, t,
-        tellAdmin: async (text) => {
-          const admin = (await botUsers.list()).find((u) => u.role === 'admin');
-          if (admin) await reach.sendToPerson(admin.id, { text });
-        },
+        tellAdmin,
         log: walkLog,
       });
       hostTick.add('model-watch', { every: MODEL_WATCH_EVERY_MS, run: () => modelWatch.ref.check() });
@@ -1423,7 +1429,7 @@ const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null)
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
-console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
+console.log(`  wire      ${relayUrl || `LOCAL ONLY — no relay set (a person's device would use ${DEFAULT_RELAY_URL}; the box dials only ONDERLING_RELAY_URL)`}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
 // the address another node names this one by — e.g. the household's companion, when its owner grants this bot a place there
 console.log(`  address   ${agent.identity?.chat?.pubKey ?? '—'}`);

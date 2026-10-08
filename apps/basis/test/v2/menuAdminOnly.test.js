@@ -15,7 +15,12 @@ import { validateManifest } from '@onderling/app-manifest';
 import { basisManifest } from '../../manifest.js';
 import { circleActions, circleActionsMobile } from '../../src/v2/actionProjection.js';
 
-const ADMIN_ONLY = ['invite', 'settings', 'admin'];
+const ADMIN_ONLY = ['invite'];
+// NOT admin-only, though their names suggest it: a member opens Circle settings to ADOPT a pending policy the
+// admin changed (the app shows the incoming document there and asks them to apply it), and the Admin panel is
+// the roster every member may read — its controls are decided per viewer, its ops refuse a non-admin
+// server-side. Greying these locked members out of both (found by the browser tail, 2026-10-08).
+const MEMBER_OPEN = ['settings', 'admin'];
 
 describe('the ⋯ menu — admin-only entries', () => {
   for (const [shell, project] of [['web', (o) => circleActions(basisManifest, { platform: 'web', ...o })], ['mobile', (o) => circleActionsMobile(basisManifest, o)]]) {
@@ -28,7 +33,17 @@ describe('the ⋯ menu — admin-only entries', () => {
         expect(typeof a.reasonKey, id).toBe('string');
       }
       expect(roster.find((x) => x.id === 'invite').reasonKey).toBe('circle.invite.admin_only');
-      expect(roster.find((x) => x.id === 'settings').reasonKey).toBe('circle.op.admin_only');
+    });
+
+    it(`${shell}: settings and admin stay open to a member (adopting a policy, reading the roster)`, () => {
+      for (const isAdmin of [false, undefined]) {
+        const roster = project(isAdmin === undefined ? {} : { isAdmin });
+        for (const id of MEMBER_OPEN) {
+          const a = roster.find((x) => x.id === id);
+          expect(a, id).toBeTruthy();
+          expect(a.disabled, `${id} isAdmin=${isAdmin}`).toBeFalsy();
+        }
+      }
     });
 
     it(`${shell}: an admin sees them enabled`, () => {
@@ -49,6 +64,7 @@ describe('the ⋯ menu — admin-only entries', () => {
 
   it('the manifest declares the role, and the validator accepts only a known one', () => {
     for (const id of ADMIN_ONLY) expect(basisManifest.actions.find((a) => a.id === id)?.role, id).toBe('admin');
+    for (const id of MEMBER_OPEN) expect(basisManifest.actions.find((a) => a.id === id)?.role, id).toBeUndefined();
     const bad = { ...basisManifest, actions: [{ id: 'x', labelKey: 'circle.back', target: { kind: 'nav', to: 'back' }, role: 'king' }] };
     const res = validateManifest(bad);
     expect(res.errors.some((e) => /role/.test(e.message))).toBe(true);

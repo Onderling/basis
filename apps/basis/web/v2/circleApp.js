@@ -98,6 +98,7 @@ import {
   // Used at module scope to pick the boot relay; it was never imported, so loading the web shell threw
   // `bootRelayUrl is not defined` before anything rendered — a BLANK PAGE, not a degraded one.
   bootRelayUrl, bootRelayUrls,
+  createRelayQuestion,
 } from '../../src/v2/connectionPoints.js';
 import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
@@ -111,6 +112,7 @@ import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 // the shared confirm gate at the dispatch waist (web presenter: confirmDialog.js).
 import { runConfirmGate } from '../../src/v2/confirmGate.js';
 import { renderConfirmDialog } from './confirmDialog.js';
+import { renderRelayQuestionDialog } from './relayQuestionDialog.js';
 // …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
 // from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
 import { roleChangeConfirm, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
@@ -1025,6 +1027,27 @@ async function applyRelayUrl(url) {
     catch (err) { return { ok: false, error: err?.message ?? String(err), effective: CIRCLE_RELAY_URL }; }
   }
   return { ok: true, effective: CIRCLE_RELAY_URL };
+}
+
+// The relay question (there is no default relay): when this device knows none, the first action that needs one —
+// an invite, an add-device offer — asks. The shared `createRelayQuestion` decides; the answer goes through the
+// relay setting (`applyRelayUrl`), and "Later" holds for this session.
+const relayQuestion = createRelayQuestion({
+  read: () => ({ saved: localStorageRelayIo().load(), arg: CIRCLE_RELAY_ENV, list: getConnectionPoints().list() }),
+});
+async function askRelayIfNone() {
+  if (!(await relayQuestion.check()).ask) return;
+  const url = await new Promise((resolve) => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderRelayQuestionDialog(container, {
+      t,
+      onResolve: (u) => { try { container.remove(); } catch { /* already gone */ } resolve(u); },
+    });
+  });
+  if (!url) { relayQuestion.later(); return; }
+  const r = await applyRelayUrl(url);
+  if (!r?.ok) console.warn('[circleApp] the relay was saved but did not connect:', r?.error);
 }
 
 /**
@@ -4824,6 +4847,7 @@ async function showJoinCircle(inviteArg) {
 // OBJ-2 — Invite to THIS circle: read the current membership code (admin-gated) + encode it as a
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId) {
+  await askRelayIfNone();   // an invite without a relay gives the person joining none either
   const adminPeerAddr = circleHouseholdAgent?.householdSelfAddr ?? null;
   // the admin's NKN native address (distinct from the pubKey), so a pure-NKN
   // joiner can route the redeem handshake. Best-effort: null when NKN isn't up.
@@ -5155,6 +5179,7 @@ function showEnrollDeviceFlow() {
     back.className = 'cc-btn cc-btn--quiet';
     back.textContent = t('circle.enroll.offer_back');
     back.addEventListener('click', () => paint());
+    await askRelayIfNone();   // the new device finds this one over the relay the offer names
     const built = await rawCallSkill('household', 'buildEnrollOffer', { relayUrl: CIRCLE_RELAY_URL || undefined }).catch(() => null);
     if (!built?.ok || !built.uri) {
       const err = document.createElement('p');

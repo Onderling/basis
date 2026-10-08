@@ -13,6 +13,8 @@ import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { plannedForMe, plannedLines } from '../../../../basis/src/v2/plannedForMe.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
+import { mijOverviewBlocks, MIJ_OVERVIEW_TITLE_KEY } from '../../../../basis/src/v2/mijOverview.js';
+import CircleScreenView from './CircleScreenView.js';
 
 export default function CircleProfileScreen({ callSkill, personClock = null, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
   const theme = useTheme();
@@ -26,6 +28,8 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
   const [busy, setBusy] = useState(false);
   // Gepland: what is coming for me, wherever it lives — read on this device (no bot); null while it loads
   const [planned, setPlanned] = useState(null);
+  // Mijn overzicht: my chores and my appointments across every circle (the shared blocks); null while they load
+  const [overview, setOverview] = useState(null);
   // the person's own week overview: on · off · null while it loads or switches (absent: no clock here)
   const [weekOn, setWeekOn] = useState(undefined);
   const meRef = useRef(null);
@@ -44,6 +48,8 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
     try {
       const me = (await callSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
       meRef.current = me;
+      // the overview beside Gepland, not waiting on it (a block that fails says so under its own title)
+      mijOverviewBlocks({ callSkill, me }).then(setOverview);
       const clock = personClock ? await personClock : null;
       if (clock && me) setWeekOn(personWeekOn(clock.book, me));
       const r = await plannedForMe({ callSkill, me });
@@ -121,6 +127,11 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
             </Pressable>
           ))}
         </View>
+      </Section>
+
+      {/* Mijn overzicht: my chores and my appointments across every circle — read-only, no screens manager */}
+      <Section title={t(MIJ_OVERVIEW_TITLE_KEY)}>
+        <View testID="profile-overview"><CircleScreenView blocks={overview} /></View>
       </Section>
 
       <Section title={t('circle.profile.planned_title')}>

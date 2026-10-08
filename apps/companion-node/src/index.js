@@ -738,7 +738,9 @@ export async function startCompanionNode(opts = {}) {
 
     // `grants.mint` — OWNER-GATED: let another agent (a household bot) do a FAMILY of this node's ops — one token per
     // op, issuer this node, subject that agent, no wildcard (`grants.js`); delivered to the agent over the relay.
-    const nodeGrants = tokenRegistry ? createNodeGrants({ identity, agent, tokenRegistry, vault: permVault }) : null;
+    const nodeGrants = tokenRegistry
+      ? createNodeGrants({ identity, agent, tokenRegistry, vault: permVault, onRevoked: async (to) => (feedShelf ? feedShelf.dropAllBy(to) : 0) })
+      : null;
     managed('grants.mint', async (ctx) => {
       if (!nodeGrants) return { ok: false, error: 'gate-off' };
       const { args } = argsOf(ctx);
@@ -778,7 +780,8 @@ export async function startCompanionNode(opts = {}) {
       feedShelf = createFeedShelf({ bucket: feedBucket ?? makeFileBlobBucket(join(resolveConfigDir(configDir), 'feeds')) });
       agent.register('feed.put', async (ctx) => {
         const { id, envelope } = Parts.data(ctx?.parts) ?? {};
-        return feedShelf.put(id, envelope);
+        // the putter is the caller the gate verified (the token's subject): its files go when its grant does
+        return feedShelf.put(id, envelope, { by: ctx?.from ?? null });
       }, { policy: 'requires-token' });
       agent.register('feed.drop', async (ctx) => {
         const { id } = Parts.data(ctx?.parts) ?? {};

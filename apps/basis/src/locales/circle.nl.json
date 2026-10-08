@@ -4654,7 +4654,7 @@
     "agenda_link_failed": "De agenda-link kon ik nu niet maken. Probeer het straks nog eens.",
     "agenda_calendar_name": "Huishouden",
     "agenda_grant_ended": {
-      "text": "De companion geeft me geen toegang meer tot de agenda-bestanden (de toegang is ingetrokken). De agenda-links blijven staan zoals ze waren, maar volgen geen wijzigingen meer — tot de eigenaar van de companion opnieuw toegang geeft.",
+      "text": "De companion geeft me geen toegang meer tot de agenda-bestanden (de toegang is ingetrokken). De agenda-links zijn uit — tot de eigenaar van de companion opnieuw toegang geeft.",
       "doc": "To the bot's admin, once, when the household companion refuses the token the bot presented (its owner revoked the grant). Not repeated until a new grant arrives."
     },
     "menu_head": "Je instellingen (tik om te wijzigen):",

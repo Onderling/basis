@@ -59,8 +59,9 @@ export function opsForFamilies(families) {
  * @param {import('@onderling/core').Agent} a.agent             this node's agent (to deliver)
  * @param {import('@onderling/core').TokenRegistry} a.tokenRegistry  the issuer-side ledger the gate's revocation reads
  * @param {{get: Function, set: Function}} a.vault
+ * @param {(to: string) => Promise<number>} [a.onRevoked]  what else ends with an agent's grant (the files it put); how many
  */
-export function createNodeGrants({ identity, agent, tokenRegistry, vault }) {
+export function createNodeGrants({ identity, agent, tokenRegistry, vault, onRevoked = null }) {
   const HELD = 'grant-held:';
   const heldKey = (to) => `${HELD}${to}`;
   /** What an agent holds here: `{ids, families}` (empty when nothing). */
@@ -115,12 +116,16 @@ export function createNodeGrants({ identity, agent, tokenRegistry, vault }) {
     },
 
     /**
-     * Revoke everything `to` holds here: the gate refuses its next call (revocation is checked before every op).
-     * @returns {Promise<{ok: true, revoked: number}|{ok: false, error: 'bad-target'}>}
+     * Revoke everything `to` holds here: the gate refuses its next call (revocation is checked before every op), and
+     * what it put goes dark (`onRevoked`).
+     * @returns {Promise<{ok: true, revoked: number, dropped: number}|{ok: false, error: 'bad-target'}>}
      */
     async revoke({ to }) {
       if (typeof to !== 'string' || !AGENT_KEY.test(to)) return { ok: false, error: 'bad-target' };
-      return { ok: true, revoked: await revokeAll(to) };
+      const revoked = await revokeAll(to);
+      // its files go with it: a link the agent made outlives no grant (the same miss as any)
+      const dropped = typeof onRevoked === 'function' ? Number(await onRevoked(to)) || 0 : 0;
+      return { ok: true, revoked, dropped };
     },
 
     /** Who holds a grant here, and for which families: `[{to, families}]`. */

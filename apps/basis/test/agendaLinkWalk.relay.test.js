@@ -8,7 +8,8 @@
  * on → `/agenda-link` sends a link privately, AT THE RELAY, naming the companion; fetching it gives the agenda with the
  * appointment; a new appointment re-renders it; asking again turns the old link dark; `/revoke` turns a person's link
  * dark; and before any of it, the relay's route answers 404. Last, the owner REVOKES the grant from their app: the
- * box's next put is refused, it drops the grant, and its admin hears so once — not again on the next change.
+ * box's links go dark at once, its next put is refused, it drops the grant, and its admin hears so once — not again on
+ * the next change.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
@@ -147,12 +148,12 @@ describe('the agenda link, on a real box and a real companion', () => {
     expect((await fetchFeed(link3)).status).toBe(200);
     expect(await owner.agent.callSkill('household', 'companionGrantList', { node: companionAddress })).toMatchObject({ ok: true, grants: [{ to: boxAddress, families: ['agenda-files'] }] });
     expect(await owner.agent.callSkill('household', 'revokeCompanionGrant', { node: companionAddress, to: boxAddress })).toMatchObject({ ok: true, revoked: 2 });
+    expect((await fetchFeed(link3)).status, 'the revoked grant\'s links are dark: the one 404').toBe(404);
     const ENDED = /geeft me geen toegang meer/;
     const before = api.said(ADMIN).length;
     await ask(api, ADMIN, 'zwemmen overmorgen om 15 uur', (m) => /zwemmen/i.test(m.text), { log });
     expect(await until(async () => (api.said(ADMIN).slice(before).some((m) => ENDED.test(m.text)) ? true : null), { timeout: 30_000, step: 250 }), `the admin is told\n${log().slice(-1500)}`).toBe(true);
     expect(walked().some((e) => e.kind === 'companion-grant-ended'), 'the box dropped the grant').toBe(true);
-    expect((await fetchFeed(link3)).body, 'the link no longer follows a change').not.toMatch(/[Zz]wemmen/);
     // another change: refused again (nothing presented now), and NOT said again
     await ask(api, ADMIN, 'tennis overmorgen om 17 uur', (m) => /tennis/i.test(m.text), { log });
     await new Promise((r) => { setTimeout(r, 6_000); });

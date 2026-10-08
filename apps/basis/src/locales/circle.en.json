@@ -4654,7 +4654,7 @@
     "agenda_link_failed": "I could not make the agenda link just now. Please try again later.",
     "agenda_calendar_name": "Household",
     "agenda_grant_ended": {
-      "text": "The companion no longer lets me place the agenda files (the access was revoked). The agenda links stay as they were but no longer follow changes — until the companion's owner gives access again.",
+      "text": "The companion no longer lets me place the agenda files (the access was revoked). The agenda links are off — until the companion's owner gives access again.",
       "doc": "To the bot's admin, once, when the household companion refuses the token the bot presented (its owner revoked the grant). Not repeated until a new grant arrives."
     },
     "menu_head": "Your settings (tap to change):",

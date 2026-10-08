@@ -186,7 +186,8 @@ describe('a companion grants its agenda files to a bot', () => {
     ]));
     expect(list.grants).toHaveLength(2);
 
-    const put = { id: randomKey(), envelope: sealForLink(ICS, randomKey()) };
+    const putK = randomKey();
+    const put = { id: randomKey(), envelope: sealForLink(ICS, putK) };
     expect(Parts.data(await bot.agent.invoke(node$, 'feed.put', put, { token: tok.find((t) => t.skill === 'feed.put') }))).toEqual({ ok: true });
 
     // only the owner revokes; an unsigned or another root's ask changes nothing
@@ -194,7 +195,15 @@ describe('a companion grants its agenda files to a bot', () => {
     const eve = ownerDevice(Bootstrap.create().bootstrap, 'laptop');
     expect(await app.agent.invoke(node$, 'grants.revoke', { to: bot.key, auth: eve.auth(node$, 'grants.revoke', { to: bot.key }) }).then(Parts.data)).toEqual({ ok: false, error: 'forbidden' });
 
-    expect(await signed('grants.revoke', { to: bot.key })).toEqual({ ok: true, revoked: 2 });
+    // what the bot put is served — until the revoke: then its links go dark, the same miss as any
+    const serveArgs = { id: put.id, k: putK };
+    expect(Parts.data(await other.agent.invoke(node$, 'feed.serve', serveArgs))).toEqual({ ok: true, ics: ICS });
+    const otherFile = { id: randomKey(), envelope: sealForLink(ICS, putK) };
+    expect(Parts.data(await other.agent.invoke(node$, 'feed.put', otherFile, { token: otherTok.find((t) => t.skill === 'feed.put') }))).toEqual({ ok: true });
+
+    expect(await signed('grants.revoke', { to: bot.key })).toEqual({ ok: true, revoked: 2, dropped: 1 });
+    expect(Parts.data(await other.agent.invoke(node$, 'feed.serve', serveArgs)), 'the revoked agent\'s link is dark').toEqual({ ok: false });
+    expect(Parts.data(await other.agent.invoke(node$, 'feed.serve', { id: otherFile.id, k: putK })), 'another agent\'s file stays').toEqual({ ok: true, ics: ICS });
     for (const t of tok) {
       await expect(bot.agent.invoke(node$, t.skill, t.skill === 'feed.put' ? put : { id: put.id }, { token: t }), `${t.skill} after revoke`).rejects.toThrow(/revoked/i);
     }
@@ -202,7 +211,7 @@ describe('a companion grants its agenda files to a bot', () => {
     expect(Parts.data(await other.agent.invoke(node$, 'feed.put', put, { token: otherTok.find((t) => t.skill === 'feed.put') }))).toEqual({ ok: true });
     expect((await signed('grants.list', {})).grants).toEqual([{ to: other.key, families: ['agenda-files'] }]);
     // revoking someone with nothing: nothing to revoke, not an error
-    expect(await signed('grants.revoke', { to: bot.key })).toEqual({ ok: true, revoked: 0 });
+    expect(await signed('grants.revoke', { to: bot.key })).toEqual({ ok: true, revoked: 0, dropped: 0 });
     expect(await signed('grants.revoke', { to: 'nope' })).toEqual({ ok: false, error: 'bad-target' });
   }, 60_000);
 

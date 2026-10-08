@@ -28,7 +28,7 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
   const [busy, setBusy] = useState(false);
   // Gepland: what is coming for me, wherever it lives — read on this device (no bot); null while it loads
   const [planned, setPlanned] = useState(null);
-  // Mijn overzicht: my chores and my appointments across every circle (the shared blocks); null while they load
+  // Mijn overzicht, below Gepland: my chores across every circle (the shared block); null while it loads
   const [overview, setOverview] = useState(null);
   // the person's own week overview: on · off · null while it loads or switches (absent: no clock here)
   const [weekOn, setWeekOn] = useState(undefined);
@@ -129,12 +129,9 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
         </View>
       </Section>
 
-      {/* Mijn overzicht: my chores and my appointments across every circle — read-only, no screens manager */}
+      {/* Mijn overzicht — ONE section (web: circleProfile.js): Gepland's rows on top with the week-overview switch beside
+          them, then "Mijn dingen" (my chores across every circle, the shared block). Read-only, no screens manager. */}
       <Section title={t(MIJ_OVERVIEW_TITLE_KEY)}>
-        <View testID="profile-overview"><CircleScreenView blocks={overview} /></View>
-      </Section>
-
-      <Section title={t('circle.profile.planned_title')}>
         {planned === null || planned.length === 0
           ? <Text style={styles.muted} testID="profile-planned-empty">{t(planned === null ? 'circle.profile.planned_loading' : 'circle.profile.planned_none')}</Text>
           : planned.map((line, i) => <Text key={`${i}-${line}`} style={styles.plannedItem} testID="profile-planned-item">{line}</Text>)}
@@ -160,6 +157,7 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
             </Pressable>
           </View>
         ) : null}
+        <View testID="profile-overview"><CircleScreenView blocks={overview} /></View>
       </Section>
 
       <Section title={t('circle.profile.location')}>

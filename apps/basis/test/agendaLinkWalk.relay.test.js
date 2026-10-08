@@ -7,7 +7,9 @@
  * and sends them over the relay; the box keeps them and presents one on every put. Then: the switch is off → no link;
  * on → `/agenda-link` sends a link privately, AT THE RELAY, naming the companion; fetching it gives the agenda with the
  * appointment; a new appointment re-renders it; asking again turns the old link dark; `/revoke` turns a person's link
- * dark; and before any of it, the relay's route answers 404.
+ * dark; and before any of it, the relay's route answers 404. Last, the owner REVOKES the grant from their app: the
+ * box's links go dark at once, its next put is refused, it drops the grant, and its admin hears so once — not again on
+ * the next change.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
@@ -140,12 +142,31 @@ describe('the agenda link, on a real box and a real companion', () => {
     await ask(api, ADMIN, '/huishouden agenda off', () => true, { log });
     expect(await until(async () => ((await fetchFeed(link2)).status === 404 ? true : null), { timeout: 15_000, step: 500 }), 'switched off: dark').toBe(true);
 
+    // the owner revokes the grant from their app: the box's next put is refused, and its admin hears it ONCE
+    expect((await ask(api, ADMIN, '/huishouden agenda on', () => true, { log })).all).not.toMatch(/niet opgeslagen/);
+    const link3 = (await ask(api, ADMIN, '/agenda-link', (m) => /\/feed\//.test(m.text), { log })).all.match(/http:\/\/127\.0\.0\.1:\d+\/feed\/[A-Za-z0-9_-]{43}\/\S+\.ics/)?.[0];
+    expect((await fetchFeed(link3)).status).toBe(200);
+    expect(await owner.agent.callSkill('household', 'companionGrantList', { node: companionAddress })).toMatchObject({ ok: true, grants: [{ to: boxAddress, families: ['agenda-files'] }] });
+    expect(await owner.agent.callSkill('household', 'revokeCompanionGrant', { node: companionAddress, to: boxAddress })).toMatchObject({ ok: true, revoked: 2 });
+    expect((await fetchFeed(link3)).status, 'the revoked grant\'s links are dark: the one 404').toBe(404);
+    const ENDED = /geeft me geen toegang meer/;
+    const before = api.said(ADMIN).length;
+    await ask(api, ADMIN, 'zwemmen overmorgen om 15 uur', (m) => /zwemmen/i.test(m.text), { log });
+    expect(await until(async () => (api.said(ADMIN).slice(before).some((m) => ENDED.test(m.text)) ? true : null), { timeout: 30_000, step: 250 }), `the admin is told\n${log().slice(-1500)}`).toBe(true);
+    expect(walked().some((e) => e.kind === 'companion-grant-ended'), 'the box dropped the grant').toBe(true);
+    // another change: refused again (nothing presented now), and NOT said again
+    await ask(api, ADMIN, 'tennis overmorgen om 17 uur', (m) => /tennis/i.test(m.text), { log });
+    await new Promise((r) => { setTimeout(r, 6_000); });
+    expect(api.said(ADMIN).slice(before).filter((m) => ENDED.test(m.text)), 'said once').toHaveLength(1);
+
     // the companion never logged a link's id or key
     const [, id, k] = /\/feed\/[^/]+\/([^.]+)\.([^.]+)\.ics/.exec(link2);
     expect(comp.log()).not.toContain(id);
     expect(comp.log()).not.toContain(k);
-    // every put and drop went with the grant's token: the companion refused none of the box's calls
-    expect(walked().filter((e) => e.kind === 'companion-call'), 'a call the companion refused').toEqual([]);
+    // every put and drop went with the grant's token until the revoke: the companion refused none of them before it
+    const calls = walked();
+    const endedAt = calls.findIndex((e) => e.kind === 'companion-grant-ended');
+    expect(calls.slice(0, endedAt).filter((e) => e.kind === 'companion-call'), 'the only refused call before the grant ended is the one that ended it').toHaveLength(1);
     await box.stop(); await comp.stop();
   }, 300_000);
 });

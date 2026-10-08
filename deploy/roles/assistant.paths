@@ -8,6 +8,8 @@ apps/agents/
 apps/basis/
 apps/calendar/
 apps/folio/
+apps/household/
+apps/lists/
 apps/stoop/
 apps/tasks-v0/
 deploy/assistant/

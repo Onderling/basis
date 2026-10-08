@@ -61,7 +61,8 @@ const node = await startCompanionNode({
 });
 
 console.log('');
-console.log('  @onderling-app/companion-node  (Slice R1 — LAN/trusted, no gate)');
+// what the node IS: its gate decides who may call it (a granted token, the owner's devices), so the banner says it
+console.log(`  @onderling-app/companion-node  (gate ${node.gate ? 'on — calls need a token or the owner' : 'OFF — anyone on the relay may call it'})`);
 console.log('  ────────────────────────────────────────────────────────────');
 console.log(`  Host agent:   ${node.agent.address}`);
 console.log(`  Relay:        ${node.relayUrl}${node.relay ? '  (booted in-process)' : '  (shared, connected as client)'}`);

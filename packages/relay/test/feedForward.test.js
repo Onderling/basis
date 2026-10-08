@@ -118,6 +118,47 @@ describe('the relay forwards a link to the node that holds it', () => {
   }, 30_000);
 });
 
+/** A connected node that is NOT a companion (a phone, say): no `feed.serve`. Counts the hellos it receives. */
+async function bystander(relayUrl) {
+  const identity = await AgentIdentity.generate(new VaultMemory());
+  const transport = new RelayTransport({ relayUrl, identity });
+  const agent = new Agent({ identity, transport, label: 'phone' });
+  agent.security.setSenderAuthorizer(() => allowSender('test'));
+  const hellos = { n: 0 };
+  const receive = transport._receive.bind(transport);
+  transport._receive = (env) => { if (env?._p === 'HI' && env?._from !== agent.address) hellos.n += 1; return receive(env); };
+  await agent.start();
+  cleanups.push(() => agent.stop());
+  for (let i = 0; i < 100 && !agent.transport?.connected; i += 1) await new Promise((r) => { setTimeout(r, 20); });
+  await new Promise((r) => { setTimeout(r, 100); });
+  return { agent, address: agent.address, hellos };
+}
+
+describe('the forward cannot be turned on a node that is no companion', () => {
+  it('ten concurrent GETs for a phone: one hello; another GET inside the minute: none', async () => {
+    const relay = await startRelay({ port: 0, host: '127.0.0.1', log: false, feeds: { missFloorMs: 0 } });
+    cleanups.push(() => relay.stop());
+    const base = `http://127.0.0.1:${relay.port}`;
+    const phone = await bystander(`ws://127.0.0.1:${relay.port}`);
+    const storm = await Promise.all(Array.from({ length: 10 }, () => get(base, `/feed/${phone.address}/${randomKey()}.${randomKey()}.ics`)));
+    expect(storm.every((r) => r.status === 404 && r.body === FEED_MISS_BODY)).toBe(true);
+    expect(phone.hellos.n, 'one hello for ten asks').toBe(1);
+    const again = await get(base, `/feed/${phone.address}/${randomKey()}.${randomKey()}.ics`);
+    expect(again.status).toBe(404);
+    expect(phone.hellos.n, 'refused once: not asked again inside the minute').toBe(1);
+  }, 30_000);
+
+  it('a companion\'s miss (a wrong key) is not a refusal: the right link still opens at once', async () => {
+    const relay = await startRelay({ port: 0, host: '127.0.0.1', log: false, feeds: { missFloorMs: 0 } });
+    cleanups.push(() => relay.stop());
+    const base = `http://127.0.0.1:${relay.port}`;
+    const id = randomKey(); const k = randomKey();
+    const n = await node(`ws://127.0.0.1:${relay.port}`, { id, k });
+    expect((await get(base, `/feed/${n.address}/${id}.${randomKey()}.ics`)).status).toBe(404);
+    expect((await get(base, `/feed/${n.address}/${id}.${k}.ics`)).status).toBe(200);
+  }, 30_000);
+});
+
 describe('the forward\'s handler on its own', () => {
   async function mounted(o) {
     const server = http.createServer((req, res) => { res.writeHead(200); res.end('the relay'); });
@@ -143,6 +184,19 @@ describe('the forward\'s handler on its own', () => {
     const post = await fetch(`${base}/feed/${NODE}/${randomKey()}.${randomKey()}.ics`, { method: 'POST' });
     expect(post.status).toBe(404);
     expect(serve).not.toHaveBeenCalled();
+  });
+
+  it('at most two serves in flight per node; the third waits for a place', async () => {
+    let live = 0; let peak = 0;
+    const serve = vi.fn(async () => { live += 1; peak = Math.max(peak, live); await new Promise((r) => { setTimeout(r, 100); }); live -= 1; return null; });
+    const base = await mounted({ serve, isPresent: () => true, missFloorMs: 0 });
+    await Promise.all(Array.from({ length: 5 }, () => get(base, `/feed/${NODE}/${randomKey()}.${randomKey()}.ics`)));
+    expect(peak, 'never more than two at one node').toBe(2);
+    expect(serve, 'the others waited and were asked').toHaveBeenCalledTimes(5);
+    // another node is not held up by the first
+    live = 0; peak = 0;
+    await Promise.all([NODE, 'D'.repeat(43)].flatMap((n) => [n, n].map((x) => get(base, `/feed/${x}/${randomKey()}.${randomKey()}.ics`))));
+    expect(peak).toBe(4);
   });
 
   it('bounded (never retried), capped in flight, and a miss takes the floor whether the node is there or not', async () => {

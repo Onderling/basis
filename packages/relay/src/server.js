@@ -308,7 +308,7 @@ const MIME = {
  * @param {boolean|object} [opts.feeds=false]
  *   Serve a person's agenda link, `GET /feed/<node>/<id>.<k>.ics`, by forwarding it to that node over its live
  *   session (`feed.serve`) and passing the answer on — holding nothing (`./feedForward.js`). `true`, or
- *   `{ timeoutMs?, maxInFlight?, missFloorMs? }`. Off ⇒ no route, no seat; the relay is byte-identical.
+ *   `{ timeoutMs?, maxInFlight?, maxPerNode?, refusedTtlMs?, missFloorMs? }`. Off ⇒ no route, no seat; the relay is byte-identical.
  * @returns {Promise<{
  *   httpServer: import('node:http').Server | import('node:https').Server,
  *   wss: WebSocketServer,
@@ -624,6 +624,7 @@ export async function startRelay(opts = {}) {
   // wakes anyone, and nothing it sends or receives is logged. Off unless `feeds` is set.
   const feedSeat = feeds
     ? await createFeedSeat({
+      ...(feeds && typeof feeds === 'object' && feeds.refusedTtlMs != null ? { refusedTtlMs: feeds.refusedTtlMs } : {}),
       deliver: (to, envelope) => {
         const socket = clients.get(to);
         if (socket && socket.readyState === 1) { try { socket.send(ForwardQueue.messageFrame(envelope)); } catch { /* raced a close */ } }
@@ -635,8 +636,10 @@ export async function startRelay(opts = {}) {
     mountFeedForward(httpServer, {
       serve: (node, link) => feedSeat.serve(node, link, o.timeoutMs != null ? { timeoutMs: o.timeoutMs } : {}),
       isPresent: (node) => clients.get(node)?.readyState === 1,
+      isRefused: (node) => feedSeat.isRefused(node),
       ...(o.timeoutMs != null ? { timeoutMs: o.timeoutMs } : {}),
       ...(o.maxInFlight != null ? { maxInFlight: o.maxInFlight } : {}),
+      ...(o.maxPerNode != null ? { maxPerNode: o.maxPerNode } : {}),
       ...(o.missFloorMs != null ? { missFloorMs: o.missFloorMs } : {}),
     });
   }

@@ -22,8 +22,13 @@
  *     so "this address is connected" and "it is not" take the same time (a hit is faster — it needs the link's key);
  *   - nothing logged: neither this handler nor the seat's traffic writes a line (the relay's `log` skips the seat);
  *   - no fan-out: the ask is bounded (15 s), never retried, one in flight per (node, id) — a second identical request
- *     waits for the first and shares its answer, one with another key waits for it and then asks for itself — and a
- *     ceiling on all serves in flight together.
+ *     waits for the first and shares its answer, one with another key waits for it and then asks for itself — at most
+ *     two in flight per node (a third waits for a place), and a ceiling on all serves in flight together;
+ *   - not a way to poke any connected address: anyone who can GET can name any node, a phone included. A node that
+ *     REFUSES (it has no `feed.serve`, its gate denies, it answers something that is no answer) is not asked again for
+ *     a minute — no hello, the miss at the floor — and concurrent asks to one node share one hello. A companion's own
+ *     miss (`{ok: false}`: a wrong key, no file) is an answer, not a refusal, and is never held against it; neither is
+ *     a timeout (a slow companion is not a phone).
  *   - `no-store`, `nosniff`, no ETag, on the hit and the miss alike.
  */
 import {
@@ -42,6 +47,10 @@ export const FEED_SERVE_OP = 'feed.serve';
 export const FEED_SERVE_TIMEOUT_MS = param({ key: 'relay.feedServeTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_000 });
 /** How many serves may be in flight at once, all nodes together; beyond it a request is a miss. */
 export const FEED_MAX_IN_FLIGHT = param({ key: 'relay.feedMaxInFlight', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 32 });
+/** How many serves may be in flight to ONE node at once; a further request waits for a place (within the bound). */
+export const FEED_MAX_PER_NODE = param({ key: 'relay.feedMaxPerNode', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2 });
+/** How long a node that REFUSED (no such op, a policy denial, an answer that is no answer) is not asked again (ms). */
+export const FEED_REFUSED_TTL_MS = param({ key: 'relay.feedRefusedTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 /** No miss after a parsed path answers sooner than this (ms) — away and present take the same time. */
 export const FEED_MISS_FLOOR_MS = param({ key: 'relay.feedMissFloorMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000 });
 
@@ -57,12 +66,15 @@ const MISS = Object.freeze({ status: 404, type: 'text/plain; charset=utf-8', bod
  * @param {object} o
  * @param {(node: string, a: {id: string, k: string}) => Promise<string|null>} o.serve   ask the node; the text or null
  * @param {(node: string) => boolean} o.isPresent   is that node's session live right now
+ * @param {(node: string) => boolean} [o.isRefused]  did that node refuse lately (then it is not asked)
  * @param {number} [o.timeoutMs]
  * @param {number} [o.maxInFlight]
+ * @param {number} [o.maxPerNode]
  * @param {number} [o.missFloorMs]
  */
 export function mountFeedForward(httpServer, {
-  serve, isPresent, timeoutMs = FEED_SERVE_TIMEOUT_MS, maxInFlight = FEED_MAX_IN_FLIGHT, missFloorMs = FEED_MISS_FLOOR_MS,
+  serve, isPresent, isRefused = () => false, timeoutMs = FEED_SERVE_TIMEOUT_MS, maxInFlight = FEED_MAX_IN_FLIGHT,
+  maxPerNode = FEED_MAX_PER_NODE, missFloorMs = FEED_MISS_FLOOR_MS,
 } = {}) {
   if (!httpServer || typeof httpServer.listeners !== 'function') throw new Error('mountFeedForward: a node http server is required');
   if (typeof serve !== 'function' || typeof isPresent !== 'function') throw new Error('mountFeedForward: serve and isPresent are required');
@@ -77,8 +89,31 @@ export function mountFeedForward(httpServer, {
     Promise.resolve(p).then((v) => resolve(v), () => resolve(null)).finally(() => clearTimeout(timer));
   });
 
+  /** node → { busy, waiting: [wake] } — the places at one node. */
+  const places = new Map();
+  /** A place at `node`, waited for no longer than the bound: true, or false (then no place is held). */
+  function takePlace(node) {
+    const at = places.get(node) ?? { busy: 0, waiting: [] };
+    places.set(node, at);
+    if (at.busy < maxPerNode) { at.busy += 1; return Promise.resolve(true); }
+    return new Promise((resolve) => {
+      const wake = () => { clearTimeout(timer); at.busy += 1; resolve(true); };
+      const timer = setTimeout(() => { at.waiting.splice(at.waiting.indexOf(wake), 1); resolve(false); }, timeoutMs);
+      timer.unref?.();
+      at.waiting.push(wake);
+    });
+  }
+  function leavePlace(node) {
+    const at = places.get(node);
+    if (!at) return;
+    at.busy -= 1;
+    const next = at.waiting.shift();
+    if (next) next();
+    else if (at.busy <= 0) places.delete(node);
+  }
+
   async function serveOnce({ node, id, k }) {
-    if (!isPresent(node)) return null;
+    if (!isPresent(node) || isRefused(node)) return null;
     const key = `${node}\n${id}`;
     for (;;) {
       const cur = inFlight.get(key);
@@ -86,11 +121,18 @@ export function mountFeedForward(httpServer, {
       if (sameKey(cur.k, k)) return cur.promise;   // the very same request: one ask, one answer
       await cur.promise;                           // another key for this file: wait, then ask for itself
     }
-    if (total >= maxInFlight) return null;
-    const promise = bounded(serve(node, { id, k })).then((v) => (typeof v === 'string' ? v : null));
+    // claimed before any wait, so an identical request arriving meanwhile shares this one
+    const promise = (async () => {
+      if (!(await takePlace(node))) return null;
+      try {
+        // what may have changed while it waited: the node gone, or refusing, or the relay full
+        if (!isPresent(node) || isRefused(node) || total >= maxInFlight) return null;
+        total += 1;
+        try { const v = await bounded(serve(node, { id, k })); return typeof v === 'string' ? v : null; } finally { total -= 1; }
+      } finally { leavePlace(node); }
+    })();
     inFlight.set(key, { k, promise });
-    total += 1;
-    try { return await promise; } finally { inFlight.delete(key); total -= 1; }
+    try { return await promise; } finally { if (inFlight.get(key)?.promise === promise) inFlight.delete(key); }
   }
 
   async function handle(req, res, pathname) {
@@ -136,12 +178,30 @@ function sameKey(a, b) {
  *
  * @param {object} o
  * @param {(to: string, envelope: object) => void} o.deliver   hand an envelope to `to`'s live socket, or drop it
- * @returns {Promise<{address: string, receive: (envelope: object) => void, serve: Function, stop: () => Promise<void>}>}
+ * @param {number} [o.refusedTtlMs]   how long a node that refused is not asked again
+ * @param {() => number} [o.now]
+ * @returns {Promise<{address: string, receive: (envelope: object) => void, serve: Function, isRefused: (node: string) => boolean, stop: () => Promise<void>}>}
  */
-export async function createFeedSeat({ deliver }) {
+export async function createFeedSeat({ deliver, refusedTtlMs = FEED_REFUSED_TTL_MS, now = Date.now }) {
   const identity = await AgentIdentity.generate(new VaultMemory());
   /** node → how many asks are waiting on it; the seat hears only from these. */
   const asking = new Map();
+  /** node → the hello on its way to it: concurrent asks share one. */
+  const greeting = new Map();
+  /** node → until when it is not asked (it refused). Swept as it is read; bounded by the nodes that refused. */
+  const refusedUntil = new Map();
+  const isRefused = (node) => {
+    const until = refusedUntil.get(node);
+    if (until === undefined) return false;
+    if (until > now()) return true;
+    refusedUntil.delete(node);
+    return false;
+  };
+  const greet = (node, ms) => {
+    let p = greeting.get(node);
+    if (!p) { p = agent.hello(node, ms).finally(() => greeting.delete(node)); greeting.set(node, p); }
+    return p;
+  };
   const transport = new SeatTransport({ address: identity.pubKey, identity, deliver });
   const agent = new Agent({ identity, transport, label: 'relay-feed' });
   agent.security.setSenderAuthorizer(({ from }) => (asking.has(from) ? allowSender('asked') : refuseSender('not-asked')));
@@ -154,16 +214,26 @@ export async function createFeedSeat({ deliver }) {
       if (!asking.has(envelope?._from)) return;
       queueMicrotask(() => { try { transport._receive(envelope); } catch { /* a bad envelope is a miss */ } });
     },
+    isRefused,
     /** Ask `node` for the link's text: the text, or null for every kind of miss. Never retried. */
     async serve(node, { id, k }, { timeoutMs = FEED_SERVE_TIMEOUT_MS } = {}) {
+      if (isRefused(node)) return null;
       asking.set(node, (asking.get(node) ?? 0) + 1);
       const deadline = Date.now() + timeoutMs;
+      let stage = 'hello';
       try {
-        await agent.hello(node, Math.max(1, deadline - Date.now()));
+        await greet(node, Math.max(1, deadline - Date.now()));
+        stage = 'ask';
         const parts = await agent.invoke(node, FEED_SERVE_OP, { id, k }, { timeout: Math.max(1, deadline - Date.now()), quiet: true });
         const r = Parts.data(parts);
-        return r?.ok === true && typeof r.ics === 'string' ? r.ics : null;
-      } catch {
+        if (r?.ok === true && typeof r.ics === 'string') return r.ics;
+        // a companion's miss is an answer; anything else from a node that greeted us is a refusal
+        if (r?.ok !== false) refusedUntil.set(node, now() + refusedTtlMs);
+        return null;
+      } catch (err) {
+        // the node answered the ask with a refusal (no such op, its gate denied): not asked again for a while. A
+        // timeout — at the hello or the ask — is no refusal: a slow companion is not a phone.
+        if (stage === 'ask' && !/timeout/i.test(String(err?.message ?? ''))) refusedUntil.set(node, now() + refusedTtlMs);
         // the node may have restarted and forgotten this seat: greet it afresh next time (not now — never retried)
         agent.security.unregisterPeer(node);
         return null;

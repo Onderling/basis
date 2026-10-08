@@ -132,7 +132,7 @@ if (process.env.QUEUE_DB) {
   forwardStore = new SqliteForwardStore({ path: process.env.QUEUE_DB, Database });
 }
 
-const { port: boundPort, tls } = await startRelay({
+const { port: boundPort, tls, feeds: feedInfo } = await startRelay({
   peerDiscovery: process.env.PEER_DISCOVERY === '1',   // OFF by default — a presence + linkage oracle; disclose when on
   port,
   host,
@@ -153,7 +153,7 @@ console.log('  ─────────────────────�
 console.log(`  Listening:  http://${host}:${boundPort}  (proxy terminates TLS → ${wsScheme}://)`);
 console.log(`  Media edge: ${blobGate ? `ON  route=${blobGate.route}  uploaders=${blobGate.uploaders.length}` : 'off (set R2_* to enable)'}`);
 console.log(`  Push wake:  ${pushSender ? `ON (expo)${pushTokenRegistry ? `  tokens=${process.env.PUSH_TOKENS_DB}` : '  tokens=memory (lost on redeploy)'}` : 'off (set PUSH_PROVIDER=expo to enable)'}`);
-console.log('  Feeds:      /feed/<node>/… forwarded to the node over its session — nothing held, nothing logged');
+console.log(`  Feeds:      /feed/<node>/… forwarded to the node over its session — nothing held, nothing logged; seat ${feedInfo?.seatAddress ?? '—'} (README: the seat)`);
 const lan = getLanIp();
 if (lan) console.log(`  LAN:        ws://${lan}:${boundPort}`);
 console.log('');

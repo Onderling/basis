@@ -315,6 +315,8 @@ export class MemberMap extends Emitter {
       // serves: for a NODE (a household's companion), the public https address its agenda links are served at — from
       // its card. A household bot builds a person's link from it (`feedCompanion.js`). Same whitelist lesson.
       serves:      (typeof m.serves === 'string' && /^https?:\/\/[^\s]+$/.test(m.serves)) ? m.serves : null,
+      // bot: the contact's card says it is a household bot — display and the add-flow's words only, never for trust
+      bot:         m.bot === true ? true : null,
       // The identity link (`/koppel`), one field per side — the same whitelist lesson as `serves`: named here or dropped.
       //   linkedRoot: on a HOUSEHOLD BOT's row for a person admitted through a keyless door — the owner ROOT their Basis
       //     identity is linked to. A turn from their app is theirs when a device statement chains to it.

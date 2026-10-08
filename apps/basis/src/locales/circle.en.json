@@ -501,6 +501,10 @@
     "text": "← circles",
     "doc": "Back link from a circle detail view to the launcher."
   },
+  "membercard_close": {
+    "text": "Close",
+    "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
+  },
   "detail_empty": {
     "text": "Nothing here yet.",
     "doc": "Empty state inside a circle detail view."
@@ -4145,6 +4149,10 @@
     "apps_none_left": "At least one app has to stay on.",
     "status": "Apps: {{apps}}\nModel: {{model}}\nDoor: {{door}}\nConversations in the log: {{turns}}\nDefault memory: {{memory}}\nPeople admitted: {{users}}",
     "users_none": "Nobody admitted yet.",
+    "admission_relink": {
+      "text": "Link again: type /start <code> in the app (the admin gives the code, as always).",
+      "doc": "Told once to a person admitted at the bot's inbox before their app signed its turns: they re-link with a fresh code."
+    },
     "admission_needs_code": {
       "text": "To talk to this assistant you need a code from its administrator. Then send: /start <code>",
       "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."

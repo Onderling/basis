@@ -136,8 +136,7 @@ import { followUpClaim } from '../../../../basis/src/v2/assistantFollowUp.js';
 import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
-import { effectiveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
-import { RELAY_DEFAULT } from '../../core/agentBundle.js';
+import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
 import { parseCircleBuiltin } from '../../../../basis/src/v2/circleComposerBuiltins.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 // The SHARED security-status report — the SAME handler web reaches (circleApp.js). Mobile's circle composer
@@ -557,7 +556,7 @@ export default function CircleLauncherScreen({
   const [circleTransport, setCircleTransport] = useState(null);
   const loadCircleTransport = useCallback(async () => {
     try {
-      const relayUrl = effectiveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL, RELAY_DEFAULT) || '';
+      const relayUrl = resolveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL) || '';
       // The register is the one home since the device-params consolidation.
       const m = bundle?.agent?.getParamValue?.('transport.mode');
       const mode = (m === 'nkn' || m === 'relay' || m === 'both') ? m : null;
@@ -587,7 +586,7 @@ export default function CircleLauncherScreen({
       bundle?.callSkill?.('params', 'set-param', { key: 'relay.url', value: args?.clear ? '' : String(args?.url ?? '') })
         .catch(() => { /* the cache stands */ });
       let effective = '';
-      try { effective = effectiveRelayUrl(await io.load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL, RELAY_DEFAULT) || ''; }
+      try { effective = resolveRelayUrl(await io.load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL) || ''; }
       catch { /* read-back best-effort */ }
       let reconnect = { ok: true };
       if (!saveError) {

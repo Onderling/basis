@@ -236,6 +236,24 @@ function narrowMenu(menu, opsById) {
 }
 
 /**
+ * Who may do what, as the model is told it — GENERATED from the map the host gate reads, so a line can never lag it
+ * (a household's log, 2026-10: a member told "only the admin can" make a list, a reminder refused, "I cannot change
+ * that" about their own reminders — each op on the member column). One line for the member column, one for the admin's
+ * (whose role decides under the household's roles; a person's own line, `roleHintsFor`, says what THEY lack). The
+ * same for every person, so it sits in the stable part of the prompt. LLM-facing.
+ * @param {{member: readonly string[], admin: readonly string[]}} [map]
+ * @returns {string[]}
+ */
+export function opMapPromptLines(map = BOT_OP_MAP) {
+  const mine = (map.member ?? []).map(bareOf);
+  const theirs = (map.admin ?? []).filter((q) => !(map.member ?? []).includes(q)).map(bareOf);
+  return [
+    `EVERY member may use these tools — call the tool; never say that only the admin can, or that you cannot do or change what one of them does: ${mine.join(', ')}.`,
+    ...(theirs.length ? [`These are the admin's (the household's roles decide who else; a line for this person below says when they lack them): ${theirs.join(', ')}.`] : []),
+  ];
+}
+
+/**
  * What a person's model is told about the tools they do NOT have: a member asking to make a list gets "the admin does
  * that" rather than their words squeezed into another op. LLM-facing.
  * @param {'member'|'admin'|null} role

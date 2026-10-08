@@ -31,7 +31,7 @@ const INTENTS = NOTICEBOARD_INTENTS;
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
+export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
   // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
   // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
   // still loading) → no byline rather than a wire address.
@@ -110,6 +110,12 @@ export default function CircleNoticeboard({ callSkill, onEmbedOpen, media = null
   }, [callSkill, myWebid, enrichEmbeds, members, viewerId, revealPolicy]);
 
   useEffect(() => { reload(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // S6.4 — refresh when a recipient's requested attachment bytes arrive.
+  useEffect(() => {
+    if (typeof onStoopEvent !== 'function') return undefined;
+    return onStoopEvent('stoop:attachment-fetched', () => { reload(); });
+  }, [onStoopEvent, reload]);
 
   // S5 — pick + encode an image into the inbound-attachment shape, held pending.
   const attachImage = useCallback(async () => {

@@ -6301,9 +6301,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // activates the already-built pod-routing write-through). Pass {podRoot, webid, fetch}.
     attachStoopPod: (opts) => (typeof stoopAgent?.attachPod === 'function' ? stoopAgent.attachPod(opts) : Promise.resolve({ ok: false })),
     detachStoopPod: () => stoopAgent?.detachPod?.(),
-    // Subscribe to events the inner stoop agent emits. The stoop agent extends core.Emitter (on/off). Returns an
-    // unsubscribe fn; a no-op when stoop isn't composed. (Its one former event, the attachment-fetched notice of the
-    // removed attachment fetch route, is gone with that route.)
+    // S6.4 — subscribe to events the inner stoop agent emits (e.g.
+    // 'stoop:attachment-fetched' when a recipient's requested attachment bytes
+    // arrive over the 1:1 channel). The stoop agent extends core.Emitter
+    // (on/off). Returns an unsubscribe fn; a no-op when stoop isn't composed.
     onStoopEvent: (event, handler) => {
       const a = stoopAgent?.bundle?.agent;
       if (!a || typeof a.on !== 'function' || typeof handler !== 'function') return () => {};

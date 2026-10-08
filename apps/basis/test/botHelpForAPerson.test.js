@@ -30,3 +30,12 @@ describe('/help for a person', () => {
     expect(admin.split('\n').slice(1).every((l) => l.includes(' — '))).toBe(true);
   });
 });
+
+describe('which of the bot\'s ops are the admin\'s', () => {
+  it('the admin column (moving, removing, editing a chore) counts as the admin\'s — on the screen and in /help (one rule)', () => {
+    for (const id of ['reassignTask', 'removeTask', 'editTask']) {
+      expect(isAdmin({ appOrigin: 'tasks', op: { id } }), `tasks.${id}`).toBe(true);
+    }
+    expect(isAdmin({ appOrigin: 'tasks', op: { id: 'claimTask' } })).toBe(false);
+  });
+});

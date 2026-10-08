@@ -49,23 +49,28 @@ Reaching the relay from a role on the same box works by its public name (`wss://
 2026-09-18 from inside a container: 8/8 smoke); the internal name `ws://relay:8787` also connects but is
 the URL the device would then ADVERTISE on its contact card, which nobody outside can dial — use the public name.
 
-## A household's agenda links (the companion serves them)
+## A household's agenda links (the companion serves them, through the relay)
 
 A household bot can give each person their agenda as a link for a calendar app (`/agenda-link`, behind the admin's
-`/huishouden agenda on`). The files are served by a **companion on the public relay's box** (the `companion` role,
-`/feed/*` in `relay.caddy`); the bot puts each person's file there, sealed to a key only their link carries, and the
-companion keeps the ciphertext only. Pairing the two is a one-time step:
+`/huishouden agenda on`). The files are kept by the household's **companion**, sealed to a key only each link carries
+(it holds ciphertext only); the bot puts each person's file there. The companion needs no public port: the link is
+`https://<relay-domain>/feed/<companion address>/<id>.<k>.ics`, and the **relay** forwards it to the companion over the
+companion's own connection and passes the answer on, holding nothing (`relay.caddy` sends that form to the relay, with
+no access log). The companion will run on the household's tablet beside the bot; until it moves, the `companion` role
+on the public box is a test instance, and its own older `/feed/<id>.<k>.ics` route still answers through Caddy.
 
-1. **The bot's address.** On the household's box: `docker compose -p onderling logs assistant | grep -m1 'address '`.
-2. **The companion, claimed by you.** In `.env`: `COMPANION_FEEDS=on`; add `companion@<repo>` to `ROLES` in
-   `box.conf` if it is not there; then `FORCE=1 /opt/onderling/repos/<repo>/deploy/box/update.sh`. Its address:
-   `docker compose -p onderling logs companion | grep -m1 'Host agent'`; its claim code (ten minutes, then a new one):
-   `docker compose -p onderling logs companion | grep 'Claim:' | tail -1`. Claiming it from your app and granting
-   the bot its place there land with the pairing work; until then this step cannot be finished.
-3. **The bot, told where.** On the household's box, in `.env`: `ONDERLING_FEED_COMPANION=<the companion's address>`
-   and `ONDERLING_FEED_BASE_URL=https://<relay-domain>`; then `FORCE=1 …/update.sh`.
-4. **Check:** `curl -s -o /dev/null -w '%{http_code}\n' https://<relay-domain>/feed/x.y.ics` answers `404` (the
-   route is there, nothing is served without a link). Then in Telegram: `/huishouden agenda on`, `/agenda-link`.
+The bot learns where from the companion's **contact card** (its address, and `serves`: where its links are served),
+never from configuration. Pairing them is one step, from the owner's app — it lands with the pairing work:
+
+1. **The companion, claimed by you.** With `COMPANION_FEEDS=on` in `.env` (and `companion@<repo>` in `ROLES`): its
+   claim code (ten minutes, then a new one) is in `docker compose -p onderling logs companion | grep 'Claim:' | tail -1`,
+   its card in `… | grep -m1 'Card:'`. On the box it dials the relay by the inside name, so its card takes the public
+   address from `COMPANION_PUBLIC_URL` (default `https://$RELAY_DOMAIN`).
+2. **The bot, given the companion.** From your app: the companion's card to the bot, and the grant to put files there
+   (the pairing work; until then the bot cannot put, and `/agenda-link` says it could not make one).
+3. **Check:** `curl -s -o /dev/null -w '%{http_code}\n' https://<relay-domain>/feed/<companion address>/xxxxxxxxxxxxxxxxxxxxxx.yyyyyyyyyyyyyyyyyyyyyy.ics`
+   answers `404` after a second (the route is there; nothing is served without a link, and a miss takes as long whether
+   the companion is connected or not). Then in Telegram: `/huishouden agenda on`, `/agenda-link`.
 
 Whoever holds a person's link reads that person's agenda, and the calendar service it is pasted into keeps it
 readable — the bot says so when it sends the link. `/agenda-link` again makes a new link (the old one stops),

@@ -737,6 +737,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return { ok: false, error: { code: 'off', message: tp('circle.bot.agenda_link_off') } };
     }
     const made = await admin.feeds.mint(person);
+    // no companion among the bot's contacts: this household has no agenda link (yet) — not a failure to retry
+    if (!made.ok && made.reason === 'no-companion') return { ok: false, error: { code: made.reason, message: tp('circle.bot.agenda_link_none_here') } };
     if (!made.ok) return { ok: false, error: { code: made.reason, message: tp('circle.bot.agenda_link_failed') } };
     const sent = await admin.sendPrivately(person, tp('circle.bot.agenda_link', { https: made.urls.https, webcal: made.urls.webcal }), tp('circle.bot.agenda_link_remembered'));
     // a link that never reached the person is not left standing

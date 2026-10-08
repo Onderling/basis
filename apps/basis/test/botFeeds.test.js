@@ -6,7 +6,9 @@ import { describe, it, expect } from 'vitest';
 import { openForLink } from '@onderling/blob-gateway';
 import { createBotFeeds } from '../src/v2/botFeeds.js';
 
-function rig({ putOk = true } = {}) {
+const NODE = 'N'.repeat(43);
+
+function rig({ putOk = true, companion = { node: NODE, base: 'https://relay.example.org' } } = {}) {
   const rows = new Map();
   const threads = {
     feedLinkOf: (id) => rows.get(id) ?? null,
@@ -15,17 +17,19 @@ function rig({ putOk = true } = {}) {
   };
   const bucket = new Map();
   const dropped = [];
+  const asked = [];
   let timer = null;
   let events = [{ id: 'e1', type: 'calendar-event', title: 'Tandarts', startsAt: new Date(Date.now() + 86_400_000).toISOString(), createdBy: 'p1' }];
   const people = [{ id: 'p1' }, { id: 'p2' }];
   const feeds = createBotFeeds({
     threads, events: async () => events, people: async () => people, calendarName: async () => 'Huishouden',
-    put: async (id, env) => { if (!putOk) return { ok: false }; bucket.set(id, env); return { ok: true }; },
-    drop: async (id) => { dropped.push(id); bucket.delete(id); return { ok: true }; },
-    base: 'https://relay.example.org',
+    // where the links are served: the companion the bot holds as a contact (its address, and where it serves)
+    companion: async () => companion,
+    put: async (node, id, env) => { asked.push(node); if (!putOk) return { ok: false }; bucket.set(id, env); return { ok: true }; },
+    drop: async (node, id) => { asked.push(node); dropped.push(id); bucket.delete(id); return { ok: true }; },
     setTimer: (fn) => { timer = fn; return 1; }, clearTimer: () => { timer = null; },
   });
-  return { feeds, rows, bucket, dropped, fire: async () => { const f = timer; timer = null; await f?.(); await new Promise((r) => { setTimeout(r, 0); }); }, setEvents: (e) => { events = e; }, people };
+  return { feeds, rows, bucket, dropped, asked, fire: async () => { const f = timer; timer = null; await f?.(); await new Promise((r) => { setTimeout(r, 0); }); }, setEvents: (e) => { events = e; }, people };
 }
 
 describe('the bot\'s agenda links', () => {
@@ -33,7 +37,9 @@ describe('the bot\'s agenda links', () => {
     const r = rig();
     const a = await r.feeds.mint('p1');
     expect(a.ok).toBe(true);
-    expect(a.urls.https).toMatch(/^https:\/\/relay\.example\.org\/feed\/[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{22}\.ics$/);
+    // the link names the companion the file is on, at the address its contact says it serves
+    expect(a.urls.https).toMatch(new RegExp(`^https://relay\\.example\\.org/feed/${NODE}/[A-Za-z0-9_-]{22}\\.[A-Za-z0-9_-]{22}\\.ics$`));
+    expect(new Set(r.asked)).toEqual(new Set([NODE]));
     expect(a.urls.webcal).toMatch(/^webcal:\/\//);
     const first = r.rows.get('p1');
     expect(openForLink(r.bucket.get(first.id), first.k)).toContain('SUMMARY:Tandarts');
@@ -41,6 +47,13 @@ describe('the bot\'s agenda links', () => {
     expect(b.urls.https).not.toBe(a.urls.https);
     expect(r.dropped).toEqual([first.id]);
     expect(r.bucket.has(first.id)).toBe(false);
+  });
+
+  it('no companion among the bot\'s contacts: no link, and nothing asked', async () => {
+    const r = rig({ companion: null });
+    expect(await r.feeds.mint('p1')).toEqual({ ok: false, reason: 'no-companion' });
+    expect(r.asked).toEqual([]);
+    expect(r.rows.has('p1')).toBe(false);
   });
 
   it('a companion that refuses: no link is kept, and the old one stands', async () => {
@@ -83,5 +96,24 @@ describe('the bot\'s agenda links', () => {
     r.bucket.delete(p2.id);
     await r.feeds.pushAll();
     expect(r.bucket.has(p2.id)).toBe(false);
+  });
+});
+
+describe('/agenda-link with no companion among the bot\'s contacts', () => {
+  it('says this household has no agenda link — not "try again later"', async () => {
+    const { withAssistantOps } = await import('../src/v2/assistantOps.js');
+    const { createBotThreads, memoryThreadStore } = await import('../src/v2/botThreads.js');
+    const { EventLog } = await import('../src/eventLog.js');
+    const t = (k) => k;
+    const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
+    const feeds = createBotFeeds({ threads, events: async () => [], people: async () => [{ id: 'telegram:1' }], companion: async () => null, put: async () => ({ ok: true }), drop: async () => ({ ok: true }) });
+    const sent = [];
+    const callSkill = async (app, op) => (app === 'params' && op === 'list-user-params' ? { params: [{ key: 'assistant.calendarFeed', value: 'on' }] } : null);
+    const door = withAssistantOps({ callSkill, threads, t, admin: { feeds, sendPrivately: async (...a) => { sent.push(a); return { ok: true }; } } });
+    const r = await door('assistant', 'assistant-agenda-link', {}, { caller: 'telegram:1', threadId: 'telegram:1' });
+    expect(r.ok).toBe(false);
+    expect(r.error.code).toBe('no-companion');
+    expect(r.error.message).toBe('circle.bot.agenda_link_none_here');
+    expect(sent).toEqual([]);
   });
 });

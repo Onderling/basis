@@ -79,8 +79,14 @@ import { ACCEPT_DELEGATION_OP }        from './authorizePod.js';
 import { makeMemoryRegistryPod }       from './registryPod.js';
 import { buildDevMediaEdge }           from './mediaEdge.js';
 import { createOwnerClaim, ownerFile, CLAIM_TTL_MS } from './ownerClaim.js';
+import { companionCard }               from './card.js';
 
 const IDENTITY_FILE = 'host-identity.json';
+
+/** The op a link is served with — the ONE public op on this node (see where it is registered). */
+export const FEED_SERVE_OP = 'feed.serve';
+/** `feed.serve`'s one answer to every failure: unknown id, wrong key, no file, bad arguments, a throw. */
+const FEED_MISS = Object.freeze({ ok: false });
 
 /**
  * R3.0 — bound the host→device `pod.proxyRequest` invoke so an OFFLINE device
@@ -236,9 +242,12 @@ export async function startCompanionNode(opts = {}) {
     onClaimCode,                // told each new claim, as `<code>@<node address>` — the one string the owner pastes
     manageHttp         = false, // surface ② — serve the /manage web (true → random port, or a port number)
     manageHttpHost     = '127.0.0.1',
-    // ── a person's agenda as a link: sealed files the owner (a household bot) puts, served at /feed/ ──
-    feeds              = false, // needs management (the owner) and the manage HTTP server (the route)
+    // ── a person's agenda as a link: sealed files the owner (a household bot) puts, served as `feed.serve` ──
+    feeds              = false, // needs management (the owner); the manage HTTP server adds this node's own /feed route
     feedBucket,                 // the bucket the files live in (tests, or a real R2/S3); default a file bucket under configDir
+    // where this node's links are served, as its card says: the public https address of the relay it dials (mapped
+    // from `relayUrl`), or this explicit override (a node that dials its relay by an inside name, e.g. `ws://relay:8787`)
+    publicUrl,
   } = opts;
   const bootAt = Date.now();
 
@@ -736,6 +745,9 @@ export async function startCompanionNode(opts = {}) {
 
     // ── a person's agenda as a link (the owner's files, blind at rest: `feedShelf.js`) ─────────────
     // `feed.put` / `feed.drop` — OWNER-GATED, refused before the body is read; the node never logs an id.
+    // `feed.serve` — the link itself, asked by the relay a calendar app fetched it from: THE ONE PUBLIC OP on this node.
+    // No token, no admission, no statement: `k` is the capability (whoever holds the link reads the agenda — exactly
+    // what this node's own `/feed` route has always taken it to be). Every failure is one identical miss.
     if (feeds) {
       const { createFeedShelf } = await import('./feedShelf.js');
       const { makeFileBlobBucket } = await import('./mediaEdge.js');
@@ -748,6 +760,13 @@ export async function startCompanionNode(opts = {}) {
         const { id } = Parts.data(ctx?.parts) ?? {};
         return feedShelf.drop(id);
       });
+      agent.register(FEED_SERVE_OP, async (ctx) => {
+        try {
+          const { id, k } = Parts.data(ctx?.parts) ?? {};
+          const ics = await feedShelf.open(id, k);
+          return typeof ics === 'string' ? { ok: true, ics } : { ...FEED_MISS };
+        } catch { return { ...FEED_MISS }; }
+      }, { visibility: 'public', policy: 'always-allow', description: 'A person\'s agenda file, opened with the key their link carries.' });
     }
 
     // ── surface ② — the ONLINE /manage interface (node-served HTTP tenant) ──────
@@ -811,8 +830,10 @@ export async function startCompanionNode(opts = {}) {
     // owner-gated; drains to the owner device on reconnect via `inbox.drain`.
     inbox: sealedInbox,
     inboxOwnerPubKey: inbox ? inboxOwnerPubKey : null,
-    // the owner's agenda files (null when `feeds` is off): sealed, served at /feed/<id>.<k>.ics
+    // the owner's agenda files (null when `feeds` is off): sealed, served by `feed.serve` (and this node's own /feed route)
     feeds: feedShelf,
+    // this node as a contact: its address, the relay it is found on, and — with `feeds` — where its links are served
+    card: companionCard({ address: agent.address, relayUrl, publicUrl, feeds: !!feedShelf }),
     // R2 — the inbound gate + its authority surface (all null when gate is OFF).
     gate,
     policyEngine,

@@ -13,7 +13,11 @@
  *   and the owner's app hands it back (a device statement; `src/ownerClaim.js`). The owner is kept in the config dir.
  *   COMPANION_MANAGE_HTTP_PORT     serve the online /manage web on this port
  *   COMPANION_MANAGE_HTTP_HOST     bind host (default 127.0.0.1; use 0.0.0.0 behind Caddy)
- *   COMPANION_FEEDS                on → the owner may put agenda files, served at /feed/<id>.<k>.ics
+ *   COMPANION_FEEDS                on → the owner may put people's agenda files; a link opens them through the relay
+ *                                  (`/feed/<node>/<id>.<k>.ics`, forwarded here as `feed.serve`) and, with the manage
+ *                                  HTTP port, at this node's own `/feed/<id>.<k>.ics`
+ *   COMPANION_PUBLIC_URL           the relay's public https address, for the card, when COMPANION_RELAY_URL is an inside
+ *                                  name (`ws://relay:8787`); otherwise the card maps it from COMPANION_RELAY_URL
  *   ── the local radio (opt-in) ──
  *   COMPANION_NEARBY               same values as `--nearby` below; the flag wins when both are given
  *
@@ -40,8 +44,9 @@ const manageHttp   = process.env.COMPANION_MANAGE_HTTP_PORT
   ? parseInt(process.env.COMPANION_MANAGE_HTTP_PORT, 10)
   : false;
 const manageHttpHost = process.env.COMPANION_MANAGE_HTTP_HOST ?? '127.0.0.1';
-// a person's agenda as a link: the owner's sealed files, served at /feed/ (needs the owner and the manage HTTP port)
-const feeds = Boolean(manageHttp) && /^(1|on|true|yes)$/i.test(process.env.COMPANION_FEEDS ?? '');
+// a person's agenda as a link: the owner's sealed files, served through the relay (and the manage HTTP port when set)
+const feeds = /^(1|on|true|yes)$/i.test(process.env.COMPANION_FEEDS ?? '');
+const publicUrl = process.env.COMPANION_PUBLIC_URL || undefined;
 
 // The local radio. A bad value stops the boot rather than starting a node whose radio is quietly off —
 // "nobody is nearby" and "I never turned it on" look identical from the outside, which is the one
@@ -51,7 +56,7 @@ if (nearbyError) { console.error(`\n  ${nearbyError}\n`); process.exit(1); }
 
 // the claim code goes to this log only — the person who can read the node's log is the one who may claim it
 const node = await startCompanionNode({
-  relayUrl, port, host, management, manageHttp, manageHttpHost, nearby, feeds,
+  relayUrl, port, host, management, manageHttp, manageHttpHost, nearby, feeds, publicUrl,
   onClaimCode: (claim) => { console.log(`  Claim:        ${claim}  (valid 10 minutes — paste it in your app to become this node's owner)`); },
 });
 
@@ -63,6 +68,8 @@ console.log(`  Relay:        ${node.relayUrl}${node.relay ? '  (booted in-proces
 console.log(`  Capabilities: ${node.capabilities.join(', ')}`);
 console.log(`  Management:   ${node.managementOwnerRoot ? `claimed (owner root ${node.managementOwnerRoot.slice(0, 12)}…)` : 'unclaimed — waiting for its owner'}`);
 if (node.manageUrl) console.log(`  Manage web:   ${node.manageUrl}  (owner-paired; front with Caddy /manage)`);
+// this node as a contact (public: its address, its relay, where its links are served) — what its owner's app adds it by
+console.log(`  Card:         ${node.card}`);
 // What the radio is ACTUALLY doing, not what was asked for: `setDiscoverability` reports `degraded` when
 // a transport ends up more exposed than requested, and a person needs to be told that in the banner
 // rather than discover it from a packet capture.

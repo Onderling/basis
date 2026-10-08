@@ -16,6 +16,7 @@ export const SERVER_FILES = Object.freeze([
   { file: 'apps/companion-node/src/manageServer.js', kind: 'route', find: /['`](\/[a-z][a-z0-9_.-]*)/g },
   { file: 'packages/relay/src/blobGateMount.js', kind: 'route', find: /['`](\/[a-z][a-z0-9_.-]*)/g },
   { file: 'packages/relay/src/server.js', kind: 'route', find: /['`](\/[a-z][a-z0-9_.-]*)/g },
+  { file: 'packages/relay/src/feedForward.js', kind: 'route', find: /['`](\/[a-z][a-z0-9_.-]*)/g },
   { file: 'apps/companion-node/src/index.js', kind: 'store', find: /join\(resolveConfigDir\(configDir\), '([^']+)'\)|_FILE = '([^']+)'/g },
   { file: 'packages/relay/bin/relay.js', kind: 'store', find: /process\.env\.([A-Z_]+_DB)\b/g },
 ]);

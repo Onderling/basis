@@ -1,14 +1,17 @@
 /**
  * A PERSON'S AGENDA AS A LINK, walked on real processes: the household's box (the runner, against a Bot API of our own)
- * and the household's companion (its own boot, as the box role runs it), over one relay. Paired the way an admin pairs
- * them: the companion first (its address), the box told that address, the companion restarted with the box as its
- * owner. Then: the switch is off → no link; on → `/agenda-link` sends a link privately; fetching it gives the agenda with
- * the appointment; a new appointment re-renders it; asking again turns the old link dark; `/revoke` turns a person's
- * link dark; and before any of it, the route answers 404.
+ * and the household's companion (its own boot, as the tablet will run it: no port of its own), over one relay that
+ * serves the links by forwarding them to the companion. The box holds the companion as a CONTACT — its card, which
+ * says where its links are served (seeded here; its owner's app hands it over with the grant). Then: the switch is off
+ * → no link; on → `/agenda-link` sends a link privately, AT THE RELAY, naming the companion; fetching it gives the
+ * agenda with the appointment; a new appointment re-renders it; asking again turns the old link dark; `/revoke` turns
+ * a person's link dark; and before any of it, the relay's route answers 404.
+ *
+ * RED on its own until the bot holds the companion's GRANT: the companion's `feed.put` takes its owner's devices (or,
+ * with the grant, the bot's token) — the bot holds neither yet, so the first `/agenda-link` cannot put the file.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:net';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -22,7 +25,6 @@ const COMPANION = fileURLToPath(new URL('../../companion-node/src/boot.js', impo
 const ADMIN = '9';
 const BEA = '22';
 
-const freePort = () => new Promise((resolve) => { const s = createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
 
 describe('the agenda link, on a real box and a real companion', () => {
   const cleanup = [];
@@ -50,36 +52,28 @@ describe('the agenda link, on a real box and a real companion', () => {
   const fetchFeed = async (url) => { const r = await fetch(url); return { status: r.status, body: await r.text(), type: r.headers.get('content-type') }; };
 
   it('off, then on: the link carries the agenda, follows a change, and goes dark when renewed or revoked', async () => {
-    const relay = await startJourneyRelay();
+    // the relay serves the links (`feeds`), as both relay boot doors run it
+    const relay = await startJourneyRelay({ feeds: { missFloorMs: 0 } });
     cleanup.push(() => relay.close?.());
+    const base = relay.url.replace(/^ws/, 'http');
     const api = await fakeBotApi();
     cleanup.push(api.close);
     const boxDir = mkdtempSync(path.join(tmpdir(), 'agenda-box-'));
     const compDir = mkdtempSync(path.join(tmpdir(), 'agenda-companion-'));
     cleanup.push(() => rmSync(boxDir, { recursive: true, force: true }), () => rmSync(compDir, { recursive: true, force: true }));
-    const httpPort = await freePort();
-    const base = `http://127.0.0.1:${httpPort}`;
-    const compEnv = (owner) => ({
-      COMPANION_RELAY_URL: relay.url, COMPANION_NODE_CONFIG_DIR: compDir, COMPANION_MANAGE_OWNER_PUBKEY: owner,
-      COMPANION_MANAGE_HTTP_PORT: String(httpPort), COMPANION_MANAGE_HTTP_HOST: '127.0.0.1', COMPANION_FEEDS: 'on',
-    });
-
-    // 0 · the companion exists (its address); nobody owns it yet that could put anything
-    let comp = proc(COMPANION, [], compEnv('nobody-yet'));
+    // 0 · the companion, on the relay, no port of its own: its address and its card (where its links are served)
+    const comp = proc(COMPANION, [], { COMPANION_RELAY_URL: relay.url, COMPANION_NODE_CONFIG_DIR: compDir, COMPANION_FEEDS: 'on' });
     const companionAddress = (await comp.waitFor(/Host agent:\s+(\S+)/))[1];
-    expect((await fetchFeed(`${base}/feed/${'a'.repeat(32)}.${'b'.repeat(43)}.ics`)).status, 'the route before any put').toBe(404);
-    await comp.stop();
+    const companionCard = (await comp.waitFor(/Card:\s+(onderling-contact:\/\/\S+)/))[1];
+    expect((await fetchFeed(`${base}/feed/${companionAddress}/${'a'.repeat(32)}.${'b'.repeat(43)}.ics`)).status, 'the relay\'s route before any put').toBe(404);
 
-    // 1 · the box, told the companion's address and its public address
+    // 1 · the box, holding the companion as a contact (its card) — no address or URL configured
     const box = proc(RUNNER, ['--data-dir', boxDir], {
       HOME: boxDir, BASIS_VAULT_PASSPHRASE: 'test-only-passphrase', ONDERLING_PROFILE_KIND: 'function', ONDERLING_PRIMARY_DEVICE: '0',
       ONDERLING_RELAY_URL: relay.url, TG_BOT_TOKEN: '123:fake', TG_ADMIN_UID: ADMIN, ONDERLING_TELEGRAM_API_ROOT: api.root,
-      ONDERLING_FEED_COMPANION: companionAddress, ONDERLING_FEED_BASE_URL: base,
+      ONDERLING_SEEDED_CONTACT_CARD: companionCard,
     });
-    const botAddress = (await box.waitFor(/address\s+(\S{20,})/))[1];
-    // 2 · the companion again, the box as its owner (what the admin does once, on the public box)
-    comp = proc(COMPANION, [], compEnv(botAddress));
-    await comp.waitFor(/Host agent:/);
+    await box.waitFor(/address\s+(\S{20,})/);
     const log = box.log;
 
     await ask(api, ADMIN, '/start', () => true, { log });
@@ -88,8 +82,9 @@ describe('the agenda link, on a real box and a real companion', () => {
     expect((await ask(api, ADMIN, '/agenda-link', () => true, { log })).all).toMatch(/staat uit/);
     expect((await ask(api, ADMIN, '/huishouden agenda on', () => true, { log })).all).not.toMatch(/niet opgeslagen/);
     const got = await ask(api, ADMIN, '/agenda-link', (m) => /\/feed\//.test(m.text), { log });
-    const link = got.all.match(/http:\/\/127\.0\.0\.1:\d+\/feed\/\S+\.ics/)?.[0];
+    const link = got.all.match(/http:\/\/127\.0\.0\.1:\d+\/feed\/[A-Za-z0-9_-]{43}\/\S+\.ics/)?.[0];
     expect(link, got.all).toBeTruthy();
+    expect(link, 'the link is at the relay and names the companion').toContain(`${base}/feed/${companionAddress}/`);
     expect(got.all).toMatch(/webcal:\/\//);
     const first = await fetchFeed(link);
     expect(first.status, `${first.body}\n${comp.log().slice(-800)}`).toBe(200);
@@ -103,7 +98,7 @@ describe('the agenda link, on a real box and a real companion', () => {
 
     // asked again: a new link, the old one dark
     const again = await ask(api, ADMIN, '/agenda-link', (m) => /\/feed\//.test(m.text), { log });
-    const link2 = again.all.match(/http:\/\/127\.0\.0\.1:\d+\/feed\/\S+\.ics/)?.[0];
+    const link2 = again.all.match(/http:\/\/127\.0\.0\.1:\d+\/feed\/[A-Za-z0-9_-]{43}\/\S+\.ics/)?.[0];
     expect(link2).toBeTruthy();
     expect(link2).not.toBe(link);
     expect((await fetchFeed(link2)).status).toBe(200);
@@ -114,7 +109,7 @@ describe('the agenda link, on a real box and a real companion', () => {
     const invite = await ask(api, ADMIN, '/invite', (m) => /\/start \S+/.test(m.text), { log });
     await ask(api, BEA, `/start ${invite.text.match(/\/start (\S+)/)[1]}`, () => true, { name: 'Bea', log });
     const bea = await ask(api, BEA, '/agenda-link', (m) => /\/feed\//.test(m.text), { name: 'Bea', log });
-    const beaLink = bea.all.match(/http:\/\/127\.0\.0\.1:\d+\/feed\/\S+\.ics/)?.[0];
+    const beaLink = bea.all.match(/http:\/\/127\.0\.0\.1:\d+\/feed\/[A-Za-z0-9_-]{43}\/\S+\.ics/)?.[0];
     expect((await fetchFeed(beaLink)).body).toMatch(/[Tt]andarts/);
     await ask(api, ADMIN, '/revoke Bea', () => true, { log });
     expect(await until(async () => ((await fetchFeed(beaLink)).status === 404 ? true : null), { timeout: 15_000, step: 500 }), 'revoked: dark').toBe(true);
@@ -124,7 +119,7 @@ describe('the agenda link, on a real box and a real companion', () => {
     expect(await until(async () => ((await fetchFeed(link2)).status === 404 ? true : null), { timeout: 15_000, step: 500 }), 'switched off: dark').toBe(true);
 
     // the companion never logged a link's id or key
-    const [, id, k] = /\/feed\/([^.]+)\.([^.]+)\.ics/.exec(link2);
+    const [, id, k] = /\/feed\/[^/]+\/([^.]+)\.([^.]+)\.ics/.exec(link2);
     expect(comp.log()).not.toContain(id);
     expect(comp.log()).not.toContain(k);
     await box.stop(); await comp.stop();

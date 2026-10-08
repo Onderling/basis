@@ -27,6 +27,8 @@
  *   ONDERLING_TELEGRAM_API_ROOT optional — a Bot API server of one's own (Telegram's self-hosted one); default Telegram's
  *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
+ *   ONDERLING_SEEDED_CONTACT_CARD optional — a contact card (`onderling-contact://…`) added to this device's contacts at
+ *                            boot, once (the box's form of web's and mobile's seeded contact)
  *   BASIS_APP_URL            the web app: a household bot's screen and identity links go into it (the role defaults it to
  *                            the public app); without it a screen cannot be connected and an offer prints without a link
  *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
@@ -100,6 +102,8 @@ import { verifyTelegramLaunch } from '../src/v2/telegramLaunch.js';
 import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createBotFeeds } from '../src/v2/botFeeds.js';
+import { loadFeedCompanion } from '../src/v2/feedCompanion.js';
+import { seedContactCard } from '../src/v2/seededContact.js';
 import { DataPart, Parts } from '@onderling/core';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom, CALENDAR_FEED_KEY, calendarFeedFrom } from '../src/v2/botSettings.js';
@@ -296,6 +300,11 @@ const agent = await createRealHouseholdAgent({
 try { deviceLog.setRetention(retentionFromDays(agent.getParamValue?.('retention.chatDays'))); } catch { /* the defaults stand */ }
 // `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
 const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
+// A card handed to this install, added to its contacts the way a scanned card is — the seam web (VITE_SEEDED_CONTACT_CARD)
+// and mobile (EXPO_PUBLIC_SEEDED_CONTACT_CARD) have, here the box's. On a household bot that is how it holds the
+// household's companion until its owner's app hands it over (the companion's card says where it serves the links).
+await seedContactCard({ payload: process.env.ONDERLING_SEEDED_CONTACT_CARD, callSkill })
+  .catch((err) => console.warn(`device-runner: the seeded contact was not added (${err?.message ?? err})`));
 
 // The walk log — one JSON line per event, so a run can be read afterwards rather than retold.
 // `--walk-log` names a FILE (stamped before its extension) or a DIRECTORY (a trailing slash, or one that
@@ -948,20 +957,18 @@ if (tgToken || inboxDoor.bridge) {
   });
   // A household bot's people connect screens (`/scherm`): the grant is their role column, each token acting as them.
   const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
-  // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file. Wired
-  // when the box knows the companion (its address; the bot may put files there by the owner's grant) and the
-  // public address it is served at; off in the household until the admin switches it on.
-  const feedCompanion = process.env.ONDERLING_FEED_COMPANION || '';
-  const feedBase = process.env.ONDERLING_FEED_BASE_URL || '';
-  const companionCall = async (skill, data) => Parts.data(await agent.sa.peer.invoke(feedCompanion, skill, [DataPart(data)])) ?? null;
-  const feeds = isFunctionProfile && feedCompanion && feedBase ? createBotFeeds({
+  // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file, through
+  // the relay. WHICH companion and where its links are served comes from the contact the bot holds (its card), read
+  // each time — no companion among its contacts, no link; off in the household until the admin switches it on.
+  const companionCall = async (node, skill, data) => Parts.data(await agent.sa.peer.invoke(node, skill, [DataPart(data)])) ?? null;
+  const feeds = isFunctionProfile ? createBotFeeds({
     threads,
     events: async () => (await agent.reminderSources())?.events ?? [],
     people: () => botUsers.list(),
     calendarName: async () => t('circle.bot.agenda_calendar_name'),
-    put: (id, envelope) => companionCall('feed.put', { id, envelope }),
-    drop: (id) => companionCall('feed.drop', { id }),
-    base: feedBase,
+    companion: () => loadFeedCompanion({ callSkill }),
+    put: (node, id, envelope) => companionCall(node, 'feed.put', { id, envelope }),
+    drop: (node, id) => companionCall(node, 'feed.drop', { id }),
   }) : null;
   // The host's planned work (the own-devices store): its own rows and those of the people it is the device for — the
   // Sunday overview of each person who asked for it. Sealed on disk; reaches no circle.

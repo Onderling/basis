@@ -137,14 +137,30 @@ describe('the companion serves the owner\'s agenda files', () => {
 });
 
 describe('Caddy in front of it keeps no log of the path', () => {
-  // the path carries the key: the /feed handle skips the access log, in both front configs, and goes to the companion
+  // the path carries the key: the /feed handle skips the access log, in both front configs, for BOTH forms of the link —
+  // `/feed/<node>/<id>.<k>.ics` to the relay (which forwards it to the node), `/feed/<id>.<k>.ics` to this companion
+  /** The body of `handle /feed/* { … }`, nested blocks and all. */
+  const feedHandle = (text) => {
+    const at = text.indexOf('handle /feed/* {');
+    if (at < 0) return '';
+    let depth = 0;
+    for (let i = text.indexOf('{', at); i < text.length; i += 1) {
+      if (text[i] === '{') depth += 1;
+      if (text[i] === '}' && (depth -= 1) === 0) return text.slice(at, i + 1);
+    }
+    return '';
+  };
   for (const rel of ['../../../deploy/roles/relay.caddy', '../../../deploy/caddy/Caddyfile']) {
     it(rel.split('/deploy/')[1], () => {
       const text = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
-      const block = /handle \/feed\/\* \{([^}]*)\}/.exec(text)?.[1] ?? '';
+      const block = feedHandle(text);
       expect(block, 'a /feed handle').not.toBe('');
-      expect(block).toMatch(/\blog_skip\b/);
-      expect(block).toMatch(/reverse_proxy companion:8790/);
+      expect(block).toMatch(/^\s*log_skip\s*$/m);
+      // the relay's form: a node (an address) then the file, to the relay — matched before the companion's catch-all
+      expect(block).toMatch(/@viaRelay path_regexp \^\/feed\/\[A-Za-z0-9_-\]\{43\}\/\[\^\/\]\+\$/);
+      expect(block).toMatch(/route \{\s*reverse_proxy @viaRelay relay:8787\s*reverse_proxy companion:8790\s*\}/);
+      // and no access log anywhere in the site
+      expect(text).not.toMatch(/^\s*log\s*(\{|$)/m);
     });
   }
 });

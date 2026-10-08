@@ -56,6 +56,7 @@ import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
+import { DEFAULT_RELAY_URL } from '../src/v2/relayPref.js';   // named in the banner only — a headless node dials what its operator set
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
 import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
@@ -90,7 +91,7 @@ import { createChangeFeed } from '../src/v2/changeFeed.js';
 import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { exportDirFiles } from '../src/v2/exportDirFiles.js';
 import { createExportRequestJob } from '../src/v2/exportRequest.js';
-import { seedAnnounceRows, isAnnounceRow, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
+import { seedAnnounceRows, isAnnounceRow, runRowThroughDoor } from '../src/v2/announceRows.js';
 import { createCircleRowGate } from '../src/v2/circleRowGate.js';
 import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
 import { moveOverviewSwitchesToRows, switchWeekOverview } from '../src/v2/weekOverviewRows.js';
@@ -1401,12 +1402,7 @@ if (tgToken || inboxDoor.bridge) {
       mayRun: (o, scope, row) => circleRows.mayRun(o, scope, row),
       // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that
       // person, through their own column of the door
-      run: async (o) => {
-        if (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS) return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true });
-        // as the person, through their own column of the door (a member's key maps to the row of the person it names)
-        const as = (await circleRows.callerFor(o.actsAs)) ?? o.actsAs;
-        return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: as, threadId: as });
-      },
+      run: runRowThroughDoor({ door: doorCall, callerFor: (actsAs) => circleRows.callerFor(actsAs) }),
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });
@@ -1451,7 +1447,7 @@ const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null)
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
-console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
+console.log(`  wire      ${relayUrl || `LOCAL ONLY — no relay set (a person's device would use ${DEFAULT_RELAY_URL}; the box dials only ONDERLING_RELAY_URL)`}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
 // the address another node names this one by — e.g. the household's companion, when its owner grants this bot a place there
 console.log(`  address   ${agent.identity?.chat?.pubKey ?? '—'}`);

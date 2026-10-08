@@ -7,8 +7,19 @@
 // Mirrors the userLlmDefault store shape (createStore + per-platform IO adapters) so the two settings feel
 // the same in the Mij/My-data screen.
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 // pre-boot cache of relay.url
 const STORAGE_KEY = 'cc.relayUrl';
+
+/**
+ * The relay a person's device dials when nothing else names one — the public relay. The LAST candidate: a saved or
+ * build-time relay wins, and at boot so does a relay a circle recorded (`bootRelayUrl`'s `fallback`). INTERNAL: a person
+ * already chooses their relay through `relay.url` (the saved setting, the first candidate) — a second user knob for the
+ * same fact would be two answers to one question. The box does not use it: a headless node dials only what its
+ * operator set.
+ */
+export const DEFAULT_RELAY_URL = param({ key: 'relay.defaultUrl', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 'wss://relay.onderling.org' });
 
 /** Coerce raw input to a valid ws://|wss:// relay URL, or '' (blank ⇒ use the env fallback). */
 export function normalizeRelayUrl(raw) {
@@ -38,6 +49,15 @@ export function resolveRelayUrl(...candidates) {
     if (url) return url;
   }
   return null;
+}
+
+/**
+ * The relay actually in use for this device's saved setting and build-time env — `resolveRelayUrl` with the public
+ * default as the last candidate. For the places that ADVERTISE or REPORT the relay (an invite link, the transport
+ * state); the settings field keeps `resolveRelayUrl(saved, '')` so it shows only what was saved.
+ */
+export function effectiveRelayUrl(saved, envUrl) {
+  return resolveRelayUrl(saved, envUrl, DEFAULT_RELAY_URL);
 }
 
 /**

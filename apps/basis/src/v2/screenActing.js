@@ -36,6 +36,8 @@ export const BOT_SCREEN_NEVER = Object.freeze([
   'assistant.announceChange',
   // a greeting is a line typed in the chat, answered there — not a button
   'assistant.assistant-hello',
+  // a reminder a person set is said by the host's runner, as them, at its moment — not a button
+  'assistant.sayReminder',
 ]);
 
 /**

@@ -95,30 +95,36 @@ export function createAnnouncer({ users, threads, reach, t, tz, quiet, log, now 
   const tFor = (id) => { const lang = langOf(id); return lang ? (k, p) => t(k, p, lang) : t; };
   const quietFor = (id) => threads?.quietOf?.(id) || quiet?.() || null;
   /** May this person be written to at all, and now? */
-  const standing = (row) => Boolean(row && !row.hidden && row.role !== 'observer' && threads.remindersOn(row.id));
+  // (a reminder a person set themselves is theirs whatever their switch for the bot's own reminders says: `own`)
+  const standing = (row, own = false) => Boolean(row && !row.hidden && row.role !== 'observer' && (own || threads.remindersOn(row.id)));
   const quietNow = (id) => { const q = quietFor(id); return Boolean(q && inQuiet(wallClockInTz(now(), tz), q)); };
   const tell = (e) => { try { onAnnounced?.(e); } catch { /* the walk log never stops a change */ } };
 
-  async function deliver(list) {
-    if (!list.length) return;
+  /** Say a list of announcements (one message per person, held through quiet hours); how many were sent, held, failed. */
+  async function deliver(list, { own = false } = {}) {
+    const out = { sent: 0, held: 0, failed: 0 };
+    if (!list.length) return out;
     const rows = new Map(((await users.list()) ?? []).map((r) => [r.id, r]));
     const done = marks.ids();
     const byPerson = new Map();
     for (const a of list) { if (done.has(a.id)) continue; (byPerson.get(a.personId) ?? byPerson.set(a.personId, []).get(a.personId)).push(a); }
     for (const [personId, items] of byPerson) {
-      if (!standing(rows.get(personId))) continue;
+      if (!standing(rows.get(personId), own)) continue;
       if (quietNow(personId)) {
         const held = threads.heldAnnouncementsOf(personId);
         const ids = new Set(held.map((h) => h.id));
         threads.setHeldAnnouncements(personId, [...held, ...items.filter((i) => !ids.has(i.id))]);
         for (const a of items) tell({ personId, kind: a.kind, item: a.itemId, outcome: 'held' });
+        out.held += 1;
         continue;
       }
       const tp = tFor(personId);
       const r = await reach.sendToPerson(personId, { text: items.map((a) => announcementLine(a, tp, tz, langOf(personId) ?? 'nl')).join('\n') });
       for (const a of items) tell({ personId, kind: a.kind, item: a.itemId, outcome: r?.ok ? 'sent' : 'failed', ...(r?.ok ? {} : { reason: r?.reason ?? null }) });
       if (r?.ok) for (const a of items) marks.mark(a.id, { item: a.itemId, kind: a.kind });
+      out[r?.ok ? 'sent' : 'failed'] += 1;
     }
+    return out;
   }
 
   return {
@@ -155,6 +161,21 @@ export function createAnnouncer({ users, threads, reach, t, tz, quiet, log, now 
       const list = people.map((r) => ({ id: `announce:say:${key}:${r.id}`, personId: r.id, kind: 'say', itemId: key, itemKind: 'say', text: words, at: null }));
       await deliver(list);
       return { ok: true, told: list.length };
+    },
+    /**
+     * A reminder a person set for themselves ("herinner me over 10 minuten: …"), at its moment: said to THEM only, in their
+     * own chat — held through their quiet hours like an announcement, said whatever their switch for the bot's own
+     * reminders says. Not sent (their door failed): not ok, so the runner tries again while its window is open.
+     * @param {string} personId
+     * @param {string} text
+     * @param {{occurrence?: string|null}} [opts]
+     */
+    async remind(personId, text, { occurrence = null } = {}) {
+      const words = String(text ?? '').trim();
+      if (!personId || !words) return { ok: false, reason: 'nothing to say' };
+      const key = occurrence ?? String(now());
+      const r = await deliver([{ id: `announce:mine:${key}`, personId, kind: 'mine', itemId: key, itemKind: 'mine', text: words, at: null }], { own: true });
+      return r.failed ? { ok: false, reason: 'not-sent' } : { ok: true };
     },
     /**
      * A person's held announcements as lines, once their quiet hours are over — or null. The tick says them (in the

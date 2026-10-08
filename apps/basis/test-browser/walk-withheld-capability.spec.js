@@ -27,9 +27,9 @@ test.skip(!R1, 'needs PEER_TEST_RELAY');
 const RE = /onthouden/i;
 
 /** The stored capability row for claiming, as B's device holds it (null when the policy names none). */
-const claimRowOn = (page, circleId) => page.evaluate((cid) => {
+const claimRowOn = (page, circleId) => page.evaluate(async (cid) => {
   try {
-    const p = JSON.parse(localStorage.getItem(`cc.circlePolicy.${cid}`) || 'null');
+    const p = await window.onderlingCirclePolicy?.get(cid);
     const hit = Object.entries(p?.capabilities ?? {}).find(([k]) => / claim task$/.test(k));
     return hit ? hit[1] : null;
   } catch { return null; }

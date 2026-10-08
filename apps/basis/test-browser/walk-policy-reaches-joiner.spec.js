@@ -18,8 +18,8 @@ import { circleIds } from './contactsWalk.js';
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-const policyOn = (page, circleId) => page.evaluate((cid) => {
-  try { const p = JSON.parse(localStorage.getItem(`cc.circlePolicy.${cid}`) || 'null'); return p ? { storagePosture: p.storagePosture ?? null, llmTool: p.llmTool ?? null } : null; }
+const policyOn = (page, circleId) => page.evaluate(async (cid) => {
+  try { const p = await window.onderlingCirclePolicy?.get(cid); return p ? { storagePosture: p.storagePosture ?? null, llmTool: p.llmTool ?? null } : null; }
   catch { return null; }
 }, circleId);
 

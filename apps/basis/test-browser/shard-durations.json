@@ -44,6 +44,7 @@
   "walk-policy-reaches-joiner.spec.js": 55,
   "walk-reproduce.spec.js": 456,
   "walk-share-my-contact.spec.js": 102,
+  "walk-step0-box.spec.js": 600,
   "walk-stories.spec.js": 910,
   "walk-sweep.spec.js": 204,
   "walk-two-devices-first-statements.spec.js": 90,

@@ -1,4 +1,37 @@
 {
+  "assistant.hello": {
+    "doc": "A greeting and nothing else (\"hoi\", \"goedemorgen\"): the bot says its greeting line, without the model.",
+    "patterns": [
+      "(hoi|hoii|hallo|hee|hey|hii|goedemorgen|goedemiddag|goedenavond) (allemaal|daar)?"
+    ],
+    "examples": [
+      "hoi",
+      "Hallo!",
+      "goedemorgen",
+      "hoi allemaal"
+    ],
+    "not": [
+      "hoi, zet melk op de boodschappen",
+      "hallo wie doet de lamp",
+      "goedemorgen, wat staat er vandaag"
+    ]
+  },
+  "assistant.remindMe.everyone": {
+    "doc": "A reminder for everyone in the household at a time: \"herinner iedereen om 19:45: eten\" (the words after the colon are what is said).",
+    "patterns": [
+      "(herinner|waarschuw) iedereen {time}: {text}",
+      "(herinner|waarschuw) iedereen {time} (aan|dat|om te) {text}"
+    ],
+    "examples": [
+      "herinner iedereen om 19:45: eten",
+      "Herinner iedereen om half 8: we eten",
+      "herinner iedereen om 19:30 dat de vuilnis buiten moet"
+    ],
+    "not": [
+      "herinner me om 19:45 aan de tandarts",
+      "herinner iedereen aan de tandarts"
+    ]
+  },
   "lists.addToList.named": {
     "doc": "Put one or more things on a list the household names (\"melk en kaas\" are two).",
     "patterns": [

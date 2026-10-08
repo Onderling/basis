@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
@@ -26,7 +27,8 @@ import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circ
 export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null }) {
   const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const channel = bundle?.contactChannel ?? null;
   const registry = bundle?.contactSkills ?? null;
   const contactId = contact?.contactId;
@@ -222,7 +224,11 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
         {/* The contact's face beside their name (web parity: contactThread's header slot) — so the person you
             opened is visibly the person you tapped in Contacten. */}
         <FaceView row={contact ?? { name }} size={26} resolvePicture={resolvePicture} />
-        <Text style={styles.title}>{t('circle.contacts.thread_title', { name })}</Text>
+        <Text style={styles.title} numberOfLines={1}>{t('circle.contacts.thread_title', { name })}</Text>
+      </View>
+      {/* The mark and the contact's actions get a row of their own that WRAPS: in one row with the title they ran
+          past a phone's edge and could not be tapped — hiding, inspecting and deleting a contact did not exist. */}
+      <View style={styles.actions} testID="contact-thread-actions">
         {sealedMark ? (
           <Text style={[styles.sealed, sealedMark.level === 'person' ? styles.sealedPerson : null]} testID="contact-thread-sealed" accessibilityLabel={t(sealedMark.key)}>
             {`${sealedMark.level === 'person' ? '🔐' : '🔒'} ${t(sealedMark.key)}`}
@@ -386,9 +392,10 @@ function replyTextFromResult(res) {
   try { return JSON.stringify(res); } catch { return ''; }
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  wrap: { flex: 1, padding: 16, backgroundColor: theme.color.paper },
-  header: { flexDirection: 'row', alignItems: 'baseline', gap: 12, marginBottom: 8 },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4, rowGap: 2, marginBottom: 8 },
   floor: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingVertical: 4 },
   sealed: { fontSize: 12, color: theme.color.inkSoft },
   sealedPerson: { color: theme.color.green },   // STATUS colour: sealed to the person
@@ -397,7 +404,7 @@ const makeStyles = (theme) => StyleSheet.create({
   hideNote: { fontSize: 12, color: theme.color.inkSoft, paddingHorizontal: 12, paddingBottom: 4 },
   system: { fontSize: 12, color: theme.color.inkSoft, textAlign: 'center', paddingVertical: 4, fontStyle: 'italic' },
   back: { fontSize: 13, color: theme.color.inkSoft },
-  title: { fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },
+  title: { flexShrink: 1, fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },
   log: { flex: 1 },
   msg: { maxWidth: '82%' },
   msgUser: { alignSelf: 'flex-end' },

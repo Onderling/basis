@@ -33,6 +33,7 @@ export const CARRIERS = Object.freeze([
   { id: 'feeds', row: 'serve something at a link to a program that holds no key (a calendar app)' },
   { id: 'sealed-inbox.json', row: 'drop sealed mail for an away owner at a companion' },
   { id: 'host-identity.json', notCarrying: "the node's own key pair" },
+  { id: 'owner.json', notCarrying: "who owns the node: the owner root's public key and the devices it revoked — nobody's data" },
   { id: 'QUEUE_DB', row: 'keep a message for an address that is offline, at the relay' },
   { id: 'PUSH_TOKENS_DB', row: 'wake a sleeping phone' },
 ]);

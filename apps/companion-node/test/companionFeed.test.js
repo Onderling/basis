@@ -11,7 +11,8 @@ import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Agent, AgentIdentity, Parts } from '@onderling/core';
+import { Agent, AgentIdentity, Parts, Bootstrap } from '@onderling/core';
+import { ownerDevice } from './support/ownerDevice.js';
 import { randomKey, sealForLink } from '@onderling/blob-gateway';
 import { VaultMemory } from '@onderling/vault';
 import { RelayTransport } from '@onderling/transports';
@@ -84,10 +85,12 @@ describe('the feed shelf', () => {
 
 describe('the companion serves the owner\'s agenda files', () => {
   it('the owner puts, the link opens it; a non-owner is refused; every miss is one identical 404', async () => {
-    const owner = await AgentIdentity.generate(new VaultMemory());
+    // the owner's device signs each put (a node composed already claimed by that person's root)
+    const root = Bootstrap.create().bootstrap;
+    const ownersDevice = ownerDevice(root, 'household-bot');
     const host = await startCompanionNode({
       identityVault: new VaultMemory(), gate: false,
-      management: true, managementOwnerPubKey: owner.pubKey, manageHttp: true,
+      management: true, claimedOwner: { root: ownersDevice.delegation.by }, manageHttp: true,
       feeds: true, feedBucket: makeDevBlobBucket(),
     });
     cleanups.push(() => host.stop());
@@ -108,8 +111,9 @@ describe('the companion serves the owner\'s agenda files', () => {
     expect(await host.feeds.open(id, k)).toBeNull();
 
     // the owner's put; the link opens it
-    const bot = await device(host, owner);
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', { id, envelope: sealed(k) }))).toEqual({ ok: true });
+    const bot = await device(host);
+    const put = { id, envelope: sealed(k) };
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', { ...put, auth: ownersDevice.auth(host.agent.address, 'feed.put', put) }))).toEqual({ ok: true });
     const hit = await get(`/feed/${id}.${k}.ics`);
     expect(hit.status).toBe(200);
     expect(hit.type).toMatch(/^text\/calendar/);
@@ -127,7 +131,7 @@ describe('the companion serves the owner\'s agenda files', () => {
     // a non-owner cannot drop it; the owner can, and the link is dark
     expect(Parts.data(await stranger.invoke(host.agent.address, 'feed.drop', { id }))).toEqual({ ok: false, error: 'forbidden' });
     expect((await get(`/feed/${id}.${k}.ics`)).status).toBe(200);
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.drop', { id }))).toEqual({ ok: true });
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.drop', { id, auth: ownersDevice.auth(host.agent.address, 'feed.drop', { id }) }))).toEqual({ ok: true });
     expect((await get(`/feed/${id}.${k}.ics`)).body).toBe(nowhere.body);
   }, 30_000);
 });

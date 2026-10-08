@@ -57,10 +57,11 @@ A household bot can give each person their agenda as a link for a calendar app (
 companion keeps the ciphertext only. Pairing the two is a one-time step:
 
 1. **The bot's address.** On the household's box: `docker compose -p onderling logs assistant | grep -m1 'address '`.
-2. **The companion, owned by the bot.** On the public box, in `.env`: `COMPANION_MANAGE_OWNER_PUBKEY=<the bot's
-   address>` and `COMPANION_FEEDS=on`; add `companion@<repo>` to `ROLES` in `box.conf` if it is not there; then
-   `FORCE=1 /opt/onderling/repos/<repo>/deploy/box/update.sh`. Its address:
-   `docker compose -p onderling logs companion | grep -m1 'Host agent'`.
+2. **The companion, claimed by you.** In `.env`: `COMPANION_FEEDS=on`; add `companion@<repo>` to `ROLES` in
+   `box.conf` if it is not there; then `FORCE=1 /opt/onderling/repos/<repo>/deploy/box/update.sh`. Its address:
+   `docker compose -p onderling logs companion | grep -m1 'Host agent'`; its claim code (ten minutes, then a new one):
+   `docker compose -p onderling logs companion | grep 'Claim code' | tail -1`. Claiming it from your app and granting
+   the bot its place there land with the pairing work; until then this step cannot be finished.
 3. **The bot, told where.** On the household's box, in `.env`: `ONDERLING_FEED_COMPANION=<the companion's address>`
    and `ONDERLING_FEED_BASE_URL=https://<relay-domain>`; then `FORCE=1 …/update.sh`.
 4. **Check:** `curl -s -o /dev/null -w '%{http_code}\n' https://<relay-domain>/feed/x.y.ics` answers `404` (the

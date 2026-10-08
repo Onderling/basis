@@ -8,9 +8,9 @@
  *   PORT                       local-relay port (default 0 ⇒ OS-assigned)
  *   HOST                       local-relay bind host (default 127.0.0.1)
  *   COMPANION_NODE_CONFIG_DIR  where the host keypair is persisted
- *   ── 6d management surface (opt-in) ──
- *   COMPANION_MANAGE_OWNER_PUBKEY  the owner's device pubKey → enables management
- *                                  (the ONLY key allowed to manage). Absent ⇒ OFF.
+ *   ── management ──
+ *   The node is CLAIMED by its owner, never configured with one: started unclaimed it prints a claim code below,
+ *   and the owner's app hands it back (a device statement; `src/ownerClaim.js`). The owner is kept in the config dir.
  *   COMPANION_MANAGE_HTTP_PORT     serve the online /manage web on this port
  *   COMPANION_MANAGE_HTTP_HOST     bind host (default 127.0.0.1; use 0.0.0.0 behind Caddy)
  *   COMPANION_FEEDS                on → the owner may put agenda files, served at /feed/<id>.<k>.ics
@@ -34,10 +34,9 @@ const relayUrl = process.env.COMPANION_RELAY_URL || undefined;
 const port     = process.env.PORT ? parseInt(process.env.PORT, 10) : 0;
 const host     = process.env.HOST ?? '127.0.0.1';
 
-// 6d — management is opt-in: ON only when an owner pubKey is provided.
-const managementOwnerPubKey = process.env.COMPANION_MANAGE_OWNER_PUBKEY || undefined;
-const management   = !!managementOwnerPubKey;
-const manageHttp   = management && process.env.COMPANION_MANAGE_HTTP_PORT
+// management is always there: an unclaimed node answers only the claim, a claimed one only its owner's devices
+const management   = true;
+const manageHttp   = process.env.COMPANION_MANAGE_HTTP_PORT
   ? parseInt(process.env.COMPANION_MANAGE_HTTP_PORT, 10)
   : false;
 const manageHttpHost = process.env.COMPANION_MANAGE_HTTP_HOST ?? '127.0.0.1';
@@ -50,8 +49,10 @@ const feeds = Boolean(manageHttp) && /^(1|on|true|yes)$/i.test(process.env.COMPA
 const { nearby, error: nearbyError } = parseNearbyFlag(process.argv.slice(2), process.env);
 if (nearbyError) { console.error(`\n  ${nearbyError}\n`); process.exit(1); }
 
+// the claim code goes to this log only — the person who can read the node's log is the one who may claim it
 const node = await startCompanionNode({
-  relayUrl, port, host, management, managementOwnerPubKey, manageHttp, manageHttpHost, nearby, feeds,
+  relayUrl, port, host, management, manageHttp, manageHttpHost, nearby, feeds,
+  onClaimCode: (code) => { console.log(`  Claim code:   ${code}  (valid 10 minutes — enter it in your app to become this node's owner)`); },
 });
 
 console.log('');
@@ -60,7 +61,7 @@ console.log('  ─────────────────────�
 console.log(`  Host agent:   ${node.agent.address}`);
 console.log(`  Relay:        ${node.relayUrl}${node.relay ? '  (booted in-process)' : '  (shared, connected as client)'}`);
 console.log(`  Capabilities: ${node.capabilities.join(', ')}`);
-console.log(`  Management:   ${node.management ? `on (owner ${node.managementOwnerPubKey?.slice(0, 12)}…)` : 'off'}`);
+console.log(`  Management:   ${node.managementOwnerRoot ? `claimed (owner root ${node.managementOwnerRoot.slice(0, 12)}…)` : 'unclaimed — waiting for its owner'}`);
 if (node.manageUrl) console.log(`  Manage web:   ${node.manageUrl}  (owner-paired; front with Caddy /manage)`);
 // What the radio is ACTUALLY doing, not what was asked for: `setDiscoverability` reports `degraded` when
 // a transport ends up more exposed than requested, and a person needs to be told that in the banner

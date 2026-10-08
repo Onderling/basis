@@ -96,6 +96,7 @@ started with `--nearby`.
 
 - **The relay:** the forward queue (SQLite at `QUEUE_DB`, else memory), push tokens (SQLite at `PUSH_TOKENS_DB`, else
   memory), the blob gate's ACL (memory by default) and whatever bucket it is handed.
-- **The companion** (its config dir): `host-identity.json`; `sealed-inbox.json` when the inbox is on; `feeds/` (a
+- **The companion** (its config dir): `host-identity.json`; `owner.json` once claimed (the owner root's public key and
+  the devices it revoked); `sealed-inbox.json` when the inbox is on; `feeds/` (a
   file bucket, ciphertext only) when feeds are on. Its media bucket and registry pseudo-pod are in memory.
 - **A device:** its outbox (the hold-forward queue), the device log, the stores — all sealed at rest on the box.

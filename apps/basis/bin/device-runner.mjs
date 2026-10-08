@@ -949,7 +949,7 @@ if (tgToken || inboxDoor.bridge) {
   // A household bot's people connect screens (`/scherm`): the grant is their role column, each token acting as them.
   const reach = createPersonReach({ bridges: { telegram: tgBridge, web: inboxDoor.bridge }, users: botUsers, threads });
   // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file. Wired
-  // when the box knows the companion (its address, as `COMPANION_MANAGE_OWNER_PUBKEY` there names this bot) and the
+  // when the box knows the companion (its address; the bot may put files there by the owner's grant) and the
   // public address it is served at; off in the household until the admin switches it on.
   const feedCompanion = process.env.ONDERLING_FEED_COMPANION || '';
   const feedBase = process.env.ONDERLING_FEED_BASE_URL || '';
@@ -1386,7 +1386,7 @@ console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
 console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
-// the address another node names this one by — e.g. the household's companion, whose owner it is (COMPANION_MANAGE_OWNER_PUBKEY)
+// the address another node names this one by — e.g. the household's companion, when its owner grants this bot a place there
 console.log(`  address   ${agent.identity?.chat?.pubKey ?? '—'}`);
 if (card?.payload) {
   console.log('\n  This device as a contact — hand this to whoever should be able to write to you:\n');

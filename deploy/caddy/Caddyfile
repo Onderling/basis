@@ -35,9 +35,9 @@
 # SAME public domain under `/manage` — a separate `handle` so it routes to the
 # companion (its manage HTTP port, internal 8790) while everything else falls
 # through to the relay. `handle` blocks are mutually exclusive + matched in order.
-# Requires the companion booted with COMPANION_MANAGE_OWNER_PUBKEY +
-# COMPANION_MANAGE_HTTP_PORT=8790 + COMPANION_MANAGE_HTTP_HOST=0.0.0.0 (the
-# docker-compose.tls.yml overlay wires that when you set the owner pubkey).
+# Requires the companion booted with COMPANION_MANAGE_HTTP_PORT=8790 +
+# COMPANION_MANAGE_HTTP_HOST=0.0.0.0 (the docker-compose.tls.yml overlay wires that).
+# Its owner claims it with the code in its log.
 {$RELAY_DOMAIN} {
 	handle /manage* {
 		reverse_proxy companion:8790

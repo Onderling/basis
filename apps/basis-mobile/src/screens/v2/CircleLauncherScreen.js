@@ -292,6 +292,7 @@ import { bindCircleGovernance, openPolicyProposals } from '../../../../basis/src
 import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
+import { launcherListPaint } from './launcherListPaint.js';
 
 // B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
 // Unset → no provider → the LLM branch
@@ -517,6 +518,9 @@ export default function CircleLauncherScreen({
   // The persona the Me tab's pointers open (the general one — there is no circle context here).
   const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Whether the list has had a real answer: "No circles yet." is said only then, never in "not known yet" (see
+  // `launcherListPaint`).
+  const [launcherSettled, setLauncherSettled] = useState(false);
   const [selected, setSelected] = useState(null);
   // The OPEN circle, readable from a closure that outlives a render — the mounted waist ops need "which
   // circle am I in" at CALL time, and an effect that mounts once would otherwise hold whichever circle
@@ -1271,24 +1275,27 @@ export default function CircleLauncherScreen({
     } catch { setShareContacts([]); }
   }, [bundle]);
 
-  // The stoop store hydrates from AsyncStorage a beat AFTER the agent bundle is
-  // ready, so the first load can race ahead of it and return 0 circles (the
-  // persisted ones look "lost" until the next manual reload). Retry a few times
-  // while empty so saved circles surface on their own. Bounded so a genuinely
-  // empty account doesn't spin; any real load (≥1 circle) stops it immediately.
+  // The first load WITH the agent bundle is the answer: stoop's store is loaded inside the agent's boot, which the
+  // bundle awaits — instrumented on a phone (2026-10-08): the store loaded, then the first load with the bundle listed
+  // the circle at once. (A comment here used to say the store hydrated "a beat after" the bundle and retried boot on a
+  // timer; it no longer does.) Before the bundle exists there is no answer yet, so nothing is settled.
+  // A circle arriving from ELSEWHERE (`circlesRevision`, e.g. a join through an invite link) may still take a beat to
+  // reach the store, so that path keeps a short, bounded retry while the list is empty.
+  const bootLoadedRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     let tries = 0;
+    const afterJoin = bootLoadedRef.current;   // a re-run after the first answer is a circle arriving from elsewhere
     const tick = async () => {
       const n = await load();
-      if (!cancelled && n === 0 && resolveSkill && (tries += 1) < 5) {
+      if (cancelled) return;
+      if (resolveSkill) { setLauncherSettled(true); bootLoadedRef.current = true; }
+      if (afterJoin && n === 0 && resolveSkill && (tries += 1) < 5) {
         setTimeout(() => { if (!cancelled) tick(); }, 1200);
       }
     };
     tick();
     return () => { cancelled = true; };
-    // `circlesRevision` re-runs this when a circle arrives from elsewhere — the retry-while-empty loop is
-    // exactly the right shape for it, since a just-joined circle may take a beat to reach the store.
   }, [load, resolveSkill, circlesRevision]);
 
   // refresh per-circle pending proposal counts whenever the
@@ -2143,6 +2150,7 @@ export default function CircleLauncherScreen({
     );
   }
 
+  const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
     <WithTabBar active="circles" onSelect={onTab} badges={tabBadges}>
       <View style={styles.page} testID="circle-launcher">
@@ -2156,7 +2164,7 @@ export default function CircleLauncherScreen({
             And reloads are common exactly where the miss was seen: joining from an invite link bumps
             `circlesRevision`, and the boot retry re-runs `load()` up to five times.
             So the placeholder is for an EMPTY list only — a refresh now repaints in place. */}
-        {loading && circles.length === 0 ? (
+        {listPaint === 'loading' ? (
           <Text style={styles.muted}>{t('circle.loading')}</Text>
         ) : (
           <ScrollView
@@ -2182,7 +2190,7 @@ export default function CircleLauncherScreen({
                 {t('circle.boot_failed', { reason: String(bootError) })}
               </Text>
             ) : null}
-            {circles.length === 0 && !bootError ? (
+            {listPaint === 'empty' ? (
               <Text style={styles.muted}>{t('circle.empty')}</Text>
             ) : (
               renderLauncherGroups(bySight.shown, {

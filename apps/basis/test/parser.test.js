@@ -151,6 +151,15 @@ describe('parseSlash — body: flags, a value after a space', () => {
     expect(parseInput('/list-remove --confirm brood', withParams).args).toEqual({ confirm: true, _match: 'brood' });
     expect(parseInput('/list-remove --later brood', withParams).args).toEqual({ later: true, _match: 'brood' });
   });
+  it('a value runs until the next flag, or the end: "--text oude kaas" is "oude kaas", trimmed', () => {
+    const edit = {
+      commandMenu: [{ command: '/list-edit', opId: 'editEntry', body: 'flags' }],
+      opsById: new Map([['editEntry', { op: { id: 'editEntry', params: [{ name: 'item', kind: 'string' }, { name: 'text', kind: 'string' }, { name: 'when', kind: 'date' }] } }]]),
+    };
+    expect(parseInput('/list-edit --item kaas --text oude kaas', edit).args).toEqual({ item: 'kaas', text: 'oude kaas' });
+    expect(parseInput('/list-edit --text oude  kaas  --item kaas ', edit).args).toEqual({ text: 'oude kaas', item: 'kaas' });
+    expect(parseInput('/list-edit --item tandarts --when vrijdag 14:00', edit).args).toEqual({ item: 'tandarts', when: 'vrijdag 14:00' });
+  });
   it('a value flag with no value is left out — the op then says what is missing, never reads `true` as the value', () => {
     expect(parseInput('/list-remove --item --confirm', withParams).args).toEqual({ confirm: true });
     expect(parseInput('/list-remove --item', withParams).args).toEqual({});

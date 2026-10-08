@@ -108,6 +108,16 @@ describe('the household bot says one line per op family', () => {
     expect(await say('haal eieren van de lijst')).toEqual(['Van Boodschappen gehaald: eieren.']);
   });
 
+  it('a slash flag\'s value is every word up to the next flag: /list-edit --text oude kaas is "oude kaas"', async () => {
+    await say('zet jonge kaas op de boodschappen');
+    await say('/list-edit --item jonge kaas --text oude kaas');
+    const read = await agent.callSkill('lists', 'listEntries', { list: 'Boodschappen' });
+    const words = (read?.items ?? read?.entries ?? []).map((e) => e?.text ?? e?.label);
+    expect(words, JSON.stringify(read).slice(0, 400)).toContain('oude kaas');
+    expect(words).not.toContain('oude');
+    expect(words).not.toContain('jonge kaas');
+  });
+
   it('chores: who holds it and its day, in one line — never "✓ Opgepakt: …"', async () => {
     await say('nieuwe taak: lamp vervangen');
     // said so that it reads right wherever the reply lands (a circle door posts it for everyone): "opgepakt", not "van jou"

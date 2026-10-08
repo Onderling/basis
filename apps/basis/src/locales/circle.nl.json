@@ -5505,6 +5505,10 @@
       "text": "Mijn contact delen →",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
     },
+    "overview_title": {
+      "text": "Mijn overzicht",
+      "doc": "Mij → the section with my chores and my appointments across every circle (the \"Mijn dingen\" and \"Mijn agenda\" blocks), shown without the screens manager."
+    },
     "planned_title": {
       "text": "Gepland",
       "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."

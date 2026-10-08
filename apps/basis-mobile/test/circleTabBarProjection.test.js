@@ -20,10 +20,10 @@ import { basisManifest } from '../../basis/src/index.js';
 import { t } from '../src/core/localisation.js';
 
 describe('D / Surface 1 — mobile CircleTabBar roster from the manifest projection', () => {
-  it('renderMobile projects the alpha tabs in order with their locale keys (Schermen back after Kringen; Nearby hidden, not removed)', () => {
+  it('renderMobile projects the alpha tabs in order with their locale keys (Schermen and Nearby hidden, not removed)', () => {
     const tabs = circleTabsMobile(basisManifest);
-    expect(tabs.map((tab) => tab.id)).toEqual(['circles', 'screens', 'contacten', 'mij']);
-    expect(tabs.map((tab) => tab.labelKey)).toEqual(['circle.tab.circles', 'circle.tab.screens', 'circle.tab.contacten', 'circle.tab.mij']);
+    expect(tabs.map((tab) => tab.id)).toEqual(['circles', 'contacten', 'mij']);
+    expect(tabs.map((tab) => tab.labelKey)).toEqual(['circle.tab.circles', 'circle.tab.contacten', 'circle.tab.mij']);
   });
 
   it('each tab label resolves from the manifest labelKey via t() (invariant #8)', () => {
@@ -40,7 +40,7 @@ describe('D / Surface 1 — mobile CircleTabBar roster from the manifest project
     const tabs = circleTabsMobile(basisManifest);
     const mij = tabs.find((tab) => tab.id === 'mij');
     expect(mij.target).toEqual({ kind: 'op', opId: 'me' });
-    for (const id of ['circles', 'screens', 'contacten']) {   // the nav tabs the alpha paints (alphaSurface.js)
+    for (const id of ['circles', 'contacten']) {   // the nav tabs the alpha paints (alphaSurface.js)
       expect(tabs.find((tab) => tab.id === id).target).toEqual({ kind: 'nav', to: id });
     }
   });

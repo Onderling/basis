@@ -80,6 +80,12 @@ export default function CircleScreenView({ blocks = null, refreshing = false, on
   );
 }
 
+// A block that carries its own title (`titleKey` — the Mij overview's "Mijn dingen" / "Mijn agenda") is called by it;
+// any other block by its type, as before (web: circleScreen.js).
+function blockName(block) {
+  return block.titleKey ? t(block.titleKey) : block.type;
+}
+
 function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -89,7 +95,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     return (
       <View style={[...baseStyle, styles.blockError]} testID={`screen-block-${block.blockId}`}>
         <Text style={styles.blockErrorText}>
-          {t('circle.screen.block_error', { type: block.type })}{block.error ? ` — ${block.error}` : ''}
+          {t('circle.screen.block_error', { type: blockName(block) })}{block.error ? ` — ${block.error}` : ''}
         </Text>
       </View>
     );
@@ -97,7 +103,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
   if (block.status === 'empty') {
     return (
       <View style={[...baseStyle, styles.blockEmpty]} testID={`screen-block-${block.blockId}`}>
-        <Text style={styles.blockEmptyText}>{t('circle.screen.block_empty', { type: block.type })}</Text>
+        <Text style={styles.blockEmptyText}>{t('circle.screen.block_empty', { type: blockName(block) })}</Text>
       </View>
     );
   }
@@ -209,7 +215,7 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
   const labelStyle = isCompact ? styles.agendaLabelCompact : styles.agendaLabel;
   return (
     <View>
-      <Text style={styles.blockTitle}>{t('circle.recipe.block.calendar')}</Text>
+      <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.calendar')}</Text>
       {items.map((ev) => {
         // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
         // it.  The hit row carries the parent's ref + fires onHighlightLayout once
@@ -235,7 +241,7 @@ function renderItems(block, styles) {
   const items = block.content?.items ?? [];
   return (
     <View>
-      <Text style={styles.blockTitle}>{t(`circle.screen.items_title.${block.content?.noun ?? ''}`)}</Text>
+      <Text style={styles.blockTitle}>{t(block.titleKey ?? `circle.screen.items_title.${block.content?.noun ?? ''}`)}</Text>
       {items.map((it) => (
         <View key={it.id ?? Math.random().toString(36)} style={styles.agendaRow}>
           <Text style={styles.agendaLabel}>{it.circleName ? `${it.circleName} · ` : ''}{it.label ?? ''}</Text>
@@ -253,7 +259,7 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
   const textStyle   = isCompact ? styles.taskTextCompact   : styles.taskText;
   return (
     <View>
-      <Text style={styles.blockTitle}>{t('circle.recipe.block.tasks')}</Text>
+      <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.tasks')}</Text>
       {items.map((task) => {
         const embeds = embedChipsOf(task);
         // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to

@@ -7,8 +7,6 @@
  * someone later deletes or renames is not made again: the template is a start, not a rule.
  */
 
-import { reminderPromptLines } from './botReminders.js';
-
 /**
  * The household TEMPLATE, as data: a composition of the plugins that exist (lists · tasks · calendar), not an app.
  * "Household" is the bot's name and this start — a "Tennisclub" template composes the same plugins with other lists
@@ -50,12 +48,13 @@ export const HOUSEHOLD_TEMPLATE = Object.freeze({
     "\"ik ben bij … geweest\" / \"de afspraak is geweest\" is GEEN rsvp: → markListItemDone(item: de woorden van de afspraak).",
     "\"wie zitten er in dit huishouden\" / \"wie is de beheerder\" → assistant-people. Zeg NOOIT dat je dat niet kunt zien.",
     "\"wat staat er deze week\" / \"wat moet er nog gebeuren\" → weekOverview. \"geen herinneringen meer\" → assistant-reminders(mode: off).",
+    "\"wie doet de lamp\" → listOpen(text: lamp): wie het klusje heeft en wanneer. \"wat moet Bob doen\" → listMine(who: Bob). \"wie is er zaterdag\" / \"wat is er morgen\" → weekOverview(day: zaterdag / morgen): de afspraken van die dag met wie er komt, en de klusjes met wie ze doet.",
     "Zegt iemand bij iets op een andere lijst wie het doet of wanneer (\"melk voor Bob\", \"taart voor zaterdag\"): roep addToList aan met assignee en/of due; het wordt een klusje op diezelfde lijst. \"maak van X een klusje (voor Bob)\" → makeChore(item: X, assignee, due).",
     "\"ik ben bij de Lidl\" / \"ik sta in de Albert Heijn\" → shopVisit(shop: die winkel, general: {shopping}): de boodschappen én de lijst van die winkel. Een winkel zonder eigen lijst: laat {shopping} zien.",
     "Elk ding is een eigen regel: \"melk en kaas\" zijn twee aanroepen (melk, kaas). Vaste paren zoals \"peper en zout\" blijven één.",
     "Een klusje voor jezelf (\"nieuwe taak voor mij: X\") mag ieder lid: roep addToList aan met assignee: mij. Een klusje voor een ander: roep addToList ook aan; het systeem zegt zelf of het mag. Zeg NOOIT zelf dat iets niet mag als er een tool voor is.",
-    "Iedereen mag een lijst maken (createList), weggooien (removeList) en binnen 30 dagen terugzetten (restoreList).",
-    "Je kunt niet veranderen hoe je werkt: je antwoorden, de overzichten en de knoppen liggen vast. Krijg je een wens of feedback daarover: bedank, zeg eerlijk dat je dat zelf niet kunt veranderen, en dat wie het anders wil het aan de beheerder van het huishouden kan vragen. Beloof NOOIT dat je iets voortaan anders doet.",
+    "Een weggegooide lijst (removeList) kan binnen 30 dagen terug (restoreList).",
+    "Wat een tool instelt — iemands herinneringen, taal, geheugen, stille uren, het weekoverzicht — verander je MET die tool, meteen; vraag zo nodig één ding na (bv. hoe laat). Verder kun je niet veranderen hoe je werkt: je antwoorden, de overzichten en de knoppen liggen vast. Krijg je daarover een wens of feedback: bedank, zeg eerlijk dat je dat zelf niet kunt veranderen, en dat wie het anders wil het aan de beheerder van het huishouden kan vragen. Beloof NOOIT dat je iets voortaan anders doet.",
   ]),
 });
 
@@ -119,14 +118,6 @@ function listLine({ name, defaultChild }) {
  * @param {object} [template]
  * @returns {string[]}
  */
-/**
- * Everything a household bot tells its model about its household, in ONE place: the template's lines and the reminder
- * lines. The box reads it, and so does the eval — "the eval composes the bot as it ships" stays true by construction.
- */
-export function botPromptLines(t, template = HOUSEHOLD_TEMPLATE) {
-  return [...promptLinesFor(t, template), ...reminderPromptLines()];
-}
-
 /**
  * The model's lines for lists as they ARE (a circle's own, which no template made): their names, and one line per list
  * from what it holds. LLM-facing.

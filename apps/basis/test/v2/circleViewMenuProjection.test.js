@@ -80,7 +80,8 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
   it('clicking a menu item fires its projected callback by id', () => {
     const el = mount();
     const more = fullMore();
-    renderCircleView(el, { circle, rows: [], t, policy: DEFAULT_CIRCLE_POLICY, more });
+    // As an ADMIN: settings is reserved for the circle's admins and waits greyed for anyone else (menuAdminOnly.test.js).
+    renderCircleView(el, { circle, rows: [], t, policy: DEFAULT_CIRCLE_POLICY, more, viewerIsAdmin: true });
     el.querySelector('.circle-view__more-menu [data-action="settings"]').click();
     expect(more.settings).toHaveBeenCalledTimes(1);
   });

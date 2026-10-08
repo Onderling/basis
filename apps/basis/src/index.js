@@ -300,7 +300,7 @@ export {
   recordJoinedCirclePoints,
 } from './v2/connectionPoints.js';
 export {
-  createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
+  createFallbackOffer, fallbackOfferStateIo, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
 } from './v2/addressFallback.js';
 // Re-exported THROUGH the composer: a shell imports basis and nothing else from apps/
 // (`shellLayering.test.js`), so basis-mobile reaches stoop's fallback-report hook via here.

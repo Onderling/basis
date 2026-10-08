@@ -39,6 +39,28 @@ describe('makeTasksOps — chores over the circle\'s store', () => {
     expect((await tasks.listOpen({})).items.map((t) => t.id)).not.toContain(task.id);
   });
 
+  it('a chore records the PERSON as its last writer, not the host key — the authority facts unchanged', async () => {
+    const { tasks, store } = ops();
+    const { task } = await tasks.addTask({ text: 'lamp vervangen', actor: 'telegram:7' });
+    const { result } = await tasks.claimTask({ id: task.id, actor: 'telegram:7' });
+    expect(result.updatedBy, 'a claim is written by the claimant').toBe('telegram:7');
+    // what decides a claim is not who wrote it last: the confirmation reads as it always did
+    expect(result).toMatchObject({ confirmedAssignee: 'telegram:7', claimSeq: 1 });
+    expect(result.confirmedBy).toBe((await store.get(task.id)).confirmedBy);
+    expect(result.confirmedBy).not.toBe('telegram:7');
+
+    const edited = await tasks.editTask({ id: task.id, text: 'lamp ophangen', actor: 'telegram:7' });
+    expect((edited.task ?? edited).updatedBy, 'an edit').toBe('telegram:7');
+    const moved = await tasks.reassignTask({ id: task.id, newAssignee: 'telegram:9', actor: 'telegram:7' });
+    expect(moved.task.updatedBy, 'a reassign').toBe('telegram:7');
+    const done = await tasks.completeTask({ id: task.id, actor: 'telegram:9' });
+    expect(done.task.updatedBy, 'a completion').toBe('telegram:9');
+
+    const { task: other } = await tasks.addTask({ text: 'ramen lappen', actor: 'telegram:7' });
+    expect((await store.get(other.id)).updatedBy, 'an add').toBe('telegram:7');
+    await tasks.removeTask({ id: other.id, actor: 'telegram:7' });
+  });
+
   it('listOpen is the chores only — a list line or an appointment in the same store is not one', async () => {
     const { tasks, store } = ops();
     await store.put({ type: 'list-item', text: 'melk' });

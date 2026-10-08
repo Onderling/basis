@@ -137,7 +137,7 @@ export { VIEWER_KINDS };
 
 const makeStyles = (theme) => StyleSheet.create({
   page:        { flex: 1, paddingHorizontal: 16, paddingTop: 12, backgroundColor: theme.color.paper },
-  bar:         { flexDirection: 'row', alignItems: 'center', minHeight: 22 },
+  bar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 22 },   // back left, report right — never one run-on phrase
   back:        { fontSize: 13, color: theme.color.inkSoft },
   title:       { fontSize: 24, fontWeight: '600', fontFamily: theme.font.serif, color: theme.color.ink, marginVertical: 6 },
   lede:        { fontSize: 13, color: theme.color.inkSoft, marginBottom: 12 },

@@ -29,6 +29,10 @@ import { renderWeb, renderMobile } from '@onderling/app-manifest';
 import { alphaActions } from './alphaSurface.js';
 import { isFeatureEnabled } from './circlePolicy.js';
 
+/** The sentence a greyed admin-only entry says. One general sentence; an entry with its own, more specific one
+ *  (invite already said it when a member opened it) keeps that. */
+const ROLE_REASON_KEYS = Object.freeze({ invite: 'circle.invite.admin_only' });
+
 /**
  * True when an action is available in the given platform + policy context.
  *   - platform gate: `platforms` absent ⇒ all platforms; else must include it.
@@ -70,7 +74,7 @@ export function circleActions(manifest, opts = {}) {
  * platform allow. What a shell would paint once the alpha widens; what tests of the feature gate and
  * the platform gate assert on, since the trim hides most of the gated ids from the DOM today.
  */
-export function gatedActions(manifest, { policy = null, platform = 'web', renderer = renderWeb, availability = null } = {}) {
+export function gatedActions(manifest, { policy = null, platform = 'web', renderer = renderWeb, availability = null, isAdmin = false } = {}) {
   const nav = renderer(manifest);
   const actions = Array.isArray(nav.actions) ? nav.actions : [];
   const out = [];
@@ -81,6 +85,14 @@ export function gatedActions(manifest, { policy = null, platform = 'web', render
     const opId = action?.target?.kind === 'op' ? action.target.opId : null;
     const st = opId && availability?.of ? availability.of(opId)?.state : 'available';
     if (st === 'hidden') continue;
+    // An entry reserved for a role (`role: 'admin'`) is GREYED for anyone else — shown, with the sentence that says
+    // why, never hidden and never offered as if it would work. `isAdmin` is the viewer's role from the circle's
+    // roster; until that answers it is false, so the entry waits greyed rather than being offered and refused.
+    // A convention, not the gate: the op or screen behind the entry keeps its own refusal.
+    if (action.role === 'admin' && isAdmin !== true) {
+      out.push({ ...action, disabled: true, reasonKey: ROLE_REASON_KEYS[action.id] ?? 'circle.op.admin_only' });
+      continue;
+    }
     out.push(st === 'greyed' ? { ...action, disabled: true } : action);
   }
   return out;

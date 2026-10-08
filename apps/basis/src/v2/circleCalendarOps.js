@@ -104,7 +104,13 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const open = eventsInWindow(await eventsOf(circleId), { since: now, until: now + days * 86_400_000 });
       // the list's own name above its appointments, as any list read says which list it is
       const agenda = await agendaOf(circleId);
-      return { ok: true, ...(agenda?.text ? { title: agenda.text } : {}), items: open.map((e) => ({ id: e.id, label: label(e), type: 'calendar-event', title: titleOf(e), startsAt: e.startsAt ?? null, ...(e.createdBy ? { createdBy: e.createdBy } : {}) })) };
+      // who it names and who answered (the household's people, by id): a door's reader sees them as names, under the
+      // household's names setting (the agent puts them through it), never as ids
+      const people = (e) => ({
+        ...(Array.isArray(e.attendees) && e.attendees.length ? { attendees: [...e.attendees] } : {}),
+        ...(e.rsvp && typeof e.rsvp === 'object' && Object.keys(e.rsvp).length ? { rsvp: { ...e.rsvp } } : {}),
+      });
+      return { ok: true, ...(agenda?.text ? { title: agenda.text } : {}), items: open.map((e) => ({ id: e.id, label: label(e), type: 'calendar-event', title: titleOf(e), startsAt: e.startsAt ?? null, ...(e.createdBy ? { createdBy: e.createdBy } : {}), ...people(e) })) };
     },
 
     /** The morning brief's calendar slot: the next 24 hours, the first five; nothing when there is nothing. */

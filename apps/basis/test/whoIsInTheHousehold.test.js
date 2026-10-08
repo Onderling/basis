@@ -30,8 +30,8 @@ const as = (who) => ({ caller: who, threadId: who, chatId: who.split(':')[1] });
 
 describe('/wie: who is in the household', () => {
   it('is a member\'s and an observer\'s op too', () => {
-    expect(BOT_OP_MAP.member).toContain('assistant-people');
-    expect(BOT_OP_MAP.observer).toContain('assistant-people');
+    expect(BOT_OP_MAP.member).toContain('assistant.assistant-people');
+    expect(BOT_OP_MAP.observer).toContain('assistant.assistant-people');
   });
   it('a member sees the names and role words — no ids, no linked apps; themselves as "jij"', async () => {
     const r = await door()('assistant', 'assistant-people', {}, as('telegram:1'));

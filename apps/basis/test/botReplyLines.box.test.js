@@ -53,10 +53,9 @@ describe('the box words what it did', () => {
     await ask('/start');   // the admin's welcome
     expect(await ask('zet melk, brood en kaas op de boodschappen')).toEqual(['Op de lijst Boodschappen: melk, brood, kaas.']);
     await ask('nieuwe taak: lamp vervangen');
-    // the op's line first (the announcer's "Voor jou: …" may follow it: the store records the bot's key as the
-    // claim's writer, so the claimer is told as if someone else gave it — that is the announcer's, not this line's)
+    // the claimer hears it once: the store records the person as the claim's writer, so the announcer does not tell
+    // them "Voor jou: …" as if someone else had given it to them
     const claimed = await ask('ik doe de lamp');
-    expect(claimed[0]).toBe("Klusje 'lamp vervangen' is opgepakt.");
-    expect(claimed.join('\n')).not.toMatch(/✓/);
+    expect(claimed).toEqual(["Klusje 'lamp vervangen' is opgepakt."]);
   }, 150_000);
 });

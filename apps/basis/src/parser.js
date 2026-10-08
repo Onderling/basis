@@ -182,27 +182,34 @@ function parseBody(body, rule, params = []) {
 function parseFlags(body, params = []) {
   const out = {};
   const positional = [];
-  // A flag the op declares as a VALUE (not a boolean) takes the next word when written `--key value`; a boolean, or a
-  // flag the op does not declare, stays `true` without one.
+  // A flag the op declares as a VALUE (not a boolean) takes the words after it when written `--key value`: up to the
+  // next flag, or the end (`--text oude kaas` is "oude kaas"); a quoted value right after it is the whole value, and
+  // the words after that are positional again. A boolean, or a flag the op does not declare, stays `true` without one.
   const takesValue = new Set((Array.isArray(params) ? params : []).filter((p) => p?.name && p.kind && p.kind !== 'boolean').map((p) => p.name));
 
   // Tokenize on whitespace BUT respect simple double-quoted spans.
   const tokens = tokenize(body);
+  const isFlag = (tok) => !tok.quoted && tok.text.startsWith('--');
   for (let i = 0; i < tokens.length; i++) {
     const tok = tokens[i];
-    if (tok.startsWith('--')) {
-      const eq    = tok.indexOf('=');
-      const key   = eq === -1 ? tok.slice(2) : tok.slice(2, eq);
-      let value   = eq === -1 ? true         : tok.slice(eq + 1);
+    if (isFlag(tok)) {
+      const eq    = tok.text.indexOf('=');
+      const key   = eq === -1 ? tok.text.slice(2) : tok.text.slice(2, eq);
+      let value   = eq === -1 ? true              : tok.text.slice(eq + 1);
       if (eq === -1 && takesValue.has(key)) {
-        // a value flag takes the next word; with none (`--item` last, or before another flag) it is LEFT OUT, so the
-        // op says what is missing — never `true` read as the value ("'true' staat op geen lijst")
-        if (i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) value = tokens[++i];
-        else continue;
+        // a value flag with no words after it (`--item` last, or before another flag) is LEFT OUT, so the op says what
+        // is missing — never `true` read as the value ("'true' staat op geen lijst")
+        if (i + 1 >= tokens.length || isFlag(tokens[i + 1])) continue;
+        if (tokens[i + 1].quoted) value = tokens[++i].text;
+        else {
+          const words = [];
+          while (i + 1 < tokens.length && !isFlag(tokens[i + 1]) && !tokens[i + 1].quoted) words.push(tokens[++i].text);
+          value = words.join(' ').trim();
+        }
       }
       out[key] = value;
     } else {
-      positional.push(tok);
+      positional.push(tok.text);
     }
   }
   if (positional.length > 0) {
@@ -218,13 +225,15 @@ function parseFlags(body, params = []) {
 
 /**
  * Tokenize a string respecting double-quoted spans.  Each quote span
- * is one token; bare words split on whitespace.
+ * is one token; bare words split on whitespace.  A token that IS a quoted
+ * span says so (`quoted`): it is never a flag, and never runs on into the
+ * words after it.
  *
  * Lightweight v0.1 implementation — does NOT support escapes, single
  * quotes, or nested quotes.  Sufficient for J2-style command bodies.
  *
  * @param {string} s
- * @returns {string[]}
+ * @returns {{text: string, quoted: boolean}[]}
  */
 function tokenize(s) {
   const out = [];
@@ -247,10 +256,10 @@ function tokenize(s) {
       const quote = s[i];
       const end = s.indexOf(quote, i + 1);
       if (end === -1) {                            // unterminated → take rest
-        out.push(s.slice(i + 1));
+        out.push({ text: s.slice(i + 1), quoted: true });
         break;
       }
-      out.push(s.slice(i + 1, end));
+      out.push({ text: s.slice(i + 1, end), quoted: true });
       i = end + 1;
       continue;
     }
@@ -275,7 +284,7 @@ function tokenize(s) {
         i++;
       }
     }
-    out.push(buf);
+    out.push({ text: buf, quoted: false });
   }
   return out;
 }

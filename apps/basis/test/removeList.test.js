@@ -46,7 +46,7 @@ describe('removing a list', () => {
     expect((await call('lists', 'removeList', { list: 'werktaken' })).ok).toBe(false);
 
     // everyone's since it can come back for 30 days (Frits 2026-10-05; `restoreList.test.js`)
-    expect(BOT_OP_MAP.member).toContain('removeList');
+    expect(BOT_OP_MAP.member).toContain('lists.removeList');
     const r = resolveDispatch({ kind: 'slash', opId: 'removeList', args: { list: 'Boodschappen' } }, mergeManifests([{ manifest: listsManifest }]));
     expect(r.kind).toBe('needsConfirm');
     expect(r.messageKey).toBe('circle.lists.remove_list_confirm');

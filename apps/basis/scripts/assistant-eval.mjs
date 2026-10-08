@@ -24,7 +24,8 @@ import { composeAssistantCatalogue } from '../src/telegram/assistantCatalogue.js
 import { createAssistantEngine } from '../src/v2/assistantEngine.js';
 import { scopeCatalogueToRole, roleHintsFor } from '../src/v2/botOpMap.js';
 import { listsGateRules } from '../src/v2/circleGate.js';
-import { HOUSEHOLD_TEMPLATE, templateLists, botPromptLines, expandAdds } from '../src/v2/householdTemplate.js';
+import { HOUSEHOLD_TEMPLATE, templateLists, expandAdds } from '../src/v2/householdTemplate.js';
+import { botPromptLines } from '../src/v2/botPrompt.js';
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { FIXTURES } from './assistant-eval.fixtures.mjs';
 import { detectLang } from '../src/v2/assistantLanguage.js';

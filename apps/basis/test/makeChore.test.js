@@ -28,7 +28,7 @@ describe('a line becomes a chore', () => {
   afterAll(async () => { await agent?.stop?.().catch(() => {}); if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {}); });
 
   it('"melk voor Bob" on Boodschappen is a chore of Bob\'s on Boodschappen; a line already there becomes one, same id', async () => {
-    expect(BOT_OP_MAP.member).toContain('makeChore');
+    expect(BOT_OP_MAP.member).toContain('lists.makeChore');
     dir = await mkdtemp(path.join(tmpdir(), 'make-chore-'));
     const pass = randomBytes(32).toString('base64url');
     await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });

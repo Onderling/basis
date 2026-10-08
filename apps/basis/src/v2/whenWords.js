@@ -22,6 +22,17 @@ export function whenWords(at, { locale, tz, dayOnly = false } = {}) {
 }
 
 /**
+ * The time of day of a moment, on the household's clock: "10:00" ('' for a moment that is not one).
+ * @param {string|number|Date} at
+ * @param {{tz?: string}} [o]
+ */
+export function timeWords(at, { tz } = {}) {
+  const d = at instanceof Date ? at : new Date(at);
+  if (at == null || at === '' || Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', { ...(tz ? { timeZone: tz } : {}), hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+}
+
+/**
  * The date language a translator speaks: its bundle names it (`circle.reply.date_locale`), so a day is written in the
  * language the rest of the line is — on every shell, whatever language the person picked. Undefined when it names none.
  * @param {(key: string) => string} t

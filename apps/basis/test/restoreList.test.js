@@ -65,7 +65,7 @@ describe('removing a list, and putting it back', () => {
   it('removing and restoring a list are everyone\'s on the bot (an observer only reads)', () => {
     expect(botOpLevel('removeList')).toBe('authenticated');
     expect(botOpLevel('restoreList')).toBe('authenticated');
-    expect(BOT_OP_MAP.observer).not.toContain('removeList');
+    expect(BOT_OP_MAP.observer).not.toContain('lists.removeList');
   });
 });
 

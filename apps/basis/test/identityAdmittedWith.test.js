@@ -97,4 +97,21 @@ describe('a person admitted by the card\'s code, from their app', () => {
     expect(await d.write(bea, 'phone', '/help'), 'the phone still').toContain('circle.bot.help_memory');
     expect((await d.users.list()).filter((r) => r.channel === 'web')).toHaveLength(1);
   });
+
+  it('a row admitted the OLD way (no root) is not kept by its key: one line to re-link, nothing run; a signed /start gives it its root', async () => {
+    const bea = await linkedPerson();
+    const d = await boot();
+    // admitted before this change: a web row with no root
+    await d.users.admit({ channel: 'web', uid: bea.webid });
+    const said = await d.write(bea, null, '/help');
+    expect(said, 'the one line').toContain('circle.bot.admission_relink');
+    expect(said, 'nothing run').not.toContain('circle.bot.help_memory');
+    expect(await d.write(bea, null, '/help'), 'once').toBe('');
+    // the person re-links: a fresh code, typed in their app, signed
+    await d.admission.openCohort({ ceiling: 3, days: 1 });
+    await d.write(bea, 'phone', `/start ${await d.admission.code()}`);
+    const row = (await d.users.list()).find((r) => r.channel === 'web');
+    expect(row.linkedRoot).toBe(bea.root);
+    expect(await d.write(bea, 'phone', '/help'), 'acts as before').toContain('circle.bot.help_memory');
+  });
 });

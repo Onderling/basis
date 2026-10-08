@@ -102,12 +102,19 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
      * @param {string} uid
      * @param {{linkedRoot?: string|null}} [o]
      */
+    /** An inbox-door row admitted the OLD way (no root): its person re-links with `/start <code>` from their app. */
+    async needsRelink(channel, uid) {
+      if (channel !== 'web') return false;
+      const row = await store.get(idOf(channel, String(uid ?? '').trim()));
+      return !!row && !row.hidden && !row.linkedRoot;
+    },
     async find(channel, uid, { linkedRoot = null } = {}) {
       const u = String(uid ?? '').trim();
       const row = await store.get(idOf(channel, u));
       // an inbox-door row admitted WITH a statement is found only through one chaining to its root: the key a turn came
       // from is held by every device of the person, a revoked one too
-      if (row && !row.hidden) return (channel === 'web' && row.linkedRoot && row.linkedRoot !== linkedRoot) ? null : row;
+      // — and a row admitted the old way (no root) is not kept by its key at all: it re-links with `/start <code>`
+      if (row && !row.hidden) return (channel === 'web' && (!row.linkedRoot || row.linkedRoot !== linkedRoot)) ? null : row;
       if (channel !== 'web' || typeof linkedRoot !== 'string' || !linkedRoot) return null;
       return (await store.list()).find((r) => r && !r.hidden && r.linkedRoot === linkedRoot) ?? null;
     },
@@ -258,7 +265,11 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     // The code: a field on the message (the bot's inbox — from the card), or `/start <code>` (Telegram's link).
     const m = /^\/start(?:@\S+)?\s+(\S+)/.exec(String(who?.text ?? '').trim());
     const code = typeof who?.admission === 'string' && who.admission ? who.admission : m?.[1];
-    if (!code) return { refused: 'needs-code', id };
+    // a row admitted the old way (no root) is not kept by its key: one line to re-link, then the same /start as anyone
+    if (!code) return { refused: (typeof users.needsRelink === 'function' && await users.needsRelink(who.channel, uid)) ? 'relink' : 'needs-code', id };
+    // at the inbox door an admission is the person's own signed act (`/start <code>` from their app): without a device
+    // statement it would make a row nobody can speak as — refused before the code is spent
+    if (who.channel === 'web' && !linkedRoot) return { refused: 'relink', id };
     const r = await admission.redeem(code);
     if (!r.ok) return { refused: r.reason, id };
     const row = await users.admit({ ...who, role: r.role ?? null, ...(linkedRoot ? { linkedRoot } : {}) });

@@ -501,6 +501,10 @@
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
   },
+  "membercard_close": {
+    "text": "Sluiten",
+    "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
+  },
   "detail_empty": {
     "text": "Nog niks hier.",
     "doc": "Empty state inside a circle detail view."
@@ -3446,7 +3450,7 @@
         "doc": "P1.7 — author chip: hide agent chatter (Frits' case)."
       },
       "agents": {
-        "text": "Agents",
+        "text": "Bots",
         "doc": "P1.7 — author chip: only what the agents said."
       }
     }
@@ -4145,6 +4149,10 @@
     "apps_none_left": "Er moet minstens één app aan blijven.",
     "status": "Apps: {{apps}}\nModel: {{model}}\nDeur: {{door}}\nGesprekken in het logboek: {{turns}}\nStandaard geheugen: {{memory}}\nToegelaten mensen: {{users}}",
     "users_none": "Nog niemand toegelaten.",
+    "admission_relink": {
+      "text": "Koppel opnieuw: typ /start <code> in de app (de code geeft de beheerder, zoals altijd).",
+      "doc": "Told once to a person admitted at the bot's inbox before their app signed its turns: they re-link with a fresh code."
+    },
     "admission_needs_code": {
       "text": "Om met deze assistent te praten heb je een code nodig van de beheerder. Stuur dan: /start <code>",
       "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
@@ -4362,11 +4370,11 @@
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_morning": {
-      "text": "'s ochtends (08:00)",
+      "text": "'s ochtends ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_evening": {
-      "text": "de avond ervoor (19:00)",
+      "text": "de avond ervoor ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_before": {

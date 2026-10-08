@@ -56,7 +56,6 @@ import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { initLocalisation, t } from '../src/localisation.js';
 import { createTelegramRunner } from '../src/telegram/runner.js';
 import { loadAssistantItems } from '../src/v2/assistantEngine.js';
-import { DEFAULT_RELAY_URL } from '../src/v2/relayPref.js';   // named in the banner only — a headless node dials what its operator set
 import { interpretToCommand } from '../src/v2/interpretCommand.js';
 import { createBotUsers, contactBookStore, createDoorAdmit } from '../src/v2/botUsers.js';
 import { createBotThreads, dataSourceRowStore, ASSISTANT_MEMORY_DEFAULT_KEY } from '../src/v2/botThreads.js';
@@ -901,7 +900,12 @@ if (tgToken || inboxDoor.bridge) {
     store: dataSourceRowStore(await stores.botAdmissionSource(), 'mem://basis/bot-admission/'),
   });
   // The door's admission, once: who is let in, their tier in the gate, and the role their thread's tools follow.
-  const doorAdmit = createDoorAdmit({ users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller });
+  const doorAdmit = createDoorAdmit({
+    users: botUsers, admission, bootstrapUids, setDoorCaller: agent.setDoorCaller, clearDoorCaller: agent.clearDoorCaller,
+    // admitted at the inbox door WITH a device statement: the person's app hears it (the identity link, made below;
+    // read at the time of the admission, never before the box is up)
+    onAdmittedWith: (row, who) => identityLink?.admittedWith(row, who),
+  });
   // Everyone in the book is in the gate from the start: the reminder tick and the Sunday overview act AS a person, and
   // after a restart nobody has written yet. A book the gate cannot take is said, not fatal (the door still tiers on the
   // next message).
@@ -1447,7 +1451,7 @@ const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null)
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);
 console.log(`  log       ${deviceLog.size} entr${deviceLog.size === 1 ? 'y' : 'ies'} restored from disk`);
-console.log(`  wire      ${relayUrl || `LOCAL ONLY — no relay set (a person's device would use ${DEFAULT_RELAY_URL}; the box dials only ONDERLING_RELAY_URL)`}`);
+console.log(`  wire      ${relayUrl || 'LOCAL ONLY (set ONDERLING_RELAY_URL to join the relay)'}`);
 console.log(`  telegram  ${tgToken ? 'on' : 'off (no token)'}`);
 // the address another node names this one by — e.g. the household's companion, when its owner grants this bot a place there
 console.log(`  address   ${agent.identity?.chat?.pubKey ?? '—'}`);

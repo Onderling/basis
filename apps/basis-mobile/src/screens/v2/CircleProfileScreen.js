@@ -9,6 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { plannedForMe, plannedLines } from '../../../../basis/src/v2/plannedForMe.js';
@@ -18,8 +19,12 @@ import CircleScreenView from './CircleScreenView.js';
 
 export default function CircleProfileScreen({ callSkill, personClock = null, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: the title and scrolled content drew under it
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [profile, setProfile] = useState({});
+  // The identity fields are editable only once the profile has ANSWERED: before that they are empty, and what
+  // someone typed there was overwritten when the load landed a few seconds later (seen on a phone, 2026-10-08).
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [categories, setCategories] = useState([]);
   const [handle, setHandle] = useState('');
   const [display, setDisplay] = useState('');
@@ -44,6 +49,7 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
     setProfile(entry);
     setHandle(entry.handle ?? '');
     setDisplay(entry.displayName ?? '');
+    if (prof) setProfileLoaded(true);
     setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
     try {
       const me = (await callSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
@@ -89,13 +95,18 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
   const catLabel = (id) => categories.find((c) => c.id === id)?.label ?? id;
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-profile">
+    <View style={styles.wrap}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} testID="circle-profile">
       <Text style={styles.title}>{t('circle.profile.title')}</Text>
 
       <Section title={t('circle.profile.identity')}>
-        <Field label={t('circle.profile.handle')} value={handle} onChangeText={setHandle} testID="profile-handle" />
-        <Field label={t('circle.profile.displayName')} value={display} onChangeText={setDisplay} testID="profile-display" />
-        <Pressable style={styles.primary} onPress={saveIdentity} testID="profile-save"><Text style={styles.primaryText}>{t('circle.profile.save')}</Text></Pressable>
+        <Field label={t('circle.profile.handle')} value={handle} onChangeText={setHandle} editable={profileLoaded} testID="profile-handle" />
+        <Field label={t('circle.profile.displayName')} value={display} onChangeText={setDisplay} editable={profileLoaded} testID="profile-display" />
+        <Pressable
+          style={[styles.primary, (!profileLoaded || busy) && styles.primaryDisabled]}
+          onPress={saveIdentity} disabled={!profileLoaded || busy}
+          accessibilityState={{ disabled: !profileLoaded || busy }} testID="profile-save"
+        ><Text style={styles.primaryText}>{t('circle.profile.save')}</Text></Pressable>
       </Section>
 
       {/* Fold-in phase C (web parity, circleProfile.js) — quiet pointer to the
@@ -137,7 +148,8 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
           : planned.map((line, i) => <Text key={`${i}-${line}`} style={styles.plannedItem} testID="profile-planned-item">{line}</Text>)}
         {weekOn !== undefined ? (
           <View style={styles.weekRow}>
-            <Text style={styles.muted}>{t('circle.profile.week_switch')}</Text>
+            {/* The label wraps; the switch keeps its place on the screen (a long label pushed it off the edge). */}
+            <Text style={[styles.muted, styles.weekLabel]}>{t('circle.profile.week_switch')}</Text>
             <Pressable
               testID="profile-week-toggle"
               accessibilityRole="switch"
@@ -205,6 +217,7 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
       )}
       {busy && <Text style={styles.muted}>{t('circle.profile.saving')}</Text>}
     </ScrollView>
+    </View>
   );
 }
 
@@ -218,19 +231,20 @@ function Section({ title, children }) {
     </View>
   );
 }
-function Field({ label, value, onChangeText, testID }) {
+function Field({ label, value, onChangeText, editable = true, testID }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput style={styles.input} value={value} onChangeText={onChangeText} autoCapitalize="none" testID={testID} />
+      <TextInput style={[styles.input, !editable && styles.inputWaiting]} value={value} onChangeText={onChangeText} editable={editable} autoCapitalize="none" testID={testID} />
     </View>
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: theme.color.paper },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  wrap: { flex: 1, paddingTop: insets?.top ?? 0, backgroundColor: theme.color.paper },
+  scroll: { flex: 1 },
   content: { padding: 16, gap: 16, paddingBottom: 80 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   section: { borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, padding: 12, gap: 10, backgroundColor: theme.color.paper },
@@ -240,11 +254,14 @@ const makeStyles = (theme) => StyleSheet.create({
   input: { flex: 1, fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   primary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.accent, justifyContent: 'center', alignSelf: 'flex-start' },
+  primaryDisabled: { opacity: 0.4 },
+  inputWaiting: { opacity: 0.5 },
   primaryText: { fontSize: 14, fontWeight: '600', color: theme.color.white },
   secondary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent, alignSelf: 'flex-start' },
   secondaryText: { fontSize: 14, fontWeight: '600', color: theme.color.accent },
   muted: { fontSize: 13, color: theme.color.inkSoft },
-  offeringsMoved: { fontSize: 12.5, fontStyle: 'italic', color: theme.color.inkSoft },
+  // The two pointers into personas are LINKS (they open Me → personas) — painted as links, not as footnotes.
+  offeringsMoved: { fontSize: 13.5, fontWeight: '600', color: theme.color.accent, textDecorationLine: 'underline' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   offeringChip: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 14, borderWidth: 1, borderColor: theme.color.line },
   offeringChipText: { fontSize: 13, color: theme.color.ink },
@@ -253,6 +270,7 @@ const makeStyles = (theme) => StyleSheet.create({
   locCurrent: { fontSize: 14, color: theme.color.ink },
   plannedItem: { fontSize: 14, color: theme.color.ink },
   weekRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
+  weekLabel: { flex: 1 },
   weekToggle: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radius ?? 6, borderWidth: 1, borderColor: theme.color.ink },
   weekToggleText: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
   locResult: { flex: 1, fontSize: 14, color: theme.color.ink },

@@ -50,6 +50,15 @@ describe('relay queue retention', () => {
     const appTtl = constantIn('../../secure-agent/src/createSecureAgent.js', ...APP_TTL);
     expect(appTtl).toBe(constantIn('../src/server.js', ...RELAY_TTL));
   });
+  it('a linked person\'s turn held for the whole hold still verifies at the bot — its statement window covers the hold', () => {
+    // The bot accepts a linked turn only while its device statement is inside a window; a turn the sender's device or
+    // the relay held while the bot was away arrives late by up to the hold. Two layers, one fact: the window must cover
+    // the hold (and a little slack for the clocks), or a held turn arrives only to be refused as stale.
+    const hold = constantIn('../../secure-agent/src/createSecureAgent.js', ...APP_TTL);
+    const relay = constantIn('../src/server.js', ...RELAY_TTL);
+    const turnWindow = constantIn('../../../apps/basis/src/v2/botIdentityLink.js', /LINKED_TURN_WINDOW_MS\s*=\s*([^;\n]+)/, 'LINKED_TURN_WINDOW_MS');
+    expect(turnWindow).toBeGreaterThan(Math.max(hold, relay));
+  });
 });
 
 describe('what actually bounds memory is the CAP, not the TTL', () => {

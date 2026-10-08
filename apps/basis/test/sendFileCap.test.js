@@ -92,3 +92,37 @@ describe('/send-file — the door\'s own size question, on the shared code', () 
     expect(h.peerCalls).toHaveLength(0);
   });
 });
+
+describe('/send-file goes over whichever route is up', () => {
+  it('NKN down, the relay up: the picker opens and the file is sent (it went no further than "not connected")', async () => {
+    let picked = false;
+    const peerCalls = [];
+    const agent = {
+      identity: { chat: { pubKey: 'pk', stableId: 'sid' }, host: { webid: 'https://a/profile#me' } },
+      peer: { address: 'app.peer-addr', status: 'disconnected' },
+      isPeerReachable: () => true,   // the relay is connected
+      sendPeerMessage: async (addr, msg, opts) => { peerCalls.push({ addr, msg, opts }); return { ok: true }; },
+    };
+    const handlers = createLocalBuiltins({
+      catalogue: [], t, threadStore: { get: () => null, upsert: () => {}, list: () => [] }, setActive: () => {},
+      callSkill: async () => ({}), localActor: 'me', agent,
+      openFilePicker: async () => { picked = true; return { name: 'foto.jpg', type: 'image/jpeg', size: 1000, dataB64: 'AAAA' }; },
+    });
+    const r = await handlers['send-file']({ peer: 'app.peer-addr' });
+    expect(picked, 'the picker opened').toBe(true);
+    expect(r?.error).toBeUndefined();
+    expect(peerCalls.length).toBeGreaterThan(0);
+  });
+
+  it('nothing up at all: not connected, and no picker', async () => {
+    let picked = false;
+    const agent = { peer: { status: 'disconnected' }, isPeerReachable: () => false, sendPeerMessage: async () => ({ ok: true }) };
+    const handlers = createLocalBuiltins({
+      catalogue: [], t, threadStore: { get: () => null, upsert: () => {}, list: () => [] }, setActive: () => {},
+      callSkill: async () => ({}), localActor: 'me', agent, openFilePicker: async () => { picked = true; return null; },
+    });
+    const r = await handlers['send-file']({ peer: 'app.peer-addr' });
+    expect(r.error).toContain('sendFile.not_connected');
+    expect(picked).toBe(false);
+  });
+});

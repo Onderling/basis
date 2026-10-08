@@ -49,7 +49,7 @@ import EnrollDeviceModal from './EnrollDeviceModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
-import { loadCompanionGrantPicker, companionGrantText } from '../../../../basis/src/v2/companionGrant.js';
+import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
@@ -90,8 +90,16 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
   const [companions, setCompanions] = useState([]);    // the nodes this person owns: [{node, short}]
+  const [companionsPending, setCompanionsPending] = useState(null);   // "intrekken onderweg bij n companion(s)", or null
   // the open grant on one node: {node, picker (null while asked), to, picked: family ids, line (how it ended)}
   const [grant, setGrant] = useState(null);
+  // who each node granted: { [node]: {ok, rows: [{to, label, may}]} | {ok: false, message}, said?: string }
+  const [holders, setHolders] = useState({});
+  const loadHolders = useCallback(async (node, said = null) => {
+    const r = await loadCompanionGrantRows({ callSkill, node, t }).catch(() => null);
+    setHolders((h) => ({ ...h, [node]: { ...(r ?? { ok: false, message: t('circle.companionGrant.failed') }), said } }));
+  }, [callSkill]);
+  useEffect(() => { for (const c of companions) loadHolders(c.node); }, [companions, loadHolders]);
   const [connections, setConnections] = useState([]);  // paired views ("gekoppelde apparaten")
   const [offerText, setOfferText] = useState('');      // the pasted onderling-connect:// code
   const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
@@ -254,6 +262,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     // the nodes this person claimed (their own list; each node keeps its owner itself)
     setCompanions(Object.values(ownedNodesOf({ properties: profProps?.properties ?? {} }))
       .map((n) => ({ node: n.address, short: n.label || `${n.address.slice(0, 8)}…` })));
+    setCompanionsPending(pendingRevokeLine({ properties: profProps?.properties ?? {} }, t));
     // The paired views. A read, never an authority: the grants live in the agent's durable
     // registry and the acting door reads THAT, so a stale list can only look stale.
     const conns = await callSkill('household', 'listSurfaceGrants', {}).catch(() => null);
@@ -473,6 +482,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           access" asks the node what it can give, then who (a contact) and the ticks. Web parity: circleMyData.js. */}
       {companions.length > 0 && (
         <Section title={t('circle.companionGrant.nodes')}>
+          {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}
           {companions.map((c) => {
             const open = grant?.node === c.node ? grant : null;
             const picker = open?.picker ?? null;
@@ -491,6 +501,23 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
                     <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.give')}</Text>
                   </Pressable>
                 </View>
+                {/* who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken" */}
+                {holders[c.node]?.said ? <Text style={styles.privacyBody}>{holders[c.node].said}</Text> : null}
+                {holders[c.node] && !holders[c.node].ok && <Text style={styles.privacyBody}>{holders[c.node].message}</Text>}
+                {(holders[c.node]?.rows ?? []).map((h) => (
+                  <View key={h.to} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 }}>
+                    <Text style={[styles.privacyBody, { flex: 1, paddingRight: 8 }]}>{`${h.label} — ${h.may}`}</Text>
+                    <Pressable
+                      testID={`mydata-companion-revoke-${h.to.slice(0, 8)}`}
+                      onPress={async () => {
+                        const r = await callSkill('household', 'revokeCompanionGrant', { node: c.node, to: h.to }).catch(() => null);
+                        loadHolders(c.node, companionRevokeText(r, t));
+                      }}
+                    >
+                      <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.revoke')}</Text>
+                    </Pressable>
+                  </View>
+                ))}
                 {open && !picker && <Text style={styles.privacyBody}>{t('circle.companionGrant.loading')}</Text>}
                 {open && open.line && <Text style={styles.privacyBody} testID="mydata-companion-line">{open.line}</Text>}
                 {open && picker && !open.line && !picker.ok && <Text style={styles.privacyBody}>{picker.message}</Text>}
@@ -521,6 +548,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
                         if (!open.to || open.picked.length === 0) { setGrant({ ...open, note: t('circle.companionGrant.nothing_ticked') }); return; }
                         const r = await callSkill('household', 'grantCompanion', { node: c.node, to: open.to, families: open.picked }).catch(() => null);
                         setGrant({ ...open, line: companionGrantText(r, t) });
+                        loadHolders(c.node);
                       }}
                     >
                       <Text style={styles.actionLabel}>{t('circle.companionGrant.confirm')}</Text>

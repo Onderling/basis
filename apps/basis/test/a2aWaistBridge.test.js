@@ -109,7 +109,7 @@ describe('the A2A bridge — a peer invokes a declared op through the waist', ()
   it("granting what the person's node lets another agent do is refused even holding a token for it", async () => {
     const { A, owner, caller } = await ownerAndCaller();
     await A.sa.trust?.setTier?.(owner.identity.pubKey, 'trusted');
-    for (const op of ['household.grantCompanion', 'household.companionGrantChoices']) {
+    for (const op of ['household.grantCompanion', 'household.companionGrantChoices', 'household.companionGrantList', 'household.revokeCompanionGrant']) {
       const token = await grantFor(A, caller, op);
       await expect(
         owner.policyEngine.checkInbound({ peerPubKey: caller.pubKey, skillId: op, token }),

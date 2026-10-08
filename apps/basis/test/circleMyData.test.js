@@ -233,4 +233,37 @@ describe('renderCircleMyData', () => {
     expect(notes).toEqual(['antwoordt niet', 'circle.companionGrant.to_none']);
     expect(renderCircleMyData(document.createElement('div'), { t }).querySelector('.cc-mydata__companion')).toBeNull();
   });
+
+  it('my agents: one line per agent the node granted — what it may, and "intrekken", which revokes and reads again', async () => {
+    let held = [{ to: 'B'.repeat(43), label: 'Huishoudbot', may: 'mag: agenda-bestanden plaatsen' }];
+    const revoked = [];
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }],
+      onOpenCompanionGrant: async () => ({ ok: true, targets: [], choices: [] }),
+      onGrantCompanion: async () => '',
+      onLoadCompanionGrants: async () => ({ ok: true, rows: held }),
+      onRevokeCompanionGrant: async (a) => { revoked.push(a); held = []; return 'ingetrokken'; },
+    });
+    await new Promise((r) => { setTimeout(r, 0); });
+    const line = el.querySelector('.cc-mydata__companion-holder');
+    expect(line.textContent).toContain('Huishoudbot');
+    expect(line.textContent).toContain('mag: agenda-bestanden plaatsen');
+    line.querySelector('.cc-mydata__companion-revoke').click();
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(revoked).toEqual([{ node: 'N'.repeat(43), to: 'B'.repeat(43) }]);
+    expect(el.querySelector('.cc-mydata__companion-holder')).toBeNull();
+    expect(el.querySelector('.cc-mydata__companion-holders').textContent).toContain('ingetrokken');
+  });
+
+  it('my agents: while revokes are on their way, the section says so', () => {
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'a' }], companionsPending: 'onderweg bij 1',
+      onOpenCompanionGrant: async () => ({ ok: true, targets: [], choices: [] }), onGrantCompanion: async () => '',
+    });
+    expect(el.querySelector('.cc-mydata__companion-pending').textContent).toBe('onderweg bij 1');
+    const none = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'a' }], onOpenCompanionGrant: async () => ({}), onGrantCompanion: async () => '',
+    });
+    expect(none.querySelector('.cc-mydata__companion-pending')).toBeNull();
+  });
 });

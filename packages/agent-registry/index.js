@@ -47,7 +47,7 @@ export {
   } from './src/deviceDelegations.js';
 // The headless nodes the person claimed (a companion): where they are owner, so every device manages them and
 // every claimed node hears of a revoked device.
-export { OWNED_NODES_KEY, isOwnedNodeRecord, ownedNodesOf, setOwnedNode } from './src/ownedNodes.js';
+export { OWNED_NODES_KEY, isOwnedNodeRecord, ownedNodesOf, setOwnedNode, addPendingRevokes, clearPendingRevoke, pendingRevokesOf } from './src/ownedNodes.js';
 // identity step 5A — encrypted-file/DB export of the profile set
 export { exportProfileRegistry, importProfileRegistry, restoreProfilesInto } from './src/exportRegistry.js';
 export { registerAgentBundle } from './src/registerAgentBundle.js';

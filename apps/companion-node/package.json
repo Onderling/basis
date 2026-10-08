@@ -2,7 +2,7 @@
   "name": "@onderling-app/companion-node",
   "version": "0.1.0",
   "private": true,
-  "description": "companion-node \u2014 a user-hostable Node process that remotely hosts Folio's relocatable (runtime:'browser') pod-file agent, reachable by the user's own devices over the mesh. Slice R1 (LAN/trusted, no gate).",
+  "description": "companion-node \u2014 a user-hostable Node process that remotely hosts Folio's relocatable (runtime:'browser') pod-file agent, reachable by the user's own devices over the mesh. Gated: calls take a token it issued, or its owner's device statement.",
   "type": "module",
   "main": "src/index.js",
   "exports": {

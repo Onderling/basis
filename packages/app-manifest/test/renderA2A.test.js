@@ -64,6 +64,7 @@ describe('renderA2A projects declared ops into kernel skills', () => {
       'household.grantSurface', 'household.revokeSurface', 'household.listSurfaceGrants',
       'household.claimCompanion',
       'household.grantCompanion', 'household.companionGrantChoices',
+      'household.companionGrantList', 'household.revokeCompanionGrant',
     ]) expect(NEVER_DELEGABLE.has(id), `${id} fell out of the withhold list`).toBe(true);
   });
 

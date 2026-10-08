@@ -40,6 +40,8 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // statement for the person's node — a peer must not get the person's device to sign for it.
   'household.grantCompanion',
   'household.companionGrantChoices',
+  'household.companionGrantList',
+  'household.revokeCompanionGrant',
   // Authority over authority: a connection that could grant connections is a connection that owns you.
   'household.grantSurface',
   'household.revokeSurface',

@@ -1,4 +1,37 @@
 {
+  "assistant.hello": {
+    "doc": "A greeting and nothing else (\"hi\", \"good morning\"): the bot says its greeting line, without the model.",
+    "patterns": [
+      "(hi|hii|hello|hullo|hey|good morning|good afternoon|good evening) (there|all|everyone)?"
+    ],
+    "examples": [
+      "hi",
+      "Hello!",
+      "hullo",
+      "good morning",
+      "hi there"
+    ],
+    "not": [
+      "hi, add milk to the shopping list",
+      "hello who does the lamp"
+    ]
+  },
+  "assistant.remindMe.everyone": {
+    "doc": "A reminder for everyone in the household at a time: \"remind everyone at 19:45: dinner\" (the words after the colon are what is said).",
+    "patterns": [
+      "remind everyone {time}: {text}",
+      "remind everyone {time} (to|that|about) {text}"
+    ],
+    "examples": [
+      "remind everyone at 19:45: dinner",
+      "Remind everyone at 7 pm: dinner",
+      "remind everyone at 19:30 to take the bins out"
+    ],
+    "not": [
+      "remind me at 19:45 about the dentist",
+      "remind everyone about the dentist"
+    ]
+  },
   "lists.addToList.named": {
     "doc": "Put one or more things on a list the household names (\"melk en kaas\" are two).",
     "patterns": [
@@ -10,6 +43,22 @@
     ],
     "not": [
       "add a comment to the agenda later please"
+    ]
+  },
+  "tasks.listMine.who": {
+    "doc": "Someone else's open chores, by the name the person uses for them (\"what does Bob have to do\").",
+    "patterns": [
+      "what does {person} (still)? have to do",
+      "what (tasks|chores) does {person} (still)? have"
+    ],
+    "examples": [
+      "what does Bob still have to do",
+      "What does Ann have to do?",
+      "what chores does Ann have"
+    ],
+    "not": [
+      "what do i still have to do",
+      "what does it have to do"
     ]
   },
   "lists.listEntries.named": {
@@ -39,6 +88,20 @@
       "what do i do with the milk"
     ]
   },
+  "tasks.listOpen.words": {
+    "doc": "Who does a chore, and when: the open chores whose words hold the words said (\"who does the lamp\").",
+    "patterns": [
+      "who (does|is doing|will do|takes) (the)? {item}"
+    ],
+    "examples": [
+      "who does the lamp",
+      "Who is doing the windows?"
+    ],
+    "not": [
+      "who does what",
+      "who does it"
+    ]
+  },
   "assistant.weekOverview": {
     "doc": "The person's week: their chores, the appointments, what is open.",
     "patterns": [
@@ -49,6 +112,23 @@
     ],
     "not": [
       "what's on the shopping list"
+    ]
+  },
+  "assistant.weekOverview.day": {
+    "doc": "One day of the person's week: that day's appointments with who comes, and its chores with who does them.",
+    "patterns": [
+      "who is (in|home|around|there)? (on)? {day}",
+      "(what's|what is) (on)? {day}",
+      "what (happens|is happening) {day}"
+    ],
+    "examples": [
+      "who is in on saturday",
+      "What's on tomorrow?",
+      "who is home friday"
+    ],
+    "not": [
+      "what's on this week",
+      "who is in"
     ]
   },
   "lists.markListItemDone.stated": {

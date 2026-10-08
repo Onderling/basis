@@ -151,7 +151,8 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
 
     const el2 = mount();
     const onSettings = vi.fn();
-    renderCircleView(el2, { circle, rows, t, more: { settings: onSettings } });
+    // As an ADMIN: settings is reserved for the circle's admins and waits greyed for anyone else (menuAdminOnly.test.js).
+    renderCircleView(el2, { circle, rows, t, more: { settings: onSettings }, viewerIsAdmin: true });
     const trigger = el2.querySelector('.circle-view__more');
     expect(trigger).not.toBeNull();
     const menu = el2.querySelector('.circle-view__more-menu');

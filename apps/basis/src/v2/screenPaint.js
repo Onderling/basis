@@ -56,7 +56,7 @@ export function screenPanels({ ops, catalogue, isAdmin = () => false, t, order =
 /** The panels for a grant, from the bot's door catalogue as the screen's code knows it (a household bot's apps). */
 export function screenPanelsForGrant(ops, t) {
   const { catalogue } = composeAssistantCatalogue({ apps: ['lists', 'tasks', 'calendar'], slim: true });
-  const isAdmin = (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibility === 'trusted' : botOpLevel(entry.op?.id) === 'trusted');
+  const isAdmin = (entry) => (entry.appOrigin === 'assistant' ? entry.op?.visibility === 'trusted' : botOpLevel(`${entry.appOrigin}.${entry.op?.id}`) === 'trusted');
   return screenPanels({ ops, catalogue, isAdmin, t, order: SCREEN_ORDER });
 }
 

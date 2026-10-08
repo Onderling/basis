@@ -15,12 +15,22 @@
  *                                                   "Afspraak 'tandarts' staat op di 14 okt 10:00."
  *   list         a list's own verbs (made, removed, put back, a line edited or made a chore): the op's own sentence
  *
+ * …and the people reads, worded the same way (a read without its question is painted as a list, as before):
+ *   who          the chores that hold some words, with who does them and when ("wie doet de lamp")
+ *                                                   "Klusje 'lamp vervangen' is van Bob, za 10 okt."
+ *   mine         someone else's open chores, by the name asked ("wat moet Bob doen")
+ *                                                   "Bob doet: lamp vervangen (za 10 okt); ramen."
+ *   day          one day: its appointments with who comes, its chores with who does them ("wie is er zaterdag")
+ *
+ * A person a reader may not name is "iemand" in these lines — the reads hand over `{you}`, `{name}` or `{someone}` per
+ * person, under the household's names ceiling; a row that never went through it names nobody, and never an id.
+ *
  * Within one turn the lines of a family fold into one ("melk", "brood" added to one list is one line); a door that
  * paints a turn at once folds them (`replyLines`), a door that paints each reply on its own says each (`replyLine`).
  * A family op that did not hand over what it did says its own sentence; an op outside the families, and a refusal, get
  * no line here (the door paints them as it always did). The words are the locale's; the day is `whenWords`.
  */
-import { whenWords, dateLocaleOf } from './whenWords.js';
+import { whenWords, timeWords, dateLocaleOf } from './whenWords.js';
 import { translatorOr } from '../locales/translatorOr.js';
 
 /** The op families: op id → family. The ops a household bot reaches that act (its reads are painted as lists). */
@@ -44,7 +54,17 @@ export const REPLY_FAMILY = Object.freeze({
   restoreList: 'list',
   editEntry: 'list',
   entryReminders: 'list',
+  // the people reads
+  listOpen: 'who',
+  listMine: 'mine',
+  weekOverview: 'day',
 });
+
+/** The families that READ: a door paints their line instead of the list it would paint (`isReadFamily`). */
+const READ_FAMILIES = new Set(['who', 'mine', 'day']);
+
+/** Is this op one of the people reads (its answer a line, when it carries its question)? */
+export const isReadFamily = (opId) => READ_FAMILIES.has(REPLY_FAMILY[bareOp(opId)]);
 
 const RSVP = Object.freeze({ rsvpAccept: 'accepted', rsvpDecline: 'declined', rsvpTentative: 'tentative' });
 
@@ -81,6 +101,12 @@ export function replyFact(result, { opId, args = {} } = {}) {
         : own;
     case 'chore':
       return choreOpFact(id, result, args) ?? own;
+    case 'who':
+      return whoFact(result, args);
+    case 'mine':
+      return mineFact(result);
+    case 'day':
+      return dayFact(result);
     case 'appointment': {
       if (!result.title || !result.startsAt) return own;
       const key = id === 'addEvent' ? (result.duplicate ? 'circle.calendar.already_there' : 'circle.calendar.added')
@@ -126,10 +152,88 @@ function choreOpFact(id, result, args) {
   }
 }
 
+/** The people a row names, as a reader may see them: their own `{you}`, a `{name}`, or `{someone}` they may not name. */
+const RAW_HOLDERS = (row) => [...(Array.isArray(row?.assignees) ? row.assignees : []), row?.assignee].filter(Boolean);
+function holdersOf(row) {
+  if (Array.isArray(row?.heldBy)) return row.heldBy;
+  // a row that never went through the reader's ceiling: who holds it is not named here, and never by its id
+  const raw = RAW_HOLDERS(row);
+  return raw.length || row?.state === 'claimed' ? [{ someone: true }] : [];
+}
+const titleOf = (row) => row?.text ?? row?.title ?? row?.label ?? '';
+const choreDue = (row) => (row?.dueAt ? { at: row.dueAt, dayOnly: 'auto', suffix: true } : { at: null, dayOnly: 'auto', suffix: true });
+
+/** "wie doet de lamp": the chores holding the words — none, one with who and when, or several, one row each. */
+function whoFact(result, args) {
+  const words = typeof result?.text === 'string' && result.text.trim() ? result.text.trim()
+    : (typeof args?.text === 'string' && args.text.trim() ? args.text.trim() : null);
+  const rows = Array.isArray(result?.items) ? result.items : null;
+  if (!words || !rows) return null;
+  const family = 'who';
+  const choreOf = (row, held, open) => {
+    const who = holdersOf(row);
+    return who.length ? { key: held, vars: { title: titleOf(row) }, who, when: choreDue(row) } : { key: open, vars: { title: titleOf(row) }, when: choreDue(row) };
+  };
+  if (!rows.length) return { family, key: 'circle.reply.who_none', vars: { text: words } };
+  if (rows.length === 1) return { family, ...choreOf(rows[0], 'circle.reply.who_held', 'circle.reply.who_open') };
+  return { family, key: 'circle.reply.who_several', vars: { count: rows.length, text: words }, rows: rows.map((r) => choreOf(r, 'circle.reply.who_row_held', 'circle.reply.who_row_open')) };
+}
+
+/** "wat moet Bob doen": the chores of the person named (the read says whose); one's own stays the list. */
+function mineFact(result) {
+  const name = typeof result?.whose === 'string' && result.whose ? result.whose : null;
+  const rows = Array.isArray(result?.items) ? result.items : null;
+  if (!name || !rows) return null;
+  const family = 'mine';
+  if (!rows.length) return { family, key: 'circle.reply.mine_none', vars: { name } };
+  return {
+    family, key: 'circle.reply.mine_list', vars: { name },
+    rows: rows.map((r) => (r?.dueAt
+      ? { key: 'circle.reply.mine_row_due', vars: { title: titleOf(r) }, when: { at: r.dueAt, dayOnly: 'auto' } }
+      : { key: 'circle.reply.mine_row', vars: { title: titleOf(r) } })),
+  };
+}
+
+/** A day as `YYYY-MM-DD` on the household's clock (its own midnight, not UTC's). */
+const localDay = (ymd) => { const [y, m, d] = String(ymd).split('-').map(Number); return y && m && d ? new Date(y, m - 1, d) : null; };
+
+/** "wie is er zaterdag": that day's appointments with who comes, and its chores with who does them. */
+function dayFact(result) {
+  const at = typeof result?.day === 'string' ? localDay(result.day) : null;
+  if (!at || !Array.isArray(result?.events) || !Array.isArray(result?.chores)) return null;
+  const family = 'day';
+  const when = { at, dayOnly: true };
+  if (!result.events.length && !result.chores.length) return { family, key: 'circle.reply.day_none', vars: {}, when };
+  const lines = [
+    { key: 'circle.reply.day_head', vars: {}, when },
+    ...result.events.map((e) => ({ key: 'circle.reply.day_event', vars: { time: e?.startsAt ?? null, title: titleOf(e) }, who: e?.everyone ? 'everyone' : (Array.isArray(e?.comes) ? e.comes : []) })),
+    ...result.chores.map((c) => ({ key: 'circle.reply.day_chore', vars: { title: titleOf(c) }, who: holdersOf(c), nobody: true })),
+  ];
+  return { family, lines };
+}
+
+/** People in the person's words: "jou", a name, "iemand" (once, however many), joined as their language joins a list. */
+function peopleWords(who, t) {
+  if (who === 'everyone') return t('circle.reply.who_everyone');
+  const words = [];
+  for (const p of who ?? []) {
+    const w = p?.you ? t('circle.reply.who_you') : (typeof p?.name === 'string' && p.name ? p.name : t('circle.reply.who_someone'));
+    if (!words.includes(w)) words.push(w);
+  }
+  try { return new Intl.ListFormat(dateLocaleOf(t), { type: 'conjunction' }).format(words); } catch { return words.join(', '); }
+}
+
 /** A fact in the person's words (`t` is theirs; its bundle names the date language). */
 function word(fact, t) {
   if (fact.message) return fact.message;
-  const vars = { ...(fact.item != null ? { text: (fact.items ?? [fact.item]).join(', ') } : {}), ...fact.vars };
+  if (Array.isArray(fact.lines)) return fact.lines.map((l) => word(l, t)).join('\n');
+  const vars = {
+    ...(Array.isArray(fact.rows) ? { chores: fact.rows.map((r) => word(r, t)).join('; ') } : {}),
+    ...(fact.item != null ? { text: (fact.items ?? [fact.item]).join(', ') } : {}),
+    ...fact.vars,
+  };
+  if (fact.who !== undefined) vars.who = Array.isArray(fact.who) && !fact.who.length && fact.nobody ? t('circle.reply.who_nobody') : peopleWords(fact.who, t);
+  if ('time' in vars) vars.time = timeWords(vars.time);
   if (fact.when) {
     const w = whenWords(fact.when.at, { locale: dateLocaleOf(t), dayOnly: fact.when.dayOnly });
     vars.when = fact.when.suffix ? (w ? `, ${w}` : '') : w;

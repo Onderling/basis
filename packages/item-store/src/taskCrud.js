@@ -18,7 +18,7 @@
  * `CircleItemStore` stamps the canonical BASE fields (`createdAt`/`createdBy`/
  * `updatedAt`/`updatedBy`) inside `put`, where the class `ItemStore` stamped its
  * own `addedAt`/`addedBy`/`_etag`. So `addTasks` builds the item BODY + defaults
- * and lets `store.put({ by: actor })` own the base metadata — exactly how the
+ * and lets `store.put({ by })` own the base metadata — exactly how the
  * lifecycle verbs already rely on `put`/`putIfMatch` to stamp it.
  *
  * ── ctx ──────────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ import { ulid } from './ulid.js';
 import { detectCycle } from './dag.js';
 import { audienceFromItem, audienceMatches, audienceMatchesAny } from './audience.js';
 import { ItemNotFoundError } from './errors.js';
-import { requireActor, gate, emit, resolveById } from './taskCtx.js';
+import { requireActor, gate, emit, resolveById, personOf } from './taskCtx.js';
 
 const TASK_TYPE = 'task';
 
@@ -78,7 +78,7 @@ export async function addTasks(store, partials, ctx = {}) {
       }
     }
     gate(ctx.rolePolicy, 'canAdd', actor, item);
-    const res = await store.put(item, { by: actor });
+    const res = await store.put(item, { by: personOf(ctx, actor, 'write') });
     created.push(res);
     emit(ctx, 'item-added', res);
   }
@@ -253,7 +253,7 @@ export async function update(store, id, patch, ctx = {}) {
   assertEditableFields(patch);
   gate(ctx.rolePolicy, 'canEditBody', actor, current, patch);
   const updated = { ...current, ...patch };
-  const res = await store.put(updated, { by: actor });
+  const res = await store.put(updated, { by: personOf(ctx, actor, 'write') });
   emit(ctx, 'item-updated', res);
   return res;
 }

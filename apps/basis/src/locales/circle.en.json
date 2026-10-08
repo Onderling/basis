@@ -4405,6 +4405,30 @@
       "text": "Say which appointment or chore, and when — for example: remind me an hour before the dentist.",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
+    "remind_everyone_set": {
+      "text": "I'll remind everyone {{when}}: {{text}}.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_today": {
+      "text": "today at {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_tomorrow": {
+      "text": "tomorrow at {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_usage": {
+      "text": "Say when and what — for example: remind everyone at 19:45: dinner.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_failed": {
+      "text": "That didn't work: the reminder for everyone was not saved.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "announce_say": {
+      "text": "Reminder for everyone: {{title}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
     "overview_on": {
       "text": "The weekly overview is on (Sunday 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4470,12 +4494,36 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "When something has a date, I remind you: at 08:00 everything of that day, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
+      "text": "Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
       "text": "Reminders are off for this household.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_rule": {
+      "text": "Reminders: {{rules}}. Your own way: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_morning": {
+      "text": "at {{time}} everything of that day (chores and appointments)",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_evening": {
+      "text": "the evening before at {{time}} for an appointment before {{until}}",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_before": {
+      "text": "{{n}} minutes before anything with a time",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_at": {
+      "text": "at {{time}} on the day itself",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_none": {
+      "text": "Reminders: the household sends none. Your own: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
     },
     "welcome_overview": {
       "text": "Want a weekly overview, Sundays at 18:00? Switch it on with /overzicht aan.",
@@ -4709,7 +4757,6 @@
     "screen_confirm_none": "None of these",
     "reminder_event_soon": "Soon: {{title}}, {{time}}.",
     "reminder_chore_soon": "Coming up: {{text}}, at {{time}}.",
-    "welcome_reminders_on_lead": "When something has a date, I remind you: at 08:00 everything of that day, {{lead}} minutes before it, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
     "menu_lead": "Reminder beforehand",
     "value_lead_min": "{{n}} minutes",
     "value_lead_off": "none",
@@ -4737,12 +4784,13 @@
           "entryReminders": "the reminders everyone gets for one appointment or chore (60 · morning · evening · also … · usual)"
         },
         "tasks": {
-          "listMine": "your own chores",
+          "listMine": "your own chores, or someone else's (or say: what does Bob have to do)",
           "claimTask": "take on a chore (or say: I'll do the windows)",
           "completeTask": "report a chore done (or say: windows are done)",
           "editTask": "change a chore",
           "removeTask": "remove a chore",
-          "reassignTask": "give a chore to someone else"
+          "reassignTask": "give a chore to someone else",
+          "listOpen": "who does a chore, and when (or say: who does the lamp)"
         },
         "calendar": {
           "addEvent": "make an appointment (or say: dentist tomorrow at 10)",
@@ -4754,7 +4802,7 @@
         },
         "assistant": {
           "assistant-people": "who is in this household",
-          "weekOverview": "your week: chores, appointments, shopping",
+          "weekOverview": "your week: chores, appointments, shopping — or one day (or say: who is in on Saturday)",
           "assistant-menu": "your settings, with buttons",
           "assistant-reminders": "reminders on or off, or when (60 · morning · evening · also …)",
           "assistant-overview": "the Sunday overview on or off",
@@ -4789,7 +4837,7 @@
           "assistant-forget": "forget our conversation now (what you put on a list stays)",
           "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",
           "assistant-circles": "the circles the bot is in",
-          "remindMe": "your own reminder for one appointment or chore",
+          "remindMe": "your own reminder for one appointment or chore, or one for everyone at a time",
           "assistant-planned": "what I will send you this week (reminders, the week overview)"
         }
       }
@@ -4864,9 +4912,17 @@
     "link_failed": "Linking did not work.",
     "unlink_done": "Unlinked: messages from that Basis app no longer count as you, and its screens are disconnected.",
     "unlink_nothing": "No Basis app is linked to you.",
-    "users_linked": "linked app: yes"
+    "users_linked": "linked app: yes",
+    "day_unread": {
+      "text": "Which day do you mean by '{{day}}'? Say for example 'Saturday' or 'tomorrow'.",
+      "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    }
   },
   "op": {
+    "admin_only": {
+      "text": "Only an admin of this circle can do this.",
+      "doc": "A ⋯ menu entry reserved for the circle's admins, shown greyed to a member with this sentence beside it (invite keeps its own, more specific one). Names the role, never the people who hold it."
+    },
     "not_in_this_circle": {
       "text": "That is not something this circle does — the app it belongs to is not switched on here. An admin can turn it on in the settings.",
       "doc": "Said when a person invokes an op whose APP this circle does not compose. It used to answer \"I couldn't turn that into an action\", which blames the person for the circle's configuration. Names what is wrong AND who can change it, because a refusal a person cannot act on is only slightly better than silence."
@@ -8197,6 +8253,10 @@
         "text": "✓ Circle \"{{circle}}\" created. It shows in /circles as \"pending\"; it becomes fully active once more than one circle at a time is supported.",
         "doc": "Confirmation of /circle-new."
       }
+    },
+    "names_hidden_read": {
+      "text": "Names are not visible here: you can only ask for your own chores.",
+      "doc": "A household bot's reply when someone asks for another person's chores by name and the household's names setting does not let them see names."
     }
   },
   "refusal": {
@@ -8423,6 +8483,78 @@
     "chore_edited": {
       "text": "Chore '{{title}}' is changed.",
       "doc": "A chore was changed; its words as they are now."
+    },
+    "who_held": {
+      "text": "Chore '{{title}}' is held by {{who}}{{when}}.",
+      "doc": "Who does a chore (\"wie doet de lamp\"): the one chore the words fit, who holds it and its day. {{who}}: the holders as the reader may see them (\"jou\", a name, \"iemand\"); {{when}}: \", za 10 okt\" or empty."
+    },
+    "who_open": {
+      "text": "Chore '{{title}}' has nobody yet{{when}}.",
+      "doc": "Who does a chore: the one chore the words fit, and nobody holds it. {{when}}: \", za 10 okt\" or empty."
+    },
+    "who_none": {
+      "text": "There is no open chore with '{{text}}'.",
+      "doc": "Who does a chore: no open chore holds the words the person used."
+    },
+    "who_several": {
+      "text": "{{count}} chores with '{{text}}': {{chores}}.",
+      "doc": "Who does a chore: several open chores hold the words; {{chores}} is one row each (who_row_held / who_row_open), joined by \"; \"."
+    },
+    "who_row_held": {
+      "text": "{{title}} ({{who}}{{when}})",
+      "doc": "One chore in the several-chores line: its words, who holds it and its day (\", za 10 okt\" or empty)."
+    },
+    "who_row_open": {
+      "text": "{{title}} (nobody yet{{when}})",
+      "doc": "One chore in the several-chores line that nobody holds; its day as \", za 10 okt\" or empty."
+    },
+    "who_you": {
+      "text": "you",
+      "doc": "The reader themselves among the people of a chore or an appointment (\"is van jou\")."
+    },
+    "who_someone": {
+      "text": "someone",
+      "doc": "A person the reader may not name (the household's names setting): never their id."
+    },
+    "who_everyone": {
+      "text": "everyone",
+      "doc": "An appointment that names nobody: it is for the whole household."
+    },
+    "who_nobody": {
+      "text": "nobody yet",
+      "doc": "A chore on a day that nobody holds yet."
+    },
+    "mine_list": {
+      "text": "{{name}} does: {{chores}}.",
+      "doc": "Someone else's open chores (\"wat moet Bob doen\"), by the name asked. {{chores}}: one row each (mine_row / mine_row_due), joined by \"; \"."
+    },
+    "mine_none": {
+      "text": "{{name}} has no open chores.",
+      "doc": "Someone else's open chores: they hold none."
+    },
+    "mine_row": {
+      "text": "{{title}}",
+      "doc": "One chore in someone's chores line, without a day."
+    },
+    "mine_row_due": {
+      "text": "{{title}} ({{when}})",
+      "doc": "One chore in someone's chores line, with its day (\"za 10 okt\")."
+    },
+    "day_head": {
+      "text": "On {{when}}:",
+      "doc": "One day's read (\"wie is er zaterdag\"): its first line, the day as \"za 10 okt\"."
+    },
+    "day_event": {
+      "text": "• {{time}} {{title}} — {{who}}",
+      "doc": "One appointment that day: its time, its title and who comes (\"iedereen\" when it names nobody)."
+    },
+    "day_chore": {
+      "text": "• chore {{title}} — {{who}}",
+      "doc": "One chore due that day and who does it (\"nog niemand\" when nobody holds it)."
+    },
+    "day_none": {
+      "text": "Nothing on {{when}}.",
+      "doc": "One day's read: no appointments and no chores that day."
     }
   }
 }

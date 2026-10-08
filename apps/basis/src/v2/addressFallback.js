@@ -55,12 +55,15 @@ export const OFFER_COOLDOWN_MS = param({ key: 'addressFallback.offerCooldownMs',
  * @param {() => number} [deps.now]
  * @param {object} [deps.state]                    `{ declinedAt }` restored from storage
  * @param {(state: object) => any} [deps.save]
+ * @param {{load: () => any, save: (state: object) => any}} [deps.io]  the offer's memory across restarts — what
+ *   the shells compose (`fallbackOfferStateIo` over their sealed storage). Read once, on the first report (after
+ *   boot, so a sealed value can be opened); the offer waits for it, so a boot cannot re-offer what was declined.
  * @param {number} [deps.afterPeers]
  * @param {number} [deps.cooldownMs]
  * @returns {{report, shouldOffer, decline, accept, reset, blockedPeers}}
  */
 export function createFallbackOffer({
-  onOffer = null, now = () => Date.now(), state = null, save = null,
+  onOffer = null, now = () => Date.now(), state = null, save = null, io = null,
   afterPeers = OFFER_AFTER_PEERS, cooldownMs = OFFER_COOLDOWN_MS,
 } = {}) {
   /** Distinct peers we could not reach because the setting is off. Peers, not messages: ten to one person
@@ -74,7 +77,43 @@ export function createFallbackOffer({
   let declinedAt = typeof state?.declinedAt === 'number' ? state.declinedAt : 0;
   let offered = false;
 
-  const persist = () => { try { save?.({ declinedAt }); } catch { /* best-effort */ } };
+  const persist = () => {
+    for (const write of [save, io?.save]) {
+      if (typeof write !== 'function') continue;
+      try { Promise.resolve(write({ declinedAt })).catch(() => {}); } catch { /* best-effort */ }
+    }
+  };
+  // The stored decline, read once — LAZILY, on the first report. Both shells build the offer early in boot, before
+  // the content key exists, and a sealed storage hands back an unopened value until then; a report only comes from
+  // a send, after boot. Until it has been read, an offer is not decided: a boot's first blocked report would
+  // otherwise re-offer what the person declined yesterday (it did, once per app start, 2026-10-08).
+  let restored = null;
+  let restoring = false;
+  const restore = () => {
+    if (restored || typeof io?.load !== 'function') return restored;
+    restoring = true;
+    restored = Promise.resolve().then(() => io.load()).then((s) => {
+      if (typeof s?.declinedAt === 'number' && s.declinedAt > declinedAt) declinedAt = s.declinedAt;
+    }).catch(() => { /* unreadable ⇒ nothing remembered; the offer still works */ })
+      .then(() => { restoring = false; });
+    return restored;
+  };
+
+  function maybeOffer(api) {
+    restore();
+    if (restoring) { restored.then(() => maybeOffer(api)); return; }
+    if (offered || !api.shouldOffer()) return;
+    offered = true;
+    try {
+      onOffer?.({
+        peers: blocked.size,
+        // The renderer pairs these two. The cost is not optional — see rule 3.
+        messageKey: 'circle.nearbyScreen.delivery_fallback_hint',
+        costKey: 'circle.nearbyScreen.delivery_fallback_cost',
+        actionKey: 'circle.nearbyScreen.delivery_fallback_enable',
+      });
+    } catch { /* an offer that throws must not break the send path that produced it */ }
+  }
 
   return {
     /** Feed one report from `resolveMemberAddress`. Ignores anything the setting did not cause. */
@@ -84,17 +123,7 @@ export function createFallbackOffer({
       if (!who) return;
       blocked.add(who);
       if (info.via === 'blocked-by-transport') standing = true;
-      if (offered || !this.shouldOffer()) return;
-      offered = true;
-      try {
-        onOffer?.({
-          peers: blocked.size,
-          // The renderer pairs these two. The cost is not optional — see rule 3.
-          messageKey: 'circle.nearbyScreen.delivery_fallback_hint',
-          costKey: 'circle.nearbyScreen.delivery_fallback_cost',
-          actionKey: 'circle.nearbyScreen.delivery_fallback_enable',
-        });
-      } catch { /* an offer that throws must not break the send path that produced it */ }
+      maybeOffer(this);
     },
 
     /** Enough evidence, and not recently declined. */
@@ -114,5 +143,21 @@ export function createFallbackOffer({
 
     /** Forget everything (a sign-out, a profile switch). */
     reset() { blocked.clear(); standing = false; offered = false; },
+  };
+}
+
+/**
+ * The offer's memory on one device: `{ declinedAt }` under one key, over whatever key-value storage the shell
+ * has (localStorage on web, AsyncStorage on mobile — each wrapped in `sealedKeyValue`). Sync or async storage
+ * alike; a storage that refuses (a sealed one before the content key exists) loses the memory, never throws.
+ */
+export function fallbackOfferStateIo(storage, key = 'cc.fallbackOffer') {
+  return {
+    load: async () => {
+      try { const raw = await storage?.getItem?.(key); return raw ? JSON.parse(raw) : null; } catch { return null; }
+    },
+    save: async (v) => {
+      try { await storage?.setItem?.(key, JSON.stringify(v ?? {})); } catch { /* best-effort */ }
+    },
   };
 }

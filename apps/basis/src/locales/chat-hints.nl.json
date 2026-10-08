@@ -113,11 +113,11 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "weekOverview": {
-      "text": "Het overzicht van deze week voor dit lid: eigen klusjes, afspraken, open boodschappen. Voor 'wat staat er deze week', 'wat moet er nog gebeuren'.",
+      "text": "Het overzicht van deze week voor dit lid: eigen klusjes, afspraken, open boodschappen. Voor 'wat staat er deze week', 'wat moet er nog gebeuren'. Met day (een dag of datum, bv. 'zaterdag'): alleen die dag — de afspraken met wie er komt en de klusjes met wie ze doet. Voor 'wie is er zaterdag', 'wat is er morgen'.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "remindMe": {
-      "text": "Een eigen herinnering van dit lid voor één afspraak of klusje. item = woorden uit de titel; rules in woorden: \"60\" (minuten van tevoren), \"ochtend\", \"avond\" (de avond ervoor), \"7:30\", \"ook …\" om toe te voegen aan de gewone, \"gewoon\" om de eigen weer weg te halen. Voor 'herinner me een uur van tevoren aan de tandarts'.",
+      "text": "Een eigen herinnering van dit lid voor één BESTAANDE afspraak of klusje; geen eigen herinnering op een los tijdstip zonder afspraak of klusje ('herinner me over 10 minuten' kan niet: zeg dat, en bied aan het in de agenda of op een lijst te zetten). item = woorden uit de titel; rules in woorden: \"60\" (minuten van tevoren), \"ochtend\", \"avond\" (de avond ervoor), \"7:30\", \"ook …\" om toe te voegen aan de gewone, \"gewoon\" om de eigen weer weg te halen. Voor 'herinner me een uur van tevoren aan de tandarts'. Met who: everyone een herinnering voor IEDEREEN in huis op een tijd: item = wat er gezegd wordt, rules = de tijd (\"19:45\", \"over 10 minuten\"). Voor 'herinner iedereen om 19:45: eten'.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "assistant-planned": {
@@ -127,7 +127,7 @@
   },
   "tasks": {
     "listMine": {
-      "text": "De klusjes die dit lid heeft opgepakt en nog moet doen.",
+      "text": "De klusjes die dit lid heeft opgepakt en nog moet doen; who = de naam van een ander voor diens klusjes ('wat moet Bob doen' → who: Bob).",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "claimTask": {
@@ -136,6 +136,10 @@
     },
     "completeTask": {
       "text": "Een klusje afronden: id = de woorden ('de lamp is gemaakt').",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "listOpen": {
+      "text": "De open klusjes met deze woorden, met wie ze doet en wanneer: text = woorden van het klusje. Voor 'wie doet de lamp' (text: lamp).",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },

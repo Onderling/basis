@@ -28,7 +28,7 @@ export function peopleRows({ rows, setting, callerId }) {
     const own = r.id === callerId && namesPolicyFrom(setting) !== 'none';
     const named = own || mayName;
     if (!named && callerRole !== 'admin') continue;          // left out, never shown by id
-    out.push({ id: r.id, label: named ? (r.displayName || r.id) : r.id, role: r.role ?? null, linked: Boolean(r.pubKey) });
+    out.push({ id: r.id, label: named ? (r.displayName || r.id) : r.id, role: r.role ?? null, linked: Boolean(r.linkedRoot) });
   }
   return out;
 }

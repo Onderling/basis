@@ -19,12 +19,14 @@
  * @param {object} a
  * @param {() => Promise<'person'|'function'>} a.profileKind  the node's profile kind (the agent's `profileKind`)
  * @param {(turn: {peerAddr: string, text: string}) => Promise<unknown>} a.sendTurn  the contact channel's send
+ * @param {(turn: {auth: object, text: string, messageId?: string}) => {ok: boolean, root?: string}|null} [a.linkedRootOf]
+ *   the identity link's check of a turn's device statement (`createIdentityLink().verifyTurn`)
  * @returns {Promise<{bridge: object|null, feed: (msg: object) => boolean}>}  no bridge on a person's node
  */
-export async function createInboxDoor({ profileKind, sendTurn }) {
+export async function createInboxDoor({ profileKind, sendTurn, linkedRootOf = null }) {
   const kind = typeof profileKind === 'function' ? await profileKind() : 'person';
   if (kind !== 'function') return { bridge: null, feed: () => false };
-  const bridge = createContactDoorBridge({ sendTurn });
+  const bridge = createContactDoorBridge({ sendTurn, linkedRootOf });
   return { bridge, feed: (msg) => bridge.feed(msg) };
 }
 
@@ -42,8 +44,14 @@ export function plainReply(text) {
     .replace(/^\s*[-*]\s+/gm, '• ');
 }
 
-/** @param {{sendTurn: Function}} a */
-export function createContactDoorBridge({ sendTurn }) {
+/**
+ * A turn from a person whose Basis identity is linked to a row here (`/koppel`) carries a statement from one of their
+ * devices over exactly that turn (`auth`). The door checks it (`linkedRootOf`) and hands the admission the ROOT it chains
+ * to — never the address it came from, which every device of the person shares (a revoked one too). A turn without a
+ * statement, or one that does not verify, carries no root: whoever its address is, nothing more.
+ * @param {{sendTurn: Function, linkedRootOf?: Function|null}} a
+ */
+export function createContactDoorBridge({ sendTurn, linkedRootOf = null }) {
   if (typeof sendTurn !== 'function') throw new TypeError('createContactDoorBridge: sendTurn is required');
   let handler = null;
   // The same message can arrive more than once (the pair route and the profile address): the door takes it once.
@@ -64,19 +72,24 @@ export function createContactDoorBridge({ sendTurn }) {
     },
     /**
      * A contact's message, already landed in the inbox by the host.
-     * @param {{contactId: string, fromAddr: string, text: string, admission?: string, displayName?: string, messageId?: string}} msg
+     * @param {{contactId: string, fromAddr: string, text: string, admission?: string, displayName?: string, messageId?: string, auth?: object}} msg
      * @returns {boolean} whether it went to the door
      */
-    feed({ contactId, fromAddr, text, admission, displayName = null, messageId } = {}) {
+    feed({ contactId, fromAddr, text, admission, displayName = null, messageId, auth = null } = {}) {
       if (typeof handler !== 'function' || !contactId || !fromAddr || typeof text !== 'string' || !text.trim()) return false;
       if (messageId) {
         if (seen.has(messageId)) return false;
         seen.add(messageId);
         if (seen.size > SEEN_MAX) seen.delete(seen.values().next().value);
       }
+      let linked = null;
+      if (auth && typeof linkedRootOf === 'function') {
+        try { linked = linkedRootOf({ auth, text, messageId }); } catch { linked = null; }
+      }
       handler({
         bridgeId: 'web', channel: 'web', chatId: contactId, messageId, text,
         ...(typeof admission === 'string' && admission ? { admission } : {}),
+        ...(linked?.ok === true && typeof linked.root === 'string' ? { linkedRoot: linked.root } : {}),
         refuseOnce: true,
         slash: false,   // a contact turn is words: this door has no commands to point at
         buttons: false, // …and no buttons: a confirm is asked and answered in words

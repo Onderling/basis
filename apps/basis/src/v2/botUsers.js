@@ -31,13 +31,16 @@ export function personNamed(rows, nameOrId) {
 }
 
 /**
- * A person's Basis key on the bot, or null: the key their `/koppel` linked (a door row: Telegram), or — on the inbox
- * door — the row's own id, which IS their key (the book does not repeat it as `pubKey`).
+ * A person's chat identity on the bot (the key their circles know them by), or null: the one their `/koppel` offer named
+ * and signed (a door row: Telegram), or — on the inbox door — the row's own id, which IS their key (the book does not
+ * repeat it as `pubKey`). It names the person in the household's circle; it is never what a turn is accepted by — a
+ * linked row is found by its ROOT (`linkedRoot`), through a device statement.
  */
 export function linkedKeyOf(row) {
   if (!row || typeof row !== 'object') return null;
-  if (typeof row.pubKey === 'string' && row.pubKey) return row.pubKey;
-  return row.channel === 'web' && typeof row.id === 'string' && row.id ? row.id : null;
+  if (row.channel === 'web') return typeof row.id === 'string' && row.id ? row.id : null;
+  // a door row: only while it is linked (its root recorded) — a chat identity left from before is nobody's
+  return typeof row.linkedRoot === 'string' && row.linkedRoot && typeof row.pubKey === 'string' && row.pubKey ? row.pubKey : null;
 }
 
 /**
@@ -87,38 +90,48 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
     async list() { return (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden); },
     /**
      * The admitted person behind a door's uid, or null (never admitted, or revoked). At the inbox door a uid is a key:
-     * the row of that key, or the Telegram person's row that LINKED it (their Basis identity, `/koppel`) — one person.
+     * the row of that key — or, for a turn whose device statement the door verified (`linkedRoot`, the ROOT it chains
+     * to), the Telegram person's row that linked that root (their Basis identity, `/koppel`) — one person. The key a
+     * turn came from never finds a linked row by itself: every device of the person holds it, a revoked one too.
+     * @param {string} channel
+     * @param {string} uid
+     * @param {{linkedRoot?: string|null}} [o]
      */
-    async find(channel, uid) {
+    async find(channel, uid, { linkedRoot = null } = {}) {
       const u = String(uid ?? '').trim();
       const row = await store.get(idOf(channel, u));
       if (row && !row.hidden) return row;
-      if (channel !== 'web' || !u) return null;
-      return (await store.list()).find((r) => r && !r.hidden && r.pubKey === u) ?? null;
+      if (channel !== 'web' || typeof linkedRoot !== 'string' || !linkedRoot) return null;
+      return (await store.list()).find((r) => r && !r.hidden && r.linkedRoot === linkedRoot) ?? null;
     },
     /**
-     * Link a person's Basis key to their row (the keyless row gains its key). One key per row, one row per key: a key
-     * already on another row (or an inbox-door person's own) is refused; the same key on the same row is a no-op.
+     * Link a person's Basis identity to their row: the row records their ROOT (what a turn is checked against) and the
+     * chat identity their offer named (what names them in the household's circle). One root per row, one row per root,
+     * and the chat identity on no other row: refused when either is already elsewhere (or is an inbox-door person's
+     * own); a row linked to another root is refused; the same root on the same row is a no-op.
+     * @param {string} id
+     * @param {{root: string, webid: string}} who
      * @returns {Promise<{ok: true, already?: true}|{ok: false, reason: 'no-row'|'key-on-another-row'|'row-has-a-key'}>}
      */
-    async linkKey(id, key) {
-      const k = String(key ?? '').trim();
+    async linkKey(id, { root, webid } = {}) {
+      const r0 = String(root ?? '').trim();
+      const w = String(webid ?? '').trim();
       const rows = (await store.list()).filter((r) => r && !r.hidden);
       const row = rows.find((r) => r.id === id);
-      if (!row || !k) return { ok: false, reason: 'no-row' };
-      if (row.pubKey === k) return { ok: true, already: true };
-      if (rows.some((r) => r.id !== id && (r.id === k || r.pubKey === k))) return { ok: false, reason: 'key-on-another-row' };
-      if (row.pubKey) return { ok: false, reason: 'row-has-a-key' };
-      await store.put({ ...row, pubKey: k });
+      if (!row || !r0 || !w) return { ok: false, reason: 'no-row' };
+      if (row.linkedRoot === r0) return { ok: true, already: true };
+      if (rows.some((r) => r.id !== id && (r.linkedRoot === r0 || r.id === w || r.pubKey === w))) return { ok: false, reason: 'key-on-another-row' };
+      if (row.linkedRoot) return { ok: false, reason: 'row-has-a-key' };
+      await store.put({ ...row, linkedRoot: r0, pubKey: w });
       return { ok: true };
     },
-    /** Drop a row's linked key (`/ontkoppel`): a turn from it is a stranger's again. */
+    /** Drop a row's link (`/ontkoppel`): no device of that root speaks as the row any more. Says which root and identity went. */
     async unlinkKey(id) {
       const row = await store.get(id);
-      if (!row?.pubKey) return { ok: false, reason: 'no-key' };
-      const { pubKey: key, ...rest } = row;
-      await store.put({ ...rest, pubKey: null });
-      return { ok: true, key };
+      if (!row?.linkedRoot) return { ok: false, reason: 'no-key' };
+      const { pubKey: key = null, linkedRoot: root, ...rest } = row;
+      await store.put({ ...rest, linkedRoot: null, pubKey: null });
+      return { ok: true, root, key };
     },
     /**
      * Drop a person: they are no longer admitted and need a new code. Named by display name or contact id.
@@ -166,7 +179,9 @@ export function contactBookStore(callSkill) {
     id: c.webid, type: 'contact', channel: c.channel, uid: c.channel === 'web' ? c.webid : String(c.webid).slice(c.channel.length + 1), role: c.role ?? null,
     ...(c.displayName ? { displayName: c.displayName } : {}),
     ...(c.hidden ? { hidden: true } : {}),
-    // a door row that linked its person's Basis key (`/koppel`); an inbox-door row's key is its id
+    // a door row that linked its person's Basis identity (`/koppel`): the root a turn is checked against, and the chat
+    // identity that names them in the household's circle; an inbox-door row's key is its id
+    ...(c.channel !== 'web' && typeof c.linkedRoot === 'string' && c.linkedRoot ? { linkedRoot: c.linkedRoot } : {}),
     ...(c.channel !== 'web' && typeof c.pubKey === 'string' && c.pubKey ? { pubKey: c.pubKey } : {}),
   });
   return {
@@ -179,6 +194,7 @@ export function contactBookStore(callSkill) {
       const r = await callSkill('stoop', 'addContact', {
         webid: user.id, channel: user.channel, role: user.role, ...(user.displayName ? { displayName: user.displayName } : {}),
         ...('pubKey' in user ? { pubKey: user.pubKey ?? null } : {}),
+        ...('linkedRoot' in user ? { linkedRoot: user.linkedRoot ?? null } : {}),
       });
       if (r?.ok === false || r?.error) throw new Error(`botUsers: the contact book refused ${user.id} (${r.error ?? 'refused'})`);
       return user;
@@ -216,10 +232,15 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     return row.id;
   };
   const admit = async (who) => {
-    // Without admission (a door that admits everyone it is handed), every person is admitted.
-    if (!admission) return tier(await users.admit(who));
     const uid = String(who?.uid ?? '').trim();
-    const known = typeof users.find === 'function' ? await users.find(who.channel, uid) : null;
+    // a turn whose device statement the door verified names the ROOT it chains to: the row that linked that root
+    const linkedRoot = typeof who?.linkedRoot === 'string' && who.linkedRoot ? who.linkedRoot : null;
+    // Without admission (a door that admits everyone it is handed), every person is admitted.
+    if (!admission) {
+      const linked = linkedRoot && typeof users.find === 'function' ? await users.find(who.channel, uid, { linkedRoot }) : null;
+      return tier(linked && linked.channel !== who.channel ? linked : await users.admit(who));
+    }
+    const known = typeof users.find === 'function' ? await users.find(who.channel, uid, { linkedRoot }) : null;
     // a row found through ANOTHER door (a Telegram person's row that linked this key) is never re-admitted here: that
     // would make the key a second row, a second person
     if (known) return tier(known.channel !== who.channel || known.displayName || !who.displayName ? known : await users.admit(who));

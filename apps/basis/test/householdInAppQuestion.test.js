@@ -1,24 +1,24 @@
 /**
  * The household in your own app (B3, Fable's shape): behind the admin's setting `assistant.householdInApp` (off by
  * default), a person who has just linked their Basis identity (`/koppel`) is asked, privately, whether they want the
- * household in their own app too. On yes: an invite bound to THEIR chat key (the key `/koppel` linked), single use,
+ * household in their own app too. On yes: an invite bound to THEIR chat key (the one their `/koppel` offer named and
+ * signed — the link itself rests on their root), single use,
  * 24 hours, sent only to their private chat. From a group, from a screen, before linking, or with the setting off:
  * no invite.
  */
 import { describe, it, expect } from 'vitest';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { createBotUsers, linkedKeyOf } from '../src/v2/botUsers.js';
-import { createIdentityLink } from '../src/v2/botIdentityLink.js';
-import { encodeLinkOffer, linkCode } from '../src/v2/identityLink.js';
-import { AgentIdentity, b64encode } from '@onderling/core';
-import { VaultMemory } from '@onderling/vault';
+import { createIdentityLink, createLinkTombstones } from '../src/v2/botIdentityLink.js';
+import { linkCode } from '../src/v2/identityLink.js';
+import { linkedPerson } from './support/linkedPerson.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 import { EventLog } from '../src/eventLog.js';
 
 const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
 const BOT = 'BOT-ADDRESS';
-const ANN_ID = await AgentIdentity.generate(new VaultMemory());
-const KEY = ANN_ID.pubKey;
+const ann = await linkedPerson();
+const KEY = ann.webid;
 const ANN = 'telegram:42';
 const ADMIN = 'telegram:9';
 const PRIVATE = { caller: ANN, threadId: ANN, chatId: '42' };
@@ -34,8 +34,9 @@ async function door({ setting = null } = {}) {
   await users.admit({ channel: 'telegram', uid: '9', displayName: 'Anne', role: 'admin' });
   await users.admit({ channel: 'telegram', uid: '42', displayName: 'Ann' });
   const asked = [];
+  const vault = new Map();
   const link = createIdentityLink({
-    users, botAddress: () => BOT,
+    users, botAddress: () => BOT, tombstones: createLinkTombstones({ vault: { get: async (k) => vault.get(k) ?? null, set: async (k, v) => { vault.set(k, v); } } }),
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
     sendPrivately: async () => ({ ok: true }), tellApp: async () => {}, listGrants: async () => [], revokeView: async () => true,
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: BOT, relayUrl: 'wss://r', botName: '@bot' }),
@@ -56,9 +57,9 @@ async function door({ setting = null } = {}) {
     },
   });
   const linkAnn = async () => {
-    const { offer, nonce } = encodeLinkOffer({ personKey: KEY, botAddress: BOT, sign: (m) => b64encode(ANN_ID.sign(m)) });
+    const { offer, nonce } = ann.offer('phone', BOT);
     await call('assistant', 'assistant-link', { offer }, PRIVATE);
-    return call('assistant', 'assistant-link-confirm', { answer: await linkCode(KEY, nonce) }, PRIVATE);
+    return call('assistant', 'assistant-link-confirm', { answer: await linkCode(ann.root, nonce) }, PRIVATE);
   };
   return { call, linkAnn, invited, evicted, params, users };
 }
@@ -131,8 +132,10 @@ describe('/revoke', () => {
 });
 
 describe('whose key', () => {
-  it('a door row: the key its /koppel linked; an inbox row: its own id (the book does not repeat it); none: null', () => {
-    expect(linkedKeyOf({ id: 'telegram:42', channel: 'telegram', pubKey: 'K' })).toBe('K');
+  it('a door row: the chat key its /koppel offer named, while linked; an inbox row: its own id (the book does not repeat it); none: null', () => {
+    expect(linkedKeyOf({ id: 'telegram:42', channel: 'telegram', pubKey: 'K', linkedRoot: 'R' })).toBe('K');
+    // a chat key left on a row that is not linked (to a root) is nobody's
+    expect(linkedKeyOf({ id: 'telegram:42', channel: 'telegram', pubKey: 'K' })).toBeNull();
     expect(linkedKeyOf({ id: 'telegram:42', channel: 'telegram' })).toBeNull();
     expect(linkedKeyOf({ id: 'ANN-KEY', channel: 'web' })).toBe('ANN-KEY');
     expect(linkedKeyOf(null)).toBeNull();

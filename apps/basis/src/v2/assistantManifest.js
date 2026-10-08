@@ -25,7 +25,7 @@ export const assistantManifest = {
   domainVerbs: {
     'set-memory': 'write', 'forget-conversation': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
-    'connect-screen': 'write', 'agenda-link': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
+    'connect-screen': 'write', 'agenda-link': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-companion': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
   operations: [
     {
@@ -403,13 +403,25 @@ export const assistantManifest = {
       surfaces: { slash: { command: '/inapp', body: 'argline' } },
     },
     {
-      // Undo the link (`/ontkoppel`): the key goes, and every screen grant minted to it.
+      // Undo the link (`/ontkoppel`): the root goes, and every screen grant minted to the person's chat identity.
       id:     'assistant-unlink',
       verb:   'unlink-identity',
       visibility: 'authenticated',
       writes: { scope: 'person' },
       params: [],
       surfaces: { slash: { command: '/ontkoppel', body: 'none' } },
+    },
+    {
+      // The household's companion, handed to the bot: its card becomes a contact of the bot, and the bot's agenda links
+      // are served where that card says. The admin's (`trusted`), and only from their own app — reached through the
+      // bot's linked-app call with a statement from one of their devices over exactly this card, in the same act as
+      // their grant on the companion. No command and no tool: never typed, never chosen by the model, never a screen's.
+      id:     'assistant-companion',
+      verb:   'set-companion',
+      visibility: 'trusted',
+      writes: { scope: 'device' },
+      params: [{ name: 'card', kind: 'string', required: true }],
+      surfaces: {},
     },
     {
       // The admin's yes (or no) to what a screen asked: counts from the private chat only (`/bevestig ja|nee`).

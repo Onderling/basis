@@ -47,6 +47,10 @@ export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
 const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr', 'points',
   // a node's: where its agenda links are served
   'serves',
+  // the identity link: on a person's row for a household bot, the row their identity is linked to there (every device
+  // of theirs then speaks to it as them, and a device revoke reaches it); on a bot's row for a person, their root
+  // (and WHEN the link last changed: the third field-set a sibling may change on a row this device holds, newer wins)
+  'linkedRow', 'linkedRoot', 'linkedAt',
   'shareLocation', 'allowHopThrough', 'allowAutomatching',
   // the hidden mark and WHEN it last changed — the one field-pair a sibling may change on a row this device holds (L106)
   'hidden', 'hiddenAt',
@@ -93,7 +97,7 @@ export function knownPeersToWire(known) {
  * @param {(to: string, payload: object) => Promise<any>} a.sendToPeer   hold-forward, like every own-devices fan
  * @param {() => Promise<{peers: object[], contacts: object[]}>} a.snapshot   everything this device knows, for a new sibling or a catch-up
  * @param {(address: string, pubKey: string) => 'established'|'unchanged'|'refused'} a.learnPeerKey   the security layer's establish-never-replace setter
- * @param {{ has: (webid: string) => Promise<boolean>, add: (contact: object) => Promise<any>, get?: (webid: string) => Promise<object|null>, setHidden?: (webid: string, hidden: boolean, hiddenAt: number) => Promise<any>, setPersona?: (webid: string, persona: string, opts: {revealPreset?: string|null, personaAt: number}) => Promise<any> }} a.contacts
+ * @param {{ has: (webid: string) => Promise<boolean>, add: (contact: object) => Promise<any>, get?: (webid: string) => Promise<object|null>, setHidden?: (webid: string, hidden: boolean, hiddenAt: number) => Promise<any>, setPersona?: (webid: string, persona: string, opts: {revealPreset?: string|null, personaAt: number}) => Promise<any>, setLinked?: (webid: string, linkedRow: string|null, linkedAt: number) => Promise<any> }} a.contacts
  *   the contact book, raw (not through the waist — a landed row must not fan back out). `get` + `setHidden` let a
  *   sibling's NEWER hidden mark land on a row this device holds — the one change a sibling may make to it (L106).
  * @param {(summary: {from: string, established: number, contactsAdded: number}) => void} [a.onLanded]   observability seam
@@ -152,6 +156,11 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
             if (c.personaAt > myAt) {
               await contacts.setPersona(c.webid, c.persona, { revealPreset: c.revealPreset ?? null, personaAt: c.personaAt });
             }
+          }
+          // …and the identity link, by the same rule: linked (or unlinked) to a household bot on one device, on every one
+          if (Number.isFinite(c.linkedAt) && typeof contacts.get === 'function' && typeof contacts.setLinked === 'function') {
+            const myAt = Number.isFinite(mine?.linkedAt) ? mine.linkedAt : -Infinity;
+            if (c.linkedAt > myAt) await contacts.setLinked(c.webid, typeof c.linkedRow === 'string' && c.linkedRow ? c.linkedRow : null, c.linkedAt);
           }
           continue;
         }

@@ -21,7 +21,6 @@ const NOT_PASSED = {
   BASIS_VAULT_PASSPHRASE: 'generated once beside the vault on the data volume; never in the .env',
   PRIVATEMODE_MODEL: 'optional override of the default model; the default is what a box runs',
   ONDERLING_TELEGRAM_API_ROOT: 'a Bot API server of its own (self-hosted, or a test fake); a box talks to Telegram itself',
-  ONDERLING_SEEDED_CONTACT_CARD: 'a card handed to the install at boot (the walks\' seam); a household bot gets its companion from its owner\'s app, not from the .env',
 };
 // Passed by the role, read elsewhere than the runner.
 const READ_ELSEWHERE = {
@@ -36,6 +35,10 @@ describe('the assistant container\'s environment', () => {
   it('every variable the runner reads is passed by the role, or listed with the reason it is not', () => {
     const missing = [...readByRunner].filter((v) => !passed.has(v) && !NOT_PASSED[v]);
     expect(missing).toEqual([]);
+  });
+
+  it('a household bot\'s companion is never configured: its admin hands it over from their app (no seeded card)', () => {
+    expect(readByRunner.has('ONDERLING_SEEDED_CONTACT_CARD')).toBe(false);
   });
 
   it('every variable the role passes is read — by the runner, or where the list says', () => {

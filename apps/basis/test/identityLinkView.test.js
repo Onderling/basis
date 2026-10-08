@@ -1,47 +1,90 @@
 /**
- * The app's side of `/koppel`: the start link read (which bot), an offer written with the person's OWN key (the chat
- * identity — the same on every device of theirs), the code the bot will ask for, and the bot's statement kept once it
- * arrives — only from the bot the offer was for, only about this person's key. An unlink statement drops it.
+ * The app's side of `/koppel`, shared by every shell: the start link read (which bot), the offer made by THIS DEVICE
+ * (its statement; the code is the one the bot will ask for), and the bot's statement kept as a CONTACT-BOOK ROW — only
+ * from the bot this device offered to, only about this person's root. An unlink statement clears the mark. Nothing in
+ * browser storage: the book is what both shells read, and it carries to the person's other devices.
  */
 import { describe, it, expect } from 'vitest';
-import { createIdentityLinkView } from '../src/v2/identityLinkView.js';
-import { encodeLinkStartLink, parseLinkOffer, linkCode, linkOfferMessage, IDENTITY_LINK_SUBTYPE } from '../src/v2/identityLink.js';
-import { AgentIdentity, b64encode } from '@onderling/core';
-import { VaultMemory } from '@onderling/vault';
+import { createIdentityLinks } from '../src/v2/identityLinkView.js';
+import { encodeLinkStartLink, parseLinkOffer, linkCode, IDENTITY_LINK_SUBTYPE } from '../src/v2/identityLink.js';
+import { linkedPerson } from './support/linkedPerson.js';
 
-const ME_ID = await AgentIdentity.generate(new VaultMemory());
-const ME = ME_ID.pubKey;
-// the agent's narrow signer, as realAgent builds it
-const signOffer = ({ botAddress, nonce }) => b64encode(ME_ID.sign(linkOfferMessage({ k: ME, b: botAddress, n: nonce })));
-
-const store = () => { const m = new Map(); return { m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) }; };
+const ME = await linkedPerson();
 const LINK = encodeLinkStartLink('https://basis.example/app', { botAddress: 'BOT', relayUrl: 'wss://r', botName: '@huisbot' });
 
+function book() {
+  const rows = new Map();
+  const callSkill = async (app, op, args) => {
+    if (app === 'stoop' && op === 'listContacts') return { contacts: [...rows.values()] };
+    if (app === 'stoop' && op === 'addContact') { rows.set(args.webid, { ...(rows.get(args.webid) ?? {}), ...args }); return { contact: rows.get(args.webid) }; }
+    return null;
+  };
+  return { rows, callSkill };
+}
+const links = (b) => createIdentityLinks({
+  signOffer: async ({ botAddress }) => ME.offer('phone', botAddress),
+  selfRoot: () => ME.root,
+  callSkill: b.callSkill,
+  now: () => 1234,
+});
+const statement = (o = {}) => ({ subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: 'BOT', row: 'telegram:42', root: ME.root, ...o } });
+
 describe('the app\'s side of the identity link', () => {
-  it('reads which bot; writes an offer with the person\'s key for that bot; the code matches the bot\'s', async () => {
-    const v = createIdentityLinkView({ link: LINK, personKey: ME, signOffer, storage: store() });
+  it('reads which bot; the offer is this device\'s statement for that bot; the code matches the bot\'s', async () => {
+    const v = links(book()).view(LINK);
     expect(v.bot).toMatchObject({ ok: true, botAddress: 'BOT', botName: '@huisbot' });
-    const { line, code } = await v.offer();
-    expect(line.startsWith('/koppel ')).toBe(true);
-    const o = parseLinkOffer(line.slice('/koppel '.length));
-    expect(o).toMatchObject({ ok: true, personKey: ME, botAddress: 'BOT' });   // and its signature verified
-    expect(code).toBe(await linkCode(ME, o.nonce));
+    expect(v.label).toBe('@huisbot (BOT…)');
+    const made = await v.offer();
+    expect(made.ok).toBe(true);
+    expect(made.line.startsWith('/koppel ')).toBe(true);
+    const o = parseLinkOffer(made.line.slice('/koppel '.length));
+    expect(o).toMatchObject({ ok: true, root: ME.root, webid: ME.webid, botAddress: 'BOT' });
+    expect(made.code).toBe(await linkCode(ME.root, o.nonce));
   });
 
-  it('keeps the statement from that bot about this key; ignores another key\'s or another bot\'s; an unlink drops it', async () => {
-    const s = store();
-    const v = createIdentityLinkView({ link: LINK, personKey: ME, signOffer, storage: s });
-    await v.offer();
-    expect(v.received('SOMEONE', { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: 'SOMEONE', row: 'telegram:42', key: ME } })).toBe(false);
-    expect(v.received('BOT', { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: 'BOT', row: 'telegram:42', key: 'OTHER' } })).toBe(false);
-    expect(v.received('BOT', { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: 'BOT', row: 'telegram:42', key: ME } })).toBe(true);
-    expect(createIdentityLinkView({ link: '', personKey: ME, signOffer, storage: s }).linkedTo()).toEqual([{ bot: 'BOT', row: 'telegram:42', botName: '@huisbot' }]);
-    expect(v.received('BOT', { subtype: IDENTITY_LINK_SUBTYPE, unlinked: true, statement: { bot: 'BOT', row: 'telegram:42', key: ME } })).toBe(true);
-    expect(v.linkedTo()).toEqual([]);
+  it('a device that cannot sign makes no offer, and says so', async () => {
+    const b = book();
+    const l = createIdentityLinks({ signOffer: async () => null, selfRoot: () => ME.root, callSkill: b.callSkill });
+    expect(await l.view(LINK).offer()).toEqual({ ok: false, reason: 'no-device-key' });
+    // …and waits for nobody
+    expect(await l.received('BOT', statement())).toBe(false);
   });
 
-  it('a statement for a bot this app never offered to is not kept (it grants nothing, but it is not ours)', () => {
-    const v = createIdentityLinkView({ link: '', personKey: ME, signOffer, storage: store() });
-    expect(v.received('BOT', { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: 'BOT', row: 'telegram:42', key: ME } })).toBe(false);
+  it('the bot\'s statement makes the bot a contact — from the bot offered to, about this root; another bot or root is not kept', async () => {
+    const b = book();
+    const l = links(b);
+    const heard = [];
+    l.onLinked((e) => heard.push(e));
+    expect(await l.received('BOT', statement()), 'no offer made yet').toBe(false);
+    await l.view(LINK).offer();
+    expect(await l.received('SOMEONE', statement({ bot: 'SOMEONE' }))).toBe(false);
+    expect(await l.received('BOT', statement({ root: 'ANOTHER-ROOT' }))).toBe(false);
+    expect(await l.received('SOMEONE', statement()), 'the statement must name its sender').toBe(false);
+    expect(await l.received('BOT', statement())).toBe(true);
+    expect(b.rows.get('BOT')).toEqual({ webid: 'BOT', pubKey: 'BOT', peerAddr: 'BOT', displayName: '@huisbot', linkedRow: 'telegram:42', linkedAt: 1234 });
+    expect(heard).toEqual([{ bot: 'BOT', row: 'telegram:42', botName: '@huisbot' }]);
+    // the offer was answered: a second statement is not taken on its word
+    expect(await l.received('BOT', statement({ row: 'telegram:7' }))).toBe(false);
+  });
+
+  it('an unlink clears the mark on a bot held as linked (the contact stays); for anyone else it is nothing', async () => {
+    const b = book();
+    const l = links(b);
+    expect(await l.received('BOT', { ...statement(), unlinked: true }), 'not linked here').toBe(false);
+    await l.view(LINK).offer();
+    await l.received('BOT', statement());
+    expect(await l.received('BOT', { ...statement({ root: 'ANOTHER-ROOT' }), unlinked: true })).toBe(false);
+    expect(await l.received('BOT', { ...statement(), unlinked: true })).toBe(true);
+    expect(b.rows.get('BOT')).toMatchObject({ webid: 'BOT', linkedRow: null, linkedAt: 1234 });
+  });
+
+  it('the peer router\'s entry is the subtype, and it takes the statement', async () => {
+    const b = book();
+    const l = links(b);
+    expect(Object.keys(l.handlers)).toEqual([IDENTITY_LINK_SUBTYPE]);
+    await l.view(LINK).offer();
+    l.handlers[IDENTITY_LINK_SUBTYPE]('BOT', statement());
+    await new Promise((r) => { setTimeout(r, 10); });
+    expect(b.rows.get('BOT')?.linkedRow).toBe('telegram:42');
   });
 });

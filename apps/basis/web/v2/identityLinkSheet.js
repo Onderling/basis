@@ -1,7 +1,7 @@
 /**
  * identityLinkSheet — the sheet the web app opens for a bot's `/koppel` link: which bot, what linking means, the line
- * to paste into the private chat with the bot, the code to pick there, and "linked" once the bot's statement arrives.
- * Paint only; what it does is `src/v2/identityLinkView.js`.
+ * to paste into the private chat with the bot, the code to pick there, and "linked" once the bot's statement arrives (the
+ * bot is then a contact). Paint only; what it does is `src/v2/identityLinkView.js`.
  */
 import { t } from '../../src/index.js';
 
@@ -21,10 +21,12 @@ export function openIdentityLinkSheet(view, { doc = document, win = window } = {
   const dialog = el(doc, 'dialog', { class: 'cc-identity-link', 'data-identity-link': 'sheet' });
   const say = (...nodes) => dialog.replaceChildren(el(doc, 'h2', {}, t('circle.identityLink.title')), ...nodes,
     el(doc, 'button', { type: 'button', 'data-identity-link': 'close', onclick: () => dialog.close() }, t('circle.identityLink.close')));
-  const bot = view.bot.botName ? `${view.bot.botName} (${view.bot.botAddress.slice(0, 8)}…)` : `${view.bot.botAddress.slice(0, 10)}…`;
+  const bot = view.label;
   const make = el(doc, 'button', { type: 'button', 'data-identity-link': 'make', onclick: async () => {
     make.disabled = true;
-    const { line, code } = await view.offer();
+    const made = await view.offer();
+    if (!made.ok) { say(el(doc, 'p', { 'data-identity-link': 'failed' }, t('circle.identityLink.no_device_key'))); return; }
+    const { line, code } = made;
     say(
       el(doc, 'p', {}, t('circle.identityLink.paste_this', { bot })),
       el(doc, 'textarea', { readonly: 'readonly', rows: '3', 'data-identity-link': 'line' }, line),

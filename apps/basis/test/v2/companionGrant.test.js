@@ -100,7 +100,7 @@ describe('the bot keeps its companion\'s grant', () => {
 
 describe('the app: who a grant can go to, and what a node offers', () => {
   const BOT = 'B'.repeat(43); const PERSON = 'P'.repeat(43); const NODE = 'N'.repeat(43);
-  it('contacts and linked bots, by the address they are reached at; hidden, keyless and the node itself left out', async () => {
+  it('contacts — a bot linked by /koppel is one — by the address they are reached at; hidden, keyless and the node itself left out', async () => {
     const { companionGrantTargets } = await import('../../src/v2/companionGrant.js');
     expect(companionGrantTargets({
       contacts: [
@@ -108,8 +108,9 @@ describe('the app: who a grant can go to, and what a node offers', () => {
         { webid: PERSON, pubKey: PERSON, displayName: 'Ann', hidden: true },
         { webid: 'https://id.example/bot', pubKey: 'X'.repeat(43), peerAddr: BOT, displayName: 'Huishoudbot' },
         { webid: NODE, peerAddr: NODE, serves: 'https://r.example' },
+        // the row the identity link wrote: the bot by its address, marked with the row there
+        { webid: 'C'.repeat(43), pubKey: 'C'.repeat(43), peerAddr: 'C'.repeat(43), linkedRow: 'telegram:9' },
       ],
-      linkedBots: [{ bot: BOT, botName: '@thuisbot' }, { bot: 'C'.repeat(43), botName: null }],
       node: NODE,
     })).toEqual([{ key: BOT, label: 'Huishoudbot' }, { key: 'C'.repeat(43), label: 'CCCCCCCC…' }]);
   });

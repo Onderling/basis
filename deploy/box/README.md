@@ -60,15 +60,19 @@ no access log). The companion will run on the household's tablet beside the bot;
 on the public box is a test instance, and its own older `/feed/<id>.<k>.ics` route still answers through Caddy.
 
 The bot learns where from the companion's **contact card** (its address, and `serves`: where its links are served),
-never from configuration. Pairing them is one step, from the owner's app — it lands with the pairing work:
+never from configuration: the person linked as the bot's admin hands it over from their app. Nothing is set on the box
+beyond starting the roles (`companion@<repo>` and the assistant in `ROLES`; the role runs the companion with its agenda
+files on and says its public address from `$RELAY_DOMAIN`). Step 0, from the admin's app:
 
-1. **The companion, claimed by you.** With `COMPANION_FEEDS=on` in `.env` (and `companion@<repo>` in `ROLES`): its
-   claim code (ten minutes, then a new one) is in `docker compose -p onderling logs companion | grep 'Claim:' | tail -1`,
-   its card in `… | grep -m1 'Card:'`. On the box it dials the relay by the inside name, so its card takes the public
-   address from `COMPANION_PUBLIC_URL` (default `https://$RELAY_DOMAIN`).
-2. **The bot, given the companion.** From your app: the companion's card to the bot, and the grant to put files there
-   (the pairing work; until then the bot cannot put, and `/agenda-link` says it could not make one).
-3. **Check:** `curl -s -o /dev/null -w '%{http_code}\n' https://<relay-domain>/feed/<companion address>/xxxxxxxxxxxxxxxxxxxxxx.yyyyyyyyyyyyyyyyyyyyyy.ics`
+1. **Link your app to the bot.** In your private chat with the bot: `/koppel`. Open the link it sends, tap "Maak de
+   koppelregel", paste the line into the chat and pick the code your app shows. The bot is now a contact in your app,
+   and your app's messages to it count as you — from every device of yours, not from one you revoke.
+2. **Claim the companion.** Its claim line (ten minutes, then a new one) is in
+   `docker compose -p onderling logs companion | grep 'Claim:' | tail -1`; paste it under My data → "Companion claimen".
+3. **Give the bot the agenda files.** Under My data → "Mijn agents", at the companion: "Toegang geven", pick the bot,
+   tick "agenda-bestanden plaatsen". In that one act your app hands the bot the companion's card and the companion gives
+   the bot its access. Only the bot's admin can do this; a member's app is refused.
+4. **Check:** `curl -s -o /dev/null -w '%{http_code}\n' https://<relay-domain>/feed/<companion address>/xxxxxxxxxxxxxxxxxxxxxx.yyyyyyyyyyyyyyyyyyyyyy.ics`
    answers `404` after a second (the route is there; nothing is served without a link, and a miss takes as long whether
    the companion is connected or not). Then in Telegram: `/huishouden agenda on`, `/agenda-link`.
 

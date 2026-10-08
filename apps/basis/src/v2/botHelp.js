@@ -13,7 +13,9 @@ const SECTION_OF = { lists: 'lists', tasks: 'chores', calendar: 'agenda', assist
 const ORDER = ['lists', 'chores', 'agenda', 'you', 'admin'];
 
 /** Is this op the admin's on the bot: the assistant's own by its visibility, the rest by their level on the bot's map. */
-export const isAdminOp = (entry) => (entry?.appOrigin === 'assistant' ? entry?.op?.visibility === 'trusted' : botOpLevel(`${entry?.appOrigin}.${entry?.op?.id}`) === 'trusted');
+// the admin's: a door op the assistant declares `trusted`, or an op on the map's admin column (its level is `by-role` — the
+// role preset decides who else may; the help and the screen file it under the admin)
+export const isAdminOp = (entry) => (entry?.appOrigin === 'assistant' ? entry?.op?.visibility === 'trusted' : botOpLevel(`${entry?.appOrigin}.${entry?.op?.id}`) === 'by-role');
 
 /** The person's commands by section, in `/help`'s order: `[section, entries]`, empty sections left out. */
 function botHelpGroups(commandMenu, opsById, isAdmin = isAdminOp) {

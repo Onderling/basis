@@ -3,11 +3,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  buildTilePreviews, renderSubtitle, bumpSeenAt,
+  buildTilePreviews, renderSubtitle, bumpSeenAt, countsAsUnread,
 } from '../../src/v2/circleTilePreviews.js';
 
-function mkEvent({ id, ts, circleId, payload = {}, actor = null } = {}) {
-  return { id, ts, actor, payload: { ...payload, circleId } };
+// A conversation line by default — only the human lane counts as unread (see the last describe).
+function mkEvent({ id, ts, circleId, payload = {}, actor = null, type = 'chat-message' } = {}) {
+  return { id, ts, type, actor, payload: { ...payload, circleId } };
 }
 
 describe('renderSubtitle', () => {
@@ -130,5 +131,42 @@ describe('bumpSeenAt', () => {
   it('seeds an empty seenAt when the input is null', () => {
     const after = bumpSeenAt(null, 'a', 42);
     expect(after).toEqual({ a: 42 });
+  });
+});
+
+/**
+ * A circle you had just made showed "6 unread" (exploratory walk, 2026-10-08): every event counted — your own
+ * sends, the roster, the rules, the join — and whatever happened while you were INSIDE the circle was newer than
+ * the mark set on opening it. Unread now means: on the HUMAN lane (the entry-kinds dictionary decides, never a
+ * hand list) AND not mine; the shells bump seenAt on leaving as well as on opening.
+ */
+describe('buildTilePreviews — unread is what OTHERS said', () => {
+  const circles = [{ id: 'club' }];
+  const ME = 'me-pub';
+  it('my own send is never unread', () => {
+    const events = [{ id: 'a', ts: 10, type: 'chat-message', circleId: 'club', actor: ME, payload: { text: 'hoi' } }];
+    expect(buildTilePreviews({ events, circles, myRefs: [ME] }).club.unread).toBe(0);
+  });
+  it("someone else's message is one", () => {
+    const events = [{ id: 'b', ts: 10, type: 'chat-message', circleId: 'club', actor: 'bea-pub', payload: { text: 'dank!' } }];
+    expect(buildTilePreviews({ events, circles, myRefs: [ME] }).club.unread).toBe(1);
+  });
+  it('roster / rules / system entries are never unread', () => {
+    const events = [
+      { id: 'r', ts: 10, type: 'roster-updated', circleId: 'club', actor: 'bea-pub' },
+      { id: 's', ts: 11, type: 'group-rules', circleId: 'club', actor: 'bea-pub' },
+      { id: 'u', ts: 12, type: 'some-unlisted-kind', circleId: 'club', actor: 'bea-pub' },
+    ];
+    expect(buildTilePreviews({ events, circles, myRefs: [ME] }).club.unread).toBe(0);
+  });
+  it('leave and return: nothing new since leaving → none', () => {
+    const events = [{ id: 'b', ts: 10, type: 'chat-message', circleId: 'club', actor: 'bea-pub', payload: { text: 'dank!' } }];
+    const seenAt = bumpSeenAt({}, 'club', 20);   // left the circle at 20, after Bea's line
+    expect(buildTilePreviews({ events, circles, seenAt, myRefs: [ME] }).club.unread).toBe(0);
+  });
+  it('countsAsUnread is the one decision, exported for both shells', () => {
+    expect(countsAsUnread({ type: 'chat-message', actor: 'bea-pub' }, { myRefs: [ME] })).toBe(true);
+    expect(countsAsUnread({ type: 'chat-message', actor: ME }, { myRefs: [ME] })).toBe(false);
+    expect(countsAsUnread({ type: 'roster-updated', actor: 'bea-pub' }, { myRefs: [ME] })).toBe(false);
   });
 });

@@ -14,8 +14,10 @@ const people = [{ id: 'telegram:1', channel: 'telegram', uid: '1', role: 'member
 const tandarts = { id: 'e1', type: 'calendar-event', title: 'tandarts', startsAt: '2026-10-02T07:00:00.000Z', createdBy: 'telegram:1' };
 const vuilnis = { id: 'c1', type: 'task', text: 'vuilnis', dueAt: '2026-10-01T22:00:00.000Z', assignees: ['telegram:1'] };   // Fri 2 Oct
 
-function world({ now, reminders = 'on', store = memoryThreadStore(), logged = [], log = new EventLog({ initial: [], muted: [] }) }) {
-  const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store });
+// The device logs run on the test's clock: a log on the real clock prunes a done-mark stamped a week "ago" by retention,
+// so a fixed date in the past turns this file red once real time passes it by the retention window.
+function world({ now, reminders = 'on', store = memoryThreadStore(), logged = [], log = new EventLog({ initial: [], muted: [], now: () => now }) }) {
+  const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [], now: () => now }), store });
   const sent = [];
   const reach = { sendToPerson: async (id, m) => { sent.push({ id, ...m }); return { ok: true }; } };
   const tick = createReminderTick({
@@ -46,12 +48,14 @@ describe('the reminder tick', () => {
   it('a restart between the moment and the send still sends once', async () => {
     const store = memoryThreadStore();
     // the device log survives the restart, as the box's does (sealed on disk)
-    const log = new EventLog({ initial: [], muted: [] });
-    const before = world({ now: new Date('2026-10-01T17:05:00.000Z').getTime(), store, log });
+    let clock = new Date('2026-10-01T17:05:00.000Z').getTime();
+    const log = new EventLog({ initial: [], muted: [], now: () => clock });
+    const before = world({ now: clock, store, log });
     await before.threads.load();
     await before.tick.pass();
     await new Promise((r) => setTimeout(r, 10));   // the thread row reaches its store
-    const after = world({ now: new Date('2026-10-01T17:35:00.000Z').getTime(), store, log });
+    clock = new Date('2026-10-01T17:35:00.000Z').getTime();
+    const after = world({ now: clock, store, log });
     await after.threads.load();
     await after.tick.pass();
     // each person once, whichever side of the restart

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 48
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 49
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -40,6 +40,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
 | `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
+| `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
 | `plans-structure` | — | the private plans/ folder keeps the shape it was sorted into (2026-09-25) |
 | `rails-named-verifier` | — | every signed rail is constructed with a NAMED binding verifier, and the name agrees |
